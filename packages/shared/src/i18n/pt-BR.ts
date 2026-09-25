@@ -3537,6 +3537,11 @@ export const ptBR: TranslationKeys = {
       submit: "Reordenar",
       submitBatch: "Reordenar ({count} arquivos)",
       progressLabel: "Reordenando",
+      dragHint: "Arraste as páginas para reordenar",
+      resetOrder: "Redefinir ordem",
+      pageLabel: "Página {n}",
+      orderTooLong:
+        "Muitas movimentações separadas para enviar. Redefina e tente com menos alterações.",
     },
     "protect-pdf": {
       userPassword: "Senha do usuário",

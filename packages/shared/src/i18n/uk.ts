@@ -3534,6 +3534,11 @@ export const uk: TranslationKeys = {
       submit: "Переупорядкувати",
       submitBatch: "Переупорядкувати ({count} файлів)",
       progressLabel: "Переупорядкування",
+      dragHint: "Перетягніть сторінки, щоб змінити порядок",
+      resetOrder: "Скинути порядок",
+      pageLabel: "Сторінка {n}",
+      orderTooLong:
+        "Забагато окремих переміщень для надсилання. Скиньте порядок і спробуйте внести менше змін.",
     },
     "protect-pdf": {
       userPassword: "Пароль користувача",

@@ -3539,6 +3539,11 @@ export const it: TranslationKeys = {
       submit: "Riordina",
       submitBatch: "Riordina ({count} file)",
       progressLabel: "Riordinamento",
+      dragHint: "Trascina le pagine per riordinarle",
+      resetOrder: "Ripristina ordine",
+      pageLabel: "Pagina {n}",
+      orderTooLong:
+        "Troppi spostamenti separati da inviare. Ripristina e prova con meno modifiche.",
     },
     "protect-pdf": {
       userPassword: "Password utente",

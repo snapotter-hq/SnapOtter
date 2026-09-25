@@ -4,8 +4,8 @@
  * The API takes a qpdf `--pages` spec ("3,1,2", "5-20") capped at 200
  * characters, so a naive one-number-per-page list stops fitting somewhere
  * around page 50. Collapsing consecutive runs into ranges keeps the edits
- * people actually make — move a page, pull a section to the front, reverse a
- * chapter — comfortably inside the cap.
+ * people actually make (move a page, pull a section to the front, reverse a
+ * chapter) comfortably inside the cap.
  */
 
 /** Longest spec the API accepts (`rangeField` in routes/tools/organize-pdf.ts). */
@@ -19,10 +19,16 @@ const MIN_RANGE_RUN = 3;
  * Ascending and descending runs both become ranges, because qpdf reads "5-3"
  * as 5,4,3.
  *
+ * When `pageCount` is given, an ascending run that ends on the last page is
+ * written as "n-z". pdf.js takes its count from the page tree's /Count while
+ * qpdf walks the tree itself, so on a malformed file the two can disagree;
+ * "z" keeps any pages pdf.js missed instead of silently dropping them.
+ *
  * @param pages - Page numbers in their desired output order (1-based)
+ * @param pageCount - Page count the order was built from, if known
  * @returns A qpdf pages spec, or "" for an empty order
  */
-export function serializePageOrder(pages: number[]): string {
+export function serializePageOrder(pages: number[], pageCount?: number): string {
   const parts: string[] = [];
   let i = 0;
 
@@ -34,8 +40,12 @@ export function serializePageOrder(pages: number[]): string {
     if (step === 1 || step === -1) {
       while (end + 1 < pages.length && pages[end + 1] - pages[end] === step) end += 1;
     }
+    const length = end - i + 1;
 
-    if (end - i + 1 >= MIN_RANGE_RUN) {
+    if (pages[end] === pageCount && (length === 1 || step === 1)) {
+      parts.push(`${pages[i]}-z`);
+      i = end + 1;
+    } else if (length >= MIN_RANGE_RUN) {
       parts.push(`${pages[i]}-${pages[end]}`);
       i = end + 1;
     } else {

@@ -15,11 +15,13 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SafeError } from "@snapotter/shared";
 import { Loader2, RotateCcw } from "lucide-react";
 import * as pdfjs from "pdfjs-dist";
 import { useEffect, useState } from "react";
 import { DocumentView } from "@/components/tools/document-view";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { useOrganizeStore } from "@/stores/organize-store";
@@ -44,19 +46,33 @@ function renderPageThumbs(
   onFail: () => void,
 ): () => void {
   let cancelled = false;
-  let opened = false;
   let destroy: (() => unknown) | undefined;
 
   (async () => {
+    let doc: pdfjs.PDFDocumentProxy;
     try {
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
-      destroy = () => loadingTask.destroy();
-      const doc = await loadingTask.promise;
+      const data = new Uint8Array(await file.arrayBuffer());
       if (cancelled) return;
-      opened = true;
-      onCount(doc.numPages);
+      const loadingTask = pdfjs.getDocument({ data });
+      destroy = () => loadingTask.destroy();
+      doc = await loadingTask.promise;
+    } catch {
+      // A document that never opens (corrupt, password-protected) falls back
+      // to the plain viewer, which reports the failure on screen, and the
+      // settings panel returns to the typed spec. The cleanup's destroy()
+      // also lands here, which is why a cancelled load stays quiet.
+      if (!cancelled) onFail();
+      return;
+    }
+    if (cancelled) return;
+    onCount(doc.numPages);
 
-      for (let n = 1; n <= doc.numPages && !cancelled; n += 1) {
+    // One page failing keeps its numbered placeholder; the pages after it
+    // still render, and the order is unaffected because it only needs the
+    // count. Report the first failure so a broken render path is visible.
+    let reported = false;
+    for (let n = 1; n <= doc.numPages && !cancelled; n += 1) {
+      try {
         const page = await doc.getPage(n);
         const base = page.getViewport({ scale: 1 });
         const scale = Math.min(THUMB_W / base.width, THUMB_H / base.height, 2);
@@ -64,15 +80,24 @@ function renderPageThumbs(
         const canvas = document.createElement("canvas");
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
-        await page.render({ canvas, viewport }).promise;
+        try {
+          await page.render({ canvas, viewport }).promise;
+        } finally {
+          page.cleanup();
+        }
         if (!cancelled) onPage(n, canvas.toDataURL("image/jpeg", 0.7));
-        page.cleanup();
+      } catch (cause) {
+        if (cancelled || reported) continue;
+        reported = true;
+        console.error("organize-pdf: page thumbnail failed to render", cause);
+        void captureHandledError(
+          new SafeError("Organize PDF page thumbnail failed to render", {
+            kind: "operational",
+            cause,
+          }),
+          { error_class: "operational", tool_id: "organize-pdf" },
+        );
       }
-    } catch {
-      // Pages that fail after the document opens keep their numbered
-      // placeholders and still reorder. Only a document that never opens
-      // falls back to the plain viewer and the typed spec.
-      if (!cancelled && !opened) onFail();
     }
   })();
 
@@ -133,29 +158,33 @@ export function OrganizePdfCanvas() {
   const { t } = useTranslation();
   const s = t.toolSettings["organize-pdf"];
   const { files } = useFileStore();
-  const { pageOrder, pageCount, setDocument, movePage, reset, clear } = useOrganizeStore();
+  const {
+    file: orderedFile,
+    pageOrder,
+    pageCount,
+    setDocument,
+    movePage,
+    reset,
+  } = useOrganizeStore();
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
   const [failed, setFailed] = useState(false);
 
   const file = files[0];
 
+  // The order stays in the store when this grid unmounts for the result view,
+  // so coming back to the same file keeps the arrangement. The settings panel
+  // only trusts an order whose file matches the one loaded now.
   useEffect(() => {
     if (!file) return;
     setThumbs({});
     setFailed(false);
-    const cancel = renderPageThumbs(
+    return renderPageThumbs(
       file,
-      setDocument,
+      (count) => setDocument(file, count),
       (n, url) => setThumbs((prev) => ({ ...prev, [n]: url })),
       () => setFailed(true),
     );
-    // Clearing on the way out stops the settings panel from submitting the
-    // previous document's order while the next one is still loading.
-    return () => {
-      cancel();
-      clear();
-    };
-  }, [file, setDocument, clear]);
+  }, [file, setDocument]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -170,10 +199,10 @@ export function OrganizePdfCanvas() {
 
   if (failed) return <DocumentView />;
 
-  if (!pageCount) {
+  if (!pageCount || orderedFile !== file) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        <Loader2 className="h-4 w-4 animate-spin me-2" />
         {t.common.loading}
       </div>
     );

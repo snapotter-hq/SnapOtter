@@ -3544,6 +3544,11 @@ export const nl: TranslationKeys = {
       submit: "Herschikken",
       submitBatch: "Herschikken ({count} bestanden)",
       progressLabel: "Herschikken",
+      dragHint: "Sleep pagina's om ze te herschikken",
+      resetOrder: "Volgorde herstellen",
+      pageLabel: "Pagina {n}",
+      orderTooLong:
+        "Te veel afzonderlijke verplaatsingen om te verzenden. Herstel en probeer het met minder wijzigingen.",
     },
     "protect-pdf": {
       userPassword: "Gebruikerswachtwoord",

@@ -3511,6 +3511,11 @@ export const ar: TranslationKeys = {
       submit: "إعادة الترتيب",
       submitBatch: "إعادة الترتيب ({count} ملفات)",
       progressLabel: "جارٍ إعادة الترتيب",
+      dragHint: "اسحب الصفحات لإعادة ترتيبها",
+      resetOrder: "إعادة تعيين الترتيب",
+      pageLabel: "الصفحة {n}",
+      orderTooLong:
+        "عدد التنقلات المنفصلة كبير جدًا بحيث لا يمكن إرساله. أعد التعيين وجرّب تغييرات أقل.",
     },
     "protect-pdf": {
       userPassword: "كلمة مرور المستخدم",

@@ -3548,6 +3548,11 @@ export const de: TranslationKeys = {
       submit: "Neu anordnen",
       submitBatch: "Neu anordnen ({count} Dateien)",
       progressLabel: "Wird neu angeordnet",
+      dragHint: "Seiten zum Neuanordnen ziehen",
+      resetOrder: "Reihenfolge zurücksetzen",
+      pageLabel: "Seite {n}",
+      orderTooLong:
+        "Zu viele einzelne Verschiebungen zum Senden. Setze zurück und versuche es mit weniger Änderungen.",
     },
     "protect-pdf": {
       userPassword: "Benutzerkennwort",

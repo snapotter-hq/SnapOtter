@@ -3530,6 +3530,11 @@ export const id: TranslationKeys = {
       submit: "Urutkan Ulang",
       submitBatch: "Urutkan Ulang ({count} file)",
       progressLabel: "Mengurutkan ulang",
+      dragHint: "Seret halaman untuk mengurutkan ulang",
+      resetOrder: "Atur ulang urutan",
+      pageLabel: "Halaman {n}",
+      orderTooLong:
+        "Terlalu banyak perpindahan terpisah untuk dikirim. Atur ulang dan coba dengan lebih sedikit perubahan.",
     },
     "protect-pdf": {
       userPassword: "Kata sandi pengguna",

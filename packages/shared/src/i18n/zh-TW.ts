@@ -3278,6 +3278,10 @@ export const zhTW: TranslationKeys = {
       submit: "重新排序",
       submitBatch: "重新排序（{count} 個檔案）",
       progressLabel: "正在重新排序",
+      dragHint: "拖曳頁面以重新排序",
+      resetOrder: "重設順序",
+      pageLabel: "第{n}頁",
+      orderTooLong: "個別移動次數過多，無法送出。請重設後減少變更再試。",
     },
     "protect-pdf": {
       userPassword: "使用者密碼",

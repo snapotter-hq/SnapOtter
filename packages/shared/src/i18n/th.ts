@@ -3490,6 +3490,10 @@ export const th: TranslationKeys = {
       submit: "จัดลำดับใหม่",
       submitBatch: "จัดลำดับใหม่ ({count} ไฟล์)",
       progressLabel: "กำลังจัดลำดับใหม่",
+      dragHint: "ลากหน้าเพื่อจัดลำดับใหม่",
+      resetOrder: "รีเซ็ตลำดับ",
+      pageLabel: "หน้า {n}",
+      orderTooLong: "มีการย้ายแยกกันมากเกินกว่าจะส่งได้ รีเซ็ตแล้วลองเปลี่ยนให้น้อยลง",
     },
     "protect-pdf": {
       userPassword: "รหัสผ่านผู้ใช้",

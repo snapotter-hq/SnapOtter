@@ -3528,6 +3528,11 @@ export const sv: TranslationKeys = {
       submit: "Ordna om",
       submitBatch: "Ordna om ({count} filer)",
       progressLabel: "Ordnar om",
+      dragHint: "Dra sidorna för att ordna om dem",
+      resetOrder: "Återställ ordning",
+      pageLabel: "Sida {n}",
+      orderTooLong:
+        "För många separata flyttar att skicka. Återställ och försök med färre ändringar.",
     },
     "protect-pdf": {
       userPassword: "Användarlösenord",

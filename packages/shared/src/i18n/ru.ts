@@ -3535,6 +3535,11 @@ export const ru: TranslationKeys = {
       submit: "Упорядочить",
       submitBatch: "Упорядочить ({count} файлов)",
       progressLabel: "Упорядочивание",
+      dragHint: "Перетащите страницы, чтобы изменить порядок",
+      resetOrder: "Сбросить порядок",
+      pageLabel: "Страница {n}",
+      orderTooLong:
+        "Слишком много отдельных перемещений для отправки. Сбросьте порядок и попробуйте внести меньше изменений.",
     },
     "protect-pdf": {
       userPassword: "Пароль пользователя",

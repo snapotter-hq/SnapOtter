@@ -3487,6 +3487,10 @@ export const ja: TranslationKeys = {
       submit: "並べ替え",
       submitBatch: "並べ替え ({count}ファイル)",
       progressLabel: "並べ替え中",
+      dragHint: "ページをドラッグして並べ替え",
+      resetOrder: "順序をリセット",
+      pageLabel: "ページ{n}",
+      orderTooLong: "送信できる移動の数を超えています。リセットして、変更を減らしてください。",
     },
     "protect-pdf": {
       userPassword: "ユーザーパスワード",

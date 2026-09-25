@@ -3536,6 +3536,11 @@ export const tr: TranslationKeys = {
       submit: "Yeniden Sırala",
       submitBatch: "Yeniden Sırala ({count} dosya)",
       progressLabel: "Yeniden sıralanıyor",
+      dragHint: "Yeniden sıralamak için sayfaları sürükleyin",
+      resetOrder: "Sırayı sıfırla",
+      pageLabel: "Sayfa {n}",
+      orderTooLong:
+        "Gönderilemeyecek kadar çok ayrı taşıma var. Sıfırlayın ve daha az değişiklikle deneyin.",
     },
     "protect-pdf": {
       userPassword: "Kullanıcı şifresi",

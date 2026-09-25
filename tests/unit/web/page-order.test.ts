@@ -31,6 +31,18 @@ describe("serializePageOrder", () => {
     expect(spec.length).toBeLessThanOrEqual(MAX_ORDER_LENGTH);
   });
 
+  it("ends an ascending run on the last page with z so qpdf keeps pages pdf.js missed", () => {
+    expect(serializePageOrder([1, 2, 3, 4, 5], 5)).toBe("1-z");
+    expect(serializePageOrder([7, 1, 2, 3, 4, 5, 6, 8, 9, 10], 10)).toBe("7,1-6,8-z");
+    expect(serializePageOrder([2, 1, 3], 3)).toBe("2,1,3-z");
+    expect(serializePageOrder([1, 2, 4, 3, 5], 5)).toBe("1,2,4,3,5-z");
+  });
+
+  it("leaves a run ending on the last page alone when it is descending or not last", () => {
+    expect(serializePageOrder([5, 4, 3, 2, 1], 5)).toBe("5-1");
+    expect(serializePageOrder([4, 5, 1, 2, 3], 5)).toBe("4-z,1-3");
+  });
+
   it("round-trips every page exactly once", () => {
     const pages = [4, 2, 9, 1, 3, 8, 7, 5, 6];
     const expanded = serializePageOrder(pages)

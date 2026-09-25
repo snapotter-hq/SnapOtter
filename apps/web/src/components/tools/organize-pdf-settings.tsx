@@ -15,15 +15,20 @@ export function OrganizePdfSettings() {
     useToolProcessor("organize-pdf");
 
   const [order, setOrder] = useState("1-z");
-  const { pageOrder, pageCount } = useOrganizeStore();
+  const { file: orderedFile, pageOrder, pageCount, clear } = useOrganizeStore();
+
+  // The arranged order outlives the grid (it unmounts while a result shows),
+  // so drop it when the tool itself goes away.
+  useEffect(() => clear, [clear]);
 
   const hasFile = files.length > 0;
   const hasMultiple = files.length > 1;
 
   // With one PDF open, the page grid owns the order and this panel reports what
-  // it will send. Batches and unrenderable PDFs keep the typed qpdf spec.
-  const isVisual = !hasMultiple && pageCount > 0;
-  const effectiveOrder = isVisual ? serializePageOrder(pageOrder) : order;
+  // it will send. Batches and unrenderable PDFs keep the typed qpdf spec, and so
+  // does an order left over from a different file.
+  const isVisual = !hasMultiple && pageCount > 0 && orderedFile === files[0];
+  const effectiveOrder = isVisual ? serializePageOrder(pageOrder, pageCount) : order;
   const tooLong = effectiveOrder.length > MAX_ORDER_LENGTH;
 
   const handleProcess = () => {

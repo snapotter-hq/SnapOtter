@@ -3528,6 +3528,11 @@ export const vi: TranslationKeys = {
       submit: "Sắp xếp lại",
       submitBatch: "Sắp xếp lại ({count} tệp)",
       progressLabel: "Đang sắp xếp lại",
+      dragHint: "Kéo các trang để sắp xếp lại",
+      resetOrder: "Đặt lại thứ tự",
+      pageLabel: "Trang {n}",
+      orderTooLong:
+        "Có quá nhiều lần di chuyển riêng lẻ để gửi. Hãy đặt lại và thử với ít thay đổi hơn.",
     },
     "protect-pdf": {
       userPassword: "Mật khẩu người dùng",

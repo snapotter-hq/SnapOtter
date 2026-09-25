@@ -3550,6 +3550,11 @@ export const fr: TranslationKeys = {
       submit: "Réorganiser",
       submitBatch: "Réorganiser ({count} fichiers)",
       progressLabel: "Réorganisation",
+      dragHint: "Faites glisser les pages pour les réorganiser",
+      resetOrder: "Réinitialiser l'ordre",
+      pageLabel: "Page {n}",
+      orderTooLong:
+        "Trop de déplacements distincts à envoyer. Réinitialisez et essayez avec moins de modifications.",
     },
     "protect-pdf": {
       userPassword: "Mot de passe utilisateur",

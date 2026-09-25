@@ -3339,6 +3339,10 @@ export const hi: TranslationKeys = {
       submit: "पुनर्क्रमित करें",
       submitBatch: "पुनर्क्रमित करें ({count} फ़ाइलें)",
       progressLabel: "पुनर्क्रमित हो रहा है",
+      dragHint: "क्रम बदलने के लिए पेज खींचें",
+      resetOrder: "क्रम रीसेट करें",
+      pageLabel: "पेज {n}",
+      orderTooLong: "भेजने के लिए बहुत अधिक अलग-अलग बदलाव हैं। रीसेट करें और कम बदलाव करके देखें।",
     },
     "protect-pdf": {
       userPassword: "उपयोगकर्ता पासवर्ड",

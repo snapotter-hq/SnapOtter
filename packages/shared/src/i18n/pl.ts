@@ -3533,6 +3533,11 @@ export const pl: TranslationKeys = {
       submit: "Zmień kolejność",
       submitBatch: "Zmień kolejność ({count} plików)",
       progressLabel: "Zmiana kolejności",
+      dragHint: "Przeciągnij strony, aby zmienić kolejność",
+      resetOrder: "Przywróć kolejność",
+      pageLabel: "Strona {n}",
+      orderTooLong:
+        "Zbyt wiele osobnych przesunięć do wysłania. Przywróć kolejność i spróbuj z mniejszą liczbą zmian.",
     },
     "protect-pdf": {
       userPassword: "Hasło użytkownika",

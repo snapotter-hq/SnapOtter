@@ -3278,6 +3278,10 @@ export const zhCN: TranslationKeys = {
       submit: "重新排序",
       submitBatch: "重新排序（{count} 个文件）",
       progressLabel: "正在重新排序",
+      dragHint: "拖动页面以重新排序",
+      resetOrder: "重置顺序",
+      pageLabel: "第 {n} 页",
+      orderTooLong: "单独移动的次数过多，无法提交。请重置后减少更改再试。",
     },
     "protect-pdf": {
       userPassword: "用户密码",

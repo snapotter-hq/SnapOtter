@@ -3464,6 +3464,11 @@ export const ko: TranslationKeys = {
       submit: "재정렬",
       submitBatch: "재정렬 ({count}개 파일)",
       progressLabel: "재정렬 중",
+      dragHint: "페이지를 드래그하여 재정렬",
+      resetOrder: "순서 초기화",
+      pageLabel: "{n}페이지",
+      orderTooLong:
+        "보낼 수 있는 개별 이동이 너무 많습니다. 초기화한 후 변경을 줄여 다시 시도하세요.",
     },
     "protect-pdf": {
       userPassword: "사용자 비밀번호",
