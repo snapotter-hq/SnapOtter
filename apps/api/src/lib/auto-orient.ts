@@ -1,4 +1,5 @@
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
+import { logger } from "./logger.js";
 import { resolveOutputFormat } from "./output-format.js";
 
 /**
@@ -14,18 +15,27 @@ import { resolveOutputFormat } from "./output-format.js";
  * Returns the original buffer unchanged if no rotation is needed.
  */
 export async function autoOrient(buffer: Buffer): Promise<Buffer> {
+  let meta: Metadata;
   try {
-    const meta = await sharp(buffer).metadata();
-    if (meta.orientation && meta.orientation > 1) {
-      // Re-encode in the container the image arrived in, at the quality the
-      // rest of the pipeline uses. A bare toBuffer() would let Sharp pick both,
-      // which for a JPEG means a second lossy generation at the encoder's
-      // default (~80) before any tool the user asked for has run.
-      const output = await resolveOutputFormat(buffer, "");
-      return await sharp(buffer).rotate().toFormat(output.format, output.encoderOptions).toBuffer();
-    }
+    meta = await sharp(buffer).metadata();
   } catch {
     // If metadata reading fails, return the original buffer
+    return buffer;
   }
-  return buffer;
+  if (!meta.orientation || meta.orientation <= 1) return buffer;
+
+  try {
+    // Re-encode in the container the image arrived in, at the quality the
+    // rest of the pipeline uses. A bare toBuffer() would let Sharp pick both,
+    // which for a JPEG means a second lossy generation at the encoder's
+    // default (~80) before any tool the user asked for has run.
+    const output = await resolveOutputFormat(buffer, "");
+    return await sharp(buffer).rotate().toFormat(output.format, output.encoderOptions).toBuffer();
+  } catch (err) {
+    logger.warn(
+      { err, orientation: meta.orientation, format: meta.format },
+      "autoOrient: rotation failed, passing image through unrotated",
+    );
+    return buffer;
+  }
 }
