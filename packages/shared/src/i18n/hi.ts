@@ -4588,7 +4588,7 @@ export const hi: TranslationKeys = {
     verify: "सत्यापित करें",
     verifying: "सत्यापित हो रहा है...",
     mfaInvalidCode: "अमान्य कोड। कृपया पुनः प्रयास करें।",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "जारी रखने के लिए द्वि-कारक प्रमाणीकरण सेट अप करें",
     mfaEnrollmentRequired:
       "आपके संगठन को मल्टी-फ़ैक्टर प्रमाणीकरण आवश्यक है। कृपया अपनी खाता सेटिंग्स में MFA सेट अप करें।",
     mfaPolicyUnavailable: "MFA नीति की जाँच नहीं हो सकी। कृपया थोड़ी देर बाद फिर से प्रयास करें।",

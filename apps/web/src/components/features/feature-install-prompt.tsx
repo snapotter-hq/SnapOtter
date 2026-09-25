@@ -3,6 +3,7 @@ import {
   FEATURE_BUNDLES,
   type FeatureBundleState,
   getRequiredBundlesForTool,
+  type TranslationKeys,
 } from "@snapotter/shared";
 import { AlertCircle, Clock, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -43,11 +44,11 @@ const PROGRESS_MESSAGES = [
   "Hang tight, the best is yet to come...",
 ];
 
-function formatTimeRemaining(ms: number): string {
-  if (ms < 60000) return "Less than a minute left";
-  const mins = Math.ceil(ms / 60000);
-  if (mins === 1) return "~1 minute left";
-  return `~${mins} minutes left`;
+function formatTimeRemaining(ms: number, t: TranslationKeys): string {
+  if (ms < 60000) return t.features.lessThanMinute;
+  const mins = Math.round(ms / 60000);
+  if (mins === 1) return t.features.oneMinuteLeft;
+  return format(t.features.minutesLeft, { mins });
 }
 
 interface FeatureInstallPromptProps {
@@ -162,7 +163,7 @@ export function FeatureInstallPrompt({
     const rate = progress.percent / elapsed;
     if (rate <= 0) return null;
     const remaining = (100 - progress.percent) / rate;
-    return formatTimeRemaining(remaining);
+    return formatTimeRemaining(remaining, t);
   })();
 
   function handleInstall() {

@@ -913,3 +913,100 @@ describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
     expect(f.stored_name).toBe("abc123.png");
   });
 });
+
+/**
+ * Run DDL as the owning role. The runtime role the importer serves as may only
+ * do DML, so a fixture that needs a trigger installed reaches for owner rights
+ * the same way truncateMigratedTables does, rather than widening a grant.
+ */
+async function withPrivileged<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
+  const client = new pg.Client({ connectionString: process.env.TEST_PRIVILEGED_DATABASE_URL });
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+describe("migrate-from-sqlite (a dropped row under force)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "snapotter-migrator-drop-"));
+  const seedPath = join(dir, "seed-1x.db");
+  const incomingPath = join(dir, "incoming-1x.db");
+
+  beforeAll(async () => {
+    // One local account already in the target, so the second import runs against
+    // a populated table under --force.
+    buildTwinSource(seedPath, [
+      {
+        id: "drop-seed",
+        username: "drop-seed-user",
+        provider: "local",
+        externalId: null,
+        createdAt: 1748000000,
+      }, // prettier-ignore
+    ]);
+    // Two more local accounts. A trigger will drop one before it lands, so the
+    // import inserts one row fewer than the source held.
+    buildTwinSource(incomingPath, [
+      {
+        id: "drop-keep",
+        username: "drop-keep-user",
+        provider: "local",
+        externalId: null,
+        createdAt: 1748000060,
+      }, // prettier-ignore
+      {
+        id: "drop-gone",
+        username: "drop-gone-user",
+        provider: "local",
+        externalId: null,
+        createdAt: 1748000120,
+      }, // prettier-ignore
+    ]);
+    await truncateMigratedTables();
+    await migrateFromSqlite(seedPath, { force: false });
+  });
+
+  afterAll(async () => {
+    await truncateMigratedTables();
+  });
+
+  it("throws when a row goes missing on a populated target under force", async () => {
+    // There is no path today that drops a row silently (issue #1217): every
+    // INSERT is unconditional. A BEFORE INSERT trigger that returns NULL for one
+    // incoming row stands in for a future change that could, so the guard is
+    // tested against the case it exists to catch.
+    await withPrivileged(async (client) => {
+      await client.query(`
+        CREATE OR REPLACE FUNCTION test_drop_gone_1217() RETURNS trigger AS $$
+        BEGIN
+          IF NEW.id = 'drop-gone' THEN RETURN NULL; END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        CREATE TRIGGER test_drop_gone_1217 BEFORE INSERT ON users
+          FOR EACH ROW EXECUTE FUNCTION test_drop_gone_1217();
+      `);
+    });
+    try {
+      // The target already holds drop-seed, so a whole-table count(*) after the
+      // insert loop is 2 (seed + drop-keep) and stays >= the source's rows.length
+      // of 2: the old guard never fires. Comparing the delta (1 inserted vs 2
+      // expected) does.
+      await expect(migrateFromSqlite(incomingPath, { force: true })).rejects.toThrow(
+        /Row count mismatch for users: sqlite=2 inserted=1/,
+      );
+    } finally {
+      await withPrivileged(async (client) => {
+        await client.query("DROP TRIGGER IF EXISTS test_drop_gone_1217 ON users");
+        await client.query("DROP FUNCTION IF EXISTS test_drop_gone_1217()");
+      });
+    }
+    // The guard threw inside the transaction, so nothing from the second import
+    // landed: only the seed row remains.
+    const rows = (await db.execute(sql`SELECT id FROM users ORDER BY id`)).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("drop-seed");
+  });
+});

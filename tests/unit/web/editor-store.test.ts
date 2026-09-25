@@ -169,6 +169,20 @@ describe("Canvas State", () => {
     expect(state().zoom).toBe(0.01);
   });
 
+  it("setZoom ignores NaN and keeps the previous zoom", () => {
+    act((s) => s.setZoom(2));
+    act((s) => s.setZoom(Number.NaN));
+    expect(Number.isFinite(state().zoom)).toBe(true);
+    expect(state().zoom).toBe(2);
+  });
+
+  it("setZoom ignores Infinity and keeps the previous zoom", () => {
+    act((s) => s.setZoom(2));
+    act((s) => s.setZoom(Number.POSITIVE_INFINITY));
+    expect(Number.isFinite(state().zoom)).toBe(true);
+    expect(state().zoom).toBe(2);
+  });
+
   it("setPanOffset updates offset", () => {
     act((s) => s.setPanOffset({ x: 100, y: -50 }));
     expect(state().panOffset).toEqual({ x: 100, y: -50 });

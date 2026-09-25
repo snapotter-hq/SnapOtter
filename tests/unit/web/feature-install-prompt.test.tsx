@@ -1,9 +1,22 @@
 // @vitest-environment jsdom
 
 import type { FeatureBundleState } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The jsdom env here has no working localStorage; the provider reads the
+// stored locale choice from it, so give it a real in-memory one.
+const storage = vi.hoisted(() => new Map<string, string>());
+vi.stubGlobal("localStorage", {
+  getItem: (k: string) => storage.get(k) ?? null,
+  setItem: (k: string, v: string) => void storage.set(k, v),
+  removeItem: (k: string) => void storage.delete(k),
+  clear: () => storage.clear(),
+});
+
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
+import { I18nProvider } from "@/contexts/i18n-context";
 import { useFeaturesStore } from "@/stores/features-store";
 
 function makeBundleState(overrides: Partial<FeatureBundleState> = {}): FeatureBundleState {
@@ -132,5 +145,45 @@ describe("FeatureInstallPrompt", () => {
     expect(screen.getByText("Background Removal")).toBeTruthy();
     expect(screen.getByText("Face Detection")).toBeTruthy();
     expect(screen.getByText("Installed")).toBeTruthy();
+  });
+});
+
+// Without a provider `t` defaults to `en`, where the pre-#1145 hardcoded
+// literals and the catalog values are byte-identical, so an English assertion
+// can't tell them apart. Render under a stored `de` choice instead.
+describe("FeatureInstallPrompt download ETA (#1145)", () => {
+  const NOW = 1_700_000_000_000;
+  const BUNDLE_ID = "background-removal";
+
+  beforeEach(() => {
+    storage.set("snapotter-locale", "de");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+  });
+
+  afterEach(() => {
+    storage.clear();
+  });
+
+  // At 50% the remaining estimate equals the elapsed time, so elapsedMs picks
+  // the branch directly: under a minute, rounds to one minute, rounds to N.
+  it.each([
+    ["under a minute", 30_000, de.features.lessThanMinute],
+    ["about one minute", 75_000, de.features.oneMinuteLeft],
+    ["several minutes", 180_000, de.features.minutesLeft.replace("{mins}", "3")],
+  ])("renders the %s ETA from the active locale", async (_label, elapsedMs, expected) => {
+    useFeaturesStore.setState({
+      installing: { [BUNDLE_ID]: { percent: 50, stage: "Downloading" } },
+      startTimes: { [BUNDLE_ID]: NOW - elapsedMs },
+    });
+
+    render(
+      <I18nProvider>
+        <FeatureInstallPrompt bundle={makeBundleState()} isAdmin />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText(expected)).toBeTruthy();
+    expect(screen.queryByText(/minutes? left/)).toBeNull();
+    expect(screen.queryByText(/\{mins\}/)).toBeNull();
   });
 });

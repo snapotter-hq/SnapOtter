@@ -4826,7 +4826,7 @@ export const fr: TranslationKeys = {
     verify: "Vérifier",
     verifying: "Vérification...",
     mfaInvalidCode: "Code invalide. Veuillez réessayer.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Configurez l'authentification à deux facteurs pour continuer",
     mfaEnrollmentRequired:
       "Votre organisation exige l'authentification multifacteur. Veuillez configurer le MFA dans les paramètres de votre compte.",
     mfaPolicyUnavailable:

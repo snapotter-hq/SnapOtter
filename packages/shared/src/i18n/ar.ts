@@ -4761,7 +4761,7 @@ export const ar: TranslationKeys = {
     verify: "تحقق",
     verifying: "جارٍ التحقق...",
     mfaInvalidCode: "رمز غير صالح. يرجى المحاولة مرة أخرى.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "قم بإعداد المصادقة الثنائية للمتابعة",
     mfaEnrollmentRequired: "تتطلب مؤسستك المصادقة متعددة العوامل. يرجى إعداد MFA في إعدادات حسابك.",
     mfaPolicyUnavailable: "تعذّر التحقق من سياسة MFA. يرجى المحاولة مرة أخرى بعد قليل.",
     loginThrottled: "عدد كبير جدًا من محاولات تسجيل الدخول. حاول مرة أخرى بعد {minutes} دقيقة.",

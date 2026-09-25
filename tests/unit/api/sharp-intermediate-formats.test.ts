@@ -117,17 +117,7 @@ const ALLOWED: Array<{ file: string; reads: string; via: string; why: string }> 
  * these are not fine, they are deferred, and writing them down as allowances
  * would let the guard read as though the class were closed when it is not.
  */
-const KNOWN_UNFIXED: Array<{ file: string; reads: string; via: string; issue: string }> = [
-  {
-    file: "lib/auto-orient.ts",
-    reads: "buffer",
-    via: "rotate",
-    // Runs on most upload paths, so PNG is the wrong answer: it would inflate
-    // every rotated photo before any tool sees it. Wants its own fix, which is
-    // to re-encode in the container it came from at a quality the caller chose.
-    issue: "#1220",
-  },
-];
+const KNOWN_UNFIXED: Array<{ file: string; reads: string; via: string; issue: string }> = [];
 
 interface Chain {
   file: string;

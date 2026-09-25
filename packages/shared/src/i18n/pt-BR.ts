@@ -4809,7 +4809,7 @@ export const ptBR: TranslationKeys = {
     verify: "Verificar",
     verifying: "Verificando...",
     mfaInvalidCode: "Código inválido. Tente novamente.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Configure a autenticação de dois fatores para continuar",
     mfaEnrollmentRequired:
       "Sua organização exige autenticação multifator. Configure o MFA nas configurações da sua conta.",
     mfaPolicyUnavailable:

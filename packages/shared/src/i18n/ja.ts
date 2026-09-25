@@ -4743,7 +4743,7 @@ export const ja: TranslationKeys = {
     verify: "確認",
     verifying: "確認中...",
     mfaInvalidCode: "無効なコードです。もう一度お試しください。",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "続行するには 2 要素認証を設定してください",
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
     mfaPolicyUnavailable:
       "MFA ポリシーを確認できませんでした。しばらくしてからもう一度お試しください。",

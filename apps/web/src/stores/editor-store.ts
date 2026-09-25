@@ -371,7 +371,14 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       setCursorPosition: (pos) => set({ cursorPosition: pos }),
 
-      setZoom: (zoom) => set({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom)) }),
+      setZoom: (zoom) => {
+        // A zero-distance pinch can produce NaN (0 / 0), which slips through the
+        // clamp below (Math.min(64, NaN) is NaN) and then silently breaks every
+        // consumer that reads zoom. Reject non-finite input so the store only
+        // ever holds a usable number.
+        if (!Number.isFinite(zoom)) return;
+        set({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom)) });
+      },
 
       setPanOffset: (offset) => set({ panOffset: offset }),
 

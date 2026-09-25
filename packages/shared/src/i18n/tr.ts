@@ -4805,7 +4805,7 @@ export const tr: TranslationKeys = {
     verify: "Doğrula",
     verifying: "Doğrulanıyor...",
     mfaInvalidCode: "Geçersiz kod. Lütfen tekrar deneyin.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Devam etmek için iki faktörlü kimlik doğrulamayı ayarlayın",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",
     mfaPolicyUnavailable: "MFA politikası kontrol edilemedi. Lütfen birazdan tekrar deneyin.",

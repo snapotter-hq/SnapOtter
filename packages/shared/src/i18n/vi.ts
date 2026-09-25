@@ -4787,7 +4787,7 @@ export const vi: TranslationKeys = {
     verify: "Xác minh",
     verifying: "Đang xác minh...",
     mfaInvalidCode: "Mã không hợp lệ. Vui lòng thử lại.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Thiết lập xác thực hai yếu tố để tiếp tục",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",
     mfaPolicyUnavailable: "Không thể kiểm tra chính sách MFA. Vui lòng thử lại sau giây lát.",

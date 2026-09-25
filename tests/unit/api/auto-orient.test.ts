@@ -16,6 +16,28 @@ async function createImageWithOrientation(orientation: number): Promise<Buffer> 
     .toBuffer();
 }
 
+/**
+ * A JPEG carrying an EXIF orientation, filled with deterministic high-frequency
+ * noise so the encoder's quality setting actually moves the file size. A flat
+ * fill compresses to the same handful of bytes at any quality, which would hide
+ * the very difference this test is about.
+ */
+async function createDetailedJpegWithOrientation(orientation: number): Promise<Buffer> {
+  const width = 128;
+  const height = 128;
+  const channels = 3;
+  const raw = Buffer.alloc(width * height * channels);
+  let seed = 12345;
+  for (let i = 0; i < raw.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    raw[i] = (seed >> 16) & 0xff;
+  }
+  return sharp(raw, { raw: { width, height, channels } })
+    .withMetadata({ orientation })
+    .jpeg()
+    .toBuffer();
+}
+
 describe("autoOrient", () => {
   it("returns original buffer unchanged when orientation is 1", async () => {
     const buf = await createImageWithOrientation(1);
@@ -89,6 +111,28 @@ describe("autoOrient", () => {
     const result = await autoOrient(buf);
     const meta = await sharp(result).metadata();
     expect(meta.orientation === undefined || meta.orientation === 1).toBe(true);
+  });
+
+  it("re-encodes a rotated JPEG in its own format at quality 95, not Sharp's default", async () => {
+    const buf = await createDetailedJpegWithOrientation(6);
+    const result = await autoOrient(buf);
+
+    // Format is preserved: a rotated JPEG stays a JPEG rather than being
+    // promoted to PNG.
+    const meta = await sharp(result).metadata();
+    expect(meta.format).toBe("jpeg");
+
+    // The intended encode names quality 95, the same quality the rest of the
+    // pipeline uses. A bare toBuffer() re-encodes at Sharp's JPEG default
+    // (~80), which on this noisy image is a markedly smaller file. Comparing
+    // against both reference encodes computed with the same Sharp keeps this
+    // deterministic across platforms.
+    const atQuality95 = await sharp(buf).rotate().toFormat("jpeg", { quality: 95 }).toBuffer();
+    const atSharpDefault = await sharp(buf).rotate().toBuffer();
+
+    expect(atSharpDefault.length).toBeLessThan(atQuality95.length);
+    expect(result.length).toBe(atQuality95.length);
+    expect(result.equals(atQuality95)).toBe(true);
   });
 
   it("returns original buffer for corrupted/invalid input", async () => {

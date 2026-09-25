@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { resolveOutputFormat } from "./output-format.js";
 
 /**
  * Auto-orient an image buffer based on EXIF orientation metadata.
@@ -16,7 +17,12 @@ export async function autoOrient(buffer: Buffer): Promise<Buffer> {
   try {
     const meta = await sharp(buffer).metadata();
     if (meta.orientation && meta.orientation > 1) {
-      return await sharp(buffer).rotate().toBuffer();
+      // Re-encode in the container the image arrived in, at the quality the
+      // rest of the pipeline uses. A bare toBuffer() would let Sharp pick both,
+      // which for a JPEG means a second lossy generation at the encoder's
+      // default (~80) before any tool the user asked for has run.
+      const output = await resolveOutputFormat(buffer, "");
+      return await sharp(buffer).rotate().toFormat(output.format, output.encoderOptions).toBuffer();
     }
   } catch {
     // If metadata reading fails, return the original buffer

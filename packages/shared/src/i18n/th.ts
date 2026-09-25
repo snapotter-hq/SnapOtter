@@ -4736,7 +4736,7 @@ export const th: TranslationKeys = {
     verify: "ยืนยัน",
     verifying: "กำลังยืนยัน...",
     mfaInvalidCode: "รหัสไม่ถูกต้อง กรุณาลองอีกครั้ง",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "ตั้งค่าการยืนยันตัวตนสองปัจจัยเพื่อดำเนินการต่อ",
     mfaEnrollmentRequired: "องค์กรของคุณกำหนดให้ใช้การยืนยันตัวตนหลายปัจจัย กรุณาตั้งค่า MFA ในการตั้งค่าบัญชี",
     mfaPolicyUnavailable: "ไม่สามารถตรวจสอบนโยบาย MFA ได้ กรุณาลองอีกครั้งในอีกสักครู่",
     loginThrottled: "มีการพยายามเข้าสู่ระบบมากเกินไป ลองอีกครั้งใน {minutes} นาที",

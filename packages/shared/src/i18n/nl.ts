@@ -4813,7 +4813,7 @@ export const nl: TranslationKeys = {
     verify: "Verifieer",
     verifying: "Verifieren...",
     mfaInvalidCode: "Ongeldige code. Probeer het opnieuw.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Stel tweefactorauthenticatie in om door te gaan",
     mfaEnrollmentRequired:
       "Uw organisatie vereist meerfactorauthenticatie. Stel MFA in via uw accountinstellingen.",
     mfaPolicyUnavailable:

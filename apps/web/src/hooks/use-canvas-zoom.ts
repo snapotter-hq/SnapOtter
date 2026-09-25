@@ -129,7 +129,15 @@ export function useCanvasZoom() {
         y: (t1.clientY + t2.clientY) / 2,
       };
 
-      if (lastDistRef.current !== null && lastCenterRef.current !== null) {
+      // A zero distance on either frame (fingers on one pixel) makes the ratio
+      // NaN, Infinity, or 0, which would blank the stage or snap zoom to a
+      // bound. Skip that frame; the refs below still advance for the next one.
+      if (
+        lastDistRef.current !== null &&
+        lastCenterRef.current !== null &&
+        lastDistRef.current > 0 &&
+        newDist > 0
+      ) {
         const scaleDelta = newDist / lastDistRef.current;
         const currentZoom = useEditorStore.getState().zoom;
         const currentPan = useEditorStore.getState().panOffset;

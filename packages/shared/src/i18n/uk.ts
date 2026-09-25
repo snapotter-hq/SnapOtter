@@ -4802,7 +4802,7 @@ export const uk: TranslationKeys = {
     verify: "Перевірити",
     verifying: "Перевірка...",
     mfaInvalidCode: "Невірний код. Спробуйте ще раз.",
-    mfaEnrollmentHeading: "Set up two-factor authentication to continue",
+    mfaEnrollmentHeading: "Налаштуйте двофакторну автентифікацію, щоб продовжити",
     mfaEnrollmentRequired:
       "Ваша організація вимагає багатофакторну автентифікацію. Налаштуйте MFA в параметрах облікового запису.",
     mfaPolicyUnavailable: "Не вдалося перевірити політику MFA. Повторіть спробу трохи пізніше.",
