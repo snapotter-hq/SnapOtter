@@ -12,6 +12,8 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
 const sentryRelease = process.env.SENTRY_RELEASE;
 
 export default defineConfig({
+  // Resolve assets through the runtime <base> so one build works at any subpath.
+  base: "./",
   plugins: [
     react(),
     tailwindcss(),

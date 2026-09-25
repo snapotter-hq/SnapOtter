@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { setToken } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 
@@ -279,7 +280,7 @@ export function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(appUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -337,9 +338,9 @@ export function LoginPage() {
       setToken(data.token);
       localStorage.setItem("snapotter-username", data.user?.username || username);
       if (data.user?.mustChangePassword) {
-        window.location.href = "/change-password";
+        window.location.href = appUrl("/change-password");
       } else {
-        window.location.href = "/";
+        window.location.href = appUrl("/");
       }
     } catch {
       setError(t.auth.connectionError);
@@ -352,7 +353,7 @@ export function LoginPage() {
     setMfaLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/mfa/complete", {
+      const res = await fetch(appUrl("/api/auth/mfa/complete"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mfaToken, code: mfaCode }),
@@ -373,9 +374,9 @@ export function LoginPage() {
       setToken(data.token);
       localStorage.setItem("snapotter-username", data.user?.username || username);
       if (data.user?.mustChangePassword) {
-        window.location.href = "/change-password";
+        window.location.href = appUrl("/change-password");
       } else {
-        window.location.href = "/";
+        window.location.href = appUrl("/");
       }
     } catch {
       setError(t.auth.connectionError);
@@ -388,7 +389,7 @@ export function LoginPage() {
     setEnrollmentLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/auth/mfa/enroll-complete", {
+      const res = await fetch(appUrl("/api/auth/mfa/enroll-complete"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enrollmentToken, code: enrollmentCode }),
@@ -409,9 +410,9 @@ export function LoginPage() {
       setToken(data.token);
       localStorage.setItem("snapotter-username", data.user?.username || username);
       if (data.user?.mustChangePassword) {
-        window.location.href = "/change-password";
+        window.location.href = appUrl("/change-password");
       } else {
-        window.location.href = "/";
+        window.location.href = appUrl("/");
       }
     } catch {
       setError(t.auth.connectionError);
@@ -443,7 +444,7 @@ export function LoginPage() {
             <div className="space-y-3">
               {oidcEnabled && (
                 <a
-                  href="/api/auth/oidc/login"
+                  href={appUrl("/api/auth/oidc/login")}
                   className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
@@ -452,7 +453,7 @@ export function LoginPage() {
               )}
               {samlEnabled && (
                 <a
-                  href="/api/auth/saml/login"
+                  href={appUrl("/api/auth/saml/login")}
                   className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
@@ -689,7 +690,7 @@ export function LoginPage() {
               </div>
               {oidcEnabled && (
                 <a
-                  href="/api/auth/oidc/login"
+                  href={appUrl("/api/auth/oidc/login")}
                   className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound
@@ -701,7 +702,7 @@ export function LoginPage() {
               )}
               {samlEnabled && (
                 <a
-                  href="/api/auth/saml/login"
+                  href={appUrl("/api/auth/saml/login")}
                   className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
                 >
                   <KeyRound

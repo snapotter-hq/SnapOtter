@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
@@ -47,7 +48,7 @@ export function ImageToBase64Settings() {
         formData.append("files", file);
         formData.append("settings", settings);
 
-        const res = await fetch("/api/v1/tools/image/image-to-base64", {
+        const res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

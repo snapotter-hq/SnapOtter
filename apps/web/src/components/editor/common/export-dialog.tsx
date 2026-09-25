@@ -1,3 +1,4 @@
+import { appUrl } from "@/lib/app-url";
 // apps/web/src/components/editor/common/export-dialog.tsx
 
 import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
@@ -195,7 +196,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           JSON.stringify({ format: settings.format, quality: settings.quality }),
         );
         try {
-          const res = await fetch(apiToolPath("convert"), {
+          const res = await fetch(appUrl(apiToolPath("convert")), {
             method: "POST",
             body: formData,
           });
@@ -262,7 +263,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             "settings",
             JSON.stringify({ format: settings.format, quality: settings.quality }),
           );
-          const res = await fetch(apiToolPath("convert"), { method: "POST", body: formData });
+          const res = await fetch(appUrl(apiToolPath("convert")), {
+            method: "POST",
+            body: formData,
+          });
           if (!res.ok) throw new Error("Server conversion failed");
           const json = await res.json();
           if (json.downloadUrl) {

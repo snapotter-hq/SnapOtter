@@ -2,6 +2,7 @@ import { Sparkles } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 /**
  * Trigger the browser's "Save Password" prompt by submitting a real form
@@ -18,7 +19,7 @@ import { formatHeaders } from "@/lib/api";
 function triggerBrowserPasswordSave(username: string, password: string) {
   const form = document.createElement("form");
   form.method = "POST";
-  form.action = "/";
+  form.action = appUrl("/");
   form.style.position = "fixed";
   form.style.top = "-9999px";
 
@@ -93,7 +94,7 @@ export function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const res = await fetch(appUrl("/api/auth/change-password"), {
         method: "POST",
         headers: formatHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ currentPassword, newPassword }),

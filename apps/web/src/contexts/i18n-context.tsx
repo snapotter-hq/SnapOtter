@@ -1,6 +1,7 @@
 import type { SupportedLocale, TranslationKeys } from "@snapotter/shared";
 import { en, SUPPORTED_LOCALES } from "@snapotter/shared";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { appUrl } from "@/lib/app-url";
 
 type LocaleModule = Record<string, TranslationKeys>;
 
@@ -75,7 +76,7 @@ function detectLocale(): string {
 
 async function fetchInstanceDefault(): Promise<string> {
   try {
-    const res = await fetch("/api/v1/config/locale");
+    const res = await fetch(appUrl("/api/v1/config/locale"));
     if (res.ok) {
       const data = await res.json();
       if (data.defaultLocale && data.defaultLocale !== "en") {

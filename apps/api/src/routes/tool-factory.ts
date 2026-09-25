@@ -609,9 +609,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
             return reply.send({
               jobId,
-              downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+              downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
               previewUrl: result.previewRef
-                ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+                ? `${env.BASE_PATH}/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
                 : undefined,
               originalSize: result.originalSize,
               processedSize: result.processedSize,

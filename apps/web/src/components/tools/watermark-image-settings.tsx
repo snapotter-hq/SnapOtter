@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -36,7 +37,7 @@ export function WatermarkImageSettings() {
         formData.append("watermark", watermarkFile);
         formData.append("settings", settingsJson);
 
-        const res = await fetch("/api/v1/tools/image/watermark-image", {
+        const res = await fetch(appUrl("/api/v1/tools/image/watermark-image"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
@@ -71,7 +72,7 @@ export function WatermarkImageSettings() {
             formData.append("watermark", watermarkFile);
             formData.append("settings", settingsJson);
 
-            const res = await fetch("/api/v1/tools/image/watermark-image", {
+            const res = await fetch(appUrl("/api/v1/tools/image/watermark-image"), {
               method: "POST",
               headers: formatHeaders(),
               body: formData,

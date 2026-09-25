@@ -4,6 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -172,7 +173,7 @@ export function ImageEnhancementControls({
     const formData = new FormData();
     formData.append("file", files[0]);
 
-    fetch("/api/v1/tools/image/image-enhancement/analyze", {
+    fetch(appUrl("/api/v1/tools/image/image-enhancement/analyze"), {
       method: "POST",
       body: formData,
       signal: controller.signal,

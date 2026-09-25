@@ -2,6 +2,7 @@ import { Download, FolderArchive, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { format, plural } from "@/lib/format";
 import type { DuplicateResult } from "@/stores/duplicate-store";
@@ -111,7 +112,7 @@ export function FindDuplicatesSettings() {
       setScanning(false);
     };
 
-    xhr.open("POST", "/api/v1/tools/image/find-duplicates");
+    xhr.open("POST", appUrl("/api/v1/tools/image/find-duplicates"));
     xhr.timeout = 300_000;
     const headers = formatHeaders();
     headers.forEach((value, key) => {

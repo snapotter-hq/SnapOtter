@@ -1,4 +1,5 @@
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 const SERVER_PREVIEW_EXTENSIONS = new Set([
   "heic",
@@ -75,7 +76,7 @@ export async function fetchDecodedPreview(file: File): Promise<DecodedPreview | 
   try {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/api/v1/preview", {
+    const res = await fetch(appUrl("/api/v1/preview"), {
       method: "POST",
       headers: formatHeaders(),
       body: formData,

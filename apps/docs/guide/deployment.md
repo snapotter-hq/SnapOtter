@@ -521,6 +521,43 @@ server {
 }
 ```
 
+### Deploying under a subpath {#subpath}
+
+To serve `https://example.com/snapotter`, set `BASE_PATH=/snapotter` in the
+SnapOtter container environment and restart it. The official CPU and GPU Compose
+files also accept `BASE_PATH` from your shell or Compose `.env` file. The same
+image works at any path; no frontend rebuild is needed.
+
+`BASE_PATH` accepts slash-separated segments containing letters, digits, `_`, or
+`-`, including nested paths such as `/apps/snapotter`. A trailing slash is
+optional. Leave it empty (the default), or set `/`, for a root deployment.
+
+In your existing Nginx HTTPS server block, use:
+
+```nginx
+location = /snapotter {
+    return 308 /snapotter/$is_args$args;
+}
+location /snapotter/ {
+    proxy_pass http://localhost:1349;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 500M;
+    proxy_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+This example preserves the prefix. Proxies that strip `/snapotter` before
+forwarding are supported too. Internal health checks can keep using
+`/api/v1/health`. For OIDC or SAML, also set
+`EXTERNAL_URL=https://example.com/snapotter` and update the identity provider's
+callback URLs to include `/snapotter/api/auth/oidc/callback` or
+`/snapotter/api/auth/saml/callback` respectively.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Add a new Proxy Host

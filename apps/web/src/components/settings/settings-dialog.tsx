@@ -33,6 +33,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
 import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
@@ -388,7 +389,7 @@ function GeneralSection() {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("/api/auth/logout", {
+      const res = await fetch(appUrl("/api/auth/logout"), {
         method: "POST",
         headers: formatHeaders(),
       });
@@ -398,12 +399,12 @@ function GeneralSection() {
       if (data.logoutUrl) {
         window.location.href = data.logoutUrl;
       } else {
-        window.location.href = "/login";
+        window.location.href = appUrl("/login");
       }
     } catch {
       clearToken();
       localStorage.removeItem("snapotter-username");
-      window.location.href = "/login";
+      window.location.href = appUrl("/login");
     }
   };
 
@@ -862,7 +863,7 @@ function SystemSection() {
               setBundleLoading(true);
               setBundleError(null);
               try {
-                const res = await fetch("/api/v1/admin/support-bundle", {
+                const res = await fetch(appUrl("/api/v1/admin/support-bundle"), {
                   headers: formatHeaders(),
                 });
                 if (!res.ok) throw new Error(`${res.status}`);
@@ -3667,7 +3668,7 @@ function AboutSection() {
             {t.settings.about.docsLink}
           </a>
           <a
-            href="/api/docs"
+            href={appUrl("/api/docs")}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-primary-ink hover:underline"

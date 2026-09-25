@@ -4,6 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -246,7 +247,7 @@ export function ImageToPdfSettings() {
       cleanup();
     };
 
-    xhr.open("POST", "/api/v1/tools/image/image-to-pdf");
+    xhr.open("POST", appUrl("/api/v1/tools/image/image-to-pdf"));
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });

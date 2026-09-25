@@ -52,7 +52,7 @@ function getSamlInstance(): SAML {
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 
 function redirectToLogin(reply: FastifyReply, errorCode: string): void {
-  reply.redirect(`/login?error=${errorCode}`);
+  reply.redirect(`${env.BASE_PATH}/login?error=${errorCode}`);
 }
 
 // -- Plugin registration ------------------------------------------------------
@@ -285,7 +285,7 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
           userId: resolvedUser.id,
           username: resolvedUser.username,
         });
-        return reply.redirect(`/login?mfaToken=${mfaToken}`);
+        return reply.redirect(`${env.BASE_PATH}/login?mfaToken=${mfaToken}`);
       }
 
       if (mfaOutcome === "enrollment_required") {
@@ -333,11 +333,11 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
         httpOnly: true,
         sameSite: "strict",
         secure: isSecureRequest(request),
-        path: "/",
+        path: `${env.BASE_PATH}/`,
         maxAge: env.SESSION_DURATION_HOURS * 3600,
       });
 
-      return reply.redirect("/");
+      return reply.redirect(`${env.BASE_PATH}/`);
     },
   );
 }

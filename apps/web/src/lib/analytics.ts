@@ -1,4 +1,5 @@
 import { type AnalyticsConfig, resolvePostHogClientHosts } from "@snapotter/shared";
+import { appUrl } from "./app-url";
 import { flushEarlyErrors } from "./early-errors";
 
 type PostHogInstance = import("posthog-js").PostHog;
@@ -61,7 +62,9 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const { apiHost, uiHost } = resolvePostHogClientHosts({
         posthogHost: config.posthogHost,
-        posthogProxyPath: config.posthogProxyPath,
+        posthogProxyPath: config.posthogProxyPath
+          ? appUrl(config.posthogProxyPath)
+          : config.posthogProxyPath,
         origin,
       });
       posthog =

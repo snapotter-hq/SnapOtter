@@ -1,7 +1,8 @@
 import { getDistinctId } from "@/lib/analytics";
+import { appUrl } from "@/lib/app-url";
 import { useConnectionStore } from "@/stores/connection-store";
 
-const API_BASE = "/api";
+const API_BASE = appUrl("/api");
 
 export interface FeatureNotInstalledError {
   type: "feature_not_installed";
@@ -173,7 +174,7 @@ export async function apiUpload(files: File[]): Promise<{
   for (const f of files) formData.append("files", f);
   let res: Response;
   try {
-    res = await fetch("/api/v1/upload", {
+    res = await fetch(appUrl("/api/v1/upload"), {
       method: "POST",
       headers: formatHeaders(),
       body: formData,
@@ -189,7 +190,7 @@ export async function apiUpload(files: File[]): Promise<{
 }
 
 export function getDownloadUrl(jobId: string, filename: string): string {
-  return `/api/v1/download/${jobId}/${filename}`;
+  return appUrl(`/api/v1/download/${jobId}/${filename}`);
 }
 
 // ── Persistent File Management ──────────────────────────────────
@@ -245,7 +246,7 @@ export function apiUploadUserFiles(
     for (const f of files) formData.append("files", f);
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/v1/files/upload");
+    xhr.open("POST", appUrl("/api/v1/files/upload"));
     xhr.timeout = 120_000;
 
     const headers = formatHeaders();
@@ -291,7 +292,7 @@ export function apiUploadUserFiles(
 export async function apiDeleteUserFiles(ids: string[]): Promise<{ deleted: number }> {
   let res: Response;
   try {
-    res = await fetch("/api/v1/files", {
+    res = await fetch(appUrl("/api/v1/files"), {
       method: "DELETE",
       headers: formatHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ ids }),
@@ -307,15 +308,15 @@ export async function apiDeleteUserFiles(ids: string[]): Promise<{ deleted: numb
 }
 
 export function getFileThumbnailUrl(id: string): string {
-  return `/api/v1/files/${id}/thumbnail`;
+  return appUrl(`/api/v1/files/${id}/thumbnail`);
 }
 
 export function getFileDownloadUrl(id: string): string {
-  return `/api/v1/files/${id}/download`;
+  return appUrl(`/api/v1/files/${id}/download`);
 }
 
 export function getFilePreviewUrl(id: string): string {
-  return `/api/v1/files/${id}/preview`;
+  return appUrl(`/api/v1/files/${id}/preview`);
 }
 
 export async function apiDownloadBlob(jobId: string, filename: string): Promise<Blob> {

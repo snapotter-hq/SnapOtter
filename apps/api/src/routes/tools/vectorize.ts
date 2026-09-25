@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import potrace from "potrace";
 import sharp from "sharp";
 import { z } from "zod";
+import { env } from "../../config.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -156,7 +157,7 @@ export function registerVectorize(app: FastifyInstance) {
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
         originalSize: fileBuffer.length,
         processedSize: result.buffer.length,
       });

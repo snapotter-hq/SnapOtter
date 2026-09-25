@@ -25,6 +25,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { appUrl } from "@/lib/app-url";
 import { useEditorStore } from "@/stores/editor-store";
 
 const SERVER_DECODED_EXTS = new Set(["psd", "tga", "exr", "hdr"]);
@@ -101,7 +102,10 @@ export function EditorPage() {
           const formData = new FormData();
           formData.append("file", file);
           formData.append("settings", JSON.stringify({ format: "png" }));
-          const res = await fetch(apiToolPath("convert"), { method: "POST", body: formData });
+          const res = await fetch(appUrl(apiToolPath("convert")), {
+            method: "POST",
+            body: formData,
+          });
           if (!res.ok) throw new Error("Server decode failed");
           const json = await res.json();
           if (json.downloadUrl) {

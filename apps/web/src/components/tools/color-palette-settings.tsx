@@ -2,6 +2,7 @@ import { Check, ClipboardCopy, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -31,7 +32,7 @@ export function ColorPaletteSettings() {
       formData.append("file", files[0]);
       formData.append("settings", JSON.stringify({ count, format }));
 
-      const res = await fetch("/api/v1/tools/image/color-palette", {
+      const res = await fetch(appUrl("/api/v1/tools/image/color-palette"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

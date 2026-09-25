@@ -11,6 +11,7 @@ import {
 // and degrades view transitions and flushSync navigations to a console warning.
 import { RouterProvider } from "react-router/dom";
 import { Toaster, toast } from "sonner";
+import { appUrl, BASE_PATH } from "@/lib/app-url";
 import { ConnectionMonitor } from "./components/common/connection-monitor";
 import { KeyboardShortcutProvider } from "./components/common/keyboard-shortcut-provider";
 import { MigrationBanner } from "./components/common/migration-banner";
@@ -97,7 +98,7 @@ class ErrorBoundary extends Component<
               type="button"
               onClick={() => {
                 this.setState({ hasError: false, error: null });
-                window.location.href = "/";
+                window.location.href = appUrl("/");
               }}
               className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
             >
@@ -204,28 +205,31 @@ function RootLayout() {
 const reportRouterError: ClientOnErrorFunction = (error, { errorInfo }) =>
   reportRenderError(error, errorInfo);
 
-const router = createBrowserRouter([
-  {
-    element: <RootLayout />,
-    children: [
-      { path: "/login", element: <LoginPage /> },
-      { path: "/change-password", element: <ChangePasswordPage /> },
-      { path: "/automate", element: <AutomatePage /> },
-      { path: "/files", element: <FilesPage /> },
-      { path: "/privacy", element: <PrivacyPolicyPage /> },
-      { path: "/editor", element: <EditorPage /> },
-      // Legacy 1.x color tools were consolidated into adjust-colors;
-      // redirect old bookmarks to the section route.
-      { path: "/brightness-contrast", element: <Navigate to="/image/adjust-colors" replace /> },
-      { path: "/saturation", element: <Navigate to="/image/adjust-colors" replace /> },
-      { path: "/color-channels", element: <Navigate to="/image/adjust-colors" replace /> },
-      { path: "/color-effects", element: <Navigate to="/image/adjust-colors" replace /> },
-      { path: "/:section/:toolId", element: <ToolPage /> },
-      { path: "/", element: <HomePage /> },
-      { path: "*", element: <NotFoundPage /> },
-    ],
-  },
-]);
+const router = createBrowserRouter(
+  [
+    {
+      element: <RootLayout />,
+      children: [
+        { path: "/login", element: <LoginPage /> },
+        { path: "/change-password", element: <ChangePasswordPage /> },
+        { path: "/automate", element: <AutomatePage /> },
+        { path: "/files", element: <FilesPage /> },
+        { path: "/privacy", element: <PrivacyPolicyPage /> },
+        { path: "/editor", element: <EditorPage /> },
+        // Legacy 1.x color tools were consolidated into adjust-colors;
+        // redirect old bookmarks to the section route.
+        { path: "/brightness-contrast", element: <Navigate to="/image/adjust-colors" replace /> },
+        { path: "/saturation", element: <Navigate to="/image/adjust-colors" replace /> },
+        { path: "/color-channels", element: <Navigate to="/image/adjust-colors" replace /> },
+        { path: "/color-effects", element: <Navigate to="/image/adjust-colors" replace /> },
+        { path: "/:section/:toolId", element: <ToolPage /> },
+        { path: "/", element: <HomePage /> },
+        { path: "*", element: <NotFoundPage /> },
+      ],
+    },
+  ],
+  { basename: BASE_PATH || "/" },
+);
 
 export function App() {
   const isMobile = useMobile();

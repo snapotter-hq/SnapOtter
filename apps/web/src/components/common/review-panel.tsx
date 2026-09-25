@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { formatFileSize, triggerDownload } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
@@ -101,7 +102,7 @@ export function ReviewPanel({
       // "Tools Used" (append before the file so the field is parsed first).
       if (currentToolId) formData.append("toolId", currentToolId);
       formData.append("file", new File([blob], filename, { type: fileType }));
-      const uploadRes = await fetch("/api/v1/files/upload", {
+      const uploadRes = await fetch(appUrl("/api/v1/files/upload"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

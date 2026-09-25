@@ -5,6 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, formatFileSize } from "@/lib/format";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
@@ -86,7 +87,7 @@ export function subscribeEraseObjectJobProgress(
     if (es && es.readyState === EventSource.OPEN) return;
     if (es) es.close();
     try {
-      es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+      es = new EventSource(appUrl(`/api/v1/jobs/${clientJobId}/progress`));
     } catch {
       return;
     }
@@ -260,7 +261,7 @@ export function EraseObjectSettings({
         stopProgress();
         reject(new Error("Request timed out"));
       };
-      xhr.open("POST", "/api/v1/tools/image/erase-object");
+      xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
       for (const [key, value] of formatHeaders()) {
         xhr.setRequestHeader(key, value);
       }
@@ -418,7 +419,7 @@ export function EraseObjectSettings({
       setError("Request timed out - the server may be overloaded. Try again.");
       finishUi();
     };
-    xhr.open("POST", "/api/v1/tools/image/erase-object");
+    xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });

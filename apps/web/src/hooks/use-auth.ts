@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { clearToken, formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { useConnectionStore } from "@/stores/connection-store";
 
 interface AuthState {
@@ -54,7 +55,7 @@ interface AuthConfig {
 let authConfigPromise: Promise<AuthConfig> | null = null;
 function fetchAuthConfig(): Promise<AuthConfig> {
   if (!authConfigPromise) {
-    authConfigPromise = fetch("/api/v1/config/auth")
+    authConfigPromise = fetch(appUrl("/api/v1/config/auth"))
       .then((res) => res.json() as Promise<AuthConfig>)
       .catch((err) => {
         authConfigPromise = null;
@@ -114,7 +115,7 @@ export function useAuth() {
 
         // Always call /api/auth/session -- OIDC users have a session cookie
         // (not a localStorage token), so we cannot skip based on token absence.
-        const sessionRes = await fetch("/api/auth/session", {
+        const sessionRes = await fetch(appUrl("/api/auth/session"), {
           headers: formatHeaders(),
         });
 

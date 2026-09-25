@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
@@ -127,7 +128,7 @@ export function SplitSettings() {
         formData.append("file", file);
         formData.append("settings", settingsJson);
 
-        const res = await fetch("/api/v1/tools/image/split", {
+        const res = await fetch(appUrl("/api/v1/tools/image/split"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

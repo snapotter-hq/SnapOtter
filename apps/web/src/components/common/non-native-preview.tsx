@@ -2,6 +2,7 @@ import { Play, RefreshCw, Video, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +85,7 @@ export function NonNativePreview({
       const formData = new FormData();
       formData.append("file", fileToUpload, filename);
 
-      const response = await fetch("/api/v1/preview/generate", {
+      const response = await fetch(appUrl("/api/v1/preview/generate"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

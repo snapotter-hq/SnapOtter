@@ -113,7 +113,7 @@ function deriveUsername(claims: Record<string, unknown>): string {
 const SESSION_DURATION_MS = env.SESSION_DURATION_HOURS * 60 * 60 * 1000;
 
 function redirectToLogin(reply: FastifyReply, errorCode: string): void {
-  reply.redirect(`/login?error=${errorCode}`);
+  reply.redirect(`${env.BASE_PATH}/login?error=${errorCode}`);
 }
 
 /**
@@ -159,7 +159,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         httpOnly: true,
         sameSite: "lax",
         secure: isSecureRequest(request),
-        path: "/api/auth/oidc",
+        path: `${env.BASE_PATH}/api/auth/oidc`,
         maxAge: 600, // 10 minutes
         signed: false, // already signed manually
       });
@@ -191,7 +191,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
 
       // Clear the cookie immediately
       reply.clearCookie("oidc-state", {
-        path: "/api/auth/oidc",
+        path: `${env.BASE_PATH}/api/auth/oidc`,
         httpOnly: true,
         sameSite: "lax",
         secure: isSecureRequest(request),
@@ -413,7 +413,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           userId: resolvedUser.id,
           username: resolvedUser.username,
         });
-        return reply.redirect(`/login?mfaToken=${mfaToken}`);
+        return reply.redirect(`${env.BASE_PATH}/login?mfaToken=${mfaToken}`);
       }
 
       if (mfaOutcome === "enrollment_required") {
@@ -463,12 +463,12 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         httpOnly: true,
         sameSite: "strict",
         secure: isSecureRequest(request),
-        path: "/",
+        path: `${env.BASE_PATH}/`,
         maxAge: env.SESSION_DURATION_HOURS * 3600,
       });
 
       // 7. Redirect to app
-      return reply.redirect("/");
+      return reply.redirect(`${env.BASE_PATH}/`);
     },
   );
 }

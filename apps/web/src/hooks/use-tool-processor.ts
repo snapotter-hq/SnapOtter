@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -246,7 +247,7 @@ export function useToolProcessor(toolId: string) {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
     try {
-      const res = await fetch(`/api/v1/jobs/${jobId}/cancel`, {
+      const res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
         method: "POST",
         headers: formatHeaders(),
       });
@@ -316,7 +317,7 @@ export function useToolProcessor(toolId: string) {
       }
 
       try {
-        const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
+        const es = new EventSource(appUrl(`/api/v1/jobs/${jobId}/progress`));
         eventSourceRef.current = es;
         if (asyncModeRef.current) resetStallTimer();
 
@@ -766,7 +767,7 @@ export function useToolProcessor(toolId: string) {
         clearActiveJob();
       };
 
-      xhr.open("POST", apiToolPath(toolId));
+      xhr.open("POST", appUrl(apiToolPath(toolId)));
       formatHeaders().forEach((value, key) => {
         xhr.setRequestHeader(key, value);
       });
@@ -1197,7 +1198,7 @@ export function useToolProcessor(toolId: string) {
         failRun("Request timed out - the server may be overloaded. Try again.", "timeout");
       };
 
-      xhr.open("POST", `${apiToolPath(toolId)}/batch`);
+      xhr.open("POST", `${appUrl(apiToolPath(toolId))}/batch`);
       formatHeaders().forEach((value, key) => {
         xhr.setRequestHeader(key, value);
       });

@@ -752,9 +752,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
             return reply.send({
               jobId,
-              downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+              downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
               previewUrl: result.previewRef
-                ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+                ? `${env.BASE_PATH}/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
                 : undefined,
               originalSize,
               processedSize: result.processedSize,

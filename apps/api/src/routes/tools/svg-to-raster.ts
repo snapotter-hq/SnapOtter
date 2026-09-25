@@ -479,7 +479,7 @@ export function registerSvgToRasterRoute(
             .webp({ quality: 80 })
             .toBuffer();
           await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
-          previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+          previewUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/preview.webp`;
         } catch {
           // Non-fatal - frontend shows success card fallback
         }
@@ -487,7 +487,7 @@ export function registerSvgToRasterRoute(
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outFilename)}`,
+        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outFilename)}`,
         previewUrl,
         originalSize: fileBuffer.length,
         processedSize: buffer.length,

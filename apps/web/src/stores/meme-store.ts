@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ export function injectMemeFonts() {
 
   const css = FONT_FACES.map(
     (f) =>
-      `@font-face { font-family: '${f.family}'; src: url('/api/v1/meme-templates/fonts/${f.file}') format('truetype'); font-display: swap; }`,
+      `@font-face { font-family: '${f.family}'; src: url('${appUrl(`/api/v1/meme-templates/fonts/${f.file}`)}') format('truetype'); font-display: swap; }`,
   ).join("\n");
 
   const style = document.createElement("style");
@@ -277,7 +278,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   fetchTemplates: async () => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch("/api/v1/meme-templates", { headers: formatHeaders() });
+      const res = await fetch(appUrl("/api/v1/meme-templates"), { headers: formatHeaders() });
       if (!res.ok) throw new Error(`Failed to load templates: ${res.status}`);
       const data: TemplateManifest = await res.json();
       set({ templates: data.templates, loading: false });
@@ -312,13 +313,13 @@ export const useMemeStore = create<MemeState>((set, get) => ({
         const formData = new FormData();
         formData.append("file", state.customFile);
         formData.append("settings", JSON.stringify(apiSettings));
-        response = await fetch("/api/v1/tools/image/meme-generator", {
+        response = await fetch(appUrl("/api/v1/tools/image/meme-generator"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
         });
       } else {
-        response = await fetch("/api/v1/tools/image/meme-generator", {
+        response = await fetch(appUrl("/api/v1/tools/image/meme-generator"), {
           method: "POST",
           headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(apiSettings),

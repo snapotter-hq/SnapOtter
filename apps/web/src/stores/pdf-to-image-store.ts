@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 export interface PageResult {
   page: number;
@@ -189,7 +190,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/v1/tools/pdf/pdf-to-image/preview", {
+      const res = await fetch(appUrl("/api/v1/tools/pdf/pdf-to-image/preview"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,
@@ -231,7 +232,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         "settings",
         JSON.stringify({ format, dpi, quality, colorMode, pages: pagesValue }),
       );
-      const res = await fetch("/api/v1/tools/pdf/pdf-to-image", {
+      const res = await fetch(appUrl("/api/v1/tools/pdf/pdf-to-image"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

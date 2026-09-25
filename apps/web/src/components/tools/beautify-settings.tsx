@@ -7,6 +7,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -1342,7 +1343,7 @@ export function BeautifySettings({
         formData.append("backgroundImage", bgImageFile);
         formData.append("settings", JSON.stringify(settings));
 
-        const res = await fetch("/api/v1/tools/image/beautify", {
+        const res = await fetch(appUrl("/api/v1/tools/image/beautify"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

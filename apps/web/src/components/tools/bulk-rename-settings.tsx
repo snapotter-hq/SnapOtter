@@ -2,6 +2,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 export function BulkRenameSettings() {
@@ -25,7 +26,7 @@ export function BulkRenameSettings() {
       }
       formData.append("settings", JSON.stringify({ pattern, startIndex }));
 
-      const res = await fetch("/api/v1/tools/image/bulk-rename", {
+      const res = await fetch(appUrl("/api/v1/tools/image/bulk-rename"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

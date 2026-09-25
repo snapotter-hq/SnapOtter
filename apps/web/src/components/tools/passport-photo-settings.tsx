@@ -22,6 +22,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
@@ -333,7 +334,7 @@ export function PassportPhotoSettings() {
         formData.append("settings", JSON.stringify({}));
 
         const headers = formatHeaders();
-        const response = await fetch("/api/v1/tools/image/passport-photo/analyze", {
+        const response = await fetch(appUrl("/api/v1/tools/image/passport-photo/analyze"), {
           method: "POST",
           headers,
           body: formData,
@@ -402,7 +403,7 @@ export function PassportPhotoSettings() {
         imageHeight: analyzeResult.imageHeight,
       };
 
-      const response = await fetch("/api/v1/tools/image/passport-photo/generate", {
+      const response = await fetch(appUrl("/api/v1/tools/image/passport-photo/generate"), {
         method: "POST",
         headers,
         body: JSON.stringify(body),

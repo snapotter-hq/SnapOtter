@@ -2,6 +2,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 const BARCODE_TYPES = [
   { value: "code128", label: "Code 128" },
@@ -36,7 +37,7 @@ export function BarcodeGenerateSettings() {
     setResultUrl(null);
 
     try {
-      const res = await fetch("/api/v1/tools/image/barcode-generate", {
+      const res = await fetch(appUrl("/api/v1/tools/image/barcode-generate"), {
         method: "POST",
         headers: {
           ...formatHeaders(),

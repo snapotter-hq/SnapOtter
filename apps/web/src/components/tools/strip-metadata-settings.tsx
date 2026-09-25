@@ -7,6 +7,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { EXIF_LABELS, SKIP_KEYS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
@@ -218,7 +219,7 @@ export function StripMetadataSettings() {
       try {
         const formData = new FormData();
         formData.append("file", currentFile);
-        const res = await fetch("/api/v1/tools/image/strip-metadata/inspect", {
+        const res = await fetch(appUrl("/api/v1/tools/image/strip-metadata/inspect"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

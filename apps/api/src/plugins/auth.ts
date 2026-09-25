@@ -608,7 +608,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       };
       if (typeof cookieReply.setCookie === "function") {
         cookieReply.setCookie("snapotter-session", token, {
-          path: "/",
+          path: `${env.BASE_PATH}/`,
           httpOnly: true,
           sameSite: "strict",
           secure: isSecureRequest(request),
@@ -667,7 +667,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       clearCookie?: (name: string, opts: Record<string, unknown>) => void;
     };
     if (typeof cookieReply.clearCookie === "function") {
-      cookieReply.clearCookie("snapotter-session", { path: "/" });
+      cookieReply.clearCookie("snapotter-session", { path: `${env.BASE_PATH}/` });
     }
 
     await auditFromRequest(request)("LOGOUT", { userId: user?.id });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -345,7 +346,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(output.filename)}`,
+        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(output.filename)}`,
         originalSize: imageBuffer.length,
         processedSize: output.buffer.length,
       });

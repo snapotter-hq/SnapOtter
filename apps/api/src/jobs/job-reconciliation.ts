@@ -31,6 +31,7 @@
  *      resurrected.
  */
 import { and, eq, inArray, isNotNull, lt, ne } from "drizzle-orm";
+import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { logger } from "../lib/logger.js";
 import { getObjectSize, listObjects, type ObjectInfo } from "../lib/object-storage.js";
@@ -168,7 +169,7 @@ async function recoverFromOutputs(
 
   const result: Record<string, unknown> = {
     jobId: row.id,
-    downloadUrl: `/api/v1/download/${row.id}/${encodeURIComponent(filename)}`,
+    downloadUrl: `${env.BASE_PATH}/api/v1/download/${row.id}/${encodeURIComponent(filename)}`,
     originalSize,
     processedSize: primary.size,
     // Marks the row as resolved after the fact rather than by the worker, so
@@ -176,7 +177,7 @@ async function recoverFromOutputs(
     reconciled: true,
   };
   if (preview) {
-    result.previewUrl = `/api/v1/download/${row.id}/${preview.key.slice(preview.key.lastIndexOf("/") + 1)}`;
+    result.previewUrl = `${env.BASE_PATH}/api/v1/download/${row.id}/${preview.key.slice(preview.key.lastIndexOf("/") + 1)}`;
   }
 
   const updated = await db

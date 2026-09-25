@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format.js";
 
 interface HelpDialogProps {
@@ -147,7 +148,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                 <ExternalLink className="h-3 w-3" />
               </a>
               <a
-                href="/api/docs"
+                href={appUrl("/api/docs")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-primary-ink hover:underline"

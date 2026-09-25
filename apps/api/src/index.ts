@@ -24,6 +24,7 @@ import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
 import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
+import { stripBasePath } from "./lib/base-path.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
@@ -338,6 +339,7 @@ startInterruptedInstallRecovery({
 if (initialOcrRuntimeReconciliation) await initialOcrRuntimeReconciliation;
 
 const app = Fastify({
+  rewriteUrl: (request) => stripBasePath(request.url ?? "/", env.BASE_PATH),
   genReqId: (req) => (req.headers["x-request-id"] as string) ?? randomUUID(),
   loggerInstance: logger,
   bodyLimit: env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : 1073741824,

@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import {
   COLLAGE_TEMPLATES,
   type CollageTemplate,
@@ -109,7 +110,7 @@ export function CollageSettings() {
         jobId: string;
       }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/v1/tools/image/collage");
+        xhr.open("POST", appUrl("/api/v1/tools/image/collage"));
 
         const headers = formatHeaders();
         headers.forEach((value, key) => {

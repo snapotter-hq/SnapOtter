@@ -7,7 +7,7 @@ const objectStorageMocks = vi.hoisted(() => ({
   putObject: vi.fn(),
 }));
 
-async function loadWorker() {
+async function loadWorker(basePath = "") {
   vi.resetModules();
 
   vi.doMock("node:fs/promises", () => ({
@@ -37,6 +37,7 @@ async function loadWorker() {
 
   vi.doMock("../../../../apps/api/src/config.js", () => ({
     env: {
+      BASE_PATH: basePath,
       SCRATCH_PATH: "",
       JOB_TIMEOUT_LONG_S: 60,
       JOB_TIMEOUT_FAST_S: 15,
@@ -202,8 +203,8 @@ describe("worker result payload behavior", () => {
     expect(objectStorageMocks.getObjectBuffer).toHaveBeenCalledTimes(2);
   });
 
-  it("builds legacy download, preview, saved-file, and tool payload fields", async () => {
-    const { buildLegacyResultPayload } = await loadWorker();
+  it.each(["", "/snapotter"])("builds download and preview links under %s", async (basePath) => {
+    const { buildLegacyResultPayload } = await loadWorker(basePath);
 
     expect(
       buildLegacyResultPayload(
@@ -221,8 +222,8 @@ describe("worker result payload behavior", () => {
       ),
     ).toEqual({
       jobId: "job-1",
-      downloadUrl: "/api/v1/download/job-1/report%20final.pdf",
-      previewUrl: "/api/v1/download/job-1/preview.png",
+      downloadUrl: `${basePath}/api/v1/download/job-1/report%20final.pdf`,
+      previewUrl: `${basePath}/api/v1/download/job-1/preview.png`,
       originalSize: 100,
       processedSize: 80,
       savedFileId: "file-2",

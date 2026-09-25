@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 interface HtmlToImageState {
   mode: "url" | "html";
@@ -66,7 +67,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     set({ capturing: true, error: null, resultUrl: null, resultSize: null });
 
     try {
-      const res = await fetch("/api/v1/tools/image/html-to-image", {
+      const res = await fetch(appUrl("/api/v1/tools/image/html-to-image"), {
         method: "POST",
         headers: formatHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

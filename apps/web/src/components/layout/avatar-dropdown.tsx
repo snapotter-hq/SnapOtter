@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { clearToken } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { cn } from "@/lib/utils";
 
 interface AvatarDropdownProps {
@@ -37,19 +38,19 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("/api/auth/logout", { method: "POST" });
+      const res = await fetch(appUrl("/api/auth/logout"), { method: "POST" });
       const data = await res.json().catch(() => ({}));
       clearToken();
       localStorage.removeItem("snapotter-username");
       if (data.logoutUrl) {
         window.location.href = data.logoutUrl;
       } else {
-        window.location.href = "/login";
+        window.location.href = appUrl("/login");
       }
     } catch {
       clearToken();
       localStorage.removeItem("snapotter-username");
-      window.location.href = "/login";
+      window.location.href = appUrl("/login");
     }
   };
 
@@ -122,7 +123,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
 
           {/* API Reference */}
           <a
-            href="/api/docs"
+            href={appUrl("/api/docs")}
             target="_blank"
             rel="noopener noreferrer"
             className={cn(

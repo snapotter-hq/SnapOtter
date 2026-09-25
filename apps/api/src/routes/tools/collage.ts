@@ -3,6 +3,7 @@ import { COLLAGE_PAN_LIMIT } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
+import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -768,7 +769,7 @@ export function registerCollage(app: FastifyInstance) {
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${filename}`,
+        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${filename}`,
         originalSize: files.reduce((s, f) => s + f.buffer.length, 0),
         processedSize: finalBuffer.length,
       });

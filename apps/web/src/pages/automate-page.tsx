@@ -38,6 +38,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
 import { formatHeaders, getFileDownloadUrl } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -138,7 +139,7 @@ export function AutomatePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/v1/pipeline/list", {
+        const res = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (res.ok) {
@@ -242,7 +243,7 @@ export function AutomatePage() {
     if (!saveName.trim() || steps.length === 0) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/v1/pipeline/save", {
+      const res = await fetch(appUrl("/api/v1/pipeline/save"), {
         method: "POST",
         headers: formatHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
@@ -255,7 +256,7 @@ export function AutomatePage() {
         import("@/lib/analytics").then(({ track }) =>
           track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
         );
-        const listRes = await fetch("/api/v1/pipeline/list", {
+        const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (listRes.ok) {
@@ -276,11 +277,11 @@ export function AutomatePage() {
   const handleDeletePipeline = useCallback(
     async (id: string) => {
       try {
-        await fetch(`/api/v1/pipeline/${id}`, {
+        await fetch(appUrl(`/api/v1/pipeline/${id}`), {
           method: "DELETE",
           headers: formatHeaders(),
         });
-        const listRes = await fetch("/api/v1/pipeline/list", {
+        const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (listRes.ok) {
@@ -361,7 +362,7 @@ export function AutomatePage() {
           return;
         }
 
-        const res = await fetch("/api/v1/pipeline/save", {
+        const res = await fetch(appUrl("/api/v1/pipeline/save"), {
           method: "POST",
           headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({
@@ -377,7 +378,7 @@ export function AutomatePage() {
           return;
         }
 
-        const listRes = await fetch("/api/v1/pipeline/list", {
+        const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (listRes.ok) {

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -65,7 +66,7 @@ export function StitchSettings() {
         processedSize: number;
       }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/v1/tools/image/stitch");
+        xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
 
         const headers = formatHeaders();
         headers.forEach((value, key) => {

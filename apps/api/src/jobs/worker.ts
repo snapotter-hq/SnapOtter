@@ -210,13 +210,13 @@ export function buildLegacyResultPayload(
   const outName = jobResult.filename;
   const payload: LegacyResultPayload = {
     jobId,
-    downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
+    downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
     originalSize: jobResult.originalSize,
     processedSize: jobResult.processedSize,
   };
   if (jobResult.previewRef) {
     const previewFilename = jobResult.previewRef.split("/").pop();
-    payload.previewUrl = `/api/v1/download/${jobId}/${previewFilename}`;
+    payload.previewUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/${previewFilename}`;
   }
   if (jobResult.savedFileId) {
     payload.savedFileId = jobResult.savedFileId;
@@ -1550,7 +1550,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
   const result: Record<string, unknown> = {
     jobId: data.jobId,
-    downloadUrl: `/api/v1/download/${data.jobId}/${encodeURIComponent(zipFilename)}`,
+    downloadUrl: `${env.BASE_PATH}/api/v1/download/${data.jobId}/${encodeURIComponent(zipFilename)}`,
     zipFilename,
     fileResults,
     processedSize: zipSize,

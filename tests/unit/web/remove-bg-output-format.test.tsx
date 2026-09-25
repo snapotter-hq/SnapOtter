@@ -4,6 +4,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const deployment = vi.hoisted(() => ({ basePath: "" }));
+
 // Phase 1 (background removal) is "done": the processor exposes a mask PNG
 // download URL and is no longer processing, so the wrapper renders its
 // download controls. Only Phase 2 (the effects request) re-encodes to the
@@ -14,7 +16,7 @@ vi.mock("@/hooks/use-tool-processor", () => ({
     processAllFiles: vi.fn(),
     processing: false,
     error: null,
-    downloadUrl: "/api/v1/download/JOB123/pic_mask.png",
+    downloadUrl: `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`,
     originalSize: 1000,
     processedSize: 500,
     progress: { phase: "idle", percent: 0, stage: "", elapsed: 0 },
@@ -37,6 +39,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
+  deployment.basePath = "";
   useFileStore.getState().setFiles([]);
 });
 
@@ -65,4 +69,21 @@ describe("remove-background output format routing (#720)", () => {
     });
     expect(screen.queryByTestId("remove-background-download")).not.toBeInTheDocument();
   });
+  it.each(["/snapotter", "/apps/snapotter"])(
+    "uses the correct job for effects under %s",
+    async (basePath) => {
+      deployment.basePath = basePath;
+      // A failed response prevents navigation while still exercising the real request.
+      const fetch = vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: "test" }) });
+      vi.stubGlobal("fetch", fetch);
+      render(<RemoveBgSettings />);
+      await screen.findByTestId("remove-background-download");
+      fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+      fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+      await waitFor(() => expect(fetch).toHaveBeenCalled());
+      expect(JSON.parse(fetch.mock.calls[0][1].body.get("settings")).jobId).toBe("JOB123");
+    },
+  );
 });

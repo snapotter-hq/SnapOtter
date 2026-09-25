@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { apiGet, formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -283,7 +284,7 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
     }
 
     try {
-      const res = await fetch("/api/v1/admin/features/import", {
+      const res = await fetch(appUrl("/api/v1/admin/features/import"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

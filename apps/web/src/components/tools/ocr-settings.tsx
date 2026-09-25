@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -97,7 +98,7 @@ export function ocrOneFile(
     };
 
     try {
-      es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+      es = new EventSource(appUrl(`/api/v1/jobs/${clientJobId}/progress`));
     } catch {
       rejectOnce(new Error(messages.networkError ?? "Unable to subscribe to OCR progress"));
       return;
@@ -176,7 +177,7 @@ export function ocrOneFile(
     xhr.onerror = () => rejectOnce(new Error(messages.networkError ?? "Network error"));
     xhr.ontimeout = () => rejectOnce(new Error(messages.timeout ?? "OCR request timed out"));
     xhr.onabort = () => rejectOnce(new Error(messages.processingFailed ?? "OCR request canceled"));
-    xhr.open("POST", "/api/v1/tools/image/ocr");
+    xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
     }

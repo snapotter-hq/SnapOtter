@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { readBarcodes } from "zxing-wasm/reader";
+import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -250,7 +251,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
 
         await putObject(`outputs/${jobId}/${outputFilename}`, annotatedBuffer);
 
-        const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
+        const downloadUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`;
 
         return reply.send({
           filename,

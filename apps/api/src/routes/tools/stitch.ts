@@ -292,7 +292,7 @@ export function registerStitch(app: FastifyInstance) {
 
       return reply.send({
         jobId,
-        downloadUrl: `/api/v1/download/${jobId}/${filename}`,
+        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${filename}`,
         originalSize: files.reduce((s, f) => s + f.buffer.length, 0),
         processedSize: result.length,
       });

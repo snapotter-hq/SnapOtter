@@ -2,6 +2,7 @@ import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
@@ -157,7 +158,7 @@ export function usePipelineProcessor() {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
     try {
-      const res = await fetch(`/api/v1/jobs/${jobId}/cancel`, {
+      const res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
         method: "POST",
         headers: formatHeaders(),
       });
@@ -210,7 +211,7 @@ export function usePipelineProcessor() {
       }
 
       try {
-        const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
+        const es = new EventSource(appUrl(`/api/v1/jobs/${jobId}/progress`));
         eventSourceRef.current = es;
         if (asyncModeRef.current) resetStallTimer();
 
@@ -581,7 +582,7 @@ export function usePipelineProcessor() {
         clearActiveJob();
       };
 
-      xhr.open("POST", "/api/v1/pipeline/execute");
+      xhr.open("POST", appUrl("/api/v1/pipeline/execute"));
       formatHeaders().forEach((value, key) => {
         xhr.setRequestHeader(key, value);
       });
@@ -899,7 +900,7 @@ export function usePipelineProcessor() {
         failRun("Request timed out - the server may be overloaded. Try again.");
       };
 
-      xhr.open("POST", "/api/v1/pipeline/batch");
+      xhr.open("POST", appUrl("/api/v1/pipeline/batch"));
       formatHeaders().forEach((value, key) => {
         xhr.setRequestHeader(key, value);
       });

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 export function ComposeSettings() {
@@ -32,7 +33,7 @@ export function ComposeSettings() {
       formData.append("overlay", overlayFile);
       formData.append("settings", JSON.stringify({ x, y, opacity, blendMode }));
 
-      const res = await fetch("/api/v1/tools/image/compose", {
+      const res = await fetch(appUrl("/api/v1/tools/image/compose"), {
         method: "POST",
         headers: formatHeaders(),
         body: formData,

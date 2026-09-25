@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ export function useUrlImport() {
     async (urls: string[], signal?: AbortSignal): Promise<FetchUrlsResponse> => {
       const headers = formatHeaders();
       headers.set("Content-Type", "application/json");
-      const res = await fetch("/api/v1/fetch-urls", {
+      const res = await fetch(appUrl("/api/v1/fetch-urls"), {
         method: "POST",
         headers,
         body: JSON.stringify({ urls }),

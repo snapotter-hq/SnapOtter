@@ -1,5 +1,6 @@
 import type { AnalyticsConfig } from "@snapotter/shared";
 import { create } from "zustand";
+import { appUrl } from "@/lib/app-url";
 
 interface AnalyticsState {
   config: AnalyticsConfig | null;
@@ -14,7 +15,7 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   // instance-wide opt-out converges in already-open tabs.
   fetchConfig: async () => {
     try {
-      const res = await fetch("/api/v1/config/analytics");
+      const res = await fetch(appUrl("/api/v1/config/analytics"));
       const config: AnalyticsConfig = await res.json();
       set({ config, configLoaded: true });
     } catch {

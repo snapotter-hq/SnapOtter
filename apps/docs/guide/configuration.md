@@ -13,6 +13,7 @@ All configuration is done through environment variables. Every variable has a se
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `1349` | Port the server listens on. |
+| `BASE_PATH` | (empty) | Public deployment path, e.g. `/snapotter`. Empty or `/` serves at the domain root. Applied at runtime; no image rebuild required. |
 | `RATE_LIMIT_PER_MIN` | `1000` | Maximum requests per minute per IP. Set to 0 to disable rate limiting. |
 | `CORS_ORIGIN` | (empty) | Comma-separated allowed origins for CORS, or empty for same-origin only. |
 | `LOG_LEVEL` | `info` | Log verbosity. One of: `fatal`, `error`, `warn`, `info`, `debug`, `trace`. |

@@ -21,6 +21,7 @@ services:
       - SnapOtter-data:/data           # AI models, user files
       - SnapOtter-workspace:/tmp/workspace  # Temp processing (auto-cleaned)
     environment:
+      - BASE_PATH=${BASE_PATH:-}
       - AUTH_ENABLED=true
       - DEFAULT_USERNAME=admin
       # Set a strong password. Default is 'admin' -- CHANGE THIS for any non-local deployment.

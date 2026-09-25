@@ -13,6 +13,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -703,7 +704,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         // Decode HEIC via server preview endpoint
         const formData = new FormData();
         formData.append("file", file);
-        fetch("/api/v1/preview", {
+        fetch(appUrl("/api/v1/preview"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
@@ -858,10 +859,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // After processFiles completes, extract jobId from downloadUrl
   useEffect(() => {
     if (!downloadUrl || processing) return;
-    // downloadUrl format: /api/v1/download/{jobId}/{filename}
+    // The last two segments are stable even with a deployment base path.
     const parts = downloadUrl.split("/");
-    const jobId = parts[4]; // [0]='' [1]='api' [2]='v1' [3]='download' [4]=jobId [5]=filename
-    const filename = decodeURIComponent(parts[5] || "");
+    const jobId = parts.at(-2);
+    const filename = decodeURIComponent(parts.at(-1) || "");
     if (jobId && filename) {
       setBgJobId(jobId);
       // Derive the cached filenames from the mask filename
@@ -869,7 +870,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       setBgFilename(baseName || filename.replace(/\.[^.]+$/, ""));
       // Build original URL from the job
       const origFilename = `${baseName || filename.replace(/\.[^.]+$/, "")}_original.png`;
-      setBgOriginalUrl(`/api/v1/download/${jobId}/${encodeURIComponent(origFilename)}`);
+      setBgOriginalUrl(appUrl(`/api/v1/download/${jobId}/${encodeURIComponent(origFilename)}`));
     }
   }, [downloadUrl, processing]);
 
@@ -914,7 +915,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       }
 
       const headers = formatHeaders();
-      const response = await fetch("/api/v1/tools/image/remove-background/effects", {
+      const response = await fetch(appUrl("/api/v1/tools/image/remove-background/effects"), {
         method: "POST",
         headers,
         body: formData,

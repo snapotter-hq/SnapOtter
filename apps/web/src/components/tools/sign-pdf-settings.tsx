@@ -5,6 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import {
   addSignature,
@@ -73,7 +74,7 @@ export function subscribeSignPdfJobProgress(
     if (es && es.readyState === EventSource.OPEN) return;
     if (es) es.close();
     try {
-      es = new EventSource(`/api/v1/jobs/${clientJobId}/progress`);
+      es = new EventSource(appUrl(`/api/v1/jobs/${clientJobId}/progress`));
     } catch {
       return;
     }
@@ -356,7 +357,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       setError("Request timed out. Try again.");
       endRun();
     };
-    xhr.open("POST", "/api/v1/tools/pdf/sign-pdf");
+    xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });

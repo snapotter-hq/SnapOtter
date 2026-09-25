@@ -5,6 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -104,7 +105,7 @@ export function OptimizeForWebSettings() {
     formData.append("file", file);
     formData.append("settings", JSON.stringify(buildSettings()));
 
-    fetch("/api/v1/tools/image/optimize-for-web/preview", {
+    fetch(appUrl("/api/v1/tools/image/optimize-for-web/preview"), {
       method: "POST",
       headers: formatHeaders(),
       body: formData,

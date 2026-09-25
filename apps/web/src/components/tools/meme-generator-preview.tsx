@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { appUrl } from "@/lib/app-url";
 import { cn } from "@/lib/utils";
 import {
   CATEGORIES,
@@ -221,7 +222,9 @@ function TemplateGallery() {
               className="group relative aspect-square rounded-lg overflow-hidden border border-border hover:border-primary/60 transition-all hover:shadow-md"
             >
               <img
-                src={`/api/v1/meme-templates/thumbs/${t.filename.replace(/\.[^.]+$/, ".webp")}`}
+                src={appUrl(
+                  `/api/v1/meme-templates/thumbs/${t.filename.replace(/\.[^.]+$/, ".webp")}`,
+                )}
                 alt={t.name}
                 loading="lazy"
                 className="w-full h-full object-cover"
@@ -354,7 +357,7 @@ function EditorPreview() {
   }, []);
 
   const imageSrc = selectedTemplate
-    ? `/api/v1/meme-templates/full/${selectedTemplate.filename}`
+    ? appUrl(`/api/v1/meme-templates/full/${selectedTemplate.filename}`)
     : (customImageUrl ?? "");
 
   const textBoxes = selectedTemplate

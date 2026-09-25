@@ -2,6 +2,7 @@ import type { FeatureBundleState } from "@snapotter/shared";
 import { TOOL_BUNDLE_MAP, TOOL_EXTRA_BUNDLES } from "@snapotter/shared";
 import { create } from "zustand";
 import { apiGet, apiPost } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 
 /**
  * Every bundle a tool needs: its primary bundle plus any extras. Computed from
@@ -171,7 +172,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     delete esRefs[bundleId];
     stopPolling(bundleId);
 
-    const es = new EventSource(`/api/v1/jobs/${jobId}/progress`);
+    const es = new EventSource(appUrl(`/api/v1/jobs/${jobId}/progress`));
     esRefs[bundleId] = es;
 
     es.onmessage = (event) => {

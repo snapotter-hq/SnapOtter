@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { useFileStore } from "@/stores/file-store";
 
 export interface GifInfo {
@@ -38,7 +39,7 @@ export function useGifInfo() {
     const formData = new FormData();
     formData.append("file", file);
 
-    fetch("/api/v1/tools/image/gif-tools/info", {
+    fetch(appUrl("/api/v1/tools/image/gif-tools/info"), {
       method: "POST",
       headers: formatHeaders(),
       body: formData,

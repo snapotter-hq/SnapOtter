@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -64,7 +65,7 @@ export function InfoSettings() {
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch("/api/v1/tools/image/info", {
+        const res = await fetch(appUrl("/api/v1/tools/image/info"), {
           method: "POST",
           headers: formatHeaders(),
           body: formData,

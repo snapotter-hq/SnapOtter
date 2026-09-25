@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const uploadConfig = vi.hoisted(() => ({
+  BASE_PATH: "",
   MAX_UPLOAD_SIZE_MB: 10,
   MAX_BATCH_SIZE: 5,
 }));
@@ -24,6 +25,7 @@ vi.mock("node:fs", async (importOriginal) => {
   return {
     ...actual,
     existsSync: vi.fn(() => true),
+    readFileSync: vi.fn(() => '<html><head><base href="/" /></head></html>'),
   };
 });
 
@@ -42,6 +44,7 @@ describe("registerStatic", () => {
   it("registers static plugin when dist path exists", async () => {
     existsSyncMock.mockReturnValue(true);
     const app = {
+      get: vi.fn(),
       register: vi.fn().mockResolvedValue(undefined),
       setNotFoundHandler: vi.fn(),
       hasReplyDecorator: vi.fn().mockReturnValue(false),
@@ -53,6 +56,8 @@ describe("registerStatic", () => {
       root: expect.stringContaining("web/dist"),
       prefix: "/",
       wildcard: false,
+      index: false,
+      globIgnore: ["**/index.html"],
       decorateReply: true,
     });
     expect(app.setNotFoundHandler).toHaveBeenCalled();
@@ -62,6 +67,7 @@ describe("registerStatic", () => {
     existsSyncMock.mockReturnValue(true);
     let notFoundHandler: (request: unknown, reply: unknown) => void;
     const app = {
+      get: vi.fn(),
       register: vi.fn().mockResolvedValue(undefined),
       setNotFoundHandler: vi.fn((handler: typeof notFoundHandler) => {
         notFoundHandler = handler;
@@ -72,7 +78,12 @@ describe("registerStatic", () => {
 
     await registerStatic(app as never);
 
-    const reply = { code: vi.fn().mockReturnThis(), send: vi.fn(), sendFile: vi.fn() };
+    const reply = {
+      code: vi.fn().mockReturnThis(),
+      header: vi.fn().mockReturnThis(),
+      type: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    };
     notFoundHandler?.({ url: "/api/v1/tools" }, reply);
     expect(reply.code).toHaveBeenCalledWith(404);
     expect(reply.send).toHaveBeenCalledWith({ error: "Not found", code: "NOT_FOUND" });
@@ -82,6 +93,7 @@ describe("registerStatic", () => {
     existsSyncMock.mockReturnValue(true);
     let notFoundHandler: (request: unknown, reply: unknown) => void;
     const app = {
+      get: vi.fn(),
       register: vi.fn().mockResolvedValue(undefined),
       setNotFoundHandler: vi.fn((handler: typeof notFoundHandler) => {
         notFoundHandler = handler;
@@ -92,14 +104,20 @@ describe("registerStatic", () => {
 
     await registerStatic(app as never);
 
-    const reply = { code: vi.fn().mockReturnThis(), send: vi.fn(), sendFile: vi.fn() };
+    const reply = {
+      code: vi.fn().mockReturnThis(),
+      header: vi.fn().mockReturnThis(),
+      type: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+    };
     notFoundHandler?.({ url: "/resize" }, reply);
-    expect(reply.sendFile).toHaveBeenCalledWith("index.html");
+    expect(reply.send).toHaveBeenCalledWith(expect.stringContaining('<base href="/"'));
   });
 
   it("logs warning and skips registration when dist path does not exist", async () => {
     existsSyncMock.mockReturnValue(false);
     const app = {
+      get: vi.fn(),
       register: vi.fn().mockResolvedValue(undefined),
       setNotFoundHandler: vi.fn(),
       log: { warn: vi.fn() },

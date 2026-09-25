@@ -49,6 +49,7 @@ interface OpenAPISpec {
   info: { title: string; version: string; description?: string };
   tags?: Array<{ name: string; description?: string }>;
   paths: Record<string, Record<string, PathOperation>>;
+  servers?: Array<{ url: string }>;
 }
 
 function isPublic(op: PathOperation): boolean {
@@ -240,7 +241,11 @@ async function loadLocaleToolStrings(
 
 export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const specPath = resolve(__dirname, "../openapi.yaml");
-  const specContent = readFileSync(specPath, "utf-8");
+  const withBasePath = (content: string) =>
+    env.BASE_PATH
+      ? yaml.dump({ ...(yaml.load(content) as OpenAPISpec), servers: [{ url: env.BASE_PATH }] })
+      : content;
+  const specContent = withBasePath(readFileSync(specPath, "utf-8"));
   const spec = yaml.load(specContent) as OpenAPISpec;
   const specDir = dirname(specPath); // apps/api/src
 
@@ -265,7 +270,7 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
       const file = resolveSpecFile(specDir, request.query.lang);
       // English default is byte-identical to the file read at startup, preserving
       // the ASCII-only guarantee; localized files are UTF-8 and only served with ?lang.
-      const body = file === specPath ? specContent : readFileSync(file, "utf-8");
+      const body = file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"));
       reply.type("text/yaml; charset=utf-8").send(body);
     },
   );
@@ -362,8 +367,13 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
   // its content at registration, so the shell stays English by design. This is
   // a documented limitation, not a gap to fix here. See the web-surfaces i18n
   // spec, "API reference (Scalar), scoped".
-  await app.register(scalarPlugin, {
-    routePrefix: "/api/docs",
-    configuration,
+  await app.register(async (docs) => {
+    docs.addHook("onSend", async (_request, reply) => {
+      const location = reply.getHeader("location");
+      if (typeof location === "string" && location.startsWith("/api/docs")) {
+        reply.header("location", `${env.BASE_PATH}${location}`);
+      }
+    });
+    await docs.register(scalarPlugin, { routePrefix: "/api/docs", configuration });
   });
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { appUrl } from "@/lib/app-url";
 
 type ConnectionStatus = "connected" | "disconnected" | "reconnected" | "offline";
 
@@ -43,7 +44,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   checkHealth: async () => {
     try {
-      const res = await fetch("/api/v1/health");
+      const res = await fetch(appUrl("/api/v1/health"));
       if (res.ok) {
         const current = get().status;
         if (current === "disconnected" || current === "offline") {

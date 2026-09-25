@@ -5,6 +5,14 @@ import { DEFAULT_TRUST_PROXY, parseTrustProxy } from "./trust-proxy.js";
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
+    BASE_PATH: z
+      .string()
+      .default("")
+      .transform((value) => value.replace(/\/$/, ""))
+      .refine((value) => /^(\/[a-zA-Z0-9_-]+)*$/.test(value), {
+        message:
+          "BASE_PATH must be empty, /, or a path such as /snapotter (letters, digits, - and _)",
+      }),
     AUTH_ENABLED: z
       .enum(["true", "false"])
       .default("true")

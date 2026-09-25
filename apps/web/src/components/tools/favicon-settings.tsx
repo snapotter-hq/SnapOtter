@@ -4,6 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -156,7 +157,7 @@ export function FaviconSettings() {
       cleanup();
     };
 
-    xhr.open("POST", "/api/v1/tools/image/favicon");
+    xhr.open("POST", appUrl("/api/v1/tools/image/favicon"));
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
+import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -99,7 +100,7 @@ function scanOneFile(
     xhr.onerror = () => reject(new Error("Network error"));
     xhr.ontimeout = () => reject(new Error("Request timed out"));
 
-    xhr.open("POST", "/api/v1/tools/image/barcode-read");
+    xhr.open("POST", appUrl("/api/v1/tools/image/barcode-read"));
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
     }
