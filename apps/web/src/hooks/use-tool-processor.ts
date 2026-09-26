@@ -25,6 +25,7 @@ interface ProcessResult {
 }
 
 interface BatchProgressFrame {
+  type?: string;
   status: "processing" | "completed" | "failed";
   totalFiles: number;
   completedFiles: number;
@@ -92,6 +93,30 @@ const MIME_BY_EXT: Record<string, string> = {
   html: "text/html",
   zip: "application/zip",
 };
+
+/** Shape of the `type: "single"` SSE frames; only the fields read below. */
+interface SingleProgressFrame {
+  type?: string;
+  phase?: string;
+  result?: unknown;
+  percent?: number;
+  stage?: string;
+  error?: string;
+}
+
+/**
+ * What `JSON.parse` hands back for any progress frame: the single-frame fields
+ * plus the batch fields the batch branch reads (through its cast to
+ * BatchProgressFrame). One type keeps the parse fallback narrowing simple.
+ */
+interface ProgressFrame extends SingleProgressFrame {
+  status?: BatchProgressFrame["status"];
+  totalFiles?: number;
+  completedFiles?: number;
+  failedFiles?: number;
+  errors?: BatchProgressFrame["errors"];
+  currentFile?: string;
+}
 
 export function useToolProcessor(toolId: string) {
   const { t } = useTranslation();
@@ -323,8 +348,15 @@ export function useToolProcessor(toolId: string) {
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
+          let data: ProgressFrame;
           try {
-            const data = JSON.parse(event.data);
+            data = JSON.parse(event.data);
+          } catch {
+            // Ignore malformed SSE frames only; the handling below must never
+            // hide a real failure behind this catch (#1287).
+            return;
+          }
+          try {
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
               return;
@@ -449,8 +481,33 @@ export function useToolProcessor(toolId: string) {
                 stage: data.stage,
               }));
             }
-          } catch {
-            // Ignore malformed SSE
+          } catch (err) {
+            // A throw inside handling used to be swallowed here, so the run
+            // limboed until the stall timer fired with an unrelated message
+            // (#1287). Surface it and settle the run like a server failure.
+            console.error("SSE frame handling failed", err);
+            try {
+              clearStallTimer();
+              if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              if (eventSourceRef.current === es) eventSourceRef.current = null;
+              xhrRef.current?.abort();
+              clearJobEvidenceTimer();
+              clearActiveJob();
+              setError("Completion handling failed unexpectedly.");
+              setProcessing(false);
+              setProgress(IDLE_PROGRESS);
+            } catch {
+              // The original error is already logged; don't mask it.
+            }
+            // Settling the entries goes last and on its own: if the store
+            // write itself is what threw, the run-level cleanup above must
+            // still have happened.
+            try {
+              settleProcessingEntries("Completion handling failed unexpectedly.");
+            } catch {
+              // already logged above
+            }
           }
         };
 

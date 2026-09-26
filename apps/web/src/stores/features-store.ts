@@ -176,42 +176,51 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     esRefs[bundleId] = es;
 
     es.onmessage = (event) => {
+      let data: {
+        type?: string;
+        phase: string;
+        percent: number;
+        stage: string;
+        error?: string;
+      };
       try {
-        const data = JSON.parse(event.data) as {
+        data = JSON.parse(event.data) as {
           type?: string;
           phase: string;
           percent: number;
           stage: string;
           error?: string;
         };
-        if (data.type === "heartbeat") return;
-        if (data.phase === "complete") {
-          es.close();
-          delete esRefs[bundleId];
-          stopTracking(bundleId);
-          refreshBundles();
-          onInstallSettled(bundleId, null);
-          return;
-        }
-        if (data.phase === "failed") {
-          es.close();
-          delete esRefs[bundleId];
-          stopTracking(bundleId);
-          onInstallSettled(bundleId, data.error ?? "Installation failed");
-          return;
-        }
-        // First progress frame means the server has started this install for
-        // real: move it out of the queued pill and into the installing map.
-        const current = get().installing[bundleId];
-        const percent = Math.max(data.percent, current?.percent ?? 0);
-        set({
-          installing: {
-            ...get().installing,
-            [bundleId]: { percent, stage: data.stage },
-          },
-          queued: get().queued.filter((id) => id !== bundleId),
-        });
-      } catch {}
+      } catch {
+        return; // malformed frame; handling below must not hide behind this catch
+      }
+      if (data.type === "heartbeat") return;
+      if (data.phase === "complete") {
+        es.close();
+        delete esRefs[bundleId];
+        stopTracking(bundleId);
+        refreshBundles();
+        onInstallSettled(bundleId, null);
+        return;
+      }
+      if (data.phase === "failed") {
+        es.close();
+        delete esRefs[bundleId];
+        stopTracking(bundleId);
+        onInstallSettled(bundleId, data.error ?? "Installation failed");
+        return;
+      }
+      // First progress frame means the server has started this install for
+      // real: move it out of the queued pill and into the installing map.
+      const current = get().installing[bundleId];
+      const percent = Math.max(data.percent, current?.percent ?? 0);
+      set({
+        installing: {
+          ...get().installing,
+          [bundleId]: { percent, stage: data.stage },
+        },
+        queued: get().queued.filter((id) => id !== bundleId),
+      });
     };
 
     es.onerror = () => {
