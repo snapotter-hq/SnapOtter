@@ -252,6 +252,27 @@ async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
+/**
+ * Batch outcome counters as recordChildOutcome leaves them. The worker
+ * writes them after the child's own jobs row has settled, so a bare read
+ * right after terminalRow() can observe the pre-write state (#1107). Polls
+ * until the counter exists and, for a failure, until its error entry has
+ * been pushed too (the counter is bumped before the list).
+ */
+async function batchOutcome(
+  parentId: string,
+  counter: "done" | "failed",
+): Promise<{ count: string; errors: Array<{ filename: string; error: string }> }> {
+  const base = `${bullPrefix()}:batch:${parentId}`;
+  return waitFor(async () => {
+    const count = await sharedRedis().get(`${base}:${counter}`);
+    if (count === null) return undefined;
+    const errors = await sharedRedis().lrange(`${base}:errors`, 0, -1);
+    if (counter === "failed" && errors.length === 0) return undefined;
+    return { count, errors: errors.map((e) => JSON.parse(e)) };
+  }, 10_000);
+}
+
 /** Poll the mocked trackEvent until minCount events for this distinctId exist. */
 async function emittedEvents(
   event: string,
@@ -738,15 +759,9 @@ describe("pipeline finalize", () => {
     // nonterminal since #750 (only batch-finalize publishes the terminal
     // frame, after the durable ZIP exists), so the record shows up in the
     // Redis counters and the parent row's persisted counts.
-    expect(await sharedRedis().get(`${bullPrefix()}:batch:${batchParent}:failed`)).toBe("1");
-    const errorsRaw = await sharedRedis().lrange(
-      `${bullPrefix()}:batch:${batchParent}:errors`,
-      0,
-      -1,
-    );
-    expect(errorsRaw.map((e) => JSON.parse(e))).toEqual([
-      { filename: "b.png", error: "Step 2: kaboom" },
-    ]);
+    const outcome = await batchOutcome(batchParent, "failed");
+    expect(outcome.count).toBe("1");
+    expect(outcome.errors).toEqual([{ filename: "b.png", error: "Step 2: kaboom" }]);
     const parentRow = await waitFor(async () => {
       const candidate = await jobRow(batchParent);
       return candidate?.status === "processing" ? candidate : undefined;
@@ -829,7 +844,9 @@ describe("pipeline finalize", () => {
 
     // Success recorded against the pipeline-batch parent; the record stays
     // nonterminal since #750 (the batch-finalize owns the terminal frame).
-    expect(await sharedRedis().get(`${bullPrefix()}:batch:${batchParent}:done`)).toBe("1");
+    const outcome = await batchOutcome(batchParent, "done");
+    expect(outcome.count).toBe("1");
+    expect(outcome.errors).toEqual([]);
     const parentRow = await waitFor(async () => {
       const candidate = await jobRow(batchParent);
       return candidate?.status === "processing" ? candidate : undefined;
