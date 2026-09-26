@@ -133,9 +133,7 @@ def _register_hr_matting_session(sessions_class):
     _hr_matting_registered = True
 
     import os
-    import numpy as np
     import pooch
-    from PIL import Image
     from rembg.sessions.birefnet_general import BiRefNetSessionGeneral
 
     class BiRefNetHRMattingSession(BiRefNetSessionGeneral):
@@ -159,22 +157,12 @@ def _register_hr_matting_session(sessions_class):
         def name(cls, *args, **kwargs):
             return "birefnet-hr-matting"
 
-        def predict(self, img, *args, **kwargs):
-            ort_outs = self.inner_session.run(
-                None,
-                self.normalize(
-                    img, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225), (2048, 2048)
-                ),
-            )
-            pred = ort_outs[0][:, 0, :, :]
-            ma = np.max(pred)
-            mi = np.min(pred)
-            denom = ma - mi
-            pred = (pred - mi) / denom if denom > 0 else pred * 0
-            pred = np.squeeze(pred)
-            mask = Image.fromarray((pred * 255).astype("uint8"), mode="L")
-            mask = mask.resize(img.size, Image.LANCZOS)
-            return [mask]
+        # rembg's BiRefNet predict feeds the model 1024x1024; the HR matting
+        # model takes 2048x2048. Change only the size and keep rembg's predict:
+        # the model outputs logits, and a hand-rolled predict once dropped the
+        # sigmoid, leaving every subject half transparent (#1298).
+        def normalize(self, img, mean, std, size, *args, **kwargs):
+            return super().normalize(img, mean, std, (2048, 2048), *args, **kwargs)
 
     sessions_class.append(BiRefNetHRMattingSession)
 
