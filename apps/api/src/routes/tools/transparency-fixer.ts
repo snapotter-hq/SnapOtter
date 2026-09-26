@@ -33,6 +33,77 @@ const settingsSchema = z.object({
 });
 
 /**
+ * Sliding max along one line of `src` (van Herk / Gil-Werman): each output is
+ * the largest value within `radius` of it on the line, at constant cost per
+ * pixel whatever the radius, so a large defringe on a large image can't stall
+ * the worker. The line is copied out before any of it is written, so `dst`
+ * may be `src`. `line`, `prefix` and `suffix` are scratch space of at least
+ * `length + 2 * radius`.
+ */
+function slideMax(
+  src: Uint8Array,
+  dst: Uint8Array,
+  start: number,
+  stride: number,
+  length: number,
+  radius: number,
+  line: Uint8Array,
+  prefix: Uint8Array,
+  suffix: Uint8Array,
+): void {
+  const size = 2 * radius + 1;
+  const padded = length + 2 * radius;
+  // Zero padding leaves windows past the line's ends judged on the pixels
+  // that exist, since zero never wins a max.
+  line.fill(0, 0, radius);
+  line.fill(0, radius + length, padded);
+  for (let k = 0; k < length; k++) line[radius + k] = src[start + k * stride];
+
+  for (let blockStart = 0; blockStart < padded; blockStart += size) {
+    const blockEnd = Math.min(blockStart + size, padded);
+    let run = 0;
+    for (let j = blockStart; j < blockEnd; j++) {
+      if (line[j] > run) run = line[j];
+      prefix[j] = run;
+    }
+    run = 0;
+    for (let j = blockEnd - 1; j >= blockStart; j--) {
+      if (line[j] > run) run = line[j];
+      suffix[j] = run;
+    }
+  }
+
+  // The window [i, i + size) spans at most two blocks: the tail of one from
+  // `suffix` and the head of the next from `prefix`.
+  for (let i = 0; i < length; i++) {
+    const tail = suffix[i];
+    const head = prefix[i + size - 1];
+    dst[start + i * stride] = tail > head ? tail : head;
+  }
+}
+
+/** Largest value within `radius` pixels of each pixel, over a square window. */
+function windowMax(values: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  const scratchLength = Math.max(width, height) + 2 * radius;
+  const line = new Uint8Array(scratchLength);
+  const prefix = new Uint8Array(scratchLength);
+  const suffix = new Uint8Array(scratchLength);
+  const result = new Uint8Array(values.length);
+  for (let y = 0; y < height; y++) {
+    slideMax(values, result, y * width, 1, width, radius, line, prefix, suffix);
+  }
+  for (let x = 0; x < width; x++) {
+    slideMax(result, result, x, width, height, radius, line, prefix, suffix);
+  }
+  return result;
+}
+
+// Alpha under this counts as background when deciding whether a pixel sits
+// next to it, so a faint noise floor left in the matte doesn't hide the
+// background from the fringe test.
+const BACKGROUND_ALPHA = 8;
+
+/**
  * Sharp-based defringe post-processing.
  */
 async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer> {
@@ -46,8 +117,10 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   const pixelCount = info.width * info.height;
 
   const alpha = Buffer.alloc(pixelCount);
+  const background = new Uint8Array(pixelCount);
   for (let i = 0; i < pixelCount; i++) {
     alpha[i] = data[i * 4 + 3];
+    background[i] = alpha[i] < BACKGROUND_ALPHA ? 1 : 0;
   }
 
   const blurRadius = Math.max(0.3, Math.round(intensity / 20));
@@ -67,10 +140,26 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
     );
   }
 
+  // Fringe is a pixel at the subject's boundary with the background whose
+  // neighbourhood is thin compared with the subject around it (#1178). Two
+  // conditions, both judged over the pixels the blur actually read:
+  //  - background must be in reach, so an opaque region meeting a soft one
+  //    (skin under a sheer sleeve, a head under hair) is never cut apart;
+  //  - the threshold is a fraction of the most opaque alpha in reach, not of
+  //    255, so a uniform soft region (glass, smoke) blurs to its own alpha
+  //    and keeps its interior, trimmed at the edge like an opaque one.
+  // Where the blur saw a fully opaque pixel and background, this is the old
+  // absolute rule, and it never clears a pixel the old rule kept.
+  // sharp truncates its Gaussian at minAmplitude 0.2, so each blurred value
+  // comes from within this many pixels; rounding up keeps the window a superset.
+  const blurFootprint = Math.ceil(blurRadius * Math.sqrt(2 * Math.log(5)));
+  const peakAlpha = windowMax(alpha, info.width, info.height, blurFootprint);
+  const backgroundInReach = windowMax(background, info.width, info.height, blurFootprint);
   const threshold = Math.round(128 + (intensity / 100) * 80);
   const result = Buffer.from(data);
   for (let i = 0; i < pixelCount; i++) {
-    if (alpha[i] > 0 && blurredAlphaRaw[i] < threshold) {
+    const thinNeighbourhood = blurredAlphaRaw[i] * 255 < threshold * peakAlpha[i];
+    if (alpha[i] > 0 && backgroundInReach[i] && thinNeighbourhood) {
       result[i * 4] = 0;
       result[i * 4 + 1] = 0;
       result[i * 4 + 2] = 0;

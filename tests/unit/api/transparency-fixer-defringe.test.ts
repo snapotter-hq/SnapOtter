@@ -3,7 +3,9 @@
  *
  * The matting model is mocked so this needs no AI bundle. What it pins is the
  * sharp arithmetic that runs after the model: defringe may trim a thin ring
- * just inside the subject's edge, and must leave everything else alone.
+ * just inside the subject's edge, and must leave everything else alone. That
+ * holds for a semi-transparent subject too: soft alpha is what a matting model
+ * is for, so a uniform 55% region is subject, not fringe (#1178).
  */
 
 import { tmpdir } from "node:os";
@@ -36,17 +38,25 @@ const SUBJECT_TOP = 40;
 const SUBJECT_BOTTOM = 100;
 const CLEARED = Buffer.from([0, 0, 0, 0]);
 
-/** RGBA PNG: a fully opaque rectangular subject on a fully transparent ground. */
-async function opaqueSubjectPng(): Promise<Buffer> {
+type AlphaAt = (x: number, y: number) => number;
+
+/** RGBA PNG in the subject's colour, with alpha from `alphaAt`. */
+async function mattePng(alphaAt: AlphaAt): Promise<Buffer> {
   const raw = Buffer.alloc(WIDTH * HEIGHT * 4, 0);
-  for (let y = SUBJECT_TOP; y < SUBJECT_BOTTOM; y++) {
-    for (let x = SUBJECT_LEFT; x < SUBJECT_RIGHT; x++) {
-      raw.set([200, 80, 40, 255], (y * WIDTH + x) * 4);
+  for (let y = 0; y < HEIGHT; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      const alpha = alphaAt(x, y);
+      if (alpha > 0) raw.set([200, 80, 40, alpha], (y * WIDTH + x) * 4);
     }
   }
   return sharp(raw, { raw: { width: WIDTH, height: HEIGHT, channels: 4 } })
     .png()
     .toBuffer();
+}
+
+/** The rectangular subject at `subjectAlpha` on a fully transparent ground. */
+function uniformSubject(subjectAlpha: number): AlphaAt {
+  return (x, y) => (depthInsideSubject(x, y) >= 0 ? subjectAlpha : 0);
 }
 
 async function decodeRgba(png: Buffer): Promise<Buffer> {
@@ -103,8 +113,8 @@ const ctx: ToolProcessCtx = {
   report: vi.fn(),
 };
 
-async function runDefringe(settings: Record<string, unknown>) {
-  const matte = await opaqueSubjectPng();
+async function runDefringe(settings: Record<string, unknown>, alphaAt = uniformSubject(255)) {
+  const matte = await mattePng(alphaAt);
   aiMocks.removeBackground.mockResolvedValue(matte);
   const result = await runAiToolJob(job(settings), matte, ctx);
   return { input: await decodeRgba(matte), output: await decodeRgba(result.buffer) };
@@ -130,6 +140,64 @@ describe("transparency-fixer defringe", () => {
     // corners always go, so a defringe that silently became a no-op fails here.
     const erased = expectOnlyEdgeRingErased(input, output, 8);
     expect(erased).toBeGreaterThan(0);
+  });
+
+  // Alpha 140 at the default, 160 at 60 and 200 at 100 each sat just under
+  // the old absolute threshold, which cleared the whole subject.
+  it.each([
+    { subjectAlpha: 140, defringe: 30, ringWidth: 3 },
+    { subjectAlpha: 160, defringe: 60, ringWidth: 6 },
+    { subjectAlpha: 200, defringe: 100, ringWidth: 8 },
+    { subjectAlpha: 100, defringe: 1, ringWidth: 2 },
+  ])(
+    "keeps the interior of a subject at alpha $subjectAlpha with defringe $defringe",
+    async ({ subjectAlpha, defringe, ringWidth }) => {
+      const { input, output } = await runDefringe({ defringe }, uniformSubject(subjectAlpha));
+      expectOnlyEdgeRingErased(input, output, ringWidth);
+    },
+  );
+
+  it("trims a soft subject's edge exactly as it trims an opaque one", async () => {
+    const opaque = await runDefringe({ defringe: 100 });
+    const soft = await runDefringe({ defringe: 100 }, uniformSubject(140));
+
+    // Cleared pixels are where the output alpha went to zero.
+    const cleared = (out: Buffer) =>
+      Array.from({ length: WIDTH * HEIGHT }, (_, i) => out[i * 4 + 3] === 0);
+    expect(cleared(soft.output)).toEqual(cleared(opaque.output));
+  });
+
+  it("leaves the seam where an opaque region meets a soft one", async () => {
+    // Left half opaque, right half at alpha 140, touching with no gap. The
+    // seam has no background near it, so nothing there is fringe; only the
+    // subject's outer edge may be trimmed.
+    const seamX = (SUBJECT_LEFT + SUBJECT_RIGHT) / 2;
+    const { input, output } = await runDefringe({ defringe: 100 }, (x, y) => {
+      if (depthInsideSubject(x, y) < 0) return 0;
+      return x < seamX ? 255 : 140;
+    });
+    // Where the seam reaches the outer edge the soft half thins the
+    // neighbourhood, so the trim there runs as deep as the blur reads (9px at
+    // defringe 100) and no deeper. The old rule cleared the whole soft half.
+    expectOnlyEdgeRingErased(input, output, 9);
+  });
+
+  it("still clears a faint halo around an opaque subject", async () => {
+    // A 3px ring at alpha 40 just outside the subject: what defringe is for.
+    const haloWidth = 3;
+    const { output } = await runDefringe({}, (x, y) => {
+      const depth = depthInsideSubject(x, y);
+      if (depth >= 0) return 255;
+      return depth >= -haloWidth ? 40 : 0;
+    });
+
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        if (depthInsideSubject(x, y) >= 0) continue;
+        const alpha = output[(y * WIDTH + x) * 4 + 3];
+        expect(alpha, `halo pixel (${x}, ${y}) survived`).toBe(0);
+      }
+    }
   });
 
   it("changes nothing at zero", async () => {
