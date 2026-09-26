@@ -40,28 +40,19 @@ async function reportFeatureFailure(
 }
 
 /**
- * In-flight dynamic import of `@snapotter/enterprise`, deduplicated across
- * concurrent callers (snapotter-hq/SnapOtter#1000).
+ * In-flight dynamic import of `@snapotter/enterprise`, shared by every caller
+ * that arrives while it is pending (snapotter-hq/SnapOtter#1000).
  *
- * Two concurrent `Promise.all([...])` requests that each reach the licence gate
- * would otherwise resolve the same dynamic import twice through vitest's mock
- * registry, and one of them could observe the un-mocked module (404 + real
- * `isFeatureEnabled`) while the other observes the mocked one. The gate then
- * denies the loser with 403, the SCIM "concurrent duplicate group creates"
- * test times out, and the suite flaks 1-in-2.
+ * Under vitest's module mocker, two overlapping imports of a `vi.doMock`ed
+ * module resolve differently: one caller gets the mock and the other gets the
+ * real, unlicensed module. Concurrent SCIM requests in the integration suite
+ * hit that, one of the two was denied with a 403, and the race tests timed out.
+ * Node's own loader has no such split, so in production this only saves
+ * duplicate import calls.
  *
- * Caching only the in-flight promise — not the resolved module — means:
- * - Concurrent callers in the same tick share one resolution (race fixed).
- * - Once the promise settles, the cache is cleared, so the next call
- *   re-imports fresh. That matters for `vi.resetModules()` between tests: a
- *   fresh `vi.doMock("@snapotter/enterprise", ...)` must apply on the next
- *   access, not return a stale snapshot from a previous test.
- * - In production the single-flight is a no-op (Node resolves the import in
- *   microseconds and the cache slot is already null before the next request),
- *   so there is no measurable cost.
- *
- * Scope: module-private. Other files do not see this; the only public surface
- * (`isEnterpriseFeatureEnabled`) is unchanged.
+ * Only the pending promise is held. Once it settles the slot is cleared and the
+ * next call imports again, so a `vi.resetModules()` plus a fresh `vi.doMock`
+ * between tests still applies, and a failed load is not remembered.
  */
 let pendingEnterpriseImport: Promise<typeof import("@snapotter/enterprise")> | null = null;
 
@@ -71,12 +62,10 @@ function loadEnterpriseModule(): Promise<typeof import("@snapotter/enterprise")>
   }
   const inflight = import("@snapotter/enterprise");
   pendingEnterpriseImport = inflight;
-  // Clear the slot once settled so the NEXT call re-resolves fresh.
-  // Attach on the same microtask chain as the caller's await; a finally
-  // would also run on rejection, but that would rethrow to the
-  // `pendingEnterpriseImport` reader below on the rejection path even when
-  // nobody awaits it. Using then keeps the rejected value reachable only
-  // through the caller's await.
+  // Both handlers are needed: `.finally()` would return a promise that
+  // rejects again with the load error, and nothing awaits it, so a failed
+  // load would also raise an unhandled rejection. Callers still see the
+  // error through `inflight` itself.
   inflight.then(
     () => {
       pendingEnterpriseImport = null;
