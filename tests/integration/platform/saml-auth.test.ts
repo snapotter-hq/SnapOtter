@@ -470,8 +470,8 @@ describe.each(["", "/snapotter"])("SAML deployment at '%s'", (basePath) => {
   });
 
   it("keeps failed login and callback redirects under the deployment path", async () => {
-    samlMock.getAuthorizeUrlAsync.mockRejectedValue(new Error("IdP unavailable"));
-    samlMock.validatePostResponseAsync.mockRejectedValue(new Error("invalid signature"));
+    samlMock.getAuthorizeUrlAsync.mockRejectedValueOnce(new Error("IdP unavailable"));
+    samlMock.validatePostResponseAsync.mockRejectedValueOnce(new Error("invalid signature"));
     const login = await testApp.app.inject(`${basePath}/api/auth/saml/login`);
     const callback = await postCallback();
     for (const res of [login, callback]) {

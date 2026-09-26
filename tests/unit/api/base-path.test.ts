@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { stripBasePath } from "../../../apps/api/src/lib/base-path.js";
@@ -37,7 +38,7 @@ it("keeps the production URL rewrite wired before routing and auth", () => {
 it("builds every API download URL through the deployment prefix", () => {
   // Drift guard: a hardcoded "/api/v1/download/..." template ships a URL the
   // browser cannot follow under a subpath deployment. Route registrations and
-  // auth prefix literals are fine — only string interpolation of URLs is.
+  // auth prefix literals are fine; only string interpolation of URLs is.
   const offenders: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -59,7 +60,7 @@ it("builds every API download URL through the deployment prefix", () => {
       }
     }
   };
-  walk(new URL("../../../apps/api/src", import.meta.url).pathname);
+  walk(fileURLToPath(new URL("../../../apps/api/src", import.meta.url)));
   expect(offenders).toEqual([]);
 });
 
