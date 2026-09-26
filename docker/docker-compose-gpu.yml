@@ -39,6 +39,16 @@ services:
       - RATE_LIMIT_PER_MIN=${RATE_LIMIT_PER_MIN:-1000}
       - MAX_USERS=${MAX_USERS:-0}
       - SESSION_DURATION_HOURS=${SESSION_DURATION_HOURS:-168}
+      # Engine binary overrides and hardware encoding, read from your shell or
+      # Compose `.env` (see .env.example). Empty keeps the image's own binaries
+      # and software encoding. SNAPOTTER_HW_ACCEL needs an ffmpeg built with
+      # that family; point FFMPEG_PATH (and FFPROBE_PATH) at a mounted build.
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}
       # Believe X-Forwarded-For only from a peer on a private network. Set to
       # `true` only if a proxy you control sits in front on a public address.
       - TRUST_PROXY=${TRUST_PROXY:-loopback,linklocal,uniquelocal}
