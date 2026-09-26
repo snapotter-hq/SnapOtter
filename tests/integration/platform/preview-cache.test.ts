@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -18,15 +26,20 @@ import {
  * there, and every later request served it with `immutable`, so the browser
  * never asked again.
  *
- * The ffmpeg here is a stand-in for one that dies mid-encode: it writes some
- * bytes to its output path and exits 1. (It hands `-encoders` to the real
- * binary when there is one, so the encoder check sees a normal build.)
+ * The ffmpeg here is a stand-in, so this runs on CI shards without ffmpeg.
+ * By default it dies mid-encode: writes some bytes to its output path and
+ * exits 1. With PREVIEW_STUB_MODE=ok it writes a complete "preview" and exits
+ * 0, which covers the rename path. Every write is logged to a sentinel file,
+ * so a stub that silently stops writing can't make these pass by accident.
+ * (It hands `-encoders` to the real binary when there is one.)
  */
 const PARTIAL = "PARTIAL-PREVIEW-BYTES";
+const COMPLETE = "COMPLETE-PREVIEW-BYTES";
 const realFfmpeg = (spawnSync("which", ["ffmpeg"], { encoding: "utf8" }).stdout ?? "").trim();
 const originalFfmpegPath = process.env.FFMPEG_PATH;
 const stubDir = mkdtempSync(join(tmpdir(), "snapotter-preview-cache-"));
 const stub = join(stubDir, "ffmpeg");
+const writesLog = join(stubDir, "writes.log");
 writeFileSync(
   stub,
   [
@@ -44,6 +57,11 @@ writeFileSync(
     '  prev="$a"',
     "done",
     '[ -n "$out" ] || { echo "stub: no output path found" >&2; exit 2; }',
+    `echo "$out" >> '${writesLog}'`,
+    'if [ "$PREVIEW_STUB_MODE" = "ok" ]; then',
+    `  printf '${COMPLETE}' > "$out"`,
+    "  exit 0",
+    "fi",
     `printf '${PARTIAL}' > "$out"`,
     "echo 'Conversion failed!' >&2",
     "exit 1",
@@ -90,15 +108,29 @@ function getPreview(id: string) {
   });
 }
 
+/** Output paths the stub has written to so far. */
+function stubWrites(): string[] {
+  return existsSync(writesLog) ? readFileSync(writesLog, "utf8").trim().split("\n") : [];
+}
+
+function previewFiles(id: string): string[] {
+  return readdirSync(join(env.FILES_STORAGE_PATH, ".previews")).filter((n) => n.startsWith(id));
+}
+
 describe("stored-file preview when ffmpeg fails mid-encode (#1291)", () => {
   it.each([
     ["audio", "clip.wav", "audio/wav", () => readFixture(fixtures.audio.tiny("wav"))],
     ["video", "clip.mp4", "video/mp4", () => readFixture(fixtures.video.tiny("mp4"))],
   ])("does not cache or serve a partial %s preview", async (_kind, name, type, content) => {
     const file = await uploadToLibrary(name, type, content());
+    const writesBefore = stubWrites().length;
 
     const first = await getPreview(file.id);
     expect(first.statusCode).toBe(422);
+    // The stub really did leave partial output behind for the route to handle.
+    expect(stubWrites().length).toBe(writesBefore + 1);
+    // ffmpeg's stderr stays out of the response.
+    expect(JSON.parse(first.body).error).toBe("Could not generate preview");
 
     // The retry must fail again (ffmpeg still fails), not serve the leftovers.
     const second = await getPreview(file.id);
@@ -113,8 +145,35 @@ describe("stored-file preview when ffmpeg fails mid-encode (#1291)", () => {
       readFixture(fixtures.audio.tiny("wav")),
     );
     expect((await getPreview(file.id)).statusCode).toBe(422);
-    const previewDir = join(env.FILES_STORAGE_PATH, ".previews");
-    const leftovers = readdirSync(previewDir).filter((n) => n.startsWith(file.id));
-    expect(leftovers).toEqual([]);
+    expect(stubWrites().at(-1)).toContain(file.id);
+    expect(previewFiles(file.id)).toEqual([]);
+  });
+});
+
+describe("stored-file preview when the encode succeeds (#1291)", () => {
+  it("renames the finished preview into the cache and serves it from there", async () => {
+    process.env.PREVIEW_STUB_MODE = "ok";
+    try {
+      const file = await uploadToLibrary(
+        "done.wav",
+        "audio/wav",
+        readFixture(fixtures.audio.tiny("wav")),
+      );
+      const first = await getPreview(file.id);
+      expect(first.statusCode, first.body.slice(0, 200)).toBe(200);
+      expect(first.rawPayload.toString()).toBe(COMPLETE);
+      // ffmpeg wrote to a temp name, never the cache path itself.
+      expect(stubWrites().at(-1)).toMatch(/\.part\.mp3$/);
+
+      const writes = stubWrites().length;
+      const second = await getPreview(file.id);
+      expect(second.statusCode).toBe(200);
+      expect(second.rawPayload.toString()).toBe(COMPLETE);
+      // Served from the cache: ffmpeg didn't run again.
+      expect(stubWrites().length).toBe(writes);
+      expect(previewFiles(file.id)).toEqual([`${file.id}.mp3`]);
+    } finally {
+      delete process.env.PREVIEW_STUB_MODE;
+    }
   });
 });
