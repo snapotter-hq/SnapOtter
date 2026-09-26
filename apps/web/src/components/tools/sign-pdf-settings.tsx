@@ -13,7 +13,7 @@ import {
   listSignatures,
   type SavedSignature,
 } from "@/lib/signature-store";
-import { generateId } from "@/lib/utils";
+import { generateId, resolveServerUrl } from "@/lib/utils";
 import { safeRandomUUID } from "@/lib/uuid";
 import { useFileStore } from "@/stores/file-store";
 import type { SignCanvasRef } from "./sign-canvas";
@@ -79,28 +79,35 @@ export function subscribeSignPdfJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      let data: {
+        type?: string;
+        phase?: string;
+        result?: Record<string, unknown>;
+        percent?: number;
+        error?: string;
+      };
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === "heartbeat") {
-          resetStall();
-          return;
-        }
-        if (data.type !== "single") return;
-        resetStall();
-        if (data.phase === "complete" && data.result) {
-          cleanup();
-          handlers.onComplete(data.result as Record<string, unknown>);
-          return;
-        }
-        if (data.phase === "failed") {
-          cleanup();
-          handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
-          return;
-        }
-        if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
+        data = JSON.parse(event.data);
       } catch {
-        // Ignore malformed SSE frames
+        return; // malformed frame
       }
+      if (data.type === "heartbeat") {
+        resetStall();
+        return;
+      }
+      if (data.type !== "single") return;
+      resetStall();
+      if (data.phase === "complete" && data.result) {
+        cleanup();
+        handlers.onComplete(data.result as Record<string, unknown>);
+        return;
+      }
+      if (data.phase === "failed") {
+        cleanup();
+        handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
+        return;
+      }
+      if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
     };
     // A transient drop triggers the browser's built-in reconnect; on reconnect
     // the backend replays the terminal frame, so a completed job still resolves.
@@ -258,7 +265,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     let landed = false;
     const landResult = (r: Record<string, unknown>) => {
       if (landed) return;
-      const url = typeof r.downloadUrl === "string" ? r.downloadUrl : null;
+      const url = typeof r.downloadUrl === "string" ? resolveServerUrl(r.downloadUrl) : null;
       if (!url) {
         setError("Invalid response");
         return;

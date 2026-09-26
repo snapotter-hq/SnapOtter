@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Blend } from "sharp";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -172,7 +171,7 @@ export function registerCompose(app: FastifyInstance) {
 
       return reply.send({
         jobId,
-        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
         originalSize: baseBuffer.length,
         processedSize: result.length,
       });

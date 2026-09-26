@@ -12,7 +12,7 @@ import {
   getTemplatesForCount,
 } from "@/lib/collage-templates";
 import { format, plural } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, resolveServerUrl } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
@@ -149,7 +149,12 @@ export function CollageSettings() {
 
       const elapsed = Date.now() - startTime;
       if (elapsed < 800) await new Promise((r) => setTimeout(r, 800 - elapsed));
-      store.setResult(result.downloadUrl, result.processedSize, result.originalSize, result.jobId);
+      store.setResult(
+        resolveServerUrl(result.downloadUrl),
+        result.processedSize,
+        result.originalSize,
+        result.jobId,
+      );
     } catch (err) {
       store.setError(err instanceof Error ? err.message : "Collage failed");
     }

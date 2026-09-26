@@ -155,4 +155,57 @@ describe("useToolProcessor SSE recovery", () => {
 
     unmount();
   });
+
+  // #1287: the SSE catch must only hide malformed frames, never an exception
+  // thrown while handling a completion. A throw there used to leave the run
+  // limbo until the stall timer fired with a misleading "stalled" message.
+  it("fails the run with the real cause when completion handling throws", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("upscale"));
+
+    act(() => {
+      result.current.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "server-job", async: true });
+      xhrs[0].onload?.();
+    });
+
+    const updateEntry = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    act(() => {
+      MockEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          result: {
+            jobId: "server-job",
+            downloadUrl: "/api/v1/download/server-job/upscaled.png",
+            originalSize: 64,
+            processedSize: 128,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().error).toBe("Completion handling failed unexpectedly.");
+
+    // The run is already settled; a later stall timer cannot own the outcome.
+    act(() => {
+      vi.advanceTimersByTime(300_001);
+    });
+    expect(useFileStore.getState().error).toBe("Completion handling failed unexpectedly.");
+
+    updateEntry.mockRestore();
+    unmount();
+  });
 });

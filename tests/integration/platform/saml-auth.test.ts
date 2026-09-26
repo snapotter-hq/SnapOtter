@@ -26,6 +26,9 @@ const samlMock = vi.hoisted(() => ({
   validatePostResponseAsync: vi.fn(),
   generateServiceProviderMetadata: vi.fn(),
 }));
+// Records the options each new SAML(...) instance was built with, so a test
+// can assert the ACS callbackUrl / issuer the real constructor receives (#1297).
+const samlCtorMock = vi.hoisted(() => vi.fn());
 const mfaOutcomeMock = vi.hoisted(() => vi.fn(() => "proceed"));
 // A controllable handle for getMfaPolicy so a single test can make the MFA
 // policy lookup reject and drive saml.ts's policy-read catch. Since #815 a
@@ -58,6 +61,9 @@ vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOrig
 vi.mock("@node-saml/node-saml", () => ({
   ValidateInResponseTo: { ifPresent: "ifPresent", always: "always", never: "never" },
   SAML: class {
+    constructor(options: unknown) {
+      samlCtorMock(options);
+    }
     getAuthorizeUrlAsync = (...a: unknown[]) => samlMock.getAuthorizeUrlAsync(...a);
     validatePostResponseAsync = (...a: unknown[]) => samlMock.validatePostResponseAsync(...a);
     generateServiceProviderMetadata = (...a: unknown[]) =>
@@ -127,7 +133,7 @@ afterEach(() => {
 function postCallback() {
   return testApp.app.inject({
     method: "POST",
-    url: "/api/auth/saml/callback",
+    url: `${env.BASE_PATH}/api/auth/saml/callback`,
     headers: { "content-type": "application/x-www-form-urlencoded" },
     payload: "SAMLResponse=stub",
   });
@@ -452,5 +458,81 @@ describe("SAML callback", () => {
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
     }
+  });
+});
+
+describe.each(["", "/snapotter"])("SAML deployment at '%s'", (basePath) => {
+  const originalBasePath = env.BASE_PATH;
+  let externalUrl: string;
+
+  beforeAll(() => {
+    externalUrl = env.EXTERNAL_URL;
+    env.BASE_PATH = basePath;
+    env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+  });
+  afterAll(() => {
+    env.BASE_PATH = originalBasePath;
+    env.EXTERNAL_URL = externalUrl;
+  });
+
+  it("keeps failed login and callback redirects under the deployment path", async () => {
+    samlMock.getAuthorizeUrlAsync.mockRejectedValueOnce(new Error("IdP unavailable"));
+    samlMock.validatePostResponseAsync.mockRejectedValueOnce(new Error("invalid signature"));
+    const login = await testApp.app.inject(`${basePath}/api/auth/saml/login`);
+    const callback = await postCallback();
+    for (const res of [login, callback]) {
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe(`${basePath}/login?error=saml_auth_failed`);
+    }
+  });
+
+  it("builds the ACS callbackUrl and issuer under the deployment path", async () => {
+    const email = `acs-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValueOnce({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValueOnce("proceed");
+    samlCtorMock.mockClear();
+    const res = await postCallback();
+    expect(res.statusCode).toBe(302);
+
+    // The mocked SAML class ignores its options, so nothing else checks them:
+    // a real IdP rejects a mismatched ACS URL or entity ID (#1297).
+    const options = samlCtorMock.mock.calls.at(-1)?.[0] as
+      | { callbackUrl: string; issuer: string }
+      | undefined;
+    expect(options).toBeDefined();
+    const callbackUrl = new URL(options.callbackUrl);
+    expect(callbackUrl.origin).toBe("http://localhost:9999");
+    expect(callbackUrl.pathname).toBe(`${basePath}/api/auth/saml/callback`);
+    // SAML_ENTITY_ID is unset in this suite, so the issuer falls back to the
+    // metadata path under the same origin.
+    const issuer = new URL(options.issuer);
+    expect(issuer.origin).toBe("http://localhost:9999");
+    expect(issuer.pathname).toBe(`${basePath}/api/auth/saml/metadata`);
+  });
+
+  it("issues the MFA challenge redirect under the deployment path", async () => {
+    const email = `mfachal-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValueOnce({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValueOnce("challenge");
+    const res = await postCallback();
+    expect(res.statusCode).toBe(302);
+    expect(String(res.headers.location)).toMatch(new RegExp(`^${basePath}/login\\?mfaToken=`));
+  });
+
+  it("redirects into the app with a usable session cookie at the deployment path", async () => {
+    const email = `path-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValue("proceed");
+    const res = await postCallback();
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe(`${basePath}/`);
+    const cookie = res.cookies.find((c) => c.name === "snapotter-session");
+    expect(cookie).toMatchObject({ path: `${basePath}/`, httpOnly: true });
+    const session = await testApp.app.inject({
+      url: `${basePath}/api/auth/session`,
+      cookies: { "snapotter-session": cookie?.value ?? "" },
+    });
+    expect(session.statusCode).toBe(200);
+    expect(session.json().user.email).toBe(email);
   });
 });

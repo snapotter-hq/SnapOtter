@@ -104,30 +104,40 @@ export function ocrOneFile(
       return;
     }
     es.onmessage = (event) => {
+      let data: {
+        type?: string;
+        phase?: string;
+        result?: Record<string, unknown>;
+        percent?: number;
+        stage?: string;
+        error?: string;
+      };
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === "heartbeat") {
-          if (asyncMode) armStallTimer();
-          return;
-        }
-        if (data.type !== "single") return;
-        armStallTimer();
-        if (data.phase === "complete" && data.result) {
-          resolveOnce({
-            text: typeof data.result.text === "string" ? data.result.text : "",
-            savedFileId:
-              typeof data.result.savedFileId === "string" ? data.result.savedFileId : undefined,
-          });
-          return;
-        }
-        if (data.phase === "failed") {
-          rejectOnce(new Error(typeof data.error === "string" ? data.error : "OCR failed"));
-          return;
-        }
-        if (typeof data.percent === "number") {
-          callbacks.onProcessingProgress(data.percent, data.stage);
-        }
-      } catch {}
+        data = JSON.parse(event.data);
+      } catch {
+        return; // malformed frame
+      }
+      if (data.type === "heartbeat") {
+        if (asyncMode) armStallTimer();
+        return;
+      }
+      if (data.type !== "single") return;
+      armStallTimer();
+      if (data.phase === "complete" && data.result) {
+        resolveOnce({
+          text: typeof data.result.text === "string" ? data.result.text : "",
+          savedFileId:
+            typeof data.result.savedFileId === "string" ? data.result.savedFileId : undefined,
+        });
+        return;
+      }
+      if (data.phase === "failed") {
+        rejectOnce(new Error(typeof data.error === "string" ? data.error : "OCR failed"));
+        return;
+      }
+      if (typeof data.percent === "number") {
+        callbacks.onProcessingProgress(data.percent, data.stage ?? "");
+      }
     };
     // EventSource reconnects automatically. The progress endpoint replays the
     // terminal frame, so transient network loss must not discard a queued OCR.

@@ -593,6 +593,43 @@ describe("OIDC login redirect", () => {
     expect(cookieStr).toContain("HttpOnly");
     expect(cookieStr).toContain("SameSite=Lax");
   });
+
+  describe.each(["", "/snapotter"])("deployment at '%s'", (basePath) => {
+    const originalBasePath = env.BASE_PATH;
+    let externalUrl: string;
+
+    beforeAll(() => {
+      externalUrl = env.EXTERNAL_URL;
+      env.BASE_PATH = basePath;
+      env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+    });
+    afterAll(() => {
+      env.BASE_PATH = originalBasePath;
+      env.EXTERNAL_URL = externalUrl;
+    });
+
+    it("scopes the state cookie, callback URL, and failure redirect to the deployment", async () => {
+      const login = await oidcApp.app.inject(`${basePath}/api/auth/oidc/login`);
+      expect(login.statusCode).toBe(302);
+      const redirect = new URL(login.headers.location ?? "");
+      expect(redirect.searchParams.get("redirect_uri")).toBe(
+        `http://localhost:9999${basePath}/api/auth/oidc/callback`,
+      );
+      const cookie = login.cookies.find((c) => c.name === "oidc-state");
+      expect(cookie).toMatchObject({ path: `${basePath}/api/auth/oidc`, httpOnly: true });
+      const callback = await oidcApp.app.inject({
+        url: `${basePath}/api/auth/oidc/callback?error=access_denied&state=${redirect.searchParams.get("state")}`,
+        cookies: { "oidc-state": cookie?.value ?? "" },
+      });
+      expect(callback.statusCode).toBe(302);
+      expect(callback.headers.location).toBe(`${basePath}/login?error=oidc_auth_failed`);
+      expect(callback.cookies.find((c) => c.name === "oidc-state")).toMatchObject({
+        path: `${basePath}/api/auth/oidc`,
+        value: "",
+        expires: new Date(0),
+      });
+    });
+  });
 });
 
 // =====================================================================

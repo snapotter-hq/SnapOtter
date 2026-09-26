@@ -14,6 +14,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
+    BASE_PATH: "",
     WORKSPACE_PATH: "/tmp/test",
     MAX_MEGAPIXELS: 100,
     MAX_SVG_SIZE_MB: 10,

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { generateId } from "@/lib/utils";
+import { generateId, resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
 
@@ -17,6 +17,7 @@ interface ProcessResult {
 }
 
 interface BatchProgressFrame {
+  type?: string;
   status: "processing" | "completed" | "failed";
   totalFiles: number;
   completedFiles: number;
@@ -25,6 +26,30 @@ interface BatchProgressFrame {
   currentFile?: string;
   /** Terminal frames carry the durable batch result (#750). */
   result?: Record<string, unknown>;
+}
+
+/** Shape of the `type: "single"` SSE frames; only the fields read below. */
+interface SingleProgressFrame {
+  type?: string;
+  phase?: string;
+  result?: unknown;
+  percent?: number;
+  stage?: string;
+  error?: string;
+}
+
+/**
+ * What `JSON.parse` hands back for any progress frame: the single-frame fields
+ * plus the batch fields the batch branch reads (through its cast to
+ * BatchProgressFrame). One type keeps the parse fallback narrowing simple.
+ */
+interface ProgressFrame extends SingleProgressFrame {
+  status?: BatchProgressFrame["status"];
+  totalFiles?: number;
+  completedFiles?: number;
+  failedFiles?: number;
+  errors?: BatchProgressFrame["errors"];
+  currentFile?: string;
 }
 
 export interface PipelineProgress {
@@ -217,8 +242,15 @@ export function usePipelineProcessor() {
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
+          let data: ProgressFrame;
           try {
-            const data = JSON.parse(event.data);
+            data = JSON.parse(event.data);
+          } catch {
+            // Ignore malformed SSE frames only; the handling below must never
+            // hide a real failure behind this catch (#1287).
+            return;
+          }
+          try {
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
               return;
@@ -287,8 +319,8 @@ export function usePipelineProcessor() {
 
               const result = data.result as ProcessResult;
               useFileStore.getState().updateEntry(idx, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
+                processedUrl: resolveServerUrl(result.downloadUrl),
+                processedPreviewUrl: result.previewUrl ? resolveServerUrl(result.previewUrl) : null,
                 processedFilename: null,
                 status: "completed",
                 originalSize: result.originalSize,
@@ -325,8 +357,37 @@ export function usePipelineProcessor() {
                 stage: data.stage,
               }));
             }
-          } catch {
-            // Ignore malformed SSE
+          } catch (err) {
+            // A throw inside handling used to be swallowed here, so the run
+            // limboed until the stall timer fired with an unrelated message
+            // (#1287). Surface it and settle the run like an interruption.
+            console.error("SSE frame handling failed", err);
+            try {
+              clearStallTimer();
+              if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              if (eventSourceRef.current === es) eventSourceRef.current = null;
+              xhrRef.current?.abort();
+              clearJobEvidenceTimer();
+              clearActiveJob();
+              batchRunRef.current = null;
+              setError("Completion handling failed unexpectedly.");
+              setProcessing(false);
+              setProgress(IDLE_PROGRESS);
+            } catch {
+              // The original error is already logged; don't mask it.
+            }
+            // Mark the in-flight entry failed on its own, so a persistently
+            // failing store write cannot block the run-level cleanup above.
+            try {
+              const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
+              useFileStore.getState().updateEntry(idx, {
+                status: "failed",
+                error: "Completion handling failed unexpectedly.",
+              });
+            } catch {
+              // already logged above
+            }
           }
         };
 
@@ -511,8 +572,8 @@ export function usePipelineProcessor() {
           try {
             const result: ProcessResult = JSON.parse(xhr.responseText);
             useFileStore.getState().updateEntry(capturedIndex, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
+              processedUrl: resolveServerUrl(result.downloadUrl),
+              processedPreviewUrl: result.previewUrl ? resolveServerUrl(result.previewUrl) : null,
               processedFilename: null,
               status: "completed",
               originalSize: result.originalSize,
@@ -693,7 +754,7 @@ export function usePipelineProcessor() {
       // frame points at. Retried, because the reason we are on this path is
       // that the network just proved flaky.
       const downloadAndSettle = async (result: Record<string, unknown>) => {
-        const url = String(result.downloadUrl);
+        const url = resolveServerUrl(String(result.downloadUrl));
         const fileResults = (result.fileResults ?? {}) as Record<string, string>;
         for (let attempt = 0; attempt < 3; attempt++) {
           if (activeJobIdRef.current !== clientJobId) return;

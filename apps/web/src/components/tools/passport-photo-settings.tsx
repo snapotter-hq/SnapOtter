@@ -25,6 +25,7 @@ import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import {
   type FaceLandmarks,
@@ -422,7 +423,10 @@ export function PassportPhotoSettings() {
       }
 
       const result: GenerateResult = await response.json();
-      setGenerateResult(result);
+      setGenerateResult({
+        ...result,
+        downloadUrl: resolveServerUrl(result.downloadUrl),
+      });
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Photo generation failed");
     } finally {

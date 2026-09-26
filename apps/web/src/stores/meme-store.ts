@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { resolveServerUrl } from "@/lib/utils";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -341,8 +342,8 @@ export const useMemeStore = create<MemeState>((set, get) => ({
       };
 
       set({
-        resultUrl: result.downloadUrl,
-        downloadUrl: result.downloadUrl,
+        resultUrl: resolveServerUrl(result.downloadUrl),
+        downloadUrl: resolveServerUrl(result.downloadUrl),
         phase: "result",
         generating: false,
       });

@@ -222,8 +222,11 @@ describe("worker result payload behavior", () => {
       ),
     ).toEqual({
       jobId: "job-1",
-      downloadUrl: `${basePath}/api/v1/download/job-1/report%20final.pdf`,
-      previewUrl: `${basePath}/api/v1/download/job-1/preview.png`,
+      // Result URLs stay root-relative regardless of the deployment prefix
+      // (#1274): they are persisted in jobs.result, and baking BASE_PATH in
+      // would strand them when the prefix changes.
+      downloadUrl: "/api/v1/download/job-1/report%20final.pdf",
+      previewUrl: "/api/v1/download/job-1/preview.png",
       originalSize: 100,
       processedSize: 80,
       savedFileId: "file-2",

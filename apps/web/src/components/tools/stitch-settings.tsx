@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
@@ -101,8 +102,8 @@ export function StitchSettings() {
       });
 
       setJobId(result.jobId);
-      setProcessedUrl(result.downloadUrl);
-      setDownloadUrl(result.downloadUrl);
+      setProcessedUrl(resolveServerUrl(result.downloadUrl));
+      setDownloadUrl(resolveServerUrl(result.downloadUrl));
       setSizes(result.originalSize, result.processedSize);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Stitch failed");

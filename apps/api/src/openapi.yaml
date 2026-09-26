@@ -106,7 +106,7 @@ components:
           description: Unique job identifier
         downloadUrl:
           type: string
-          description: URL to download the processed image
+          description: Root-relative path to download the processed file. Resolve it against the instance base URL (including any deployment subpath); the server never bakes a deployment prefix into it.
           example: /api/v1/download/abc123/output.png
         originalSize:
           type: integer
@@ -5245,7 +5245,7 @@ paths:
       operationId: downloadProcessedImage
       tags: [Files]
       summary: Download a processed image
-      description: Download a processed image by its job ID and filename. This is the URL returned in downloadUrl from tool responses.
+      description: Download a processed image by its job ID and filename. This is the URL returned in downloadUrl from tool responses. The path is root-relative and must be resolved against the instance base URL.
       security: []
       parameters:
         - name: jobId

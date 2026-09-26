@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import {
   buildTagArgs,
@@ -218,7 +217,7 @@ export function registerEditMetadata(app: FastifyInstance) {
             }
             const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
             await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
-            previewUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/preview.webp`;
+            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
           } catch {
             // Non-fatal - frontend shows fallback
           }
@@ -226,7 +225,7 @@ export function registerEditMetadata(app: FastifyInstance) {
 
         return reply.send({
           jobId,
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
           previewUrl,
           originalSize: fileBuffer.length,
           processedSize: outputBuffer.length,
