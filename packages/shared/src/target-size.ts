@@ -10,7 +10,10 @@ export function kbToBytes(kb: number): number {
   return Math.floor(kb * BYTES_PER_KB);
 }
 
-/** "20 KB", "0.25 KB": a byte budget as the KB figure the user typed. */
+/**
+ * "20 KB", "0.25 KB", "1234 KB": a byte budget as the KB figure the user typed.
+ * Three decimals cover every whole byte, so nothing is rounded away.
+ */
 export function formatTargetKb(bytes: number): string {
-  return `${Number((bytes / BYTES_PER_KB).toPrecision(3))} KB`;
+  return `${Number((bytes / BYTES_PER_KB).toFixed(3))} KB`;
 }

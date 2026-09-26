@@ -835,6 +835,9 @@ export function useToolProcessor(toolId: string) {
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
       setError(null);
+      // A batch reports no per-file payload, so a previous single run's
+      // (e.g. compress's resizedTo) must not render under the batch result.
+      setResultPayload(null);
       // Batch runs never auto-save to the library (no fileId is sent), so a
       // previous single run's saved indicator must not survive into this one.
       useFileStore.getState().setLastSavedLibraryFileId(null);

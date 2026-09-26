@@ -1,3 +1,4 @@
+import { formatTargetKb, kbToBytes } from "@snapotter/shared";
 import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -31,8 +32,10 @@ export function CompressPdfSettings() {
   // Honest reporting for target-size mode: whether we actually hit the ceiling.
   const targetMet = resultPayload?.targetMet as boolean | undefined;
   const targetKb = resultPayload?.targetKb as number | undefined;
-  const targetLabel = targetKb != null ? `${Math.round(targetKb)} KB` : "";
-  const achievedLabel = processedSize != null ? `${Math.round(processedSize / 1024)} KB` : "";
+  // Same decimal KB the server measured against, exact to the byte, so a miss
+  // can't read as "couldn't reach 100 KB, smallest was 98 KB" (#1272).
+  const targetLabel = targetKb != null ? formatTargetKb(kbToBytes(targetKb)) : "";
+  const achievedLabel = processedSize != null ? formatTargetKb(processedSize) : "";
 
   const handleProcess = () => {
     if (hasMultiple) {

@@ -21,4 +21,11 @@ describe("target-size units (#1272)", () => {
     expect(formatTargetKb(250)).toBe("0.25 KB");
     expect(formatTargetKb(1_500)).toBe("1.5 KB");
   });
+
+  it("never rounds a large or precise target into a different number", () => {
+    expect(formatTargetKb(1_234_000)).toBe("1234 KB");
+    expect(formatTargetKb(1_024_000)).toBe("1024 KB");
+    expect(formatTargetKb(20_555)).toBe("20.555 KB");
+    expect(formatTargetKb(1)).toBe("0.001 KB");
+  });
 });

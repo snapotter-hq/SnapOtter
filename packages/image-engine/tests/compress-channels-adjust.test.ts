@@ -177,7 +177,7 @@ describe("compress: target size", () => {
       /greater than 0/,
     );
     await expect(compress(sharp(photoPng), { targetSizeBytes: 1, format: "jpg" })).rejects.toThrow(
-      "Unable to compress image to 1 bytes within safe resize limits",
+      "Couldn't get this image under 0.001 KB, even after scaling it down.",
     );
   });
 
