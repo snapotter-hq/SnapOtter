@@ -3821,6 +3821,16 @@ export const ja: TranslationKeys = {
     previewFailed: "プレビューの生成に失敗しました",
     previewEncoderMissing:
       "このサーバーの ffmpeg に {encoder} エンコーダーがないため、プレビューを生成できません。管理者にお問い合わせください。",
+    previewProgressMessages: [
+      "カワウソが準備運動中...",
+      "ピクセルを噛み砕いています...",
+      "コーデックに教えています...",
+      "もうすぐです...",
+      "プレビューを淹れています...",
+      "フレームを説得しています...",
+      "仕上げを磨いています...",
+      "少々お待ちください...",
+    ],
     previewNotAvailable: "プレビューを利用できません",
     resultPreviewFailed: "結果のプレビューを読み込めませんでした",
     resultPreviewFailedHint:

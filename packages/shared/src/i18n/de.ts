@@ -3886,6 +3886,16 @@ export const de: TranslationKeys = {
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
     previewEncoderMissing:
       "Dem ffmpeg dieses Servers fehlt der Encoder {encoder}, daher kann keine Vorschau erzeugt werden. Kontaktieren Sie Ihren Administrator.",
+    previewProgressMessages: [
+      "Der Otter wärmt sich auf...",
+      "Pixel werden zerkaut...",
+      "Der Codec lernt noch...",
+      "Fast geschafft...",
+      "Die Vorschau wird aufgebrüht...",
+      "Die Frames werden überredet...",
+      "Das Ergebnis wird poliert...",
+      "Einen Moment noch...",
+    ],
     previewNotAvailable: "Vorschau nicht verfügbar",
     resultPreviewFailed: "Ergebnisvorschau konnte nicht geladen werden",
     resultPreviewFailedHint:

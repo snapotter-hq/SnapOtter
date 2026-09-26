@@ -3863,6 +3863,16 @@ export const es: TranslationKeys = {
     previewFailed: "Error al generar la vista previa",
     previewEncoderMissing:
       "Al ffmpeg de este servidor le falta el codificador {encoder}, así que no se puede generar la vista previa. Contacta a tu administrador.",
+    previewProgressMessages: [
+      "La nutria está entrando en calor...",
+      "Triturando píxeles...",
+      "Enseñando al códec...",
+      "Ya casi...",
+      "Preparando la vista previa...",
+      "Convenciendo a los fotogramas...",
+      "Puliendo el resultado...",
+      "Un momento...",
+    ],
     previewNotAvailable: "Vista previa no disponible",
     resultPreviewFailed: "No se pudo cargar la vista previa del resultado",
     resultPreviewFailedHint:

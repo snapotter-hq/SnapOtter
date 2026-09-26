@@ -3873,6 +3873,16 @@ export const ptBR: TranslationKeys = {
     previewFailed: "Falha ao gerar pré-visualização",
     previewEncoderMissing:
       "O ffmpeg deste servidor não tem o codificador {encoder}, por isso não é possível gerar a pré-visualização. Entre em contato com o administrador.",
+    previewProgressMessages: [
+      "A lontra está se aquecendo...",
+      "Triturando pixels...",
+      "Ensinando o codec...",
+      "Quase lá...",
+      "Preparando a pré-visualização...",
+      "Convencendo os quadros...",
+      "Dando um polimento no resultado...",
+      "Só um momento...",
+    ],
     previewNotAvailable: "Pré-visualização indisponível",
     resultPreviewFailed: "Falha ao carregar a pré-visualização do resultado",
     resultPreviewFailedHint:

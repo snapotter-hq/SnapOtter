@@ -35,8 +35,50 @@ function getStructuralKeys(obj: Record<string, unknown>, prefix = ""): string[] 
   return keys;
 }
 
+/** Map every array-valued key path to its array. */
+function getArrays(obj: Record<string, unknown>, prefix = ""): Map<string, unknown[]> {
+  const arrays = new Map<string, unknown[]>();
+  for (const [k, v] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${k}` : k;
+    if (Array.isArray(v)) {
+      arrays.set(path, v);
+    } else if (v && typeof v === "object") {
+      for (const [p, a] of getArrays(v as Record<string, unknown>, path)) arrays.set(p, a);
+    }
+  }
+  return arrays;
+}
+
 describe("i18n cross-locale parity", () => {
   const enKeys = new Set(getStructuralKeys(en as unknown as Record<string, unknown>));
+  const enArrays = getArrays(en as unknown as Record<string, unknown>);
+
+  // The key-set check treats an array as one leaf, so a locale with fewer
+  // entries passes it. Rotating-line components index these arrays with a
+  // counter, and a short or blank entry renders as an empty line (#1268).
+  it.each(SUPPORTED_LOCALES.filter((l) => l.code !== "en").map((l) => [l.code, l.name]))(
+    "%s (%s) has the same array lengths as en, with no blank entries",
+    async (code) => {
+      const localeArrays = getArrays(
+        (await loadTranslations(code)) as unknown as Record<string, unknown>,
+      );
+      expect(enArrays.size).toBeGreaterThan(0);
+      for (const [path, enArray] of enArrays) {
+        // An empty array makes the components' `index % length` NaN.
+        expect(enArray.length, `en ${path} is empty`).toBeGreaterThan(0);
+        const localeArray = localeArrays.get(path);
+        expect(localeArray, `locale "${code}" has no array at ${path}`).toBeDefined();
+        expect(
+          localeArray?.length,
+          `locale "${code}" ${path} has ${localeArray?.length} entries, en has ${enArray.length}`,
+        ).toBe(enArray.length);
+        const blank = (localeArray ?? []).findIndex(
+          (entry) => typeof entry !== "string" || entry.trim() === "",
+        );
+        expect(blank, `locale "${code}" ${path}[${blank}] is blank or not a string`).toBe(-1);
+      }
+    },
+  );
 
   it("en reference locale has keys", () => {
     expect(enKeys.size).toBeGreaterThan(100);

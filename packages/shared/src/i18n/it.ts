@@ -3876,6 +3876,16 @@ export const it: TranslationKeys = {
     previewFailed: "Generazione dell'anteprima non riuscita",
     previewEncoderMissing:
       "Al ffmpeg di questo server manca l'encoder {encoder}, quindi non è possibile generare l'anteprima. Contatta l'amministratore.",
+    previewProgressMessages: [
+      "La lontra si sta scaldando...",
+      "Macinando pixel...",
+      "Istruendo il codec...",
+      "Ci siamo quasi...",
+      "L'anteprima è in infusione...",
+      "Convincendo i fotogrammi...",
+      "Lucidando il risultato...",
+      "Solo un attimo...",
+    ],
     previewNotAvailable: "Anteprima non disponibile",
     resultPreviewFailed: "Impossibile caricare l'anteprima del risultato",
     resultPreviewFailedHint:

@@ -3810,6 +3810,16 @@ export const en = {
     previewFailed: "Preview generation failed",
     previewEncoderMissing:
       "This server's ffmpeg is missing the {encoder} encoder, so the preview can't be generated. Contact your administrator.",
+    previewProgressMessages: [
+      "Warming up the otter...",
+      "Crunching pixels...",
+      "Teaching the codec...",
+      "Almost there...",
+      "Brewing the preview...",
+      "Convincing the frames...",
+      "Polishing the output...",
+      "Just a moment...",
+    ],
     previewNotAvailable: "Preview not available",
     resultPreviewFailed: "Result preview failed to load",
     resultPreviewFailedHint: "Processing finished. Use the download button to save your file.",

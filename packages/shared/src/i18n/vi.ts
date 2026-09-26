@@ -3864,6 +3864,16 @@ export const vi: TranslationKeys = {
     previewFailed: "Tạo xem trước thất bại",
     previewEncoderMissing:
       "ffmpeg trên máy chủ này thiếu bộ mã hóa {encoder} nên không thể tạo xem trước. Liên hệ quản trị viên.",
+    previewProgressMessages: [
+      "Rái cá đang khởi động...",
+      "Đang nghiền điểm ảnh...",
+      "Đang dạy codec...",
+      "Sắp xong rồi...",
+      "Đang pha bản xem trước...",
+      "Đang thuyết phục các khung hình...",
+      "Đang đánh bóng kết quả...",
+      "Chờ một chút...",
+    ],
     previewNotAvailable: "Không có bản xem trước",
     resultPreviewFailed: "Không tải được bản xem trước kết quả",
     resultPreviewFailedHint: "Đã xử lý xong. Sử dụng nút tải xuống để lưu tệp.",

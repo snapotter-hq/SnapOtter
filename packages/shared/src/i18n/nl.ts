@@ -3881,6 +3881,16 @@ export const nl: TranslationKeys = {
     previewFailed: "Voorbeeld genereren mislukt",
     previewEncoderMissing:
       "De ffmpeg van deze server mist de encoder {encoder}, dus het voorbeeld kan niet worden gemaakt. Neem contact op met je beheerder.",
+    previewProgressMessages: [
+      "De otter warmt op...",
+      "Pixels worden vermalen...",
+      "De codec krijgt les...",
+      "Bijna klaar...",
+      "Het voorbeeld staat te trekken...",
+      "De frames worden overgehaald...",
+      "Het resultaat wordt opgepoetst...",
+      "Even geduld...",
+    ],
     previewNotAvailable: "Voorbeeld niet beschikbaar",
     resultPreviewFailed: "Resultaatvoorbeeld kon niet worden geladen",
     resultPreviewFailedHint:

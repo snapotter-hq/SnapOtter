@@ -3872,6 +3872,16 @@ export const tr: TranslationKeys = {
     previewFailed: "Önizleme oluşturulamadı",
     previewEncoderMissing:
       "Bu sunucudaki ffmpeg'de {encoder} kodlayıcısı yok, bu yüzden önizleme oluşturulamıyor. Yöneticinizle iletişime geçin.",
+    previewProgressMessages: [
+      "Su samuru ısınıyor...",
+      "Pikseller öğütülüyor...",
+      "Codec'e ders veriliyor...",
+      "Neredeyse bitti...",
+      "Önizleme demleniyor...",
+      "Kareler ikna ediliyor...",
+      "Sonuç parlatılıyor...",
+      "Bir saniye...",
+    ],
     previewNotAvailable: "Önizleme kullanılamıyor",
     resultPreviewFailed: "Sonuç önizlemesi yüklenemedi",
     resultPreviewFailedHint:
