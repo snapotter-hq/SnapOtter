@@ -317,6 +317,37 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(session.statusCode).toBe(200);
       expect(session.json().user.username).toBe(sub);
     });
+
+    it("sends the IdP a prefixed redirect_uri at token-exchange time", async () => {
+      const sub = `sub-uri-${Math.random().toString(36).slice(2, 10)}`;
+      await callbackWithClaims({ sub, preferred_username: sub });
+
+      expect(authorizationCodeGrantMock).toHaveBeenCalledTimes(1);
+      // A real IdP rejects a mismatched redirect_uri, so the landing URL
+      // passed as the token-exchange argument must carry the prefix (#1297):
+      // a regression here breaks SSO login while a suite that never reads the
+      // argument stays green.
+      const callbackUrl = authorizationCodeGrantMock.mock.calls[0][1] as URL;
+      expect(callbackUrl.origin).toBe("http://localhost:9999");
+      expect(callbackUrl.pathname).toBe(`${basePath}/api/auth/oidc/callback`);
+    });
+
+    it("redirects an enrolled user's MFA challenge under the deployment path", async () => {
+      // The dynamic import("./mfa.js") in the callback resolves to this same
+      // module instance, so a spy forces the challenge outcome the same way
+      // the #815 test forces a policy-read failure.
+      const spy = vi
+        .spyOn(mfaModule, "resolveExternalLoginMfaOutcome")
+        .mockReturnValue("challenge");
+      try {
+        const sub = `sub-mfa-${Math.random().toString(36).slice(2, 10)}`;
+        const res = await callbackWithClaims({ sub, preferred_username: sub });
+        expect(res.statusCode).toBe(302);
+        expect(String(res.headers.location)).toMatch(new RegExp(`^${basePath}/login\\?mfaToken=`));
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("fails with oidc_auth_failed when the token response carries no ID-token claims", async () => {
