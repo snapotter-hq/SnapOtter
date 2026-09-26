@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import pg from "pg";
+import { dropOrphanedForkDatabases } from "./fork-db.js";
 
 // Each test file (forks pool, isolated) gets its own Postgres database cloned
 // from the migrated template built in tests/global-setup.ts, plus its own
@@ -71,6 +72,11 @@ const hasExplicitSyncWait =
   Boolean(requestedSyncWait) && Number.isFinite(Number(requestedSyncWait));
 process.env.SYNC_WAIT_MS = hasExplicitSyncWait ? (requestedSyncWait as string) : "30000";
 const dbName = `snapotter_test_${suffix}`; // pid digits + uuid hex: identifier-safe
+// Clear the databases of files that have finished (or crashed) before adding
+// this one. The app's pool is never closed at the end of a file, so dropping a
+// file's own database from its afterAll would cut live connections; waiting
+// for the process to exit avoids that (#1277).
+await dropOrphanedForkDatabases(baseUrl);
 const admin = new pg.Client({ connectionString: baseUrl });
 await admin.connect();
 // Concurrent CREATE DATABASE ... TEMPLATE from parallel forks can transiently

@@ -37,7 +37,13 @@ export async function setup(): Promise<void> {
   if (process.env.TEST_DATABASE_URL) {
     baseUrl = process.env.TEST_DATABASE_URL;
   } else {
-    container = await new PostgreSqlContainer("postgres:17-alpine").start();
+    // Data on tmpfs, not the anonymous volume the image declares: a run that
+    // dies before teardown otherwise leaves that volume behind, unlabelled, on
+    // a Docker VM other stacks share (#1277). per-fork-env.ts drops the
+    // databases of finished files as new ones start, which keeps this small.
+    container = await new PostgreSqlContainer("postgres:17-alpine")
+      .withTmpFs({ "/var/lib/postgresql/data": "rw" })
+      .start();
     baseUrl = container.getConnectionUri();
   }
   process.env.TEST_PG_BASE_URL = baseUrl; // forks inherit this
