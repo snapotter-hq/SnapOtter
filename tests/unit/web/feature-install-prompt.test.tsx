@@ -162,6 +162,7 @@ describe("FeatureInstallPrompt download ETA (#1145)", () => {
 
   afterEach(() => {
     storage.clear();
+    vi.restoreAllMocks();
   });
 
   // At 50% the remaining estimate equals the elapsed time, so elapsedMs picks
@@ -185,5 +186,23 @@ describe("FeatureInstallPrompt download ETA (#1145)", () => {
     expect(await screen.findByText(expected)).toBeTruthy();
     expect(screen.queryByText(/minutes? left/)).toBeNull();
     expect(screen.queryByText(/\{mins\}/)).toBeNull();
+  });
+
+  // #1254: the rotating line used to be a hardcoded English array.
+  it("renders the rotating progress line from the active locale", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    useFeaturesStore.setState({
+      installing: { [BUNDLE_ID]: { percent: 50, stage: "Downloading" } },
+      startTimes: { [BUNDLE_ID]: NOW - 30_000 },
+    });
+
+    render(
+      <I18nProvider>
+        <FeatureInstallPrompt bundle={makeBundleState()} isAdmin />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText(de.features.progressMessages[0])).toBeTruthy();
+    expect(screen.queryByText("Almost there... probably...")).toBeNull();
   });
 });
