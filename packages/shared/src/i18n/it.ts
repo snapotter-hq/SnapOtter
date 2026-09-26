@@ -3867,6 +3867,16 @@ export const it: TranslationKeys = {
     previewUnavailable: "L'anteprima sarà disponibile dopo l'elaborazione",
     generatePreview: "Genera anteprima",
     previewFailed: "Generazione dell'anteprima non riuscita",
+    previewProgressMessages: [
+      "La lontra si sta scaldando...",
+      "Macinando pixel...",
+      "Istruendo il codec...",
+      "Ci siamo quasi...",
+      "L'anteprima è in infusione...",
+      "Convincendo i fotogrammi...",
+      "Lucidando il risultato...",
+      "Solo un attimo...",
+    ],
     previewNotAvailable: "Anteprima non disponibile",
     resultPreviewFailed: "Impossibile caricare l'anteprima del risultato",
     resultPreviewFailedHint:

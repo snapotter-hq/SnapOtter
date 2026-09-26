@@ -3812,6 +3812,16 @@ export const ja: TranslationKeys = {
     previewUnavailable: "プレビューは処理後に表示されます",
     generatePreview: "プレビューを生成",
     previewFailed: "プレビューの生成に失敗しました",
+    previewProgressMessages: [
+      "カワウソが準備運動中...",
+      "ピクセルを噛み砕いています...",
+      "コーデックに教えています...",
+      "もうすぐです...",
+      "プレビューを淹れています...",
+      "フレームを説得しています...",
+      "仕上げを磨いています...",
+      "少々お待ちください...",
+    ],
     previewNotAvailable: "プレビューを利用できません",
     resultPreviewFailed: "結果のプレビューを読み込めませんでした",
     resultPreviewFailedHint:

@@ -3877,6 +3877,16 @@ export const de: TranslationKeys = {
     previewUnavailable: "Vorschau ist nach der Verarbeitung verfügbar",
     generatePreview: "Vorschau erzeugen",
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
+    previewProgressMessages: [
+      "Der Otter wärmt sich auf...",
+      "Pixel werden zerkaut...",
+      "Der Codec lernt noch...",
+      "Fast geschafft...",
+      "Die Vorschau wird aufgebrüht...",
+      "Die Frames werden überredet...",
+      "Das Ergebnis wird poliert...",
+      "Einen Moment noch...",
+    ],
     previewNotAvailable: "Vorschau nicht verfügbar",
     resultPreviewFailed: "Ergebnisvorschau konnte nicht geladen werden",
     resultPreviewFailedHint:

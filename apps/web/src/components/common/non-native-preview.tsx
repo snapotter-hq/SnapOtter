@@ -6,17 +6,6 @@ import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { cn } from "@/lib/utils";
 
-const PROGRESS_MESSAGES = [
-  "Warming up the otter...",
-  "Crunching pixels...",
-  "Teaching the codec...",
-  "Almost there...",
-  "Brewing the preview...",
-  "Convincing the frames...",
-  "Polishing the output...",
-  "Just a moment...",
-];
-
 type PreviewState = "idle" | "generating" | "ready" | "error";
 
 export interface NonNativePreviewProps {
@@ -54,7 +43,9 @@ export function NonNativePreview({
   const startMessageRotation = useCallback(() => {
     setMessageIndex(0);
     intervalRef.current = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+      // Wrapped at render against the live locale's array, so a locale switch
+      // mid-rotation can't leave the index past its end.
+      setMessageIndex((prev) => prev + 1);
     }, 2500);
   }, []);
 
@@ -144,6 +135,7 @@ export function NonNativePreview({
 
   // Generating state: progress bar + rotating messages
   if (state === "generating") {
+    const previewMessages = t.toolPage.previewProgressMessages;
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center p-8 max-w-xs w-full">
@@ -163,7 +155,9 @@ export function NonNativePreview({
               )}
             />
           </div>
-          <p className="text-sm text-muted-foreground">{PROGRESS_MESSAGES[messageIndex]}</p>
+          <p className="text-sm text-muted-foreground">
+            {previewMessages[messageIndex % previewMessages.length]}
+          </p>
         </div>
       </div>
     );

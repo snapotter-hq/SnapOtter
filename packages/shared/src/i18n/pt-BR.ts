@@ -3864,6 +3864,16 @@ export const ptBR: TranslationKeys = {
     previewUnavailable: "A pré-visualização estará disponível após o processamento",
     generatePreview: "Gerar pré-visualização",
     previewFailed: "Falha ao gerar pré-visualização",
+    previewProgressMessages: [
+      "A lontra está se aquecendo...",
+      "Triturando pixels...",
+      "Ensinando o codec...",
+      "Quase lá...",
+      "Preparando a pré-visualização...",
+      "Convencendo os quadros...",
+      "Dando um polimento no resultado...",
+      "Só um momento...",
+    ],
     previewNotAvailable: "Pré-visualização indisponível",
     resultPreviewFailed: "Falha ao carregar a pré-visualização do resultado",
     resultPreviewFailedHint:

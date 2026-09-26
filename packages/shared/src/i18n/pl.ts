@@ -3861,6 +3861,16 @@ export const pl: TranslationKeys = {
     previewUnavailable: "Podgląd będzie dostępny po przetworzeniu",
     generatePreview: "Generuj podgląd",
     previewFailed: "Generowanie podglądu nie powiodło się",
+    previewProgressMessages: [
+      "Wydra się rozgrzewa...",
+      "Mielimy piksele...",
+      "Uczymy kodek...",
+      "Prawie gotowe...",
+      "Podgląd się parzy...",
+      "Przekonujemy klatki...",
+      "Szlifujemy wynik...",
+      "Chwileczkę...",
+    ],
     previewNotAvailable: "Podgląd niedostępny",
     resultPreviewFailed: "Nie udało się wczytać podglądu wyniku",
     resultPreviewFailedHint:

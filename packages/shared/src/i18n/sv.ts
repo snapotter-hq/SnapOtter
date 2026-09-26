@@ -3856,6 +3856,16 @@ export const sv: TranslationKeys = {
     previewUnavailable: "Förhandsgranskning tillgänglig efter bearbetning",
     generatePreview: "Generera förhandsgranskning",
     previewFailed: "Förhandsgranskning misslyckades",
+    previewProgressMessages: [
+      "Uttern värmer upp...",
+      "Tuggar pixlar...",
+      "Lär codecen tricks...",
+      "Nästan klart...",
+      "Förhandsgranskningen står och drar...",
+      "Övertalar bildrutorna...",
+      "Putsar resultatet...",
+      "Bara ett ögonblick...",
+    ],
     previewNotAvailable: "Förhandsvisning är inte tillgänglig",
     resultPreviewFailed: "Resultatets förhandsvisning kunde inte läsas in",
     resultPreviewFailedHint:
