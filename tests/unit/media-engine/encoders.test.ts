@@ -2,12 +2,15 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
+import { friendlyError } from "../../../apps/api/src/lib/errors.js";
 import {
   HW_ACCEL_FAMILIES,
   hwAccelStatus,
   parseEncoderNames,
   resolveEncoder,
   setEncoderInventoryForTests,
+  softwareEncoderStatus,
 } from "../../../packages/media-engine/src/encoders.js";
 
 /**
@@ -48,6 +51,7 @@ const WITH_NVENC = new Set([...QSV_ONLY, "h264_nvenc", "hevc_nvenc", "av1_nvenc"
 
 describe("resolveEncoder", () => {
   it("defaults to software encoders", () => {
+    setEncoderInventoryForTests(QSV_ONLY);
     delete process.env.SNAPOTTER_HW_ACCEL;
     expect(resolveEncoder("h264")).toBe("libx264");
     expect(resolveEncoder("hevc")).toBe("libx265");
@@ -56,6 +60,7 @@ describe("resolveEncoder", () => {
   });
 
   it("falls back to software for unknown accel values", () => {
+    setEncoderInventoryForTests(QSV_ONLY);
     process.env.SNAPOTTER_HW_ACCEL = "quantum";
     expect(resolveEncoder("h264")).toBe("libx264");
   });
@@ -100,6 +105,138 @@ describe("resolveEncoder", () => {
   });
 });
 
+/**
+ * #1092: the software branch used to hand its encoder to ffmpeg unchecked. A
+ * custom FFMPEG_PATH built without libx264 (Fedora's ffmpeg-free, say) then
+ * died with `Unknown encoder 'libx264'`, which friendlyError collapses into
+ * "the file may be corrupted" and so blames the user's file.
+ */
+describe("resolveEncoder on a build that lacks a software encoder (#1092)", () => {
+  const NO_LIBX264 = new Set([...QSV_ONLY].filter((name) => name !== "libx264"));
+
+  it("throws a message naming the missing encoder and the target", () => {
+    setEncoderInventoryForTests(NO_LIBX264);
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(() => resolveEncoder("h264")).toThrow(/libx264/);
+    expect(() => resolveEncoder("h264")).toThrow(/h264/);
+  });
+
+  it("still resolves the targets the build does provide", () => {
+    setEncoderInventoryForTests(NO_LIBX264);
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(resolveEncoder("hevc")).toBe("libx265");
+    expect(resolveEncoder("vp9")).toBe("libvpx-vp9");
+    expect(resolveEncoder("aac")).toBe("aac");
+  });
+
+  it("throws when hardware falls back to a software encoder that is also missing", () => {
+    setEncoderInventoryForTests(NO_LIBX264);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(() => resolveEncoder("h264")).toThrow(/libx264/);
+  });
+
+  it("still prefers a listed hardware encoder over a missing software one", () => {
+    setEncoderInventoryForTests(new Set([...NO_LIBX264, "h264_nvenc"]));
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(resolveEncoder("h264")).toBe("h264_nvenc");
+  });
+
+  /**
+   * The probe failing tells us nothing about the build. Failing closed here
+   * would turn one unreadable `ffmpeg -encoders` into every media job failing.
+   */
+  it("fails open when the inventory could not be read", () => {
+    setEncoderInventoryForTests(null);
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(resolveEncoder("h264")).toBe("libx264");
+    expect(resolveEncoder("opus")).toBe("libopus");
+  });
+
+  /** Anything friendlyError rewrites would reach the user as "file may be corrupted". */
+  it("throws a message friendlyError passes through unchanged", () => {
+    setEncoderInventoryForTests(new Set<string>(["aac"]));
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    for (const target of ["h264", "hevc", "av1", "vp9", "opus", "mp3"] as const) {
+      let message = "";
+      try {
+        resolveEncoder(target);
+      } catch (err) {
+        message = (err as Error).message;
+      }
+      expect(message).not.toBe("");
+      expect(friendlyError(message)).toBe(message);
+    }
+  });
+
+  /** The host's ffmpeg is at fault, so error reporting must not file it as our bug. */
+  it("throws an operational error, not a bug", () => {
+    setEncoderInventoryForTests(NO_LIBX264);
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    let thrown: unknown;
+    try {
+      resolveEncoder("h264");
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toMatchObject({ code: "ENCODER_MISSING" });
+    expect(classifyError(thrown, "worker")).toBe("operational");
+  });
+});
+
+describe("softwareEncoderStatus", () => {
+  it("lists nothing missing on the published image's inventory", () => {
+    setEncoderInventoryForTests(QSV_ONLY);
+    expect(softwareEncoderStatus()).toEqual({ missing: [], probeError: null });
+  });
+
+  it("lists every software encoder the build lacks, in target order", () => {
+    setEncoderInventoryForTests(new Set(["libx264", "aac", "libopus"]));
+    expect(softwareEncoderStatus().missing).toEqual([
+      "libx265",
+      "libsvtav1",
+      "libvpx-vp9",
+      "libmp3lame",
+    ]);
+  });
+
+  it("lists all seven when the build has no software encoders at all", () => {
+    setEncoderInventoryForTests(new Set(["h264_qsv"]));
+    expect(softwareEncoderStatus().missing).toEqual([
+      "libx264",
+      "libx265",
+      "libsvtav1",
+      "libvpx-vp9",
+      "aac",
+      "libopus",
+      "libmp3lame",
+    ]);
+  });
+
+  /** The boot warning must name exactly the encoders that fail jobs. */
+  it("agrees with resolveEncoder on which targets fail", () => {
+    setEncoderInventoryForTests(new Set(["libx264", "libvpx-vp9", "aac", "h264_qsv"]));
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    const { missing } = softwareEncoderStatus();
+    for (const target of ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"] as const) {
+      let failedFor: string | null = null;
+      try {
+        resolveEncoder(target);
+      } catch (err) {
+        failedFor = /has no (\S+) encoder/.exec((err as Error).message)?.[1] ?? "unparsed";
+      }
+      if (failedFor) expect(missing).toContain(failedFor);
+    }
+    expect(missing).toEqual(["libx265", "libsvtav1", "libopus", "libmp3lame"]);
+  });
+
+  it("reports the probe error instead of claiming everything is missing", () => {
+    setEncoderInventoryForTests(null);
+    const status = softwareEncoderStatus();
+    expect(status.missing).toEqual([]);
+    expect(status.probeError).toBeTruthy();
+  });
+});
+
 describe("hwAccelStatus", () => {
   it("reports nothing requested when the variable is unset", () => {
     delete process.env.SNAPOTTER_HW_ACCEL;
@@ -125,6 +262,7 @@ describe("hwAccelStatus", () => {
   it.each(["constructor", "__proto__", "tostring", "valueof"])(
     "does not treat inherited Object member %s as a family",
     (value) => {
+      setEncoderInventoryForTests(QSV_ONLY);
       process.env.SNAPOTTER_HW_ACCEL = value;
       const status = hwAccelStatus();
       expect(status.recognized).toBe(false);
@@ -187,6 +325,7 @@ describe("encoder probe against a stub ffmpeg", () => {
     " V..... = Video",
     " ------",
     " V....D libx264              libx264 H.264 (codec h264)",
+    " V....D libx265              libx265 H.265 / HEVC (codec hevc)",
     " V....D h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)",
   ];
 
@@ -260,13 +399,32 @@ describe("encoder probe against a stub ffmpeg", () => {
     expect(readFileSync(counter, "utf8").trim().split("\n")).toHaveLength(1);
   });
 
-  it("does not spawn at all when no accel is configured", async () => {
+  /**
+   * The software path probes too since #1092, so it gets the same once-only
+   * guarantee the hardware path has.
+   */
+  it("probes at most once when no accel is configured", async () => {
     const counter = join(dir, "calls-unset.log");
     const mod = await freshEncoders(stub("count-unset.sh", { lines: TABLE, countTo: counter }));
     delete process.env.SNAPOTTER_HW_ACCEL;
     mod.resolveEncoder("h264");
-    mod.resolveEncoder("vp9");
-    expect(() => readFileSync(counter, "utf8")).toThrow();
+    mod.resolveEncoder("h264");
+    mod.softwareEncoderStatus();
+    expect(readFileSync(counter, "utf8").trim().split("\n")).toHaveLength(1);
+  });
+
+  it("refuses a software encoder the stub build does not list (#1092)", async () => {
+    // TABLE lists libx264 but not libvpx-vp9.
+    const mod = await freshEncoders(stub("lean.sh", { lines: TABLE }));
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(mod.resolveEncoder("h264")).toBe("libx264");
+    expect(() => mod.resolveEncoder("vp9")).toThrow(/libvpx-vp9/);
+  });
+
+  it("still returns software when the binary does not exist (#1092)", async () => {
+    const mod = await freshEncoders(join(dir, "missing-for-software"));
+    delete process.env.SNAPOTTER_HW_ACCEL;
+    expect(mod.resolveEncoder("vp9")).toBe("libvpx-vp9");
   });
 });
 

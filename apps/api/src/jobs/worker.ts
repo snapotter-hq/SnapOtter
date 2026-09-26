@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { HW_ACCEL_FAMILIES, hwAccelStatus } from "@snapotter/media-engine";
+import { HW_ACCEL_FAMILIES, hwAccelStatus, softwareEncoderStatus } from "@snapotter/media-engine";
 import {
   ANALYTICS_EVENTS,
   extractErrorCode,
@@ -1723,6 +1723,29 @@ export function startWorkers(): void {
     `Workers started: ${POOLS.map((p) => `${p}(${p === "system" || p === "ai" ? 1 : concurrency})`).join(", ")}`,
   );
   logHwAccel();
+  logMissingSoftwareEncoders();
+}
+
+/**
+ * Name the software encoders a custom FFMPEG_PATH build lacks, so an admin
+ * learns it at boot rather than from the first failed job (#1092). A failed
+ * probe is only info: jobs fail open on it, so nothing breaks, but the check
+ * is off for the life of the process and that should leave a trace.
+ */
+function logMissingSoftwareEncoders(): void {
+  const { missing, probeError } = softwareEncoderStatus();
+  if (probeError) {
+    logger.info(
+      { probeError },
+      `Could not read the ffmpeg encoder list (${probeError}); software encoders will not be checked before use`,
+    );
+    return;
+  }
+  if (missing.length === 0) return;
+  logger.warn(
+    { missing },
+    `This ffmpeg build lacks software encoders ${missing.join(", ")}; media tools that need them will fail until a full ffmpeg build is installed`,
+  );
 }
 
 /**

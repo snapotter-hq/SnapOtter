@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { SafeError } from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 
 export type EncoderTarget = "h264" | "hevc" | "av1" | "vp9" | "aac" | "opus" | "mp3";
@@ -85,7 +86,10 @@ export function parseEncoderNames(stdout: string): Set<string> {
 }
 
 interface Probe {
-  /** Null when the list could not be read; callers treat that as "absent". */
+  /**
+   * Null when the list could not be read. The hardware gate treats that as
+   * "absent"; the software check treats it as "unknown" and fails open.
+   */
   names: ReadonlySet<string> | null;
   /** Why it could not be read. Null on success. */
   error: string | null;
@@ -120,8 +124,9 @@ function runProbe(): Probe {
 /**
  * Cached for the process. A failed probe is cached too: retrying a 10s
  * blocking spawn on every call would turn a slow boot into a slow every-job.
- * The cost is that a transient failure pins the process to software until it
- * restarts, which the startup warning reports.
+ * The cost is that a transient failure pins the process to software, and
+ * switches off the software-encoder check, until it restarts. The startup log
+ * reports it either way.
  */
 function encoderProbe(): Probe {
   if (probe === undefined) probe = runProbe();
@@ -143,13 +148,57 @@ export function setEncoderInventoryForTests(names: ReadonlySet<string> | null | 
  * inside the CUDA image, so a documented `SNAPOTTER_HW_ACCEL=nvenc` used to
  * resolve to `h264_nvenc` and kill every re-encoding job with
  * `Unknown encoder 'h264_nvenc'` (#1054).
+ *
+ * Throws when the software encoder it would fall back to is not listed by
+ * this build either (#1092); see requireSoftware.
  */
 export function resolveEncoder(target: EncoderTarget): string {
   const hardware = requestedFamily().map?.[target];
-  // No accel configured, unrecognised family, or no hardware encoder for this
-  // target. Returning here keeps the default path free of a probe spawn.
-  if (!hardware) return SOFTWARE[target];
-  return encoderProbe().names?.has(hardware) ? hardware : SOFTWARE[target];
+  const { names } = encoderProbe();
+  if (hardware && names?.has(hardware)) return hardware;
+  return requireSoftware(target, names);
+}
+
+/**
+ * The software encoder for `target`, checked against the build (#1092). A
+ * custom FFMPEG_PATH built without, say, libx264 otherwise dies at encode
+ * time with ffmpeg's `Unknown encoder`, which friendlyError collapses into
+ * "the file may be corrupted" and so blames the user's file.
+ *
+ * Fails open when the inventory could not be read: an unreadable probe says
+ * nothing about the build, and failing closed would turn it into every media
+ * job failing. The message stays short, single-line and path-free so
+ * friendlyError passes it to the client verbatim. Operational, because the
+ * cause is the host's ffmpeg, not a SnapOtter bug: error reporting then
+ * treats it as an environment fault rather than paging on every job.
+ */
+function requireSoftware(target: EncoderTarget, names: ReadonlySet<string> | null): string {
+  const software = SOFTWARE[target];
+  if (!names || names.has(software)) return software;
+  throw new SafeError(
+    `This server's ffmpeg build has no ${software} encoder, which ${target} output needs. ` +
+      "An administrator needs to install a full ffmpeg build or change FFMPEG_PATH.",
+    { kind: "operational", code: "ENCODER_MISSING" },
+  );
+}
+
+export interface SoftwareEncoderStatus {
+  /** Software encoders this build does not list, in target order. */
+  missing: string[];
+  /** Why the encoder list could not be read. Null when it read fine. */
+  probeError: string | null;
+}
+
+/**
+ * Which software encoders the build lacks, for the startup log, so an admin
+ * running a lean custom ffmpeg learns it at boot rather than from the first
+ * failed job. Empty when the probe failed: `probeError` says why instead.
+ */
+export function softwareEncoderStatus(): SoftwareEncoderStatus {
+  const { names, error } = encoderProbe();
+  if (!names) return { missing: [], probeError: error };
+  const missing = ALL_TARGETS.map((t) => SOFTWARE[t]).filter((name) => !names.has(name));
+  return { missing, probeError: null };
 }
 
 export interface HwAccelStatus {

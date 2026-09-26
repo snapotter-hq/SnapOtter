@@ -130,9 +130,9 @@ describe("resolveEncoder falls back when the binary lacks the encoder (#1054)", 
     expect(resolveEncoder("mp3")).toBe("libmp3lame");
   });
 
-  it("does not consult the inventory when no accel is configured", () => {
-    // A null inventory means "nothing is available". Software targets must
-    // still resolve, which proves the default path never reaches the gate.
+  it("fails open on an unreadable inventory when no accel is configured", () => {
+    // A null inventory means the probe could not read the list. Software
+    // targets must still resolve rather than failing every job (#1092).
     setEncoderInventoryForTests(null);
     delete process.env.SNAPOTTER_HW_ACCEL;
     expect(resolveEncoder("h264")).toBe("libx264");
@@ -144,7 +144,9 @@ describe("resolveEncoder falls back when the binary lacks the encoder (#1054)", 
  * The seam tests above pin the logic; this one pins reality. It runs only
  * where ffmpeg exists (CI integration shards have no ffmpeg), and asserts the
  * property that actually matters: whatever resolveEncoder hands back, this
- * ffmpeg can run it.
+ * ffmpeg lists it. On a build leaner than the shipped one a target may throw
+ * instead, naming its missing encoder (#1092); it must never return a name
+ * ffmpeg will reject.
  */
 describe.runIf(ffmpegAvailable())("resolveEncoder against the real ffmpeg binary", () => {
   const TARGETS: EncoderTarget[] = ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"];
@@ -158,12 +160,22 @@ describe.runIf(ffmpegAvailable())("resolveEncoder against the real ffmpeg binary
       else delete process.env.SNAPOTTER_HW_ACCEL;
 
       for (const target of TARGETS) {
-        const chosen = resolveEncoder(target);
+        let chosen: string;
+        try {
+          chosen = resolveEncoder(target);
+        } catch (err) {
+          // A throw is only right if the named encoder really is absent.
+          const missing = /has no (\S+) encoder/.exec((err as Error).message)?.[1];
+          expect(missing, `${target} threw: ${(err as Error).message}`).toBeTruthy();
+          expect(
+            installed.has(missing as string),
+            `${target} threw for ${missing}, which this ffmpeg lists`,
+          ).toBe(false);
+          continue;
+        }
         expect(
           installed.has(chosen),
-          `${target} resolved to "${chosen}", which this ffmpeg does not list. ` +
-            "If that is a software encoder, this build is leaner than the shipped " +
-            "one and the gap is #1092, not the hardware gate.",
+          `${target} resolved to "${chosen}", which this ffmpeg does not list`,
         ).toBe(true);
       }
     });

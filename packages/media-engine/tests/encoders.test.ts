@@ -11,13 +11,27 @@ import {
  * would leave every map-entry mutant alive.
  *
  * These tests cover the family mapping, so they pin an inventory that has
- * every hardware encoder. Whether a real build provides them is a separate
- * concern, covered in encoder-availability.test.ts (#1054).
+ * every encoder, software included, since the software branch is checked
+ * against the inventory too (#1092). Whether a real build provides them is a
+ * separate concern, covered in encoder-availability.test.ts (#1054).
  */
-const ALL_HARDWARE = new Set(["h264_nvenc", "hevc_nvenc", "av1_nvenc", "h264_vaapi", "hevc_vaapi"]);
+const ALL_ENCODERS = new Set([
+  "h264_nvenc",
+  "hevc_nvenc",
+  "av1_nvenc",
+  "h264_vaapi",
+  "hevc_vaapi",
+  "libx264",
+  "libx265",
+  "libsvtav1",
+  "libvpx-vp9",
+  "aac",
+  "libopus",
+  "libmp3lame",
+]);
 
 beforeEach(() => {
-  setEncoderInventoryForTests(ALL_HARDWARE);
+  setEncoderInventoryForTests(ALL_ENCODERS);
 });
 
 afterEach(() => {

@@ -5,6 +5,8 @@ export {
   type HwAccelStatus,
   hwAccelStatus,
   resolveEncoder,
+  type SoftwareEncoderStatus,
+  softwareEncoderStatus,
 } from "./encoders.js";
 export { type RunFfmpegOptions, runFfmpeg } from "./ffmpeg.js";
 export { type MediaInfo, type MediaStreamInfo, type ProbeOptions, probeMedia } from "./ffprobe.js";
