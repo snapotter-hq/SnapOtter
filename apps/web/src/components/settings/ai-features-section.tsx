@@ -22,39 +22,6 @@ function formatTimeRemaining(ms: number, t: TranslationKeys): string {
   return format(t.features.minutesLeft, { mins });
 }
 
-const PROGRESS_MESSAGES = [
-  "Almost there... probably...",
-  "Good things take time...",
-  "Still faster than watching paint dry...",
-  "Your patience is truly inspiring...",
-  "Working harder than it looks...",
-  "This is the exciting part, trust me...",
-  "Doing important behind-the-scenes stuff...",
-  "If you're reading this, it's working...",
-  "Preparing something awesome...",
-  "Worth every second, pinky promise...",
-  "The suspense is part of the experience...",
-  "Teaching your computer new tricks...",
-  "Setting up your superpowers...",
-  "Your files will thank you later...",
-  "Loading... but make it fancy...",
-  "This would be a great time for coffee...",
-  "Rome wasn't built in a day either...",
-  "Shhh... genius at work...",
-  "Making your projects jealous of what's coming...",
-  "Assembling the dream team...",
-  "Unpacking awesomeness...",
-  "Almost done thinking about starting... just kidding...",
-  "Plot twist: this is actually doing something...",
-  "Warming up the creative engines...",
-  "Imagination loading...",
-  "Not a screensaver, we promise...",
-  "Great art takes time to install...",
-  "Your future self will thank you...",
-  "Grabbing some really smart files...",
-  "Hang tight, the best is yet to come...",
-];
-
 export function AiFeaturesSection() {
   const { t } = useTranslation();
   const {
@@ -455,7 +422,7 @@ function BundleCard({
   const incompatible = bundle.compatibility === "incompatible";
   const displayedError = error ?? bundle.error;
   const [messageIndex, setMessageIndex] = useState(() =>
-    Math.floor(Math.random() * PROGRESS_MESSAGES.length),
+    Math.floor(Math.random() * t.features.progressMessages.length),
   );
   const [now, setNow] = useState(Date.now());
   const status = isQueued ? "queued" : isInstalling ? "installing" : bundle.status;
@@ -463,7 +430,7 @@ function BundleCard({
   useEffect(() => {
     if (!isInstalling) return;
     const interval = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+      setMessageIndex((prev) => prev + 1);
       setNow(Date.now());
     }, 3000);
     return () => clearInterval(interval);
@@ -623,7 +590,7 @@ function BundleCard({
           </div>
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground italic">
-              {PROGRESS_MESSAGES[messageIndex]}
+              {t.features.progressMessages[messageIndex % t.features.progressMessages.length]}
             </p>
             {eta && <p className="text-xs text-muted-foreground shrink-0 ms-2">{eta}</p>}
           </div>

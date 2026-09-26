@@ -2,6 +2,7 @@
 
 import type { FeatureBundleState } from "@snapotter/shared";
 import { de } from "@snapotter/shared/i18n/de.js";
+import { en } from "@snapotter/shared/i18n/en.js";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -185,5 +186,22 @@ describe("FeatureInstallPrompt download ETA (#1145)", () => {
     expect(await screen.findByText(expected)).toBeTruthy();
     expect(screen.queryByText(/minutes? left/)).toBeNull();
     expect(screen.queryByText(/\{mins\}/)).toBeNull();
+  });
+
+  it("renders the rotating progress message from the active locale", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    useFeaturesStore.setState({
+      installing: { [BUNDLE_ID]: { percent: 50, stage: "Downloading" } },
+      startTimes: { [BUNDLE_ID]: NOW - 30_000 },
+    });
+
+    render(
+      <I18nProvider>
+        <FeatureInstallPrompt bundle={makeBundleState()} isAdmin />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText(de.features.progressMessages[0])).toBeTruthy();
+    expect(screen.queryByText(en.features.progressMessages[0])).toBeNull();
   });
 });
