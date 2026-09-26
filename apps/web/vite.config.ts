@@ -3,6 +3,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { codeSplitting } from "./vite.chunks";
 
 // Source maps are emitted and uploaded to Sentry only when the build supplies
 // SENTRY_AUTH_TOKEN (the published Docker image does; dev and the source-archive
@@ -66,18 +67,7 @@ export default defineConfig({
     // Hidden source maps: generated for upload but not referenced from the
     // shipped JS, so browsers never fetch them. Off entirely when not uploading.
     sourcemap: sentryAuthToken ? "hidden" : false,
-    rolldownOptions: {
-      output: {
-        codeSplitting: {
-          // @snapotter/shared is one barrel. Left to the default splitter, a
-          // module only lazy code uses lands in that lazy chunk, the barrel's
-          // chunk imports it back, and the cycle blanks the app on load
-          // (#1296). One chunk for the package keeps it acyclic. The locale
-          // catalogs stay out: they load one language at a time, and pulling
-          // all 21 into this chunk would add megabytes to the first load.
-          groups: [{ name: "shared", test: /packages[\\/]shared[\\/]src[\\/](?!i18n[\\/])/ }],
-        },
-      },
-    },
+    // Keeps @snapotter/shared in one chunk (#1296); see vite.chunks.ts.
+    rolldownOptions: { output: { codeSplitting } },
   },
 });

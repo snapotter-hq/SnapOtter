@@ -93,7 +93,7 @@ WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json turbo.json tsconfig.base.json ./
 
 # Copy all package.json files for dependency install
-COPY apps/web/package.json apps/web/tsconfig.json apps/web/vite.config.ts apps/web/index.html ./apps/web/
+COPY apps/web/package.json apps/web/tsconfig.json apps/web/vite.config.ts apps/web/vite.chunks.ts apps/web/index.html ./apps/web/
 COPY apps/web/postcss.config.js ./apps/web/
 COPY apps/api/package.json apps/api/tsconfig.json ./apps/api/
 COPY packages/shared/package.json packages/shared/tsconfig.json ./packages/shared/

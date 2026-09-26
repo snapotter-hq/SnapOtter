@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,96 +11,180 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * Rolldown place that shared module in the lazy chunk, and the shared barrel
  * chunk then imported the lazy chunk back. The cycle left shared bindings
  * undefined when the first chunk evaluated and the production app rendered
- * blank. Dev mode serves modules one by one, so only the built bundle shows it.
- *
- * The invariant that failed: no lazily loaded page or tool panel may sit in
- * the entry's static import closure. This builds the real app and checks it.
+ * blank. Dev mode serves modules one by one, so only a production build shows
+ * it. This builds both apps that compile the web source and reads Rolldown's
+ * own chunk metadata (not the minified output).
  */
 
 const ROOT = path.resolve(__dirname, "../../..");
 const WEB = path.join(ROOT, "apps/web");
+const WEB_SRC = path.join(WEB, "src");
+const SHARED_SRC = path.join(ROOT, "packages/shared/src");
+const APP_MODULE = path.join(WEB_SRC, "App.tsx");
 
-/** Basenames of every module App.tsx and the tool registry load through lazy(). */
-function lazyModuleNames(): string[] {
-  const names = new Set<string>();
-  for (const file of ["src/App.tsx", "src/lib/tool-registry.tsx"]) {
-    const src = readFileSync(path.join(WEB, file), "utf8");
-    for (const m of src.matchAll(/lazy\(\s*\(\)\s*=>\s*import\(\s*["']([^"']+)["']/g)) {
-      names.add(path.basename(m[1]));
+interface Chunk {
+  type: "chunk";
+  fileName: string;
+  name: string;
+  isEntry: boolean;
+  imports: string[];
+  modules: Record<string, unknown>;
+}
+
+const APPS = { web: WEB, demo: path.join(ROOT, "apps/demo") } as const;
+type AppName = keyof typeof APPS;
+const builds: Partial<Record<AppName, { outDir: string; chunks: Chunk[] }>> = {};
+
+/** Module ids without their query suffix, the way they appear in chunk.modules. */
+const cleanId = (id: string) => id.split("?")[0];
+const stripExt = (p: string) => p.replace(/\.(tsx?|jsx?)$/, "");
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) return sourceFiles(full);
+    return /\.tsx?$/.test(entry) ? [full] : [];
+  });
+}
+
+/** Every module the web source loads through lazy() or lazyWithRetry(), extension-less. */
+function lazyModules(): Set<string> {
+  const found = new Set<string>();
+  for (const file of sourceFiles(WEB_SRC)) {
+    const src = readFileSync(file, "utf8");
+    for (const m of src.matchAll(
+      /\blazy(?:WithRetry)?\(\s*\(\)\s*=>\s*import\(\s*["']([^"']+)["']/g,
+    )) {
+      const spec = m[1];
+      const resolved = spec.startsWith("@/")
+        ? path.join(WEB_SRC, spec.slice(2))
+        : path.resolve(path.dirname(file), spec);
+      found.add(stripExt(resolved));
     }
   }
-  return [...names];
+  return found;
 }
 
-/** Static import graph of the built chunks, walked from the index.html entry. */
-function entryClosure(dist: string): string[] {
-  const assets = path.join(dist, "assets");
-  const html = readFileSync(path.join(dist, "index.html"), "utf8");
-  const entry = html.match(/<script[^>]+src="\.?\/assets\/([^"]+\.js)"/)?.[1];
-  if (!entry) throw new Error("no entry script in the built index.html");
-
-  const statics = new Map<string, string[]>();
-  for (const f of readdirSync(assets).filter((f) => f.endsWith(".js"))) {
-    const src = readFileSync(path.join(assets, f), "utf8");
-    statics.set(
-      f,
-      [...src.matchAll(/import(?:[^"'`()]*?from)?\s*["'`]\.\/([^"'`]+\.js)["'`]/g)].map(
-        (m) => m[1],
-      ),
-    );
-  }
-
-  const seen = new Set<string>();
-  const todo = [entry];
+function staticClosure(chunks: Chunk[], roots: Chunk[]): Chunk[] {
+  const byFile = new Map(chunks.map((c) => [c.fileName, c]));
+  const seen = new Map<string, Chunk>();
+  const todo = [...roots];
   while (todo.length > 0) {
-    const f = todo.pop() as string;
-    if (seen.has(f)) continue;
-    seen.add(f);
-    for (const d of statics.get(f) ?? []) todo.push(d);
+    const chunk = todo.pop() as Chunk;
+    if (seen.has(chunk.fileName)) continue;
+    seen.set(chunk.fileName, chunk);
+    for (const dep of chunk.imports) {
+      const next = byFile.get(dep);
+      if (!next) throw new Error(`${chunk.fileName} imports ${dep}, which the build did not emit`);
+      todo.push(next);
+    }
   }
-  return [...seen];
+  return [...seen.values()];
 }
 
-// apps/demo builds the same web source with its own config, so it gets the same check.
-const APPS = { web: WEB, demo: path.join(ROOT, "apps/demo") } as const;
-const dists: Partial<Record<keyof typeof APPS, string>> = {};
+function staticCycles(chunks: Chunk[]): string[] {
+  const byFile = new Map(chunks.map((c) => [c.fileName, c]));
+  const state = new Map<string, 1 | 2>();
+  const stack: string[] = [];
+  const cycles: string[] = [];
+  const visit = (file: string) => {
+    state.set(file, 1);
+    stack.push(file);
+    for (const dep of byFile.get(file)?.imports ?? []) {
+      if (state.get(dep) === 1) cycles.push([...stack.slice(stack.indexOf(dep)), dep].join(" -> "));
+      else if (!state.has(dep)) visit(dep);
+    }
+    stack.pop();
+    state.set(file, 2);
+  };
+  for (const c of chunks) if (!state.has(c.fileName)) visit(c.fileName);
+  return cycles;
+}
 
 beforeAll(async () => {
+  // Without a token the Sentry plugin is a no-op; with one it would upload
+  // source maps for this throwaway build.
+  delete process.env.SENTRY_AUTH_TOKEN;
   // The web apps build with their own Vite (Rolldown); the root Vitest bundles an older one.
   const vitePath = path.join(WEB, "node_modules/vite/dist/node/index.js");
   const { build } = (await import(pathToFileURL(vitePath).href)) as {
-    build: (config: Record<string, unknown>) => Promise<unknown>;
+    build: (config: Record<string, unknown>) => Promise<{ output: Array<{ type: string }> }>;
   };
-  for (const [name, root] of Object.entries(APPS) as [keyof typeof APPS, string][]) {
+  for (const [name, root] of Object.entries(APPS) as [AppName, string][]) {
     const outDir = mkdtempSync(path.join(tmpdir(), `snapotter-${name}-build-`));
-    dists[name] = outDir;
-    await build({
+    builds[name] = { outDir, chunks: [] };
+    const result = await build({
       root,
       configFile: path.join(root, "vite.config.ts"),
       logLevel: "silent",
       build: { outDir, emptyOutDir: true },
     });
+    builds[name] = {
+      outDir,
+      chunks: result.output.filter((o): o is Chunk => o.type === "chunk"),
+    };
   }
 }, 240_000);
 
 afterAll(() => {
-  for (const dir of Object.values(dists)) if (dir) rmSync(dir, { recursive: true, force: true });
+  for (const b of Object.values(builds)) if (b) rmSync(b.outDir, { recursive: true, force: true });
 });
 
-describe("production build keeps lazy chunks lazy (#1296)", () => {
-  it("found the lazy pages and tool panels to check", () => {
-    // Guards the regex above: an empty list would make the real check vacuous.
-    expect(lazyModuleNames().length).toBeGreaterThan(150);
+function chunksOf(name: AppName): Chunk[] {
+  const chunks = builds[name]?.chunks ?? [];
+  if (chunks.length === 0) throw new Error(`the ${name} build produced no chunks`);
+  return chunks;
+}
+
+describe("production builds keep @snapotter/shared in one chunk (#1296)", () => {
+  it("found the lazy pages and panels to check", () => {
+    // An empty set would make the checks below vacuous.
+    expect(lazyModules().size).toBeGreaterThan(150);
   });
 
-  it.each(Object.keys(APPS) as (keyof typeof APPS)[])(
-    "%s: loads no lazy page or tool panel as part of the first load",
-    (name) => {
-      const closure = entryClosure(dists[name] as string);
-      const lazy = lazyModuleNames();
-      const leaked = closure.filter((chunk) => lazy.some((n) => chunk.startsWith(`${n}-`)));
+  describe.each(Object.keys(APPS) as AppName[])("%s", (name) => {
+    it("puts the shared barrel and every non-locale shared module in the one shared chunk", () => {
+      const chunks = chunksOf(name);
+      const shared = chunks.filter((c) => c.name === "shared");
+      expect(shared.map((c) => c.fileName)).toHaveLength(1);
+      expect(Object.keys(shared[0].modules).map(cleanId)).toContain(
+        path.join(SHARED_SRC, "index.ts"),
+      );
 
-      expect(leaked, `lazy chunks pulled into the entry graph: ${leaked.join(", ")}`).toEqual([]);
-    },
-  );
+      const stray = chunks
+        .filter((c) => c.name !== "shared")
+        .flatMap((c) =>
+          Object.keys(c.modules)
+            .map(cleanId)
+            .filter(
+              (id) => id.startsWith(SHARED_SRC) && !id.startsWith(path.join(SHARED_SRC, "i18n")),
+            )
+            .map((id) => `${path.relative(ROOT, id)} in ${c.fileName}`),
+        );
+      expect(stray).toEqual([]);
+    });
+
+    it("has no static import cycle between chunks", () => {
+      expect(staticCycles(chunksOf(name))).toEqual([]);
+    });
+
+    it("loads no lazy page or panel before it is asked for", () => {
+      const chunks = chunksOf(name);
+      // The demo imports the whole app lazily after installing its mocks, so
+      // its startup graph begins at the chunk that holds App.tsx.
+      const roots = chunks.filter(
+        (c) => c.isEntry || Object.keys(c.modules).map(cleanId).includes(APP_MODULE),
+      );
+      expect(roots.length).toBeGreaterThan(0);
+
+      const lazy = lazyModules();
+      const leaked = staticClosure(chunks, roots).flatMap((c) =>
+        Object.keys(c.modules)
+          .map((id) => stripExt(cleanId(id)))
+          .filter((id) => lazy.has(id))
+          .map((id) => `${path.relative(ROOT, id)} in ${c.fileName}`),
+      );
+      expect(leaked).toEqual([]);
+    });
+  });
 });
