@@ -2017,6 +2017,12 @@ export const nl: TranslationKeys = {
       submitDeepBatch: "Diepte-verbetering ({count} bestanden)",
       progressLabel: "Afbeelding verbeteren",
       progressLabelBatch: "{count} afbeeldingen verbeteren",
+      deepEnhanceSkippedFailed:
+        "Diepte-verbetering is deze keer niet uitgevoerd, dus je krijgt de standaardverbetering. Probeer het opnieuw.",
+      deepEnhanceSkippedUnavailable:
+        "Diepte-verbetering vereist de Opschalen & Verbeteren-bundel, die niet is geïnstalleerd, dus je krijgt de standaardverbetering.",
+      deepEnhanceSkippedAnimated:
+        "Diepte-verbetering werkt niet op geanimeerde afbeeldingen, dus elk frame kreeg de standaardverbetering.",
     },
     "noise-removal": {
       off: "Uit",

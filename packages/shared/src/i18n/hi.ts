@@ -1822,6 +1822,12 @@ export const hi: TranslationKeys = {
       submitDeepBatch: "डीप एन्हांस ({count} फाइलें)",
       progressLabel: "इमेज एन्हांस हो रही है",
       progressLabelBatch: "{count} इमेज एन्हांस हो रही हैं",
+      deepEnhanceSkippedFailed:
+        "इस बार डीप एन्हांस नहीं चला, इसलिए आपको सामान्य एन्हांसमेंट मिला। फिर से कोशिश करें।",
+      deepEnhanceSkippedUnavailable:
+        "डीप एन्हांस के लिए अपस्केल और एन्हांस बंडल चाहिए, जो इंस्टॉल नहीं है, इसलिए आपको सामान्य एन्हांसमेंट मिला।",
+      deepEnhanceSkippedAnimated:
+        "डीप एन्हांस एनिमेटेड इमेज पर काम नहीं करता, इसलिए हर फ़्रेम को सामान्य एन्हांसमेंट मिला।",
     },
     "noise-removal": {
       off: "बंद",

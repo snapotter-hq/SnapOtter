@@ -2012,6 +2012,12 @@ export const pl: TranslationKeys = {
       submitDeepBatch: "Głębokie ulepszenie ({count} plików)",
       progressLabel: "Ulepszanie obrazu",
       progressLabelBatch: "Ulepszanie {count} obrazów",
+      deepEnhanceSkippedFailed:
+        "Tym razem głębokie ulepszenie się nie wykonało, więc otrzymujesz standardowe ulepszenie. Spróbuj ponownie.",
+      deepEnhanceSkippedUnavailable:
+        "Głębokie ulepszenie wymaga pakietu powiększania i ulepszania, który nie jest zainstalowany, więc otrzymujesz standardowe ulepszenie.",
+      deepEnhanceSkippedAnimated:
+        "Głębokie ulepszenie nie działa na animowanych obrazach, więc każda klatka otrzymała standardowe ulepszenie.",
     },
     "noise-removal": {
       off: "Wył.",
