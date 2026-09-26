@@ -273,14 +273,26 @@ describe("transparency-fixer defringe", () => {
     expect(cleanCleared.some(Boolean)).toBe(true);
   });
 
-  it("keeps a halo wider than the blur's reach, which reads as soft subject", async () => {
-    // The chosen trade-off (#1178): a uniform alpha-40 band with neither
-    // background nor subject within the blur's reach (3px at the default)
-    // looks the same as smoke or glass, so its middle survives.
-    const { output } = await runDefringe({}, haloAround(12, 40));
-
-    const middle = (SUBJECT_TOP - 6) * WIDTH + (SUBJECT_LEFT + SUBJECT_RIGHT) / 2;
-    expect(output[middle * 4 + 3]).toBe(40);
+  // Under a quarter opacity a uniform band could be smoke or a halo; the
+  // matte is upscaled from at most 2048px, so halos wider than the blur's
+  // reach are common, and faint pixels keep the old rule to clear them.
+  it.each([
+    { name: "a 12px halo", alphaAt: haloAround(12, 40) },
+    {
+      name: "haze over the background",
+      alphaAt: (x: number, y: number) => (depthInsideSubject(x, y) >= 0 ? 255 : 12),
+    },
+  ])("clears faint pixels on $name exactly as the old rule did", async ({ alphaAt }) => {
+    for (const defringe of [30, 100]) {
+      const { input, output } = await runDefringe({ defringe }, alphaAt);
+      const oldCleared = await oldRuleClearedMask(input, defringe);
+      const newCleared = clearedMask(output);
+      for (let i = 0; i < WIDTH * HEIGHT; i++) {
+        if (input[i * 4 + 3] >= 64) continue;
+        expect(newCleared[i], `defringe ${defringe} pixel ${i}`).toBe(oldCleared[i]);
+      }
+      expect(oldCleared.some((cleared, i) => cleared && input[i * 4 + 3] > 0)).toBe(true);
+    }
   });
 
   it("changes nothing at zero", async () => {
