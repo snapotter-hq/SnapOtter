@@ -83,7 +83,8 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   // A faint pixel is fringe when its blurred alpha is under the threshold, as
   // before. Any other pixel is fringe only at the subject's boundary with the
   // background, where its neighbourhood is thin compared with the subject
-  // around it (#1178). Both parts are judged over the pixels the blur read:
+  // around it (#1178). That boundary test has two conditions, both judged
+  // over the pixels the blur read:
   //  - background must be in reach, so an opaque region meeting a soft one
   //    (skin under a sheer sleeve, a head under hair) is never cut apart;
   //  - the threshold is a fraction of the most opaque alpha in reach, not of
