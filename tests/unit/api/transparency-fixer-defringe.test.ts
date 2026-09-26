@@ -59,6 +59,41 @@ function uniformSubject(subjectAlpha: number): AlphaAt {
   return (x, y) => (depthInsideSubject(x, y) >= 0 ? subjectAlpha : 0);
 }
 
+/** An opaque subject inside a `width`-pixel ring at `haloAlpha`. */
+function haloAround(width: number, haloAlpha: number): AlphaAt {
+  return (x, y) => {
+    const depth = depthInsideSubject(x, y);
+    if (depth >= 0) return 255;
+    return depth >= -width ? haloAlpha : 0;
+  };
+}
+
+/** An opaque subject whose alpha falls off linearly to 0 over `width` pixels. */
+function rampAround(width: number): AlphaAt {
+  return (x, y) => {
+    const depth = depthInsideSubject(x, y);
+    if (depth >= 0) return 255;
+    return depth >= -width ? Math.round((255 * (width + 1 + depth)) / (width + 1)) : 0;
+  };
+}
+
+/** Which pixels of a decoded RGBA output are fully transparent. */
+function clearedMask(rgba: Buffer): boolean[] {
+  return Array.from({ length: WIDTH * HEIGHT }, (_, i) => rgba[i * 4 + 3] === 0);
+}
+
+/** The pre-#1178 rule: clear any pixel whose blurred alpha is under the threshold. */
+async function oldRuleClearedMask(rgba: Buffer, defringe: number): Promise<boolean[]> {
+  const alpha = Buffer.from(Array.from({ length: WIDTH * HEIGHT }, (_, i) => rgba[i * 4 + 3]));
+  const blurred = await sharp(alpha, { raw: { width: WIDTH, height: HEIGHT, channels: 1 } })
+    .blur(Math.max(0.3, Math.round(defringe / 20)))
+    .toColourspace("b-w")
+    .raw()
+    .toBuffer();
+  const threshold = Math.round(128 + (defringe / 100) * 80);
+  return Array.from({ length: WIDTH * HEIGHT }, (_, i) => alpha[i] === 0 || blurred[i] < threshold);
+}
+
 async function decodeRgba(png: Buffer): Promise<Buffer> {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   expect([info.width, info.height, info.channels]).toEqual([WIDTH, HEIGHT, 4]);
@@ -161,10 +196,7 @@ describe("transparency-fixer defringe", () => {
     const opaque = await runDefringe({ defringe: 100 });
     const soft = await runDefringe({ defringe: 100 }, uniformSubject(140));
 
-    // Cleared pixels are where the output alpha went to zero.
-    const cleared = (out: Buffer) =>
-      Array.from({ length: WIDTH * HEIGHT }, (_, i) => out[i * 4 + 3] === 0);
-    expect(cleared(soft.output)).toEqual(cleared(opaque.output));
+    expect(clearedMask(soft.output)).toEqual(clearedMask(opaque.output));
   });
 
   it("leaves the seam where an opaque region meets a soft one", async () => {
@@ -177,19 +209,14 @@ describe("transparency-fixer defringe", () => {
       return x < seamX ? 255 : 140;
     });
     // Where the seam reaches the outer edge the soft half thins the
-    // neighbourhood, so the trim there runs as deep as the blur reads (9px at
+    // neighbourhood, so the trim there runs as deep as the blur reads (8px at
     // defringe 100) and no deeper. The old rule cleared the whole soft half.
-    expectOnlyEdgeRingErased(input, output, 9);
+    expectOnlyEdgeRingErased(input, output, 8);
   });
 
   it("still clears a faint halo around an opaque subject", async () => {
     // A 3px ring at alpha 40 just outside the subject: what defringe is for.
-    const haloWidth = 3;
-    const { output } = await runDefringe({}, (x, y) => {
-      const depth = depthInsideSubject(x, y);
-      if (depth >= 0) return 255;
-      return depth >= -haloWidth ? 40 : 0;
-    });
+    const { output } = await runDefringe({}, haloAround(3, 40));
 
     for (let y = 0; y < HEIGHT; y++) {
       for (let x = 0; x < WIDTH; x++) {
@@ -198,6 +225,62 @@ describe("transparency-fixer defringe", () => {
         expect(alpha, `halo pixel (${x}, ${y}) survived`).toBe(0);
       }
     }
+  });
+
+  // Where every pixel the old rule cleared had an opaque pixel and background
+  // in the blur's reach, the rule is the old absolute one exactly, so these
+  // pin that it clears no less. The old rule's own arithmetic is the contract.
+  it.each([
+    { name: "an opaque subject", alphaAt: uniformSubject(255) },
+    { name: "a 3px ramp", alphaAt: rampAround(3) },
+  ])("clears exactly what the old rule did on $name", async ({ alphaAt }) => {
+    for (const defringe of [30, 100]) {
+      const { input, output } = await runDefringe({ defringe }, alphaAt);
+      const expected = await oldRuleClearedMask(input, defringe);
+      expect(clearedMask(output), `defringe ${defringe}`).toEqual(expected);
+    }
+  });
+
+  it.each([
+    { name: "a soft subject", alphaAt: uniformSubject(140) },
+    // At the default the subject's corners, 4px from background, are out of
+    // the blur's 3px reach: the old rule cleared them, this keeps them.
+    { name: "a 3px halo", alphaAt: haloAround(3, 40) },
+    { name: "a 12px halo", alphaAt: haloAround(12, 40) },
+    { name: "a 12px ramp", alphaAt: rampAround(12) },
+  ])("never clears a pixel the old rule kept on $name", async ({ alphaAt }) => {
+    for (const defringe of [1, 30, 100]) {
+      const { input, output } = await runDefringe({ defringe }, alphaAt);
+      const oldCleared = await oldRuleClearedMask(input, defringe);
+      const newCleared = clearedMask(output);
+      const extra = newCleared.findIndex((cleared, i) => cleared && !oldCleared[i]);
+      expect(extra, `defringe ${defringe} cleared pixel ${extra}`).toBe(-1);
+    }
+  });
+
+  it("finds the background through a faint noise floor", async () => {
+    // A matte whose background sits at alpha 4 rather than 0 still counts as
+    // background, so the subject is trimmed exactly as on a clean ground.
+    const clean = await runDefringe({ defringe: 100 });
+    const noisy = await runDefringe({ defringe: 100 }, (x, y) =>
+      depthInsideSubject(x, y) >= 0 ? 255 : 4,
+    );
+
+    const insideSubject = (mask: boolean[]) =>
+      mask.filter((_, i) => depthInsideSubject(i % WIDTH, Math.floor(i / WIDTH)) >= 0);
+    const cleanCleared = insideSubject(clearedMask(clean.output));
+    expect(insideSubject(clearedMask(noisy.output))).toEqual(cleanCleared);
+    expect(cleanCleared.some(Boolean)).toBe(true);
+  });
+
+  it("keeps a halo wider than the blur's reach, which reads as soft subject", async () => {
+    // The chosen trade-off (#1178): a uniform alpha-40 band with neither
+    // background nor subject within the blur's reach (3px at the default)
+    // looks the same as smoke or glass, so its middle survives.
+    const { output } = await runDefringe({}, haloAround(12, 40));
+
+    const middle = (SUBJECT_TOP - 6) * WIDTH + (SUBJECT_LEFT + SUBJECT_RIGHT) / 2;
+    expect(output[middle * 4 + 3]).toBe(40);
   });
 
   it("changes nothing at zero", async () => {
