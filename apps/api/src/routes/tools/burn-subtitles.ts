@@ -1,5 +1,10 @@
 import { dirname, join } from "node:path";
-import { probeMedia, resolveEncoder, resolveFontFile } from "@snapotter/media-engine";
+import {
+  probeMedia,
+  resolveEncoder,
+  resolveFontFile,
+  videoCodecArgs,
+} from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
@@ -49,12 +54,7 @@ export function registerBurnSubtitles(app: FastifyInstance) {
           videoPath,
           "-vf",
           vf,
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
+          ...videoCodecArgs("h264", 20),
           "-pix_fmt",
           "yuv420p",
           "-c:a",

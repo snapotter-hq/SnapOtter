@@ -1,4 +1,4 @@
-import { resolveEncoder } from "@snapotter/media-engine";
+import { resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
@@ -53,12 +53,7 @@ export function registerGifToVideo(app: FastifyInstance) {
           inPath,
           "-vf",
           "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          "20",
-          "-preset",
-          "medium",
+          ...videoCodecArgs("h264", 20),
           "-pix_fmt",
           "yuv420p",
           "-movflags",

@@ -222,6 +222,83 @@ function requireSoftware(target: EncoderTarget, names: ReadonlySet<string> | nul
   );
 }
 
+/**
+ * The targets whose encoders share the H.264 quantiser scale (0..51), so one
+ * quality number can drive libx264/libx265, NVENC and VAAPI alike. AV1 and
+ * VP9 are not here: libsvtav1 and av1_nvenc run 0..63 and libsvtav1's preset
+ * is numeric, libvpx-vp9 wants `-b:v 0` and no preset. Each needs its own row
+ * in rateControlArgs before a caller appears.
+ */
+export type RateControlledTarget = "h264" | "hevc";
+
+const RATE_CONTROLLED: RateControlledTarget[] = ["h264", "hevc"];
+
+/**
+ * Rate control and speed preset for a resolved h264 or hevc encoder, given
+ * the quality as an x264-style CRF (an integer, lower is better, 0..51).
+ *
+ * `-crf` is a libx264 option. Passing it to h264_nvenc makes ffmpeg log
+ * "Codec AVOption crf has not been used for any stream" and encode at NVENC's
+ * default VBR, so the quality the user picked did nothing and compress-video's
+ * three levels produced the same file (#1090). (`-preset medium` is accepted
+ * by NVENC as a legacy alias; the quality flag was the silent part.) Each
+ * family gets its own dialect here, so a call site never pairs an encoder
+ * with another encoder's flags.
+ *
+ * The number maps 1:1 across families: CRF, NVENC's cq and VAAPI's qp all sit
+ * on the same quantiser scale, so the same value asks each encoder for roughly
+ * the same quantisation. How much picture that buys differs per encoder, and
+ * this is the one place to bias it if a host with the hardware shows a
+ * systematic gap. NVENC needs `-b:v 0` because libavcodec's default bitrate
+ * (200k) would otherwise cap the cq target. Both hardware options read 0 as
+ * "unset" (`-cq 0` is automatic, `-qp 0` falls back to the driver default),
+ * the very behaviour this replaces, so 0 becomes 1 there; libx264's 0 is
+ * lossless and passes through. The p-presets need ffmpeg 4.3 or newer, which
+ * every NVENC-capable build in circulation is.
+ *
+ * Throws on an encoder without a row, or a CRF outside the scale: every
+ * caller passes a code constant, so either is a programming error and must
+ * not reach ffmpeg as a dropped or malformed flag.
+ */
+export function rateControlArgs(encoder: string, crf: number): string[] {
+  if (!Number.isInteger(crf) || crf < 0 || crf > 51) {
+    throw new Error(`rateControlArgs: crf must be an integer in 0..51, got ${crf}`);
+  }
+  const family = rateControlFamily(encoder);
+  const hardwareQuality = String(Math.max(1, crf));
+  switch (family) {
+    case "software":
+      return ["-crf", String(crf), "-preset", "medium"];
+    case "nvenc":
+      return ["-rc", "vbr", "-cq", hardwareQuality, "-b:v", "0", "-preset", "p5"];
+    case "vaapi":
+      return ["-rc_mode", "CQP", "-qp", hardwareQuality];
+    default:
+      throw new Error(`No rate-control table for encoder ${encoder}`);
+  }
+}
+
+/** Which of the encoder maps above `encoder` came from, for a rate-controlled target. */
+function rateControlFamily(encoder: string): "software" | "nvenc" | "vaapi" | null {
+  for (const target of RATE_CONTROLLED) {
+    if (encoder === SOFTWARE[target]) return "software";
+    if (encoder === NVENC[target]) return "nvenc";
+    if (encoder === VAAPI[target]) return "vaapi";
+  }
+  return null;
+}
+
+/**
+ * `-c:v <encoder>` plus the matching rate control. Replaces the hand-written
+ * `"-c:v", resolveEncoder("h264"), "-crf", "20", "-preset", "medium"` that
+ * used to be copied into every video route, and is the only sanctioned way to
+ * put an h264 or hevc encoder on a command line.
+ */
+export function videoCodecArgs(target: RateControlledTarget, crf: number): string[] {
+  const encoder = resolveEncoder(target);
+  return ["-c:v", encoder, ...rateControlArgs(encoder, crf)];
+}
+
 export interface SoftwareEncoderStatus {
   /** Software encoders this build does not list, in target order. */
   missing: string[];

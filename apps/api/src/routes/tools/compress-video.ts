@@ -1,4 +1,4 @@
-import { resolveEncoder } from "@snapotter/media-engine";
+import { resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
@@ -9,10 +9,10 @@ const settingsSchema = z.object({
   resolution: z.enum(["original", "1080p", "720p", "480p"]).default("original"),
 });
 
-const CRF: Record<string, string> = {
-  light: "23",
-  balanced: "28",
-  strong: "33",
+const CRF: Record<string, number> = {
+  light: 23,
+  balanced: 28,
+  strong: 33,
 };
 
 const SCALE: Record<string, string> = {
@@ -36,12 +36,7 @@ export function registerCompressVideo(app: FastifyInstance) {
         const args = [
           "-i",
           inPath,
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          CRF[settings.quality],
-          "-preset",
-          "medium",
+          ...videoCodecArgs("h264", CRF[settings.quality]),
           "-pix_fmt",
           "yuv420p",
         ];

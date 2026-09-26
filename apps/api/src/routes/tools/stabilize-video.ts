@@ -1,5 +1,11 @@
 import { extname, join } from "node:path";
-import { type EncoderTarget, probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
+import {
+  type EncoderTarget,
+  probeMedia,
+  resolveEncoder,
+  runFfmpeg,
+  videoCodecArgs,
+} from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runFfmpegWithProgress, stageMediaInputs, videoContentType } from "../../lib/media-tool.js";
@@ -33,16 +39,7 @@ function codecForContainer(ext: string): {
   }
   return {
     target: "h264",
-    encodeArgs: [
-      "-c:v",
-      resolveEncoder("h264"),
-      "-crf",
-      "20",
-      "-preset",
-      "medium",
-      "-pix_fmt",
-      "yuv420p",
-    ],
+    encodeArgs: [...videoCodecArgs("h264", 20), "-pix_fmt", "yuv420p"],
   };
 }
 

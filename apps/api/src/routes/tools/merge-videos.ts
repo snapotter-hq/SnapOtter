@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
+import { probeMedia, resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
@@ -66,12 +66,7 @@ export function registerMergeVideos(app: FastifyInstance) {
         "[v]",
         "-map",
         "[a]",
-        "-c:v",
-        resolveEncoder("h264"),
-        "-crf",
-        "20",
-        "-preset",
-        "medium",
+        ...videoCodecArgs("h264", 20),
         "-pix_fmt",
         "yuv420p",
         "-c:a",

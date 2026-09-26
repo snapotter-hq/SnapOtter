@@ -4,10 +4,12 @@ export {
   HW_ACCEL_FAMILIES,
   type HwAccelStatus,
   hwAccelStatus,
+  type RateControlledTarget,
   resolveEncoder,
   type SoftwareEncoderStatus,
   softwareEncoder,
   softwareEncoderStatus,
+  videoCodecArgs,
 } from "./encoders.js";
 export { type RunFfmpegOptions, runFfmpeg } from "./ffmpeg.js";
 export { type MediaInfo, type MediaStreamInfo, type ProbeOptions, probeMedia } from "./ffprobe.js";

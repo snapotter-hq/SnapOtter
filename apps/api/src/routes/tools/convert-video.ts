@@ -1,4 +1,4 @@
-import { resolveEncoder } from "@snapotter/media-engine";
+import { resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
@@ -9,10 +9,10 @@ const settingsSchema = z.object({
   quality: z.enum(["high", "balanced", "small"]).default("balanced"),
 });
 
-const CRF: Record<string, { h264: string; vp9: string }> = {
-  high: { h264: "18", vp9: "24" },
-  balanced: { h264: "23", vp9: "32" },
-  small: { h264: "28", vp9: "40" },
+const CRF: Record<string, { h264: number; vp9: number }> = {
+  high: { h264: 18, vp9: 24 },
+  balanced: { h264: 23, vp9: 32 },
+  small: { h264: 28, vp9: 40 },
 };
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -42,7 +42,7 @@ export function registerConvertVideo(app: FastifyInstance) {
             "-c:v",
             resolveEncoder("vp9"),
             "-crf",
-            CRF[settings.quality].vp9,
+            String(CRF[settings.quality].vp9),
             "-b:v",
             "0",
             "-c:a",
@@ -54,12 +54,7 @@ export function registerConvertVideo(app: FastifyInstance) {
           return [
             "-i",
             inPath,
-            "-c:v",
-            resolveEncoder("h264"),
-            "-crf",
-            CRF[settings.quality].h264,
-            "-preset",
-            "medium",
+            ...videoCodecArgs("h264", CRF[settings.quality].h264),
             "-pix_fmt",
             "yuv420p",
             "-c:a",
@@ -73,12 +68,7 @@ export function registerConvertVideo(app: FastifyInstance) {
           return [
             "-i",
             inPath,
-            "-c:v",
-            resolveEncoder("h264"),
-            "-crf",
-            CRF[settings.quality].h264,
-            "-preset",
-            "medium",
+            ...videoCodecArgs("h264", CRF[settings.quality].h264),
             "-pix_fmt",
             "yuv420p",
             "-c:a",
@@ -92,12 +82,7 @@ export function registerConvertVideo(app: FastifyInstance) {
         return [
           "-i",
           inPath,
-          "-c:v",
-          resolveEncoder("h264"),
-          "-crf",
-          CRF[settings.quality].h264,
-          "-preset",
-          "medium",
+          ...videoCodecArgs("h264", CRF[settings.quality].h264),
           "-pix_fmt",
           "yuv420p",
           "-c:a",

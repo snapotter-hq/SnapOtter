@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
+import { probeMedia, resolveEncoder, runFfmpeg, videoCodecArgs } from "@snapotter/media-engine";
 import type { ToolProcessCtxV2 } from "../routes/tool-factory.js";
 
 const EXT_VIDEO_CONTENT_TYPES: Record<string, string> = {
@@ -45,7 +45,7 @@ export function videoEncodeArgsForContainer(ext: string): string[] {
   if (lower === ".ogv" || lower === ".ogg") {
     return ["-c:v", resolveEncoder("theora"), "-q:v", "7"];
   }
-  return ["-c:v", resolveEncoder("h264"), "-crf", "20", "-preset", "medium", "-pix_fmt", "yuv420p"];
+  return [...videoCodecArgs("h264", 20), "-pix_fmt", "yuv420p"];
 }
 
 /**

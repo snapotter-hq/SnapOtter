@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveEncoder } from "@snapotter/media-engine";
+import { videoCodecArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -58,12 +58,7 @@ export function registerImagesToVideo(app: FastifyInstance) {
         "[v]",
         "-r",
         String(settings.fps),
-        "-c:v",
-        resolveEncoder("h264"),
-        "-crf",
-        "20",
-        "-preset",
-        "medium",
+        ...videoCodecArgs("h264", 20),
         "-pix_fmt",
         "yuv420p",
         join(ctx.scratchDir, "media", "slideshow.mp4"),
