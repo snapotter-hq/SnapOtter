@@ -558,6 +558,13 @@ forwarding are supported too. Internal health checks can keep using
 callback URLs to include `/snapotter/api/auth/oidc/callback` or
 `/snapotter/api/auth/saml/callback` respectively.
 
+Open the UI through the prefixed URL (`https://example.com/snapotter`) — a
+browser arriving without the prefix is redirected there automatically, while
+only API requests are expected to reach the app unprefixed. If the logs show
+`looks like a subpath deployment, but BASE_PATH is empty`, your proxy is
+forwarding a prefix that `BASE_PATH` does not declare: set `BASE_PATH`
+accordingly, or strip the prefix at the proxy.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Add a new Proxy Host
