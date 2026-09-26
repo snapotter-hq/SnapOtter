@@ -3878,6 +3878,16 @@ export const fr: TranslationKeys = {
     previewUnavailable: "L'aperçu sera disponible après le traitement",
     generatePreview: "Générer l'aperçu",
     previewFailed: "Échec de la génération de l'aperçu",
+    previewProgressMessages: [
+      "La loutre s'échauffe...",
+      "On mouline les pixels...",
+      "On explique tout au codec...",
+      "Presque fini...",
+      "L'aperçu infuse...",
+      "On négocie avec les images...",
+      "On peaufine le résultat...",
+      "Un instant...",
+    ],
     previewNotAvailable: "Aperçu non disponible",
     resultPreviewFailed: "Échec du chargement de l'aperçu du résultat",
     resultPreviewFailedHint:

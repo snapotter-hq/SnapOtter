@@ -3872,6 +3872,16 @@ export const nl: TranslationKeys = {
     previewUnavailable: "Voorbeeld beschikbaar na verwerking",
     generatePreview: "Voorbeeld genereren",
     previewFailed: "Voorbeeld genereren mislukt",
+    previewProgressMessages: [
+      "De otter warmt op...",
+      "Pixels worden vermalen...",
+      "De codec krijgt les...",
+      "Bijna klaar...",
+      "Het voorbeeld staat te trekken...",
+      "De frames worden overgehaald...",
+      "Het resultaat wordt opgepoetst...",
+      "Even geduld...",
+    ],
     previewNotAvailable: "Voorbeeld niet beschikbaar",
     resultPreviewFailed: "Resultaatvoorbeeld kon niet worden geladen",
     resultPreviewFailedHint:

@@ -3863,6 +3863,16 @@ export const tr: TranslationKeys = {
     previewUnavailable: "Önizleme işlemden sonra kullanılabilir olacak",
     generatePreview: "Önizleme Oluştur",
     previewFailed: "Önizleme oluşturulamadı",
+    previewProgressMessages: [
+      "Su samuru ısınıyor...",
+      "Pikseller öğütülüyor...",
+      "Codec'e ders veriliyor...",
+      "Neredeyse bitti...",
+      "Önizleme demleniyor...",
+      "Kareler ikna ediliyor...",
+      "Sonuç parlatılıyor...",
+      "Bir saniye...",
+    ],
     previewNotAvailable: "Önizleme kullanılamıyor",
     resultPreviewFailed: "Sonuç önizlemesi yüklenemedi",
     resultPreviewFailedHint:

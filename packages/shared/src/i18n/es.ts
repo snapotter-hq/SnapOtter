@@ -3854,6 +3854,16 @@ export const es: TranslationKeys = {
     previewUnavailable: "La vista previa estará disponible después del procesamiento",
     generatePreview: "Generar vista previa",
     previewFailed: "Error al generar la vista previa",
+    previewProgressMessages: [
+      "La nutria está entrando en calor...",
+      "Triturando píxeles...",
+      "Enseñando al códec...",
+      "Ya casi...",
+      "Preparando la vista previa...",
+      "Convenciendo a los fotogramas...",
+      "Puliendo el resultado...",
+      "Un momento...",
+    ],
     previewNotAvailable: "Vista previa no disponible",
     resultPreviewFailed: "No se pudo cargar la vista previa del resultado",
     resultPreviewFailedHint:
