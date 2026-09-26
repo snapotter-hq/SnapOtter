@@ -1969,6 +1969,12 @@ export const ja: TranslationKeys = {
       submitDeepBatch: "ディープエンハンス（{count}ファイル）",
       progressLabel: "画像をエンハンス中",
       progressLabelBatch: "{count}枚の画像をエンハンス中",
+      deepEnhanceSkippedFailed:
+        "今回はディープエンハンスが実行されなかったため、標準のエンハンスを適用しました。もう一度お試しください。",
+      deepEnhanceSkippedUnavailable:
+        "ディープエンハンスにはアップスケール＆エンハンスバンドルが必要ですが、インストールされていないため、標準のエンハンスを適用しました。",
+      deepEnhanceSkippedAnimated:
+        "ディープエンハンスはアニメーション画像には使えないため、各フレームに標準のエンハンスを適用しました。",
     },
     "noise-removal": {
       off: "オフ",

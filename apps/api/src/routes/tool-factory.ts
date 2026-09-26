@@ -70,6 +70,15 @@ export interface ToolProcessResultV2 {
 
 export type ToolProcessV2 = (ctx: ToolProcessCtxV2) => Promise<ToolProcessResultV2>;
 
+/** What a legacy (single-input) process function returns. */
+export interface LegacyToolProcessResult {
+  buffer: Buffer;
+  filename: string;
+  contentType: string;
+  /** Extra fields merged into the tool's result JSON, as with ToolProcessResultV2. */
+  resultPayload?: Record<string, unknown>;
+}
+
 // ── Tool route config ─────────────────────────────────────────
 
 export interface ToolRouteConfig<T> {
@@ -112,7 +121,7 @@ export interface ToolRouteConfig<T> {
     settings: T,
     filename: string,
     ctx?: ToolProcessCtx,
-  ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
+  ) => Promise<LegacyToolProcessResult>;
   /** Optional v2 process function. When set, the worker calls this instead of the legacy process. */
   processV2?: ToolProcessV2;
   /**
@@ -155,7 +164,7 @@ export interface AnyToolRouteConfig {
     settings: unknown,
     filename: string,
     ctx?: ToolProcessCtx,
-  ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
+  ) => Promise<LegacyToolProcessResult>;
   processV2?: ToolProcessV2;
   skipStructuralValidation?: boolean;
   redactSettingsForAudit?: (settings: unknown) => Record<string, unknown>;
@@ -176,7 +185,12 @@ function adaptLegacyProcess(config: AnyToolRouteConfig): ToolProcessV2 {
       scratchDir: ctx.scratchDir,
       report: ctx.report,
     });
-    return { buffer: result.buffer, filename: result.filename, contentType: result.contentType };
+    return {
+      buffer: result.buffer,
+      filename: result.filename,
+      contentType: result.contentType,
+      resultPayload: result.resultPayload,
+    };
   };
 }
 

@@ -2008,6 +2008,12 @@ export const sv: TranslationKeys = {
       submitDeepBatch: "Djupförstärkning ({count} filer)",
       progressLabel: "Förstärker bild",
       progressLabelBatch: "Förstärker {count} bilder",
+      deepEnhanceSkippedFailed:
+        "Djupförstärkningen kördes inte den här gången, så du fick standardförstärkningen. Försök igen.",
+      deepEnhanceSkippedUnavailable:
+        "Djupförstärkning kräver paketet Uppskalning & Förstärkning, som inte är installerat, så du fick standardförstärkningen.",
+      deepEnhanceSkippedAnimated:
+        "Djupförstärkning fungerar inte på animerade bilder, så varje bildruta fick standardförstärkningen.",
     },
     "noise-removal": {
       off: "Av",

@@ -1764,6 +1764,9 @@ export const zhTW: TranslationKeys = {
       submitDeepBatch: "深度增強（{count}個檔案）",
       progressLabel: "正在增強影像",
       progressLabelBatch: "正在增強{count}張影像",
+      deepEnhanceSkippedFailed: "這次深度增強未能執行，因此套用了標準增強。請再試一次。",
+      deepEnhanceSkippedUnavailable: "深度增強需要放大與增強套件，但尚未安裝，因此套用了標準增強。",
+      deepEnhanceSkippedAnimated: "深度增強不支援動態影像，因此每一格都套用了標準增強。",
     },
     "noise-removal": {
       off: "關閉",

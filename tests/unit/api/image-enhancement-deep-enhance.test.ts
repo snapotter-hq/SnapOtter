@@ -10,11 +10,18 @@
  * throw) and that the failure is both logged and reported with the error
  * attached. A second case pins the success path: the sidecar's result is used
  * and nothing is logged or reported.
+ *
+ * The user has to hear about a skipped pass too (#950), so every way Deep
+ * Enhance can be asked for and not happen returns a `deepEnhanceSkipped`
+ * reason in resultPayload. Animations skip the pass outright (#1183): one
+ * SCUNet call per frame multiplies into hundreds of sidecar round trips and
+ * denoises each frame on its own, which plays back as flicker.
  */
 
 import { noiseRemoval } from "@snapotter/ai";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 
 const aiMocks = vi.hoisted(() => ({
   colorize: vi.fn(),
@@ -144,5 +151,92 @@ describe("deep-enhance failure leaves a trace (#1224)", () => {
     expect(result.buffer.equals(deepResult)).toBe(true);
     expect(loggerMock.warn).not.toHaveBeenCalled();
     expect(errorReportMock.reportError).not.toHaveBeenCalled();
+    expect(result.resultPayload).toBeUndefined();
+  });
+});
+
+async function threeFrameGif(): Promise<Buffer> {
+  // Distinct luminance per frame, or the GIF encoder merges identical frames.
+  const frames = await Promise.all(
+    [40, 120, 200].map((v) =>
+      sharp({ create: { width: 8, height: 8, channels: 3, background: { r: v, g: v, b: v } } })
+        .png()
+        .toBuffer(),
+    ),
+  );
+  return sharp(frames, { join: { animated: true } })
+    .gif({ delay: [100, 100, 100], loop: 0 })
+    .toBuffer();
+}
+
+describe("a skipped deep-enhance pass is reported to the client (#950)", () => {
+  it("reports 'failed' when the sidecar throws", async () => {
+    vi.mocked(noiseRemoval).mockRejectedValue(new Error("SCUNet boom"));
+
+    const result = await processImageEnhancement(await tinyPng(), settings, "test.png");
+
+    expect(result.resultPayload).toEqual({ deepEnhanceSkipped: "failed" });
+  });
+
+  it("reports 'unavailable' when the noise-removal bundle is not installed", async () => {
+    // Scoped, not Once: an unconsumed Once would leak into the next test.
+    vi.mocked(isToolInstalled).mockReturnValue(false);
+    try {
+      const result = await processImageEnhancement(await tinyPng(), settings, "test.png");
+
+      expect(noiseRemoval).not.toHaveBeenCalled();
+      expect(result.resultPayload).toEqual({ deepEnhanceSkipped: "unavailable" });
+    } finally {
+      vi.mocked(isToolInstalled).mockReturnValue(true);
+    }
+  });
+
+  it("reports nothing when Deep Enhance was not requested", async () => {
+    const result = await processImageEnhancement(
+      await tinyPng(),
+      { ...settings, deepEnhance: false },
+      "test.png",
+    );
+
+    expect(noiseRemoval).not.toHaveBeenCalled();
+    expect(isToolInstalled).not.toHaveBeenCalled();
+    expect(result.resultPayload).toBeUndefined();
+  });
+});
+
+describe("Deep Enhance on an animation (#1183)", () => {
+  it("skips the sidecar, keeps every frame, and reports 'animated'", async () => {
+    const gif = await threeFrameGif();
+
+    const result = await processImageEnhancement(gif, settings, "anim.gif");
+
+    expect(noiseRemoval).not.toHaveBeenCalled();
+    expect(result.resultPayload).toEqual({ deepEnhanceSkipped: "animated" });
+    const meta = await sharp(result.buffer).metadata();
+    expect(meta.format).toBe("gif");
+    expect(meta.pages).toBe(3);
+  });
+
+  it("reports 'animated' even when the bundle is missing, since installing it would not help", async () => {
+    vi.mocked(isToolInstalled).mockReturnValue(false);
+    try {
+      const result = await processImageEnhancement(await threeFrameGif(), settings, "anim.gif");
+      expect(result.resultPayload).toEqual({ deepEnhanceSkipped: "animated" });
+    } finally {
+      vi.mocked(isToolInstalled).mockReturnValue(true);
+    }
+  });
+
+  it("still runs the sidecar on a single-frame GIF", async () => {
+    // The skip keys on frame count, not on the container: a still GIF is a still.
+    vi.mocked(noiseRemoval).mockImplementation(async (buffer: Buffer) => ({ buffer }) as never);
+    const stillGif = await sharp(await tinyPng())
+      .gif()
+      .toBuffer();
+
+    const result = await processImageEnhancement(stillGif, settings, "still.gif");
+
+    expect(noiseRemoval).toHaveBeenCalledOnce();
+    expect(result.resultPayload).toBeUndefined();
   });
 });

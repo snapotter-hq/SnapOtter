@@ -1994,6 +1994,12 @@ export const ar: TranslationKeys = {
       submitDeepBatch: "تحسين عميق ({count} ملف)",
       progressLabel: "جاري تحسين الصورة",
       progressLabelBatch: "جاري تحسين {count} صورة",
+      deepEnhanceSkippedFailed:
+        "لم يعمل التحسين العميق هذه المرة، لذا حصلت على التحسين العادي. حاول مرة أخرى.",
+      deepEnhanceSkippedUnavailable:
+        "يتطلب التحسين العميق حزمة التكبير والتحسين، وهي غير مثبتة، لذا حصلت على التحسين العادي.",
+      deepEnhanceSkippedAnimated:
+        "لا يعمل التحسين العميق على الصور المتحركة، لذا حصل كل إطار على التحسين العادي.",
     },
     "noise-removal": {
       off: "إيقاف",

@@ -1946,6 +1946,12 @@ export const ko: TranslationKeys = {
       submitDeepBatch: "딥 향상 ({count}개 파일)",
       progressLabel: "이미지 향상 중",
       progressLabelBatch: "{count}개 이미지 향상 중",
+      deepEnhanceSkippedFailed:
+        "이번에는 딥 향상이 실행되지 않아 기본 향상이 적용되었습니다. 다시 시도해 주세요.",
+      deepEnhanceSkippedUnavailable:
+        "딥 향상에는 업스케일 및 향상 번들이 필요하지만 설치되어 있지 않아 기본 향상이 적용되었습니다.",
+      deepEnhanceSkippedAnimated:
+        "딥 향상은 애니메이션 이미지에서 작동하지 않아 모든 프레임에 기본 향상이 적용되었습니다.",
     },
     "noise-removal": {
       off: "끄기",

@@ -2008,6 +2008,12 @@ export const id: TranslationKeys = {
       submitDeepBatch: "Deep Enhance ({count} file)",
       progressLabel: "Meningkatkan gambar",
       progressLabelBatch: "Meningkatkan {count} gambar",
+      deepEnhanceSkippedFailed:
+        "Peningkatan Mendalam tidak berjalan kali ini, jadi Anda mendapatkan peningkatan standar. Silakan coba lagi.",
+      deepEnhanceSkippedUnavailable:
+        "Peningkatan Mendalam memerlukan bundel Perbesar & Tingkatkan, yang belum terpasang, jadi Anda mendapatkan peningkatan standar.",
+      deepEnhanceSkippedAnimated:
+        "Peningkatan Mendalam tidak berfungsi pada gambar animasi, jadi setiap frame mendapatkan peningkatan standar.",
     },
     "noise-removal": {
       off: "Mati",

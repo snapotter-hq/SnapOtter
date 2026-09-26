@@ -1975,6 +1975,12 @@ export const th: TranslationKeys = {
       submitDeepBatch: "ปรับปรุงเชิงลึก ({count} ไฟล์)",
       progressLabel: "กำลังปรับปรุงภาพ",
       progressLabelBatch: "กำลังปรับปรุง {count} ภาพ",
+      deepEnhanceSkippedFailed:
+        "การปรับปรุงเชิงลึกไม่ได้ทำงานในครั้งนี้ จึงได้รับการปรับปรุงแบบมาตรฐานแทน ลองอีกครั้ง",
+      deepEnhanceSkippedUnavailable:
+        "การปรับปรุงเชิงลึกต้องใช้ชุดขยายและปรับปรุง ซึ่งยังไม่ได้ติดตั้ง จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
+      deepEnhanceSkippedAnimated:
+        "การปรับปรุงเชิงลึกใช้กับภาพเคลื่อนไหวไม่ได้ ทุกเฟรมจึงได้รับการปรับปรุงแบบมาตรฐาน",
     },
     "noise-removal": {
       off: "ปิด",

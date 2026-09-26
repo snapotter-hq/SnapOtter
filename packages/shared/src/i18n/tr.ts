@@ -2015,6 +2015,12 @@ export const tr: TranslationKeys = {
       submitDeepBatch: "Derin İyileştir ({count} dosya)",
       progressLabel: "Görüntü iyileştiriliyor",
       progressLabelBatch: "{count} görüntü iyileştiriliyor",
+      deepEnhanceSkippedFailed:
+        "Derin İyileştirme bu sefer çalışmadı, bu yüzden standart iyileştirme uygulandı. Tekrar deneyin.",
+      deepEnhanceSkippedUnavailable:
+        "Derin İyileştirme için Büyütme ve İyileştirme paketi gerekiyor ama yüklü değil, bu yüzden standart iyileştirme uygulandı.",
+      deepEnhanceSkippedAnimated:
+        "Derin İyileştirme animasyonlu görüntülerde çalışmaz, bu yüzden her kareye standart iyileştirme uygulandı.",
     },
     "noise-removal": {
       off: "Kapalı",

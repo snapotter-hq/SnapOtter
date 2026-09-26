@@ -1957,6 +1957,12 @@ export const en = {
       submitDeepBatch: "Deep Enhance ({count} files)",
       progressLabel: "Enhancing image",
       progressLabelBatch: "Enhancing {count} images",
+      deepEnhanceSkippedFailed:
+        "Deep Enhance didn't run this time, so you got the standard enhancement. Try again.",
+      deepEnhanceSkippedUnavailable:
+        "Deep Enhance needs the Upscale & Enhance bundle, which isn't installed, so you got the standard enhancement.",
+      deepEnhanceSkippedAnimated:
+        "Deep Enhance doesn't work on animated images, so every frame got the standard enhancement.",
     },
     "noise-removal": {
       off: "Off",

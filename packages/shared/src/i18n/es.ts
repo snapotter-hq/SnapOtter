@@ -2002,6 +2002,12 @@ export const es: TranslationKeys = {
       submitDeepBatch: "Mejora profunda ({count} archivos)",
       progressLabel: "Mejorando imagen",
       progressLabelBatch: "Mejorando {count} imágenes",
+      deepEnhanceSkippedFailed:
+        "La mejora profunda no se ejecutó esta vez, así que se aplicó la mejora estándar. Inténtalo de nuevo.",
+      deepEnhanceSkippedUnavailable:
+        "La mejora profunda necesita el paquete de Escalado y mejora, que no está instalado, así que se aplicó la mejora estándar.",
+      deepEnhanceSkippedAnimated:
+        "La mejora profunda no funciona con imágenes animadas, así que cada fotograma recibió la mejora estándar.",
     },
     "noise-removal": {
       off: "Desactivado",
