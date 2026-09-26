@@ -2014,6 +2014,12 @@ export const ptBR: TranslationKeys = {
       submitDeepBatch: "Melhoria profunda ({count} arquivos)",
       progressLabel: "Melhorando imagem",
       progressLabelBatch: "Melhorando {count} imagens",
+      deepEnhanceSkippedFailed:
+        "A melhoria profunda não foi executada desta vez, então você recebeu a melhoria padrão. Tente novamente.",
+      deepEnhanceSkippedUnavailable:
+        "A melhoria profunda requer o pacote de Ampliação e melhoria, que não está instalado, então você recebeu a melhoria padrão.",
+      deepEnhanceSkippedAnimated:
+        "A melhoria profunda não funciona em imagens animadas, então cada quadro recebeu a melhoria padrão.",
     },
     "noise-removal": {
       off: "Desligado",

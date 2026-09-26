@@ -2016,6 +2016,12 @@ export const it: TranslationKeys = {
       submitDeepBatch: "Miglioramento profondo ({count} file)",
       progressLabel: "Miglioramento immagine",
       progressLabelBatch: "Miglioramento di {count} immagini",
+      deepEnhanceSkippedFailed:
+        "Il miglioramento profondo non è stato eseguito questa volta, quindi hai ottenuto il miglioramento standard. Riprova.",
+      deepEnhanceSkippedUnavailable:
+        "Il miglioramento profondo richiede il pacchetto Ingrandimento e miglioramento, che non è installato, quindi hai ottenuto il miglioramento standard.",
+      deepEnhanceSkippedAnimated:
+        "Il miglioramento profondo non funziona sulle immagini animate, quindi ogni fotogramma ha ricevuto il miglioramento standard.",
     },
     "noise-removal": {
       off: "Disattivato",

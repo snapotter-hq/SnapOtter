@@ -1764,6 +1764,10 @@ export const zhCN: TranslationKeys = {
       submitDeepBatch: "深度增强（{count} 个文件）",
       progressLabel: "正在增强图片",
       progressLabelBatch: "正在增强 {count} 张图片",
+      deepEnhanceSkippedFailed: "本次深度增强未能运行，因此应用了标准增强。请重试。",
+      deepEnhanceSkippedUnavailable:
+        "深度增强需要「放大与增强」功能包，但尚未安装，因此应用了标准增强。",
+      deepEnhanceSkippedAnimated: "深度增强不支持动图，因此每一帧都应用了标准增强。",
     },
     "noise-removal": {
       off: "关闭",

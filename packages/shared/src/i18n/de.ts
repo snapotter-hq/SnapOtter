@@ -2020,6 +2020,12 @@ export const de: TranslationKeys = {
       submitDeepBatch: "Tiefenverbesserung ({count} Dateien)",
       progressLabel: "Bild wird verbessert",
       progressLabelBatch: "{count} Bilder werden verbessert",
+      deepEnhanceSkippedFailed:
+        "Die Tiefenverbesserung hat diesmal nicht funktioniert, Sie sehen die Standardverbesserung. Versuchen Sie es noch einmal.",
+      deepEnhanceSkippedUnavailable:
+        "Die Tiefenverbesserung braucht das Bundle Hochskalierung & Verbesserung, das nicht installiert ist. Sie sehen die Standardverbesserung.",
+      deepEnhanceSkippedAnimated:
+        "Die Tiefenverbesserung funktioniert nicht bei animierten Bildern, deshalb hat jedes Frame die Standardverbesserung bekommen.",
     },
     "noise-removal": {
       off: "Aus",

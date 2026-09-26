@@ -43,6 +43,13 @@ const strictSchema = {
   parse: (data: unknown) => data,
 };
 
+/** The v2 process the registry resolved for a legacy tool (the adapter). */
+function adaptedProcess(toolId: string) {
+  const v2 = getToolConfig(toolId)?.processV2;
+  if (!v2) throw new Error(`no processV2 registered for ${toolId}`);
+  return v2;
+}
+
 function makeMockConfig(toolId: string): AnyToolRouteConfig {
   return {
     toolId,
@@ -156,6 +163,44 @@ describe("tool-factory registry functions", () => {
       expect(result.buffer).toBe(input);
       expect(result.filename).toBe("photo.png");
       expect(result.contentType).toBe("image/png");
+    });
+
+    it("the legacy adapter forwards resultPayload to the worker's v2 contract", async () => {
+      const id = uniqueId();
+      registerToolProcessFn({
+        toolId: id,
+        settingsSchema: mockSchema as never,
+        process: async (buf, _s, fn) => ({
+          buffer: buf,
+          filename: fn,
+          contentType: "image/png",
+          resultPayload: { deepEnhanceSkipped: "failed" },
+        }),
+      });
+      const v2 = adaptedProcess(id);
+      const input = Buffer.from("test-data");
+      const result = await v2({
+        inputs: [{ buffer: input, filename: "photo.png", ref: "uploads/x/photo.png" }],
+        settings: {},
+        scratchDir: "/tmp/test",
+        signal: new AbortController().signal,
+        report: () => {},
+      });
+      expect(result.buffer).toBe(input);
+      expect(result.resultPayload).toEqual({ deepEnhanceSkipped: "failed" });
+    });
+
+    it("the legacy adapter leaves resultPayload undefined when the tool returns none", async () => {
+      const id = uniqueId();
+      registerToolProcessFn(makeMockConfig(id));
+      const result = await adaptedProcess(id)({
+        inputs: [{ buffer: Buffer.from("x"), filename: "a.png", ref: "uploads/x/a.png" }],
+        settings: {},
+        scratchDir: "/tmp/test",
+        signal: new AbortController().signal,
+        report: () => {},
+      });
+      expect(result.resultPayload).toBeUndefined();
     });
 
     it("stored process function with custom schema validates correctly", () => {

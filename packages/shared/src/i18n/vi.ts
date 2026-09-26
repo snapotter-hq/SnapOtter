@@ -2007,6 +2007,12 @@ export const vi: TranslationKeys = {
       submitDeepBatch: "Nâng cao sâu ({count} tệp)",
       progressLabel: "Đang nâng cao hình ảnh",
       progressLabelBatch: "Đang nâng cao {count} hình ảnh",
+      deepEnhanceSkippedFailed:
+        "Lần này Nâng cao sâu không chạy được, nên bạn nhận được bản nâng cao tiêu chuẩn. Vui lòng thử lại.",
+      deepEnhanceSkippedUnavailable:
+        "Nâng cao sâu cần gói Phóng to & Nâng cao, nhưng gói này chưa được cài đặt, nên bạn nhận được bản nâng cao tiêu chuẩn.",
+      deepEnhanceSkippedAnimated:
+        "Nâng cao sâu không hoạt động với ảnh động, nên mọi khung hình đều nhận bản nâng cao tiêu chuẩn.",
     },
     "noise-removal": {
       off: "Tắt",
