@@ -859,10 +859,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // After processFiles completes, extract jobId from downloadUrl
   useEffect(() => {
     if (!downloadUrl || processing) return;
-    // The last two segments are stable even with a deployment base path.
-    const parts = downloadUrl.split("/");
-    const jobId = parts.at(-2);
-    const filename = decodeURIComponent(parts.at(-1) || "");
+    // Anchored on the download route so a deployment base path is tolerated but
+    // a batch result's blob: URL is not mistaken for a job.
+    const match = /\/api\/v1\/download\/([^/?#]+)\/([^/?#]+)$/.exec(downloadUrl);
+    if (!match) return;
+    const jobId = match[1];
+    const filename = decodeURIComponent(match[2]);
     if (jobId && filename) {
       setBgJobId(jobId);
       // Derive the cached filenames from the mask filename

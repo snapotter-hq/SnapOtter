@@ -268,8 +268,9 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const file = resolveSpecFile(specDir, request.query.lang);
-      // English default is byte-identical to the file read at startup, preserving
-      // the ASCII-only guarantee; localized files are UTF-8 and only served with ?lang.
+      // English default is the spec prepared at startup: byte-identical to the file
+      // at the root, re-serialized with a servers entry under BASE_PATH. Either way it
+      // stays ASCII-only; localized files are UTF-8 and only served with ?lang.
       const body = file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"));
       reply.type("text/yaml; charset=utf-8").send(body);
     },

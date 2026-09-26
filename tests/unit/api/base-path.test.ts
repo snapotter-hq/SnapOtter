@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify from "fastify";
@@ -41,9 +41,48 @@ describe("BASE_PATH configuration", () => {
     '/a"',
     "/a%2fb",
     "https://example.com/a",
+    "/api",
+    "/api/v1",
+    "/assets",
   ])("rejects %s", (input) => {
     vi.stubEnv("BASE_PATH", input);
     expect(() => loadEnv()).toThrow("BASE_PATH");
+  });
+
+  it("allows prefixes that only share letters with app paths", () => {
+    vi.stubEnv("BASE_PATH", "/apis");
+    expect(loadEnv().BASE_PATH).toBe("/apis");
+  });
+
+  describe("with OIDC enabled", () => {
+    const enableOidc = (externalUrl: string) => {
+      vi.stubEnv("OIDC_ENABLED", "true");
+      vi.stubEnv("OIDC_ISSUER_URL", "https://idp.example.com");
+      vi.stubEnv("OIDC_CLIENT_ID", "client");
+      vi.stubEnv("OIDC_CLIENT_SECRET", "secret");
+      vi.stubEnv("EXTERNAL_URL", externalUrl);
+    };
+
+    it.each([
+      ["", "https://example.com"],
+      ["", "https://example.com/"],
+      ["/snapotter", "https://example.com/snapotter"],
+      ["/snapotter/", "https://example.com/snapotter/"],
+    ])("accepts BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+      enableOidc(externalUrl);
+      vi.stubEnv("BASE_PATH", basePath);
+      expect(() => loadEnv()).not.toThrow();
+    });
+
+    it.each([
+      ["/snapotter", "https://example.com"],
+      ["", "https://example.com/snapotter"],
+      ["/snapotter", "not a url"],
+    ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+      enableOidc(externalUrl);
+      vi.stubEnv("BASE_PATH", basePath);
+      expect(() => loadEnv()).toThrow("EXTERNAL_URL");
+    });
   });
 });
 
@@ -104,4 +143,41 @@ it("keeps API documentation redirects and server URLs under the prefix", async (
   } finally {
     await app.close();
   }
+});
+
+describe("index.html <base> rewrite", () => {
+  afterEach(() => {
+    config.BASE_PATH = "";
+  });
+
+  it("matches the tag shipped in the web app source", () => {
+    const source = readFileSync(new URL("../../../apps/web/index.html", import.meta.url), "utf8");
+    expect(source.split('<base href="/"').length - 1).toBe(1);
+  });
+
+  it("refuses to start under a subpath when the build has no tag to rewrite", async () => {
+    const stale = mkdtempSync(join(tmpdir(), "snapotter-stale-dist-"));
+    writeFileSync(join(stale, "index.html"), '<html><script src="/assets/app.js"></script></html>');
+    config.BASE_PATH = "/snapotter";
+    const app = Fastify();
+    try {
+      await expect(registerStatic(app, stale)).rejects.toThrow("BASE_PATH");
+    } finally {
+      await app.close();
+      rmSync(stale, { recursive: true, force: true });
+    }
+  });
+
+  it("still serves a build without the tag at the root", async () => {
+    const stale = mkdtempSync(join(tmpdir(), "snapotter-stale-dist-"));
+    writeFileSync(join(stale, "index.html"), "<html>root</html>");
+    const app = Fastify();
+    try {
+      await registerStatic(app, stale);
+      expect((await app.inject("/files")).body).toBe("<html>root</html>");
+    } finally {
+      await app.close();
+      rmSync(stale, { recursive: true, force: true });
+    }
+  });
 });

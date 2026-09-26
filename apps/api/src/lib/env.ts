@@ -12,6 +12,11 @@ const envSchema = z
       .refine((value) => /^(\/[a-zA-Z0-9_-]+)*$/.test(value), {
         message:
           "BASE_PATH must be empty, /, or a path such as /snapotter (letters, digits, - and _)",
+      })
+      // Unprefixed requests stay routable (health checks, stripping proxies), so
+      // a prefix that is also an app path would strip /api/v1/health itself.
+      .refine((value) => !/^\/(api|assets)(\/|$)/.test(value), {
+        message: "BASE_PATH cannot start with /api or /assets; those are SnapOtter's own paths",
       }),
     AUTH_ENABLED: z
       .enum(["true", "false"])
@@ -238,6 +243,28 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           message: "EXTERNAL_URL is required when SAML_ENABLED=true",
           path: ["EXTERNAL_URL"],
+        });
+      }
+    }
+    // SSO callbacks are built from EXTERNAL_URL while the state and session
+    // cookies are scoped to BASE_PATH, so the two must name the same path or
+    // every SSO login fails with a generic state mismatch.
+    if ((data.OIDC_ENABLED || data.SAML_ENABLED) && data.EXTERNAL_URL) {
+      let externalPath: string | null = null;
+      try {
+        externalPath = new URL(data.EXTERNAL_URL).pathname.replace(/\/$/, "");
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["EXTERNAL_URL"],
+          message: "EXTERNAL_URL must be an absolute URL such as https://example.com/snapotter",
+        });
+      }
+      if (externalPath !== null && externalPath !== data.BASE_PATH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["EXTERNAL_URL"],
+          message: `EXTERNAL_URL path "${externalPath || "/"}" must match BASE_PATH "${data.BASE_PATH || "/"}" when SSO is enabled`,
         });
       }
     }

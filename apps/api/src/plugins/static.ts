@@ -15,10 +15,16 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
     return;
   }
 
-  const html = readFileSync(resolve(webDistPath, "index.html"), "utf8").replace(
-    '<base href="/"',
-    `<base href="${env.BASE_PATH}/"`,
-  );
+  const indexPath = resolve(webDistPath, "index.html");
+  const builtHtml = readFileSync(indexPath, "utf8");
+  // A build without the expected tag would serve every asset and API call from
+  // the domain root under a subpath, which only shows up as a blank page.
+  if (env.BASE_PATH && !builtHtml.includes('<base href="/"')) {
+    throw new Error(
+      `BASE_PATH is set but ${indexPath} has no <base href="/"> tag to rewrite; rebuild the web app`,
+    );
+  }
+  const html = builtHtml.replace('<base href="/"', `<base href="${env.BASE_PATH}/"`);
   const sendHtml = (_request: FastifyRequest, reply: FastifyReply) =>
     reply.header("Cache-Control", "no-cache").type("text/html; charset=utf-8").send(html);
   app.get("/", sendHtml);

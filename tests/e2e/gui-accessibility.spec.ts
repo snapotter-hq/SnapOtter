@@ -1503,6 +1503,19 @@ test.describe("Skip-to-Content Link", () => {
       `Expected skip link on tool page, first focused element text: "${activeText}"`,
     ).toBeTruthy();
   });
+
+  test("skip-to-content link stays on the tool page", async ({ loggedInPage: page }) => {
+    // The document has a <base href>, so a bare "#main-content" href resolves
+    // to the app root. Activating the link must not leave the tool page.
+    await page.goto("/image/resize");
+    await page.locator("#main-content").waitFor({ state: "attached" });
+
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Enter");
+
+    await expect(page).toHaveURL(/\/image\/resize$/);
+    await expect(page.locator("#main-content")).toBeFocused();
+  });
 });
 
 // ---------------------------------------------------------------------------

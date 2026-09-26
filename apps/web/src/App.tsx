@@ -5,6 +5,7 @@ import {
   createBrowserRouter,
   Navigate,
   Outlet,
+  useHref,
   useLocation,
 } from "react-router";
 // The /dom build injects ReactDOM.flushSync; the bare one leaves it undefined
@@ -167,6 +168,10 @@ function PageLoader() {
  * because useBlocker (the navigation guard) requires a data router.
  */
 function RootLayout() {
+  // <base href> makes a bare "#main-content" resolve to the app root, which
+  // would load the home page. Point at the current page and move focus in place.
+  const { pathname, search } = useLocation();
+  const skipHref = `${useHref({ pathname, search })}#main-content`;
   // A data router wraps the root match in its own error boundary, so without
   // this the "Unexpected Application Error!" screen would replace our fallback
   // and componentDidCatch would never run (no crash event, no Sentry report).
@@ -175,7 +180,11 @@ function RootLayout() {
     <ErrorBoundary>
       <nav aria-label={en.a11y.skipToContent}>
         <a
-          href="#main-content"
+          href={skipHref}
+          onClick={(event) => {
+            event.preventDefault();
+            document.getElementById("main-content")?.focus();
+          }}
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:start-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg"
         >
           {en.a11y.skipToContent}

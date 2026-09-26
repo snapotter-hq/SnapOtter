@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const deployment = vi.hoisted(() => ({ basePath: "" }));
+const deployment = vi.hoisted(() => ({ basePath: "", downloadUrl: null as string | null }));
 
 // Phase 1 (background removal) is "done": the processor exposes a mask PNG
 // download URL and is no longer processing, so the wrapper renders its
@@ -16,7 +16,8 @@ vi.mock("@/hooks/use-tool-processor", () => ({
     processAllFiles: vi.fn(),
     processing: false,
     error: null,
-    downloadUrl: `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`,
+    downloadUrl:
+      deployment.downloadUrl ?? `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`,
     originalSize: 1000,
     processedSize: 500,
     progress: { phase: "idle", percent: 0, stage: "", elapsed: 0 },
@@ -41,6 +42,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   deployment.basePath = "";
+  deployment.downloadUrl = null;
   useFileStore.getState().setFiles([]);
 });
 
@@ -86,4 +88,13 @@ describe("remove-background output format routing (#720)", () => {
       expect(JSON.parse(fetch.mock.calls[0][1].body.get("settings")).jobId).toBe("JOB123");
     },
   );
+
+  it("does not treat a batch result's blob URL as a finished job", async () => {
+    // A multi-file run settles the entry with an object URL for the ZIP entry.
+    deployment.downloadUrl = "blob:https://host:1349/3f2a9c1e-0000-4000-8000-000000000000";
+    render(<RemoveBgSettings />);
+
+    expect(await screen.findByTestId("remove-background-submit")).toBeInTheDocument();
+    expect(screen.queryByTestId("remove-background-download")).not.toBeInTheDocument();
+  });
 });
