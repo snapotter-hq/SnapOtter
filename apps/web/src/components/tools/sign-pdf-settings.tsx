@@ -13,7 +13,7 @@ import {
   listSignatures,
   type SavedSignature,
 } from "@/lib/signature-store";
-import { generateId } from "@/lib/utils";
+import { generateId, resolveServerUrl } from "@/lib/utils";
 import { safeRandomUUID } from "@/lib/uuid";
 import { useFileStore } from "@/stores/file-store";
 import type { SignCanvasRef } from "./sign-canvas";
@@ -258,7 +258,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     let landed = false;
     const landResult = (r: Record<string, unknown>) => {
       if (landed) return;
-      const url = typeof r.downloadUrl === "string" ? r.downloadUrl : null;
+      const url = typeof r.downloadUrl === "string" ? resolveServerUrl(r.downloadUrl) : null;
       if (!url) {
         setError("Invalid response");
         return;

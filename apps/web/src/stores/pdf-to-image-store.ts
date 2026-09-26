@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { resolveServerUrl } from "@/lib/utils";
 
 export interface PageResult {
   page: number;
@@ -242,7 +243,16 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         throw new Error(body.error || `Conversion failed: ${res.status}`);
       }
       const data = await res.json();
-      set({ results: data.pages, zipUrl: data.zipUrl, zipSize: data.zipSize });
+      set({
+        // Server-returned result URLs are root-relative; resolve them here so
+        // the preview tiles and the ZIP link work under a BASE_PATH deploy.
+        results: data.pages.map((p: { downloadUrl: string } & Record<string, unknown>) => ({
+          ...p,
+          downloadUrl: resolveServerUrl(p.downloadUrl),
+        })),
+        zipUrl: data.zipUrl ? resolveServerUrl(data.zipUrl) : null,
+        zipSize: data.zipSize,
+      });
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : "Conversion failed",

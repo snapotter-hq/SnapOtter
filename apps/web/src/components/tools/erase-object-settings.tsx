@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, formatFileSize } from "@/lib/format";
-import { generateId } from "@/lib/utils";
+import { generateId, resolveServerUrl } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import type { EraserCanvasRef } from "./eraser-canvas";
@@ -195,7 +195,7 @@ export function EraseObjectSettings({
 
       const applyResult = (r: Record<string, unknown>) => {
         useFileStore.getState().updateEntry(entryIndex, {
-          processedUrl: r.downloadUrl as string,
+          processedUrl: resolveServerUrl(r.downloadUrl as string),
           processedPreviewUrl: (r.previewUrl as string) ?? null,
           processedFilename: null,
           status: "completed",
@@ -306,7 +306,7 @@ export function EraseObjectSettings({
         useFileStore.getState().setLastSavedLibraryFileId(r.savedFileId as string);
       }
       useFileStore.getState().updateEntry(capturedIndex, {
-        processedUrl: r.downloadUrl as string,
+        processedUrl: resolveServerUrl(r.downloadUrl as string),
         processedPreviewUrl: (r.previewUrl as string) ?? null,
         processedFilename: null,
         status: "completed",

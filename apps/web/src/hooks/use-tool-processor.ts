@@ -11,7 +11,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
-import { generateId } from "@/lib/utils";
+import { generateId, resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface ProcessResult {
@@ -404,8 +404,8 @@ export function useToolProcessor(toolId: string) {
                 useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
               }
               useFileStore.getState().updateEntry(idx, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
+                processedUrl: resolveServerUrl(result.downloadUrl),
+                processedPreviewUrl: result.previewUrl ? resolveServerUrl(result.previewUrl) : null,
                 processedFilename: null,
                 status: "completed",
                 originalSize: result.originalSize,
@@ -690,8 +690,8 @@ export function useToolProcessor(toolId: string) {
               useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
             }
             useFileStore.getState().updateEntry(capturedIndex, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
+              processedUrl: resolveServerUrl(result.downloadUrl),
+              processedPreviewUrl: result.previewUrl ? resolveServerUrl(result.previewUrl) : null,
               processedFilename: null,
               status: "completed",
               originalSize: result.originalSize,
@@ -966,7 +966,7 @@ export function useToolProcessor(toolId: string) {
       // frame points at. Retried, because the reason we are on this path is
       // that the network just proved flaky.
       const downloadAndSettle = async (result: Record<string, unknown>) => {
-        const url = String(result.downloadUrl);
+        const url = resolveServerUrl(String(result.downloadUrl));
         const fileResults = (result.fileResults ?? {}) as Record<string, string>;
         for (let attempt = 0; attempt < 3; attempt++) {
           if (activeJobIdRef.current !== clientJobId) return;

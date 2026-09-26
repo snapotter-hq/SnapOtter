@@ -6,7 +6,6 @@ import { removeBackground } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { autoSaveToLibrary } from "../../jobs/postprocess.js";
@@ -66,8 +65,8 @@ registerAiJobHandler("remove-background", async (input, data, ctx) => {
   const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
   const originalFilename = `${data.filename.replace(/\.[^.]+$/, "")}_original.png`;
 
-  const maskUrl = `${env.BASE_PATH}/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
-  const originalUrl = `${env.BASE_PATH}/api/v1/download/${data.jobId}/${encodeURIComponent(originalFilename)}`;
+  const maskUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
+  const originalUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(originalFilename)}`;
 
   return {
     buffer: transparentResult,
@@ -377,7 +376,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         return reply.send({
           jobId,
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
           processedSize: resultBuffer.length,
           savedFileId,
         });

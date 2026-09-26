@@ -111,8 +111,11 @@ describe.each(["", "/snapotter", "/apps/snapotter"])("deployment at '%s'", (base
     });
     expect(res.statusCode, res.body).toBe(200);
     const result = res.json();
-    expect(result.downloadUrl).toBe(`${basePath}/api/v1/download/${result.jobId}/people.json`);
-    const download = await testApp.app.inject(result.downloadUrl);
+    // Result URLs are root-relative (#1274): the server never bakes the
+    // deployment prefix into a persisted result. Clients resolve them
+    // against their own base, so the prefixed path is what a browser hits.
+    expect(result.downloadUrl).toBe(`/api/v1/download/${result.jobId}/people.json`);
+    const download = await testApp.app.inject(`${basePath}${result.downloadUrl}`);
     expect(download.statusCode).toBe(200);
     expect(download.json()).toEqual([{ name: "Ada", age: "36" }]);
   });

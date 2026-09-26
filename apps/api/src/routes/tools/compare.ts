@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { env } from "../../config.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
@@ -129,7 +128,7 @@ export function registerCompare(app: FastifyInstance) {
         jobId,
         similarity: Math.round(similarity * 100) / 100,
         dimensions: { width: w, height: h },
-        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${diffFilename}`,
+        downloadUrl: `/api/v1/download/${jobId}/${diffFilename}`,
         originalSize: bufferA.length + bufferB.length,
         processedSize: diffBuffer.length,
       });

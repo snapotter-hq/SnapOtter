@@ -15,6 +15,7 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 type SubjectType = "people" | "products" | "general";
@@ -929,7 +930,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       }
 
       const result = await response.json();
-      setEffectsDownloadUrl(result.downloadUrl);
+      setEffectsDownloadUrl(resolveServerUrl(result.downloadUrl));
       setEffectsError(null);
 
       // Surface the "saved to your files" indicator and, on overwrite,
@@ -944,7 +945,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
       // Auto-trigger download
       const a = document.createElement("a");
-      a.href = result.downloadUrl;
+      a.href = resolveServerUrl(result.downloadUrl);
       a.download = "";
       document.body.appendChild(a);
       a.click();

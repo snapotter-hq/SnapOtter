@@ -121,6 +121,9 @@ function generateLlmsTxt(spec: OpenAPISpec): string {
     '- Progress streams from `GET /api/v1/jobs/:jobId/progress` as SSE frames with `type: "single"` or `type: "batch"`.',
   );
   lines.push(
+    "- Result URLs (`downloadUrl`, `previewUrl`) are root-relative paths relative to the instance base. Join them with your instance base URL (including any deployment subpath, e.g. `https://host/snapotter` + `/api/v1/download/...`); never expect a baked-in prefix.",
+  );
+  lines.push(
     "- Missing AI bundles return `501` with code `FEATURE_NOT_INSTALLED`, feature id, feature name, and estimated size.",
   );
   lines.push("");
@@ -241,16 +244,35 @@ async function loadLocaleToolStrings(
 
 export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const specPath = resolve(__dirname, "../openapi.yaml");
-  const withBasePath = (content: string) =>
-    env.BASE_PATH
-      ? yaml.dump({ ...(yaml.load(content) as OpenAPISpec), servers: [{ url: env.BASE_PATH }] })
-      : content;
+  // Transforming a 700KB+ YAML through a yaml.load/yaml.dump round-trip is
+  // slow, so it runs once per locale at registration, not per request. The
+  // existing `servers` entries are kept: adding the prefix server must not
+  // drop the "Current instance" entry (its description) that the spec ships.
+  const withBasePath = (content: string): string => {
+    if (!env.BASE_PATH) return content;
+    const result = yaml.load(content) as OpenAPISpec;
+    result.servers = [{ url: env.BASE_PATH }, ...(result.servers ?? [])];
+    return yaml.dump(result);
+  };
   const specContent = withBasePath(readFileSync(specPath, "utf-8"));
   const spec = yaml.load(specContent) as OpenAPISpec;
   const specDir = dirname(specPath); // apps/api/src
 
   const llmsTxt = generateLlmsTxt(spec);
   const llmsFullTxt = generateLlmsFullTxt(spec);
+
+  // Read + transform every supported locale up front (2 YAML files/sync
+  // chunks at boot; starts only when BASE_PATH is set). Cache misses fall
+  // back to the on-demand path above, so this is an optimization only.
+  const localizedSpecBodies = new Map<string, string>();
+  if (env.BASE_PATH) {
+    for (const localeInfo of SUPPORTED_LOCALES) {
+      if (localeInfo.code === "en") continue;
+      const file = resolveSpecFile(specDir, localeInfo.code);
+      if (file === specPath) continue;
+      localizedSpecBodies.set(file, withBasePath(readFileSync(file, "utf-8")));
+    }
+  }
 
   app.get("/llms.txt", async (_request, reply) => {
     reply.type("text/plain; charset=utf-8").send(llmsTxt);
@@ -271,7 +293,12 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
       // English default is the spec prepared at startup: byte-identical to the file
       // at the root, re-serialized with a servers entry under BASE_PATH. Either way it
       // stays ASCII-only; localized files are UTF-8 and only served with ?lang.
-      const body = file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"));
+      // Localized transforms are cached: every ?lang= request would otherwise
+      // re-run the load/dump round-trip synchronously on the event loop.
+      const body =
+        file === specPath
+          ? specContent
+          : (localizedSpecBodies.get(file) ?? withBasePath(readFileSync(file, "utf-8")));
       reply.type("text/yaml; charset=utf-8").send(body);
     },
   );

@@ -35,10 +35,13 @@ it("keeps the production URL rewrite wired before routing and auth", () => {
   );
 });
 
-it("builds every API download URL through the deployment prefix", () => {
-  // Drift guard: a hardcoded "/api/v1/download/..." template ships a URL the
-  // browser cannot follow under a subpath deployment. Route registrations and
-  // auth prefix literals are fine; only string interpolation of URLs is.
+it("keeps result download URLs root-relative (no baked deployment prefix)", () => {
+  // Drift guard for #1274: interpolating env.BASE_PATH into a persisted
+  // result URL bakes the deployment prefix into the jobs.result JSON, so
+  // changing BASE_PATH leaves every earlier result pointing at the old
+  // prefix. Server-emitted download/preview URLs must be root-relative and
+  // let clients resolve them against their own base. Route registrations
+  // (`"/api/v1/download/:jobId/..."`) are plain strings and stay fine.
   const offenders: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -46,14 +49,12 @@ it("builds every API download URL through the deployment prefix", () => {
       if (entry.isDirectory()) walk(p);
       else if (entry.name.endsWith(".ts")) {
         for (const [i, line] of readFileSync(p, "utf8").split("\n").entries()) {
-          // A drifted URL is always a template literal: route registrations
-          // (`"/api/v1/download/:jobId/..."`) and the auth isPublicRoute prefix
-          // literal are plain strings, so interpolating `${...}` into a
-          // `/api/v1/download/` template without `env.BASE_PATH` is the failure.
+          // A baked prefix is always a template literal interpolating
+          // env.BASE_PATH into a /api/v1/download/ URL.
           if (
             /["'`]\/api\/v1\/download\//.test(line) &&
             line.includes("${") &&
-            !line.includes("env.BASE_PATH")
+            line.includes("env.BASE_PATH")
           )
             offenders.push(`${p}:${i + 1}: ${line.trim()}`);
         }
@@ -176,9 +177,30 @@ it("keeps API documentation redirects and server URLs under the prefix", async (
     const page = await app.inject("/snapotter/api/docs/");
     expect(page.statusCode).toBe(200);
     const spec = await app.inject("/snapotter/api/docs/openapi.json");
-    expect(spec.json().servers).toEqual([{ url: "/snapotter" }]);
+    // The prefixed server is prepended; the spec's own entries (with the
+    // "Current instance" description) are kept, not dropped.
+    expect(spec.json().servers).toEqual([
+      { url: "/snapotter" },
+      { url: "/", description: "Current instance" },
+    ]);
     const localized = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
     expect(localized.body).toContain("url: /snapotter");
+  } finally {
+    await app.close();
+  }
+});
+
+it("caches the localized spec body so repeated ?lang= requests do not re-transform", async () => {
+  config.BASE_PATH = "/snapotter";
+  const app = Fastify({
+    rewriteUrl: (request) => stripBasePath(request.url ?? "/", config.BASE_PATH),
+  });
+  await docsRoutes(app);
+  try {
+    const first = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
+    const second = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
+    expect(first.body).toBe(second.body);
+    expect(first.body).toContain("url: /snapotter");
   } finally {
     await app.close();
   }
