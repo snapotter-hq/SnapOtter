@@ -13,27 +13,29 @@ import { describe, expect, it } from "vitest";
 // Lowercase stems that mean "image" in each locale. A stem, not a whole word,
 // so inflected forms (Bilder, imágenes, изображения) still match.
 const IMAGE_WORDS: Record<string, string[]> = {
-  en: ["image"],
+  en: ["image", "photo"],
   ar: ["صور"],
-  de: ["bild"],
-  es: ["imagen", "imágen"],
-  fr: ["image"],
-  hi: ["इमेज", "छवि"],
-  id: ["gambar"],
-  it: ["immagin"],
-  ja: ["画像"],
-  ko: ["이미지"],
-  nl: ["afbeelding"],
-  pl: ["obraz"],
-  "pt-BR": ["imagem", "imagens"],
-  ru: ["изображ"],
-  sv: ["bild"],
-  th: ["ภาพ", "รูป"],
-  tr: ["görüntü", "görsel"],
-  uk: ["зображ"],
+  de: ["bild", "foto"],
+  // "imagen" misses "imágenes" (the plural carries an accent), so both stems.
+  es: ["imagen", "imágen", "foto"],
+  fr: ["image", "photo"],
+  hi: ["इमेज", "छवि", "चित्र", "फोटो"],
+  id: ["gambar", "foto"],
+  it: ["immagin", "foto"],
+  ja: ["画像", "写真"],
+  ko: ["이미지", "사진", "그림"],
+  nl: ["afbeelding", "foto"],
+  pl: ["obraz", "zdjęci"],
+  "pt-BR": ["imagem", "imagens", "foto"],
+  ru: ["изображ", "фото"],
+  sv: ["bild", "foto"],
+  // Not the bare "รูป": it also starts "รูปแบบ" (format).
+  th: ["ภาพ", "รูปภาพ"],
+  tr: ["görüntü", "görsel", "fotoğraf", "resim"],
+  uk: ["зображ", "фото"],
   vi: ["ảnh"],
-  "zh-CN": ["图片", "图像"],
-  "zh-TW": ["影像", "圖片"],
+  "zh-CN": ["图片", "图像", "照片"],
+  "zh-TW": ["影像", "圖片", "圖像", "照片"],
 };
 
 type Catalog = typeof en;
@@ -52,8 +54,11 @@ describe("dropzone copy says files, not images (#1281)", () => {
 
   it.each(SUPPORTED_LOCALES.map((l) => [l.code]))("%s", async (code) => {
     const t = (code === "en" ? en : await loadTranslations(code)) as Catalog;
+    // loadTranslations falls back to en on a failed import, which would pass
+    // every non-en locale without checking it.
+    if (code !== "en") expect(t, `${code} fell back to en`).not.toBe(en);
     for (const [key, pick] of FILE_GENERIC_STRINGS) {
-      const value = pick(t).toLocaleLowerCase();
+      const value = pick(t).toLowerCase();
       for (const word of IMAGE_WORDS[code]) {
         expect(value, `${code} ${key} = "${pick(t)}" still says "${word}"`).not.toContain(word);
       }
