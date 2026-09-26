@@ -564,23 +564,23 @@ export const th: TranslationKeys = {
       description: "ลดขนาดไฟล์ตามคุณภาพหรือขนาดเป้าหมาย",
     },
     "compress-image-to-20kb": {
-      name: "บีบอัดภาพเป็น 20 KB",
+      name: "บีบอัดภาพให้เหลือ 20 KB",
       description: "ลดขนาดไฟล์ภาพให้ต่ำกว่า 20 KB",
     },
     "compress-image-to-50kb": {
-      name: "บีบอัดภาพเป็น 50 KB",
+      name: "บีบอัดภาพให้เหลือ 50 KB",
       description: "ลดขนาดไฟล์ภาพให้ต่ำกว่า 50 KB",
     },
     "compress-image-to-100kb": {
-      name: "บีบอัดภาพเป็น 100 KB",
+      name: "บีบอัดภาพให้เหลือ 100 KB",
       description: "ลดขนาดไฟล์ภาพให้ต่ำกว่า 100 KB",
     },
     "compress-image-to-200kb": {
-      name: "บีบอัดภาพเป็น 200 KB",
+      name: "บีบอัดภาพให้เหลือ 200 KB",
       description: "ลดขนาดไฟล์ภาพให้ต่ำกว่า 200 KB",
     },
     "compress-image-to-500kb": {
-      name: "บีบอัดภาพเป็น 500 KB",
+      name: "บีบอัดภาพให้เหลือ 500 KB",
       description: "ลดขนาดไฟล์ภาพให้ต่ำกว่า 500 KB",
     },
     "optimize-for-web": {
@@ -1366,7 +1366,7 @@ export const th: TranslationKeys = {
       bestQuality: "คุณภาพดีที่สุด",
       submit: "บีบอัด",
       submitBatch: "บีบอัด ({count} ไฟล์)",
-      submitTarget: "บีบอัดเป็น {size} KB",
+      submitTarget: "บีบอัดให้เหลือ {size} KB",
       resizedToFit: "ปรับขนาดเป็น {width} × {height} เพื่อให้ไม่เกิน {size} KB",
       progressLabel: "กำลังบีบอัด",
       original: "ต้นฉบับ: {size} KB",

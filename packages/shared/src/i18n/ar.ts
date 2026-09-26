@@ -1375,7 +1375,7 @@ export const ar: TranslationKeys = {
       submit: "ضغط",
       submitBatch: "ضغط ({count} ملف)",
       submitTarget: "ضغط إلى {size} KB",
-      resizedToFit: "تم تغيير الحجم إلى {width} × {height} ليتسع ضمن {size} KB",
+      resizedToFit: "تم تغيير الحجم إلى {width} × {height} ليناسب {size} KB",
       progressLabel: "جاري الضغط",
       original: "الأصلي: {size} KB",
       processed: "المعالج: {size} KB",

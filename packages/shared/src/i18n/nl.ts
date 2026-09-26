@@ -568,23 +568,23 @@ export const nl: TranslationKeys = {
     },
     "compress-image-to-20kb": {
       name: "Afbeelding comprimeren tot 20 KB",
-      description: "Bestandsgrootte van afbeelding verkleinen tot onder 20 KB",
+      description: "Bestandsgrootte van een afbeelding verkleinen tot onder 20 KB",
     },
     "compress-image-to-50kb": {
       name: "Afbeelding comprimeren tot 50 KB",
-      description: "Bestandsgrootte van afbeelding verkleinen tot onder 50 KB",
+      description: "Bestandsgrootte van een afbeelding verkleinen tot onder 50 KB",
     },
     "compress-image-to-100kb": {
       name: "Afbeelding comprimeren tot 100 KB",
-      description: "Bestandsgrootte van afbeelding verkleinen tot onder 100 KB",
+      description: "Bestandsgrootte van een afbeelding verkleinen tot onder 100 KB",
     },
     "compress-image-to-200kb": {
       name: "Afbeelding comprimeren tot 200 KB",
-      description: "Bestandsgrootte van afbeelding verkleinen tot onder 200 KB",
+      description: "Bestandsgrootte van een afbeelding verkleinen tot onder 200 KB",
     },
     "compress-image-to-500kb": {
       name: "Afbeelding comprimeren tot 500 KB",
-      description: "Bestandsgrootte van afbeelding verkleinen tot onder 500 KB",
+      description: "Bestandsgrootte van een afbeelding verkleinen tot onder 500 KB",
     },
     "optimize-for-web": {
       name: "Optimaliseren voor web",
