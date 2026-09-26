@@ -28,6 +28,9 @@ const ALL_ENCODERS = new Set([
   "aac",
   "libopus",
   "libmp3lame",
+  "libvorbis",
+  "libtheora",
+  "libwebp_anim",
 ]);
 
 beforeEach(() => {
@@ -39,7 +42,18 @@ afterEach(() => {
   setEncoderInventoryForTests(undefined);
 });
 
-const ALL_TARGETS: EncoderTarget[] = ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"];
+const ALL_TARGETS: EncoderTarget[] = [
+  "h264",
+  "hevc",
+  "av1",
+  "vp9",
+  "aac",
+  "opus",
+  "mp3",
+  "vorbis",
+  "theora",
+  "webp",
+];
 
 describe("resolveEncoder: software (no accel set)", () => {
   const expected: Record<EncoderTarget, string> = {
@@ -50,6 +64,9 @@ describe("resolveEncoder: software (no accel set)", () => {
     aac: "aac",
     opus: "libopus",
     mp3: "libmp3lame",
+    vorbis: "libvorbis",
+    theora: "libtheora",
+    webp: "libwebp_anim",
   };
   for (const target of ALL_TARGETS) {
     it(`${target} -> ${expected[target]}`, () => {

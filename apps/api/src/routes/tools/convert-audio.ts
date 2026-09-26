@@ -1,3 +1,4 @@
+import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
@@ -81,7 +82,17 @@ export function registerConvertAudio(app: FastifyInstance) {
             // too high for the source sample rate (e.g. 8 kHz). Use quality VBR (-q:a),
             // which adapts to the rate. Map bitrate -> quality (~bitrate/32: 192k -> q6).
             const quality = (settings.bitrateKbps / 32).toFixed(1);
-            return ["-i", inPath, "-vn", "-c:a", "libvorbis", "-q:a", quality, ...rate, out];
+            return [
+              "-i",
+              inPath,
+              "-vn",
+              "-c:a",
+              resolveEncoder("vorbis"),
+              "-q:a",
+              quality,
+              ...rate,
+              out,
+            ];
           }
           case "flac":
             return ["-i", inPath, "-vn", "-c:a", "flac", ...rate, out];
@@ -103,7 +114,7 @@ export function registerConvertAudio(app: FastifyInstance) {
               inPath,
               "-vn",
               "-c:a",
-              "libmp3lame",
+              resolveEncoder("mp3"),
               "-b:a",
               `${settings.bitrateKbps}k`,
               ...rate,

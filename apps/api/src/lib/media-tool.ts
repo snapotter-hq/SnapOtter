@@ -43,8 +43,7 @@ export function videoEncodeArgsForContainer(ext: string): string[] {
     return ["-c:v", resolveEncoder("vp9"), "-crf", "30", "-b:v", "0", "-row-mt", "1"];
   }
   if (lower === ".ogv" || lower === ".ogg") {
-    // Theora has no HW-accel path; use libtheora directly.
-    return ["-c:v", "libtheora", "-q:v", "7"];
+    return ["-c:v", resolveEncoder("theora"), "-q:v", "7"];
   }
   return ["-c:v", resolveEncoder("h264"), "-crf", "20", "-preset", "medium", "-pix_fmt", "yuv420p"];
 }
@@ -60,7 +59,7 @@ export function audioEncodeArgsForContainer(ext: string): string[] {
   const lower = ext.toLowerCase();
   if (lower === ".mpg" || lower === ".mpeg") return ["-c:a", "mp2", "-b:a", "192k"];
   if (lower === ".webm") return ["-c:a", resolveEncoder("opus")];
-  if (lower === ".ogv" || lower === ".ogg") return ["-c:a", "libvorbis"];
+  if (lower === ".ogv" || lower === ".ogg") return ["-c:a", resolveEncoder("vorbis")];
   return ["-c:a", resolveEncoder("aac")];
 }
 
@@ -113,30 +112,46 @@ export interface AudioOutput {
   encodeArgs: string[];
 }
 
-const AUDIO_OUTPUTS: Record<string, AudioOutput> = {
+/**
+ * `encodeArgs` is a function so the encoder is resolved when a job builds its
+ * command line, not when this module loads: resolving probes the ffmpeg
+ * build, and a missing encoder throws (#1270).
+ */
+const AUDIO_OUTPUTS: Record<
+  string,
+  Omit<AudioOutput, "encodeArgs"> & { encodeArgs: () => string[] }
+> = {
   ".mp3": {
     ext: ".mp3",
     contentType: "audio/mpeg",
-    encodeArgs: ["-c:a", "libmp3lame", "-b:a", "192k"],
+    encodeArgs: () => ["-c:a", resolveEncoder("mp3"), "-b:a", "192k"],
   },
-  ".wav": { ext: ".wav", contentType: "audio/wav", encodeArgs: ["-c:a", "pcm_s16le"] },
+  ".wav": { ext: ".wav", contentType: "audio/wav", encodeArgs: () => ["-c:a", "pcm_s16le"] },
   ".ogg": {
     ext: ".ogg",
     contentType: "audio/ogg",
     // Quality-based VBR, not a fixed bitrate: libvorbis fails with "encoder setup
     // failed" when a high fixed bitrate (192k) is requested for a low sample rate
     // (e.g. 8 kHz mono). -q:a 6 is ~192 kbps for normal audio and adapts to the rate.
-    encodeArgs: ["-c:a", "libvorbis", "-q:a", "6"],
+    encodeArgs: () => ["-c:a", resolveEncoder("vorbis"), "-q:a", "6"],
   },
   ".opus": {
     ext: ".opus",
     contentType: "audio/opus",
-    encodeArgs: ["-c:a", "libopus", "-b:a", "128k"],
+    encodeArgs: () => ["-c:a", resolveEncoder("opus"), "-b:a", "128k"],
   },
-  ".flac": { ext: ".flac", contentType: "audio/flac", encodeArgs: ["-c:a", "flac"] },
-  ".m4a": { ext: ".m4a", contentType: "audio/mp4", encodeArgs: ["-c:a", "aac", "-b:a", "192k"] },
-  ".aac": { ext: ".m4a", contentType: "audio/mp4", encodeArgs: ["-c:a", "aac", "-b:a", "192k"] },
-  ".aiff": { ext: ".aiff", contentType: "audio/aiff", encodeArgs: ["-c:a", "pcm_s16be"] },
+  ".flac": { ext: ".flac", contentType: "audio/flac", encodeArgs: () => ["-c:a", "flac"] },
+  ".m4a": {
+    ext: ".m4a",
+    contentType: "audio/mp4",
+    encodeArgs: () => ["-c:a", "aac", "-b:a", "192k"],
+  },
+  ".aac": {
+    ext: ".m4a",
+    contentType: "audio/mp4",
+    encodeArgs: () => ["-c:a", "aac", "-b:a", "192k"],
+  },
+  ".aiff": { ext: ".aiff", contentType: "audio/aiff", encodeArgs: () => ["-c:a", "pcm_s16be"] },
 };
 
 /**
@@ -144,7 +159,8 @@ const AUDIO_OUTPUTS: Record<string, AudioOutput> = {
  * SOURCE extension. Decode-only sources (wma/amr/ape/...) fall back to mp3.
  */
 export function audioOutputFor(srcExt: string): AudioOutput {
-  return AUDIO_OUTPUTS[srcExt.toLowerCase()] ?? AUDIO_OUTPUTS[".mp3"];
+  const spec = AUDIO_OUTPUTS[srcExt.toLowerCase()] ?? AUDIO_OUTPUTS[".mp3"];
+  return { ext: spec.ext, contentType: spec.contentType, encodeArgs: spec.encodeArgs() };
 }
 
 export interface MediaRunResult {
