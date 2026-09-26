@@ -34,6 +34,7 @@ import { startCancelListener, stopCancelListener } from "../../apps/api/src/jobs
 import { pingRedis } from "../../apps/api/src/jobs/connection.js";
 import { closeQueueEvents, warmQueueEvents } from "../../apps/api/src/jobs/enqueue.js";
 import { closeWorkers, startWorkers } from "../../apps/api/src/jobs/worker.js";
+import { stripBasePath } from "../../apps/api/src/lib/base-path.js";
 import { posthogProxyEnabled } from "../../apps/api/src/lib/posthog-proxy.js";
 import { parseTrustProxy } from "../../apps/api/src/lib/trust-proxy.js";
 import { requirePermission } from "../../apps/api/src/permissions.js";
@@ -137,6 +138,8 @@ export async function buildTestApp(): Promise<TestApp> {
     .where(eq(schema.users.username, "admin"));
 
   const app = Fastify({
+    // Rewrite before routing and auth hooks, just as the production server does.
+    rewriteUrl: (request) => stripBasePath(request.url ?? "/", env.BASE_PATH),
     logger: false, // quiet during tests
     bodyLimit: env.MAX_UPLOAD_SIZE_MB * 1024 * 1024,
     // Mirrors index.ts so forwarded-header behaviour (request.ip,
