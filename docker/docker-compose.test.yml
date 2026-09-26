@@ -20,6 +20,8 @@ services:
     # .git, and /tmp is a noexec tmpfs, so in this image they can only report
     # the build context's own stripping (missing DOCKERHUB.md / CONTRIBUTING.md
     # / third-party notices, no `git ls-files`, a non-executable fake binary).
+    # The lazy-chunk build check is out too: it production-builds apps/demo,
+    # whose dependencies Dockerfile.test never installs.
     # Host CI runs all of them on every PR.
     command:
       [
@@ -39,6 +41,8 @@ services:
         "**/tests/unit/scripts/check-production-licenses.test.ts",
         "--exclude",
         "**/tests/unit/helpers/run-generated-tool.test.ts",
+        "--exclude",
+        "**/tests/unit/web/lazy-chunks-stay-lazy.test.ts",
       ]
     environment:
       - NODE_ENV=test

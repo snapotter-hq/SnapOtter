@@ -1,3 +1,4 @@
+import { formatTargetKb, kbToBytes } from "@snapotter/shared";
 import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -5,11 +6,6 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { CompressControls } from "./compress-settings";
-
-// Mirrors BYTES_PER_KB in packages/shared/src/target-size.ts. Imported directly,
-// that module landed in this lazy chunk and the shared chunk imported it back,
-// a chunk cycle that blanked the production app on load (#1296).
-const BYTES_PER_KB = 1000;
 
 export function CompressPdfSettings() {
   const { t } = useTranslation();
@@ -38,9 +34,8 @@ export function CompressPdfSettings() {
   const targetKb = resultPayload?.targetKb as number | undefined;
   // Same decimal KB the server measured against, exact to the byte, so a miss
   // can't read as "couldn't reach 100 KB, smallest was 98 KB" (#1272).
-  const targetLabel = targetKb != null ? `${targetKb} KB` : "";
-  const achievedLabel =
-    processedSize != null ? `${Number((processedSize / BYTES_PER_KB).toFixed(3))} KB` : "";
+  const targetLabel = targetKb != null ? formatTargetKb(kbToBytes(targetKb)) : "";
+  const achievedLabel = processedSize != null ? formatTargetKb(processedSize) : "";
 
   const handleProcess = () => {
     if (hasMultiple) {
