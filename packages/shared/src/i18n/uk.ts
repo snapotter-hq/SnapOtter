@@ -564,23 +564,23 @@ export const uk: TranslationKeys = {
     },
     "compress-image-to-20kb": {
       name: "Стиснення зображення до 20 KB",
-      description: "Зменшення розміру файлу зображення до менш ніж 20 KB",
+      description: "Зменшення розміру файлу зображення до 20 KB і менше",
     },
     "compress-image-to-50kb": {
       name: "Стиснення зображення до 50 KB",
-      description: "Зменшення розміру файлу зображення до менш ніж 50 KB",
+      description: "Зменшення розміру файлу зображення до 50 KB і менше",
     },
     "compress-image-to-100kb": {
       name: "Стиснення зображення до 100 KB",
-      description: "Зменшення розміру файлу зображення до менш ніж 100 KB",
+      description: "Зменшення розміру файлу зображення до 100 KB і менше",
     },
     "compress-image-to-200kb": {
       name: "Стиснення зображення до 200 KB",
-      description: "Зменшення розміру файлу зображення до менш ніж 200 KB",
+      description: "Зменшення розміру файлу зображення до 200 KB і менше",
     },
     "compress-image-to-500kb": {
       name: "Стиснення зображення до 500 KB",
-      description: "Зменшення розміру файлу зображення до менш ніж 500 KB",
+      description: "Зменшення розміру файлу зображення до 500 KB і менше",
     },
     "optimize-for-web": {
       name: "Оптимізація для вебу",
@@ -1390,6 +1390,7 @@ export const uk: TranslationKeys = {
       submit: "Стиснути",
       submitBatch: "Стиснути ({count} файлів)",
       submitTarget: "Стиснути до {size} KB",
+      resizedToFit: "Зменшено до {width} × {height}, щоб вміститися в {size} KB",
       progressLabel: "Стиснення",
       original: "Оригінал: {size} KB",
       processed: "Оброблено: {size} KB",

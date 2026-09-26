@@ -1155,6 +1155,7 @@ export const zhCN: TranslationKeys = {
       submit: "压缩",
       submitBatch: "压缩（{count} 个文件）",
       submitTarget: "压缩至 {size} KB",
+      resizedToFit: "已缩小至 {width} × {height} 以控制在 {size} KB 内",
       progressLabel: "压缩中",
       original: "原始：{size} KB",
       processed: "处理后：{size} KB",

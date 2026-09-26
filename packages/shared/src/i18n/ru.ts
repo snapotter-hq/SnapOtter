@@ -567,23 +567,23 @@ export const ru: TranslationKeys = {
     },
     "compress-image-to-20kb": {
       name: "Сжатие изображения до 20 KB",
-      description: "Уменьшение размера файла изображения до менее чем 20 KB",
+      description: "Уменьшение размера файла изображения до 20 KB и меньше",
     },
     "compress-image-to-50kb": {
       name: "Сжатие изображения до 50 KB",
-      description: "Уменьшение размера файла изображения до менее чем 50 KB",
+      description: "Уменьшение размера файла изображения до 50 KB и меньше",
     },
     "compress-image-to-100kb": {
       name: "Сжатие изображения до 100 KB",
-      description: "Уменьшение размера файла изображения до менее чем 100 KB",
+      description: "Уменьшение размера файла изображения до 100 KB и меньше",
     },
     "compress-image-to-200kb": {
       name: "Сжатие изображения до 200 KB",
-      description: "Уменьшение размера файла изображения до менее чем 200 KB",
+      description: "Уменьшение размера файла изображения до 200 KB и меньше",
     },
     "compress-image-to-500kb": {
       name: "Сжатие изображения до 500 KB",
-      description: "Уменьшение размера файла изображения до менее чем 500 KB",
+      description: "Уменьшение размера файла изображения до 500 KB и меньше",
     },
     "optimize-for-web": {
       name: "Оптимизация для веба",
@@ -1391,6 +1391,7 @@ export const ru: TranslationKeys = {
       submit: "Сжать",
       submitBatch: "Сжать ({count} файлов)",
       submitTarget: "Сжать до {size} KB",
+      resizedToFit: "Уменьшено до {width} × {height}, чтобы уложиться в {size} KB",
       progressLabel: "Сжатие",
       original: "Оригинал: {size} KB",
       processed: "Обработано: {size} KB",

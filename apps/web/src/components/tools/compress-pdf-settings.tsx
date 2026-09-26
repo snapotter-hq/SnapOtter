@@ -6,6 +6,11 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { CompressControls } from "./compress-settings";
 
+// Mirrors BYTES_PER_KB in packages/shared/src/target-size.ts. Imported directly,
+// that module landed in this lazy chunk and the shared chunk imported it back,
+// a chunk cycle that blanked the production app on load (#1296).
+const BYTES_PER_KB = 1000;
+
 export function CompressPdfSettings() {
   const { t } = useTranslation();
   const s = t.toolSettings["compress-pdf"];
@@ -31,8 +36,11 @@ export function CompressPdfSettings() {
   // Honest reporting for target-size mode: whether we actually hit the ceiling.
   const targetMet = resultPayload?.targetMet as boolean | undefined;
   const targetKb = resultPayload?.targetKb as number | undefined;
-  const targetLabel = targetKb != null ? `${Math.round(targetKb)} KB` : "";
-  const achievedLabel = processedSize != null ? `${Math.round(processedSize / 1024)} KB` : "";
+  // Same decimal KB the server measured against, exact to the byte, so a miss
+  // can't read as "couldn't reach 100 KB, smallest was 98 KB" (#1272).
+  const targetLabel = targetKb != null ? `${targetKb} KB` : "";
+  const achievedLabel =
+    processedSize != null ? `${Number((processedSize / BYTES_PER_KB).toFixed(3))} KB` : "";
 
   const handleProcess = () => {
     if (hasMultiple) {

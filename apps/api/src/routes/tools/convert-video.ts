@@ -63,7 +63,7 @@ export function registerConvertVideo(app: FastifyInstance) {
             "-pix_fmt",
             "yuv420p",
             "-c:a",
-            "libmp3lame",
+            resolveEncoder("mp3"),
             "-b:a",
             "192k",
             out,

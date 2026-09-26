@@ -6,6 +6,7 @@ export {
   hwAccelStatus,
   resolveEncoder,
   type SoftwareEncoderStatus,
+  softwareEncoder,
   softwareEncoderStatus,
 } from "./encoders.js";
 export { type RunFfmpegOptions, runFfmpeg } from "./ffmpeg.js";

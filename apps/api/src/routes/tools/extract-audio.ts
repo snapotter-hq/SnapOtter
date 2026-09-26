@@ -1,3 +1,4 @@
+import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
@@ -29,15 +30,15 @@ export function registerExtractAudio(app: FastifyInstance) {
       const { outPath } = await runMediaTool(ctx, outName, (inPath, out) => {
         switch (settings.format) {
           case "mp3":
-            return ["-i", inPath, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", out];
+            return ["-i", inPath, "-vn", "-c:a", resolveEncoder("mp3"), "-b:a", "192k", out];
           case "wav":
             return ["-i", inPath, "-vn", "-c:a", "pcm_s16le", out];
           case "m4a":
             return ["-i", inPath, "-vn", "-c:a", "aac", "-b:a", "192k", out];
           case "ogg":
-            return ["-i", inPath, "-vn", "-c:a", "libvorbis", "-q:a", "5", out];
+            return ["-i", inPath, "-vn", "-c:a", resolveEncoder("vorbis"), "-q:a", "5", out];
           default:
-            return ["-i", inPath, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", out];
+            return ["-i", inPath, "-vn", "-c:a", resolveEncoder("mp3"), "-b:a", "192k", out];
         }
       });
       return {

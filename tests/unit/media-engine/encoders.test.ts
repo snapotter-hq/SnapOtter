@@ -1,7 +1,7 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { friendlyError } from "../../../apps/api/src/lib/errors.js";
 import {
@@ -10,6 +10,7 @@ import {
   parseEncoderNames,
   resolveEncoder,
   setEncoderInventoryForTests,
+  softwareEncoder,
   softwareEncoderStatus,
 } from "../../../packages/media-engine/src/encoders.js";
 
@@ -43,9 +44,26 @@ const QSV_ONLY = new Set([
   "aac",
   "libopus",
   "libmp3lame",
+  "libvorbis",
+  "libtheora",
+  "libwebp_anim",
   "h264_qsv",
   "hevc_qsv",
 ]);
+
+/** Every target resolveEncoder serves, in declaration order. */
+const TARGETS = [
+  "h264",
+  "hevc",
+  "av1",
+  "vp9",
+  "aac",
+  "opus",
+  "mp3",
+  "vorbis",
+  "theora",
+  "webp",
+] as const;
 
 const WITH_NVENC = new Set([...QSV_ONLY, "h264_nvenc", "hevc_nvenc", "av1_nvenc"]);
 
@@ -156,7 +174,7 @@ describe("resolveEncoder on a build that lacks a software encoder (#1092)", () =
   it("throws a message friendlyError passes through unchanged", () => {
     setEncoderInventoryForTests(new Set<string>(["aac"]));
     delete process.env.SNAPOTTER_HW_ACCEL;
-    for (const target of ["h264", "hevc", "av1", "vp9", "opus", "mp3"] as const) {
+    for (const target of TARGETS.filter((t) => t !== "aac")) {
       let message = "";
       try {
         resolveEncoder(target);
@@ -183,6 +201,30 @@ describe("resolveEncoder on a build that lacks a software encoder (#1092)", () =
   });
 });
 
+/**
+ * For command lines whose options only the software encoder accepts, like
+ * file-preview's libx264 `-preset ultrafast`, which NVENC rejects (#1270).
+ */
+describe("softwareEncoder", () => {
+  it("never swaps in a hardware encoder, even one the build lists", () => {
+    setEncoderInventoryForTests(WITH_NVENC);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(resolveEncoder("h264")).toBe("h264_nvenc");
+    expect(softwareEncoder("h264")).toBe("libx264");
+  });
+
+  it("names a software encoder the build lacks", () => {
+    setEncoderInventoryForTests(new Set([...WITH_NVENC].filter((n) => n !== "libx264")));
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(() => softwareEncoder("h264")).toThrow(/has no libx264 encoder/);
+  });
+
+  it("fails open when the encoder list could not be read", () => {
+    setEncoderInventoryForTests(null);
+    expect(softwareEncoder("mp3")).toBe("libmp3lame");
+  });
+});
+
 describe("softwareEncoderStatus", () => {
   it("lists nothing missing on the published image's inventory", () => {
     setEncoderInventoryForTests(QSV_ONLY);
@@ -196,10 +238,13 @@ describe("softwareEncoderStatus", () => {
       "libsvtav1",
       "libvpx-vp9",
       "libmp3lame",
+      "libvorbis",
+      "libtheora",
+      "libwebp_anim",
     ]);
   });
 
-  it("lists all seven when the build has no software encoders at all", () => {
+  it("lists all ten when the build has no software encoders at all", () => {
     setEncoderInventoryForTests(new Set(["h264_qsv"]));
     expect(softwareEncoderStatus().missing).toEqual([
       "libx264",
@@ -209,6 +254,9 @@ describe("softwareEncoderStatus", () => {
       "aac",
       "libopus",
       "libmp3lame",
+      "libvorbis",
+      "libtheora",
+      "libwebp_anim",
     ]);
   });
 
@@ -217,7 +265,7 @@ describe("softwareEncoderStatus", () => {
     setEncoderInventoryForTests(new Set(["libx264", "libvpx-vp9", "aac", "h264_qsv"]));
     delete process.env.SNAPOTTER_HW_ACCEL;
     const { missing } = softwareEncoderStatus();
-    for (const target of ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"] as const) {
+    for (const target of TARGETS) {
       let failedFor: string | null = null;
       try {
         resolveEncoder(target);
@@ -226,7 +274,15 @@ describe("softwareEncoderStatus", () => {
       }
       if (failedFor) expect(missing).toContain(failedFor);
     }
-    expect(missing).toEqual(["libx265", "libsvtav1", "libopus", "libmp3lame"]);
+    expect(missing).toEqual([
+      "libx265",
+      "libsvtav1",
+      "libopus",
+      "libmp3lame",
+      "libvorbis",
+      "libtheora",
+      "libwebp_anim",
+    ]);
   });
 
   it("reports the probe error instead of claiming everything is missing", () => {
@@ -303,7 +359,16 @@ describe("hwAccelStatus", () => {
     setEncoderInventoryForTests(WITH_NVENC);
     process.env.SNAPOTTER_HW_ACCEL = "vaapi";
     // VAAPI maps h264 and hevc only, so the rest silently stay on software.
-    expect(hwAccelStatus().unmapped).toEqual(["av1", "vp9", "aac", "opus", "mp3"]);
+    expect(hwAccelStatus().unmapped).toEqual([
+      "av1",
+      "vp9",
+      "aac",
+      "opus",
+      "mp3",
+      "vorbis",
+      "theora",
+      "webp",
+    ]);
   });
 
   it("exposes the accepted family names for docs and logs", () => {
@@ -319,6 +384,7 @@ describe("hwAccelStatus", () => {
  */
 describe("encoder probe against a stub ffmpeg", () => {
   const dir = mkdtempSync(join(tmpdir(), "snapotter-encoder-probe-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   const TABLE = [
     "Encoders:",

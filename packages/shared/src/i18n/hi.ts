@@ -1206,6 +1206,7 @@ export const hi: TranslationKeys = {
       submit: "कंप्रेस करें",
       submitBatch: "कंप्रेस करें ({count} फाइलें)",
       submitTarget: "{size} KB में कंप्रेस करें",
+      resizedToFit: "{size} KB में फिट करने के लिए आकार {width} × {height} किया गया",
       progressLabel: "कंप्रेस हो रहा है",
       original: "मूल: {size} KB",
       processed: "प्रोसेस्ड: {size} KB",

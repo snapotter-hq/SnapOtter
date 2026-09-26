@@ -1155,6 +1155,7 @@ export const zhTW: TranslationKeys = {
       submit: "壓縮",
       submitBatch: "壓縮（{count}個檔案）",
       submitTarget: "壓縮至 {size} KB",
+      resizedToFit: "已縮小至 {width} × {height} 以控制在 {size} KB 內",
       progressLabel: "壓縮中",
       original: "原始：{size} KB",
       processed: "處理後：{size} KB",

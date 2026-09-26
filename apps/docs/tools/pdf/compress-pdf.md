@@ -18,7 +18,7 @@ Accepts multipart form data with a PDF file and a JSON `settings` field.
 |-----------|------|----------|---------|-------------|
 | mode | string | No | `"quality"` | Compression mode: `quality` or `targetSize` |
 | quality | integer | No | `75` | Compression quality, 1-100 (higher = less compression). Used in `quality` mode |
-| targetSizeKb | number | No | - | Target file size in kilobytes. Used in `targetSize` mode |
+| targetSizeKb | number | No | - | Target file size in KB (1 KB = 1000 bytes). Used in `targetSize` mode |
 
 ## Example Request {#example-request}
 

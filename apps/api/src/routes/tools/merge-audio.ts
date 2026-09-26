@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { probeMedia } from "@snapotter/media-engine";
+import { probeMedia, resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
@@ -18,11 +18,12 @@ const CONTENT_TYPES: Record<string, string> = {
   m4a: "audio/mp4",
 };
 
-const ENCODERS: Record<string, string[]> = {
-  mp3: ["-c:a", "libmp3lame", "-b:a", "192k"],
-  wav: ["-c:a", "pcm_s16le"],
-  flac: ["-c:a", "flac"],
-  m4a: ["-c:a", "aac", "-b:a", "192k"],
+/** Functions, so the encoder is resolved per job rather than at module load (#1270). */
+const ENCODERS: Record<string, () => string[]> = {
+  mp3: () => ["-c:a", resolveEncoder("mp3"), "-b:a", "192k"],
+  wav: () => ["-c:a", "pcm_s16le"],
+  flac: () => ["-c:a", "flac"],
+  m4a: () => ["-c:a", "aac", "-b:a", "192k"],
 };
 
 export function registerMergeAudio(app: FastifyInstance) {
@@ -70,7 +71,7 @@ export function registerMergeAudio(app: FastifyInstance) {
         filter,
         "-map",
         "[a]",
-        ...ENCODERS[settings.format],
+        ...ENCODERS[settings.format](),
         outPath,
       ];
 

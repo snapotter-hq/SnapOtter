@@ -295,20 +295,29 @@ describe("compress keeps animation across both modes (#1083)", () => {
     // The binary search gives up on quality alone and falls into the resize
     // fallback, the one place the engine's new animated flag meets .resize().
     // Sized off the strip, that would stretch every frame by the frame count.
+    // processV2 is the path the worker runs (#1272), so this guards production.
     const source = readFixture(fixtures.image.animated.real);
     const config = getToolConfig("compress");
-    if (!config) throw new Error("compress must be registered");
+    if (!config?.processV2) throw new Error("compress must be registered with processV2");
 
-    const result = await config.process(
-      source,
-      config.settingsSchema.parse({ mode: "targetSize", targetSizeKb: 40 }),
-      "animated-simpsons.gif",
-    );
+    const result = await config.processV2({
+      inputs: [{ buffer: source, filename: "animated-simpsons.gif", ref: "in" }],
+      settings: { mode: "targetSize", targetSizeKb: 40 },
+      scratchDir: "/nonexistent",
+      signal: new AbortController().signal,
+      report: () => {},
+    });
+    if (!result.buffer) throw new Error("compress must return a buffer");
     const shape = await frameShape(result.buffer);
 
     expect(shape.pages).toBe(30);
     // The source frames are square, so a strip-sized downscale shows up here.
     expect(shape.pageHeight).toBe(shape.width);
+    // resizedTo reports one frame, not the stacked strip.
+    expect(result.resultPayload).toEqual({
+      targetKb: 40,
+      resizedTo: { width: shape.width, height: shape.pageHeight },
+    });
   });
 
   it("preserves frames in targetSize mode, which re-encodes through the engine", async () => {
