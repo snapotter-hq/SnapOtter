@@ -1,10 +1,32 @@
 import { spawn } from "node:child_process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeChild, type FakeChild, settleClose, settleError } from "./helpers/fake-child.js";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 
 const mockSpawn = vi.mocked(spawn);
+
+/**
+ * A real executable stands in for qpdf. The memory-limit wrapper preflights a
+ * path-shaped binary before handing it to sh (#1310), so a made-up path such
+ * as /usr/bin/qpdf would fail that check on a host without qpdf there.
+ */
+let stubDir: string;
+let QPDF_STUB: string;
+
+beforeAll(() => {
+  stubDir = mkdtempSync(join(tmpdir(), "snapotter-qpdf-stub-"));
+  QPDF_STUB = join(stubDir, "qpdf");
+  writeFileSync(QPDF_STUB, "#!/bin/sh\n");
+  chmodSync(QPDF_STUB, 0o755);
+});
+
+afterAll(() => {
+  rmSync(stubDir, { recursive: true, force: true });
+});
 
 /** Queue one fake child for the next spawn call, pre-programmed to settle. */
 function nextChild(
@@ -47,7 +69,7 @@ function lastSpawnOpts(): { stdio?: unknown } {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.QPDF_PATH = "/usr/bin/qpdf";
+  process.env.QPDF_PATH = QPDF_STUB;
   delete process.env.SUBPROCESS_MEMORY_LIMIT_MB;
 });
 
@@ -59,7 +81,7 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
   it("passes the raw binary and args to spawn when no memory limit is set", async () => {
     nextChild({ stdout: "", code: 0 });
     await import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf"));
-    expect(lastSpawnBin()).toBe("/usr/bin/qpdf");
+    expect(lastSpawnBin()).toBe(QPDF_STUB);
     expect(lastSpawnArgs()).toEqual(["--check", "/doc.pdf"]);
   });
 
@@ -142,7 +164,7 @@ describe("runQpdf memory-limit wrapping", () => {
     expect(args[0]).toBe("-c");
     expect(args[2]).toBe("sh");
     expect(args[3]).toBe(String(256 * 1024));
-    expect(args[4]).toBe("/usr/bin/qpdf");
+    expect(args[4]).toBe(QPDF_STUB);
     expect(args.slice(5)).toEqual(["--check", "/doc.pdf"]);
   });
 });

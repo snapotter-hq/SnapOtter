@@ -212,3 +212,62 @@ describe("path-backed PDF validation", () => {
     expect(qpdf.check).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * #1310: QPDF_PATH pointing at a missing or non-executable file makes
+ * qpdfAvailable() true and every qpdf spawn reject with ENOENT. That is the
+ * operator's container, not the caller's file, so it has to come back as a
+ * 503 naming the variable rather than a masked 500 or a "Damaged PDF".
+ */
+describe("qpdf spawn failures", () => {
+  const spawnFailure = (code = "ENOENT") =>
+    Object.assign(new Error(`spawn /nonexistent/qpdf ${code}`), { code, syscall: "spawn" });
+
+  const expectEngineUnavailable = async (promise: Promise<unknown>) => {
+    const err = await promise.catch((e: unknown) => e);
+    expect(err).toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+    expect((err as Error).message).toMatch(/qpdf/);
+    expect((err as { details?: string }).details).toMatch(/QPDF_PATH/);
+  };
+
+  it.each(["ENOENT", "EACCES"])(
+    "reports a qpdf that cannot be started (%s) from the password probe as an unavailable engine",
+    async (code) => {
+      const inputPath = join(scratchDir, "fine.pdf");
+      writeFileSync(inputPath, "%PDF-path-backed");
+      qpdf.requiresPassword.mockRejectedValueOnce(spawnFailure(code));
+
+      await expectEngineUnavailable(validatePdfPath(inputPath, { rejectPasswordProtected: true }));
+      expect(qpdf.check).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not blame the file when the structural check cannot start qpdf", async () => {
+    const inputPath = join(scratchDir, "fine.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(spawnFailure());
+
+    await expectEngineUnavailable(validatePdfPath(inputPath, { rejectPasswordProtected: true }));
+    expect(qpdf.pageCount).not.toHaveBeenCalled();
+  });
+
+  it("reports the page-count probe the same way", async () => {
+    const inputPath = join(scratchDir, "fine.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockResolvedValueOnce(undefined);
+    qpdf.pageCount.mockRejectedValueOnce(spawnFailure());
+    const original = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 5;
+    try {
+      await expectEngineUnavailable(validatePdfPath(inputPath, { rejectPasswordProtected: true }));
+    } finally {
+      env.MAX_PDF_PAGES = original;
+    }
+  });
+});

@@ -1,8 +1,68 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { wrapWithMemoryLimit } from "../../../packages/shared/src/subprocess-limit.js";
 
 const KEY = "SUBPROCESS_MEMORY_LIMIT_MB";
 const orig = process.env[KEY];
+
+/**
+ * #1310: under the shim the shell starts fine and a bad binary path only
+ * surfaces as exit 126/127, so the errno-coded spawn failure callers key on
+ * (ENOENT, EACCES) never happens. The wrapper has to reproduce it itself.
+ */
+describe("wrapWithMemoryLimit preflight", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "snapotter-subprocess-limit-"));
+    process.env[KEY] = "64";
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    if (orig === undefined) delete process.env[KEY];
+    else process.env[KEY] = orig;
+  });
+
+  it("throws ENOENT for a path that does not exist, as a direct spawn would", () => {
+    const missing = join(dir, "not-qpdf");
+    expect(() => wrapWithMemoryLimit(missing, ["--check"])).toThrow(
+      expect.objectContaining({ code: "ENOENT", message: expect.stringContaining(missing) }),
+    );
+  });
+
+  it("throws EACCES for a file without the execute bit and for a directory", () => {
+    const plain = join(dir, "qpdf");
+    writeFileSync(plain, "#!/bin/sh\n");
+    chmodSync(plain, 0o644);
+    expect(() => wrapWithMemoryLimit(plain, [])).toThrow(
+      expect.objectContaining({ code: "EACCES" }),
+    );
+    expect(() => wrapWithMemoryLimit(dir, [])).toThrow(expect.objectContaining({ code: "EACCES" }));
+  });
+
+  it("wraps an executable path", () => {
+    const exe = join(dir, "qpdf");
+    writeFileSync(exe, "#!/bin/sh\n");
+    chmodSync(exe, 0o755);
+    const [bin, args] = wrapWithMemoryLimit(exe, ["--check"]);
+    expect(bin).toBe("/bin/sh");
+    expect(args.slice(4)).toEqual([exe, "--check"]);
+  });
+
+  it("leaves a bare command name to the shell's PATH lookup", () => {
+    const [, args] = wrapWithMemoryLimit("definitely-not-on-path-1310", ["-v"]);
+    expect(args.slice(4)).toEqual(["definitely-not-on-path-1310", "-v"]);
+  });
+
+  it("does not probe when the limit is off", () => {
+    delete process.env[KEY];
+    const missing = join(dir, "not-qpdf");
+    expect(wrapWithMemoryLimit(missing, ["--check"])).toEqual([missing, ["--check"]]);
+  });
+});
 
 describe("wrapWithMemoryLimit", () => {
   afterEach(() => {

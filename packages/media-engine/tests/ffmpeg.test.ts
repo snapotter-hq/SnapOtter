@@ -1,5 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FfmpegProgress } from "../src/progress.js";
@@ -83,30 +86,41 @@ describe("runFfmpeg: argv construction", () => {
   });
 
   it("routes argv through the memory-limit wrapper when SUBPROCESS_MEMORY_LIMIT_MB is set", async () => {
+    // The wrapper preflights a path-shaped binary before handing it to sh
+    // (#1310), so the override has to be a real executable here.
+    const dir = mkdtempSync(join(tmpdir(), "snapotter-ffmpeg-stub-"));
+    const stub = join(dir, "ffmpeg");
+    writeFileSync(stub, "#!/bin/sh\n");
+    chmodSync(stub, 0o755);
+    process.env.FFMPEG_PATH = stub;
     process.env.SUBPROCESS_MEMORY_LIMIT_MB = "128";
-    const child = makeChild();
-    mockSpawnReturns(child);
-    const runFfmpeg = await loadRunFfmpeg();
-    const p = runFfmpeg(["-i", "in.mp4", "out.mp4"]);
-    const [bin, args] = vi.mocked(spawn).mock.calls[0];
-    expect(bin).toBe("/bin/sh");
-    expect(args).toEqual([
-      "-c",
-      'ulimit -v "$1" 2>/dev/null || true; shift; exec "$@"',
-      "sh",
-      "131072", // 128 * 1024
-      "/fake/ffmpeg",
-      "-hide_banner",
-      "-nostdin",
-      "-y",
-      "-i",
-      "in.mp4",
-      "out.mp4",
-      "-progress",
-      "pipe:1",
-    ]);
-    child.proc.emit("close", 0, null);
-    await p;
+    try {
+      const child = makeChild();
+      mockSpawnReturns(child);
+      const runFfmpeg = await loadRunFfmpeg();
+      const p = runFfmpeg(["-i", "in.mp4", "out.mp4"]);
+      const [bin, args] = vi.mocked(spawn).mock.calls[0];
+      expect(bin).toBe("/bin/sh");
+      expect(args).toEqual([
+        "-c",
+        'ulimit -v "$1" 2>/dev/null || true; shift; exec "$@"',
+        "sh",
+        "131072", // 128 * 1024
+        stub,
+        "-hide_banner",
+        "-nostdin",
+        "-y",
+        "-i",
+        "in.mp4",
+        "out.mp4",
+        "-progress",
+        "pipe:1",
+      ]);
+      child.proc.emit("close", 0, null);
+      await p;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
