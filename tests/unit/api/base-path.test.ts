@@ -204,3 +204,81 @@ describe("index.html <base> rewrite", () => {
     }
   });
 });
+
+describe("SPA fallback disambiguation (#1275)", () => {
+  it("answers asset-shaped misses with 404 instead of the shell", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const url of [
+        "/assets/gone.js",
+        "/assets/gone.css",
+        "/assets/gone.js?v=9a3b",
+        "/deep/gone.js",
+        "/gone.css",
+        // A prefix-preserving proxy with BASE_PATH unset reaches the same spots.
+        "/snapotter/assets/gone.js",
+        "/apps/snapotter/gone.css",
+      ]) {
+        const response = await app.inject(url);
+        expect(response.statusCode).toBe(404);
+        expect(response.headers["content-type"]).toContain("text/plain");
+      }
+      // Router deep links keep the shell.
+      for (const url of ["/files", "/image/resize", "/deep/route?lang=fr", "/snapotter/gone.png"]) {
+        const response = await app.inject(url);
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toContain("<base href");
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("warns once per prefix when an undeclared forwarded prefix reaches the fallback", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warnings: string[] = [];
+    vi.spyOn(app.log, "warn").mockImplementation((message) => void warnings.push(String(message)));
+    try {
+      // The shell (200) is still served — the warning is the diagnostic.
+      for (const call of [1, 2, 3]) {
+        const response = await app.inject(`/snapotter/api/v1/config/analytics?n=${call}`);
+        expect(response.statusCode).toBe(200);
+      }
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("/snapotter");
+      expect(warnings[0]).toContain("BASE_PATH");
+
+      // A different undeclared prefix also warns exactly once.
+      await app.inject("/other/assets/manifest");
+      expect(warnings).toHaveLength(2);
+      expect(warnings[1]).toContain("/other");
+
+      // Second-segment api/assets under a configured prefix is already stripped
+      // before routing, and an unrelated shell fallback stays silent.
+      config.BASE_PATH = "/snapotter";
+      warnings.length = 0;
+      await app.inject("/snapotter/api/v1/config/analytics");
+      await app.inject("/snapotter/login");
+      expect(warnings).toHaveLength(0);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps the warning silent when the second segment is unrelated", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warn = vi.spyOn(app.log, "warn");
+    try {
+      await app.inject("/snapotter");
+      await app.inject("/snapotter/login");
+      await app.inject("/files");
+      await app.inject("/snapotter/image/resize");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+});
