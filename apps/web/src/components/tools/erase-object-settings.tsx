@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, formatFileSize } from "@/lib/format";
-import { generateId } from "@/lib/utils";
+import { generateId, resolveServerUrl } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import type { EraserCanvasRef } from "./eraser-canvas";
@@ -92,28 +92,35 @@ export function subscribeEraseObjectJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      let data: {
+        type?: string;
+        phase?: string;
+        result?: Record<string, unknown>;
+        percent?: number;
+        error?: string;
+      };
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === "heartbeat") {
-          resetStall();
-          return;
-        }
-        if (data.type !== "single") return;
-        resetStall();
-        if (data.phase === "complete" && data.result) {
-          cleanup();
-          handlers.onComplete(data.result as Record<string, unknown>);
-          return;
-        }
-        if (data.phase === "failed") {
-          cleanup();
-          handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
-          return;
-        }
-        if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
+        data = JSON.parse(event.data);
       } catch {
-        // Ignore malformed SSE frames
+        return; // malformed frame
       }
+      if (data.type === "heartbeat") {
+        resetStall();
+        return;
+      }
+      if (data.type !== "single") return;
+      resetStall();
+      if (data.phase === "complete" && data.result) {
+        cleanup();
+        handlers.onComplete(data.result as Record<string, unknown>);
+        return;
+      }
+      if (data.phase === "failed") {
+        cleanup();
+        handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
+        return;
+      }
+      if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
     };
     // A transient drop triggers the browser's built-in reconnect; on reconnect
     // the backend replays the terminal frame, so a completed job still resolves.
@@ -195,7 +202,7 @@ export function EraseObjectSettings({
 
       const applyResult = (r: Record<string, unknown>) => {
         useFileStore.getState().updateEntry(entryIndex, {
-          processedUrl: r.downloadUrl as string,
+          processedUrl: resolveServerUrl(r.downloadUrl as string),
           processedPreviewUrl: (r.previewUrl as string) ?? null,
           processedFilename: null,
           status: "completed",
@@ -306,7 +313,7 @@ export function EraseObjectSettings({
         useFileStore.getState().setLastSavedLibraryFileId(r.savedFileId as string);
       }
       useFileStore.getState().updateEntry(capturedIndex, {
-        processedUrl: r.downloadUrl as string,
+        processedUrl: resolveServerUrl(r.downloadUrl as string),
         processedPreviewUrl: (r.previewUrl as string) ?? null,
         processedFilename: null,
         status: "completed",

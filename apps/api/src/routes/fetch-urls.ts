@@ -14,7 +14,6 @@ import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
-import { env } from "../config.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
@@ -255,7 +254,7 @@ async function fetchSingleUrl(
     const contentType = validation?.valid
       ? (FORMAT_TO_MIME[validation.format] ?? "application/octet-stream")
       : responseContentType || "application/octet-stream";
-    const downloadUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
+    const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
 
     // Formats in CLI_DECODED_FORMATS (HEIC, RAW, PSD, TGA, ...) validate
     // successfully without Sharp ever decoding pixels -- validateImageBuffer
@@ -310,7 +309,7 @@ async function fetchSingleUrl(
         const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
         await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
-        previewUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
+        previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
       } catch {
         // Preview generation failed -- non-fatal, skip preview
       }

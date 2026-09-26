@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { seamCarve } from "@snapotter/ai";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -141,7 +140,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
 
           return reply.send({
             jobId,
-            downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+            downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
             originalSize: fileBuffer.length,
             processedSize: result.buffer.length,
             width: result.width,

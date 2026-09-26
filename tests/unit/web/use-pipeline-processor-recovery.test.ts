@@ -727,4 +727,42 @@ describe("usePipelineProcessor batch recovery (#766)", () => {
 
     unmount();
   });
+
+  // #1287: a throw inside completion handling (here the store update) used to
+  // be swallowed, leaving the run to a misleading stall. It must fail the run
+  // with the real message instead.
+  it("fails the run with the real cause when completion handling throws", () => {
+    vi.useFakeTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startSingleRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+
+    const updateEntry = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+
+    expect(consoleError).toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe("Completion handling failed unexpectedly.");
+
+    // The run is already settled; a later stall timer cannot own the outcome.
+    act(() => {
+      vi.advanceTimersByTime(300_001);
+    });
+    expect(useFileStore.getState().error).toBe("Completion handling failed unexpectedly.");
+
+    updateEntry.mockRestore();
+    unmount();
+  });
 });

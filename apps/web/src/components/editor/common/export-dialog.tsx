@@ -18,7 +18,7 @@ import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
-import { cn, copyImageToClipboard } from "@/lib/utils";
+import { cn, copyImageToClipboard, resolveServerUrl } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
   AdjustmentValues,
@@ -204,7 +204,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           const json = await res.json();
           if (json.downloadUrl) {
             const a = document.createElement("a");
-            a.href = json.downloadUrl;
+            a.href = resolveServerUrl(json.downloadUrl);
             a.download = `export.${settings.format}`;
             document.body.appendChild(a);
             a.click();
@@ -271,7 +271,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           const json = await res.json();
           if (json.downloadUrl) {
             const a = document.createElement("a");
-            a.href = json.downloadUrl;
+            a.href = resolveServerUrl(json.downloadUrl);
             a.download = `export.${settings.format}`;
             document.body.appendChild(a);
             a.click();

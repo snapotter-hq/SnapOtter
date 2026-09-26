@@ -86,7 +86,7 @@ describe("ReviewPanel claim tracking", () => {
       "fetch",
       vi.fn((input: string) =>
         input === "blob:result"
-          ? Promise.resolve({ blob: () => Promise.resolve(new Blob(["result"])) })
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
           : upload,
       ),
     );
@@ -115,5 +115,29 @@ describe("ReviewPanel claim tracking", () => {
     const { entries } = useFileStore.getState();
     expect(entries[0].claimed).toBe(true);
     expect(entries[1].claimed).toBe(false);
+  });
+
+  // #1286: a failed result fetch (expired result, deleted output, missed
+  // subpath resolution) must never be uploaded as the user's file.
+  it("does not upload anything and reports an error when the result fetch fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn((input: string) =>
+      Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob(["404"])) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    // Only the download fetch happened; the upload endpoint was never called,
+    // and the entry was never claimed.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("blob:result");
+    expect(screen.queryByRole("button", { name: /saved to files/i })).toBeNull();
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+    // The failure is logged; the bare catch used to drop the cause entirely.
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 });

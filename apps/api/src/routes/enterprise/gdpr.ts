@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { requestCancel } from "../../jobs/cancel.js";
 import { getQueue } from "../../jobs/queues.js";
@@ -202,7 +201,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         const filename = outputRef?.split("/").pop() ?? "gdpr-export.zip";
         return reply.send({
           status: "completed",
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
         });
       }
 

@@ -6,6 +6,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 const PAGE_SIZES: Record<string, [number, number]> = {
@@ -220,7 +221,7 @@ export function ImageToPdfSettings() {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const result = JSON.parse(xhr.responseText);
-          setDownloadUrl(result.downloadUrl);
+          setDownloadUrl(resolveServerUrl(result.downloadUrl));
           setCompressionResult(result.compression ?? null);
           setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
         } catch {

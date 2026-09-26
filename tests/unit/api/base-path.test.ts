@@ -1,6 +1,7 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { stripBasePath } from "../../../apps/api/src/lib/base-path.js";
@@ -20,7 +21,49 @@ writeFileSync(
 );
 writeFileSync(join(root, "assets/app.js"), "console.log('loaded')");
 afterAll(() => rmSync(root, { recursive: true, force: true }));
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  config.BASE_PATH = "";
+});
+
+it("keeps the production URL rewrite wired before routing and auth", () => {
+  // index.ts boots the full service; the integration harness cannot import it.
+  // Pin its wiring so removing the production rewrite cannot leave tests green.
+  const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+  expect(source).toMatch(
+    /const app = Fastify\(\{\s*rewriteUrl: \(request\) => stripBasePath\(request\.url \?\? "\/", env\.BASE_PATH\)/,
+  );
+});
+
+it("keeps result download URLs root-relative (no baked deployment prefix)", () => {
+  // Drift guard for #1274: interpolating env.BASE_PATH into a persisted
+  // result URL bakes the deployment prefix into the jobs.result JSON, so
+  // changing BASE_PATH leaves every earlier result pointing at the old
+  // prefix. Server-emitted download/preview URLs must be root-relative and
+  // let clients resolve them against their own base. Route registrations
+  // (`"/api/v1/download/:jobId/..."`) are plain strings and stay fine.
+  const offenders: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (entry.name.endsWith(".ts")) {
+        for (const [i, line] of readFileSync(p, "utf8").split("\n").entries()) {
+          // A baked prefix is always a template literal interpolating
+          // env.BASE_PATH into a /api/v1/download/ URL.
+          if (
+            /["'`]\/api\/v1\/download\//.test(line) &&
+            line.includes("${") &&
+            line.includes("env.BASE_PATH")
+          )
+            offenders.push(`${p}:${i + 1}: ${line.trim()}`);
+        }
+      }
+    }
+  };
+  walk(fileURLToPath(new URL("../../../apps/api/src", import.meta.url)));
+  expect(offenders).toEqual([]);
+});
 
 describe("BASE_PATH configuration", () => {
   it.each([
@@ -102,9 +145,6 @@ describe.each(["", "/snapotter", "/apps/snapotter"])("deployment at '%s'", (base
         expect(response.statusCode).toBe(200);
         expect(response.headers["cache-control"]).toBe("no-cache");
         expect(response.body).toContain(`<base href="${basePath}/"`);
-        expect(new URL("./assets/app.js", `https://example.com${basePath}/`).pathname).toBe(
-          `${basePath}/assets/app.js`,
-        );
       }
       expect((await app.inject(`${basePath}/assets/app.js`)).body).toContain("loaded");
       expect((await app.inject(`${basePath}/api/v1/health?ready=1`)).json()).toEqual({ ok: true });
@@ -137,7 +177,12 @@ it("keeps API documentation redirects and server URLs under the prefix", async (
     const page = await app.inject("/snapotter/api/docs/");
     expect(page.statusCode).toBe(200);
     const spec = await app.inject("/snapotter/api/docs/openapi.json");
-    expect(spec.json().servers).toEqual([{ url: "/snapotter" }]);
+    // The prefixed server is prepended; the spec's own entries (with the
+    // "Current instance" description) are kept, not dropped.
+    expect(spec.json().servers).toEqual([
+      { url: "/snapotter" },
+      { url: "/", description: "Current instance" },
+    ]);
     const localized = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
     expect(localized.body).toContain("url: /snapotter");
   } finally {
@@ -145,11 +190,23 @@ it("keeps API documentation redirects and server URLs under the prefix", async (
   }
 });
 
-describe("index.html <base> rewrite", () => {
-  afterEach(() => {
-    config.BASE_PATH = "";
+it("caches the localized spec body so repeated ?lang= requests do not re-transform", async () => {
+  config.BASE_PATH = "/snapotter";
+  const app = Fastify({
+    rewriteUrl: (request) => stripBasePath(request.url ?? "/", config.BASE_PATH),
   });
+  await docsRoutes(app);
+  try {
+    const first = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
+    const second = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
+    expect(first.body).toBe(second.body);
+    expect(first.body).toContain("url: /snapotter");
+  } finally {
+    await app.close();
+  }
+});
 
+describe("index.html <base> rewrite", () => {
   it("matches the tag shipped in the web app source", () => {
     const source = readFileSync(new URL("../../../apps/web/index.html", import.meta.url), "utf8");
     expect(source.split('<base href="/"').length - 1).toBe(1);

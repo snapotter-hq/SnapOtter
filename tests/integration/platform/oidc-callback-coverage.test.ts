@@ -208,7 +208,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     const cookieValue = signState(state);
     return oidcApp.app.inject({
       method: "GET",
-      url: `/api/auth/oidc/callback?code=code-abc&state=${state}`,
+      url: `${env.BASE_PATH}/api/auth/oidc/callback?code=code-abc&state=${state}`,
       cookies: { "oidc-state": cookieValue },
     });
   }
@@ -283,6 +283,41 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
   }, 10_000);
+
+  describe.each(["", "/snapotter"])("deployment at '%s'", (basePath) => {
+    const originalBasePath = env.BASE_PATH;
+    let externalUrl: string;
+
+    beforeAll(() => {
+      externalUrl = env.EXTERNAL_URL;
+      env.BASE_PATH = basePath;
+      env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+    });
+    afterAll(() => {
+      env.BASE_PATH = originalBasePath;
+      env.EXTERNAL_URL = externalUrl;
+    });
+
+    it("redirects into the app with a usable session cookie at the deployment path", async () => {
+      const sub = `sub-path-${Math.random().toString(36).slice(2, 10)}`;
+      const res = await callbackWithClaims({ sub, preferred_username: sub });
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe(`${basePath}/`);
+      const cookie = res.cookies.find((c) => c.name === "snapotter-session");
+      expect(cookie).toMatchObject({ path: `${basePath}/`, httpOnly: true });
+      expect(res.cookies.find((c) => c.name === "oidc-state")).toMatchObject({
+        path: `${basePath}/api/auth/oidc`,
+        value: "",
+        expires: new Date(0),
+      });
+      const session = await oidcApp.app.inject({
+        url: `${basePath}/api/auth/session`,
+        cookies: { "snapotter-session": cookie?.value ?? "" },
+      });
+      expect(session.statusCode).toBe(200);
+      expect(session.json().user.username).toBe(sub);
+    });
+  });
 
   it("fails with oidc_auth_failed when the token response carries no ID-token claims", async () => {
     const res = await callbackWithClaims(null);

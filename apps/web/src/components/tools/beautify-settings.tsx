@@ -9,6 +9,7 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 // -- Preset types -----------------------------------------------------------
@@ -1356,8 +1357,8 @@ export function BeautifySettings({
 
         const result = await res.json();
         setJobId(result.jobId);
-        setProcessedUrl(result.downloadUrl);
-        setManualDownloadUrl(result.downloadUrl);
+        setProcessedUrl(resolveServerUrl(result.downloadUrl));
+        setManualDownloadUrl(resolveServerUrl(result.downloadUrl));
         setSizes(result.originalSize, result.processedSize);
       } catch (err) {
         setManualError(err instanceof Error ? err.message : "Processing failed");

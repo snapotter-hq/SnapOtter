@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 export function CompareSettings() {
   const { t } = useTranslation();
@@ -40,7 +41,7 @@ export function CompareSettings() {
 
       const result = await res.json();
       setSimilarity(result.similarity);
-      setDownloadUrl(result.downloadUrl);
+      setDownloadUrl(resolveServerUrl(result.downloadUrl));
       // Show the second image in the slider (not the diff) so the user can
       // visually compare their two originals. The diff is still downloadable.
       setProcessedUrl(URL.createObjectURL(secondFile));

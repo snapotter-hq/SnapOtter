@@ -96,6 +96,9 @@ export function ReviewPanel({
     setSaveStatus("saving");
     try {
       const res = await fetch(downloadUrl);
+      // An error page fetched here would otherwise be uploaded as the user's
+      // file and shown as "Saved" (#1286).
+      if (!res.ok) throw new Error(`Result fetch failed: ${res.status}`);
       const blob = await res.blob();
       const formData = new FormData();
       // Record which tool produced this file so the library shows it under
@@ -116,7 +119,10 @@ export function ReviewPanel({
       import("@/lib/analytics").then(({ track }) => {
         track(ANALYTICS_EVENTS.RESULT_SAVED, { tool_id: currentToolId });
       });
-    } catch {
+    } catch (err) {
+      // The saved-state UI shows "error" but not the cause; log it so a bad
+      // result URL (expired result, missed subpath resolution) is diagnosable.
+      console.error("Save to Files failed", err);
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
     }

@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { resolveServerUrl } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 export function ComposeSettings() {
   const { t } = useTranslation();
@@ -46,8 +47,8 @@ export function ComposeSettings() {
 
       const result = await res.json();
       setJobId(result.jobId);
-      setProcessedUrl(result.downloadUrl);
-      setDownloadUrl(result.downloadUrl);
+      setProcessedUrl(resolveServerUrl(result.downloadUrl));
+      setDownloadUrl(resolveServerUrl(result.downloadUrl));
       setOriginalSize(result.originalSize);
       setProcessedSize(result.processedSize);
       setSizes(result.originalSize, result.processedSize);

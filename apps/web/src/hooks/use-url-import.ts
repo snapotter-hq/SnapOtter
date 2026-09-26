@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { resolveServerUrl } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -70,8 +71,8 @@ export function useUrlImport() {
         size: result.size,
         width: result.width,
         height: result.height,
-        downloadUrl: result.downloadUrl,
-        previewUrl: result.previewUrl,
+        downloadUrl: result.downloadUrl ? resolveServerUrl(result.downloadUrl) : undefined,
+        previewUrl: result.previewUrl ? resolveServerUrl(result.previewUrl) : null,
       };
     }
     return {
@@ -83,7 +84,10 @@ export function useUrlImport() {
 
   const downloadAsFile = useCallback(
     async (downloadUrl: string, filename: string, signal?: AbortSignal): Promise<File> => {
-      const res = await fetch(downloadUrl, { headers: formatHeaders(), signal });
+      const res = await fetch(resolveServerUrl(downloadUrl), {
+        headers: formatHeaders(),
+        signal,
+      });
       if (!res.ok) throw new Error(`Download failed: ${res.status}`);
       const blob = await res.blob();
       return new File([blob], filename, { type: blob.type });

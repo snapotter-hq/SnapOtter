@@ -76,6 +76,9 @@ export function NonNativePreview({
       let fileToUpload = file;
       if (!fileToUpload && src) {
         const res = await fetch(src);
+        // A failed preview-source fetch (expired result, bad URL) must not
+        // turn the error body into the "file" being previewed (#1286).
+        if (!res.ok) throw new Error(`Result fetch failed: ${res.status}`);
         const blob = await res.blob();
         fileToUpload = new File([blob], filename, { type: blob.type });
       }
@@ -106,6 +109,7 @@ export function NonNativePreview({
       setState("ready");
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
+        console.error("Preview generation failed", err);
         setState("error");
       }
     } finally {

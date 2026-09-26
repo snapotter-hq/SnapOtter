@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { resolveServerUrl } from "@/lib/utils";
 
 const BARCODE_TYPES = [
   { value: "code128", label: "Code 128" },
@@ -53,7 +54,7 @@ export function BarcodeGenerateSettings() {
 
       const data = await res.json();
       if (data.downloadUrl) {
-        setResultUrl(data.downloadUrl);
+        setResultUrl(resolveServerUrl(data.downloadUrl));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate barcode");
