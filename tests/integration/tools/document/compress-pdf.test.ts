@@ -80,8 +80,20 @@ describe.skipIf(!gsAvailable())("compress-pdf (requires gs)", () => {
       mode: "targetSize",
       targetSizeKb: targetKb,
     });
-    expect(size).toBeLessThanOrEqual(targetKb * 1024);
-    expect(size).toBeGreaterThanOrEqual(targetKb * 1024 * 0.8);
+    expect(size).toBeLessThanOrEqual(targetKb * 1000);
+    expect(size).toBeGreaterThanOrEqual(targetKb * 1000 * 0.8);
+    expect(result.targetMet).toBe(true);
+  }, 120_000);
+
+  it("target-size: counts KB as 1000 bytes, the way upload forms do (#1272)", async () => {
+    // With 1024-byte KB this scan came back at 200,166 bytes for a 200 KB
+    // target (gs 10.x): over a form that counts 200 KB as 200,000 bytes.
+    const targetKb = 200;
+    const { size, result } = await runToCompletion(SCAN, "ocr-scanned.pdf", {
+      mode: "targetSize",
+      targetSizeKb: targetKb,
+    });
+    expect(size).toBeLessThanOrEqual(targetKb * 1000);
     expect(result.targetMet).toBe(true);
   }, 120_000);
 

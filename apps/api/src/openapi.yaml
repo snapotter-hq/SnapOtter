@@ -533,7 +533,7 @@ paths:
                     JSON string with options:
                     - `mode` (string, default "quality") - One of: quality, targetSize
                     - `quality` (number 1-100, optional) - Compression quality level
-                    - `targetSizeKb` (number, optional) - Target file size in kilobytes
+                    - `targetSizeKb` (number, optional) - Target file size in KB, where 1 KB = 1000 bytes. The response then adds `targetKb`, plus `resizedTo` ({width, height}) when the image had to be scaled down to fit
       responses:
         "200":
           description: Processed image
@@ -9834,7 +9834,7 @@ paths:
                     JSON string with options:
                     - `mode` (string, default "quality") - One of: quality, targetSize
                     - `quality` (integer 1-100, optional) - Compression quality (higher = less compression). Used in quality mode
-                    - `targetSizeKb` (number, optional) - Target file size in kilobytes. Used in targetSize mode
+                    - `targetSizeKb` (number, optional) - Target file size in KB, where 1 KB = 1000 bytes. Used in targetSize mode
       responses:
         "200":
           description: Compressed PDF

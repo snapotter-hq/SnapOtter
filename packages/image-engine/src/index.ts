@@ -6,7 +6,7 @@ export { analyzeImage, applyCorrections, scaleCorrections } from "./operations/a
 export { brightness } from "./operations/brightness.js";
 export { COLOR_BLINDNESS_MATRICES, colorBlindness } from "./operations/color-blindness.js";
 export { colorChannels } from "./operations/color-channels.js";
-export { compress } from "./operations/compress.js";
+export { type CompressResult, compress, compressDetailed } from "./operations/compress.js";
 export { contrast } from "./operations/contrast.js";
 export { convert } from "./operations/convert.js";
 export { crop } from "./operations/crop.js";

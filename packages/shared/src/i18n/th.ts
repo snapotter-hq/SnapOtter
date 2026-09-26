@@ -1367,6 +1367,7 @@ export const th: TranslationKeys = {
       submit: "บีบอัด",
       submitBatch: "บีบอัด ({count} ไฟล์)",
       submitTarget: "บีบอัดเป็น {size} KB",
+      resizedToFit: "ปรับขนาดเป็น {width} × {height} เพื่อให้ไม่เกิน {size} KB",
       progressLabel: "กำลังบีบอัด",
       original: "ต้นฉบับ: {size} KB",
       processed: "ประมวลผลแล้ว: {size} KB",

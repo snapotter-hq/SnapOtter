@@ -1391,6 +1391,7 @@ export const ru: TranslationKeys = {
       submit: "Сжать",
       submitBatch: "Сжать ({count} файлов)",
       submitTarget: "Сжать до {size} KB",
+      resizedToFit: "Уменьшено до {width} × {height}, чтобы уложиться в {size} KB",
       progressLabel: "Сжатие",
       original: "Оригинал: {size} KB",
       processed: "Обработано: {size} KB",

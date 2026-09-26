@@ -2,6 +2,7 @@ import { COMPRESS_PRESET_BY_ID } from "@snapotter/shared";
 import { useParams } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
+import { CompressResizeNote } from "@/components/tools/compress-settings";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
@@ -23,6 +24,7 @@ export function CompressPresetSettings() {
     originalSize,
     processedSize,
     progress,
+    resultPayload,
   } = useToolProcessor(toolId);
 
   const hasFile = files.length > 0;
@@ -73,6 +75,7 @@ export function CompressPresetSettings() {
                 originalSize > 0 ? ((1 - processedSize / originalSize) * 100).toFixed(1) : "0",
             })}
           </p>
+          <CompressResizeNote resultPayload={resultPayload} />
         </div>
       )}
 

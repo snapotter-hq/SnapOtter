@@ -1329,6 +1329,7 @@ export const ko: TranslationKeys = {
       submit: "압축",
       submitBatch: "압축 ({count}개 파일)",
       submitTarget: "{size}KB로 압축",
+      resizedToFit: "{size}KB에 맞추기 위해 {width} × {height}(으)로 축소했습니다",
       progressLabel: "압축 중",
       original: "원본: {size} KB",
       processed: "처리 후: {size} KB",

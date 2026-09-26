@@ -6,6 +6,8 @@ description: Reduce image file size by quality level or to a target file size.
 
 Reduce image file size by specifying a quality level or a target file size in kilobytes. The tool uses iterative binary search to hit size targets accurately.
 
+Target sizes count 1 KB as 1000 bytes, the way upload forms do, so a 20 KB target never returns more than 20,000 bytes. The tool lowers quality first. If that isn't enough, it scales the image down step by step, and the response then includes `resizedTo` with the final width and height. If even the smallest step can't reach the target, the request fails with a message saying so.
+
 ## API Endpoint {#api-endpoint}
 
 `POST /api/v1/tools/image/compress`
@@ -18,7 +20,7 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 |-----------|------|----------|---------|-------------|
 | mode | string | No | `"quality"` | Compression mode: `quality` or `targetSize` |
 | quality | number | No | `80` | Quality level (1-100). Used when mode is `quality`. |
-| targetSizeKb | number | No | - | Target file size in kilobytes. Used when mode is `targetSize`. |
+| targetSizeKb | number | No | - | Target file size in KB (1 KB = 1000 bytes). Used when mode is `targetSize`. |
 
 ## Example Request {#example-request}
 

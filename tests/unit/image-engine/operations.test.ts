@@ -777,7 +777,7 @@ describe("compress", () => {
         targetSizeBytes: 1,
         format: "jpg",
       }),
-    ).rejects.toThrow("Unable to compress image to 1 bytes within safe resize limits");
+    ).rejects.toThrow("Couldn't get this image under 0.001 KB, even after scaling it down.");
   });
 });
 

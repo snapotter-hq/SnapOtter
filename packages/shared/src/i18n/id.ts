@@ -1386,6 +1386,7 @@ export const id: TranslationKeys = {
       submit: "Kompres",
       submitBatch: "Kompres ({count} file)",
       submitTarget: "Kompres ke {size} KB",
+      resizedToFit: "Diubah ukurannya menjadi {width} × {height} agar muat dalam {size} KB",
       progressLabel: "Mengompresi",
       original: "Asli: {size} KB",
       processed: "Diproses: {size} KB",

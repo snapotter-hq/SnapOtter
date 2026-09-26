@@ -1389,6 +1389,7 @@ export const pl: TranslationKeys = {
       submit: "Kompresuj",
       submitBatch: "Kompresuj ({count} plików)",
       submitTarget: "Kompresuj do {size} KB",
+      resizedToFit: "Zmniejszono do {width} × {height}, aby zmieścić się w {size} KB",
       progressLabel: "Kompresja",
       original: "Oryginał: {size} KB",
       processed: "Przetworzono: {size} KB",

@@ -1,4 +1,4 @@
-import { ToolInputError } from "@snapotter/shared";
+import { formatTargetKb, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import type { CompressOptions, Sharp, SharpFormat } from "../types.js";
 
@@ -20,7 +20,20 @@ function formatOpts(format: SharpFormat, quality: number): Record<string, unknow
   return opts;
 }
 
+export interface CompressResult {
+  image: Sharp;
+  /** Set only when a target size forced the image below its original dimensions. */
+  resizedTo?: { width: number; height: number };
+}
+
 export async function compress(image: Sharp, options: CompressOptions): Promise<Sharp> {
+  return (await compressDetailed(image, options)).image;
+}
+
+export async function compressDetailed(
+  image: Sharp,
+  options: CompressOptions,
+): Promise<CompressResult> {
   const { quality, targetSizeBytes, format, animated = false } = options;
 
   const explicitFormat = FORMAT_MAP[format ?? ""];
@@ -56,7 +69,7 @@ export async function compress(image: Sharp, options: CompressOptions): Promise<
   }
 
   const q = quality ?? 80;
-  return image.toFormat(outputFormat, formatOpts(outputFormat, q));
+  return { image: image.toFormat(outputFormat, formatOpts(outputFormat, q)) };
 }
 
 interface CompressionCandidate {
@@ -104,13 +117,15 @@ async function compressToTargetSize(
   format: SharpFormat,
   targetBytes: number,
   animated: boolean,
-): Promise<Sharp> {
+): Promise<CompressResult> {
   const fullSizeCandidate = await findBestQuality(inputBuffer, null, format, targetBytes, animated);
   if (fullSizeCandidate !== null) {
-    return openSource(inputBuffer, animated).toFormat(
-      format,
-      formatOpts(format, fullSizeCandidate.quality),
-    );
+    return {
+      image: openSource(inputBuffer, animated).toFormat(
+        format,
+        formatOpts(format, fullSizeCandidate.quality),
+      ),
+    };
   }
 
   const metadata = await sharp(inputBuffer).metadata();
@@ -135,13 +150,16 @@ async function compressToTargetSize(
     const dims = { width: newWidth, height: newHeight };
     const candidate = await findBestQuality(inputBuffer, dims, format, targetBytes, animated);
     if (candidate !== null) {
-      return openSource(inputBuffer, animated)
-        .resize(newWidth, newHeight)
-        .toFormat(format, formatOpts(format, candidate.quality));
+      return {
+        image: openSource(inputBuffer, animated)
+          .resize(newWidth, newHeight)
+          .toFormat(format, formatOpts(format, candidate.quality)),
+        resizedTo: dims,
+      };
     }
   }
 
   throw new ToolInputError(
-    `Unable to compress image to ${targetBytes} bytes within safe resize limits`,
+    `Couldn't get this image under ${formatTargetKb(targetBytes)}, even after scaling it down. Try a larger target, or crop the image first.`,
   );
 }

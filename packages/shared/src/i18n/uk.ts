@@ -1390,6 +1390,7 @@ export const uk: TranslationKeys = {
       submit: "Стиснути",
       submitBatch: "Стиснути ({count} файлів)",
       submitTarget: "Стиснути до {size} KB",
+      resizedToFit: "Зменшено до {width} × {height}, щоб вміститися в {size} KB",
       progressLabel: "Стиснення",
       original: "Оригінал: {size} KB",
       processed: "Оброблено: {size} KB",

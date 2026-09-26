@@ -1387,6 +1387,7 @@ export const sv: TranslationKeys = {
       submit: "Komprimera",
       submitBatch: "Komprimera ({count} filer)",
       submitTarget: "Komprimera till {size} KB",
+      resizedToFit: "Förminskad till {width} × {height} för att rymmas inom {size} KB",
       progressLabel: "Komprimerar",
       original: "Original: {size} KB",
       processed: "Bearbetat: {size} KB",

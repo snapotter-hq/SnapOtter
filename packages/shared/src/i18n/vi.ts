@@ -1387,6 +1387,7 @@ export const vi: TranslationKeys = {
       submit: "Nén",
       submitBatch: "Nén ({count} tệp)",
       submitTarget: "Nén xuống {size} KB",
+      resizedToFit: "Đã thu nhỏ xuống {width} × {height} để vừa {size} KB",
       progressLabel: "Đang nén",
       original: "Gốc: {size} KB",
       processed: "Đã xử lý: {size} KB",

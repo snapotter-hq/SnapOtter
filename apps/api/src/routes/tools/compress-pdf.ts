@@ -1,6 +1,7 @@
 import { copyFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { gsCompressPdfTuned } from "@snapotter/doc-engine";
+import { kbToBytes } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createToolRoute } from "../tool-factory.js";
@@ -50,7 +51,7 @@ export function registerCompressPdf(app: FastifyInstance) {
       let resultPayload: Record<string, unknown> | undefined;
 
       if (settings.mode === "targetSize" && settings.targetSizeKb) {
-        const targetBytes = settings.targetSizeKb * 1024;
+        const targetBytes = kbToBytes(settings.targetSizeKb);
         // Binary-search the quality axis for the largest output that still fits.
         // Memoize by q so repeated probes never re-run ghostscript.
         const cache = new Map<number, { path: string; size: number }>();

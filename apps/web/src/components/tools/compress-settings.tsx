@@ -63,8 +63,9 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
         ? { mode, quality }
         : {
             mode,
+            // Decimal units, like the server (#1272): 1 MB = 1000 KB = 1,000,000 bytes.
             targetSizeKb:
-              sizeUnit === "MB" ? Number(targetSizeValue) * 1024 : Number(targetSizeValue),
+              sizeUnit === "MB" ? Number(targetSizeValue) * 1000 : Number(targetSizeValue),
           };
 
     if (initialSettings && canonicalSettings(next) === canonicalSettings(initialSettings)) {
@@ -169,6 +170,30 @@ export function CompressControls({ settings: initialSettings, onChange }: Compre
   );
 }
 
+/**
+ * Tells the user when a target size could only be met by shrinking the image
+ * (#1272). The server sets resizedTo only on that path.
+ */
+export function CompressResizeNote({
+  resultPayload,
+}: {
+  resultPayload: Record<string, unknown> | null | undefined;
+}) {
+  const { t } = useTranslation();
+  const resizedTo = resultPayload?.resizedTo as { width: number; height: number } | undefined;
+  const targetKb = resultPayload?.targetKb as number | undefined;
+  if (!resizedTo || targetKb == null) return null;
+  return (
+    <p className="text-xs text-foreground" data-testid="compress-resized-note">
+      {format(t.toolSettings.compress.resizedToFit, {
+        width: resizedTo.width,
+        height: resizedTo.height,
+        size: targetKb,
+      })}
+    </p>
+  );
+}
+
 export function CompressSettings() {
   const { t } = useTranslation();
   const { files } = useFileStore();
@@ -181,6 +206,7 @@ export function CompressSettings() {
     originalSize,
     processedSize,
     progress,
+    resultPayload,
   } = useToolProcessor("compress");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
@@ -224,6 +250,7 @@ export function CompressSettings() {
                 originalSize > 0 ? ((1 - processedSize / originalSize) * 100).toFixed(1) : "0",
             })}
           </p>
+          <CompressResizeNote resultPayload={resultPayload} />
         </div>
       )}
 
