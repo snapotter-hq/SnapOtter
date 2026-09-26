@@ -974,9 +974,13 @@ describe("batch children and finalize", () => {
     expect(boomResult.resultPayload).toEqual({ failed: true, error: "boom" });
 
     // Child outcomes alone stay nonterminal since #750; only the finalize
-    // publishes the terminal frame, once the durable ZIP exists.
-    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:done`)).toBe("1");
-    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:failed`)).toBe("1");
+    // publishes the terminal frame, once the durable ZIP exists. The ok
+    // child's counter lands after its row settles, so poll it (#1107).
+    const done = await batchOutcome(parentId, "done");
+    expect(done.count).toBe("1");
+    const failed = await batchOutcome(parentId, "failed");
+    expect(failed.count).toBe("1");
+    expect(failed.errors).toEqual([{ filename: "b.png", error: "boom" }]);
     expect(await sharedRedis().get(`${bullPrefix()}:terminal:${parentId}`)).toBeNull();
 
     // The parent row already exists (the nonterminal persist created it), so
