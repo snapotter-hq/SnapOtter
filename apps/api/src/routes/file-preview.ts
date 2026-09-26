@@ -17,6 +17,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath } from "../lib/file-storage.js";
 import { hasEffectivePermission, requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
@@ -56,12 +57,15 @@ function previewPath(fileId: string, ext: string): string {
 }
 
 /**
- * A SafeError's message is written for the client, such as the one naming an
- * encoder this ffmpeg build lacks (#1270). Anything else is raw ffmpeg output
- * and stays behind the generic message.
+ * Only the missing-encoder error is written for the client (#1270); it names
+ * what the admin has to install. Other SafeErrors can carry raw tool stderr
+ * (the AI bridge builds them from it), and ffmpeg's own failures always do,
+ * so everything else stays behind the generic message.
  */
 function previewErrorMessage(err: unknown): string {
-  return isSafeMessageError(err) ? err.message : "Could not generate preview";
+  return isSafeMessageError(err) && err.code === "ENCODER_MISSING"
+    ? friendlyError(err.message)
+    : "Could not generate preview";
 }
 
 async function fileExists(path: string): Promise<boolean> {

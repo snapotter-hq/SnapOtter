@@ -15,10 +15,11 @@ export type EncoderTarget =
   | "webp";
 
 /**
- * Every encoder that comes from an external library, so a custom ffmpeg can
- * be built without it. Tools go through resolveEncoder (or softwareEncoder)
- * rather than naming these, which is what lets a missing one fail with a
- * clear message instead of "Unknown encoder" (#1270).
+ * The software encoder for each target. All but aac come from external
+ * libraries, so a custom ffmpeg can be built without them. Tools go through
+ * resolveEncoder (or softwareEncoder) rather than naming these, which is what
+ * lets a missing one fail with a clear message instead of "Unknown encoder"
+ * (#1270).
  */
 const SOFTWARE: Record<EncoderTarget, string> = {
   h264: "libx264",

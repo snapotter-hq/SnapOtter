@@ -29,10 +29,23 @@ import {
  */
 const HIDDEN = ["libmp3lame", "libvorbis", "libtheora", "libwebp_anim"];
 
-const realFfmpeg = spawnSync("which", ["ffmpeg"], { encoding: "utf8" }).stdout.trim();
-const wrapperDir = mkdtempSync(join(tmpdir(), "snapotter-lean-ffmpeg-"));
+/** A binary on PATH, or "" when absent (including when `which` itself is missing). */
+function onPath(name: string): string {
+  return (spawnSync("which", [name], { encoding: "utf8" }).stdout ?? "").trim();
+}
 
-if (realFfmpeg) {
+// Resolved by hand rather than with ffmpegAvailable(): that caches the real
+// binary in media-engine before FFMPEG_PATH points at the wrapper, and the
+// wrapper would then be silently ignored. ffprobe is needed for input
+// validation, so without it every tool fails for an unrelated reason.
+const realFfmpeg = process.env.FFMPEG_PATH || onPath("ffmpeg");
+const canRun = Boolean(realFfmpeg && (process.env.FFPROBE_PATH || onPath("ffprobe")));
+const originalFfmpegPath = process.env.FFMPEG_PATH;
+// Only created when the file will run: vitest never calls afterAll for a
+// skipped file, so an unconditional mkdtemp would leak a dir on every CI run.
+const wrapperDir = canRun ? mkdtempSync(join(tmpdir(), "snapotter-lean-ffmpeg-")) : "";
+
+if (canRun) {
   const wrapper = join(wrapperDir, "ffmpeg");
   writeFileSync(
     wrapper,
@@ -60,7 +73,9 @@ if (realFfmpeg) {
   );
   chmodSync(wrapper, 0o755);
   // media-engine caches the binary and the encoder list per process, so this
-  // has to be in place before anything in the app resolves ffmpeg.
+  // has to be in place before anything in the app resolves ffmpeg. It relies
+  // on vitest's per-file isolation (forks, the default): with isolation off,
+  // the cached wrapper path would outlive this file.
   process.env.FFMPEG_PATH = wrapper;
 }
 
@@ -73,14 +88,16 @@ let testApp: TestApp;
 let adminToken: string;
 
 beforeAll(async () => {
-  if (!realFfmpeg) return;
+  if (!canRun) return;
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
 }, 30_000);
 
 afterAll(async () => {
   await testApp?.cleanup();
-  rmSync(wrapperDir, { recursive: true, force: true });
+  if (originalFfmpegPath === undefined) delete process.env.FFMPEG_PATH;
+  else process.env.FFMPEG_PATH = originalFfmpegPath;
+  if (wrapperDir) rmSync(wrapperDir, { recursive: true, force: true });
 }, 10_000);
 
 interface Upload {
@@ -133,7 +150,7 @@ function namesEncoder(message: string, encoder: string): void {
   expect(message).toContain(`has no ${encoder} encoder`);
 }
 
-describe.skipIf(!realFfmpeg)("tools on an ffmpeg without external encoders (#1270)", () => {
+describe.skipIf(!canRun)("tools on an ffmpeg without external encoders (#1270)", () => {
   it.each([
     ["convert-audio to mp3", "audio/convert-audio", { format: "mp3" }, [wav()], "libmp3lame"],
     ["convert-audio to ogg", "audio/convert-audio", { format: "ogg" }, [wav()], "libvorbis"],
