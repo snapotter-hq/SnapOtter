@@ -40,8 +40,9 @@ const SUBJECT_TOP = 40;
 const SUBJECT_BOTTOM = 100;
 const CLEARED = Buffer.from([0, 0, 0, 0]);
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "../../fixtures/image/edge");
-// Holes in the sample-photo haze crop: 72 when faintness is read off the
-// blurred alpha, 769 when it was read off each pixel's own (#1278).
+// Holes in the sample-photo haze crop: 72 at defringe 30 and 15 at 100 when
+// faintness is read off the blurred alpha, 769 at both when it was read off
+// each pixel's own (#1278).
 const HOLE_BUDGET = 200;
 
 type AlphaAt = (x: number, y: number) => number;
@@ -326,40 +327,43 @@ describe("transparency-fixer defringe", () => {
   // tests/fixtures/image/valid/sample-photo.jpg: sea haze the model scored
   // around a quarter opacity. Cleared pixels with most of their neighbours
   // kept are holes punched into a region that otherwise survives.
-  it("does not shred a real soft matte into speckle", async () => {
-    const matte = readFileSync(join(FIXTURES, "sample-photo-haze-matte.png"));
-    const { data: input, info } = await sharp(matte)
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    aiMocks.removeBackground.mockResolvedValue(matte);
-    const result = await runAiToolJob(job({}), matte, ctx);
-    const output = await sharp(result.buffer).ensureAlpha().raw().toBuffer();
+  it.each([30, 100])(
+    "does not shred a real soft matte into speckle at defringe %i",
+    async (defringe) => {
+      const matte = readFileSync(join(FIXTURES, "sample-photo-haze-matte.png"));
+      const { data: input, info } = await sharp(matte)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      aiMocks.removeBackground.mockResolvedValue(matte);
+      const result = await runAiToolJob(job({ defringe }), matte, ctx);
+      const output = await sharp(result.buffer).ensureAlpha().raw().toBuffer();
 
-    const { width, height } = info;
-    const visible = (i: number) => input[i * 4 + 3] > 0;
-    const cleared = (i: number) => visible(i) && output[i * 4 + 3] === 0;
-    let holes = 0;
-    let keptPixels = 0;
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        const i = y * width + x;
-        if (visible(i) && !cleared(i)) keptPixels++;
-        if (!cleared(i)) continue;
-        let keptNeighbours = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const j = i + dy * width + dx;
-            if (j !== i && visible(j) && !cleared(j)) keptNeighbours++;
+      const { width, height } = info;
+      const visible = (i: number) => input[i * 4 + 3] > 0;
+      const cleared = (i: number) => visible(i) && output[i * 4 + 3] === 0;
+      let holes = 0;
+      let keptPixels = 0;
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const i = y * width + x;
+          if (visible(i) && !cleared(i)) keptPixels++;
+          if (!cleared(i)) continue;
+          let keptNeighbours = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const j = i + dy * width + dx;
+              if (j !== i && visible(j) && !cleared(j)) keptNeighbours++;
+            }
           }
+          if (keptNeighbours >= 5) holes++;
         }
-        if (keptNeighbours >= 5) holes++;
       }
-    }
-    // Something survives, or "no holes" would be trivially true.
-    expect(keptPixels).toBeGreaterThan(1000);
-    expect(holes).toBeLessThan(HOLE_BUDGET);
-  });
+      // Something survives, or "no holes" would be trivially true.
+      expect(keptPixels).toBeGreaterThan(1000);
+      expect(holes).toBeLessThan(HOLE_BUDGET);
+    },
+  );
 
   it("changes nothing at zero", async () => {
     const { input, output } = await runDefringe({ defringe: 0 });

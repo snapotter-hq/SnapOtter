@@ -99,7 +99,7 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   // libvips cuts sharp's Gaussian where it drops under minAmplitude 0.2, so
   // each blurred value comes from exactly this many pixels either side (none
   // at sigma 0.3, where the blur changes nothing and only faint pixels go).
-  // A faint halo wider than this reach keeps a band this wide against the
+  // A faint halo wider than this reach keeps a band up to this wide against the
   // body: the body lifts those pixels' blurred alpha over FAINT_ALPHA, and
   // the background is out of reach. Real BiRefNet edges are narrower.
   const blurFootprint = Math.floor(blurRadius * Math.sqrt(2 * Math.log(5)));
