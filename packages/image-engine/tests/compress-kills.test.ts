@@ -211,7 +211,7 @@ describe("compress downscale pass (L110, L117)", () => {
     const asymmetric = await seededPhoto(20, 40, 55555, 3, 2, 120);
     await expect(
       compress(sharp(asymmetric), { targetSizeBytes: 1, format: "jpg" }),
-    ).rejects.toThrow("Unable to compress image to 1 bytes within safe resize limits");
+    ).rejects.toThrow("Couldn't get this image under 0.001 KB, even after scaling it down.");
   });
 
   // Transposed source (40x20): the passes are 30x15, 23x11, then 17x8 which trips
@@ -224,7 +224,7 @@ describe("compress downscale pass (L110, L117)", () => {
     const asymmetric = await seededPhoto(40, 20, 55555, 3, 2, 120);
     await expect(
       compress(sharp(asymmetric), { targetSizeBytes: 1, format: "jpg" }),
-    ).rejects.toThrow("Unable to compress image to 1 bytes within safe resize limits");
+    ).rejects.toThrow("Couldn't get this image under 0.001 KB, even after scaling it down.");
   });
 
   // A 13x13 source scales to exactly 10x10 on the first pass. With `< 10`
@@ -234,7 +234,7 @@ describe("compress downscale pass (L110, L117)", () => {
   it("does not claim success when the 10px floor still exceeds the target", async () => {
     const tiny = await seededPhoto(13, 13, 987654321, 3, 2, 120);
     await expect(compress(sharp(tiny), { targetSizeBytes: 1, format: "jpg" })).rejects.toThrow(
-      "Unable to compress image to 1 bytes within safe resize limits",
+      "Couldn't get this image under 0.001 KB, even after scaling it down.",
     );
   });
 });

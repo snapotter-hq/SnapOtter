@@ -283,3 +283,67 @@ describe("Error handling", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// ── Target size semantics and reporting (#1272) ───────────────────
+
+/** Random noise barely compresses, so a small target forces the downscale path. */
+async function noisyPng(width: number, height: number): Promise<Buffer> {
+  const raw = Buffer.alloc(width * height * 3);
+  let seed = 7654321;
+  for (let i = 0; i < raw.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    raw[i] = seed & 0xff;
+  }
+  return await sharp(raw, { raw: { width, height, channels: 3 } })
+    .png()
+    .toBuffer();
+}
+
+describe("target size semantics and reporting (#1272)", () => {
+  it("treats KB as 1000 bytes, the way upload forms count it", async () => {
+    // With 1024-byte KB this portrait came back at 10,179 bytes for a 10 KB
+    // target: over a form that counts 10 KB as 10,000 bytes.
+    const photo = readFixture(fixtures.image.portrait.jpg);
+    const res = await postTool({ mode: "targetSize", targetSizeKb: 10 }, photo);
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.processedSize).toBeLessThanOrEqual(10_000);
+  });
+
+  it("says so when it had to shrink the image to fit", async () => {
+    const noise = await noisyPng(1200, 900);
+    const res = await postTool(
+      { mode: "targetSize", targetSizeKb: 5 },
+      noise,
+      "noise.png",
+      "image/png",
+    );
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.targetKb).toBe(5);
+    expect(result.resizedTo).toEqual({ width: expect.any(Number), height: expect.any(Number) });
+    expect(result.resizedTo.width).toBeLessThan(1200);
+    expect(result.resizedTo.height).toBeLessThan(900);
+    expect(result.processedSize).toBeLessThanOrEqual(5_000);
+  });
+
+  it("reports no resize when quality alone reached the target", async () => {
+    const res = await postTool({ mode: "targetSize", targetSizeKb: 50 });
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.targetKb).toBe(50);
+    expect(result.resizedTo).toBeUndefined();
+  });
+
+  it("explains an unreachable target in KB with a next step", async () => {
+    const noiseJpg = await sharp(await noisyPng(200, 200))
+      .jpeg()
+      .toBuffer();
+    const res = await postTool({ mode: "targetSize", targetSizeKb: 0.2 }, noiseJpg);
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.details).toBe(
+      "Couldn't get this image under 0.2 KB, even after scaling it down. Try a larger target, or crop the image first.",
+    );
+  });
+});

@@ -50,6 +50,9 @@ const SHIPPED_QSV_ONLY = `Encoders:
  A....D aac                  AAC (Advanced Audio Coding)
  A....D libopus              libopus Opus (codec opus)
  A....D libmp3lame           libmp3lame MP3 (MPEG audio layer 3) (codec mp3)
+ A....D libvorbis            libvorbis (codec vorbis)
+ V....D libtheora            libtheora Theora (codec theora)
+ V....D libwebp_anim         libwebp WebP image (codec webp)
 `;
 
 /** Same shape, but from a build that really was compiled with NVENC. */
@@ -149,7 +152,18 @@ describe("resolveEncoder falls back when the binary lacks the encoder (#1054)", 
  * ffmpeg will reject.
  */
 describe.runIf(ffmpegAvailable())("resolveEncoder against the real ffmpeg binary", () => {
-  const TARGETS: EncoderTarget[] = ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"];
+  const TARGETS: EncoderTarget[] = [
+    "h264",
+    "hevc",
+    "av1",
+    "vp9",
+    "aac",
+    "opus",
+    "mp3",
+    "vorbis",
+    "theora",
+    "webp",
+  ];
   // One spawn for the whole block: this used to shell out once per target.
   const installed = parseEncoderNames(realEncoderOutput());
 

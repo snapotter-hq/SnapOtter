@@ -2,8 +2,25 @@ import { spawnSync } from "node:child_process";
 import { SafeError } from "@snapotter/shared";
 import { resolveFfmpeg } from "./binaries.js";
 
-export type EncoderTarget = "h264" | "hevc" | "av1" | "vp9" | "aac" | "opus" | "mp3";
+export type EncoderTarget =
+  | "h264"
+  | "hevc"
+  | "av1"
+  | "vp9"
+  | "aac"
+  | "opus"
+  | "mp3"
+  | "vorbis"
+  | "theora"
+  | "webp";
 
+/**
+ * The software encoder for each target. All but aac come from external
+ * libraries, so a custom ffmpeg can be built without them. Tools go through
+ * resolveEncoder (or softwareEncoder) rather than naming these, which is what
+ * lets a missing one fail with a clear message instead of "Unknown encoder"
+ * (#1270).
+ */
 const SOFTWARE: Record<EncoderTarget, string> = {
   h264: "libx264",
   hevc: "libx265",
@@ -12,6 +29,9 @@ const SOFTWARE: Record<EncoderTarget, string> = {
   aac: "aac",
   opus: "libopus",
   mp3: "libmp3lame",
+  vorbis: "libvorbis",
+  theora: "libtheora",
+  webp: "libwebp_anim",
 };
 
 const NVENC: Partial<Record<EncoderTarget, string>> = {
@@ -33,7 +53,18 @@ const FAMILIES: Record<string, Partial<Record<EncoderTarget, string>>> = {
 /** The values SNAPOTTER_HW_ACCEL accepts. Single source for docs and logs. */
 export const HW_ACCEL_FAMILIES = Object.keys(FAMILIES);
 
-const ALL_TARGETS: EncoderTarget[] = ["h264", "hevc", "av1", "vp9", "aac", "opus", "mp3"];
+const ALL_TARGETS: EncoderTarget[] = [
+  "h264",
+  "hevc",
+  "av1",
+  "vp9",
+  "aac",
+  "opus",
+  "mp3",
+  "vorbis",
+  "theora",
+  "webp",
+];
 
 /**
  * The configured family map, or undefined.
@@ -157,6 +188,15 @@ export function resolveEncoder(target: EncoderTarget): string {
   const { names } = encoderProbe();
   if (hardware && names?.has(hardware)) return hardware;
   return requireSoftware(target, names);
+}
+
+/**
+ * The software encoder for `target`, checked against the build but never
+ * swapped for hardware. For command lines whose options only the software
+ * encoder accepts, such as libx264's `-preset ultrafast`, which NVENC rejects.
+ */
+export function softwareEncoder(target: EncoderTarget): string {
+  return requireSoftware(target, encoderProbe().names);
 }
 
 /**

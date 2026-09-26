@@ -1349,6 +1349,7 @@ export const ja: TranslationKeys = {
       submit: "圧縮",
       submitBatch: "圧縮（{count}ファイル）",
       submitTarget: "{size} KBに圧縮",
+      resizedToFit: "{size} KBに収めるため{width} × {height}に縮小しました",
       progressLabel: "圧縮中",
       original: "元：{size} KB",
       processed: "処理後：{size} KB",

@@ -1337,6 +1337,7 @@ export const en = {
       submit: "Compress",
       submitBatch: "Compress ({count} files)",
       submitTarget: "Compress to {size} KB",
+      resizedToFit: "Resized to {width} × {height} to fit {size} KB",
       progressLabel: "Compressing",
       original: "Original: {size} KB",
       processed: "Processed: {size} KB",

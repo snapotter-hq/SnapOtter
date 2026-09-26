@@ -40,6 +40,44 @@ async function reportFeatureFailure(
 }
 
 /**
+ * In-flight dynamic import of `@snapotter/enterprise`, shared by every caller
+ * that arrives while it is pending (snapotter-hq/SnapOtter#1000).
+ *
+ * Under vitest's module mocker, two overlapping imports of a `vi.doMock`ed
+ * module resolve differently: one caller gets the mock and the other gets the
+ * real, unlicensed module. Concurrent SCIM requests in the integration suite
+ * hit that, one of the two was denied with a 403, and the race tests timed out.
+ * Node's own loader has no such split, so in production this only saves
+ * duplicate import calls.
+ *
+ * Only the pending promise is held. Once it settles the slot is cleared and the
+ * next call imports again, so a `vi.resetModules()` plus a fresh `vi.doMock`
+ * between tests still applies, and a failed load is not remembered.
+ */
+let pendingEnterpriseImport: Promise<typeof import("@snapotter/enterprise")> | null = null;
+
+function loadEnterpriseModule(): Promise<typeof import("@snapotter/enterprise")> {
+  if (pendingEnterpriseImport) {
+    return pendingEnterpriseImport;
+  }
+  const inflight = import("@snapotter/enterprise");
+  pendingEnterpriseImport = inflight;
+  // Both handlers are needed: `.finally()` would return a promise that
+  // rejects again with the load error, and nothing awaits it, so a failed
+  // load would also raise an unhandled rejection. Callers still see the
+  // error through `inflight` itself.
+  inflight.then(
+    () => {
+      pendingEnterpriseImport = null;
+    },
+    () => {
+      pendingEnterpriseImport = null;
+    },
+  );
+  return inflight;
+}
+
+/**
  * Whether an enterprise feature is licensed, resolved through the sanctioned
  * `@snapotter/enterprise` boundary (the same dynamic import every gate uses).
  *
@@ -61,7 +99,7 @@ export async function isEnterpriseFeatureEnabled(
 ): Promise<boolean> {
   let mod: typeof import("@snapotter/enterprise");
   try {
-    mod = await import("@snapotter/enterprise");
+    mod = await loadEnterpriseModule();
   } catch (err) {
     if (!isModuleNotFound(err)) {
       await reportFeatureFailure(

@@ -83,4 +83,58 @@ describe("isEnterpriseFeatureEnabled (#868)", () => {
     expect(logErrorMock).toHaveBeenCalled();
     expect(reportErrorMock).toHaveBeenCalled();
   });
+
+  // Regression for snapotter-hq/SnapOtter#1000. Under vitest, two overlapping
+  // `import("@snapotter/enterprise")` calls hand the mock to one caller and the
+  // real, unlicensed module to the other, so one of two concurrent SCIM
+  // requests got a 403. Both tests below fail without the shared import.
+  it("shares one enterprise resolution across concurrent callers (#1000)", async () => {
+    const { isEnterpriseFeatureEnabled } = await loadHelper((f) => f === "scim");
+    const [a, b, c] = await Promise.all([
+      isEnterpriseFeatureEnabled("scim"),
+      isEnterpriseFeatureEnabled("scim"),
+      isEnterpriseFeatureEnabled("scim"),
+    ]);
+    expect(a).toBe(true);
+    expect(b).toBe(true);
+    expect(c).toBe(true);
+  });
+
+  it("concurrent callers with a broken module all report the fault (#1000)", async () => {
+    // Without the shared import, the second overlapping caller gets the real
+    // module instead of the broken mock, so it returns false silently and the
+    // fault is reported once instead of twice. The logger mock is not counted:
+    // reportFeatureFailure imports it lazily, and the same overlap sends one
+    // of the two log calls to the real logger.
+    const { isEnterpriseFeatureEnabled, reportErrorMock } = await loadHelper("broken");
+    const [a, b] = await Promise.all([
+      isEnterpriseFeatureEnabled("scim"),
+      isEnterpriseFeatureEnabled("scim"),
+    ]);
+    expect(a).toBe(false);
+    expect(b).toBe(false);
+    expect(reportErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not keep a failed import once it settles (#1000)", async () => {
+    // The shared slot only lives while an import is in flight. If it held on
+    // to a rejected import, one transient load failure would deny the feature
+    // for the life of the process.
+    vi.resetModules();
+    vi.doMock("../../../apps/api/src/lib/logger.js", () => ({
+      logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+    }));
+    vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({ reportError: vi.fn() }));
+    let loads = 0;
+    vi.doMock("@snapotter/enterprise", () => {
+      loads++;
+      if (loads === 1) throw new Error("transient load failure");
+      return { isFeatureEnabled: (f: string) => f === "scim" };
+    });
+    const { isEnterpriseFeatureEnabled } = await import(
+      "../../../apps/api/src/lib/enterprise-feature.js"
+    );
+    expect(await isEnterpriseFeatureEnabled("scim")).toBe(false);
+    expect(await isEnterpriseFeatureEnabled("scim")).toBe(true);
+  });
 });

@@ -1392,6 +1392,7 @@ export const ptBR: TranslationKeys = {
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} arquivos)",
       submitTarget: "Comprimir para {size} KB",
+      resizedToFit: "Redimensionada para {width} × {height} para caber em {size} KB",
       progressLabel: "Comprimindo",
       original: "Original: {size} KB",
       processed: "Processado: {size} KB",

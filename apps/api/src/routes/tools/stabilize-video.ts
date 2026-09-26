@@ -26,10 +26,9 @@ function codecForContainer(ext: string): {
     };
   }
   if (lower === ".ogv" || lower === ".ogg") {
-    // Theora has no HW-accel path; use libtheora directly.
     return {
-      target: "h264", // unused, just for the type
-      encodeArgs: ["-c:v", "libtheora", "-q:v", "7"],
+      target: "theora",
+      encodeArgs: ["-c:v", resolveEncoder("theora"), "-q:v", "7"],
     };
   }
   return {
@@ -80,6 +79,17 @@ export function registerStabilizeVideo(app: FastifyInstance) {
       const trf = join(ctx.scratchDir, "media", "stab.trf");
       const nullOut = join(ctx.scratchDir, "media", "null.out");
 
+      // Resolve encoders before pass 1: an ffmpeg without one of them should
+      // fail the job now, not after a motion analysis that can run for 30
+      // minutes (#1270). webm/ogv need Opus/Vorbis audio; other containers copy.
+      const { encodeArgs } = codecForContainer(origExt);
+      const audioArgs =
+        origExt.toLowerCase() === ".webm"
+          ? ["-c:a", resolveEncoder("opus")]
+          : origExt.toLowerCase() === ".ogv" || origExt.toLowerCase() === ".ogg"
+            ? ["-c:a", resolveEncoder("vorbis")]
+            : ["-c:a", "copy"];
+
       // Pass 1: motion analysis (no progress mapping; stdout carries -progress pipe:1)
       ctx.report(5, "Analyzing");
       await runFfmpeg(
@@ -93,15 +103,6 @@ export function registerStabilizeVideo(app: FastifyInstance) {
       // Pass 2: stabilization with re-encode using a container-appropriate codec.
       ctx.report(50, "Stabilizing");
       const outPath = join(ctx.scratchDir, "media", outName);
-      const { encodeArgs } = codecForContainer(origExt);
-
-      // Audio: webm/ogv need Opus/Vorbis; for other containers just copy.
-      const audioArgs =
-        origExt.toLowerCase() === ".webm"
-          ? ["-c:a", resolveEncoder("opus")]
-          : origExt.toLowerCase() === ".ogv" || origExt.toLowerCase() === ".ogg"
-            ? ["-c:a", "libvorbis"]
-            : ["-c:a", "copy"];
 
       await runFfmpegWithProgress(
         ctx,

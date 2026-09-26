@@ -1,3 +1,4 @@
+import { resolveEncoder } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { runMediaTool } from "../../lib/media-tool.js";
@@ -29,7 +30,7 @@ export function registerVideoToWebp(app: FastifyInstance) {
           "-vf",
           `fps=${settings.fps},scale=${settings.width}:-2:flags=lanczos`,
           "-c:v",
-          "libwebp_anim",
+          resolveEncoder("webp"),
           "-quality",
           String(settings.quality),
           "-loop",

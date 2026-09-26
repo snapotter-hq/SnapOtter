@@ -1390,6 +1390,7 @@ export const tr: TranslationKeys = {
       submit: "Sıkıştır",
       submitBatch: "Sıkıştır ({count} dosya)",
       submitTarget: "{size} KB'a sıkıştır",
+      resizedToFit: "{size} KB sınırına sığması için {width} × {height} boyutuna küçültüldü",
       progressLabel: "Sıkıştırılıyor",
       original: "Orijinal: {size} KB",
       processed: "İşlenmiş: {size} KB",
