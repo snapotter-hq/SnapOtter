@@ -40,6 +40,55 @@ async function reportFeatureFailure(
 }
 
 /**
+ * In-flight dynamic import of `@snapotter/enterprise`, deduplicated across
+ * concurrent callers (snapotter-hq/SnapOtter#1000).
+ *
+ * Two concurrent `Promise.all([...])` requests that each reach the licence gate
+ * would otherwise resolve the same dynamic import twice through vitest's mock
+ * registry, and one of them could observe the un-mocked module (404 + real
+ * `isFeatureEnabled`) while the other observes the mocked one. The gate then
+ * denies the loser with 403, the SCIM "concurrent duplicate group creates"
+ * test times out, and the suite flaks 1-in-2.
+ *
+ * Caching only the in-flight promise — not the resolved module — means:
+ * - Concurrent callers in the same tick share one resolution (race fixed).
+ * - Once the promise settles, the cache is cleared, so the next call
+ *   re-imports fresh. That matters for `vi.resetModules()` between tests: a
+ *   fresh `vi.doMock("@snapotter/enterprise", ...)` must apply on the next
+ *   access, not return a stale snapshot from a previous test.
+ * - In production the single-flight is a no-op (Node resolves the import in
+ *   microseconds and the cache slot is already null before the next request),
+ *   so there is no measurable cost.
+ *
+ * Scope: module-private. Other files do not see this; the only public surface
+ * (`isEnterpriseFeatureEnabled`) is unchanged.
+ */
+let pendingEnterpriseImport: Promise<typeof import("@snapotter/enterprise")> | null = null;
+
+function loadEnterpriseModule(): Promise<typeof import("@snapotter/enterprise")> {
+  if (pendingEnterpriseImport) {
+    return pendingEnterpriseImport;
+  }
+  const inflight = import("@snapotter/enterprise");
+  pendingEnterpriseImport = inflight;
+  // Clear the slot once settled so the NEXT call re-resolves fresh.
+  // Attach on the same microtask chain as the caller's await; a finally
+  // would also run on rejection, but that would rethrow to the
+  // `pendingEnterpriseImport` reader below on the rejection path even when
+  // nobody awaits it. Using then keeps the rejected value reachable only
+  // through the caller's await.
+  inflight.then(
+    () => {
+      pendingEnterpriseImport = null;
+    },
+    () => {
+      pendingEnterpriseImport = null;
+    },
+  );
+  return inflight;
+}
+
+/**
  * Whether an enterprise feature is licensed, resolved through the sanctioned
  * `@snapotter/enterprise` boundary (the same dynamic import every gate uses).
  *
@@ -61,7 +110,7 @@ export async function isEnterpriseFeatureEnabled(
 ): Promise<boolean> {
   let mod: typeof import("@snapotter/enterprise");
   try {
-    mod = await import("@snapotter/enterprise");
+    mod = await loadEnterpriseModule();
   } catch (err) {
     if (!isModuleNotFound(err)) {
       await reportFeatureFailure(

@@ -83,4 +83,52 @@ describe("isEnterpriseFeatureEnabled (#868)", () => {
     expect(logErrorMock).toHaveBeenCalled();
     expect(reportErrorMock).toHaveBeenCalled();
   });
+
+  // Regression for snapotter-hq/SnapOtter#1000: the SCIM "concurrent duplicate
+  // group creates" integration test was flaky 1-in-2 on main because two
+  // concurrent `Promise.all` requests each ran `await import("@snapotter/enterprise")`
+  // through vitest's mock registry, and one of them got an un-mocked module
+  // and read the licence as missing. The single-flight in `loadEnterpriseModule`
+  // forces every concurrent caller to share the same import resolution, so the
+  // gate either accepts both or rejects both together.
+  it("shares one enterprise resolution across concurrent callers (#1000)", async () => {
+    const { isEnterpriseFeatureEnabled } = await loadHelper((f) => f === "scim");
+    const [a, b, c] = await Promise.all([
+      isEnterpriseFeatureEnabled("scim"),
+      isEnterpriseFeatureEnabled("scim"),
+      isEnterpriseFeatureEnabled("scim"),
+    ]);
+    expect(a).toBe(true);
+    expect(b).toBe(true);
+    expect(c).toBe(true);
+  });
+
+  it("concurrent callers with a broken module still co-resolve to false (#1000)", async () => {
+    // The single-flight must deduplicate the rejection too, otherwise one
+    // caller in a Promise.all pair sees a thrown import and another sees a
+    // cached previous success path. With the fix, all callers see the same
+    // broken module and all report the fault.
+    const { isEnterpriseFeatureEnabled, logErrorMock, reportErrorMock } =
+      await loadHelper("broken");
+    const [a, b] = await Promise.all([
+      isEnterpriseFeatureEnabled("scim"),
+      isEnterpriseFeatureEnabled("scim"),
+    ]);
+    expect(a).toBe(false);
+    expect(b).toBe(false);
+    // Both callers unwrap the same single rejection (proof they shared one
+    // import, not two), so the failure is reported twice — once per caller.
+    expect(logErrorMock).toHaveBeenCalledTimes(2);
+    expect(reportErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-imports the module on the next call after the previous settles (#1000)", async () => {
+    // The cache lives for the duration of one in-flight import only. Two
+    // sequential calls each re-resolve fresh — that is what makes
+    // vi.resetModules() between tests safe: a later test's doMock applies on
+    // its own next access, not by sharing the first test's module.
+    const { isEnterpriseFeatureEnabled } = await loadHelper((f) => f === "scim");
+    expect(await isEnterpriseFeatureEnabled("scim")).toBe(true);
+    expect(await isEnterpriseFeatureEnabled("scim")).toBe(true);
+  });
 });
