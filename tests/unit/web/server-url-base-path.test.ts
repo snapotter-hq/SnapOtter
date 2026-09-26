@@ -20,9 +20,12 @@ vi.mock("@/lib/analytics", () => ({
   getDistinctId: vi.fn(() => "test-distinct-id"),
 }));
 
+import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { useFileStore } from "@/stores/file-store";
+import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
+import type { PipelineStep } from "@/stores/pipeline-store";
 
 describe("serverUrl under /snapotter", () => {
   it("prefixes root-relative API paths", () => {
@@ -64,14 +67,29 @@ describe("serverUrl under /snapotter", () => {
     });
     expect(resolveServerUrls(resolveServerUrls(response))).toEqual(resolveServerUrls(response));
   });
+
+  it("leaves user content alone even when it looks like an API path", () => {
+    // A QR code that encodes "/api/v1/foo" must read back exactly that.
+    const barcodeRead = {
+      downloadUrl: "/api/v1/download/job/annotated.png",
+      barcodes: [{ type: "QRCode", text: "/api/v1/foo" }],
+      text: "/api/v1/ocr-line",
+    };
+    expect(resolveServerUrls(barcodeRead)).toEqual({
+      downloadUrl: "/snapotter/api/v1/download/job/annotated.png",
+      barcodes: [{ type: "QRCode", text: "/api/v1/foo" }],
+      text: "/api/v1/ocr-line",
+    });
+  });
 });
 
 interface MockXhr {
   status: number;
   responseText: string;
   timeout: number;
-  upload: Record<string, unknown>;
+  upload: { onload?: (() => void) | null };
   onload?: () => void;
+  onerror?: (() => void) | null;
   open: ReturnType<typeof vi.fn>;
   send: ReturnType<typeof vi.fn>;
   setRequestHeader: ReturnType<typeof vi.fn>;
@@ -185,5 +203,81 @@ describe("useToolProcessor under /snapotter", () => {
     expect(entry.processedUrl).toBe("/snapotter/api/v1/download/job-1/photo_resize.png");
     expect(entry.processedPreviewUrl).toBe("/snapotter/api/v1/download/job-1/preview.webp");
     unmount();
+  });
+});
+
+const STEPS = [
+  { id: "s1", toolId: "resize", settings: { width: 50 } },
+] as unknown as PipelineStep[];
+
+describe("usePipelineProcessor under /snapotter", () => {
+  it("resolves a synchronous pipeline result against the deployment path", () => {
+    const file = stageFile();
+    const { result: hook, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      hook.current.processSingle(file, STEPS);
+    });
+    expect(xhrs[0].open.mock.calls[0][1]).toMatch(/^\/snapotter\/api\/v1\/pipeline\//);
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(result);
+      xhrs[0].onload?.();
+    });
+
+    const entry = useFileStore.getState().entries[0];
+    expect(entry.processedUrl).toBe("/snapotter/api/v1/download/job-1/photo_resize.png");
+    expect(entry.processedPreviewUrl).toBe("/snapotter/api/v1/download/job-1/preview.webp");
+    unmount();
+  });
+
+  it("resolves a pipeline result recovered over SSE against the deployment path", () => {
+    const file = stageFile();
+    const { result: hook, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      hook.current.processSingle(file, STEPS);
+    });
+    // The upload finished but the response socket died: the run settles from SSE.
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    const sse = MockEventSource.instances.at(-1);
+    expect(sse?.url).toMatch(/^\/snapotter\/api\/v1\/jobs\/[^/]+\/progress$/);
+
+    act(() => {
+      sse?.onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", percent: 100, result }),
+      } as MessageEvent);
+    });
+
+    expect(useFileStore.getState().entries[0].processedUrl).toBe(
+      "/snapotter/api/v1/download/job-1/photo_resize.png",
+    );
+    unmount();
+  });
+});
+
+describe("pdf-to-image store under /snapotter", () => {
+  it("resolves nested page links and the ZIP link", async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        pages: [{ page: 1, downloadUrl: "/api/v1/download/job-2/page-1.png", size: 10 }],
+        zipUrl: "/api/v1/download/job-2/pages.zip",
+        zipSize: 20,
+      }),
+    });
+    vi.stubGlobal("fetch", fetch);
+    usePdfToImageStore.setState({
+      file: new File([new Uint8Array([1])], "doc.pdf", { type: "application/pdf" }),
+    });
+
+    await usePdfToImageStore.getState().convert();
+
+    expect(fetch.mock.calls[0][0]).toBe("/snapotter/api/v1/tools/pdf/pdf-to-image");
+    const state = usePdfToImageStore.getState();
+    expect(state.results?.[0].downloadUrl).toBe("/snapotter/api/v1/download/job-2/page-1.png");
+    expect(state.zipUrl).toBe("/snapotter/api/v1/download/job-2/pages.zip");
   });
 });

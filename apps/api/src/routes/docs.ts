@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import scalarPlugin, { type FastifyApiReferenceOptions } from "@scalar/fastify-api-reference";
@@ -257,6 +257,13 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const specContent = withBasePath(readFileSync(specPath, "utf-8"), specPath);
   const spec = yaml.load(specContent) as OpenAPISpec;
   const specDir = dirname(specPath); // apps/api/src
+  // Localized specs are read per request; check them once here so a missing
+  // servers block fails the boot instead of 500ing one locale's API reference.
+  if (env.BASE_PATH) {
+    for (const name of readdirSync(specDir).filter((n) => /^openapi\.[\w-]+\.yaml$/.test(n))) {
+      withBasePath(readFileSync(resolve(specDir, name), "utf-8"), name);
+    }
+  }
 
   const llmsTxt = generateLlmsTxt(spec);
   const llmsFullTxt = generateLlmsFullTxt(spec);

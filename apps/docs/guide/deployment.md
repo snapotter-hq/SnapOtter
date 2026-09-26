@@ -558,6 +558,11 @@ forwarding are supported too. Internal health checks can keep using
 callback URLs to include `/snapotter/api/auth/oidc/callback` or
 `/snapotter/api/auth/saml/callback` respectively.
 
+API scripts keep working unchanged: URLs in API responses, such as a tool's
+`downloadUrl`, start with `/api/` whatever `BASE_PATH` is. Append them to your
+instance's base URL (`https://example.com/snapotter` + `/api/v1/download/...`)
+rather than resolving them against the domain root.
+
 ### Nginx Proxy Manager {#nginx-proxy-manager}
 
 1. Add a new Proxy Host
