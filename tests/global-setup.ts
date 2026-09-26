@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -37,9 +38,21 @@ export async function setup(): Promise<void> {
   if (process.env.TEST_DATABASE_URL) {
     baseUrl = process.env.TEST_DATABASE_URL;
   } else {
-    container = await new PostgreSqlContainer("postgres:17-alpine").start();
+    // Data on tmpfs, not the anonymous volume the image declares: a run that
+    // dies before teardown otherwise leaves that volume behind, unlabelled, on
+    // a Docker VM other stacks share (#1277). per-fork-env.ts drops the
+    // databases of finished files as new ones start, which keeps this small.
+    // The cap turns a regression in that cleanup into a loud "no space left"
+    // inside Postgres instead of memory pressure on the rest of the VM.
+    container = await new PostgreSqlContainer("postgres:17-alpine")
+      .withTmpFs({ "/var/lib/postgresql/data": "rw,size=2g" })
+      .start();
     baseUrl = container.getConnectionUri();
+    process.env.TEST_PG_CONTAINER_ID = container.getId();
   }
+  // Scopes per-file database names to this run, so per-fork-env.ts only ever
+  // sweeps its own run's leftovers (tests/setup/fork-db.ts).
+  process.env.TEST_RUN_ID = crypto.randomBytes(4).toString("hex");
   process.env.TEST_PG_BASE_URL = baseUrl; // forks inherit this
   // Setup files load outside Vite's transform pipeline (the reason for
   // createRequire above), so per-fork-env.ts reads these from env rather than
