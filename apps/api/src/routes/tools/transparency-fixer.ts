@@ -39,8 +39,9 @@ const settingsSchema = z.object({
 const BACKGROUND_ALPHA = 8;
 
 // Under a quarter opacity a uniform band could as easily be a halo as smoke,
-// and the matte comes back upscaled from at most 2048px, so halos wider than
-// the blur's reach are common. Pixels this faint keep the old absolute rule.
+// so a neighbourhood this faint is cleared, as the old absolute rule did.
+// Checked against real BiRefNet HR mattes (#1278): 32 left haze behind, 96
+// ate half of a smoke plume that 64 keeps.
 const FAINT_ALPHA = 64;
 
 /**
@@ -80,11 +81,14 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
     );
   }
 
-  // A faint pixel is fringe when its blurred alpha is under the threshold, as
-  // before. Any other pixel is fringe only at the subject's boundary with the
-  // background, where its neighbourhood is thin compared with the subject
-  // around it (#1178). That boundary test has two conditions, both judged
-  // over the pixels the blur read:
+  // A pixel whose blurred alpha is under FAINT_ALPHA is fringe, as it always
+  // was: that is under the threshold at every setting. Faintness is judged on
+  // the blurred alpha, not the pixel's own, so matte noise straddling the
+  // cutoff can't punch holes in a soft region (#1278). Any other pixel is
+  // fringe only at the subject's boundary with the background, where its
+  // neighbourhood is thin compared with the subject around it (#1178). That
+  // boundary test has two conditions, both judged over the pixels the blur
+  // read:
   //  - background must be in reach, so an opaque region meeting a soft one
   //    (skin under a sheer sleeve, a head under hair) is never cut apart;
   //  - the threshold is a fraction of the most opaque alpha in reach, not of
@@ -95,17 +99,19 @@ async function applyDefringe(buffer: Buffer, intensity: number): Promise<Buffer>
   // libvips cuts sharp's Gaussian where it drops under minAmplitude 0.2, so
   // each blurred value comes from exactly this many pixels either side (none
   // at sigma 0.3, where the blur changes nothing and only faint pixels go).
+  // A faint halo wider than this reach keeps a band this wide against the
+  // body: the body lifts those pixels' blurred alpha over FAINT_ALPHA, and
+  // the background is out of reach. Real BiRefNet edges are narrower.
   const blurFootprint = Math.floor(blurRadius * Math.sqrt(2 * Math.log(5)));
   const peakAlpha = windowMax(alpha, info.width, info.height, blurFootprint);
   const backgroundInReach = windowMax(background, info.width, info.height, blurFootprint);
   const threshold = Math.round(128 + (intensity / 100) * 80);
   const result = Buffer.from(data);
   for (let i = 0; i < pixelCount; i++) {
-    const fringe =
-      alpha[i] < FAINT_ALPHA
-        ? blurredAlphaRaw[i] < threshold
-        : backgroundInReach[i] === 1 && blurredAlphaRaw[i] * 255 < threshold * peakAlpha[i];
-    if (alpha[i] > 0 && fringe) {
+    const faintNeighbourhood = blurredAlphaRaw[i] < FAINT_ALPHA;
+    const thinAtBoundary =
+      backgroundInReach[i] === 1 && blurredAlphaRaw[i] * 255 < threshold * peakAlpha[i];
+    if (alpha[i] > 0 && (faintNeighbourhood || thinAtBoundary)) {
       result[i * 4] = 0;
       result[i * 4 + 1] = 0;
       result[i * 4 + 2] = 0;

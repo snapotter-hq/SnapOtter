@@ -8,8 +8,10 @@
  * is for, so a uniform 55% region is subject, not fringe (#1178).
  */
 
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
@@ -37,6 +39,10 @@ const SUBJECT_RIGHT = 160;
 const SUBJECT_TOP = 40;
 const SUBJECT_BOTTOM = 100;
 const CLEARED = Buffer.from([0, 0, 0, 0]);
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "../../fixtures/image/edge");
+// Holes in the sample-photo haze crop: 72 when faintness is read off the
+// blurred alpha, 769 when it was read off each pixel's own (#1278).
+const HOLE_BUDGET = 200;
 
 type AlphaAt = (x: number, y: number) => number;
 
@@ -273,26 +279,86 @@ describe("transparency-fixer defringe", () => {
     expect(cleanCleared.some(Boolean)).toBe(true);
   });
 
-  // Under a quarter opacity a uniform band could be smoke or a halo; the
-  // matte is upscaled from at most 2048px, so halos wider than the blur's
-  // reach are common, and faint pixels keep the old rule to clear them.
+  // Under a quarter opacity a uniform band could be smoke or a halo, so a
+  // neighbourhood that faint is cleared as the old rule cleared it. Faintness
+  // is judged on the blurred alpha, so the band within the blur's reach of the
+  // body (3px at the default, 8px at 100) reads as the subject's soft edge;
+  // everything beyond it must clear exactly as before.
   it.each([
     { name: "a 12px halo", alphaAt: haloAround(12, 40) },
     {
       name: "haze over the background",
       alphaAt: (x: number, y: number) => (depthInsideSubject(x, y) >= 0 ? 255 : 12),
     },
-  ])("clears faint pixels on $name exactly as the old rule did", async ({ alphaAt }) => {
-    for (const defringe of [30, 100]) {
+  ])("clears $name beyond the blur's reach as the old rule did", async ({ alphaAt }) => {
+    for (const [defringe, reach] of [
+      [30, 3],
+      [100, 8],
+    ]) {
       const { input, output } = await runDefringe({ defringe }, alphaAt);
       const oldCleared = await oldRuleClearedMask(input, defringe);
       const newCleared = clearedMask(output);
-      for (let i = 0; i < WIDTH * HEIGHT; i++) {
-        if (input[i * 4 + 3] >= 64) continue;
-        expect(newCleared[i], `defringe ${defringe} pixel ${i}`).toBe(oldCleared[i]);
+      let checked = 0;
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          if (depthInsideSubject(x, y) >= -reach) continue;
+          const i = y * WIDTH + x;
+          expect(newCleared[i], `defringe ${defringe} pixel (${x}, ${y})`).toBe(oldCleared[i]);
+          if (input[i * 4 + 3] > 0) checked++;
+        }
       }
-      expect(oldCleared.some((cleared, i) => cleared && input[i * 4 + 3] > 0)).toBe(true);
+      expect(checked).toBeGreaterThan(0);
     }
+  });
+
+  // Matte noise straddling the faint cutoff must not punch holes in a soft
+  // region: judging each pixel's own alpha cleared every one under 64 and
+  // shredded the rest (#1278).
+  it("keeps a soft region whose alpha straddles the faint cutoff in one piece", async () => {
+    const { input, output } = await runDefringe({}, (x, y) => {
+      if (depthInsideSubject(x, y) < 0) return 0;
+      return (x + y) % 2 === 0 ? 60 : 76;
+    });
+    expectOnlyEdgeRingErased(input, output, 4);
+  });
+
+  // A crop of the corrected BiRefNet HR matte of
+  // tests/fixtures/image/valid/sample-photo.jpg: sea haze the model scored
+  // around a quarter opacity. Cleared pixels with most of their neighbours
+  // kept are holes punched into a region that otherwise survives.
+  it("does not shred a real soft matte into speckle", async () => {
+    const matte = readFileSync(join(FIXTURES, "sample-photo-haze-matte.png"));
+    const { data: input, info } = await sharp(matte)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    aiMocks.removeBackground.mockResolvedValue(matte);
+    const result = await runAiToolJob(job({}), matte, ctx);
+    const output = await sharp(result.buffer).ensureAlpha().raw().toBuffer();
+
+    const { width, height } = info;
+    const visible = (i: number) => input[i * 4 + 3] > 0;
+    const cleared = (i: number) => visible(i) && output[i * 4 + 3] === 0;
+    let holes = 0;
+    let keptPixels = 0;
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const i = y * width + x;
+        if (visible(i) && !cleared(i)) keptPixels++;
+        if (!cleared(i)) continue;
+        let keptNeighbours = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const j = i + dy * width + dx;
+            if (j !== i && visible(j) && !cleared(j)) keptNeighbours++;
+          }
+        }
+        if (keptNeighbours >= 5) holes++;
+      }
+    }
+    // Something survives, or "no holes" would be trivially true.
+    expect(keptPixels).toBeGreaterThan(1000);
+    expect(holes).toBeLessThan(HOLE_BUDGET);
   });
 
   it("changes nothing at zero", async () => {
