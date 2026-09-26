@@ -127,7 +127,7 @@ afterEach(() => {
 function postCallback() {
   return testApp.app.inject({
     method: "POST",
-    url: "/api/auth/saml/callback",
+    url: `${env.BASE_PATH}/api/auth/saml/callback`,
     headers: { "content-type": "application/x-www-form-urlencoded" },
     payload: "SAMLResponse=stub",
   });
@@ -452,5 +452,48 @@ describe("SAML callback", () => {
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
     }
+  });
+});
+
+describe.each(["", "/snapotter"])("SAML deployment at '%s'", (basePath) => {
+  const originalBasePath = env.BASE_PATH;
+  let externalUrl: string;
+
+  beforeAll(() => {
+    externalUrl = env.EXTERNAL_URL;
+    env.BASE_PATH = basePath;
+    env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+  });
+  afterAll(() => {
+    env.BASE_PATH = originalBasePath;
+    env.EXTERNAL_URL = externalUrl;
+  });
+
+  it("keeps failed login and callback redirects under the deployment path", async () => {
+    samlMock.getAuthorizeUrlAsync.mockRejectedValue(new Error("IdP unavailable"));
+    samlMock.validatePostResponseAsync.mockRejectedValue(new Error("invalid signature"));
+    const login = await testApp.app.inject(`${basePath}/api/auth/saml/login`);
+    const callback = await postCallback();
+    for (const res of [login, callback]) {
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe(`${basePath}/login?error=saml_auth_failed`);
+    }
+  });
+
+  it("redirects into the app with a usable session cookie at the deployment path", async () => {
+    const email = `path-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValue("proceed");
+    const res = await postCallback();
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe(`${basePath}/`);
+    const cookie = res.cookies.find((c) => c.name === "snapotter-session");
+    expect(cookie).toMatchObject({ path: `${basePath}/`, httpOnly: true });
+    const session = await testApp.app.inject({
+      url: `${basePath}/api/auth/session`,
+      cookies: { "snapotter-session": cookie?.value ?? "" },
+    });
+    expect(session.statusCode).toBe(200);
+    expect(session.json().user.email).toBe(email);
   });
 });
