@@ -1,7 +1,7 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { friendlyError } from "../../../apps/api/src/lib/errors.js";
 import {
@@ -384,6 +384,7 @@ describe("hwAccelStatus", () => {
  */
 describe("encoder probe against a stub ffmpeg", () => {
   const dir = mkdtempSync(join(tmpdir(), "snapotter-encoder-probe-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   const TABLE = [
     "Encoders:",
