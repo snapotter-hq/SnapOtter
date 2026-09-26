@@ -3814,7 +3814,7 @@ export const de: TranslationKeys = {
   },
   urlImport: {
     title: "Von URLs importieren",
-    placeholder: "Bild-URLs einfügen, eine pro Zeile...",
+    placeholder: "Datei-URLs einfügen, eine pro Zeile...",
     importButton: "URLs importieren",
     addButton: "{count} Dateien hinzufügen",
     adding: "Wird hinzugefügt...",
@@ -5036,16 +5036,16 @@ export const de: TranslationKeys = {
   },
   dropzone: {
     unsupportedFileType: "Dieser Dateityp wird von diesem Werkzeug nicht unterstützt",
-    urlFetchFailed: "Bild konnte nicht von URL abgerufen werden",
+    urlFetchFailed: "Datei konnte nicht von URL abgerufen werden",
     ariaLabel: "Datei-Ablagezone",
-    dropPrompt: "Bilder hierher ziehen",
+    dropPrompt: "Dateien hierher ziehen",
     takePhoto: "Foto aufnehmen",
     browseOrPaste:
       "Verwenden Sie die Upload-Schaltfläche oder fügen Sie aus der Zwischenablage ein",
     uploadButton: "Hochladen",
     defaultFormats: "Bilder, Videos, Audio, PDF, Dateien und 150+ Formate",
     orSeparator: "oder",
-    urlPlaceholder: "Bild-URL einfügen...",
+    urlPlaceholder: "Datei-URL einfügen...",
     urlLoadingIndicator: "...",
     addUrlButton: "Hinzufügen",
     importMultipleUrls: "Mehrere URLs importieren...",

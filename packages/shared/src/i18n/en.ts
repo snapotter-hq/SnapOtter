@@ -3738,7 +3738,7 @@ export const en = {
   },
   urlImport: {
     title: "Import from URLs",
-    placeholder: "Paste image URLs, one per line...",
+    placeholder: "Paste file URLs, one per line...",
     importButton: "Import URLs",
     addButton: "Add {count} Files",
     adding: "Adding...",
