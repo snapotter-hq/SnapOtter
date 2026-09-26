@@ -111,8 +111,10 @@ describe.each(["", "/snapotter", "/apps/snapotter"])("deployment at '%s'", (base
     });
     expect(res.statusCode, res.body).toBe(200);
     const result = res.json();
-    expect(result.downloadUrl).toBe(`${basePath}/api/v1/download/${result.jobId}/people.json`);
-    const download = await testApp.app.inject(result.downloadUrl);
+    // Result URLs stay root-relative whatever the prefix (#1274); clients join
+    // them onto the instance base, as the web app's serverUrl() does.
+    expect(result.downloadUrl).toBe(`/api/v1/download/${result.jobId}/people.json`);
+    const download = await testApp.app.inject(`${basePath}${result.downloadUrl}`);
     expect(download.statusCode).toBe(200);
     expect(download.json()).toEqual([{ name: "Ada", age: "36" }]);
   });

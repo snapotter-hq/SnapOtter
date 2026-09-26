@@ -1,7 +1,6 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { stripBasePath } from "../../../apps/api/src/lib/base-path.js";
@@ -33,35 +32,6 @@ it("keeps the production URL rewrite wired before routing and auth", () => {
   expect(source).toMatch(
     /const app = Fastify\(\{\s*rewriteUrl: \(request\) => stripBasePath\(request\.url \?\? "\/", env\.BASE_PATH\)/,
   );
-});
-
-it("builds every API download URL through the deployment prefix", () => {
-  // Drift guard: a hardcoded "/api/v1/download/..." template ships a URL the
-  // browser cannot follow under a subpath deployment. Route registrations and
-  // auth prefix literals are fine; only string interpolation of URLs is.
-  const offenders: string[] = [];
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, entry.name);
-      if (entry.isDirectory()) walk(p);
-      else if (entry.name.endsWith(".ts")) {
-        for (const [i, line] of readFileSync(p, "utf8").split("\n").entries()) {
-          // A drifted URL is always a template literal: route registrations
-          // (`"/api/v1/download/:jobId/..."`) and the auth isPublicRoute prefix
-          // literal are plain strings, so interpolating `${...}` into a
-          // `/api/v1/download/` template without `env.BASE_PATH` is the failure.
-          if (
-            /["'`]\/api\/v1\/download\//.test(line) &&
-            line.includes("${") &&
-            !line.includes("env.BASE_PATH")
-          )
-            offenders.push(`${p}:${i + 1}: ${line.trim()}`);
-        }
-      }
-    }
-  };
-  walk(fileURLToPath(new URL("../../../apps/api/src", import.meta.url)));
-  expect(offenders).toEqual([]);
 });
 
 describe("BASE_PATH configuration", () => {
