@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -105,7 +105,7 @@ export function ocrOneFile(
     }
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = resolveServerUrls(JSON.parse(event.data));
         if (data.type === "heartbeat") {
           if (asyncMode) armStallTimer();
           return;

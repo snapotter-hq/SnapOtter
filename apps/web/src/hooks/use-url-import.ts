@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ export function useUrlImport() {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as Record<string, string>).error || `Fetch failed: ${res.status}`);
       }
-      return res.json();
+      return resolveServerUrls(await res.json());
     },
     [],
   );

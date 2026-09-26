@@ -176,11 +176,29 @@ it("keeps API documentation redirects and server URLs under the prefix", async (
     const page = await app.inject("/snapotter/api/docs/");
     expect(page.statusCode).toBe(200);
     const spec = await app.inject("/snapotter/api/docs/openapi.json");
-    expect(spec.json().servers).toEqual([{ url: "/snapotter" }]);
+    expect(spec.json().servers).toEqual([{ url: "/snapotter", description: "Current instance" }]);
+    // Only the servers url changes; the rest of the localized file is served as-is.
     const localized = await app.inject("/snapotter/api/v1/openapi.yaml?lang=fr");
-    expect(localized.body).toContain("url: /snapotter");
+    const frSource = readFileSync(
+      new URL("../../../apps/api/src/openapi.fr.yaml", import.meta.url),
+      "utf8",
+    );
+    expect(localized.body).toBe(
+      frSource.replace("\nservers:\n  - url: /\n", "\nservers:\n  - url: /snapotter\n"),
+    );
+    expect(localized.body).not.toBe(frSource);
   } finally {
     await app.close();
+    config.BASE_PATH = "";
+  }
+});
+
+it("finds the root servers entry in every OpenAPI spec", () => {
+  const dir = new URL("../../../apps/api/src/", import.meta.url);
+  const specs = readdirSync(dir).filter((name) => /^openapi(\.[\w-]+)?\.yaml$/.test(name));
+  expect(specs.length).toBeGreaterThan(1);
+  for (const name of specs) {
+    expect(readFileSync(new URL(name, dir), "utf8"), name).toContain("\nservers:\n  - url: /\n");
   }
 });
 

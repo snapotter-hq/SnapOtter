@@ -25,7 +25,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { useEditorStore } from "@/stores/editor-store";
 
 const SERVER_DECODED_EXTS = new Set(["psd", "tga", "exr", "hdr"]);
@@ -107,7 +107,7 @@ export function EditorPage() {
             body: formData,
           });
           if (!res.ok) throw new Error("Server decode failed");
-          const json = await res.json();
+          const json = resolveServerUrls(await res.json());
           if (json.downloadUrl) {
             const imgRes = await fetch(json.downloadUrl);
             const blob = await imgRes.blob();

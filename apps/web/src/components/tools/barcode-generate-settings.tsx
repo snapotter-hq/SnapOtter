@@ -2,7 +2,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 const BARCODE_TYPES = [
   { value: "code128", label: "Code 128" },
@@ -51,7 +51,7 @@ export function BarcodeGenerateSettings() {
         throw new Error(body.error || `Request failed: ${res.status}`);
       }
 
-      const data = await res.json();
+      const data = resolveServerUrls(await res.json());
       if (data.downloadUrl) {
         setResultUrl(data.downloadUrl);
       }

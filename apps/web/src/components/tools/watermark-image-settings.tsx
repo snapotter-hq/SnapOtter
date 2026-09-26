@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -48,7 +48,7 @@ export function WatermarkImageSettings() {
           throw new Error(body.error || `Processing failed: ${res.status}`);
         }
 
-        const result = await res.json();
+        const result = resolveServerUrls(await res.json());
         setJobId(result.jobId);
         setProcessedUrl(result.downloadUrl);
         setDownloadUrl(result.downloadUrl);
@@ -84,7 +84,7 @@ export function WatermarkImageSettings() {
               continue;
             }
 
-            const result = await res.json();
+            const result = resolveServerUrls(await res.json());
             store.updateEntry(i, {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,

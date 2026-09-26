@@ -203,33 +203,38 @@ describe("worker result payload behavior", () => {
     expect(objectStorageMocks.getObjectBuffer).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["", "/snapotter"])("builds download and preview links under %s", async (basePath) => {
-    const { buildLegacyResultPayload } = await loadWorker(basePath);
+  // Result URLs are persisted with the job, so they must not depend on the
+  // deployment path (#1274): the web app resolves them against its own base.
+  it.each(["", "/snapotter"])(
+    "builds root-relative links under BASE_PATH '%s'",
+    async (basePath) => {
+      const { buildLegacyResultPayload } = await loadWorker(basePath);
 
-    expect(
-      buildLegacyResultPayload(
-        {
-          outputRefs: ["outputs/job-1/report final.pdf"],
-          filename: "report final.pdf",
-          contentType: "application/pdf",
-          originalSize: 100,
-          processedSize: 80,
-          previewRef: "outputs/job-1/preview.png",
-          savedFileId: "file-2",
-          resultPayload: { pageCount: 3 },
-        },
-        "job-1",
-      ),
-    ).toEqual({
-      jobId: "job-1",
-      downloadUrl: `${basePath}/api/v1/download/job-1/report%20final.pdf`,
-      previewUrl: `${basePath}/api/v1/download/job-1/preview.png`,
-      originalSize: 100,
-      processedSize: 80,
-      savedFileId: "file-2",
-      pageCount: 3,
-    });
-  });
+      expect(
+        buildLegacyResultPayload(
+          {
+            outputRefs: ["outputs/job-1/report final.pdf"],
+            filename: "report final.pdf",
+            contentType: "application/pdf",
+            originalSize: 100,
+            processedSize: 80,
+            previewRef: "outputs/job-1/preview.png",
+            savedFileId: "file-2",
+            resultPayload: { pageCount: 3 },
+          },
+          "job-1",
+        ),
+      ).toEqual({
+        jobId: "job-1",
+        downloadUrl: "/api/v1/download/job-1/report%20final.pdf",
+        previewUrl: "/api/v1/download/job-1/preview.png",
+        originalSize: 100,
+        processedSize: 80,
+        savedFileId: "file-2",
+        pageCount: 3,
+      });
+    },
+  );
 
   it("omits optional legacy payload fields when the job result does not include them", async () => {
     const { buildLegacyResultPayload } = await loadWorker();

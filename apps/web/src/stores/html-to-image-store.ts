@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 interface HtmlToImageState {
   mode: "url" | "html";
@@ -81,7 +81,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         }),
       });
 
-      const data = await res.json();
+      const data = resolveServerUrls(await res.json());
 
       if (!res.ok) {
         set({

@@ -16,6 +16,9 @@ import { generateLocaleLlmsTxt, resolveSpecFile } from "./openapi-i18n.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Every openapi*.yaml opens with this server block (see tests/unit/api/base-path.test.ts).
+const ROOT_SERVER_ENTRY = "\nservers:\n  - url: /\n";
+
 function localizedDocsRateLimit() {
   return {
     // A route-local limit replaces the global one in @fastify/rate-limit.
@@ -49,7 +52,6 @@ interface OpenAPISpec {
   info: { title: string; version: string; description?: string };
   tags?: Array<{ name: string; description?: string }>;
   paths: Record<string, Record<string, PathOperation>>;
-  servers?: Array<{ url: string }>;
 }
 
 function isPublic(op: PathOperation): boolean {
@@ -241,11 +243,18 @@ async function loadLocaleToolStrings(
 
 export async function docsRoutes(app: FastifyInstance): Promise<void> {
   const specPath = resolve(__dirname, "../openapi.yaml");
-  const withBasePath = (content: string) =>
-    env.BASE_PATH
-      ? yaml.dump({ ...(yaml.load(content) as OpenAPISpec), servers: [{ url: env.BASE_PATH }] })
-      : content;
-  const specContent = withBasePath(readFileSync(specPath, "utf-8"));
+  // Point the spec's root server entry at the deployment path so "try it"
+  // requests stay under it. A text edit rather than a YAML round trip keeps the
+  // rest of the file (descriptions, formatting) intact and costs nothing per
+  // request for the large localized specs.
+  const withBasePath = (content: string, file: string) => {
+    if (!env.BASE_PATH) return content;
+    if (!content.includes(ROOT_SERVER_ENTRY)) {
+      throw new Error(`${file} has no "servers: - url: /" entry to point at BASE_PATH`);
+    }
+    return content.replace(ROOT_SERVER_ENTRY, `\nservers:\n  - url: ${env.BASE_PATH}\n`);
+  };
+  const specContent = withBasePath(readFileSync(specPath, "utf-8"), specPath);
   const spec = yaml.load(specContent) as OpenAPISpec;
   const specDir = dirname(specPath); // apps/api/src
 
@@ -268,10 +277,11 @@ export async function docsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (request, reply) => {
       const file = resolveSpecFile(specDir, request.query.lang);
-      // English default is the spec prepared at startup: byte-identical to the file
-      // at the root, re-serialized with a servers entry under BASE_PATH. Either way it
-      // stays ASCII-only; localized files are UTF-8 and only served with ?lang.
-      const body = file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"));
+      // English default is the spec prepared at startup, byte-identical to the file
+      // apart from the servers url under a BASE_PATH, which preserves the ASCII-only
+      // guarantee; localized files are UTF-8 and only served with ?lang.
+      const body =
+        file === specPath ? specContent : withBasePath(readFileSync(file, "utf-8"), file);
       reply.type("text/yaml; charset=utf-8").send(body);
     },
   );

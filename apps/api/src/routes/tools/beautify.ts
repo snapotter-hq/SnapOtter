@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import {
   type BackgroundOpts,
@@ -311,7 +310,7 @@ export function registerBeautify(app: FastifyInstance) {
 
       return reply.send({
         jobId,
-        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outFilename)}`,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outFilename)}`,
         originalSize,
         processedSize: outputBuf.length,
       });

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -324,7 +324,7 @@ export function useToolProcessor(toolId: string) {
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
           try {
-            const data = JSON.parse(event.data);
+            const data = resolveServerUrls(JSON.parse(event.data));
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
               return;
@@ -683,7 +683,7 @@ export function useToolProcessor(toolId: string) {
 
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const result: ProcessResult = JSON.parse(xhr.responseText);
+            const result: ProcessResult = resolveServerUrls(JSON.parse(xhr.responseText));
             setWarning(result.warning ?? null);
             setResultPayload(result as unknown as Record<string, unknown>);
             if (result.savedFileId) {
@@ -969,7 +969,7 @@ export function useToolProcessor(toolId: string) {
       // frame points at. Retried, because the reason we are on this path is
       // that the network just proved flaky.
       const downloadAndSettle = async (result: Record<string, unknown>) => {
-        const url = String(result.downloadUrl);
+        const url = serverUrl(String(result.downloadUrl));
         const fileResults = (result.fileResults ?? {}) as Record<string, string>;
         for (let attempt = 0; attempt < 3; attempt++) {
           if (activeJobIdRef.current !== clientJobId) return;

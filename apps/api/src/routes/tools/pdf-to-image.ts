@@ -252,7 +252,7 @@ async function renderPdfPages(
       filenames.push(filename);
       pages.push({
         page: pageNum,
-        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
+        downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
         size: imageBuffer.length,
       });
     }
@@ -688,7 +688,7 @@ export function registerPdfToImageRoute(
       const zipFilename = "pdf-pages.zip";
       const zipBuffer = await buildPagesZip(jobId, filenames);
       await putObject(`outputs/${jobId}/${zipFilename}`, zipBuffer);
-      const zipUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`;
+      const zipUrl = `/api/v1/download/${jobId}/${encodeURIComponent(zipFilename)}`;
 
       return reply.send({
         jobId,

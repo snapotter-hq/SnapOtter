@@ -22,7 +22,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
@@ -352,7 +352,7 @@ export function PassportPhotoSettings() {
           throw new Error(msg);
         }
 
-        const result = await response.json();
+        const result = resolveServerUrls(await response.json());
         setAnalyzeResult(result);
       } catch (err) {
         setAnalyzeError(err instanceof Error ? err.message : "Face analysis failed");
@@ -421,7 +421,7 @@ export function PassportPhotoSettings() {
         throw new Error(msg);
       }
 
-      const result: GenerateResult = await response.json();
+      const result: GenerateResult = resolveServerUrls(await response.json());
       setGenerateResult(result);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Photo generation failed");

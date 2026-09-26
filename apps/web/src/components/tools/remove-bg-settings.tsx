@@ -13,7 +13,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -928,7 +928,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         throw new Error(body?.details || body?.error || `Effects failed: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = resolveServerUrls(await response.json());
       setEffectsDownloadUrl(result.downloadUrl);
       setEffectsError(null);
 

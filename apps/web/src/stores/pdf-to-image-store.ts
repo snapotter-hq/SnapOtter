@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 export interface PageResult {
   page: number;
@@ -199,7 +199,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Failed: ${res.status}`);
       }
-      const data = await res.json();
+      const data = resolveServerUrls(await res.json());
       set({
         pageCount: data.pageCount,
         thumbnails: data.thumbnails,
@@ -241,7 +241,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Conversion failed: ${res.status}`);
       }
-      const data = await res.json();
+      const data = resolveServerUrls(await res.json());
       set({ results: data.pages, zipUrl: data.zipUrl, zipSize: data.zipSize });
     } catch (err) {
       set({

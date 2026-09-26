@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import {
   COLLAGE_TEMPLATES,
   type CollageTemplate,
@@ -127,7 +127,7 @@ export function CollageSettings() {
           if (xhr.status >= 200 && xhr.status < 300) {
             store.setProgress(100);
             try {
-              resolve(JSON.parse(xhr.responseText));
+              resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
             } catch {
               reject(new Error("Invalid response"));
             }

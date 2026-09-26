@@ -6,7 +6,6 @@ import { pdfSignPy } from "@snapotter/doc-engine";
 import type { SignPlacement } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
@@ -174,9 +173,9 @@ export function registerSignPdf(app: FastifyInstance) {
       if (result) {
         return reply.send({
           jobId,
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
           previewUrl: result.previewRef
-            ? `${env.BASE_PATH}/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+            ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
             : undefined,
           originalSize: result.originalSize,
           processedSize: result.processedSize,

@@ -5,7 +5,6 @@ import type { FastifyInstance } from "fastify";
 import PDFDocument from "pdfkit";
 import sharp from "sharp";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -309,7 +308,7 @@ export function registerImageToPdfRoute(
 
         return reply.send({
           jobId,
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${filename}`,
+          downloadUrl: `/api/v1/download/${jobId}/${filename}`,
           originalSize,
           processedSize: pdfBuffer.length,
           pages: files.length,
@@ -349,7 +348,7 @@ export function registerImageToPdfRoute(
 
       return reply.send({
         jobId,
-        downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${zipFilename}`,
+        downloadUrl: `/api/v1/download/${jobId}/${zipFilename}`,
         originalSize,
         processedSize: totalProcessedSize,
         pages: files.length,

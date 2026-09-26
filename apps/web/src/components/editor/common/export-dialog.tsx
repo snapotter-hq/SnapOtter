@@ -1,4 +1,4 @@
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 // apps/web/src/components/editor/common/export-dialog.tsx
 
 import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
@@ -201,7 +201,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             body: formData,
           });
           if (!res.ok) throw new Error("Server convert failed");
-          const json = await res.json();
+          const json = resolveServerUrls(await res.json());
           if (json.downloadUrl) {
             const a = document.createElement("a");
             a.href = json.downloadUrl;
@@ -268,7 +268,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             body: formData,
           });
           if (!res.ok) throw new Error("Server conversion failed");
-          const json = await res.json();
+          const json = resolveServerUrls(await res.json());
           if (json.downloadUrl) {
             const a = document.createElement("a");
             a.href = json.downloadUrl;

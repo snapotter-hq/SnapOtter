@@ -4,7 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -219,7 +219,7 @@ export function ImageToPdfSettings() {
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const result = JSON.parse(xhr.responseText);
+          const result = resolveServerUrls(JSON.parse(xhr.responseText));
           setDownloadUrl(result.downloadUrl);
           setCompressionResult(result.compression ?? null);
           setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));

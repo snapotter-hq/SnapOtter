@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -84,7 +84,7 @@ function scanOneFile(
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText));
+          resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
         } catch {
           reject(new Error("Invalid response"));
         }

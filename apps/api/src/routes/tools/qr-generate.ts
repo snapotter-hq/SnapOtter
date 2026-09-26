@@ -3,7 +3,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { putObject } from "../../lib/object-storage.js";
 
@@ -101,7 +100,7 @@ export function registerQrGenerate(app: FastifyInstance) {
 
         return reply.send({
           jobId,
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${filename}`,
+          downloadUrl: `/api/v1/download/${jobId}/${filename}`,
           originalSize: 0,
           processedSize: buffer.length,
         });

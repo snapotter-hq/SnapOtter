@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -82,7 +82,7 @@ export function StitchSettings() {
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
-              resolve(JSON.parse(xhr.responseText));
+              resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
             } catch {
               reject(new Error("Invalid response"));
             }

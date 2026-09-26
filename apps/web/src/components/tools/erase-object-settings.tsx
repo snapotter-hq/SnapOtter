@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, formatFileSize } from "@/lib/format";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
@@ -93,7 +93,7 @@ export function subscribeEraseObjectJobProgress(
     }
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = resolveServerUrls(JSON.parse(event.data));
         if (data.type === "heartbeat") {
           resetStall();
           return;
@@ -231,7 +231,7 @@ export function EraseObjectSettings({
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            applyResult(JSON.parse(xhr.responseText));
+            applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
             resolve();
           } catch {
             reject(new Error("Invalid response"));
@@ -387,7 +387,7 @@ export function EraseObjectSettings({
 
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          applyResult(JSON.parse(xhr.responseText));
+          applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
         } catch {
           setError("Invalid response");
         }

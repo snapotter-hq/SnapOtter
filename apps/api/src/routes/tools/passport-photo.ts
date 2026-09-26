@@ -7,7 +7,6 @@ import { FEATURE_BUNDLES, PASSPORT_SPECS, PRINT_LAYOUTS } from "@snapotter/share
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
-import { env } from "../../config.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
@@ -510,7 +509,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         const response: Record<string, unknown> = {
           jobId,
-          downloadUrl: `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
           dimensions: {
             widthMm: docSpec.width,
             heightMm: docSpec.height,
@@ -538,7 +537,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
           if (printBuffer) {
             const printFilename = `${filename.replace(/\.[^.]+$/, "")}_passport_print_${printLayout}.jpg`;
             await putObject(`outputs/${jobId}/${printFilename}`, printBuffer);
-            response.printDownloadUrl = `${env.BASE_PATH}/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;
+            response.printDownloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;
           }
         }
 

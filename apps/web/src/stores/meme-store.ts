@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -333,7 +333,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
         );
       }
 
-      const result = (await response.json()) as {
+      const result = resolveServerUrls(await response.json()) as {
         jobId: string;
         downloadUrl: string;
         originalSize: number;

@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
-import { appUrl } from "@/lib/app-url";
+import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import {
   addSignature,
@@ -80,7 +80,7 @@ export function subscribeSignPdfJobProgress(
     }
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = resolveServerUrls(JSON.parse(event.data));
         if (data.type === "heartbeat") {
           resetStall();
           return;
@@ -325,7 +325,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       progressCleanupRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          landResult(JSON.parse(xhr.responseText));
+          landResult(resolveServerUrls(JSON.parse(xhr.responseText)));
         } catch {
           setError("Invalid response");
         }
