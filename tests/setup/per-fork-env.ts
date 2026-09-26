@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import pg from "pg";
-import { dropOrphanedForkDatabases } from "./fork-db.js";
+import { dropOrphanedForkDatabases, forkDatabaseName } from "./fork-db.js";
 
 // Each test file (forks pool, isolated) gets its own Postgres database cloned
 // from the migrated template built in tests/global-setup.ts, plus its own
@@ -15,6 +15,10 @@ process.env.WORKSPACE_PATH = path.join(forkDir, "workspace");
 const baseUrl = process.env.TEST_PG_BASE_URL;
 if (!baseUrl) {
   throw new Error("TEST_PG_BASE_URL missing; tests/global-setup.ts did not run");
+}
+const runId = process.env.TEST_RUN_ID;
+if (!runId) {
+  throw new Error("TEST_RUN_ID missing; tests/global-setup.ts did not run");
 }
 
 // The least-privilege role the app serves requests as. Created cluster-wide and
@@ -71,12 +75,14 @@ const requestedSyncWait = process.env.SYNC_WAIT_MS?.trim();
 const hasExplicitSyncWait =
   Boolean(requestedSyncWait) && Number.isFinite(Number(requestedSyncWait));
 process.env.SYNC_WAIT_MS = hasExplicitSyncWait ? (requestedSyncWait as string) : "30000";
-const dbName = `snapotter_test_${suffix}`; // pid digits + uuid hex: identifier-safe
+const dbName = forkDatabaseName(runId, process.pid); // hex and digits: identifier-safe
 // Clear the databases of files that have finished (or crashed) before adding
 // this one. The app's pool is never closed at the end of a file, so dropping a
 // file's own database from its afterAll would cut live connections; waiting
 // for the process to exit avoids that (#1277).
-await dropOrphanedForkDatabases(baseUrl);
+await dropOrphanedForkDatabases(baseUrl, runId);
+// Evidence for test-harness-hygiene.test.ts that this setup really swept.
+process.env.TEST_FORK_SWEEP_RAN = "1";
 const admin = new pg.Client({ connectionString: baseUrl });
 await admin.connect();
 // Concurrent CREATE DATABASE ... TEMPLATE from parallel forks can transiently
