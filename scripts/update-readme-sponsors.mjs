@@ -18,6 +18,9 @@ const MARKER = "<!-- sponsors -->";
 const LOGIN = "snapotter-hq";
 const README_PATH = "README.md";
 
+// Organization fields need read:org, so logins come through the Actor interface
+// and only Users contribute a display name (orgs fall back to their login). If a
+// future org sponsor still trips a scope error, the run fails loudly.
 const QUERY = `query($login: String!, $after: String) {
   user(login: $login) {
     sponsorshipsAsMaintainer(first: 100, after: $after, activeOnly: false, includePrivate: true) {
@@ -26,8 +29,8 @@ const QUERY = `query($login: String!, $after: String) {
         createdAt
         privacyLevel
         sponsorEntity {
-          ... on User { login name }
-          ... on Organization { login name }
+          ... on Actor { login }
+          ... on User { name }
         }
       }
     }
