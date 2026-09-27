@@ -10,7 +10,10 @@
  * are always testable.
  */
 
+import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getObjectBuffer, putObject } from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -344,5 +347,78 @@ describe("passport-photo/generate", () => {
 
     // 422 because the workspace directory won't exist for this fake jobId
     expect(res.statusCode).toBe(422);
+  });
+});
+
+describe("passport-photo/generate maxFileSizeKb (#1288)", () => {
+  // Seeds the analyze phase's output directly (a background-removed PNG), so
+  // the crop, resize and size cap run without the face-detection model.
+  async function seedNobg(): Promise<{ jobId: string; w: number; h: number }> {
+    const w = 900;
+    const h = 1200;
+    const raw = Buffer.alloc(w * h * 4);
+    let s = 4242;
+    for (let i = 0; i < raw.length; i += 4) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      raw[i] = s & 0xff;
+      raw[i + 1] = (s >> 8) & 0xff;
+      raw[i + 2] = (s >> 16) & 0xff;
+      raw[i + 3] = 255;
+    }
+    const nobg = await sharp(raw, { raw: { width: w, height: h, channels: 4 } })
+      .png()
+      .toBuffer();
+    const jobId = randomUUID();
+    await putObject(`outputs/${jobId}/photo_nobg.png`, nobg);
+    return { jobId, w, h };
+  }
+
+  const point = (x: number, y: number) => ({ x, y });
+
+  async function generate(maxFileSizeKb: number) {
+    const { jobId, w, h } = await seedNobg();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
+      payload: {
+        jobId,
+        filename: "photo.jpg",
+        countryCode: "US",
+        maxFileSizeKb,
+        imageWidth: w,
+        imageHeight: h,
+        landmarks: {
+          leftEye: point(0.42, 0.4),
+          rightEye: point(0.58, 0.4),
+          eyeCenter: point(0.5, 0.4),
+          chin: point(0.5, 0.62),
+          forehead: point(0.5, 0.25),
+          crown: point(0.5, 0.18),
+          nose: point(0.5, 0.5),
+          faceCenterX: 0.5,
+        },
+      },
+    });
+    return { res, jobId };
+  }
+
+  it("counts the cap in 1000-byte KB, the way upload portals do", async () => {
+    // With 1024-byte KB this photo came back at 122,230 bytes for a 120 KB
+    // cap: over a portal that counts 120 KB as 120,000 bytes.
+    const { res, jobId } = await generate(120);
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const out = await getObjectBuffer(`outputs/${jobId}/photo_passport.jpg`);
+    expect(out.length).toBeLessThanOrEqual(120_000);
+  });
+
+  it("fails clearly instead of returning a photo over the cap", async () => {
+    // A 600x600 px JPEG of noise can't get under 1 KB, even at quality 1.
+    const { res } = await generate(1);
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.details).toBe(
+      "Couldn't get this photo under 1 KB at the required dimensions. Try a larger size limit.",
+    );
   });
 });

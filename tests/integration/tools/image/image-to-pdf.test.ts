@@ -402,11 +402,12 @@ describe("image-to-pdf", () => {
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.compression).toBeDefined();
-    expect(json.compression.targetRequested).toBe(5 * 1024 * 1024);
+    // Decimal units, like upload portals: 5 MB is 5,000,000 bytes (#1288).
+    expect(json.compression.targetRequested).toBe(5_000_000);
     expect(json.compression.targetMet).toBe(true);
     expect(json.compression.jpegQuality).toBeGreaterThanOrEqual(10);
     expect(json.compression.jpegQuality).toBeLessThanOrEqual(95);
-    expect(json.processedSize).toBeLessThanOrEqual(5 * 1024 * 1024);
+    expect(json.processedSize).toBeLessThanOrEqual(5_000_000);
   });
 
   it("returns targetMet=false when target is impossibly small", async () => {
@@ -569,7 +570,7 @@ describe("image-to-pdf", () => {
 
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
-    expect(json.compression.targetRequested).toBe(Math.round(1.5 * 1024 * 1024));
+    expect(json.compression.targetRequested).toBe(1_500_000);
   });
 
   it("accepts KB unit for target size", async () => {
@@ -590,7 +591,7 @@ describe("image-to-pdf", () => {
 
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
-    expect(json.compression.targetRequested).toBe(500 * 1024);
+    expect(json.compression.targetRequested).toBe(500_000);
   });
 
   // ── Large stress file ────────────────────────────────────────────
@@ -959,7 +960,7 @@ describe("image-to-pdf", () => {
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.compression).toBeDefined();
-    expect(json.compression.targetRequested).toBe(50 * 1024);
+    expect(json.compression.targetRequested).toBe(50_000);
   });
 
   // ── Rejects invalid orientation ──────────────────────────────────
