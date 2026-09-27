@@ -34,6 +34,8 @@ describe("result URL convention", () => {
         .split("\n")
         .map((line, index) => ({ line, index }))
         // Any spelling: `${env.BASE_PATH}/api/v1/`, env.BASE_PATH + "/api/v1/", ...
+        // Comment lines are skipped: prose can mention both without building a URL.
+        .filter(({ line }) => !/^\s*(\/\/|\/?\*)/.test(line))
         .filter(({ line }) => line.includes("BASE_PATH") && line.includes("/api/v1/"))
         .map(({ index }) => `${relative(root, file)}:${index + 1}`),
     );

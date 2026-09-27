@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 afterEach(() => {
@@ -52,5 +54,98 @@ describe("unprefixPathname (#1275 case A)", () => {
       // A different first segment is not the prefix; take it under verbatim.
       expect(unprefixPathname(`${basePath}-other/files`)).toBe(`${basePath}-other/files`);
     });
+
+    it("never redirects twice: every target is already prefixed", async () => {
+      document.head.innerHTML = `<base href="${basePath}/">`;
+      const { appUrl, unprefixPathname } = await import("../../../apps/web/src/lib/app-url");
+      for (const pathname of [
+        "/",
+        "/files",
+        basePath.toUpperCase(),
+        `${basePath.toUpperCase()}/x`,
+      ]) {
+        const rest = unprefixPathname(pathname);
+        expect(rest).not.toBeNull();
+        expect(unprefixPathname(appUrl(rest as string))).toBeNull();
+      }
+    });
   });
+
+  it("does nothing for a base href that is not a root-relative path", async () => {
+    document.head.innerHTML = '<base href="https://host.example/snapotter/">';
+    const { unprefixPathname } = await import("../../../apps/web/src/lib/app-url");
+    expect(unprefixPathname("/files")).toBeNull();
+  });
+});
+
+describe("redirectIfUnprefixed (#1275 case A)", () => {
+  function fakeLocation(pathname: string, search = "", hash = "") {
+    return { pathname, search, hash, replace: vi.fn() };
+  }
+  function memoryStorage() {
+    const data = new Map<string, string>();
+    return {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => void data.set(key, value),
+    };
+  }
+
+  it("replaces an unprefixed URL with the prefixed one, keeping query and hash", async () => {
+    document.head.innerHTML = '<base href="/snapotter/">';
+    const { redirectIfUnprefixed } = await import("../../../apps/web/src/lib/app-url");
+    const location = fakeLocation("/files", "?job=x", "#top");
+    expect(redirectIfUnprefixed(location, memoryStorage(), 1_000_000)).toBe(true);
+    expect(location.replace).toHaveBeenCalledExactlyOnceWith("/snapotter/files?job=x#top");
+  });
+
+  it("leaves prefixed URLs and prefix-less deployments alone", async () => {
+    document.head.innerHTML = '<base href="/snapotter/">';
+    let mod = await import("../../../apps/web/src/lib/app-url");
+    const prefixed = fakeLocation("/snapotter/files");
+    expect(mod.redirectIfUnprefixed(prefixed, memoryStorage())).toBe(false);
+    expect(prefixed.replace).not.toHaveBeenCalled();
+
+    vi.resetModules();
+    document.head.innerHTML = "";
+    mod = await import("../../../apps/web/src/lib/app-url");
+    const root = fakeLocation("/files");
+    expect(mod.redirectIfUnprefixed(root, memoryStorage())).toBe(false);
+    expect(root.replace).not.toHaveBeenCalled();
+  });
+
+  it("refuses a second redirect within the loop window and says why", async () => {
+    document.head.innerHTML = '<base href="/snapotter/">';
+    const { redirectIfUnprefixed } = await import("../../../apps/web/src/lib/app-url");
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const storage = memoryStorage();
+    // A proxy that strips the prefix with a redirect sends the browser straight back.
+    expect(redirectIfUnprefixed(fakeLocation("/files"), storage, 1_000_000)).toBe(true);
+    const bounced = fakeLocation("/files");
+    expect(redirectIfUnprefixed(bounced, storage, 1_002_000)).toBe(false);
+    expect(bounced.replace).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("/snapotter"));
+    // Once the window has passed, a fresh visit redirects again.
+    expect(redirectIfUnprefixed(fakeLocation("/files"), storage, 1_020_000)).toBe(true);
+    error.mockRestore();
+  });
+
+  it("still redirects when storage is unavailable", async () => {
+    document.head.innerHTML = '<base href="/snapotter/">';
+    const { redirectIfUnprefixed } = await import("../../../apps/web/src/lib/app-url");
+    const location = fakeLocation("/");
+    expect(redirectIfUnprefixed(location, null)).toBe(true);
+    expect(location.replace).toHaveBeenCalledWith("/snapotter/");
+  });
+});
+
+it("main.tsx mounts the app only when no redirect happened", () => {
+  // main.tsx boots the whole app on import, so pin its wiring instead: the
+  // redirect must gate everything that starts the app.
+  // jsdom gives import.meta.url a non-file scheme; vitest runs from the repo root.
+  const source = readFileSync(join(process.cwd(), "apps/web/src/main.tsx"), "utf8");
+  const gate = source.indexOf("if (!redirectIfUnprefixed(window.location)) {");
+  expect(gate).toBeGreaterThan(-1);
+  for (const call of ["startEarlyErrorCapture()", "installChunkReloadHandler()", "createRoot("]) {
+    expect(source.indexOf(call), call).toBeGreaterThan(gate);
+  }
 });

@@ -50,12 +50,12 @@ function resolveFields(value: unknown): unknown {
 }
 
 /**
- * Suffix to rename under the prefix when the browser URL lacks it (#1275), or
+ * The path to move under the prefix when the browser URL lacks it (#1275), or
  * null when no redirect is needed. The server keeps unprefixed requests
  * routable (see stripBasePath), so opening the app without the prefix still
- * returns the shell with working assets — but a router basename that doesn't
- * match, leaving a silent 404 or blank page. Only the browser can fix this: a
- * server redirect could loop behind proxies that strip the prefix.
+ * returns the shell with working assets, but the router basename doesn't
+ * match and the page is a silent 404 or blank. Only the browser can fix this:
+ * a server redirect could loop behind proxies that strip the prefix.
  *
  * The prefix match is case-insensitive because stripBasePath is
  * case-sensitive: /SnapOtter with BASE_PATH=/snapotter arrives here too, and
@@ -63,11 +63,50 @@ function resolveFields(value: unknown): unknown {
  * keeps the user's casing; only the prefix is normalized.
  */
 export function unprefixPathname(pathname: string): string | null {
-  if (!BASE_PATH) return null;
+  // Only a root-relative <base> (the server always writes one) can be compared
+  // with a pathname; anything else would redirect forever.
+  if (!BASE_PATH.startsWith("/")) return null;
   if (pathname === BASE_PATH || pathname.startsWith(`${BASE_PATH}/`)) return null;
   const lowerBase = BASE_PATH.toLowerCase();
   const lower = pathname.toLowerCase();
   if (lower === lowerBase) return "/";
   if (lower.startsWith(`${lowerBase}/`)) return pathname.slice(BASE_PATH.length);
   return pathname;
+}
+
+const REDIRECT_STAMP_KEY = "snapotter-prefix-redirect";
+const REDIRECT_LOOP_WINDOW_MS = 10_000;
+
+/**
+ * Send a browser that opened the app without its prefix to the prefixed URL,
+ * keeping the query and hash. Returns true when it navigated away, so the
+ * caller must not mount the app. A proxy that redirects the prefix back off
+ * would bounce the page forever, so a second attempt within a few seconds is
+ * refused and logged instead (same guard shape as chunk-reload.ts).
+ */
+export function redirectIfUnprefixed(
+  location: Pick<Location, "pathname" | "search" | "hash" | "replace">,
+  storage: Pick<Storage, "getItem" | "setItem"> | null = safeSessionStorage(),
+  now = Date.now(),
+): boolean {
+  const unprefixed = unprefixPathname(location.pathname);
+  if (unprefixed === null) return false;
+  const last = Number(storage?.getItem(REDIRECT_STAMP_KEY) ?? 0);
+  if (now - last < REDIRECT_LOOP_WINDOW_MS) {
+    console.error(
+      `Not redirecting ${location.pathname} to ${BASE_PATH} again: the last redirect came straight back. Check that the proxy forwards ${BASE_PATH}/ unchanged.`,
+    );
+    return false;
+  }
+  storage?.setItem(REDIRECT_STAMP_KEY, String(now));
+  location.replace(appUrl(`${unprefixed}${location.search}${location.hash}`));
+  return true;
+}
+
+function safeSessionStorage(): Storage | null {
+  try {
+    return typeof sessionStorage === "undefined" ? null : sessionStorage;
+  } catch {
+    return null;
+  }
 }
