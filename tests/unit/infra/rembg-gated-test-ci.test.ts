@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import { rembgTestPins } from "../../../scripts/rembg-test-pins.mjs";
 
 /**
  * tests/unit/ai/remove-bg-hr-matting.test.ts has a test that needs the real
@@ -9,13 +10,16 @@ import { describe, expect, it } from "vitest";
  * that test was skipped on every run, and the stubbed test next to it can't
  * notice a rembg release changing how its predict feeds the model (#1299).
  *
- * Some ci.yml job must install the rembg pinned in requirements.txt and run
- * that file with REQUIRE_REMBG=1, which turns a missing rembg into a failure
- * instead of a skip, whenever the sidecar or its pins change.
+ * Some ci.yml job must run that file with REQUIRE_REMBG=1, which turns a
+ * missing rembg into a failure instead of a skip, against both rembg pin sets
+ * that reach users: the background-removal bundle's and the sidecar
+ * requirements'. It must run whenever either set, the sidecar or the test
+ * changes.
  */
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const TEST_FILE = "tests/unit/ai/remove-bg-hr-matting.test.ts";
+const PIN_SCRIPT = "scripts/rembg-test-pins.mjs";
 
 interface Step {
   run?: string;
@@ -24,6 +28,7 @@ interface Step {
 interface Job {
   if?: string;
   env?: Record<string, string>;
+  strategy?: { matrix?: Record<string, unknown> };
   steps?: Step[];
 }
 interface Workflow {
@@ -39,6 +44,11 @@ const runsTestFile = (step: Step) =>
 
 const gatedJobs = Object.entries(ci.jobs).filter(([, job]) => (job.steps ?? []).some(runsTestFile));
 
+/** The exact rembg pin a source file declares, however it's spelled. */
+function rembgPin(pins: string[]): string | undefined {
+  return pins.find((pin) => /^rembg(\[[^\]]*\])?==/.test(pin));
+}
+
 describe("rembg-gated HR matting test in CI", () => {
   it("is run by a ci.yml job", () => {
     expect(gatedJobs.map(([name]) => name)).not.toEqual([]);
@@ -51,20 +61,55 @@ describe("rembg-gated HR matting test in CI", () => {
     expect(env.PYTHON_VENV_PATH).toBeTruthy();
   });
 
-  it.each(gatedJobs)("%s installs rembg from the pinned requirements", (_, job) => {
+  it.each(gatedJobs)("%s installs both pin sets through the pin script", (_, job) => {
+    expect(job.strategy?.matrix?.pins).toEqual(["bundle", "requirements"]);
     const installs = (job.steps ?? []).map((s) => s.run ?? "").join("\n");
-    expect(installs).toContain("packages/ai/python/requirements.txt");
-    expect(installs).toMatch(/\brembg\b/);
+    expect(installs).toContain(`node ${PIN_SCRIPT}`);
+    expect(installs).toContain("-r .rembg-pins/pins.txt -c .rembg-pins/constraints.txt");
   });
 
-  it.each(gatedJobs)("%s runs whenever the sidecar changes", (_, job) => {
-    // Gated on a changes-job output whose path filter covers the sidecar.
+  it.each(gatedJobs)("%s runs whenever the sidecar or either pin set changes", (_, job) => {
+    // Gated on a changes-job output whose path filter covers all of them.
     const output = job.if?.match(/needs\.changes\.outputs\.([a-z_-]+)/)?.[1];
     expect(output, `${job.if} must be gated on a changes output`).toBeTruthy();
     const filter = (ci.jobs.changes.steps ?? []).map((s) => s.run ?? "").join("\n");
     expect(filter).toContain(`echo "${output}=$${output}" >> "$GITHUB_OUTPUT"`);
     const block = filter.slice(filter.indexOf(`${output}=false`));
-    expect(block).toContain("packages/ai/python/*");
-    expect(block).toContain(TEST_FILE);
+    for (const pattern of [
+      "packages/ai/python/*",
+      "docker/feature-manifest.json",
+      PIN_SCRIPT,
+      TEST_FILE,
+    ]) {
+      expect(block).toContain(pattern);
+    }
+  });
+});
+
+describe("rembg test pins", () => {
+  it("takes the bundle's rembg pin from docker/feature-manifest.json", () => {
+    const manifest = JSON.parse(
+      readFileSync(path.join(root, "docker/feature-manifest.json"), "utf8"),
+    );
+    const declared = rembgPin(manifest.bundles["background-removal"].packages.common);
+    expect(declared).toBeTruthy();
+    expect(rembgPin(rembgTestPins("bundle").pins)).toBe(declared);
+  });
+
+  it("takes the sidecar's rembg pin from packages/ai/python/requirements.txt", () => {
+    const lines = readFileSync(
+      path.join(root, "packages/ai/python/requirements.txt"),
+      "utf8",
+    ).split("\n");
+    const declared = rembgPin(lines.map((line) => line.trim()));
+    expect(declared).toBeTruthy();
+    expect(rembgPin(rembgTestPins("requirements").pins)).toBe(declared);
+  });
+
+  it.each(["bundle", "requirements"] as const)("pins every %s package exactly", (source) => {
+    const { pins, constraints } = rembgTestPins(source);
+    expect(pins).toHaveLength(5);
+    for (const pin of pins) expect(pin).toMatch(/^[A-Za-z0-9_.[\]-]+==[^=]+$/);
+    expect(constraints.length).toBeGreaterThan(0);
   });
 });

@@ -88,7 +88,9 @@ class FakeInnerSession:
         return [logits]
 
 session.inner_session = FakeInnerSession()
-(mask,) = session.predict(Image.new("RGB", (64, 64)))
+# Mid-grey, not black: rembg 2.0.62 (the bundle's pin) normalises by the
+# image's max pixel unguarded, so an all-black input divides 0 by 0.
+(mask,) = session.predict(Image.new("RGB", (64, 64), (128, 128, 128)))
 alpha = np.array(mask)
 subject = alpha[20:44, 20:44]
 background = alpha[2:10, 40:60]
@@ -101,7 +103,28 @@ function runPython(script: string) {
   return spawnSync(pythonBin as string, ["-c", script], { encoding: "utf8", timeout: 60_000 });
 }
 
-describe.skipIf(!hasPython)("birefnet-hr-matting session", () => {
+// ci.yml's "AI Sidecar (rembg)" job installs a pinned rembg into a venv and
+// sets REQUIRE_REMBG=1 with PYTHON_VENV_PATH, so nothing here may skip and the
+// interpreter must be that venv's (#1299).
+const requireRembg = process.env.REQUIRE_REMBG === "1";
+
+describe.skipIf(!hasPython && !requireRembg)("birefnet-hr-matting session", () => {
+  it.runIf(requireRembg)("runs under the venv REQUIRE_REMBG points at", () => {
+    const venv = process.env.PYTHON_VENV_PATH;
+    expect(venv, "REQUIRE_REMBG=1 needs PYTHON_VENV_PATH").toBeTruthy();
+    expect(resolve(pythonBin as string).startsWith(`${resolve(venv as string)}/`)).toBe(true);
+
+    const res = spawnSync(
+      pythonBin as string,
+      ["-c", "import importlib.metadata as m; print(m.version('rembg'))"],
+      {
+        encoding: "utf8",
+      },
+    );
+    expect(res.status).toBe(0);
+    console.log(`rembg under test: ${res.stdout.trim()}`);
+  });
+
   it("runs rembg's predict, which applies the sigmoid, at 2048x2048", () => {
     const res = runPython(INHERITS_PREDICT);
     expect(res.stderr).toBe("");
@@ -109,10 +132,9 @@ describe.skipIf(!hasPython)("birefnet-hr-matting session", () => {
     expect(res.stdout).toContain("OK");
   }, 70_000);
 
-  // The Unit Tests job has no rembg, so this skips there. ci.yml's "AI Sidecar
-  // (rembg)" job installs the pinned rembg and sets REQUIRE_REMBG=1, which
-  // makes a missing rembg a failure instead of a skip (#1299).
-  it.skipIf(process.env.REQUIRE_REMBG !== "1" && !pythonWith("rembg"))(
+  // The Unit Tests job has no rembg, so this skips there and runs in the
+  // "AI Sidecar (rembg)" job instead.
+  it.skipIf(!requireRembg && !pythonWith("rembg"))(
     "turns subject logits opaque and background logits transparent",
     () => {
       const res = runPython(MASK_FROM_LOGITS);

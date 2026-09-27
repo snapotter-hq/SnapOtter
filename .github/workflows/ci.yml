@@ -90,7 +90,7 @@ jobs:
               aipython=false
               for f in $changed; do
                 case "$f" in
-                  packages/ai/python/*|tests/unit/ai/remove-bg-hr-matting.test.ts|tests/helpers/python-gate.ts|.github/workflows/ci.yml) aipython=true; break ;;
+                  packages/ai/python/*|docker/feature-manifest.json|scripts/rembg-test-pins.mjs|tests/unit/ai/remove-bg-hr-matting.test.ts|tests/helpers/python-gate.ts|.github/workflows/ci.yml) aipython=true; break ;;
                 esac
               done
             else
@@ -491,34 +491,42 @@ jobs:
   ai-sidecar-rembg:
     # tests/unit/ai/remove-bg-hr-matting.test.ts has a test that needs the real
     # rembg, which Unit Tests doesn't install, so it skipped everywhere. This
-    # job installs the pinned rembg and runs it with REQUIRE_REMBG=1, which
-    # turns a missing rembg into a failure, so a rembg bump that stops routing
-    # the HR model's input through normalize() can't pass unnoticed (#1299).
-    name: AI Sidecar (rembg)
+    # job runs it with REQUIRE_REMBG=1, which turns a missing rembg into a
+    # failure, against both rembg pin sets that reach users: the
+    # background-removal bundle's (docker/feature-manifest.json) and the
+    # sidecar requirements' (Dependabot bumps these). A rembg release that
+    # stops routing the HR model's input through normalize() can't pass
+    # unnoticed (#1299).
+    name: AI Sidecar (rembg, ${{ matrix.pins }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.aipython == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        pins: [bundle, requirements]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
 
-      - name: Install the rembg pinned in packages/ai/python/requirements.txt
-        # Only what the HR matting session imports, at the exact pins, so the
-        # test runs against the rembg a Dependabot bump would ship.
+      - name: Install the pinned rembg
+        # Only what the HR matting session imports, at the exact pins, under
+        # the bundle's constraints for everything they pull in.
+        env:
+          PINS: ${{ matrix.pins }}
         run: |
+          node scripts/rembg-test-pins.mjs "$PINS" .rembg-pins
           python -m venv .venv-rembg
-          mapfile -t pins < <(grep -E '^(rembg\[cpu\]|onnxruntime|numpy|Pillow)==' packages/ai/python/requirements.txt)
-          if [ "${#pins[@]}" -ne 4 ]; then
-            echo "::error::Expected rembg[cpu], onnxruntime, numpy and Pillow pins in packages/ai/python/requirements.txt, found: ${pins[*]}"
-            exit 1
-          fi
-          .venv-rembg/bin/pip install "${pins[@]}"
+          .venv-rembg/bin/pip install -r .rembg-pins/pins.txt -c .rembg-pins/constraints.txt
+          # The first import in a fresh venv spends about 40s while pymatting
+          # JIT-compiles and caches; pay it here, not inside the test timeout.
+          .venv-rembg/bin/python -c "import rembg"
 
-      - uses: ./.github/actions/setup
       - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
         run: |
           for img in postgres:17-alpine redis:8-alpine; do
