@@ -920,6 +920,20 @@ export function scoreTool(rawQuery: string, item: ToolSearchItem): ToolSearchRes
   if (exactNameQueries.includes(query.normalized)) {
     score += 100;
     reasons.add("name exact match");
+  } else if (
+    !query.tokens.every(isKnownConversionFormatToken) &&
+    containsPhrase(nameField.text, query.normalized) &&
+    (item.keywords ?? []).some((k) => normalizeForField(k).includes(query.normalized))
+  ) {
+    // The whole query is one of this tool's keywords AND appears in its name,
+    // so this is the tool the word names. Phrase and token scores add up per
+    // field and per alias, so tools that merely repeat the word (the
+    // compress-image-to-N-kb presets) outscored it (#1326). Requiring the name
+    // keeps a related keyword ("favicon" on rounded-crop) from winning. Format
+    // words are excluded: every converter preset names its formats, so "pdf"
+    // would lift ten converters over the base PDF tools.
+    score += 100;
+    reasons.add("keyword exact match");
   }
 
   for (const phrase of query.phrases) {
