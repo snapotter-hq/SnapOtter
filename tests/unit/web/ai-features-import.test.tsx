@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import type { FeatureBundleState } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
+import { en } from "@snapotter/shared/i18n/en.js";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +18,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { AiFeaturesSection } from "@/components/settings/ai-features-section";
+import { I18nProvider } from "@/contexts/i18n-context";
 import { useFeaturesStore } from "@/stores/features-store";
 
 const fetchMock = vi.fn();
@@ -149,5 +153,49 @@ describe("AI environment reset", () => {
     await waitFor(() => expect(apiGetMock).toHaveBeenCalled());
 
     expect(screen.queryByText(/shared Python environment was left in place/i)).toBeNull();
+  });
+});
+
+describe("bundle install progress", () => {
+  it("renders the rotating progress message from the active locale", async () => {
+    const storage = new Map([["snapotter-locale", "de"]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => void storage.set(k, v),
+      removeItem: (k: string) => void storage.delete(k),
+      clear: () => storage.clear(),
+    });
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const bundle: FeatureBundleState = {
+      id: "background-removal",
+      name: "Background Removal",
+      description: "Remove backgrounds",
+      status: "not_installed",
+      installedVersion: null,
+      estimatedSize: "4-5 GB",
+      enablesTools: ["remove-background"],
+      progress: null,
+      error: null,
+    };
+    useFeaturesStore.setState({
+      bundles: [bundle],
+      loaded: true,
+      loadError: false,
+      installing: { [bundle.id]: { percent: 50, stage: "Downloading" } },
+      errors: {},
+      queued: [],
+      installAllActive: false,
+      startTimes: { [bundle.id]: Date.now() - 30_000 },
+      fetch: vi.fn(async () => {}),
+    });
+
+    render(
+      <I18nProvider>
+        <AiFeaturesSection />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText(de.features.progressMessages[0])).toBeInTheDocument();
+    expect(screen.queryByText(en.features.progressMessages[0])).toBeNull();
   });
 });
