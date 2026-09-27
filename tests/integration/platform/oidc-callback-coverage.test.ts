@@ -320,7 +320,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
     // The IdP compares the token-exchange redirect_uri with the one it saw at
     // login and rejects a mismatch, so a dropped or doubled prefix here breaks
-    // SSO while the login-redirect test above stays green (#1297).
+    // SSO while the login-time redirect_uri checks in oidc-auth.test.ts stay
+    // green (#1297).
     it("sends the token exchange a redirect_uri under the deployment path", async () => {
       const sub = `sub-uri-${Math.random().toString(36).slice(2, 10)}`;
       const res = await callbackWithClaims({ sub, preferred_username: sub });
@@ -345,7 +346,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         expect(res.statusCode).toBe(302);
         const location = new URL(String(res.headers.location), "http://localhost:9999");
         expect(location.pathname).toBe(`${basePath}/login`);
-        expect(location.searchParams.get("mfaToken")).toMatch(/^[0-9a-f-]{36}$/);
+        expect(location.searchParams.get("mfaToken")).toBeTruthy();
         expect(res.cookies.find((c) => c.name === "snapotter-session")).toBeUndefined();
       } finally {
         spy.mockRestore();

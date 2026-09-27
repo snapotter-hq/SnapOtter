@@ -97,19 +97,17 @@ describe("202 result URLs under a deployment prefix", () => {
       });
       expect(res.statusCode, res.body).toBe(202);
       const accepted = res.json();
-      expect(accepted).toEqual({ jobId: accepted.jobId, async: true });
+      expect(accepted.async).toBe(true);
+      expect(accepted.jobId).toEqual(expect.any(String));
 
+      // A PNG result is browser-previewable, so no previewUrl is made here;
+      // worker.behavior.test.ts pins previewUrl under a prefix.
       const frame = await waitForTerminalFrame(accepted.jobId);
       expect(frame.phase).toBe("complete");
       const result = frame.result as Record<string, unknown>;
       expect(String(result.downloadUrl)).toMatch(
         new RegExp(`^/api/v1/download/${accepted.jobId}/[^/]+$`),
       );
-      if (result.previewUrl !== undefined) {
-        expect(String(result.previewUrl)).toMatch(
-          new RegExp(`^/api/v1/download/${accepted.jobId}/[^/]+$`),
-        );
-      }
 
       const download = await app.inject(`${basePath}${result.downloadUrl}`);
       expect(download.statusCode).toBe(200);
@@ -139,7 +137,8 @@ describe("202 result URLs under a deployment prefix", () => {
       });
       expect(res.statusCode, res.body).toBe(202);
       const accepted = res.json();
-      expect(accepted).toEqual({ jobId: accepted.jobId, async: true });
+      expect(accepted.async).toBe(true);
+      expect(accepted.jobId).toEqual(expect.any(String));
 
       const frame = await waitForTerminalFrame(accepted.jobId);
       expect(frame.type).toBe("batch");

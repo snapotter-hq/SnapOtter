@@ -17,16 +17,18 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-const DOWNLOAD_PATH = "/api/v1/download/";
+const DOWNLOAD_PATH = "/api/v1/download";
 
 // Allowlist form of the rule above, for the result URLs that get persisted:
-// in server code, every /api/v1/download/ must open its own string literal
-// and must not be appended to anything. The BASE_PATH line check misses a
-// prefix held in another variable (`${prefix}/api/v1/download/...`), an
-// absolute origin (`${env.EXTERNAL_URL}/api/...`), concatenation, and a prefix
-// that biome wraps onto an earlier line (#1297). Whole-line comments are
-// skipped; a trailing comment that names the path is flagged, which is loud
-// and cheap to reword.
+// in server code, every /api/v1/download must open its own string literal
+// and must not be appended to or resolved against anything. The BASE_PATH
+// line check misses a prefix held in another variable
+// (`${prefix}/api/v1/download/...`), an absolute origin
+// (`${env.EXTERNAL_URL}/api/...`, `new URL(path, base)`), concatenation, and
+// a prefix that biome wraps onto an earlier line (#1297). Whole-line comments
+// are skipped; a trailing comment that names the path is flagged, which is
+// loud and cheap to reword. Not caught: the path kept in a constant or helper
+// and prefixed at the use site, or array joins; none exist today.
 function findUnanchoredDownloadPaths(source: string): number[] {
   const lines = source.split("\n");
   const offenders: number[] = [];
@@ -35,8 +37,8 @@ function findUnanchoredDownloadPaths(source: string): number[] {
     let at = line.indexOf(DOWNLOAD_PATH);
     while (at !== -1) {
       const opener = line[at - 1];
-      const appendedTo = [...lines.slice(0, index), line.slice(0, at - 1)].join("\n").trimEnd();
-      if (!["'", '"', "`"].includes(opener) || appendedTo.endsWith("+")) {
+      const before = [...lines.slice(0, index), line.slice(0, at - 1)].join("\n").trimEnd();
+      if (!["'", '"', "`"].includes(opener) || /(\+=?|\bURL\()$/.test(before)) {
         offenders.push(index + 1);
       }
       at = line.indexOf(DOWNLOAD_PATH, at + 1);
@@ -89,6 +91,9 @@ describe("result URL convention", () => {
       "a template whose prefix biome wrapped",
       `const u = \`\${\n  prefix\n}/api/v1/download/\${id}\`;`,
     ],
+    ["compound concatenation", `u += "/api/v1/download/" + id;`],
+    ["resolution against a base URL", `const u = new URL(\`/api/v1/download/\${id}\`, base);`],
+    ["a prefix before a path split at the slash", `const u = \`\${origin}/api/v1/download\` + id;`],
     ["a trailing comment naming the path", `f(); // see /api/v1/download/<id>`],
   ])("flags %s", (_label, snippet) => {
     expect(findUnanchoredDownloadPaths(snippet)).toHaveLength(1);
