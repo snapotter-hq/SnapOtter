@@ -16,9 +16,11 @@ import { processAlive } from "./fork-db.js";
 const FORK_DIR = /^SnapOtter-test-(\d+)_[0-9a-f]{8}$/;
 
 /**
- * A sweep only removes directories at least this old. A pid means something
- * only inside its own namespace, so a run in a container sharing this temp dir
- * can look dead from here; no workspace is left idle this long while in use.
+ * A sweep only removes directories created at least this long ago (the top
+ * directory's mtime is set when its one entry, `workspace/`, is made). A pid
+ * means something only inside its own namespace, so a run in a container
+ * sharing this temp dir can look dead from here; no worker, which lives for a
+ * single test file, runs this long.
  */
 export const ORPHAN_MIN_AGE_MS = 60 * 60 * 1000;
 
@@ -46,11 +48,22 @@ export interface ExitTarget {
  * Vitest's pool (tinypool) ends each worker with a bare SIGTERM, and a signal's
  * default action kills the process without an exit event, so SIGTERM is caught
  * too: clean up, then re-raise it once this listener is gone so the worker dies
- * exactly as it would have. A worker killed by SIGKILL never runs either
- * handler; removeOrphanedForkDirs catches those.
+ * exactly as it would have. A failed removal only warns: it must never stop
+ * the re-raise, or the worker lingers until tinypool's SIGKILL and the error
+ * surfaces as an unhandled one in an otherwise green run.
+ *
+ * tinypool sends SIGKILL a second after SIGTERM, so a very large workspace can
+ * be cut off mid-removal, and a worker killed by SIGKILL never runs either
+ * handler; removeOrphanedForkDirs catches what those leave.
  */
 export function removeOnExit(dir: string, target: ExitTarget = process): void {
-  const remove = () => rmSync(dir, { recursive: true, force: true });
+  const remove = () => {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch (err) {
+      console.warn(`[fork-dir] could not remove ${dir}; a later sweep will retry`, err);
+    }
+  };
   target.once("exit", remove);
   target.once("SIGTERM", () => {
     remove();
@@ -61,14 +74,19 @@ export function removeOnExit(dir: string, target: ExitTarget = process): void {
 /**
  * Remove per-fork workspaces under `tmpDir` whose worker has exited and that
  * are older than ORPHAN_MIN_AGE_MS. Returns what it removed. One that can't be
- * removed is skipped with a warning for a later sweep; this runs in setup and
- * teardown, where throwing would fail a run over leftover scratch.
+ * removed is skipped with a warning for a later sweep; this runs in global
+ * setup, where throwing would fail a run over leftover scratch.
  */
 export function removeOrphanedForkDirs(tmpDir: string, now = Date.now()): string[] {
   let names: string[];
   try {
     names = readdirSync(tmpDir);
-  } catch {
+  } catch (err) {
+    // A missing temp dir has nothing to sweep. Anything else would switch the
+    // sweep off unnoticed, and the leak would be back.
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`[fork-dir] could not list ${tmpDir}; nothing swept`, err);
+    }
     return [];
   }
   const removed: string[] = [];

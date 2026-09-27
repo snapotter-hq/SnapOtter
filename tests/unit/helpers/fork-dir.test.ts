@@ -1,9 +1,17 @@
 import { spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   forkDirName,
   forkDirOwner,
@@ -59,6 +67,7 @@ describe("per-fork workspace names", () => {
     "SnapOtter-test-",
     "SnapOtter-test-12x_ab",
     "other-4242_deadbeef",
+    "SnapOtter-test-4242_deadbeef-extra",
   ])("owns nothing it didn't name: %s", (name) => {
     expect(forkDirOwner(name)).toBeNull();
   });
@@ -69,6 +78,12 @@ describe("removeOrphanedForkDirs", () => {
     const orphan = forkDir(deadPid(), ORPHAN_MIN_AGE_MS + 60_000);
     expect(removeOrphanedForkDirs(tmp)).toEqual([orphan]);
     expect(existsSync(orphan)).toBe(false);
+  });
+
+  it("removes one left two hours ago", () => {
+    // Pinned in wall-clock terms, so the floor can't quietly drift to days.
+    const orphan = forkDir(deadPid(), 2 * 60 * 60 * 1000);
+    expect(removeOrphanedForkDirs(tmp)).toEqual([orphan]);
   });
 
   it("keeps a live worker's directory however old", () => {
@@ -98,14 +113,44 @@ describe("removeOrphanedForkDirs", () => {
   it("returns nothing for a temp dir that doesn't exist", () => {
     expect(removeOrphanedForkDirs(path.join(tmp, "missing"))).toEqual([]);
   });
+
+  it("warns when it can't list the temp dir, rather than going quiet", () => {
+    const notADir = path.join(tmp, "file");
+    writeFileSync(notADir, "x");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(removeOrphanedForkDirs(notADir)).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(notADir), expect.anything());
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it.skipIf(process.getuid?.() === 0)("warns rather than throws when it can't remove one", () => {
+    // It runs in global setup: leftover scratch must never fail a test run.
+    const orphan = forkDir(deadPid(), ORPHAN_MIN_AGE_MS + 60_000);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    chmodSync(tmp, 0o500);
+    try {
+      expect(removeOrphanedForkDirs(tmp)).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(orphan), expect.anything());
+    } finally {
+      chmodSync(tmp, 0o700);
+      warn.mockRestore();
+    }
+    expect(existsSync(orphan)).toBe(true);
+  });
 });
 
-/** Stands in for the worker process, recording what it would have signalled. */
-function fakeProcess() {
-  const kills: [number, string][] = [];
+/**
+ * Stands in for the worker process, recording what it would have signalled and
+ * whether `dir` was still there at that moment (a real kill ends the process).
+ */
+function fakeProcess(dir: string) {
+  const kills: [number, string, boolean][] = [];
   const proc = Object.assign(new EventEmitter(), {
     pid: 4242,
-    kill: (pid: number, signal: string) => kills.push([pid, signal]),
+    kill: (pid: number, signal: string) => kills.push([pid, signal, existsSync(dir)]),
   });
   return { proc, kills };
 }
@@ -113,7 +158,7 @@ function fakeProcess() {
 describe("removeOnExit", () => {
   it("removes the directory, contents and all, when the process exits", () => {
     const dir = forkDir(process.pid, 0);
-    const { proc } = fakeProcess();
+    const { proc } = fakeProcess(dir);
     removeOnExit(dir, proc);
     expect(existsSync(dir)).toBe(true);
     // Exit handlers can't wait for async work, so the removal must be done by
@@ -126,18 +171,37 @@ describe("removeOnExit", () => {
     // Vitest's pool ends each worker with a bare SIGTERM, whose default action
     // skips the exit event entirely; that is how the directories leaked.
     const dir = forkDir(process.pid, 0);
-    const { proc, kills } = fakeProcess();
+    const { proc, kills } = fakeProcess(dir);
     removeOnExit(dir, proc);
     proc.emit("SIGTERM", "SIGTERM");
     expect(existsSync(dir)).toBe(false);
     // Only once this handler is gone, so the re-raise takes the default action.
     expect(proc.listenerCount("SIGTERM")).toBe(0);
-    expect(kills).toEqual([[4242, "SIGTERM"]]);
+    // Removed before the kill: a real kill ends the process on the spot.
+    expect(kills).toEqual([[4242, "SIGTERM", false]]);
+  });
+
+  it.skipIf(process.getuid?.() === 0)("still re-raises SIGTERM when removal fails", () => {
+    // A worker that swallowed its SIGTERM would linger until tinypool's SIGKILL,
+    // and the thrown error would surface as an unhandled error in a green run.
+    const dir = forkDir(process.pid, 0);
+    const { proc, kills } = fakeProcess(dir);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    removeOnExit(dir, proc);
+    chmodSync(tmp, 0o500);
+    try {
+      expect(() => proc.emit("SIGTERM", "SIGTERM")).not.toThrow();
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      chmodSync(tmp, 0o700);
+      warn.mockRestore();
+    }
+    expect(kills).toEqual([[4242, "SIGTERM", true]]);
   });
 
   it("doesn't throw at exit when the directory is already gone", () => {
     const dir = forkDir(process.pid, 0);
-    const { proc } = fakeProcess();
+    const { proc } = fakeProcess(dir);
     removeOnExit(dir, proc);
     rmSync(dir, { recursive: true, force: true });
     expect(() => proc.emit("exit", 0)).not.toThrow();
@@ -149,5 +213,10 @@ describe("this worker's own workspace", () => {
     const workspace = process.env.WORKSPACE_PATH as string;
     expect(path.basename(path.dirname(workspace))).toMatch(/^SnapOtter-test-\d+_[0-9a-f]{8}$/);
     expect(forkDirOwner(path.basename(path.dirname(workspace)))).toBe(process.pid);
+  });
+
+  it("has its cleanup handlers installed by per-fork-env", () => {
+    expect(process.listenerCount("SIGTERM")).toBeGreaterThanOrEqual(1);
+    expect(process.listenerCount("exit")).toBeGreaterThanOrEqual(1);
   });
 });

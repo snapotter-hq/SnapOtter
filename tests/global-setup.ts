@@ -36,7 +36,10 @@ const TEST_RUNTIME_PASSWORD = "snapotter_app_test_pw";
 export async function setup(): Promise<void> {
   // Workers killed before their exit handler ran leave their workspace behind
   // (#1004); clear those from earlier runs before this one adds its own.
-  removeOrphanedForkDirs(os.tmpdir());
+  const swept = removeOrphanedForkDirs(os.tmpdir());
+  if (swept.length > 0) {
+    console.log(`[fork-dir] removed ${swept.length} orphaned test workspaces`);
+  }
   // Base server: testcontainer by default, or an existing server via
   // TEST_DATABASE_URL (must allow CREATE DATABASE, e.g. postgres://...:5432/postgres).
   let baseUrl: string;
