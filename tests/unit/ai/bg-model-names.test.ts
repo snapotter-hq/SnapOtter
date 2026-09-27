@@ -5,26 +5,33 @@ import { describe, expect, it } from "vitest";
 /**
  * Background-removal model names live in TypeScript (the web quality map, the
  * GIF settings, passport-photo, transparency-fixer, the bridge's OOM fallback)
- * and in packages/ai/python/remove_bg.py's ALLOWED_MODELS. The script quietly
- * swaps any name outside that set for birefnet-general-lite, so a rename on
- * one side downgrades quality with no error (#1300).
+ * and in packages/ai/python/remove_bg.py's ALLOWED_MODELS, which
+ * gif_remove_bg.py shares. Both scripts quietly swap any name outside that set
+ * for a default model (birefnet-general-lite, or u2net on the GIF path), so a
+ * rename on one side downgrades quality with no error (#1300).
  *
  * Every model name the TypeScript sources send must be in ALLOWED_MODELS.
  * The sources are scanned rather than imported so a new call site is covered
- * without anyone remembering to add it here.
+ * without anyone remembering to add it here. Names must be whole string
+ * literals: one built from a template or concatenation isn't seen.
  */
 
 const root = path.resolve(import.meta.dirname, "../../..");
 const SOURCE_DIRS = ["apps/api/src", "apps/web/src", "packages/ai/src", "packages/shared/src"];
 // rembg's session names, plus the BiRefNet sessions remove_bg.py registers.
-const MODEL_NAME =
-  /["'`](u2net(?:p|_human_seg|_cloth_seg)?|isnet-[a-z]+(?:-[a-z]+)*|silueta|bria-rmbg|birefnet-[a-z]+(?:-[a-z]+)*)["'`]/g;
+// Every ALLOWED_MODELS entry must match this (checked below), so adding a new
+// model family in Python forces it in here, where the scan then finds it.
+const MODEL_NAME_BODY =
+  "u2net(?:p|_[a-z]+(?:_[a-z]+)*)?|isnet-[a-z0-9]+(?:-[a-z0-9]+)*|silueta|bria-rmbg(?:-[a-z0-9.]+)?|birefnet-[a-z0-9]+(?:-[a-z0-9]+)*";
+const MODEL_NAME = new RegExp(`["'\`](${MODEL_NAME_BODY})["'\`]`, "g");
 
-function allowedModels(): Set<string> {
+function allowedModels(): string[] {
   const source = readFileSync(path.join(root, "packages/ai/python/remove_bg.py"), "utf8");
   const literal = source.match(/^ALLOWED_MODELS = \{([^}]*)\}/m)?.[1];
   if (!literal) throw new Error("ALLOWED_MODELS set literal not found in remove_bg.py");
-  return new Set([...literal.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  // A commented-out entry is not allowed.
+  const code = literal.replace(/#.*$/gm, "");
+  return [...code.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
 function sourceFiles(dir: string): string[] {
@@ -60,9 +67,15 @@ describe("background-removal model names", () => {
     }
   });
 
+  it("recognises every model remove_bg.py allows", () => {
+    const whole = new RegExp(`^(?:${MODEL_NAME_BODY})$`);
+    const unrecognised = allowedModels().filter((name) => !whole.test(name));
+    expect(unrecognised, "extend MODEL_NAME_BODY so the scan can find these").toEqual([]);
+  });
+
   it("are all in remove_bg.py's ALLOWED_MODELS", () => {
-    const allowed = allowedModels();
+    const allowed = new Set(allowedModels());
     const unknown = referenced.filter((r) => !allowed.has(r.name));
-    expect(unknown, "remove_bg.py would silently swap these for birefnet-general-lite").toEqual([]);
+    expect(unknown, "remove_bg.py would silently swap these for a default model").toEqual([]);
   });
 });
