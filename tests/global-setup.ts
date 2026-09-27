@@ -124,14 +124,19 @@ export async function setup(): Promise<void> {
 
 export async function teardown(): Promise<void> {
   // Every fork has exited by now, so whatever per-file databases and roles the
-  // run's own sweeps didn't get to can go. It matters on a long-lived
-  // TEST_DATABASE_URL server, where they'd otherwise pile up run after run
-  // (#1315); the testcontainer is about to be thrown away regardless.
+  // run's own sweeps didn't get to can go. Only on a TEST_DATABASE_URL server,
+  // where they'd otherwise pile up run after run (#1315); our own testcontainer
+  // is about to be thrown away with everything in it.
   const baseUrl = process.env.TEST_PG_BASE_URL;
   const runId = process.env.TEST_RUN_ID;
-  if (baseUrl && runId) {
+  if (!container && baseUrl && runId) {
     try {
-      await dropRunLeftovers(baseUrl, TEST_RUNTIME_ROLE, runId);
+      const { failed } = await dropRunLeftovers(baseUrl, TEST_RUNTIME_ROLE, runId);
+      if (failed.length > 0) {
+        console.warn(
+          `[global-setup] could not drop these test databases and roles; remove them by hand: ${failed.join(", ")}`,
+        );
+      }
     } catch (err) {
       console.warn("[global-setup] could not clear this run's test databases and roles", err);
     }

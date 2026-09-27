@@ -93,6 +93,7 @@ const dbName = forkDatabaseName(runId, process.pid); // hex and digits: identifi
 await dropOrphanedForkDatabases(baseUrl, runId);
 // Then their login roles, which the databases no longer hold onto (#1315).
 await dropOrphanedForkRoles(baseUrl, runtimeRole, runId);
+process.env.TEST_FORK_ROLE_SWEEP_RAN = "1";
 // Evidence for test-harness-hygiene.test.ts that this setup really swept.
 process.env.TEST_FORK_SWEEP_RAN = "1";
 const admin = new pg.Client({ connectionString: baseUrl });

@@ -172,25 +172,44 @@ export async function dropOrphanedForkRoles(
  * fork of the run has exited. The per-file sweeps only ever clear files that
  * finished before another one started, so a run's last files outlived it; on
  * a long-lived TEST_DATABASE_URL server they piled up run after run (#1315).
+ *
+ * One failed drop doesn't stop the rest: the result lists what went and, in
+ * `failed`, what's still there, so the caller can name it.
  */
 export async function dropRunLeftovers(
   baseUrl: string,
   runtimeRole: string,
   runId: string,
-): Promise<{ databases: string[]; roles: string[] }> {
+): Promise<{ databases: string[]; roles: string[]; failed: string[] }> {
+  const result = { databases: [] as string[], roles: [] as string[], failed: [] as string[] };
   const databases = (
     await listNames(
       baseUrl,
       "SELECT datname AS name FROM pg_database WHERE datname LIKE 'snapotter\\_test\\_%'",
     )
   ).filter((name) => forkDatabaseOwner(name, runId) !== null);
-  for (const name of databases) await dropForkDatabase(baseUrl, name);
+  for (const name of databases) {
+    try {
+      await dropForkDatabase(baseUrl, name);
+      result.databases.push(name);
+    } catch {
+      result.failed.push(name);
+    }
+  }
+  // Attempted even when a database stayed: every other role can still go.
   const roles = (
     await listNames(
       baseUrl,
       `SELECT rolname AS name FROM pg_roles WHERE starts_with(rolname, '${runtimeRole}_${runId}_')`,
     )
   ).filter((name) => forkRoleOwner(name, runtimeRole, runId) !== null);
-  for (const name of roles) await dropRole(baseUrl, name);
-  return { databases, roles };
+  for (const name of roles) {
+    try {
+      await dropRole(baseUrl, name);
+      result.roles.push(name);
+    } catch {
+      result.failed.push(name);
+    }
+  }
+  return result;
 }
