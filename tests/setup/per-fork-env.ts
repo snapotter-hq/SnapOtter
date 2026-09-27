@@ -1,16 +1,19 @@
-import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import pg from "pg";
 import { dropOrphanedForkDatabases, forkDatabaseName } from "./fork-db.js";
+import { forkDirName, removeOnExit } from "./fork-dir.js";
 
 // Each test file (forks pool, isolated) gets its own Postgres database cloned
 // from the migrated template built in tests/global-setup.ts, plus its own
 // workspace dir. setupFiles run before any app module loads, so
 // apps/api/src/config.ts captures the per-file DATABASE_URL.
-const suffix = `${process.pid}_${crypto.randomUUID().slice(0, 8).replace(/-/g, "")}`;
-const forkDir = path.join(os.tmpdir(), `SnapOtter-test-${suffix}`);
+const forkDirBase = forkDirName(process.pid);
+const suffix = forkDirBase.slice("SnapOtter-test-".length);
+const forkDir = path.join(os.tmpdir(), forkDirBase);
 process.env.WORKSPACE_PATH = path.join(forkDir, "workspace");
+// Nothing else removes it, and a full run left gigabytes behind (#1004).
+removeOnExit(forkDir);
 
 const baseUrl = process.env.TEST_PG_BASE_URL;
 if (!baseUrl) {

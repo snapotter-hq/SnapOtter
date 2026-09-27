@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import { createRequire } from "node:module";
+import os from "node:os";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
+import { removeOrphanedForkDirs } from "./setup/fork-dir.js";
 
 // pg and drizzle-orm live in the api workspace's node_modules. Global-setup
 // files run outside Vite's transform pipeline, so vitest resolve.alias does
@@ -32,6 +34,9 @@ const TEST_RUNTIME_ROLE = "snapotter_app_test";
 const TEST_RUNTIME_PASSWORD = "snapotter_app_test_pw";
 
 export async function setup(): Promise<void> {
+  // Workers killed before their exit handler ran leave their workspace behind
+  // (#1004); clear those from earlier runs before this one adds its own.
+  removeOrphanedForkDirs(os.tmpdir());
   // Base server: testcontainer by default, or an existing server via
   // TEST_DATABASE_URL (must allow CREATE DATABASE, e.g. postgres://...:5432/postgres).
   let baseUrl: string;

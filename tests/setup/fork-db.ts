@@ -24,7 +24,7 @@ export function forkDatabaseOwner(name: string, runId: string): number | null {
   return match && match[1] === runId ? Number(match[2]) : null;
 }
 
-function processAlive(pid: number): boolean {
+export function processAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
