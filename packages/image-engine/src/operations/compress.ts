@@ -88,6 +88,16 @@ async function findBestQuality(
   targetBytes: number,
   animated: boolean,
 ): Promise<CompressionCandidate | null> {
+  // Sharp's GIF encoder has no quality setting, so every step of the search
+  // below would encode the same bytes. On an animation that is a full
+  // re-encode of every frame, up to seven times per size step (#1183).
+  if (format === "gif") {
+    let pipeline = openSource(inputBuffer, animated);
+    if (resize) pipeline = pipeline.resize(resize.width, resize.height);
+    const size = (await pipeline.toFormat(format, formatOpts(format, 100)).toBuffer()).length;
+    return size <= targetBytes ? { quality: 100 } : null;
+  }
+
   let low = 1;
   let high = 100;
   let best: CompressionCandidate | null = null;
