@@ -240,3 +240,78 @@ describe("Deep Enhance on an animation (#1183)", () => {
     expect(result.resultPayload).toBeUndefined();
   });
 });
+
+describe("the deep pass encodes the output format once (#1302)", () => {
+  // The real noiseRemoval() writes its input as PNG and the sidecar keeps
+  // that format, so what comes back is always PNG, whatever went in.
+  function sidecarReturnsPng() {
+    vi.mocked(noiseRemoval).mockImplementation(
+      async (buffer: Buffer) =>
+        ({ buffer: await sharp(buffer).png().toBuffer() }) as Awaited<
+          ReturnType<typeof noiseRemoval>
+        >,
+    );
+  }
+
+  async function formatOf(buffer: Buffer) {
+    return (await sharp(buffer).metadata()).format;
+  }
+
+  it.each([
+    ["jpeg", "image/jpeg", "photo.jpg"],
+    ["webp", "image/webp", "photo.webp"],
+    ["tiff", "image/tiff", "photo.tiff"],
+    // Sharp's metadata names AVIF files by their container, HEIF.
+    ["heif", "image/avif", "photo.avif"],
+    ["gif", "image/gif", "still.gif"],
+  ] as const)("returns %s bytes for %s input", async (format, contentType, filename) => {
+    sidecarReturnsPng();
+    const input = await sharp(await tinyPng())
+      .toFormat(format === "heif" ? "avif" : format)
+      .toBuffer();
+
+    const result = await processImageEnhancement(input, settings, filename);
+
+    // The sidecar gets the lossless intermediate, not an already-encoded copy.
+    expect(noiseRemoval).toHaveBeenCalledOnce();
+    expect(await formatOf(vi.mocked(noiseRemoval).mock.calls[0][0])).toBe("png");
+    expect(result.contentType).toBe(contentType);
+    expect(await formatOf(result.buffer)).toBe(format);
+  });
+
+  it("still returns the input's format when the deep pass fails", async () => {
+    vi.mocked(noiseRemoval).mockRejectedValue(new Error("SCUNet boom"));
+    const jpeg = await sharp(await tinyPng())
+      .jpeg()
+      .toBuffer();
+
+    const result = await processImageEnhancement(jpeg, settings, "photo.jpg");
+
+    expect(result.resultPayload).toEqual({ deepEnhanceSkipped: "failed" });
+    expect(result.contentType).toBe("image/jpeg");
+    expect(await formatOf(result.buffer)).toBe("jpeg");
+  });
+
+  it("keeps partial transparency through the re-encode", async () => {
+    sidecarReturnsPng();
+    const webpWithAlpha = await sharp({
+      create: {
+        width: 8,
+        height: 8,
+        channels: 4,
+        background: { r: 10, g: 200, b: 30, alpha: 0.5 },
+      },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
+
+    const result = await processImageEnhancement(webpWithAlpha, settings, "clear.webp");
+
+    expect(await formatOf(result.buffer)).toBe("webp");
+    // stats() reads the source image, not the pipeline, so pull the raw band.
+    const alpha = await sharp(result.buffer).extractChannel(3).raw().toBuffer();
+    const mean = alpha.reduce((sum, v) => sum + v, 0) / alpha.length;
+    expect(mean).toBeGreaterThan(120);
+    expect(mean).toBeLessThan(135);
+  });
+});
