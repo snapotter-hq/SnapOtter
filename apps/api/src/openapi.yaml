@@ -5167,6 +5167,10 @@ paths:
               schema:
                 type: string
               description: Percent-encoded JSON mapping of input index to output filename (decode with decodeURIComponent before JSON.parse)
+            X-File-Notes:
+              schema:
+                type: string
+              description: "Percent-encoded JSON mapping of input index to a warning about that file's result, keyed like X-File-Results. Only files with something to warn about appear, each with its `targetKb`: `resizedTo` ({width, height}) when compress scaled an image down to fit, or `targetMet: false` when target-size compress-pdf couldn't get under the target. `{}` when no file has a warning."
           content:
             application/zip:
               schema:

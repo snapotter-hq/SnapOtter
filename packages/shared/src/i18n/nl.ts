@@ -1415,6 +1415,8 @@ export const nl: TranslationKeys = {
       submitBatch: "Comprimeren ({count} bestanden)",
       submitTarget: "Comprimeren tot {size} KB",
       resizedToFit: "Verkleind tot {width} × {height} om binnen {size} KB te passen",
+      batchResized:
+        "{count} van {total} afbeeldingen zijn verkleind om binnen {size} KB te passen.",
       progressLabel: "Comprimeren",
       original: "Origineel: {size} KB",
       processed: "Verwerkt: {size} KB",
@@ -3524,6 +3526,7 @@ export const nl: TranslationKeys = {
       submit: "Comprimeren",
       submitBatch: "Comprimeren ({count} bestanden)",
       submitTarget: "Comprimeren tot {size}",
+      batchMissed: "{count} van {total} bestanden kwamen niet onder {target}.",
       progressLabel: "Comprimeren",
       bestEffortHint:
         "Maximaal haalbaar. Op afbeeldingen gebaseerde PDF's komen dichtbij; PDF's met alleen tekst worden mogelijk niet tot deze grootte verkleind.",
@@ -5240,6 +5243,8 @@ export const nl: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Zoombediening",
     dragToReorder: "Sleep om te herordenen",
+    resultResizedToFit: "Verkleind om binnen de doelgrootte te passen",
+    resultMissedTarget: "Doelgrootte niet gehaald",
     reverseOrder: "Volgorde omkeren",
     whiteBackground: "Witte achtergrond",
     blackBackground: "Zwarte achtergrond",

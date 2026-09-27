@@ -46,6 +46,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
+import { type BatchFileNotes, pickBatchFileNotes } from "../lib/batch-file-notes.js";
 import {
   binaryOverrideWarning,
   checkBinaryOverrides,
@@ -1425,6 +1426,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     filename: string;
     outputRef?: string;
     error?: string;
+    notes?: BatchFileNotes;
   }> = [];
 
   let canceledChildren = 0;
@@ -1439,7 +1441,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
     if (row.status === "completed" && row.outputRefs?.[0]) {
       const outFilename = row.outputRefs[0].split("/").pop() ?? "output";
-      manifest.push({ index: i, filename: outFilename, outputRef: row.outputRefs[0] });
+      const notes = pickBatchFileNotes(
+        (row.progress as { result?: Record<string, unknown> } | null)?.result,
+      );
+      manifest.push({
+        index: i,
+        filename: outFilename,
+        outputRef: row.outputRefs[0],
+        ...(notes ? { notes } : {}),
+      });
     } else {
       if (row.status === "canceled") canceledChildren++;
       const errorMsg = (row.error as { message?: string } | null)?.message ?? "Processing failed";
@@ -1452,12 +1462,17 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   // frame's fileResults, and the route's X-File-Results header cannot drift.
   const getUniqueName = createUniqueNamer();
   const fileResults: Record<string, string> = {};
+  // Per-file notes a single run shows (#1292), keyed exactly like fileResults
+  // so they land on the same upload after the flow-to-upload remap.
+  const fileNotes: Record<string, BatchFileNotes> = {};
   const successEntries: Array<{ filename: string; outputRef: string }> = [];
   for (const entry of manifest) {
     if (!entry.outputRef) continue;
     const uniqueName = getUniqueName(entry.filename);
     entry.filename = uniqueName;
-    fileResults[String(fileIndexMap?.[entry.index] ?? entry.index)] = uniqueName;
+    const uploadIndex = String(fileIndexMap?.[entry.index] ?? entry.index);
+    fileResults[uploadIndex] = uniqueName;
+    if (entry.notes) fileNotes[uploadIndex] = entry.notes;
     successEntries.push({ filename: uniqueName, outputRef: entry.outputRef });
   }
 
@@ -1558,6 +1573,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     downloadUrl: `/api/v1/download/${data.jobId}/${encodeURIComponent(zipFilename)}`,
     zipFilename,
     fileResults,
+    fileNotes,
     processedSize: zipSize,
   };
 
@@ -1594,7 +1610,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     resultPayload: {
       manifest,
       ...(canceled ? { canceled: true } : {}),
-      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults },
+      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults, fileNotes },
     },
   };
 }

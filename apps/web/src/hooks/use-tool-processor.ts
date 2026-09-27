@@ -11,6 +11,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -455,6 +456,7 @@ export function useToolProcessor(toolId: string) {
                 processedUrl: result.downloadUrl,
                 processedPreviewUrl: result.previewUrl ?? null,
                 processedFilename: null,
+                resultNotes: pickResultNotes(result),
                 status: "completed",
                 originalSize: result.originalSize,
                 processedSize: result.processedSize,
@@ -586,6 +588,7 @@ export function useToolProcessor(toolId: string) {
         processedUrl: null,
         processedPreviewUrl: null,
         processedFilename: null,
+        resultNotes: null,
         status: "processing",
         error: null,
       });
@@ -750,6 +753,7 @@ export function useToolProcessor(toolId: string) {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,
               processedFilename: null,
+              resultNotes: pickResultNotes(result),
               status: "completed",
               originalSize: result.originalSize,
               processedSize: result.processedSize,
@@ -892,8 +896,9 @@ export function useToolProcessor(toolId: string) {
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
       setError(null);
-      // A batch reports no per-file payload, so a previous single run's
-      // (e.g. compress's resizedTo) must not render under the batch result.
+      // A batch's per-file notes land on each entry (#1292), not in the
+      // hook's single-run payload, so a previous single run's must not render
+      // under the batch result.
       setResultPayload(null);
       // Batch runs never auto-save to the library (no fileId is sent), so a
       // previous single run's saved indicator must not survive into this one.
@@ -911,6 +916,7 @@ export function useToolProcessor(toolId: string) {
           processedPreviewUrl: null,
           processedFilename: null,
           processedSize: null,
+          resultNotes: null,
           status: "processing",
           error: null,
         });
@@ -971,7 +977,11 @@ export function useToolProcessor(toolId: string) {
         trackBatch(canceledByUser ? "canceled" : "failed", canceledByUser ? "canceled" : reason);
       };
 
-      const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
+      const settleFromZip = async (
+        zipBlob: Blob,
+        fileResults: Record<string, string>,
+        fileNotes: Record<string, unknown> = {},
+      ) => {
         setBatchZip(zipBlob, `batch-${toolId}.zip`);
 
         // Extract files from ZIP using fflate
@@ -997,6 +1007,8 @@ export function useToolProcessor(toolId: string) {
               // stale processedPreviewUrl so an earlier single run's preview
               // can't win over this result (displayUrl prefers it) (#746).
               processedPreviewUrl: null,
+              // What a single run of this file would have said (#1292).
+              resultNotes: pickResultNotes(fileNotes[String(i)]),
               status: "completed",
               error: null,
             });
@@ -1009,6 +1021,7 @@ export function useToolProcessor(toolId: string) {
               // previous result (#746).
               processedUrl: null,
               processedPreviewUrl: null,
+              resultNotes: null,
               status: "failed",
               error: canceledByUser ? "Canceled" : "File not found in batch results",
             });
@@ -1028,6 +1041,7 @@ export function useToolProcessor(toolId: string) {
       const downloadAndSettle = async (result: Record<string, unknown>) => {
         const url = serverUrl(String(result.downloadUrl));
         const fileResults = (result.fileResults ?? {}) as Record<string, string>;
+        const fileNotes = asNotesMap(result.fileNotes);
         for (let attempt = 0; attempt < 3; attempt++) {
           if (activeJobIdRef.current !== clientJobId) return;
           try {
@@ -1048,7 +1062,7 @@ export function useToolProcessor(toolId: string) {
             if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
             const blob = await res.blob();
             if (activeJobIdRef.current !== clientJobId) return;
-            await settleFromZip(blob, fileResults);
+            await settleFromZip(blob, fileResults, fileNotes);
             return;
           } catch {
             if (attempt < 2) {
@@ -1183,11 +1197,16 @@ export function useToolProcessor(toolId: string) {
           } catch {
             // Malformed header - fall back to empty mapping, all entries marked failed
           }
+          // Absent on servers from before #1292, which is no notes. A header
+          // that doesn't parse to an object only costs the notes, never the
+          // results, but it's logged: silently dropping it would settle every
+          // file as fine, the exact thing the notes exist to prevent.
+          const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
           const zipBlob = xhr.response as Blob;
           void (async () => {
             try {
               if (activeJobIdRef.current !== clientJobId) return;
-              await settleFromZip(zipBlob, fileResults);
+              await settleFromZip(zipBlob, fileResults, fileNotes);
             } catch {
               if (activeJobIdRef.current !== clientJobId) return;
               failRun("Batch processing failed", "unzip-failed");

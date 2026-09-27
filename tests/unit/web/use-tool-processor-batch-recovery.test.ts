@@ -962,3 +962,193 @@ describe("useToolProcessor batch stale-state reset (#746)", () => {
     unmount();
   });
 });
+
+/**
+ * #1292: a batch said nothing per file about what a single run says, so
+ * "compress 20 photos to 20 KB" could quietly scale half of them down. The
+ * server now sends per-file notes keyed like fileResults; they land on each
+ * FileEntry, where the panels and the thumbnail strip read them.
+ */
+describe("useToolProcessor per-file result notes (#1292)", () => {
+  const NOTES = { "1": { resizedTo: { width: 800, height: 600 }, targetKb: 20 } };
+
+  it("puts the sync response's X-File-Notes on the matching entries", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) => {
+        if (name === "X-File-Results") return encodedFileResults();
+        if (name === "X-File-Notes") return encodeURIComponent(JSON.stringify(NOTES));
+        return null;
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].resultNotes).toBeNull();
+    expect(entries[1].resultNotes).toEqual(NOTES["1"]);
+
+    unmount();
+  });
+
+  it("takes the notes from the terminal frame when the run settles over SSE", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      sendBatchFrame({
+        ...completedTerminalFrame(),
+        result: { ...TERMINAL_RESULT, fileNotes: NOTES },
+      });
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    expect(useFileStore.getState().entries[1].resultNotes).toEqual(NOTES["1"]);
+    expect(useFileStore.getState().entries[0].resultNotes).toBeNull();
+
+    unmount();
+  });
+
+  it("leaves every entry without notes when the server sends none", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    for (const entry of useFileStore.getState().entries) expect(entry.resultNotes).toBeNull();
+
+    unmount();
+  });
+
+  it("keeps the results when the notes header is junk, and logs it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) => {
+        if (name === "X-File-Results") return encodedFileResults();
+        // Parses fine, but isn't a map: it used to throw inside the settle
+        // and fail a good batch as "Batch processing failed".
+        if (name === "X-File-Notes") return encodeURIComponent("null");
+        return null;
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+
+    unmount();
+  });
+
+  it("clears every entry's notes when a batch starts", () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "first.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "second.jpg", { type: "image/jpeg" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    useFileStore.getState().updateEntry(1, { resultNotes: { targetMet: false } });
+    const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+    act(() => {
+      void result.current.processAllFiles(files, { width: 50 });
+    });
+
+    for (const entry of useFileStore.getState().entries) expect(entry.resultNotes).toBeNull();
+    unmount();
+  });
+
+  it("records a sync single run's notes on its entry", () => {
+    const file = new File([new ArrayBuffer(64)], "photo.jpg", { type: "image/jpeg" });
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("compress"));
+    act(() => {
+      result.current.processFiles([file], { mode: "targetSize", targetSizeKb: 20 });
+    });
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        jobId: "server-job",
+        downloadUrl: "/api/v1/download/server-job/photo.jpg",
+        originalSize: 64,
+        processedSize: 20,
+        targetKb: 20,
+        resizedTo: { width: 800, height: 600 },
+      });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0].resultNotes).toEqual({
+      targetKb: 20,
+      resizedTo: { width: 800, height: 600 },
+    });
+    unmount();
+  });
+
+  it("records a single run's notes on its entry too", () => {
+    const { unmount } = startSingleRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: "server-job",
+          downloadUrl: "/api/v1/download/server-job/clip.pdf",
+          originalSize: 64,
+          processedSize: 32,
+          targetKb: 100,
+          targetMet: false,
+        },
+      });
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().entries[0].resultNotes).toEqual({
+      targetKb: 100,
+      targetMet: false,
+    });
+
+    unmount();
+  });
+});

@@ -18,9 +18,8 @@ export function CompressPdfPresetSettings() {
   const toolId = params.toolId ?? "";
   const preset = COMPRESS_PRESET_BY_ID[toolId];
 
-  const { files, currentEntry } = useFileStore();
-  const { processFiles, processAllFiles, processing, error, progress, resultPayload } =
-    useToolProcessor(toolId);
+  const { files, entries, currentEntry } = useFileStore();
+  const { processFiles, processAllFiles, processing, error, progress } = useToolProcessor(toolId);
 
   if (preset?.base !== "compress-pdf") {
     throw new Error(`No PDF compress preset registered for tool "${toolId}"`);
@@ -30,12 +29,15 @@ export function CompressPdfPresetSettings() {
   const hasMultiple = files.length > 1;
 
   // Same reporting as compress-pdf's own target-size mode: a text-heavy PDF may
-  // not get under the target at all, and the result has to say so.
-  // Only speak for the file on screen: resultPayload outlives a switch to
-  // another preset or a fresh upload, and would describe a run that isn't there.
-  const achieved = currentEntry?.status === "completed" ? currentEntry.processedSize : null;
-  const targetMet =
-    achieved != null ? (resultPayload?.targetMet as boolean | undefined) : undefined;
+  // not get under the target at all, and the result has to say so. The verdict
+  // is the selected file's own (#1292): single runs and batches both store it
+  // on the entry, so it can't describe another file or an earlier run.
+  const done = currentEntry?.status === "completed";
+  const achieved = done ? currentEntry.processedSize : null;
+  const targetMet = done && achieved != null ? currentEntry.resultNotes?.targetMet : undefined;
+  const missed = entries.filter(
+    (entry) => entry.status === "completed" && entry.resultNotes?.targetMet === false,
+  );
   const targetLabel = preset.label;
   // Report the result in the target's own unit, so "1 MB" isn't set against "1049.673 KB".
   const achievedLabel =
@@ -66,6 +68,18 @@ export function CompressPdfPresetSettings() {
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
 
+      {entries.length > 1 && missed.length > 0 && (
+        <p
+          className="text-xs font-medium text-amber-700 dark:text-amber-400"
+          data-testid="compress-pdf-missed-summary"
+        >
+          {format(s.batchMissed, {
+            count: missed.length,
+            total: entries.length,
+            target: targetLabel,
+          })}
+        </p>
+      )}
       {targetMet === false && (
         <p className="text-xs text-amber-700 dark:text-amber-400">
           {format(s.targetMissed, { target: targetLabel, size: achievedLabel })}

@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { qpdfAvailable } from "@snapotter/doc-engine";
+import { gsAvailable, qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
 import AdmZip from "adm-zip";
 import { eq } from "drizzle-orm";
@@ -749,7 +749,7 @@ describe("Legacy batch SSE wire parity", () => {
     }
 
     expect(frame).not.toBeNull();
-    const parsed = JSON.parse(frame!);
+    const parsed = JSON.parse(frame ?? "null");
 
     // Legacy semantics: completedFiles = total finished (successes + failures)
     expect(parsed.totalFiles).toBe(3);
@@ -1430,5 +1430,106 @@ describe.skipIf(!qpdfAvailable())("Document batch partial failure", () => {
     const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
     expect(Object.keys(fileResults)).toEqual(["0"]);
     expect(fileResults["0"]).toMatch(/doc-ok/);
+  }, 60_000);
+});
+
+// ── X-File-Notes header (#1292) ─────────────────────────────────
+// A single target-size run says when it had to scale an image down to fit
+// (resizedTo) or couldn't reach the target (targetMet). A batch settled from
+// the ZIP said neither, so "compress 20 photos to 20 KB" could quietly shrink
+// half of them. The notes ride next to fileResults, keyed the same way.
+describe("X-File-Notes header (#1292)", () => {
+  async function noiseJpeg(w: number, h: number): Promise<Buffer> {
+    const raw = Buffer.alloc(w * h * 3);
+    let seed = 7;
+    for (let i = 0; i < raw.length; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      raw[i] = seed & 0xff;
+    }
+    return sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  }
+
+  it("reports per-file resize notes, keyed by upload index", async () => {
+    // Index 0 is a zero-byte upload that never becomes a flow child, so the
+    // notes must follow the same flow-to-upload remap as fileResults (#645).
+    const big = await noiseJpeg(3000, 2250);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "empty.png", contentType: "image/png", content: Buffer.alloc(0) },
+      { name: "file", filename: "big.jpg", contentType: "image/jpeg", content: big },
+      { name: "file", filename: "small.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ mode: "targetSize", targetSizeKb: 20 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const fileResults = JSON.parse(decodeURIComponent(res.headers["x-file-results"] as string));
+    expect(Object.keys(fileResults).sort()).toEqual(["1", "2"]);
+
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    expect(notes["1"].targetKb).toBe(20);
+    expect(notes["1"].resizedTo.width).toBeLessThan(3000);
+    // Only files with something to warn about get a note, so the header stays
+    // small however large the batch: the small PNG fit and has none.
+    expect(notes["2"]).toBeUndefined();
+    expect(notes["0"]).toBeUndefined();
+
+    // The async path (SSE terminal frame, replay) reads the same map from the
+    // parent row, so a client that lost the HTTP response still gets it.
+    const parentId = res.headers["x-job-id"] as string;
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    const result = (row.progress as { result?: { fileNotes?: Record<string, unknown> } }).result;
+    expect(result?.fileNotes).toEqual(notes);
+  }, 120_000);
+
+  // The issue's headline case: a batch through a size target where one PDF is
+  // mostly text and can't get there. It used to settle as done like the rest.
+  it.skipIf(!gsAvailable())(
+    "reports a compress-pdf file that missed its target",
+    async () => {
+      const scan = readFixture(fixtures.document.pdfScanned);
+      const text = readFixture(fixtures.document.pdf3);
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "scan.pdf", contentType: "application/pdf", content: scan },
+        { name: "file", filename: "text.pdf", contentType: "application/pdf", content: text },
+        { name: "settings", content: JSON.stringify({ mode: "targetSize", targetSizeKb: 1 }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/pdf/compress-pdf/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+      const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+      // 1 KB is out of reach for both, so both carry the miss and their target.
+      expect(notes["0"]).toEqual({ targetMet: false, targetKb: 1 });
+      expect(notes["1"]).toEqual({ targetMet: false, targetKb: 1 });
+    },
+    180_000,
+  );
+
+  it("sends an empty map when no file carries a note", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ width: 80 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string))).toEqual({});
   }, 60_000);
 });
