@@ -56,16 +56,31 @@ describe("i18n cross-locale parity", () => {
   // The key-set check treats an array as one leaf, so a locale with fewer
   // entries passes it. Rotating-line components index these arrays with a
   // counter, and a short or blank entry renders as an empty line (#1268).
+  it("en rotating-line arrays are present, non-empty, and have no blank entries", () => {
+    // Pinned so a catalog reshape can't leave the per-locale check below
+    // walking nothing.
+    for (const path of [
+      "auth.rotatingPhrases",
+      "features.progressMessages",
+      "toolPage.previewProgressMessages",
+    ]) {
+      expect(enArrays.has(path), `en has no array at ${path}`).toBe(true);
+    }
+    for (const [path, enArray] of enArrays) {
+      // An empty array makes the components' `index % length` NaN.
+      expect(enArray.length, `en ${path} is empty`).toBeGreaterThan(0);
+      const blank = enArray.findIndex((entry) => typeof entry !== "string" || entry.trim() === "");
+      expect(blank, `en ${path}[${blank}] is blank or not a string`).toBe(-1);
+    }
+  });
+
   it.each(SUPPORTED_LOCALES.filter((l) => l.code !== "en").map((l) => [l.code, l.name]))(
     "%s (%s) has the same array lengths as en, with no blank entries",
     async (code) => {
       const localeArrays = getArrays(
         (await loadTranslations(code)) as unknown as Record<string, unknown>,
       );
-      expect(enArrays.size).toBeGreaterThan(0);
       for (const [path, enArray] of enArrays) {
-        // An empty array makes the components' `index % length` NaN.
-        expect(enArray.length, `en ${path} is empty`).toBeGreaterThan(0);
         const localeArray = localeArrays.get(path);
         expect(localeArray, `locale "${code}" has no array at ${path}`).toBeDefined();
         expect(
