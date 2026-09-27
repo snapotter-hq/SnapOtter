@@ -317,6 +317,40 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(session.statusCode).toBe(200);
       expect(session.json().user.username).toBe(sub);
     });
+
+    // The IdP compares the token-exchange redirect_uri with the one it saw at
+    // login and rejects a mismatch, so a dropped or doubled prefix here breaks
+    // SSO while the login-redirect test above stays green (#1297).
+    it("sends the token exchange a redirect_uri under the deployment path", async () => {
+      const sub = `sub-uri-${Math.random().toString(36).slice(2, 10)}`;
+      const res = await callbackWithClaims({ sub, preferred_username: sub });
+      expect(res.statusCode).toBe(302);
+
+      expect(authorizationCodeGrantMock).toHaveBeenCalledTimes(1);
+      const callbackUrl = authorizationCodeGrantMock.mock.calls[0][1] as URL;
+      expect(callbackUrl.origin).toBe("http://localhost:9999");
+      expect(callbackUrl.pathname).toBe(`${basePath}/api/auth/oidc/callback`);
+    });
+
+    it("sends an MFA challenge to the login page under the deployment path", async () => {
+      // The callback's dynamic import("./mfa.js") resolves to this same module
+      // instance, so the spy forces the challenge outcome (as the #815 test
+      // forces a policy-read failure).
+      const spy = vi
+        .spyOn(mfaModule, "resolveExternalLoginMfaOutcome")
+        .mockReturnValue("challenge");
+      try {
+        const sub = `sub-mfa-${Math.random().toString(36).slice(2, 10)}`;
+        const res = await callbackWithClaims({ sub, preferred_username: sub });
+        expect(res.statusCode).toBe(302);
+        const location = new URL(String(res.headers.location), "http://localhost:9999");
+        expect(location.pathname).toBe(`${basePath}/login`);
+        expect(location.searchParams.get("mfaToken")).toMatch(/^[0-9a-f-]{36}$/);
+        expect(res.cookies.find((c) => c.name === "snapotter-session")).toBeUndefined();
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("fails with oidc_auth_failed when the token response carries no ID-token claims", async () => {

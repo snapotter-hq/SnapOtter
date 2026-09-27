@@ -22,6 +22,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
   reconcileStrandedJobs,
@@ -117,6 +118,38 @@ describe("stranded-job reconciliation", () => {
     });
     expect(res.statusCode, "the recovered bytes are still unreachable").toBe(200);
     expect(res.body).toBe("0123456789");
+  });
+
+  // The reconciler builds its payload while the sweep runs, so only a sweep
+  // under a nonempty BASE_PATH can catch a prefix baked into it (#1297). The
+  // payload is persisted, so it stays root-relative (#1274) and the client
+  // joins it onto the deployment path.
+  it("keeps a recovered row's URLs root-relative under a deployment prefix", async () => {
+    const basePath = "/snapotter";
+    const id = await seedJob({ status: "processing" });
+    await seedOutput(id, "recovered.bin", Buffer.from("0123456789"));
+    await seedOutput(id, "preview.png", Buffer.from("preview"));
+
+    const originalBasePath = env.BASE_PATH;
+    env.BASE_PATH = basePath;
+    try {
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("recovered");
+
+      const row = await readJob(id);
+      expect(row.status).toBe("completed");
+      expect(resultOf(row).downloadUrl).toBe(`/api/v1/download/${id}/recovered.bin`);
+      expect(resultOf(row).previewUrl).toBe(`/api/v1/download/${id}/preview.png`);
+
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: `${basePath}${resultOf(row).downloadUrl}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toBe("0123456789");
+    } finally {
+      env.BASE_PATH = originalBasePath;
+    }
   });
 
   it("fails a queued row that produced nothing", async () => {

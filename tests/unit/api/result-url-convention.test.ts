@@ -17,6 +17,34 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+const DOWNLOAD_PATH = "/api/v1/download/";
+
+// Allowlist form of the rule above, for the result URLs that get persisted:
+// in server code, every /api/v1/download/ must open its own string literal
+// and must not be appended to anything. The BASE_PATH line check misses a
+// prefix held in another variable (`${prefix}/api/v1/download/...`), an
+// absolute origin (`${env.EXTERNAL_URL}/api/...`), concatenation, and a prefix
+// that biome wraps onto an earlier line (#1297). Whole-line comments are
+// skipped; a trailing comment that names the path is flagged, which is loud
+// and cheap to reword.
+function findUnanchoredDownloadPaths(source: string): number[] {
+  const lines = source.split("\n");
+  const offenders: number[] = [];
+  for (const [index, line] of lines.entries()) {
+    if (/^\s*(\/\/|\/\*|\*)/.test(line)) continue;
+    let at = line.indexOf(DOWNLOAD_PATH);
+    while (at !== -1) {
+      const opener = line[at - 1];
+      const appendedTo = [...lines.slice(0, index), line.slice(0, at - 1)].join("\n").trimEnd();
+      if (!["'", '"', "`"].includes(opener) || appendedTo.endsWith("+")) {
+        offenders.push(index + 1);
+      }
+      at = line.indexOf(DOWNLOAD_PATH, at + 1);
+    }
+  }
+  return offenders;
+}
+
 // Files that read result URLs only from useToolProcessor (already resolved) and
 // parse nothing but inspect/analyze responses that carry no URLs.
 const WEB_PARSE_ALLOWLIST = new Set([
@@ -38,6 +66,43 @@ describe("result URL convention", () => {
         .map(({ index }) => `${relative(root, file)}:${index + 1}`),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it("starts every server download URL at the root", () => {
+    const offenders = sourceFiles(join(root, "apps/api/src")).flatMap((file) =>
+      findUnanchoredDownloadPaths(readFileSync(file, "utf8")).map(
+        (line) => `${relative(root, file)}:${line}`,
+      ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    ["a prefix held in another variable", `const u = \`\${prefix}/api/v1/download/\${id}\`;`],
+    ["an absolute origin", `const u = \`\${env.EXTERNAL_URL}/api/v1/download/\${id}\`;`],
+    ["concatenation onto a prefix", `const u = prefix + "/api/v1/download/" + id;`],
+    [
+      "concatenation wrapped onto the next line",
+      `const u =\n  prefix +\n  "/api/v1/download/" + id;`,
+    ],
+    [
+      "a template whose prefix biome wrapped",
+      `const u = \`\${\n  prefix\n}/api/v1/download/\${id}\`;`,
+    ],
+    ["a trailing comment naming the path", `f(); // see /api/v1/download/<id>`],
+  ])("flags %s", (_label, snippet) => {
+    expect(findUnanchoredDownloadPaths(snippet)).toHaveLength(1);
+  });
+
+  it.each([
+    ["a root-relative result URL", `downloadUrl: \`/api/v1/download/\${jobId}/\${name}\`,`],
+    ["a route registration", `app.get("/api/v1/download/:jobId/:filename", handler);`],
+    ["the public-path entry", `const PUBLIC_PATHS = [\n  "/api/v1/download/",\n];`],
+    ["a single-quoted literal", `const u = '/api/v1/download/' + id;`],
+    ["a whole-line comment", "  // the legacy download URL /api/v1/download/<id>/... works."],
+    ["a doc-comment line", " * GET /api/v1/download/:jobId/:filename"],
+  ])("allows %s", (_label, snippet) => {
+    expect(findUnanchoredDownloadPaths(snippet)).toEqual([]);
   });
 
   // A web file that parses an API response and reads a result URL out of it
