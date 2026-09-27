@@ -1,4 +1,4 @@
-import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
+import { CATEGORIES, en, TOOLS, toolSection } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   buildToolRequestDiscussionUrl,
@@ -339,6 +339,36 @@ describe("landing searchTools with real catalog metadata", () => {
     // not hand it the query the Favicon Generator is named for.
     const result = searchTools(realTools, { query: "favicon", modality: "all", limit: 8 });
     expect(result.results[0]?.item.id).toBe("favicon");
+  });
+
+  // #1327: "convert image" normalized to "image" and "vectorize" to
+  // "vec to rize"; both queries must still find the tool they name. Built
+  // from the English i18n strings like ToolGrid.astro, because the Vectorize
+  // tool's description there never says "vectorize".
+  it.each([
+    ["convert image", "convert"],
+    ["vectorize", "vectorize"],
+  ])("%j is a confident match for %s", (query, id) => {
+    const toolStrings = en.tools as Record<string, { name?: string; description?: string }>;
+    const localized = realTools.map((tool) => ({
+      ...tool,
+      name: toolStrings[tool.id]?.name ?? tool.name,
+      description: toolStrings[tool.id]?.description ?? tool.description,
+    }));
+    const result = searchTools(localized, { query, modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe(id);
+    expect(result.hasConfidentMatch).toBe(true);
+  });
+
+  it.each([
+    ["htmltopdf", "html-to-pdf"],
+    ["videotogif", "video-to-gif"],
+    ["xmltocsv", "xml-to-csv"],
+    ["pdftotext", "pdf-to-text"],
+  ])("joined %j still finds %s", (query, id) => {
+    const result = searchTools(realTools, { query, modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe(id);
+    expect(result.hasConfidentMatch).toBe(true);
   });
 
   it("gives a bare format word no keyword bonus", () => {
