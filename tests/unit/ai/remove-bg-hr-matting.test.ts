@@ -109,7 +109,10 @@ describe.skipIf(!hasPython)("birefnet-hr-matting session", () => {
     expect(res.stdout).toContain("OK");
   }, 70_000);
 
-  it.skipIf(!pythonWith("rembg"))(
+  // The Unit Tests job has no rembg, so this skips there. ci.yml's "AI Sidecar
+  // (rembg)" job installs the pinned rembg and sets REQUIRE_REMBG=1, which
+  // makes a missing rembg a failure instead of a skip (#1299).
+  it.skipIf(process.env.REQUIRE_REMBG !== "1" && !pythonWith("rembg"))(
     "turns subject logits opaque and background logits transparent",
     () => {
       const res = runPython(MASK_FROM_LOGITS);
