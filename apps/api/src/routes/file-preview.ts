@@ -11,7 +11,8 @@ import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
-import { EncoderMissingError, runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
+import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
+import { isSafeMessageError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
@@ -64,8 +65,11 @@ function previewPath(fileId: string, ext: string): string {
  * let the web UI show that reason translated rather than in English (#1290).
  */
 function previewErrorBody(err: unknown): { error: string; code?: string; encoder?: string } {
-  if (err instanceof EncoderMissingError) {
-    return { error: friendlyError(err.message), code: "ENCODER_MISSING", encoder: err.encoder };
+  // Detected by marker and code, not instanceof, the way SafeErrors are
+  // everywhere (packages/shared/src/tool-errors.ts): it survives a copied error.
+  const encoder = (err as { encoder?: unknown }).encoder;
+  if (isSafeMessageError(err) && err.code === "ENCODER_MISSING" && typeof encoder === "string") {
+    return { error: friendlyError(err.message), code: err.code, encoder };
   }
   return { error: "Could not generate preview" };
 }

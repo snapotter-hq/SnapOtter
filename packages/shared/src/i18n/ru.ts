@@ -3871,7 +3871,7 @@ export const ru: TranslationKeys = {
     generatePreview: "Сгенерировать предпросмотр",
     previewFailed: "Не удалось сгенерировать предпросмотр",
     previewEncoderMissing:
-      "В ffmpeg на этом сервере нет кодировщика {encoder}, поэтому предпросмотр не создать. Обратитесь к администратору.",
+      "В ffmpeg на этом сервере нет кодировщика {encoder}, поэтому не удаётся создать предпросмотр. Обратитесь к администратору.",
     previewNotAvailable: "Предпросмотр недоступен",
     resultPreviewFailed: "Не удалось загрузить предпросмотр результата",
     resultPreviewFailedHint:
