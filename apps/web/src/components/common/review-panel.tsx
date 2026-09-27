@@ -1,8 +1,9 @@
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, FolderPlus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize, triggerDownload } from "@/lib/download";
@@ -96,6 +97,15 @@ export function ReviewPanel({
     setSaveStatus("saving");
     try {
       const res = await fetch(downloadUrl);
+      // An expired or missing result answers with an error page. Uploading
+      // that body would put a broken file in the library and say "Saved"
+      // (#1286). The status goes in the message because Sentry's scrubber
+      // keeps a SafeError's message but drops its code.
+      if (!res.ok) {
+        throw new SafeError(`Save to Files could not fetch the result (HTTP ${res.status})`, {
+          code: `save-result-fetch-${res.status}`,
+        });
+      }
       const blob = await res.blob();
       const formData = new FormData();
       // Record which tool produced this file so the library shows it under
@@ -107,7 +117,11 @@ export function ReviewPanel({
         headers: formatHeaders(),
         body: formData,
       });
-      if (!uploadRes.ok) throw new Error("Upload failed");
+      if (!uploadRes.ok) {
+        throw new SafeError(`Save to Files upload failed (HTTP ${uploadRes.status})`, {
+          code: `save-upload-${uploadRes.status}`,
+        });
+      }
       setSaveStatus("saved");
       useFileStore.getState().markClaimed(claimIndex);
       // "Save to library" is the real success signal for a self-hosted tool
@@ -116,7 +130,14 @@ export function ReviewPanel({
       import("@/lib/analytics").then(({ track }) => {
         track(ANALYTICS_EVENTS.RESULT_SAVED, { tool_id: currentToolId });
       });
-    } catch {
+    } catch (err) {
+      console.error("Save to Files failed", err);
+      void captureHandledError(
+        isSafeMessageError(err)
+          ? err
+          : new SafeError("Save to Files request failed", { code: "save-request", cause: err }),
+        { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
+      );
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
     }
@@ -239,6 +260,8 @@ export function ReviewPanel({
           >
             {saveStatus === "saved" ? (
               <CheckCircle2 className="h-3 w-3" />
+            ) : saveStatus === "error" ? (
+              <AlertCircle className="h-3 w-3" />
             ) : saveStatus === "saving" ? (
               <div className="h-3 w-3 border-1.5 border-current border-t-transparent rounded-full animate-spin" />
             ) : (
@@ -248,7 +271,9 @@ export function ReviewPanel({
               ? t.common.saving
               : saveStatus === "saved"
                 ? t.toolPage.savedToFiles
-                : t.toolPage.saveToFiles}
+                : saveStatus === "error"
+                  ? t.common.error
+                  : t.toolPage.saveToFiles}
           </button>
         </div>
       )}
