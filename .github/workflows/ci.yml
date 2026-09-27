@@ -544,6 +544,29 @@ jobs:
           PYTHON_VENV_PATH: .venv-rembg
           REQUIRE_REMBG: "1"
 
+  ai-sidecar-rembg-result:
+    # The one name branch protection requires (#1386). A skipped matrix job
+    # reports under its unexpanded name ("AI Sidecar (rembg, ${{ matrix.pins }})"),
+    # so neither leg can be required directly: a PR that doesn't touch the AI
+    # Python would wait on it forever. This always reports, and passes when
+    # both legs passed or the path filter skipped them. A skip from a failed
+    # changes job also passes here, which is fine: Changes is required itself.
+    name: AI Sidecar (rembg)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: ai-sidecar-rembg
+    if: always()
+    steps:
+      - name: Check both pin sets
+        env:
+          RESULT: ${{ needs.ai-sidecar-rembg.result }}
+        run: |
+          echo "ai-sidecar-rembg: $RESULT"
+          case "$RESULT" in
+            success | skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
+
   build:
     name: Build
     runs-on: ubuntu-latest
