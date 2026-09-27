@@ -4,6 +4,7 @@ import os from "node:os";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
+import { dropRunLeftovers } from "./setup/fork-db.js";
 import { removeOrphanedForkDirs } from "./setup/fork-dir.js";
 
 // pg and drizzle-orm live in the api workspace's node_modules. Global-setup
@@ -122,6 +123,19 @@ export async function setup(): Promise<void> {
 }
 
 export async function teardown(): Promise<void> {
+  // Every fork has exited by now, so whatever per-file databases and roles the
+  // run's own sweeps didn't get to can go. It matters on a long-lived
+  // TEST_DATABASE_URL server, where they'd otherwise pile up run after run
+  // (#1315); the testcontainer is about to be thrown away regardless.
+  const baseUrl = process.env.TEST_PG_BASE_URL;
+  const runId = process.env.TEST_RUN_ID;
+  if (baseUrl && runId) {
+    try {
+      await dropRunLeftovers(baseUrl, TEST_RUNTIME_ROLE, runId);
+    } catch (err) {
+      console.warn("[global-setup] could not clear this run's test databases and roles", err);
+    }
+  }
   await redisContainer?.stop();
   await container?.stop();
 }
