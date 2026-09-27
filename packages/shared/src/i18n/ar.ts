@@ -1035,6 +1035,26 @@ export const ar: TranslationKeys = {
       name: "ضغط PDF",
       description: "تقليل حجم ملف PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "ضغط PDF إلى 100 KB",
+      description: "تقليل حجم ملف PDF إلى أقل من 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "ضغط PDF إلى 200 KB",
+      description: "تقليل حجم ملف PDF إلى أقل من 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "ضغط PDF إلى 500 KB",
+      description: "تقليل حجم ملف PDF إلى أقل من 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "ضغط PDF إلى 1 MB",
+      description: "تقليل حجم ملف PDF إلى أقل من 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "ضغط PDF إلى 2 MB",
+      description: "تقليل حجم ملف PDF إلى أقل من 2 MB",
+    },
     "rotate-pdf": {
       name: "تدوير PDF",
       description: "تدوير صفحات PDF",
@@ -3470,6 +3490,7 @@ export const ar: TranslationKeys = {
       printer: "طباعة (أفضل جودة)",
       submit: "ضغط",
       submitBatch: "ضغط ({count} ملفات)",
+      submitTarget: "ضغط إلى {size}",
       progressLabel: "جارٍ الضغط",
       bestEffortHint:
         "الحد الأقصى قدر الإمكان. ملفات PDF المستندة إلى الصور تقترب من هذا الحجم؛ أما ملفات PDF النصية فقد لا تنكمش إلى هذا الحجم.",

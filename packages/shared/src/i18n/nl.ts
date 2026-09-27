@@ -1046,6 +1046,26 @@ export const nl: TranslationKeys = {
       name: "PDF comprimeren",
       description: "Verklein de bestandsgrootte van PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF comprimeren tot 100 KB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF comprimeren tot 200 KB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF comprimeren tot 500 KB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF comprimeren tot 1 MB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF comprimeren tot 2 MB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 2 MB",
+    },
     "rotate-pdf": {
       name: "PDF roteren",
       description: "Roteer pagina's in een PDF",
@@ -3503,6 +3523,7 @@ export const nl: TranslationKeys = {
       printer: "Printer (beste kwaliteit)",
       submit: "Comprimeren",
       submitBatch: "Comprimeren ({count} bestanden)",
+      submitTarget: "Comprimeren tot {size}",
       progressLabel: "Comprimeren",
       bestEffortHint:
         "Maximaal haalbaar. Op afbeeldingen gebaseerde PDF's komen dichtbij; PDF's met alleen tekst worden mogelijk niet tot deze grootte verkleind.",

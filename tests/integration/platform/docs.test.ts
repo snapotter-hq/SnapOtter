@@ -142,7 +142,7 @@ describe("API docs", () => {
     }
     expect([...perSection.values()].reduce((sum, count) => sum + count, 0)).toBe(TOOLS.length);
     expect(deployment).not.toContain("All 138 non-AI tools");
-    expect(architecture).toContain("248 tool routes");
+    expect(architecture).toContain("253 tool routes");
   });
 
   it("serves an LLM summary with live catalog tools", async () => {

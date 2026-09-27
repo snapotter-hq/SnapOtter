@@ -53,7 +53,7 @@ Gemeinsam genutzte TypeScript-Typen, Konstanten (wie `APP_VERSION` und Werkzeugd
 
 ### API (`apps/api`) {#api-apps-api}
 
-Ein Fastify-v5-Server, der 248 Werkzeug-Routen über fünf Modalitäten (image, video, audio, PDF, file) bereitstellt und Folgendes übernimmt:
+Ein Fastify-v5-Server, der 253 Werkzeug-Routen über fünf Modalitäten (image, video, audio, PDF, file) bereitstellt und Folgendes übernimmt:
 - Datei-Uploads, Verwaltung des temporären Arbeitsbereichs und persistenter Dateispeicher
 - Benutzer-Dateibibliothek (`user_files`-Tabelle): Ein gespeicherter Edit wird standardmäßig als eigenständige neue Datei abgelegt, oder als übergeordnet verknüpfte Version, wenn du das Original überschreibst. Sie erfasst, welche Werkzeuge angewendet wurden (`toolChain`), und erhält ein automatisch generiertes Thumbnail für die Files-Seite
 - Werkzeugausführung (leitet jede Werkzeuganfrage an die Image-Engine oder die KI-Brücke weiter)

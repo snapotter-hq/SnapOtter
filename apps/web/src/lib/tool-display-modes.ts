@@ -226,7 +226,10 @@ for (const preset of CONVERSION_PRESETS) {
 }
 
 for (const preset of COMPRESS_PRESETS) {
-  TOOL_DISPLAY_MODES[preset.id] = "before-after";
+  // Image presets compare before/after like compress; PDF presets take
+  // compress-pdf's document view.
+  TOOL_DISPLAY_MODES[preset.id] =
+    preset.base === "compress" ? "before-after" : TOOL_DISPLAY_MODES[preset.base];
 }
 
 /**

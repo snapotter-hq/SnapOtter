@@ -1042,6 +1042,26 @@ export const sv: TranslationKeys = {
       name: "Komprimera PDF",
       description: "Minska PDF-filens storlek",
     },
+    "compress-pdf-to-100kb": {
+      name: "Komprimera PDF till 100 KB",
+      description: "Minska PDF-filens storlek till under 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Komprimera PDF till 200 KB",
+      description: "Minska PDF-filens storlek till under 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Komprimera PDF till 500 KB",
+      description: "Minska PDF-filens storlek till under 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Komprimera PDF till 1 MB",
+      description: "Minska PDF-filens storlek till under 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Komprimera PDF till 2 MB",
+      description: "Minska PDF-filens storlek till under 2 MB",
+    },
     "rotate-pdf": {
       name: "Rotera PDF",
       description: "Rotera sidor i en PDF",
@@ -3487,6 +3507,7 @@ export const sv: TranslationKeys = {
       printer: "Skrivare (bästa kvalitet)",
       submit: "Komprimera",
       submitBatch: "Komprimera ({count} filer)",
+      submitTarget: "Komprimera till {size}",
       progressLabel: "Komprimerar",
       bestEffortHint:
         "Bästa möjliga maximum. Bildbaserade PDF:er kommer nära; PDF:er med enbart text krymper kanske inte till denna storlek.",

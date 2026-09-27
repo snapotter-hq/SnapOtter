@@ -1045,6 +1045,26 @@ export const vi: TranslationKeys = {
       name: "Nén PDF",
       description: "Giảm dung lượng tệp PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Nén PDF xuống 100 KB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Nén PDF xuống 200 KB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Nén PDF xuống 500 KB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Nén PDF xuống 1 MB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Nén PDF xuống 2 MB",
+      description: "Giảm dung lượng tệp PDF xuống dưới 2 MB",
+    },
     "rotate-pdf": {
       name: "Xoay PDF",
       description: "Xoay các trang trong PDF",
@@ -3487,6 +3507,7 @@ export const vi: TranslationKeys = {
       printer: "Máy in (chất lượng tốt nhất)",
       submit: "Nén",
       submitBatch: "Nén ({count} tệp)",
+      submitTarget: "Nén xuống {size}",
       progressLabel: "Đang nén",
       bestEffortHint:
         "Mức tối đa trong khả năng. PDF chứa hình ảnh sẽ đạt gần mức này; PDF chỉ có văn bản có thể không thu nhỏ được xuống kích thước này.",

@@ -1,6 +1,6 @@
 # SnapOtter
 
-SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 248 tool routes across the five modalities, plus a layer-based image editor.
+SnapOtter is open-source, self-hosted file-processing infrastructure. It runs conversion, compression, OCR, transcription, metadata scrubbing, and local AI across image, video, audio, PDF, and documents, through a web UI, REST API, and automation pipelines. Everything runs on your own infrastructure; files never leave your network. Runs as a single container with embedded Postgres + Redis for quick start, or a Docker Compose stack for production. No external services. Dual-licensed AGPLv3 and commercial. The catalog spans 253 tool routes across the five modalities, plus a layer-based image editor.
 
 All processing happens locally. Files never leave your infrastructure.
 
@@ -40,7 +40,7 @@ Then run docker compose up -d, open http://localhost:1349, and log in with admin
 
 ## Tools
 
-248 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
+253 catalog tool routes across 5 modalities: image, video, audio, PDF, and files. The AI tools run locally on your hardware with no cloud APIs.
 
 ### Image
 
@@ -56,7 +56,7 @@ Transcribe Audio, Convert Audio, Trim Audio, Adjust Volume, Normalize Audio, Fad
 
 ### PDF
 
-PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Converter, Crop PDF, Pages Per Sheet (N-up), Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, Sign PDF, PDF to Text, PDF to Word, PDF Metadata. Plus format converters: PDF to JPG, PDF to PNG, PDF to TIFF.
+PDF OCR, PDF to Image, Merge PDFs, Split PDF, Compress PDF, Rotate PDF, Extract Pages, Remove Pages, Organize PDF, Protect PDF, Unlock PDF, Repair PDF, Web-Optimize PDF, Grayscale PDF, PDF/A Converter, Crop PDF, Pages Per Sheet (N-up), Booklet PDF, Watermark PDF, PDF Page Numbers, Flatten PDF, Redact PDF, Sign PDF, PDF to Text, PDF to Word, PDF Metadata, Compress PDF to 100 KB, Compress PDF to 200 KB, Compress PDF to 500 KB, Compress PDF to 1 MB, Compress PDF to 2 MB. Plus format converters: PDF to JPG, PDF to PNG, PDF to TIFF.
 
 ### Files
 

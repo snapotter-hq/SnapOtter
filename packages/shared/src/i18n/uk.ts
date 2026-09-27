@@ -1045,6 +1045,26 @@ export const uk: TranslationKeys = {
       name: "Стиснення PDF",
       description: "Зменшити розмір файлу PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Стиснення PDF до 100 KB",
+      description: "Зменшення розміру файлу PDF до 100 KB і менше",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Стиснення PDF до 200 KB",
+      description: "Зменшення розміру файлу PDF до 200 KB і менше",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Стиснення PDF до 500 KB",
+      description: "Зменшення розміру файлу PDF до 500 KB і менше",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Стиснення PDF до 1 MB",
+      description: "Зменшення розміру файлу PDF до 1 MB і менше",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Стиснення PDF до 2 MB",
+      description: "Зменшення розміру файлу PDF до 2 MB і менше",
+    },
     "rotate-pdf": {
       name: "Обертання PDF",
       description: "Обернути сторінки в PDF",
@@ -3493,6 +3513,7 @@ export const uk: TranslationKeys = {
       printer: "Друк (найкраща якість)",
       submit: "Стиснути",
       submitBatch: "Стиснути ({count} файлів)",
+      submitTarget: "Стиснути до {size}",
       progressLabel: "Стиснення",
       bestEffortHint:
         "Максимум за можливості. PDF на основі зображень наближаються до цього розміру; PDF лише з текстом можуть не зменшитися до нього.",

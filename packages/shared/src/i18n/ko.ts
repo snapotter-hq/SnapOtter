@@ -992,6 +992,26 @@ export const ko: TranslationKeys = {
       name: "PDF 압축",
       description: "PDF 파일 크기 줄이기",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF를 100 KB로 압축",
+      description: "PDF 파일 크기를 100 KB 미만으로 축소",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF를 200 KB로 압축",
+      description: "PDF 파일 크기를 200 KB 미만으로 축소",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF를 500 KB로 압축",
+      description: "PDF 파일 크기를 500 KB 미만으로 축소",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF를 1 MB로 압축",
+      description: "PDF 파일 크기를 1 MB 미만으로 축소",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF를 2 MB로 압축",
+      description: "PDF 파일 크기를 2 MB 미만으로 축소",
+    },
     "rotate-pdf": {
       name: "PDF 회전",
       description: "PDF 페이지 회전",
@@ -3423,6 +3443,7 @@ export const ko: TranslationKeys = {
       printer: "인쇄용 (최고 품질)",
       submit: "압축",
       submitBatch: "압축 ({count}개 파일)",
+      submitTarget: "{size}로 압축",
       progressLabel: "압축 중",
       bestEffortHint:
         "최대한 노력한 최대치입니다. 이미지 기반 PDF는 이 크기에 가깝게 도달하지만, 텍스트 전용 PDF는 이 크기까지 줄어들지 않을 수 있습니다.",

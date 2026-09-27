@@ -1047,6 +1047,26 @@ export const de: TranslationKeys = {
       name: "PDF komprimieren",
       description: "PDF-Dateigröße reduzieren",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF auf 100 KB komprimieren",
+      description: "PDF-Dateigröße auf unter 100 KB reduzieren",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF auf 200 KB komprimieren",
+      description: "PDF-Dateigröße auf unter 200 KB reduzieren",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF auf 500 KB komprimieren",
+      description: "PDF-Dateigröße auf unter 500 KB reduzieren",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF auf 1 MB komprimieren",
+      description: "PDF-Dateigröße auf unter 1 MB reduzieren",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF auf 2 MB komprimieren",
+      description: "PDF-Dateigröße auf unter 2 MB reduzieren",
+    },
     "rotate-pdf": {
       name: "PDF drehen",
       description: "Seiten in einem PDF drehen",
@@ -3507,6 +3527,7 @@ export const de: TranslationKeys = {
       printer: "Drucker (beste Qualität)",
       submit: "Komprimieren",
       submitBatch: "Komprimieren ({count} Dateien)",
+      submitTarget: "Auf {size} komprimieren",
       progressLabel: "Wird komprimiert",
       bestEffortHint:
         "Bestmögliches Maximum. Bildbasierte PDFs kommen nah heran; reine Text-PDFs schrumpfen womöglich nicht auf diese Größe.",

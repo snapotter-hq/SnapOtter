@@ -1392,6 +1392,9 @@ const BASE_TOOLS: Tool[] = [
     // "long": the target-size mode runs several ghostscript passes; async keeps
     // the request off the sync window and surfaces a real progress bar.
     executionHint: "long",
+    // The compress-pdf-to-N presets repeat these words in every keyword; without
+    // its own, the base tool lost "shrink pdf" to them (#1070, same as #1322).
+    keywords: ["compress pdf", "shrink pdf", "reduce pdf size", "pdf compressor"],
   },
   {
     id: "rotate-pdf",

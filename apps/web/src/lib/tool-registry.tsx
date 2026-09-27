@@ -620,6 +620,11 @@ const SplitPdfSettings = lazy(() =>
     default: m.SplitPdfSettings,
   })),
 );
+const CompressPdfPresetSettings = lazy(() =>
+  import("@/components/tools/compress-pdf-preset-settings").then((m) => ({
+    default: m.CompressPdfPresetSettings,
+  })),
+);
 const CompressPdfSettings = lazy(() =>
   import("@/components/tools/compress-pdf-settings").then((m) => ({
     default: m.CompressPdfSettings,
@@ -1116,6 +1121,11 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   ["merge-pdf", { accept: ".pdf", Settings: MergePdfSettings }],
   ["split-pdf", { accept: ".pdf", Settings: SplitPdfSettings }],
   ["compress-pdf", { accept: ".pdf", Settings: CompressPdfSettings }],
+  ["compress-pdf-to-100kb", { accept: ".pdf", Settings: CompressPdfPresetSettings }],
+  ["compress-pdf-to-200kb", { accept: ".pdf", Settings: CompressPdfPresetSettings }],
+  ["compress-pdf-to-500kb", { accept: ".pdf", Settings: CompressPdfPresetSettings }],
+  ["compress-pdf-to-1mb", { accept: ".pdf", Settings: CompressPdfPresetSettings }],
+  ["compress-pdf-to-2mb", { accept: ".pdf", Settings: CompressPdfPresetSettings }],
   ["rotate-pdf", { accept: ".pdf", Settings: RotatePdfSettings }],
   ["word-to-pdf", { accept: ".docx,.doc,.odt,.rtf,.txt", Settings: WordToPdfSettings }],
   ["excel-to-pdf", { accept: ".xlsx,.xls,.ods,.csv", Settings: ExcelToPdfSettings }],

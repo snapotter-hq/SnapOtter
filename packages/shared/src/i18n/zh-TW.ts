@@ -823,6 +823,26 @@ export const zhTW: TranslationKeys = {
       name: "壓縮 PDF",
       description: "縮減 PDF 檔案大小",
     },
+    "compress-pdf-to-100kb": {
+      name: "壓縮 PDF 至 100 KB",
+      description: "將 PDF 檔案體積壓縮到 100 KB 以下",
+    },
+    "compress-pdf-to-200kb": {
+      name: "壓縮 PDF 至 200 KB",
+      description: "將 PDF 檔案體積壓縮到 200 KB 以下",
+    },
+    "compress-pdf-to-500kb": {
+      name: "壓縮 PDF 至 500 KB",
+      description: "將 PDF 檔案體積壓縮到 500 KB 以下",
+    },
+    "compress-pdf-to-1mb": {
+      name: "壓縮 PDF 至 1 MB",
+      description: "將 PDF 檔案體積壓縮到 1 MB 以下",
+    },
+    "compress-pdf-to-2mb": {
+      name: "壓縮 PDF 至 2 MB",
+      description: "將 PDF 檔案體積壓縮到 2 MB 以下",
+    },
     "rotate-pdf": {
       name: "旋轉 PDF",
       description: "旋轉 PDF 中的頁面",
@@ -3234,6 +3254,7 @@ export const zhTW: TranslationKeys = {
       printer: "印表機（最佳品質）",
       submit: "壓縮",
       submitBatch: "壓縮（{count} 個檔案）",
+      submitTarget: "壓縮至 {size}",
       progressLabel: "正在壓縮",
       bestEffortHint:
         "盡力壓縮的上限。以影像為主的 PDF 會接近此大小；純文字 PDF 可能無法縮小到此大小。",

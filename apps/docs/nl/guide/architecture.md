@@ -53,7 +53,7 @@ Gedeelde TypeScript-types, constanten (zoals `APP_VERSION` en tooldefinities) en
 
 ### API (`apps/api`) {#api-apps-api}
 
-Een Fastify v5-server die 248 toolroutes over vijf modaliteiten (image, video, audio, PDF, file) blootstelt en het volgende afhandelt:
+Een Fastify v5-server die 253 toolroutes over vijf modaliteiten (image, video, audio, PDF, file) blootstelt en het volgende afhandelt:
 - Bestandsuploads, beheer van tijdelijke werkruimte en persistente bestandsopslag
 - Gebruikersbibliotheek voor bestanden (`user_files`-tabel): een opgeslagen bewerking wordt standaard opgeslagen als een onafhankelijk nieuw bestand, of als een aan de bovenliggende rij gekoppelde versie wanneer je het origineel overschrijft. Ze registreert welke tools zijn toegepast (`toolChain`) en krijgt een automatisch gegenereerde miniatuur voor de Files-pagina
 - Tooluitvoering (routeert elk toolverzoek naar de image-engine of AI-brug)

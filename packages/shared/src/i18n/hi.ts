@@ -867,6 +867,26 @@ export const hi: TranslationKeys = {
       name: "PDF कंप्रेस",
       description: "PDF फ़ाइल का आकार घटाएँ",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF को 100 KB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 100 KB से कम करें",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF को 200 KB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 200 KB से कम करें",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF को 500 KB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 500 KB से कम करें",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF को 1 MB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 1 MB से कम करें",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF को 2 MB में कंप्रेस करें",
+      description: "PDF फ़ाइल का आकार 2 MB से कम करें",
+    },
     "rotate-pdf": {
       name: "PDF रोटेट",
       description: "PDF में पेज रोटेट करें",
@@ -3298,6 +3318,7 @@ export const hi: TranslationKeys = {
       printer: "प्रिंटर (सर्वोत्तम गुणवत्ता)",
       submit: "संपीड़ित करें",
       submitBatch: "संपीड़ित करें ({count} फ़ाइलें)",
+      submitTarget: "{size} में कंप्रेस करें",
       progressLabel: "संपीड़ित हो रहा है",
       bestEffortHint:
         "अधिकतम संभव प्रयास. छवि-आधारित PDF इसके करीब पहुंचती हैं; केवल-टेक्स्ट वाली PDF शायद इस आकार तक न सिकुड़ें.",

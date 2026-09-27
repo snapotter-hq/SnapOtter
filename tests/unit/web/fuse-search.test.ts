@@ -58,3 +58,21 @@ describe("a base tool outranks its presets on its own name (#1322)", () => {
     expect(search(q)[0]).toBe(id);
   });
 });
+
+describe("compress-pdf outranks its size presets (#1070)", () => {
+  it.each([
+    ["compress pdf", "compress-pdf"],
+    ["shrink pdf", "compress-pdf"],
+    ["reduce pdf size", "compress-pdf"],
+  ])("%s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+
+  it.each([
+    ["compress pdf to 100kb", "compress-pdf-to-100kb"],
+    ["compress pdf to 1 mb", "compress-pdf-to-1mb"],
+    ["pdf under 2mb", "compress-pdf-to-2mb"],
+  ])("a sized query %s leads with %s", (q, id) => {
+    expect(search(q)[0]).toBe(id);
+  });
+});

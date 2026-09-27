@@ -1046,6 +1046,26 @@ export const ru: TranslationKeys = {
       name: "Сжатие PDF",
       description: "Уменьшение размера файла PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Сжатие PDF до 100 KB",
+      description: "Уменьшение размера файла PDF до 100 KB и меньше",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Сжатие PDF до 200 KB",
+      description: "Уменьшение размера файла PDF до 200 KB и меньше",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Сжатие PDF до 500 KB",
+      description: "Уменьшение размера файла PDF до 500 KB и меньше",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Сжатие PDF до 1 MB",
+      description: "Уменьшение размера файла PDF до 1 MB и меньше",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Сжатие PDF до 2 MB",
+      description: "Уменьшение размера файла PDF до 2 MB и меньше",
+    },
     "rotate-pdf": {
       name: "Поворот PDF",
       description: "Поворот страниц в PDF",
@@ -3494,6 +3514,7 @@ export const ru: TranslationKeys = {
       printer: "Печать (лучшее качество)",
       submit: "Сжать",
       submitBatch: "Сжать ({count} файлов)",
+      submitTarget: "Сжать до {size}",
       progressLabel: "Сжатие",
       bestEffortHint:
         "Максимум по возможности. PDF на основе изображений приближаются к этому размеру; PDF только с текстом могут не уменьшиться до него.",

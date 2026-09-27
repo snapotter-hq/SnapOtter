@@ -1007,6 +1007,26 @@ export const ja: TranslationKeys = {
       name: "PDF 圧縮",
       description: "PDF のファイルサイズを圧縮",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDFを100 KBに圧縮",
+      description: "PDFのファイルサイズを100 KB未満に削減",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDFを200 KBに圧縮",
+      description: "PDFのファイルサイズを200 KB未満に削減",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDFを500 KBに圧縮",
+      description: "PDFのファイルサイズを500 KB未満に削減",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDFを1 MBに圧縮",
+      description: "PDFのファイルサイズを1 MB未満に削減",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDFを2 MBに圧縮",
+      description: "PDFのファイルサイズを2 MB未満に削減",
+    },
     "rotate-pdf": {
       name: "PDF 回転",
       description: "PDF のページを回転",
@@ -3446,6 +3466,7 @@ export const ja: TranslationKeys = {
       printer: "印刷用（最高品質）",
       submit: "圧縮",
       submitBatch: "圧縮 ({count}ファイル)",
+      submitTarget: "{size}に圧縮",
       progressLabel: "圧縮中",
       bestEffortHint:
         "可能な限りの上限です。画像ベースのPDFはこのサイズに近づきますが、テキストのみのPDFはこのサイズまで縮小できない場合があります。",

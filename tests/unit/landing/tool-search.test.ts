@@ -388,7 +388,11 @@ describe("landing searchTools with real catalog metadata", () => {
   it("keeps each modality's own compressor first for its query", () => {
     for (const [query, id] of [
       ["compress pdf", "compress-pdf"],
+      ["shrink pdf", "compress-pdf"],
       ["compress video", "compress-video"],
+      // #1070: the PDF size presets take the sized queries.
+      ["compress pdf to 100kb", "compress-pdf-to-100kb"],
+      ["compress pdf to 1mb", "compress-pdf-to-1mb"],
     ] as const) {
       const result = searchTools(realTools, { query, modality: "all", limit: 8 });
       expect(result.results[0]?.item.id, query).toBe(id);

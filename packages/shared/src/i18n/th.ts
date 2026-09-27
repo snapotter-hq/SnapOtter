@@ -1033,6 +1033,26 @@ export const th: TranslationKeys = {
       name: "บีบอัด PDF",
       description: "ลดขนาดไฟล์ PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "บีบอัด PDF ให้เหลือ 100 KB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "บีบอัด PDF ให้เหลือ 200 KB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "บีบอัด PDF ให้เหลือ 500 KB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "บีบอัด PDF ให้เหลือ 1 MB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "บีบอัด PDF ให้เหลือ 2 MB",
+      description: "ลดขนาดไฟล์ PDF ให้ต่ำกว่า 2 MB",
+    },
     "rotate-pdf": {
       name: "หมุน PDF",
       description: "หมุนหน้าใน PDF",
@@ -3449,6 +3469,7 @@ export const th: TranslationKeys = {
       printer: "เครื่องพิมพ์ (คุณภาพดีสุด)",
       submit: "บีบอัด",
       submitBatch: "บีบอัด ({count} ไฟล์)",
+      submitTarget: "บีบอัดให้เหลือ {size}",
       progressLabel: "กำลังบีบอัด",
       bestEffortHint:
         "ค่าสูงสุดเท่าที่ทำได้ PDF ที่เป็นรูปภาพจะได้ขนาดใกล้เคียง ส่วน PDF ที่มีแต่ข้อความอาจย่อไม่ถึงขนาดนี้",

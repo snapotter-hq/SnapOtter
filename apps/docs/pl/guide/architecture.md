@@ -53,7 +53,7 @@ Współdzielone typy TypeScript, stałe (takie jak `APP_VERSION` i definicje nar
 
 ### API (`apps/api`) {#api-apps-api}
 
-Serwer Fastify v5 udostępniający 248 tras narzędzi w pięciu modalnościach (image, video, audio, PDF, file), który obsługuje:
+Serwer Fastify v5 udostępniający 253 tras narzędzi w pięciu modalnościach (image, video, audio, PDF, file), który obsługuje:
 - Przesyłanie plików, zarządzanie tymczasową przestrzenią roboczą oraz trwałe przechowywanie plików
 - Bibliotekę plików użytkownika (tabela `user_files`): zapisana edycja jest domyślnie przechowywana jako niezależny nowy plik albo jako wersja powiązana z rodzicem, gdy nadpisujesz oryginał. Zapisuje, które narzędzia zostały zastosowane (`toolChain`), i otrzymuje automatycznie generowaną miniaturę dla strony Files
 - Wykonywanie narzędzi (kieruje każde żądanie narzędzia do silnika obrazów lub mostu AI)

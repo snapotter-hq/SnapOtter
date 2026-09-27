@@ -823,6 +823,26 @@ export const zhCN: TranslationKeys = {
       name: "压缩 PDF",
       description: "缩小 PDF 文件大小",
     },
+    "compress-pdf-to-100kb": {
+      name: "压缩 PDF 至 100 KB",
+      description: "将 PDF 文件体积压缩到 100 KB 以下",
+    },
+    "compress-pdf-to-200kb": {
+      name: "压缩 PDF 至 200 KB",
+      description: "将 PDF 文件体积压缩到 200 KB 以下",
+    },
+    "compress-pdf-to-500kb": {
+      name: "压缩 PDF 至 500 KB",
+      description: "将 PDF 文件体积压缩到 500 KB 以下",
+    },
+    "compress-pdf-to-1mb": {
+      name: "压缩 PDF 至 1 MB",
+      description: "将 PDF 文件体积压缩到 1 MB 以下",
+    },
+    "compress-pdf-to-2mb": {
+      name: "压缩 PDF 至 2 MB",
+      description: "将 PDF 文件体积压缩到 2 MB 以下",
+    },
     "rotate-pdf": {
       name: "旋转 PDF",
       description: "旋转 PDF 中的页面",
@@ -3235,6 +3255,7 @@ export const zhCN: TranslationKeys = {
       printer: "打印（最佳质量）",
       submit: "压缩",
       submitBatch: "压缩（{count} 个文件）",
+      submitTarget: "压缩至 {size}",
       progressLabel: "正在压缩",
       bestEffortHint:
         "尽力压缩的上限。基于图像的 PDF 会接近该大小；纯文本 PDF 可能无法缩小到此大小。",

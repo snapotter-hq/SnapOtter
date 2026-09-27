@@ -579,7 +579,7 @@ paths:
                 settings:
                   type: string
                   description: |
-                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 20.
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 20.
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -634,7 +634,7 @@ paths:
                 settings:
                   type: string
                   description: |
-                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 50.
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 50.
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -689,7 +689,7 @@ paths:
                 settings:
                   type: string
                   description: |
-                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 100.
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 100.
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -744,7 +744,7 @@ paths:
                 settings:
                   type: string
                   description: |
-                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 200.
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 200.
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -799,7 +799,7 @@ paths:
                 settings:
                   type: string
                   description: |
-                    No settings are accepted. The endpoint locks mode to targetSize and targetSizeKb to 500.
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 500.
                 clientJobId:
                   type: string
                   description: Client-provided job ID for SSE progress tracking
@@ -9842,6 +9842,296 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf/compress-pdf-to-100kb:
+    post:
+      operationId: compressPdfTo100KbTool
+      tags: [Tools]
+      summary: "Compress PDF to 100 KB"
+      description: |
+        Compress a PDF to a 100 KB target size (100 KB, where 1 KB = 1000 bytes).
+        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
+        Best effort: a mostly-text PDF may not reach the target. The job result then carries
+        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
+        The original bytes are returned if compression would enlarge the file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 100.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf/compress-pdf-to-200kb:
+    post:
+      operationId: compressPdfTo200KbTool
+      tags: [Tools]
+      summary: "Compress PDF to 200 KB"
+      description: |
+        Compress a PDF to a 200 KB target size (200 KB, where 1 KB = 1000 bytes).
+        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
+        Best effort: a mostly-text PDF may not reach the target. The job result then carries
+        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
+        The original bytes are returned if compression would enlarge the file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 200.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf/compress-pdf-to-500kb:
+    post:
+      operationId: compressPdfTo500KbTool
+      tags: [Tools]
+      summary: "Compress PDF to 500 KB"
+      description: |
+        Compress a PDF to a 500 KB target size (500 KB, where 1 KB = 1000 bytes).
+        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
+        Best effort: a mostly-text PDF may not reach the target. The job result then carries
+        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
+        The original bytes are returned if compression would enlarge the file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 500.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf/compress-pdf-to-1mb:
+    post:
+      operationId: compressPdfTo1MbTool
+      tags: [Tools]
+      summary: "Compress PDF to 1 MB"
+      description: |
+        Compress a PDF to a 1 MB target size (1000 KB, where 1 KB = 1000 bytes).
+        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
+        Best effort: a mostly-text PDF may not reach the target. The job result then carries
+        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
+        The original bytes are returned if compression would enlarge the file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 1000.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+
+  /api/v1/tools/pdf/compress-pdf-to-2mb:
+    post:
+      operationId: compressPdfTo2MbTool
+      tags: [Tools]
+      summary: "Compress PDF to 2 MB"
+      description: |
+        Compress a PDF to a 2 MB target size (2000 KB, where 1 KB = 1000 bytes).
+        This is a dedicated compression preset endpoint backed by `compress-pdf` in targetSize mode.
+        Best effort: a mostly-text PDF may not reach the target. The job result then carries
+        `targetMet: false` alongside `targetKb`, and the file is the smallest one it could make.
+        The original bytes are returned if compression would enlarge the file.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to compress
+                settings:
+                  type: string
+                  description: |
+                    Settings are ignored. The endpoint locks mode to targetSize and targetSizeKb to 2000.
+                clientJobId:
+                  type: string
+                  description: Client-provided job ID for SSE progress tracking
+      responses:
+        "202":
+          description: Accepted for async processing. Track progress via SSE at /api/v1/jobs/{jobId}/progress.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                  async:
+                    type: boolean
+                    example: true
         "400":
           description: Invalid input
           content:

@@ -1044,6 +1044,26 @@ export const id: TranslationKeys = {
       name: "Kompres PDF",
       description: "Perkecil ukuran file PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Kompres PDF ke 100 KB",
+      description: "Kurangi ukuran file PDF hingga di bawah 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Kompres PDF ke 200 KB",
+      description: "Kurangi ukuran file PDF hingga di bawah 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Kompres PDF ke 500 KB",
+      description: "Kurangi ukuran file PDF hingga di bawah 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Kompres PDF ke 1 MB",
+      description: "Kurangi ukuran file PDF hingga di bawah 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Kompres PDF ke 2 MB",
+      description: "Kurangi ukuran file PDF hingga di bawah 2 MB",
+    },
     "rotate-pdf": {
       name: "Putar PDF",
       description: "Putar halaman dalam PDF",
@@ -3489,6 +3509,7 @@ export const id: TranslationKeys = {
       printer: "Printer (kualitas terbaik)",
       submit: "Kompres",
       submitBatch: "Kompres ({count} file)",
+      submitTarget: "Kompres ke {size}",
       progressLabel: "Mengompres",
       bestEffortHint:
         "Maksimum sebisa mungkin. PDF berbasis gambar mendekati ukuran ini; PDF berisi teks saja mungkin tidak menyusut ke ukuran ini.",

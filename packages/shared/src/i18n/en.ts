@@ -1000,6 +1000,26 @@ export const en = {
       name: "Compress PDF",
       description: "Shrink PDF file size",
     },
+    "compress-pdf-to-100kb": {
+      name: "Compress PDF to 100 KB",
+      description: "Compress PDF file size to under 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Compress PDF to 200 KB",
+      description: "Compress PDF file size to under 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Compress PDF to 500 KB",
+      description: "Compress PDF file size to under 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Compress PDF to 1 MB",
+      description: "Compress PDF file size to under 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Compress PDF to 2 MB",
+      description: "Compress PDF file size to under 2 MB",
+    },
     "rotate-pdf": {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
@@ -3434,6 +3454,7 @@ export const en = {
       printer: "Printer (best quality)",
       submit: "Compress",
       submitBatch: "Compress ({count} files)",
+      submitTarget: "Compress to {size}",
       progressLabel: "Compressing",
       bestEffortHint:
         "Best-effort maximum. Image-based PDFs land close; text-only PDFs may not shrink to this size.",

@@ -100,7 +100,7 @@ pnpm dev
 | **Hình ảnh** | 112 | Thay đổi kích thước, Cắt, Nén, Chuyển đổi, Xóa nền, Nâng cấp độ phân giải, OCR, Đóng dấu, Ghép ảnh, Tô màu, Công cụ GIF, preset định dạng |
 | **Video** | 57 | Cắt, Cắt khung, Nén, Chuyển đổi, Gộp, Trích xuất âm thanh, Phụ đề tự động, Video sang GIF, Thay đổi kích thước, Ổn định, preset định dạng |
 | **Âm thanh** | 27 | Cắt, Gộp, Chuyển đổi, Chuẩn hóa, Giảm nhiễu, Phiên âm, Dịch cao độ, Fade, Tạo nhạc chuông, preset định dạng |
-| **PDF / Tài liệu** | 29 | Gộp, Tách, Nén, OCR, Đóng dấu, Che thông tin, Word sang PDF, Excel sang PDF, Xoay, Bảo vệ, Sửa chữa |
+| **PDF / Tài liệu** | 34 | Gộp, Tách, Nén, OCR, Đóng dấu, Che thông tin, Word sang PDF, Excel sang PDF, Xoay, Bảo vệ, Sửa chữa |
 | **Tập tin** | 23 | CSV sang JSON, JSON sang XML, Gộp CSV, Tách CSV, Tạo ZIP, Giải nén ZIP, Tạo biểu đồ, YAML/JSON |
 
 ### Pipeline {#pipelines}

@@ -1045,6 +1045,26 @@ export const tr: TranslationKeys = {
       name: "PDF Sıkıştır",
       description: "PDF dosya boyutunu küçült",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF'yi 100 KB'a Sıkıştır",
+      description: "PDF dosya boyutunu 100 KB'ın altına küçültün",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF'yi 200 KB'a Sıkıştır",
+      description: "PDF dosya boyutunu 200 KB'ın altına küçültün",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF'yi 500 KB'a Sıkıştır",
+      description: "PDF dosya boyutunu 500 KB'ın altına küçültün",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF'yi 1 MB'a Sıkıştır",
+      description: "PDF dosya boyutunu 1 MB'ın altına küçültün",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF'yi 2 MB'a Sıkıştır",
+      description: "PDF dosya boyutunu 2 MB'ın altına küçültün",
+    },
     "rotate-pdf": {
       name: "PDF Döndür",
       description: "PDF'deki sayfaları döndür",
@@ -3495,6 +3515,7 @@ export const tr: TranslationKeys = {
       printer: "Yazıcı (en iyi kalite)",
       submit: "Sıkıştır",
       submitBatch: "Sıkıştır ({count} dosya)",
+      submitTarget: "{size}'a sıkıştır",
       progressLabel: "Sıkıştırılıyor",
       bestEffortHint:
         "Elden gelenin en fazlası. Görüntü tabanlı PDF'ler bu boyuta yaklaşır; yalnızca metin içeren PDF'ler bu boyuta küçülmeyebilir.",

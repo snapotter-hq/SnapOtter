@@ -53,7 +53,7 @@ Tipe TypeScript bersama, konstanta (seperti `APP_VERSION` dan definisi tool), da
 
 ### API (`apps/api`) {#api-apps-api}
 
-Server Fastify v5 yang mengekspos 248 route tool di lima modalitas (image, video, audio, PDF, file) yang menangani:
+Server Fastify v5 yang mengekspos 253 route tool di lima modalitas (image, video, audio, PDF, file) yang menangani:
 - Unggahan file, manajemen workspace sementara, dan penyimpanan file persisten
 - Pustaka file pengguna (tabel `user_files`): secara default, sebuah editan yang disimpan disimpan sebagai file baru yang independen, atau sebagai versi yang tertaut ke induk ketika Anda menimpa file asli. Ia mencatat tool mana yang diterapkan (`toolChain`) dan mendapatkan thumbnail yang dibuat otomatis untuk halaman Files
 - Eksekusi tool (mengarahkan setiap permintaan tool ke image engine atau AI bridge)
