@@ -1108,6 +1108,11 @@ export const fr: TranslationKeys = {
       name: "Organiser un PDF",
       description: "Réordonnez les pages selon un ordre explicite",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Réordonnez, pivotez, supprimez des pages et reprenez des pages d'autres PDF dans un seul éditeur",
+    },
     "protect-pdf": {
       name: "Protéger un PDF",
       description: "Ajoutez une protection par mot de passe (chiffrement AES-256)",
@@ -3806,6 +3811,29 @@ export const fr: TranslationKeys = {
       pageLabel: "Page {n}",
       orderTooLong:
         "Trop de déplacements distincts à envoyer. Réinitialisez et essayez avec moins de modifications.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maximum {docs} PDF et {pages} pages en sortie.",
+      addDocument: "Ajouter un PDF",
+      addAll: "Ajouter toutes les pages",
+      allPages: "Toutes dans le plan",
+      addPage: "Ajouter la page {n}",
+      dragHint:
+        "Faites glisser pour réordonner, faire pivoter ou supprimer des pages. Ajoutez des PDF pour reprendre leurs pages.",
+      reset: "Réinitialiser le plan",
+      emptyPlan:
+        "Aucune page dans le plan pour l'instant — ajoutez des pages depuis les documents ci-dessus.",
+      docFailed: "Un document n'a pas pu être lu.",
+      pageLabel: "Position {n}",
+      planSummary: "{pages} page(s) de {docs} document(s) seront assemblées.",
+      submit: "Créer le PDF ({pages} pages)",
+      progressLabel: "Assemblage",
+      rotateLeft: "Pivoter à gauche",
+      rotateRight: "Pivoter à droite",
+      removePage: "Retirer la page",
+      removeDoc: "Retirer le PDF",
+      zoomIn: "Agrandir",
+      zoomOut: "Réduire",
     },
     "protect-pdf": {
       userPassword: "Mot de passe utilisateur",

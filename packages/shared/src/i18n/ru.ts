@@ -1103,6 +1103,11 @@ export const ru: TranslationKeys = {
       name: "Упорядочивание PDF",
       description: "Изменение порядка страниц вручную",
     },
+    "multi-tool-pdf": {
+      name: "PDF-мультиинструмент",
+      description:
+        "Изменение порядка, поворот, удаление страниц и перенос страниц из других PDF в одном редакторе",
+    },
     "protect-pdf": {
       name: "Защита PDF",
       description: "Установка пароля (шифрование AES-256)",
@@ -3793,6 +3798,28 @@ export const ru: TranslationKeys = {
       pageLabel: "Страница {n}",
       orderTooLong:
         "Слишком много отдельных перемещений для отправки. Сбросьте порядок и попробуйте внести меньше изменений.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Не более {docs} PDF и {pages} страниц в результате.",
+      addDocument: "Добавить PDF",
+      addAll: "Добавить все страницы",
+      allPages: "Все в плане",
+      addPage: "Добавить страницу {n}",
+      dragHint:
+        "Перетащите, чтобы изменить порядок, повернуть или удалить страницы. Добавьте PDF, чтобы взять их страницы.",
+      reset: "Сбросить план",
+      emptyPlan: "В плане пока нет страниц — добавьте страницы из документов выше.",
+      docFailed: "Не удалось прочитать документ.",
+      pageLabel: "Позиция {n}",
+      planSummary: "Будет собрано страниц: {pages} из {docs} документ(ов).",
+      submit: "Собрать PDF ({pages} стр.)",
+      progressLabel: "Сборка",
+      rotateLeft: "Повернуть влево",
+      rotateRight: "Повернуть вправо",
+      removePage: "Убрать страницу",
+      removeDoc: "Убрать PDF",
+      zoomIn: "Увеличить",
+      zoomOut: "Уменьшить",
     },
     "protect-pdf": {
       userPassword: "Пароль пользователя",

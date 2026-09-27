@@ -1101,6 +1101,11 @@ export const id: TranslationKeys = {
       name: "Atur PDF",
       description: "Susun ulang halaman dengan urutan halaman eksplisit",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Atur ulang, putar, hapus halaman, dan ambil halaman dari PDF lain dalam satu editor",
+    },
     "protect-pdf": {
       name: "Lindungi PDF",
       description: "Tambahkan proteksi kata sandi (enkripsi AES-256)",
@@ -3785,6 +3790,28 @@ export const id: TranslationKeys = {
       pageLabel: "Halaman {n}",
       orderTooLong:
         "Terlalu banyak perpindahan terpisah untuk dikirim. Atur ulang dan coba dengan lebih sedikit perubahan.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maksimal {docs} PDF dan {pages} halaman keluaran.",
+      addDocument: "Tambah PDF",
+      addAll: "Tambah semua halaman",
+      allPages: "Semua dalam rencana",
+      addPage: "Tambah halaman {n}",
+      dragHint:
+        "Seret untuk mengurutkan ulang, memutar, atau menghapus halaman. Tambahkan PDF untuk mengambil halamannya.",
+      reset: "Atur ulang rencana",
+      emptyPlan: "Belum ada halaman dalam rencana — tambahkan halaman dari dokumen di atas.",
+      docFailed: "Sebuah dokumen tidak dapat dibaca.",
+      pageLabel: "Posisi {n}",
+      planSummary: "{pages} halaman dari {docs} dokumen akan dirakit.",
+      submit: "Buat PDF ({pages} halaman)",
+      progressLabel: "Merakit",
+      rotateLeft: "Putar kiri",
+      rotateRight: "Putar kanan",
+      removePage: "Hapus halaman",
+      removeDoc: "Hapus PDF",
+      zoomIn: "Perbesar",
+      zoomOut: "Perkecil",
     },
     "protect-pdf": {
       userPassword: "Kata sandi pengguna",

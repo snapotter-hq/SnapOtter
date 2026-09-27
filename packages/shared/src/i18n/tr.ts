@@ -1103,6 +1103,11 @@ export const tr: TranslationKeys = {
       name: "PDF Düzenle",
       description: "Sayfaları belirli bir sırayla yeniden düzenle",
     },
+    "multi-tool-pdf": {
+      name: "PDF Çoklu Araç",
+      description:
+        "Sayfaları tek bir düzenleyicide yeniden sıralayın, döndürün, silin ve diğer PDF'lerden alın",
+    },
     "protect-pdf": {
       name: "PDF Koru",
       description: "Parola koruması ekle (AES-256 şifreleme)",
@@ -3792,6 +3797,28 @@ export const tr: TranslationKeys = {
       pageLabel: "Sayfa {n}",
       orderTooLong:
         "Gönderilemeyecek kadar çok ayrı taşıma var. Sıfırlayın ve daha az değişiklikle deneyin.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "En fazla {docs} PDF ve {pages} çıktı sayfası.",
+      addDocument: "PDF ekle",
+      addAll: "Tüm sayfaları ekle",
+      allPages: "Tümü planda",
+      addPage: "{n}. sayfayı ekle",
+      dragHint:
+        "Yeniden sıralamak, döndürmek veya kaldırmak için sürükleyin. Sayfalarını almak için PDF ekleyin.",
+      reset: "Planı sıfırla",
+      emptyPlan: "Planda henüz sayfa yok — yukarıdaki belgelerden sayfa ekleyin.",
+      docFailed: "Bir belge okunamadı.",
+      pageLabel: "Konum {n}",
+      planSummary: "{docs} belgeden {pages} sayfa birleştirilecek.",
+      submit: "PDF oluştur ({pages} sayfa)",
+      progressLabel: "Birleştiriliyor",
+      rotateLeft: "Sola döndür",
+      rotateRight: "Sağa döndür",
+      removePage: "Sayfayı kaldır",
+      removeDoc: "PDF'yi kaldır",
+      zoomIn: "Yakınlaştır",
+      zoomOut: "Uzaklaştır",
     },
     "protect-pdf": {
       userPassword: "Kullanıcı şifresi",

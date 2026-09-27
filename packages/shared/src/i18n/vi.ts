@@ -1103,6 +1103,11 @@ export const vi: TranslationKeys = {
       name: "Sắp xếp PDF",
       description: "Sắp xếp lại thứ tự trang theo trình tự chỉ định",
     },
+    "multi-tool-pdf": {
+      name: "PDF Đa công cụ",
+      description:
+        "Sắp xếp lại, xoay, xóa trang và lấy trang từ các PDF khác trong cùng một trình chỉnh sửa",
+    },
     "protect-pdf": {
       name: "Bảo vệ PDF",
       description: "Thêm bảo vệ bằng mật khẩu (mã hóa AES-256)",
@@ -3784,6 +3789,27 @@ export const vi: TranslationKeys = {
       pageLabel: "Trang {n}",
       orderTooLong:
         "Có quá nhiều lần di chuyển riêng lẻ để gửi. Hãy đặt lại và thử với ít thay đổi hơn.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Tối đa {docs} tệp PDF và {pages} trang đầu ra.",
+      addDocument: "Thêm PDF",
+      addAll: "Thêm tất cả các trang",
+      allPages: "Tất cả đã có trong kế hoạch",
+      addPage: "Thêm trang {n}",
+      dragHint: "Kéo để sắp xếp lại, xoay hoặc loại bỏ trang. Thêm PDF để lấy các trang của chúng.",
+      reset: "Đặt lại kế hoạch",
+      emptyPlan: "Chưa có trang nào trong kế hoạch — hãy thêm trang từ các tài liệu ở trên.",
+      docFailed: "Không thể đọc một tài liệu.",
+      pageLabel: "Vị trí {n}",
+      planSummary: "Sẽ ghép {pages} trang từ {docs} tài liệu.",
+      submit: "Tạo PDF ({pages} trang)",
+      progressLabel: "Đang ghép",
+      rotateLeft: "Xoay trái",
+      rotateRight: "Xoay phải",
+      removePage: "Loại bỏ trang",
+      removeDoc: "Loại bỏ PDF",
+      zoomIn: "Phóng to",
+      zoomOut: "Thu nhỏ",
     },
     "protect-pdf": {
       userPassword: "Mật khẩu người dùng",

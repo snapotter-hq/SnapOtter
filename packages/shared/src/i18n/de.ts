@@ -1105,6 +1105,11 @@ export const de: TranslationKeys = {
       name: "PDF organisieren",
       description: "Seiten mit festgelegter Reihenfolge neu ordnen",
     },
+    "multi-tool-pdf": {
+      name: "PDF-Multi-Tool",
+      description:
+        "Seiten neu anordnen, drehen, löschen und aus anderen PDFs in einem Editor übernehmen",
+    },
     "protect-pdf": {
       name: "PDF schützen",
       description: "Passwortschutz hinzufügen (AES-256-Verschlüsselung)",
@@ -3806,6 +3811,28 @@ export const de: TranslationKeys = {
       pageLabel: "Seite {n}",
       orderTooLong:
         "Zu viele einzelne Verschiebungen zum Senden. Setze zurück und versuche es mit weniger Änderungen.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maximal {docs} PDFs und {pages} Ausgabeseiten.",
+      addDocument: "PDF hinzufügen",
+      addAll: "Alle Seiten hinzufügen",
+      allPages: "Alle im Plan",
+      addPage: "Seite {n} hinzufügen",
+      dragHint:
+        "Zum Neuanordnen, Drehen oder Entfernen ziehen. Füge PDFs hinzu, um deren Seiten zu übernehmen.",
+      reset: "Plan zurücksetzen",
+      emptyPlan: "Noch keine Seiten im Plan – füge Seiten aus den Dokumenten oben hinzu.",
+      docFailed: "Ein Dokument konnte nicht gelesen werden.",
+      pageLabel: "Position {n}",
+      planSummary: "{pages} Seite(n) aus {docs} Dokument(en) werden zusammengesetzt.",
+      submit: "PDF erstellen ({pages} Seiten)",
+      progressLabel: "Wird zusammengesetzt",
+      rotateLeft: "Nach links drehen",
+      rotateRight: "Nach rechts drehen",
+      removePage: "Seite entfernen",
+      removeDoc: "PDF entfernen",
+      zoomIn: "Vergrößern",
+      zoomOut: "Verkleinern",
     },
     "protect-pdf": {
       userPassword: "Benutzerkennwort",

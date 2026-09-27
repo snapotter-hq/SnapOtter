@@ -52,6 +52,7 @@ import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
 import {
+  DOC_CANVAS_TOOLS,
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
   MULTI_FILE_TOOLS,
   REORDERABLE_TOOLS,
@@ -64,6 +65,7 @@ import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFeaturesStore } from "@/stores/features-store";
 import { type FileEntry, useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
+import { useMultiToolStore } from "@/stores/multi-tool-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useQrStore } from "@/stores/qr-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -400,6 +402,12 @@ export function ToolPage() {
   const dragCounter = useRef(0);
   const isMultiFileTool = toolId ? MULTI_FILE_TOOLS.has(toolId) : false;
   const canReorder = toolId ? REORDERABLE_TOOLS.has(toolId) : false;
+  // Canvas editors that manage their own document set hide the generic
+  // file-selection UI (left list/add-more, bottom file strip, pager) — see
+  // DOC_CANVAS_TOOLS.
+  const docCanvas = toolId ? DOC_CANVAS_TOOLS.has(toolId) : false;
+  // Every generic multi-file affordance at once.
+  const hasBatchUi = hasMultiple && !docCanvas;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
   useEffect(() => {
@@ -428,6 +436,9 @@ export function ToolPage() {
     setEraserBrushSize(30);
     setEraserSliderInitPos(null);
     setMobileSettingsOpen(false);
+    // Settings unmount whenever the mobile sheet closes; the editor session
+    // belongs to the tool route and must survive those panel unmounts.
+    return () => useMultiToolStore.getState().clear();
   }, [toolId]);
 
   const toolAccept = registryEntry?.accept ?? (tool?.acceptedInputs?.join(",") || undefined);
@@ -803,9 +814,14 @@ export function ToolPage() {
 
     // Document viewer: pdf.js canvas with pagination
     if (displayMode === "document" && hasFile) {
-      // A document tool can replace the read-only viewer with an editor for a
-      // single document (organize-pdf swaps in a drag-to-reorder page grid).
-      const Panel = !hasProcessed && files.length === 1 ? registryEntry?.ResultsPanel : undefined;
+      // A document tool can replace the read-only viewer with an editor. For
+      // one file that is always eligible; the multi-tool editor ingests the
+      // extra documents itself, so it is eligible for multi-file selections
+      // too. A batch (or previously run) result keeps the read-only viewer.
+      const Panel =
+        !hasProcessed && (files.length === 1 || toolId === "multi-tool-pdf")
+          ? registryEntry?.ResultsPanel
+          : undefined;
       return (
         <Suspense
           fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
@@ -1157,7 +1173,7 @@ export function ToolPage() {
   function renderNavArrows() {
     return (
       <>
-        {hasMultiple && hasPrev && (
+        {hasBatchUi && hasPrev && (
           <button
             type="button"
             onClick={navigatePrev}
@@ -1167,7 +1183,7 @@ export function ToolPage() {
             <ChevronLeft className="h-4 w-4" />
           </button>
         )}
-        {hasMultiple && hasNext && (
+        {hasBatchUi && hasNext && (
           <button
             type="button"
             onClick={navigateNext}
@@ -1177,7 +1193,7 @@ export function ToolPage() {
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
-        {hasMultiple && (
+        {hasBatchUi && (
           <div
             role="status"
             aria-label={format(t.a11y.imageNOfTotal, {
@@ -1202,7 +1218,7 @@ export function ToolPage() {
   function renderSettingsContent() {
     return (
       <>
-        {!isNoDropzone && (
+        {!isNoDropzone && !docCanvas && (
           <div className="space-y-2">
             <FileSelectionInfo
               files={files}
@@ -1344,8 +1360,8 @@ export function ToolPage() {
           <section
             aria-label={t.a11y.imageArea}
             className="flex-1 flex flex-col min-h-0 min-w-0"
-            onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
-            tabIndex={hasMultiple ? 0 : undefined}
+            onKeyDown={hasBatchUi ? handleImageKeyDown : undefined}
+            tabIndex={hasBatchUi ? 0 : undefined}
           >
             <div aria-live="polite" aria-atomic="true" className="sr-only">
               {liveMessage}
@@ -1356,7 +1372,7 @@ export function ToolPage() {
               {renderNavArrows()}
               {renderImageArea()}
             </div>
-            {hasMultiple && (
+            {hasBatchUi && (
               <ThumbnailStrip
                 entries={entries}
                 selectedIndex={selectedIndex}
@@ -1471,8 +1487,8 @@ export function ToolPage() {
         <section
           aria-label={t.a11y.imageArea}
           className="flex-1 flex flex-col min-h-0 min-w-0"
-          onKeyDown={hasMultiple ? handleImageKeyDown : undefined}
-          tabIndex={hasMultiple ? 0 : undefined}
+          onKeyDown={hasBatchUi ? handleImageKeyDown : undefined}
+          tabIndex={hasBatchUi ? 0 : undefined}
         >
           <div aria-live="polite" aria-atomic="true" className="sr-only">
             {liveMessage}
@@ -1490,7 +1506,7 @@ export function ToolPage() {
             {renderNavArrows()}
             {renderImageArea()}
           </div>
-          {hasMultiple && (
+          {hasBatchUi && (
             <ThumbnailStrip
               entries={entries}
               selectedIndex={selectedIndex}

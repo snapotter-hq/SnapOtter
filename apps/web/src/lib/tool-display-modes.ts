@@ -173,6 +173,7 @@ export const TOOL_DISPLAY_MODES: Record<string, DisplayMode> = {
   "extract-pages": "document",
   "remove-pages": "document",
   "organize-pdf": "document",
+  "multi-tool-pdf": "document",
   "protect-pdf": "no-comparison",
   "unlock-pdf": "document",
   "repair-pdf": "document",
@@ -247,6 +248,7 @@ const multiFileTools = new Set<string>([
   "merge-audio",
   "merge-csvs",
   "merge-pdf",
+  "multi-tool-pdf",
   "merge-videos",
   "replace-audio",
   "burn-subtitles",
@@ -286,6 +288,16 @@ for (const preset of CONVERSION_PRESETS) {
   }
 }
 export const REORDERABLE_TOOLS: ReadonlySet<string> = reorderableTools;
+
+/**
+ * Tools that manage their own document set inside a canvas editor (the
+ * multi-tool plan references doc indexes the user builds visually; its
+ * per-document strips live in the editor). The generic file-selection UI
+ * (left file list with "+ Add more", the bottom file strip with reorder, the
+ * N/M pager) is hidden for these: adding or reordering store files after a
+ * plan exists would rebuild the session and discard it.
+ */
+export const DOC_CANVAS_TOOLS: ReadonlySet<string> = new Set(["multi-tool-pdf"]);
 
 /**
  * Live-preview tools whose imageWrapperStyle/children are an input control

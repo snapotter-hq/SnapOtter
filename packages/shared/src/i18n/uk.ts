@@ -1103,6 +1103,11 @@ export const uk: TranslationKeys = {
       name: "Впорядкування PDF",
       description: "Змінити порядок сторінок за вказаною послідовністю",
     },
+    "multi-tool-pdf": {
+      name: "PDF-мультиінструмент",
+      description:
+        "Зміна порядку, поворот, вилучення сторінок і перенесення сторінок з інших PDF в одному редакторі",
+    },
     "protect-pdf": {
       name: "Захист PDF",
       description: "Додати захист паролем (шифрування AES-256)",
@@ -3794,6 +3799,28 @@ export const uk: TranslationKeys = {
       pageLabel: "Сторінка {n}",
       orderTooLong:
         "Забагато окремих переміщень для надсилання. Скиньте порядок і спробуйте внести менше змін.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Не більше {docs} PDF і {pages} сторінок у результаті.",
+      addDocument: "Додати PDF",
+      addAll: "Додати всі сторінки",
+      allPages: "Усі в плані",
+      addPage: "Додати сторінку {n}",
+      dragHint:
+        "Перетягуйте, щоб змінити порядок, повернути або вилучити сторінки. Додайте PDF, щоб узяти їхні сторінки.",
+      reset: "Скинути план",
+      emptyPlan: "У плані поки немає сторінок — додайте сторінки з документів вище.",
+      docFailed: "Не вдалося прочитати документ.",
+      pageLabel: "Позиція {n}",
+      planSummary: "Буде зібрано сторінок: {pages} з {docs} документ(ів).",
+      submit: "Зібрати PDF ({pages} стор.)",
+      progressLabel: "Збирання",
+      rotateLeft: "Повернути вліво",
+      rotateRight: "Повернути вправо",
+      removePage: "Вилучити сторінку",
+      removeDoc: "Вилучити PDF",
+      zoomIn: "Збільшити",
+      zoomOut: "Зменшити",
     },
     "protect-pdf": {
       userPassword: "Пароль користувача",

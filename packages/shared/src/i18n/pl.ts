@@ -1102,6 +1102,11 @@ export const pl: TranslationKeys = {
       name: "Organizuj PDF",
       description: "Uporządkuj strony w podanej kolejności",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Zmieniaj kolejność, obracaj i usuwaj strony oraz przenoś strony z innych PDF-ów w jednym edytorze",
+    },
     "protect-pdf": {
       name: "Chroń PDF",
       description: "Dodaj ochronę hasłem (szyfrowanie AES-256)",
@@ -3792,6 +3797,28 @@ export const pl: TranslationKeys = {
       pageLabel: "Strona {n}",
       orderTooLong:
         "Zbyt wiele osobnych przesunięć do wysłania. Przywróć kolejność i spróbuj z mniejszą liczbą zmian.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maksymalnie {docs} plików PDF i {pages} stron wynikowych.",
+      addDocument: "Dodaj PDF",
+      addAll: "Dodaj wszystkie strony",
+      allPages: "Wszystkie w planie",
+      addPage: "Dodaj stronę {n}",
+      dragHint:
+        "Przeciągnij, aby zmienić kolejność, obrócić lub usunąć strony. Dodaj PDF-y, aby pobrać ich strony.",
+      reset: "Przywróć plan",
+      emptyPlan: "W planszy nie ma jeszcze stron — dodaj strony z dokumentów powyżej.",
+      docFailed: "Nie udało się odczytać dokumentu.",
+      pageLabel: "Pozycja {n}",
+      planSummary: "Zostanie zmontowana(e) {pages} strona/stron z {docs} dokument(ów).",
+      submit: "Zbuduj PDF ({pages} stron)",
+      progressLabel: "Montowanie",
+      rotateLeft: "Obróć w lewo",
+      rotateRight: "Obróć w prawo",
+      removePage: "Usuń stronę",
+      removeDoc: "Usuń PDF",
+      zoomIn: "Powiększ",
+      zoomOut: "Pomniejsz",
     },
     "protect-pdf": {
       userPassword: "Hasło użytkownika",

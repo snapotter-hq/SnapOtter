@@ -85,6 +85,7 @@ import { registerMergeAudio } from "./merge-audio.js";
 import { registerMergeCsvs } from "./merge-csvs.js";
 import { registerMergePdf } from "./merge-pdf.js";
 import { registerMergeVideos } from "./merge-videos.js";
+import { registerMultiToolPdf } from "./multi-tool-pdf.js";
 import { registerMuteVideo } from "./mute-video.js";
 import { registerNoiseReduction } from "./noise-reduction.js";
 import { registerNoiseRemoval } from "./noise-removal.js";
@@ -324,6 +325,7 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
     { id: "extract-pages", register: registerExtractPages },
     { id: "remove-pages", register: registerRemovePages },
     { id: "organize-pdf", register: registerOrganizePdf },
+    { id: "multi-tool-pdf", register: registerMultiToolPdf },
     { id: "protect-pdf", register: registerProtectPdf },
     { id: "unlock-pdf", register: registerUnlockPdf },
     { id: "repair-pdf", register: registerRepairPdf },

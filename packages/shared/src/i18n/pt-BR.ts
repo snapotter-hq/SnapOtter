@@ -1103,6 +1103,11 @@ export const ptBR: TranslationKeys = {
       name: "Organizar PDF",
       description: "Reordene as páginas com uma ordem explícita",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Reordene, gire, remova páginas e traga páginas de outros PDFs em um único editor",
+    },
     "protect-pdf": {
       name: "Proteger PDF",
       description: "Adicione proteção por senha (criptografia AES-256)",
@@ -3794,6 +3799,28 @@ export const ptBR: TranslationKeys = {
       pageLabel: "Página {n}",
       orderTooLong:
         "Muitas movimentações separadas para enviar. Redefina e tente com menos alterações.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Máximo de {docs} PDFs e {pages} páginas de saída.",
+      addDocument: "Adicionar PDF",
+      addAll: "Adicionar todas as páginas",
+      allPages: "Todas no plano",
+      addPage: "Adicionar página {n}",
+      dragHint:
+        "Arraste para reordenar, girar ou remover páginas. Adicione PDFs para puxar as páginas deles.",
+      reset: "Redefinir plano",
+      emptyPlan: "Nenhuma página no plano ainda — adicione páginas dos documentos acima.",
+      docFailed: "Não foi possível ler um documento.",
+      pageLabel: "Posição {n}",
+      planSummary: "{pages} página(s) de {docs} documento(s) serão montadas.",
+      submit: "Criar PDF ({pages} páginas)",
+      progressLabel: "Montando",
+      rotateLeft: "Girar à esquerda",
+      rotateRight: "Girar à direita",
+      removePage: "Remover página",
+      removeDoc: "Remover PDF",
+      zoomIn: "Ampliar",
+      zoomOut: "Reduzir",
     },
     "protect-pdf": {
       userPassword: "Senha do usuário",

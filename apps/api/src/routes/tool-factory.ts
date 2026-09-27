@@ -20,6 +20,7 @@ import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../jobs/types.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
+import { createUniqueNamer } from "../lib/filename.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
@@ -282,6 +283,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       let clientJobId: string | null = null;
       let fileCount = 0;
       const received: ReceivedUpload[] = [];
+      const uniqueInputName = createUniqueNamer();
 
       // Parse multipart parts (file parts stream to object storage).
       // request.parts() is the keep-alive-safe iterator from
@@ -300,9 +302,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               }
               continue;
             }
+            // Resolve collisions after sanitization, before streaming either
+            // part to the same object key (e.g. two document.pdf uploads).
             const upload = await receiveUpload(part, jobId, {
               maxBytes:
                 env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined,
+              ...(maxInputs > 1 ? { uniqueName: uniqueInputName } : {}),
             });
             received.push(upload);
             if (fileCount === 1) {
@@ -471,6 +476,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           // write the final version so the worker processes the correct data.
           // Skip re-upload when the buffer is reference-identical to the
           // originally streamed bytes and the filename hasn't changed.
+          if (maxInputs > 1 && fname !== upload.filename) fname = uniqueInputName(fname);
           const decodedKey = `uploads/${jobId}/${fname}`;
           if (decodedKey !== upload.key) {
             await putObject(decodedKey, fileBuffer);

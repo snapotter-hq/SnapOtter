@@ -1099,6 +1099,11 @@ export const sv: TranslationKeys = {
       name: "Organisera PDF",
       description: "Ordna om sidor med en angiven sidordning",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Ordna om, rotera och ta bort sidor och hämta sidor från andra PDF:er i en och samma editor",
+    },
     "protect-pdf": {
       name: "Skydda PDF",
       description: "Lägg till lösenordsskydd (AES-256-kryptering)",
@@ -3784,6 +3789,28 @@ export const sv: TranslationKeys = {
       pageLabel: "Sida {n}",
       orderTooLong:
         "För många separata flyttar att skicka. Återställ och försök med färre ändringar.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Högst {docs} PDF-filer och {pages} sidor i resultatet.",
+      addDocument: "Lägg till PDF",
+      addAll: "Lägg till alla sidor",
+      allPages: "Alla i planen",
+      addPage: "Lägg till sida {n}",
+      dragHint:
+        "Dra för att ordna, rotera eller ta bort sidor. Lägg till PDF:er för att hämta deras sidor.",
+      reset: "Återställ planen",
+      emptyPlan: "Inga sidor i planen än — lägg till sidor från dokumenten ovan.",
+      docFailed: "Ett dokument kunde inte läsas.",
+      pageLabel: "Position {n}",
+      planSummary: "{pages} sida/sidor från {docs} dokument kommer att sammanställas.",
+      submit: "Skapa PDF ({pages} sidor)",
+      progressLabel: "Sammanställer",
+      rotateLeft: "Rotera vänster",
+      rotateRight: "Rotera höger",
+      removePage: "Ta bort sidan",
+      removeDoc: "Ta bort PDF",
+      zoomIn: "Zooma in",
+      zoomOut: "Zooma ut",
     },
     "protect-pdf": {
       userPassword: "Användarlösenord",

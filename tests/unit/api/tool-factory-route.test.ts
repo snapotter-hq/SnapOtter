@@ -52,12 +52,11 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/lib/upload-stream.js", () => ({
-  receiveUpload: vi.fn((_part: unknown, jobId: string) =>
-    Promise.resolve({
-      key: `uploads/${jobId}/test.png`,
-      filename: "test.png",
-      size: 100,
-    }),
+  receiveUpload: vi.fn(
+    (_part: unknown, jobId: string, opts: { uniqueName?: (name: string) => string }) => {
+      const filename = opts.uniqueName?.("test.png") ?? "test.png";
+      return Promise.resolve({ key: `uploads/${jobId}/${filename}`, filename, size: 100 });
+    },
   ),
 }));
 
@@ -83,10 +82,6 @@ vi.mock("../../../apps/api/src/lib/file-validation.js", () => ({
   validateImageBuffer: vi.fn(() =>
     Promise.resolve({ valid: true, format: "png", width: 100, height: 100 }),
   ),
-}));
-
-vi.mock("../../../apps/api/src/lib/filename.js", () => ({
-  sanitizeFilename: (n: string) => n,
 }));
 
 vi.mock("../../../apps/api/src/lib/format-decoders.js", () => ({
@@ -336,6 +331,22 @@ describe("createToolRoute", () => {
   });
 
   describe("request handling", () => {
+    it("keeps same-named multipart inputs in distinct storage objects", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, { ...makeMockConfig(id), maxInputs: 2 });
+      await app.routes[apiToolPath(id)](
+        createMockRequest({ fileBuffer: Buffer.from("png-data"), fileCount: 2 }),
+        createMockReply(),
+      );
+
+      const job = vi.mocked(enqueueToolJob).mock.calls[0][0];
+      expect(job.inputRefs).toEqual([
+        `uploads/${job.jobId}/test.png`,
+        `uploads/${job.jobId}/test_1.png`,
+      ]);
+    });
+
     it("returns 400 when no file is provided", async () => {
       const app = createMockApp();
       const id = "resize";

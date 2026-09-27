@@ -4,6 +4,8 @@ import { AUDIO_INPUTS, IMAGE_INPUTS, SUBTITLE_INPUTS, VIDEO_INPUTS } from "./mod
 import { toolSection } from "./section.js";
 import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
+export const PDF_MULTI_TOOL_LIMITS = { documents: 20, outputPages: 1200 } as const;
+
 export const CATEGORIES: CategoryInfo[] = [
   // Image
   { id: "essentials", name: "Essentials", icon: "Layers", color: "#3B82F6" },
@@ -1496,6 +1498,18 @@ const BASE_TOOLS: Tool[] = [
     route: "/organize-pdf",
     modality: "document",
     acceptedInputs: [".pdf"],
+    executionHint: "fast",
+  },
+  {
+    id: "multi-tool-pdf",
+    name: "PDF Multi-Tool",
+    description: "Reorder, rotate, delete, and pull in pages from other PDFs in one editor",
+    category: "pdf-organize",
+    icon: "LayoutGrid",
+    route: "/multi-tool-pdf",
+    modality: "document",
+    acceptedInputs: [".pdf"],
+    keywords: ["pdf multi tool", "organize merge pages", "page editor"],
     executionHint: "fast",
   },
   {

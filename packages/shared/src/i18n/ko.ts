@@ -1049,6 +1049,10 @@ export const ko: TranslationKeys = {
       name: "PDF 정리",
       description: "명시적 페이지 순서로 페이지 재정렬",
     },
+    "multi-tool-pdf": {
+      name: "PDF 멀티 도구",
+      description: "하나의 편집기에서 페이지 재정렬, 회전, 삭제 및 다른 PDF에서 페이지 가져오기",
+    },
     "protect-pdf": {
       name: "PDF 보호",
       description: "비밀번호 보호 추가 (AES-256 암호화)",
@@ -3720,6 +3724,28 @@ export const ko: TranslationKeys = {
       pageLabel: "{n}페이지",
       orderTooLong:
         "보낼 수 있는 개별 이동이 너무 많습니다. 초기화한 후 변경을 줄여 다시 시도하세요.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "PDF 최대 {docs}개, 출력 최대 {pages}페이지.",
+      addDocument: "PDF 추가",
+      addAll: "모든 페이지 추가",
+      allPages: "모두 계획에 포함됨",
+      addPage: "{n}페이지 추가",
+      dragHint:
+        "드래그하여 재정렬, 회전 또는 제거하세요. 다른 PDF를 추가해 페이지를 가져올 수 있습니다.",
+      reset: "계획 초기화",
+      emptyPlan: "계획에 페이지가 없습니다 — 위 문서에서 페이지를 추가하세요.",
+      docFailed: "문서 하나를 읽을 수 없습니다.",
+      pageLabel: "위치 {n}",
+      planSummary: "{docs}개 문서에서 {pages}개 페이지를 조립합니다.",
+      submit: "PDF 만들기 ({pages}페이지)",
+      progressLabel: "조립 중",
+      rotateLeft: "왼쪽으로 회전",
+      rotateRight: "오른쪽으로 회전",
+      removePage: "페이지 제거",
+      removeDoc: "PDF 제거",
+      zoomIn: "확대",
+      zoomOut: "축소",
     },
     "protect-pdf": {
       userPassword: "사용자 비밀번호",

@@ -147,6 +147,115 @@ export async function qpdfLinearize(inputPath: string, outPath: string): Promise
 }
 
 /**
+ * Relative-rotation instruction for qpdfRotatePages: page `page` of a document
+ * gets `angle` degrees of additional clockwise rotation (recorded in /Rotate,
+ * composed with whatever the page already had).
+ */
+export interface PdfPageRotation {
+  page: number;
+  angle: 90 | 180 | 270;
+}
+
+/**
+ * Record extra clockwise rotations on pages of one document, in place on the
+ * output. One `--rotate=+angle:pages` option per distinct angle; page lists may
+ * be in any order because each number is an absolute page reference. Relative
+ * angles (+) are used over absolute per the qpdf manual: without inspecting the
+ * PDF it is impossible to know whether an apparently-rotated page already has
+ * /Rotate set, and relative rotation is correct in either case.
+ */
+export async function qpdfRotatePages(
+  inputPath: string,
+  rotations: PdfPageRotation[],
+  outPath: string,
+): Promise<void> {
+  if (rotations.length === 0) throw new Error("qpdfRotatePages needs at least one rotation");
+  for (const r of rotations) {
+    if (!Number.isInteger(r.page) || r.page < 1) {
+      throw new Error(`Invalid page number ${r.page}`);
+    }
+    if (r.angle !== 90 && r.angle !== 180 && r.angle !== 270) {
+      throw new Error(`Invalid rotation ${String(r.angle)}`);
+    }
+  }
+  const byAngle = new Map<90 | 180 | 270, string[]>();
+  for (const r of rotations) {
+    const pages = byAngle.get(r.angle) ?? [];
+    pages.push(String(r.page));
+    byAngle.set(r.angle, pages);
+  }
+  const args: string[] = [];
+  for (const [angle, pages] of byAngle) {
+    args.push(`--rotate=+${angle}:${pages.join(",")}`);
+  }
+  args.push(inputPath, outPath);
+  await runQpdf(args, 60_000);
+}
+
+/**
+ * Assemble the output document out of selected pages from one or more
+ * already-staged inputs, in one qpdf invocation from an empty document.
+ *
+ * `plan` is the OUTPUT page list, in order: each entry names the staged input
+ * `doc` (an index into `inputPaths`) and the 1-based page to take from it. The
+ * same input may appear in several consecutive runs, and one run's spec lists
+ * its pages in output order — qpdf concatenates the file/range groups of
+ * `--pages` as given, so interleaving e.g. doc0/doc1/doc0 is preserved.
+ *
+ * Rotation is NOT part of this call: pages-spec page numbers are plain page
+ * references, and rotation is only expressible as a separate `--rotate`
+ * option. Callers can rotate the assembled output with qpdfRotatePages,
+ * using output positions so duplicates can have independent rotations.
+ *
+ * Trust boundary: both documents and page numbers are structured values from
+ * the caller — paths are local scratch files and pages were validated against
+ * the real page count — so nothing here interpolates user input into the CLI.
+ */
+export interface PdfPagePlanItem {
+  /** Index into `inputPaths` (not the original upload order — callers stage). */
+  doc: number;
+  /** 1-based page number in that input. */
+  page: number;
+}
+
+export async function qpdfAssemblePages(
+  inputPaths: string[],
+  plan: PdfPagePlanItem[],
+  outPath: string,
+): Promise<void> {
+  if (inputPaths.length < 1) throw new Error("qpdfAssemblePages needs at least one input");
+  if (plan.length < 1) throw new Error("qpdfAssemblePages needs at least one page");
+  for (const item of plan) {
+    if (!Number.isInteger(item.doc) || item.doc < 0 || item.doc >= inputPaths.length) {
+      throw new Error(`Invalid doc index ${item.doc}`);
+    }
+    if (!Number.isInteger(item.page) || item.page < 1) {
+      throw new Error(`Invalid page number ${item.page}`);
+    }
+  }
+
+  // The old positional grammar (file, range — repeating files with different
+  // ranges) is supported by every qpdf in our support matrix; --file/--range
+  // pairs need 11.9+. Ranges are comma-joined plain page numbers; runs longer
+  // than the plan item stay consecutive, so runs of an ascending same-doc
+  // sequence could collapse to "a-b", but there is no argv length pressure
+  // where the 200-character pages-spec cap applied.
+  const runs: Array<{ doc: number; spec: string[] }> = [];
+  for (const item of plan) {
+    const last = runs[runs.length - 1];
+    if (last && last.doc === item.doc) last.spec.push(String(item.page));
+    else runs.push({ doc: item.doc, spec: [String(item.page)] });
+  }
+
+  const args: string[] = ["--empty", "--pages"];
+  for (const run of runs) {
+    args.push(inputPaths[run.doc], run.spec.join(","));
+  }
+  args.push("--", outPath);
+  await runQpdf(args, 60_000);
+}
+
+/**
  * Repair: qpdf's reader recovers damaged xref/structure where possible and
  * the rewrite produces a clean file. Damaged-beyond-recovery inputs reject
  * with qpdf's diagnostics.

@@ -680,6 +680,16 @@ const OrganizePdfCanvas = lazy(() =>
     default: m.OrganizePdfCanvas,
   })),
 );
+const MultiToolPdfSettings = lazy(() =>
+  import("@/components/tools/multi-tool-pdf-settings").then((m) => ({
+    default: m.MultiToolPdfSettings,
+  })),
+);
+const MultiToolPdfCanvas = lazy(() =>
+  import("@/components/tools/multi-tool-pdf-canvas").then((m) => ({
+    default: m.MultiToolPdfCanvas,
+  })),
+);
 const ProtectPdfSettings = lazy(() =>
   import("@/components/tools/protect-pdf-settings").then((m) => ({
     default: m.ProtectPdfSettings,
@@ -1144,6 +1154,10 @@ const ENTRY_CONFIG: ReadonlyArray<[string, RegistryEntryConfig]> = [
   [
     "organize-pdf",
     { accept: ".pdf", Settings: OrganizePdfSettings, ResultsPanel: OrganizePdfCanvas },
+  ],
+  [
+    "multi-tool-pdf",
+    { accept: ".pdf", Settings: MultiToolPdfSettings, ResultsPanel: MultiToolPdfCanvas },
   ],
   ["protect-pdf", { accept: ".pdf", Settings: ProtectPdfSettings }],
   ["unlock-pdf", { accept: ".pdf", Settings: UnlockPdfSettings }],

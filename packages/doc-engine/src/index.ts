@@ -19,6 +19,9 @@ export { type ConvertOptions, convertDocument, parseConvertTarget } from "./libr
 export { buildPandocArgs, type PandocOptions, pandocAvailable, runPandoc } from "./pandoc.js";
 export {
   assertValidRange,
+  type PdfPagePlanItem,
+  type PdfPageRotation,
+  qpdfAssemblePages,
   qpdfDecrypt,
   qpdfEncrypt,
   qpdfLinearize,
@@ -27,6 +30,7 @@ export {
   qpdfPagesSpecUnchecked,
   qpdfRepair,
   qpdfRotate,
+  qpdfRotatePages,
   qpdfSplitRanges,
 } from "./pdf-ops.js";
 export {

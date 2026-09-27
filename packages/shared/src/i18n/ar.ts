@@ -1092,6 +1092,10 @@ export const ar: TranslationKeys = {
       name: "ترتيب PDF",
       description: "إعادة ترتيب الصفحات بتسلسل محدد",
     },
+    "multi-tool-pdf": {
+      name: "الأداة المتعددة لـ PDF",
+      description: "إعادة ترتيب الصفحات وتدويرها وحذفها وسحب صفحات من ملفات PDF أخرى في محرر واحد",
+    },
     "protect-pdf": {
       name: "حماية PDF",
       description: "إضافة حماية بكلمة مرور (تشفير AES-256)",
@@ -3762,6 +3766,28 @@ export const ar: TranslationKeys = {
       pageLabel: "الصفحة {n}",
       orderTooLong:
         "عدد التنقلات المنفصلة كبير جدًا بحيث لا يمكن إرساله. أعد التعيين وجرّب تغييرات أقل.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "الحد الأقصى {docs} ملفات PDF و{pages} صفحة في الناتج.",
+      addDocument: "إضافة PDF",
+      addAll: "إضافة كل الصفحات",
+      allPages: "الكل في الخطة",
+      addPage: "إضافة الصفحة {n}",
+      dragHint:
+        "اسحب لإعادة الترتيب أو التدوير أو حذف الصفحات. أضف ملفات PDF لسحب صفحاتها إلى الداخل.",
+      reset: "إعادة تعيين الخطة",
+      emptyPlan: "لا توجد صفحات في الخطة بعد — أضف صفحات من المستندات أعلاه.",
+      docFailed: "تعذّرت قراءة أحد المستندات.",
+      pageLabel: "الموضع {n}",
+      planSummary: "سيتم تجميع {pages} صفحة من {docs} مستند.",
+      submit: "إنشاء PDF ({pages} صفحة)",
+      progressLabel: "جارٍ التجميع",
+      rotateLeft: "تدوير لليسار",
+      rotateRight: "تدوير لليمين",
+      removePage: "حذف الصفحة",
+      removeDoc: "إزالة PDF",
+      zoomIn: "تكبير",
+      zoomOut: "تصغير",
     },
     "protect-pdf": {
       userPassword: "كلمة مرور المستخدم",

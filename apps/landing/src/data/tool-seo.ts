@@ -6989,6 +6989,38 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "multi-tool-pdf": {
+    searchTitle: "PDF Page Editor — Organize and Merge Pages",
+    longDescription:
+      "Edit PDF pages visually in one place: reorder, rotate, duplicate, or delete pages, and pull in pages from additional PDFs. SnapOtter assembles the result locally on your server for complete privacy.",
+    useCases: [
+      "Combining the relevant pages of several PDFs into one deliverable",
+      "Rotating misoriented scanned pages while reordering a document",
+      "Deleting confidential or blank pages before sharing a report",
+      "Assembling a custom packet from section PDFs without running merge and organize separately",
+    ],
+    features: [
+      "Drag-and-drop page plan with live thumbnails",
+      "Rotate individual pages clockwise or counterclockwise",
+      "Pull pages from multiple PDFs into one output document",
+      "Duplicate or delete any page before export",
+      "Single-request processing keeps everything on your self-hosted instance",
+    ],
+    faqs: [
+      {
+        q: "Can I take pages from more than one PDF?",
+        a: "Yes. Add other PDFs in the editor, then add any of their pages to the output plan in any position. The final document is assembled in a single step on your own server.",
+      },
+      {
+        q: "Does rotating a page change the page contents?",
+        a: "No. Rotation is recorded as the page's display orientation, exactly like a viewer's rotate command; the page's content stream is untouched.",
+      },
+      {
+        q: "Are bookmarks preserved?",
+        a: "Assembling pages from multiple documents produces a flat page sequence, so document-level outline structures from the sources are not carried into the output.",
+      },
+    ],
+  },
   "protect-pdf": {
     searchTitle: "Password Protect PDF With Encryption",
     longDescription:

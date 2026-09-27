@@ -124,6 +124,7 @@ const TOOL_FIXTURE: Record<string, FixtureSpec> = {
   "nup-pdf": PDF_FIX,
   "booklet-pdf": PDF_FIX,
   "organize-pdf": PDF_FIX,
+  "multi-tool-pdf": PDF_FIX,
   "redact-pdf": PDF_FIX,
   "pdf-metadata": PDF_FIX,
   "pdf-page-numbers": PDF_FIX,
@@ -972,6 +973,20 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
   "organize-pdf": [
     { label: "reverse order", settings: { order: "3,2,1" } },
     { label: "single page", settings: { order: "1" } },
+  ],
+
+  "multi-tool-pdf": [
+    {
+      label: "reorder one doc",
+      settings: {
+        items: [
+          { doc: 0, page: 3 },
+          { doc: 0, page: 1 },
+        ],
+        pageCounts: [3],
+      },
+    },
+    { label: "rotate plan", settings: { items: [{ doc: 0, page: 1, rot: 180 }], pageCounts: [3] } },
   ],
 
   "redact-pdf": [

@@ -1104,6 +1104,11 @@ export const nl: TranslationKeys = {
       name: "PDF organiseren",
       description: "Herorden pagina's met een expliciete paginavolgorde",
     },
+    "multi-tool-pdf": {
+      name: "PDF Multi-Tool",
+      description:
+        "Herorden, draai en verwijder pagina's en neem pagina's over uit andere PDF's in één editor",
+    },
     "protect-pdf": {
       name: "PDF beveiligen",
       description: "Voeg wachtwoordbeveiliging toe (AES-256-encryptie)",
@@ -3802,6 +3807,29 @@ export const nl: TranslationKeys = {
       pageLabel: "Pagina {n}",
       orderTooLong:
         "Te veel afzonderlijke verplaatsingen om te verzenden. Herstel en probeer het met minder wijzigingen.",
+    },
+    "multi-tool-pdf": {
+      limitsHint: "Maximaal {docs} PDF’s en {pages} uitvoerpagina’s.",
+      addDocument: "PDF toevoegen",
+      addAll: "Alle pagina's toevoegen",
+      allPages: "Alle in plan",
+      addPage: "Pagina {n} toevoegen",
+      dragHint:
+        "Sleep om pagina's te herordenen, draaien of verwijderen. Voeg PDF's toe om pagina's over te nemen.",
+      reset: "Plan herstellen",
+      emptyPlan:
+        "Nog geen pagina's in het plan — voeg pagina's toe vanuit de documenten hierboven.",
+      docFailed: "Een document kon niet worden gelezen.",
+      pageLabel: "Positie {n}",
+      planSummary: "{pages} pagina('s) uit {docs} document(en) worden samengesteld.",
+      submit: "PDF maken ({pages} pagina's)",
+      progressLabel: "Samenstellen",
+      rotateLeft: "Links draaien",
+      rotateRight: "Rechts draaien",
+      removePage: "Pagina verwijderen",
+      removeDoc: "PDF verwijderen",
+      zoomIn: "Inzoomen",
+      zoomOut: "Uitzoomen",
     },
     "protect-pdf": {
       userPassword: "Gebruikerswachtwoord",

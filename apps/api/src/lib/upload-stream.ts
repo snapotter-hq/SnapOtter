@@ -20,9 +20,15 @@ export interface ReceivedUpload {
 export async function receiveUpload(
   part: MultipartFile,
   jobId: string,
-  opts: { maxBytes?: number; signal?: AbortSignal } = {},
+  opts: {
+    maxBytes?: number;
+    signal?: AbortSignal;
+    /** Assign a unique name within this request, after canonical sanitization. */
+    uniqueName?: (sanitizedName: string) => string;
+  } = {},
 ): Promise<ReceivedUpload> {
-  const filename = sanitizeFilename(part.filename || "upload");
+  const sanitized = sanitizeFilename(part.filename || "upload");
+  const filename = opts.uniqueName ? opts.uniqueName(sanitized) : sanitized;
   const key = `uploads/${jobId}/${filename}`;
   const size = await putObjectStream(key, part.file, {
     maxBytes: opts.maxBytes,

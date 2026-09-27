@@ -10802,6 +10802,56 @@ paths:
                 $ref: '#/components/schemas/UnauthorizedError'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+  /api/v1/tools/pdf/multi-tool-pdf:
+    post:
+      operationId: multiToolPdf
+      tags: [Tools]
+      summary: PDF Multi-Tool
+      description: Assemble a PDF from an explicit page plan - reorder, duplicate, rotate, or delete pages and pull pages in from additional PDFs, in one submission.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: One or more PDF files (max 20); the document being edited comes first, then the extra documents in the order added
+                settings:
+                  type: string
+                  description: |
+                    JSON string with options:
+                    - `items` (array, required) - Output page plan in output order (max 1200); each item is `{doc, page, rot?}` where `doc` is the 0-based upload index, `page` is a 1-based page number, and `rot` is an optional clockwise rotation (90, 180, or 270) recorded on that output position
+                    - `pageCounts` (array, required) - Real page count of each uploaded document, in upload order; plans referencing a page beyond its document's count are rejected with 400
+      responses:
+        "200":
+          description: Assembled PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+
   /api/v1/tools/pdf/protect-pdf:
     post:
       operationId: protectPdf

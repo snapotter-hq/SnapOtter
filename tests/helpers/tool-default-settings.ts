@@ -22,6 +22,7 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "extract-pages": { range: "1" },
   "remove-pages": { pages: "2" },
   "organize-pdf": { order: "1-z" },
+  "multi-tool-pdf": { items: [{ doc: 0, page: 1 }], pageCounts: [3] },
   "protect-pdf": { userPassword: "test123" },
   "unlock-pdf": { password: "test123" },
   "watermark-pdf": { text: "CONFIDENTIAL" },
