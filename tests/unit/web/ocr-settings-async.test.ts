@@ -233,6 +233,27 @@ describe("OCR async response handling", () => {
     expect(events.close).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the caller's localized processingFailed message for a handling error", async () => {
+    const promise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      {
+        onUploadProgress: vi.fn(),
+        onProcessingProgress: () => {
+          throw new Error("boom");
+        },
+      },
+      { processingFailed: "Verarbeitung fehlgeschlagen" },
+    );
+    xhrs[0].status = 202;
+    xhrs[0].onload?.();
+
+    expect(() =>
+      MockEventSource.instances[0].emit({ type: "single", phase: "processing", percent: 40 }),
+    ).toThrow("boom");
+    await expect(promise).rejects.toThrow("Verarbeitung fehlgeschlagen");
+  });
+
   it("ignores a malformed frame and still resolves from the next good one", async () => {
     const promise = runOcr();
     const xhr = xhrs[0];

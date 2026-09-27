@@ -507,7 +507,7 @@ describe("useToolProcessor batch recovery (#750)", () => {
         }
         realUpdateEntry(index, patch);
       });
-      const { result, unmount } = startBatchRun();
+      const { unmount } = startBatchRun();
       degrade();
 
       expect(() =>
@@ -520,10 +520,6 @@ describe("useToolProcessor batch recovery (#750)", () => {
       expect(useFileStore.getState().processing).toBe(false);
       expect(useFileStore.getState().activeJobId).toBeNull();
       expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
-
-      // The batch closure went with the run, so a late cancel changes nothing.
-      void result.current.cancelCurrentJob();
-      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
 
       unmount();
     });

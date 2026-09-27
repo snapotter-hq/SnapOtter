@@ -136,7 +136,7 @@ export function ocrOneFile(
           callbacks.onProcessingProgress(data.percent, data.stage ?? "");
         }
       } catch (err) {
-        rejectOnce(new Error(FRAME_HANDLING_FAILED));
+        rejectOnce(new Error(messages.processingFailed ?? FRAME_HANDLING_FAILED));
         throw err;
       }
     };

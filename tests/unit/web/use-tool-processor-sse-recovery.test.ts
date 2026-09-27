@@ -254,6 +254,59 @@ describe("useToolProcessor SSE recovery", () => {
       unmount();
     });
 
+    it("still ends the run when the failed-frame settle throws", () => {
+      const { unmount } = startRun({ async: true });
+      // The failed branch clears the job id before its entry write, so the
+      // handler-error path must not read that as an already-settled run.
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(() => {
+          throw new Error("boom");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      expect(() =>
+        act(() => {
+          MockEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
+          } as MessageEvent);
+        }),
+      ).toThrow("boom");
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+
+      unmount();
+    });
+
+    it("rethrows the root cause when the teardown itself throws", () => {
+      const { unmount } = startRun({ async: true });
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      // A store listener that breaks on every write: the completion write
+      // throws the root cause, then the teardown's first write throws again.
+      let writes = 0;
+      const unsubscribe = useFileStore.subscribe(() => {
+        writes++;
+        throw new Error(writes === 1 ? "root cause" : "teardown broke");
+      });
+
+      try {
+        expect(() =>
+          act(() => {
+            MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
+          }),
+        ).toThrow("root cause");
+        expect(consoleError).toHaveBeenCalledWith(
+          "SSE teardown after a frame handling error failed",
+          expect.objectContaining({ message: "teardown broke" }),
+        );
+      } finally {
+        unsubscribe();
+        consoleError.mockRestore();
+        unmount();
+      }
+    });
+
     it("still ignores a malformed frame", () => {
       const { unmount } = startRun({ async: true });
 

@@ -782,6 +782,39 @@ describe("usePipelineProcessor handler errors (#1287)", () => {
     unmount();
   });
 
+  it("keeps the real outcome when the throw lands after the run settled", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    // Breaks finishRun's clearActiveJob write, after failRun has recorded the
+    // real error (setError also turns processing off).
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("listener broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          sendBatchFrame({
+            status: "failed",
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: 2,
+            errors: [],
+          });
+        }),
+      ).toThrow("listener broke");
+
+      expect(useFileStore.getState().error).toBe("All files failed processing");
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      unsubscribe();
+      unmount();
+    }
+  });
+
   it("still ignores a malformed frame", () => {
     const { unmount } = startAsyncSingleRun();
 

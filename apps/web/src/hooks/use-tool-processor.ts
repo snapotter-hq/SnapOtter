@@ -304,10 +304,12 @@ export function useToolProcessor(toolId: string) {
   // was, the run is over: release the stream, the POST, both timers and any
   // batch closure, then fail the entries it left at "processing". A throw
   // after the run already settled leaves that outcome alone: the real error
-  // (or result) it recorded beats a generic one.
+  // (or result) it recorded beats a generic one. Settled means processing is
+  // off too: the failed-frame branch clears the job id before its own entry
+  // writes, so a throw there still has a live run to end.
   const failRunOnHandlerError = useCallback(
     (es: EventSource) => {
-      if (!activeJobIdRef.current) return;
+      if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -321,11 +323,11 @@ export function useToolProcessor(toolId: string) {
       setProgress(IDLE_PROGRESS);
       // Last and on its own: the store write that threw may throw again, and
       // the run-level teardown above has to happen regardless. The caller
-      // rethrows the original error, so nothing is lost here.
+      // rethrows the original error; this one is only logged.
       try {
         settleProcessingEntries(FRAME_HANDLING_FAILED);
-      } catch {
-        // Already surfacing through the caller's rethrow.
+      } catch (settleErr) {
+        console.error("Failing the run's entries after a frame handling error failed", settleErr);
       }
     },
     [
@@ -496,9 +498,14 @@ export function useToolProcessor(toolId: string) {
               }));
             }
           } catch (err) {
-            failRunOnHandlerError(es);
-            // Rethrow so the error reaches the console and Sentry's global
-            // handler instead of disappearing.
+            // A second throw from the teardown must not replace the root
+            // cause, which is rethrown so it reaches the console and Sentry's
+            // global handler instead of disappearing.
+            try {
+              failRunOnHandlerError(es);
+            } catch (teardownErr) {
+              console.error("SSE teardown after a frame handling error failed", teardownErr);
+            }
             throw err;
           }
         };

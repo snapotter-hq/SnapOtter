@@ -344,8 +344,10 @@ describe("useFeaturesStore", () => {
     });
 
     // #1287: the onmessage catch used to wrap the whole handler, so a throw
-    // while handling a frame was swallowed. When that throw lands after the
-    // stream is closed (a terminal frame), nothing ever settles the pill.
+    // while handling a frame was swallowed. A terminal frame closes the stream
+    // before it settles, so a throw there left nothing to settle the pill.
+    // Any handling throw now hands the bundle to the status poller; a frame
+    // that parses to null is the simplest way to throw inside the handler.
     it("falls back to polling and rethrows when frame handling throws", async () => {
       apiPostMock.mockResolvedValueOnce({ jobId: "job-throw" });
 

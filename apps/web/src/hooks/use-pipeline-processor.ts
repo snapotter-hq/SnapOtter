@@ -198,10 +198,11 @@ export function usePipelineProcessor() {
   // was, the run is over: release the stream, the POST, both timers and any
   // batch closure. The caller rethrows the original error. A throw after the
   // run already settled leaves that outcome alone: the real error (or
-  // result) it recorded beats a generic one.
+  // result) it recorded beats a generic one. Settled means processing is off
+  // too: the failed-frame branch clears the job id before it sets the error.
   const failRunOnHandlerError = useCallback(
     (es: EventSource) => {
-      if (!activeJobIdRef.current) return;
+      if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -357,9 +358,14 @@ export function usePipelineProcessor() {
               }));
             }
           } catch (err) {
-            failRunOnHandlerError(es);
-            // Rethrow so the error reaches the console and Sentry's global
-            // handler instead of disappearing.
+            // A second throw from the teardown must not replace the root
+            // cause, which is rethrown so it reaches the console and Sentry's
+            // global handler instead of disappearing.
+            try {
+              failRunOnHandlerError(es);
+            } catch (teardownErr) {
+              console.error("SSE teardown after a frame handling error failed", teardownErr);
+            }
             throw err;
           }
         };
