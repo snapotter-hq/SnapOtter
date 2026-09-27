@@ -472,6 +472,83 @@ describe("useToolProcessor batch recovery (#750)", () => {
     unmount();
   });
 
+  // #1287: a throw while settling from the terminal frame used to be
+  // swallowed, leaving a degraded batch at "processing" with no stream and no
+  // timer left to end it.
+  describe("terminal-frame handler errors (#1287)", () => {
+    const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
+    const ALL_FAILED_FRAME = {
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [],
+    };
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    afterEach(() => {
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+    });
+
+    function degrade() {
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].onerror?.();
+      });
+    }
+
+    it("fails the run when settling from the terminal frame throws", () => {
+      // failRun holds the updateEntry it saw at kickoff, so the spy goes in
+      // first; only the first "failed" write throws.
+      let thrown = false;
+      vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation((index, patch) => {
+        if (!thrown && patch.status === "failed") {
+          thrown = true;
+          throw new Error("boom");
+        }
+        realUpdateEntry(index, patch);
+      });
+      const { result, unmount } = startBatchRun();
+      degrade();
+
+      expect(() =>
+        act(() => {
+          sendBatchFrame(ALL_FAILED_FRAME);
+        }),
+      ).toThrow("boom");
+
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+
+      // The batch closure went with the run, so a late cancel changes nothing.
+      void result.current.cancelCurrentJob();
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+
+      unmount();
+    });
+
+    it("keeps the real outcome when the throw lands after the run settled", async () => {
+      const { unmount } = startBatchRun();
+      degrade();
+      // trackBatch is the last thing failRun does, after finishRun settled.
+      vi.mocked(track).mockImplementationOnce(() => {
+        throw new Error("analytics broke");
+      });
+
+      expect(() =>
+        act(() => {
+          sendBatchFrame(ALL_FAILED_FRAME);
+        }),
+      ).toThrow("analytics broke");
+
+      expect(useFileStore.getState().error).toBe("All files failed processing");
+      expect(useFileStore.getState().processing).toBe(false);
+
+      unmount();
+    });
+  });
+
   it("fails a degraded run when a completed terminal frame has no durable result", async () => {
     const { unmount } = startBatchRun();
 
