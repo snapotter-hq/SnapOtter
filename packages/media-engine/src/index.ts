@@ -1,6 +1,5 @@
 export { ffmpegAvailable, resolveFfmpeg, resolveFfprobe } from "./binaries.js";
 export {
-  EncoderMissingError,
   type EncoderTarget,
   HW_ACCEL_FAMILIES,
   type HwAccelStatus,
