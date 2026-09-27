@@ -82,15 +82,20 @@ const REDIRECT_LOOP_WINDOW_MS = 10_000;
  * keeping the query and hash. Returns true when it navigated away, so the
  * caller must not mount the app. A proxy that redirects the prefix back off
  * would bounce the page forever, so a second attempt within a few seconds is
- * refused and logged instead (same guard shape as chunk-reload.ts).
+ * refused and logged instead (same guard shape as chunk-reload.ts). Landing on
+ * a prefixed URL clears the guard: a real loop never gets there, and a user
+ * opening another unprefixed link right after a good redirect still gets one.
  */
 export function redirectIfUnprefixed(
   location: Pick<Location, "pathname" | "search" | "hash" | "replace">,
-  storage: Pick<Storage, "getItem" | "setItem"> | null = safeSessionStorage(),
+  storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null = safeSessionStorage(),
   now = Date.now(),
 ): boolean {
   const unprefixed = unprefixPathname(location.pathname);
-  if (unprefixed === null) return false;
+  if (unprefixed === null) {
+    storage?.removeItem(REDIRECT_STAMP_KEY);
+    return false;
+  }
   const last = Number(storage?.getItem(REDIRECT_STAMP_KEY) ?? 0);
   if (now - last < REDIRECT_LOOP_WINDOW_MS) {
     console.error(

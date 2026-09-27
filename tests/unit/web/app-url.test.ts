@@ -87,6 +87,7 @@ describe("redirectIfUnprefixed (#1275 case A)", () => {
     return {
       getItem: (key: string) => data.get(key) ?? null,
       setItem: (key: string, value: string) => void data.set(key, value),
+      removeItem: (key: string) => void data.delete(key),
     };
   }
 
@@ -127,6 +128,20 @@ describe("redirectIfUnprefixed (#1275 case A)", () => {
     // Once the window has passed, a fresh visit redirects again.
     expect(redirectIfUnprefixed(fakeLocation("/files"), storage, 1_020_000)).toBe(true);
     error.mockRestore();
+  });
+
+  it("lets another unprefixed visit redirect right after a redirect that landed", async () => {
+    // Found in the browser smoke run: two different unprefixed links a few
+    // seconds apart in one tab must both redirect; only a bounce is a loop.
+    document.head.innerHTML = '<base href="/snapotter/">';
+    const { redirectIfUnprefixed } = await import("../../../apps/web/src/lib/app-url");
+    const storage = memoryStorage();
+    expect(redirectIfUnprefixed(fakeLocation("/files"), storage, 1_000_000)).toBe(true);
+    // The redirect landed on the prefixed URL.
+    expect(redirectIfUnprefixed(fakeLocation("/snapotter/files"), storage, 1_001_000)).toBe(false);
+    const next = fakeLocation("/image/resize");
+    expect(redirectIfUnprefixed(next, storage, 1_002_000)).toBe(true);
+    expect(next.replace).toHaveBeenCalledWith("/snapotter/image/resize");
   });
 
   it("still redirects when storage is unavailable", async () => {
