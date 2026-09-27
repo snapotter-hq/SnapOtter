@@ -454,6 +454,13 @@ describe("Install lock", () => {
     try {
       expect(mod.acquireInstallLock("ocr")).toBe(true);
       const before = JSON.parse(readFileSync(lockPath, "utf-8"));
+      // The heartbeat refreshes mtime with a real write, stamped by the
+      // kernel's coarse clock, and fake timers fire it milliseconds after the
+      // lock was created: both writes can share one timestamp (#1358). Age the
+      // file first so a heartbeat that writes is measurably newer and one that
+      // doesn't stays a minute old.
+      const aged = new Date(Date.now() - 60_000);
+      utimesSync(lockPath, aged, aged);
       const beforeMtime = statSync(lockPath).mtimeMs;
       await vi.advanceTimersByTimeAsync(30_000);
       const after = JSON.parse(readFileSync(lockPath, "utf-8"));
