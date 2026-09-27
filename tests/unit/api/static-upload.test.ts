@@ -110,7 +110,7 @@ describe("registerStatic", () => {
       type: vi.fn().mockReturnThis(),
       send: vi.fn(),
     };
-    notFoundHandler?.({ url: "/resize" }, reply);
+    notFoundHandler?.({ method: "GET", url: "/resize" }, reply);
     expect(reply.send).toHaveBeenCalledWith(expect.stringContaining('<base href="/"'));
   });
 
