@@ -3884,6 +3884,8 @@ export const de: TranslationKeys = {
     previewUnavailable: "Vorschau ist nach der Verarbeitung verfügbar",
     generatePreview: "Vorschau erzeugen",
     previewFailed: "Vorschauerzeugung fehlgeschlagen",
+    previewEncoderMissing:
+      "Dem ffmpeg dieses Servers fehlt der Encoder {encoder}, daher kann keine Vorschau erzeugt werden. Kontaktieren Sie Ihren Administrator.",
     previewNotAvailable: "Vorschau nicht verfügbar",
     resultPreviewFailed: "Ergebnisvorschau konnte nicht geladen werden",
     resultPreviewFailedHint:

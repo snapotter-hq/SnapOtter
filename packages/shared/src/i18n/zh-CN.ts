@@ -3606,6 +3606,7 @@ export const zhCN: TranslationKeys = {
     previewUnavailable: "处理完成后可预览",
     generatePreview: "生成预览",
     previewFailed: "预览生成失败",
+    previewEncoderMissing: "此服务器的 ffmpeg 缺少 {encoder} 编码器，无法生成预览。请联系管理员。",
     previewNotAvailable: "预览不可用",
     resultPreviewFailed: "结果预览加载失败",
     resultPreviewFailedHint: "处理已完成。请使用下载按钮保存文件。",

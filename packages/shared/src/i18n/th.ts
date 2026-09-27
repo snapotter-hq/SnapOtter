@@ -3821,6 +3821,8 @@ export const th: TranslationKeys = {
     previewUnavailable: "ตัวอย่างจะพร้อมใช้งานหลังประมวลผลเสร็จ",
     generatePreview: "สร้างตัวอย่าง",
     previewFailed: "สร้างตัวอย่างไม่สำเร็จ",
+    previewEncoderMissing:
+      "ffmpeg บนเซิร์ฟเวอร์นี้ไม่มีตัวเข้ารหัส {encoder} จึงสร้างตัวอย่างไม่ได้ กรุณาติดต่อผู้ดูแลระบบ",
     previewNotAvailable: "ไม่มีตัวอย่างให้แสดง",
     resultPreviewFailed: "โหลดตัวอย่างผลลัพธ์ไม่สำเร็จ",
     resultPreviewFailedHint: "การประมวลผลเสร็จสิ้นแล้ว ใช้ปุ่มดาวน์โหลดเพื่อบันทึกไฟล์",

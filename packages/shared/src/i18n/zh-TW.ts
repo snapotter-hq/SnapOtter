@@ -3605,6 +3605,7 @@ export const zhTW: TranslationKeys = {
     previewUnavailable: "處理完成後即可預覽",
     generatePreview: "產生預覽",
     previewFailed: "預覽產生失敗",
+    previewEncoderMissing: "此伺服器的 ffmpeg 缺少 {encoder} 編碼器，無法產生預覽。請聯絡管理員。",
     previewNotAvailable: "預覽無法使用",
     resultPreviewFailed: "結果預覽載入失敗",
     resultPreviewFailedHint: "處理已完成。請使用下載按鈕儲存檔案。",

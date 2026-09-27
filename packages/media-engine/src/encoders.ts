@@ -215,11 +215,25 @@ export function softwareEncoder(target: EncoderTarget): string {
 function requireSoftware(target: EncoderTarget, names: ReadonlySet<string> | null): string {
   const software = SOFTWARE[target];
   if (!names || names.has(software)) return software;
-  throw new SafeError(
-    `This server's ffmpeg build has no ${software} encoder, which ${target} output needs. ` +
-      "An administrator needs to install a full ffmpeg build or change FFMPEG_PATH.",
-    { kind: "operational", code: "ENCODER_MISSING" },
-  );
+  throw new EncoderMissingError(software, target);
+}
+
+/**
+ * Thrown when this ffmpeg build lacks an encoder a tool needs. Carries the
+ * encoder name as data, so a client can show a translated reason instead of
+ * this English message (#1290).
+ */
+export class EncoderMissingError extends SafeError {
+  readonly encoder: string;
+
+  constructor(encoder: string, target: EncoderTarget) {
+    super(
+      `This server's ffmpeg build has no ${encoder} encoder, which ${target} output needs. ` +
+        "An administrator needs to install a full ffmpeg build or change FFMPEG_PATH.",
+      { kind: "operational", code: "ENCODER_MISSING" },
+    );
+    this.encoder = encoder;
+  }
 }
 
 /**

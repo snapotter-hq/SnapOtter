@@ -3885,6 +3885,8 @@ export const fr: TranslationKeys = {
     previewUnavailable: "L'aperçu sera disponible après le traitement",
     generatePreview: "Générer l'aperçu",
     previewFailed: "Échec de la génération de l'aperçu",
+    previewEncoderMissing:
+      "Il manque l'encodeur {encoder} au ffmpeg de ce serveur, l'aperçu ne peut donc pas être généré. Contactez votre administrateur.",
     previewNotAvailable: "Aperçu non disponible",
     resultPreviewFailed: "Échec du chargement de l'aperçu du résultat",
     resultPreviewFailedHint:

@@ -3865,6 +3865,8 @@ export const id: TranslationKeys = {
     previewUnavailable: "Pratinjau akan tersedia setelah pemrosesan",
     generatePreview: "Buat Pratinjau",
     previewFailed: "Pembuatan pratinjau gagal",
+    previewEncoderMissing:
+      "ffmpeg di server ini tidak memiliki encoder {encoder}, jadi pratinjau tidak dapat dibuat. Hubungi administrator Anda.",
     previewNotAvailable: "Pratinjau tidak tersedia",
     resultPreviewFailed: "Pratinjau hasil gagal dimuat",
     resultPreviewFailedHint: "Pemrosesan selesai. Gunakan tombol unduh untuk menyimpan file Anda.",

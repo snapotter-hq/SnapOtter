@@ -3671,6 +3671,8 @@ export const hi: TranslationKeys = {
     previewUnavailable: "प्रीव्यू प्रोसेसिंग के बाद उपलब्ध होगा",
     generatePreview: "प्रीव्यू बनाएं",
     previewFailed: "प्रीव्यू बनाना विफल रहा",
+    previewEncoderMissing:
+      "इस सर्वर के ffmpeg में {encoder} एनकोडर नहीं है, इसलिए प्रीव्यू नहीं बन सकता। अपने एडमिनिस्ट्रेटर से संपर्क करें।",
     previewNotAvailable: "प्रीव्यू उपलब्ध नहीं है",
     resultPreviewFailed: "परिणाम का प्रीव्यू लोड नहीं हो सका",
     resultPreviewFailedHint: "प्रोसेसिंग पूरी हो गई। फाइल सहेजने के लिए डाउनलोड बटन का उपयोग करें।",

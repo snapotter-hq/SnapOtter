@@ -12,6 +12,7 @@ import {
   type UserFile,
   type UserFileDetail,
 } from "@/lib/api";
+import { previewFailureMessage } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { useFilesPageStore } from "@/stores/files-page-store";
@@ -88,7 +89,7 @@ function isNativePlayable(mimeType: string, filename: string): boolean {
   return false;
 }
 
-function FilePreview({
+export function FilePreview({
   fileId,
   mimeType,
   name,
@@ -101,7 +102,8 @@ function FilePreview({
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState(false);
+  // The message to show when generating a preview failed, or null.
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const isMedia = mimeType.startsWith("video/") || mimeType.startsWith("audio/");
   const nativePlayable = isMedia && isNativePlayable(mimeType, name);
@@ -156,22 +158,26 @@ function FilePreview({
 
   const handleGeneratePreview = useCallback(() => {
     setPreviewLoading(true);
-    setPreviewError(false);
+    setPreviewError(null);
+    let failure: string | null = null;
     fetch(getFilePreviewUrl(fileId), { headers: formatHeaders() })
-      .then((res) => {
-        if (!res.ok) throw new Error("Preview generation failed");
+      .then(async (res) => {
+        if (!res.ok) {
+          failure = await previewFailureMessage(res, t, t.files.details.previewFailedRetry);
+          throw new Error("Preview generation failed");
+        }
         return res.blob();
       })
       .then((blob) => {
         setPreviewSrc(URL.createObjectURL(blob));
       })
       .catch(() => {
-        setPreviewError(true);
+        setPreviewError(failure ?? t.files.details.previewFailedRetry);
       })
       .finally(() => {
         setPreviewLoading(false);
       });
-  }, [fileId]);
+  }, [fileId, t]);
 
   // PDF files -- render inline in iframe
   if (isPdf) {
@@ -220,11 +226,7 @@ function FilePreview({
           <Play className="h-4 w-4" />
           {t.toolPage.generatePreview}
         </button>
-        {previewError && (
-          <span className="text-xs text-muted-foreground">
-            {t.files.details.previewFailedRetry}
-          </span>
-        )}
+        {previewError && <span className="text-xs text-muted-foreground">{previewError}</span>}
       </div>
     );
   }
@@ -277,11 +279,7 @@ function FilePreview({
           <Play className="h-4 w-4" />
           {t.toolPage.generatePreview}
         </button>
-        {previewError && (
-          <span className="text-xs text-muted-foreground">
-            {t.files.details.previewFailedRetry}
-          </span>
-        )}
+        {previewError && <span className="text-xs text-muted-foreground">{previewError}</span>}
       </div>
     );
   }
@@ -334,11 +332,7 @@ function FilePreview({
           <Play className="h-4 w-4" />
           {t.toolPage.generatePreview}
         </button>
-        {previewError && (
-          <span className="text-xs text-muted-foreground">
-            {t.files.details.previewFailedRetry}
-          </span>
-        )}
+        {previewError && <span className="text-xs text-muted-foreground">{previewError}</span>}
       </div>
     );
   }

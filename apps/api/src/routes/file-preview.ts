@@ -11,8 +11,7 @@ import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
-import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
-import { isSafeMessageError } from "@snapotter/shared";
+import { EncoderMissingError, runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
@@ -61,12 +60,14 @@ function previewPath(fileId: string, ext: string): string {
  * Only the missing-encoder error is written for the client (#1270); it names
  * what the admin has to install. Other SafeErrors can carry raw tool stderr
  * (the AI bridge builds them from it), and ffmpeg's own failures always do,
- * so everything else stays behind the generic message.
+ * so everything else stays behind the generic message. `code` and `encoder`
+ * let the web UI show that reason translated rather than in English (#1290).
  */
-function previewErrorMessage(err: unknown): string {
-  return isSafeMessageError(err) && err.code === "ENCODER_MISSING"
-    ? friendlyError(err.message)
-    : "Could not generate preview";
+function previewErrorBody(err: unknown): { error: string; code?: string; encoder?: string } {
+  if (err instanceof EncoderMissingError) {
+    return { error: friendlyError(err.message), code: "ENCODER_MISSING", encoder: err.encoder };
+  }
+  return { error: "Could not generate preview" };
 }
 
 /** Best-effort removal of an unfinished preview; logged, since nothing else clears it. */
@@ -257,7 +258,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
         request.log.error({ err, fileId: id }, "Preview generation failed");
-        return reply.status(422).send({ error: previewErrorMessage(err) });
+        return reply.status(422).send(previewErrorBody(err));
       }
 
       // Same directory, so the rename is atomic: a concurrent request sees
@@ -422,7 +423,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           .send(outputBuffer);
       } catch (err) {
         request.log.error({ err, filename }, "On-demand preview generation failed");
-        return reply.status(422).send({ error: previewErrorMessage(err) });
+        return reply.status(422).send(previewErrorBody(err));
       } finally {
         await rm(inputPath, { force: true }).catch(() => {});
         await rm(outputPath, { force: true }).catch(() => {});

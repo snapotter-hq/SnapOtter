@@ -3808,6 +3808,8 @@ export const en = {
     previewUnavailable: "Preview will be available after processing",
     generatePreview: "Generate Preview",
     previewFailed: "Preview generation failed",
+    previewEncoderMissing:
+      "This server's ffmpeg is missing the {encoder} encoder, so the preview can't be generated. Contact your administrator.",
     previewNotAvailable: "Preview not available",
     resultPreviewFailed: "Result preview failed to load",
     resultPreviewFailedHint: "Processing finished. Use the download button to save your file.",

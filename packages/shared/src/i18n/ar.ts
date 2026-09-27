@@ -3843,6 +3843,8 @@ export const ar: TranslationKeys = {
     previewUnavailable: "ستتوفر المعاينة بعد المعالجة",
     generatePreview: "إنشاء معاينة",
     previewFailed: "فشل إنشاء المعاينة",
+    previewEncoderMissing:
+      "لا يحتوي ffmpeg على هذا الخادم على المرمِّز {encoder}، لذا لا يمكن إنشاء المعاينة. تواصل مع المسؤول.",
     previewNotAvailable: "المعاينة غير متوفرة",
     resultPreviewFailed: "تعذر تحميل معاينة النتيجة",
     resultPreviewFailedHint: "اكتملت المعالجة. استخدم زر التحميل لحفظ ملفك.",

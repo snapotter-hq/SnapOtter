@@ -3868,6 +3868,8 @@ export const pl: TranslationKeys = {
     previewUnavailable: "Podgląd będzie dostępny po przetworzeniu",
     generatePreview: "Generuj podgląd",
     previewFailed: "Generowanie podglądu nie powiodło się",
+    previewEncoderMissing:
+      "W ffmpeg na tym serwerze brakuje kodera {encoder}, więc nie można wygenerować podglądu. Skontaktuj się z administratorem.",
     previewNotAvailable: "Podgląd niedostępny",
     resultPreviewFailed: "Nie udało się wczytać podglądu wyniku",
     resultPreviewFailedHint:

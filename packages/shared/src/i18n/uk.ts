@@ -3868,6 +3868,8 @@ export const uk: TranslationKeys = {
     previewUnavailable: "Попередній перегляд буде доступний після обробки",
     generatePreview: "Створити попередній перегляд",
     previewFailed: "Не вдалося створити попередній перегляд",
+    previewEncoderMissing:
+      "У ffmpeg на цьому сервері немає кодувальника {encoder}, тому попередній перегляд не створити. Зверніться до адміністратора.",
     previewNotAvailable: "Попередній перегляд недоступний",
     resultPreviewFailed: "Не вдалося завантажити попередній перегляд результату",
     resultPreviewFailedHint:

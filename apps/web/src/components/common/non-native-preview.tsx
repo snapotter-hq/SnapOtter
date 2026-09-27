@@ -4,6 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
+import { previewFailureMessage } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
 
 const PROGRESS_MESSAGES = [
@@ -38,6 +39,7 @@ export function NonNativePreview({
   const { t } = useTranslation();
   const [state, setState] = useState<PreviewState>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [messageIndex, setMessageIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -71,6 +73,7 @@ export function NonNativePreview({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let failure: string | null = null;
 
     try {
       let fileToUpload = file;
@@ -93,6 +96,7 @@ export function NonNativePreview({
       });
 
       if (!response.ok) {
+        failure = await previewFailureMessage(response, t, t.toolPage.previewFailed);
         throw new Error(`Preview generation failed: ${response.status}`);
       }
 
@@ -106,12 +110,13 @@ export function NonNativePreview({
       setState("ready");
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
+        setErrorMessage(failure ?? t.toolPage.previewFailed);
         setState("error");
       }
     } finally {
       stopMessageRotation();
     }
-  }, [file, src, filename, previewUrl, startMessageRotation, stopMessageRotation]);
+  }, [file, src, filename, previewUrl, startMessageRotation, stopMessageRotation, t]);
 
   const ext = filename.split(".").pop()?.toUpperCase() ?? "";
   const IconComponent = modality === "audio" ? Volume2 : Video;
@@ -177,7 +182,9 @@ export function NonNativePreview({
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
-          <p className="font-medium text-foreground mb-1">{t.toolPage.previewFailed}</p>
+          <p className="font-medium text-foreground mb-1">
+            {errorMessage ?? t.toolPage.previewFailed}
+          </p>
           <p className="text-sm text-muted-foreground mb-3">
             {filename}
             {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}

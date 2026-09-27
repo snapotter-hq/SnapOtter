@@ -3797,6 +3797,8 @@ export const ko: TranslationKeys = {
     previewUnavailable: "처리 후 미리보기를 사용할 수 있습니다",
     generatePreview: "미리보기 생성",
     previewFailed: "미리보기 생성 실패",
+    previewEncoderMissing:
+      "이 서버의 ffmpeg에 {encoder} 인코더가 없어 미리보기를 생성할 수 없습니다. 관리자에게 문의하세요.",
     previewNotAvailable: "미리보기를 사용할 수 없습니다",
     resultPreviewFailed: "결과 미리보기를 불러오지 못했습니다",
     resultPreviewFailedHint: "처리는 완료되었습니다. 다운로드 버튼으로 파일을 저장하세요.",

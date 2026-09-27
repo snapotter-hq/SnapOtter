@@ -3874,6 +3874,8 @@ export const it: TranslationKeys = {
     previewUnavailable: "L'anteprima sarà disponibile dopo l'elaborazione",
     generatePreview: "Genera anteprima",
     previewFailed: "Generazione dell'anteprima non riuscita",
+    previewEncoderMissing:
+      "Al ffmpeg di questo server manca l'encoder {encoder}, quindi non è possibile generare l'anteprima. Contatta l'amministratore.",
     previewNotAvailable: "Anteprima non disponibile",
     resultPreviewFailed: "Impossibile caricare l'anteprima del risultato",
     resultPreviewFailedHint:

@@ -3863,6 +3863,8 @@ export const sv: TranslationKeys = {
     previewUnavailable: "Förhandsgranskning tillgänglig efter bearbetning",
     generatePreview: "Generera förhandsgranskning",
     previewFailed: "Förhandsgranskning misslyckades",
+    previewEncoderMissing:
+      "Serverns ffmpeg saknar kodaren {encoder}, så förhandsvisningen kan inte skapas. Kontakta din administrator.",
     previewNotAvailable: "Förhandsvisning är inte tillgänglig",
     resultPreviewFailed: "Resultatets förhandsvisning kunde inte läsas in",
     resultPreviewFailedHint:
