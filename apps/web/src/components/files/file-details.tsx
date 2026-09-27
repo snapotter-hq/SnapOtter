@@ -119,7 +119,7 @@ export function FilePreview({
       return null;
     });
     setPreviewLoading(false);
-    setPreviewError(false);
+    setPreviewError(null);
 
     if (isPdf) {
       let revoked = false;
