@@ -404,13 +404,20 @@ describe("passport-photo/generate maxFileSizeKb (#1288)", () => {
   }
 
   it("counts the cap in 1000-byte KB, the way upload portals do", async () => {
-    // With 1024-byte KB this photo came back at 122,230 bytes for a 120 KB
-    // cap: over a portal that counts 120 KB as 120,000 bytes.
-    const { res, jobId } = await generate(120);
-    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
-    const out = await getObjectBuffer(`outputs/${jobId}/photo_passport.jpg`);
-    expect(out.length).toBeLessThanOrEqual(120_000);
-  });
+    // Quality steps of 5 put this 600x600 photo's sizes about 10% apart
+    // (~108 KB, ~120 KB, ~135 KB). A size S slips past 1024-byte KB for every
+    // cap between S/1024 and S/1000, a window about 3 KB wide near 120 KB, so
+    // sweeping 110-130 KB catches the old math on any sharp/libvips build
+    // instead of betting on one exact byte count.
+    const over: string[] = [];
+    for (let kb = 110; kb <= 130; kb++) {
+      const { res, jobId } = await generate(kb);
+      expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+      const out = await getObjectBuffer(`outputs/${jobId}/photo_passport.jpg`);
+      if (out.length > kb * 1000) over.push(`${kb} KB -> ${out.length} bytes`);
+    }
+    expect(over).toEqual([]);
+  }, 120_000);
 
   it("fails clearly instead of returning a photo over the cap", async () => {
     // A 600x600 px JPEG of noise can't get under 1 KB, even at quality 1.
