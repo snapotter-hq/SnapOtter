@@ -25,8 +25,10 @@ const PIN_SCRIPT = "scripts/rembg-test-pins.mjs";
 interface Step {
   run?: string;
   env?: Record<string, string>;
+  "continue-on-error"?: unknown;
 }
 interface Job {
+  "continue-on-error"?: unknown;
   name?: string;
   needs?: string | string[];
   if?: string;
@@ -112,8 +114,18 @@ describe("required rembg check", () => {
   });
 
   it("reads the result of the gated job", () => {
-    const [gatedName] = gatedJobs[0] ?? [];
+    // The step checks one result; a second gated job would need its own.
+    expect(gatedJobs).toHaveLength(1);
+    const [gatedName] = gatedJobs[0];
     expect(job?.steps?.[0]?.env?.RESULT).toBe(`\${{ needs.${gatedName}.result }}`);
+  });
+
+  it("can't be satisfied by a gated job that tolerates its own failure", () => {
+    // continue-on-error turns a failed leg into a success result upstream.
+    for (const [, gated] of gatedJobs) {
+      expect(gated["continue-on-error"]).toBeUndefined();
+      for (const step of gated.steps ?? []) expect(step["continue-on-error"]).toBeUndefined();
+    }
   });
 
   // Run the job's own step against each result the matrix can end in.

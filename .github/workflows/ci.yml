@@ -551,6 +551,8 @@ jobs:
     # Python would wait on it forever. This always reports, and passes when
     # both legs passed or the path filter skipped them. A skip from a failed
     # changes job also passes here, which is fine: Changes is required itself.
+    # Keep always(), not !cancelled(): a job skipped by its own if: reports as
+    # success, so a cancelled run would pass this check.
     name: AI Sidecar (rembg)
     runs-on: ubuntu-latest
     timeout-minutes: 5
