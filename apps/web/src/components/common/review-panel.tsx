@@ -1,6 +1,6 @@
 import { ANALYTICS_EVENTS, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, FolderPlus } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
@@ -9,6 +9,7 @@ import { appUrl } from "@/lib/app-url";
 import { formatFileSize, triggerDownload } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
+import { IGNORE_ERRORS } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { ToolFeedbackPrompt } from "../feedback/tool-feedback-prompt";
@@ -38,6 +39,27 @@ const MULTI_OUTPUT_TOOLS = new Set([
   "split-audio",
   "split-csv",
 ]);
+
+/**
+ * Save failures about the user's own account (signed out, not allowed, over
+ * quota). The panel still shows them; there's nothing in them to fix.
+ */
+const UNREPORTED_SAVE_STATUSES = new Set([401, 403, 413]);
+
+/**
+ * fetch() rejects without a response when the browser is offline or the
+ * connection drops. Sentry's IGNORE_ERRORS already drops those; wrapping one
+ * in a SafeError would carry it past that filter, so match it here first.
+ */
+function isIgnoredNetworkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const texts = [err.message, `${err.name}: ${err.message}`];
+  return IGNORE_ERRORS.some((pattern) =>
+    texts.some((text) =>
+      typeof pattern === "string" ? text.includes(pattern) : pattern.test(text),
+    ),
+  );
+}
 
 interface ReviewPanelProps {
   filename: string;
@@ -88,12 +110,18 @@ export function ReviewPanel({
   };
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // The error label resets itself after a few seconds. A retry clears the
+  // pending reset, or it would flip a retry's "Saved" back to an enabled
+  // button and invite a duplicate save.
+  const errorResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => clearTimeout(errorResetRef.current ?? undefined), []);
 
   const handleSaveToFiles = useCallback(async () => {
     // Capture before the awaits below: the thumbnail strip can move the
     // selection while the upload is in flight, and the claim must land on the
     // entry that was actually saved.
     const claimIndex = useFileStore.getState().selectedIndex;
+    clearTimeout(errorResetRef.current ?? undefined);
     setSaveStatus("saving");
     try {
       const res = await fetch(downloadUrl);
@@ -104,6 +132,7 @@ export function ReviewPanel({
       if (!res.ok) {
         throw new SafeError(`Save to Files could not fetch the result (HTTP ${res.status})`, {
           code: `save-result-fetch-${res.status}`,
+          statusCode: res.status,
         });
       }
       const blob = await res.blob();
@@ -120,6 +149,7 @@ export function ReviewPanel({
       if (!uploadRes.ok) {
         throw new SafeError(`Save to Files upload failed (HTTP ${uploadRes.status})`, {
           code: `save-upload-${uploadRes.status}`,
+          statusCode: uploadRes.status,
         });
       }
       setSaveStatus("saved");
@@ -132,14 +162,19 @@ export function ReviewPanel({
       });
     } catch (err) {
       console.error("Save to Files failed", err);
-      void captureHandledError(
-        isSafeMessageError(err)
-          ? err
-          : new SafeError("Save to Files request failed", { code: "save-request", cause: err }),
-        { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
-      );
+      const reportable = isSafeMessageError(err)
+        ? !UNREPORTED_SAVE_STATUSES.has(err.statusCode ?? 0)
+        : !isIgnoredNetworkError(err);
+      if (reportable) {
+        void captureHandledError(
+          isSafeMessageError(err)
+            ? err
+            : new SafeError("Save to Files request failed", { code: "save-request", cause: err }),
+          { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
+        );
+      }
       setSaveStatus("error");
-      setTimeout(() => setSaveStatus("idle"), 3000);
+      errorResetRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
     }
   }, [downloadUrl, filename, fileType, currentToolId]);
 
@@ -255,7 +290,9 @@ export function ReviewPanel({
               "text-xs flex items-center gap-1.5 transition-colors",
               saveStatus === "saved"
                 ? "text-success-ink"
-                : "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                : saveStatus === "error"
+                  ? "text-destructive-ink"
+                  : "text-muted-foreground hover:text-foreground disabled:opacity-50",
             )}
           >
             {saveStatus === "saved" ? (

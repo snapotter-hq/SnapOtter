@@ -45,7 +45,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderPanel() {
+function renderPanel(currentToolId = "resize") {
   return render(
     <MemoryRouter>
       <ReviewPanel
@@ -56,7 +56,7 @@ function renderPanel() {
         downloadUrl={RESULT_URL}
         onUndo={() => {}}
         onStartOver={() => {}}
-        currentToolId="resize"
+        currentToolId={currentToolId}
       />
     </MemoryRouter>,
   );
@@ -120,20 +120,62 @@ describe("ReviewPanel Save to Files failures (#1286)", () => {
     expect(reportedError().message).toContain("HTTP 404");
   });
 
-  it("reports a result fetch that never got a response", async () => {
+  // Offline or a dropped connection: the user sees the error, but Sentry's
+  // IGNORE_ERRORS already drops "Failed to fetch", and wrapping it in a
+  // SafeError would sneak it past that filter.
+  it.each([
+    ["a result fetch", "result"],
+    ["an upload", "upload"],
+  ])("shows but does not report %s that never got a response", async (_label, which) => {
     const networkError = new TypeError("Failed to fetch");
-    const fetchMock = stubFetch(
-      () => Promise.reject(networkError),
+    const okResult = () =>
+      Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(new Blob(["png"])) });
+    stubFetch(
+      which === "result" ? () => Promise.reject(networkError) : okResult,
+      which === "upload"
+        ? () => Promise.reject(networkError)
+        : () => Promise.resolve({ ok: true, status: 201 }),
+    );
+
+    renderPanel();
+    await clickSave();
+
+    expect(screen.getByText("An error occurred")).toBeTruthy();
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith("Save to Files failed", networkError);
+    expect(analyticsMock.captureHandledError).not.toHaveBeenCalled();
+  });
+
+  it("reports an unexpected client-side failure, wrapped with its cause", async () => {
+    const bug = new Error("blob() exploded");
+    stubFetch(
+      () => Promise.resolve({ ok: true, status: 200, blob: () => Promise.reject(bug) }),
       () => Promise.resolve({ ok: true, status: 201 }),
     );
 
     renderPanel();
     await clickSave();
 
-    expect(uploadCalls(fetchMock)).toHaveLength(0);
+    expect(screen.getByText("An error occurred")).toBeTruthy();
+    expect(reportedError().cause).toBe(bug);
+  });
+
+  // Over quota, signed out, or not allowed: about the user's own account, and
+  // nothing for us to fix, so shown but not reported.
+  it.each([401, 403, 413])("shows but does not report an upload %i", async (status) => {
+    stubFetch(
+      () =>
+        Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(new Blob(["png"])) }),
+      () => Promise.resolve({ ok: false, status }),
+    );
+
+    renderPanel();
+    await clickSave();
+
     expect(screen.getByText("An error occurred")).toBeTruthy();
     expect(useFileStore.getState().entries[0].claimed).toBe(false);
-    expect(reportedError().cause).toBe(networkError);
+    expect(consoleError).toHaveBeenCalled();
+    expect(analyticsMock.captureHandledError).not.toHaveBeenCalled();
   });
 
   it("shows an error and reports the status when the library upload fails", async () => {
@@ -155,7 +197,25 @@ describe("ReviewPanel Save to Files failures (#1286)", () => {
     expect(screen.getByText("An error occurred")).toBeTruthy();
     expect(useFileStore.getState().entries[0].claimed).toBe(false);
     expect(savedEvents()).toHaveLength(0);
+    expect(consoleError).toHaveBeenCalled();
     expect(reportedError().message).toContain("HTTP 500");
+  });
+
+  it("leaves the tool tag off a report when there is no tool id", async () => {
+    stubFetch(
+      () => Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
+      () => Promise.resolve({ ok: true, status: 201 }),
+    );
+
+    renderPanel("");
+    await clickSave();
+
+    expect(analyticsMock.captureHandledError).toHaveBeenCalledTimes(1);
+    const [, tags] = analyticsMock.captureHandledError.mock.calls[0] as unknown as [
+      Error,
+      Record<string, string>,
+    ];
+    expect(tags).toEqual({ error_class: "operational" });
   });
 
   it("goes back to the save button after the error, so the user can retry", async () => {
@@ -176,6 +236,62 @@ describe("ReviewPanel Save to Files failures (#1286)", () => {
     expect(screen.queryByText("An error occurred")).toBeNull();
     const button = screen.getByRole("button", { name: /save to files/i }) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
+  });
+
+  // The first failure's reset timer used to survive a retry. A retry that
+  // succeeded inside those 3 seconds flipped back to an enabled "Save to Files"
+  // and invited a duplicate save.
+  it("keeps a successful retry's Saved state when the earlier error's timer runs out", async () => {
+    vi.useFakeTimers();
+    let resultCalls = 0;
+    const fetchMock = stubFetch(
+      () => {
+        resultCalls += 1;
+        return resultCalls === 1
+          ? Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) })
+          : Promise.resolve({
+              ok: true,
+              status: 200,
+              blob: () => Promise.resolve(new Blob(["png"])),
+            });
+      },
+      () => Promise.resolve({ ok: true, status: 201 }),
+    );
+
+    renderPanel();
+    await clickSave();
+    expect(screen.getByText("An error occurred")).toBeTruthy();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    // The error label is still up; the button under it is the retry.
+    fireEvent.click(screen.getByRole("button", { name: /an error occurred/i }));
+    await act(async () => {});
+    expect(screen.getByText("Saved to Files")).toBeTruthy();
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(screen.getByText("Saved to Files")).toBeTruthy();
+    const button = screen.getByRole("button", { name: /saved to files/i }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(uploadCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("styles the error state as an error, not as the idle link", async () => {
+    stubFetch(
+      () => Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
+      () => Promise.resolve({ ok: true, status: 201 }),
+    );
+
+    renderPanel();
+    await clickSave();
+
+    const button = screen.getByRole("button", { name: /an error occurred/i });
+    expect(button.className).toContain("text-destructive-ink");
+    expect(button.className).not.toContain("text-muted-foreground");
   });
 
   it("still saves a result that fetched fine", async () => {

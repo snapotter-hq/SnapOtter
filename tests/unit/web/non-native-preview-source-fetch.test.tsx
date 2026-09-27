@@ -68,6 +68,7 @@ describe("NonNativePreview source fetch (#1286)", () => {
 
     await generate();
 
+    expect(fetchMock.mock.calls.filter(([url]) => url === SOURCE_URL)).toHaveLength(1);
     expect(previewCalls(fetchMock)).toHaveLength(0);
     expect(screen.getByText("Preview generation failed")).toBeTruthy();
   });
