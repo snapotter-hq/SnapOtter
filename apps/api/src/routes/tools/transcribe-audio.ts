@@ -8,8 +8,9 @@ import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
-import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { formatZodErrors } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { type TranscriptSegment, toSrt, toVtt } from "../../lib/subtitle-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
@@ -125,10 +126,8 @@ export function registerTranscribeAudio(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       // Stamp the client-facing alias before any pre-enqueue work (#892): a

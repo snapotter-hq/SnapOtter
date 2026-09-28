@@ -11,6 +11,7 @@ import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../../jobs/enque
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
@@ -88,10 +89,8 @@ export function registerSignPdf(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     // Stamp the client-facing alias before any pre-enqueue work (#892): a

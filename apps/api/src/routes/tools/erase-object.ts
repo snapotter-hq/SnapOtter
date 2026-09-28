@@ -99,10 +99,8 @@ export function registerEraseObject(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       // Stamp the client-facing alias before any pre-enqueue work (#892): a
@@ -246,6 +244,7 @@ export function registerEraseObject(app: FastifyInstance) {
 
 // ── AI job handler (separate import for the worker) ───────────────
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 
 registerAiJobHandler("erase-object", async (input, data, ctx) => {
   // Second inputRef is the mask

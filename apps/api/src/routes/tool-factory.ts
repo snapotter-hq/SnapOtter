@@ -18,8 +18,9 @@ import { db, schema } from "../db/index.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../jobs/types.js";
 import { reportError } from "../lib/error-report.js";
-import { formatZodErrors, friendlyError, stripInternalPaths } from "../lib/errors.js";
+import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
+import { multipartFailure } from "../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
@@ -329,10 +330,8 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (fileCount > maxInputs) {

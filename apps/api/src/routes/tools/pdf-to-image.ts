@@ -11,6 +11,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   deletePrefix,
   getObjectBuffer,
@@ -300,10 +301,8 @@ export function registerPdfToImageRoute(
       const result = await readPdfFromParts(request);
       fileBuffer = result.fileBuffer;
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -344,10 +343,8 @@ export function registerPdfToImageRoute(
       const result = await readPdfFromParts(request);
       fileBuffer = result.fileBuffer;
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -453,10 +450,8 @@ export function registerPdfToImageRoute(
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse multipart request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (files.length === 0) {
@@ -645,10 +640,8 @@ export function registerPdfToImageRoute(
       fileBuffer = result.fileBuffer;
       settingsRaw = result.settingsRaw;
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {

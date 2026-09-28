@@ -2,6 +2,7 @@ import type { Readable } from "node:stream";
 import { Busboy, type BusboyHeaders } from "@fastify/busboy";
 import type { FastifyRequest } from "fastify";
 import { env } from "../config.js";
+import { stripInternalPaths } from "./errors.js";
 
 export interface MultipartFilePart {
   type: "file";
@@ -35,13 +36,39 @@ const DONE = Symbol("multipart-done");
  * The error an over-limit file part fails with. It carries a 413, and the code
  * @fastify/multipart uses for the same condition, so a route that lets it
  * escape answers 413 through the error handler instead of a bare-Error 500
- * (#1280). Routes that catch it keep their own mapping.
+ * (#1280). Routes that catch it answer through multipartFailure below.
  */
 function fileTooLargeError(): Error {
   return Object.assign(new Error("request file too large"), {
     statusCode: 413,
     code: "FST_REQ_FILE_TOO_LARGE",
   });
+}
+
+/**
+ * The response for a multipart read that threw: 413 naming the limit when a
+ * file part was over MAX_UPLOAD_SIZE_MB, 400 for anything else. Routes that
+ * catch around their read loop answer with this rather than a hard-coded 400,
+ * so a client can tell "too big" from "malformed" (#1341).
+ */
+export function multipartFailure(
+  err: unknown,
+):
+  | { status: 413; body: { error: string } }
+  | { status: 400; body: { error: string; details: string } } {
+  if ((err as { statusCode?: unknown } | null)?.statusCode === 413) {
+    return {
+      status: 413,
+      body: { error: `File exceeds the ${env.MAX_UPLOAD_SIZE_MB} MB upload limit` },
+    };
+  }
+  return {
+    status: 400,
+    body: {
+      error: "Failed to parse multipart request",
+      details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+    },
+  };
 }
 
 /**

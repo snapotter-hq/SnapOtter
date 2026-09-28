@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 
 const settingsSchema = z.object({
   pattern: z.string().min(1).max(1000).default("image-{{index}}"),
@@ -41,10 +42,8 @@ export function registerBulkRename(app: FastifyInstance) {
         }
       }
     } catch (err) {
-      return reply.status(400).send({
-        error: "Failed to parse multipart request",
-        details: err instanceof Error ? err.message : String(err),
-      });
+      const failure = multipartFailure(err);
+      return reply.status(failure.status).send(failure.body);
     }
 
     if (files.length === 0) {
