@@ -8,10 +8,9 @@ import { getQueue } from "../../jobs/queues.js";
 import { SYSTEM_JOBS } from "../../jobs/system-jobs.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
-import { deleteStoredFile, deleteThumbnail } from "../../lib/file-storage.js";
+import { deleteLibraryFileStorage } from "../../lib/library-cleanup.js";
 import { deletePrefix } from "../../lib/object-storage.js";
 import { canManageTargetRole, requirePermission } from "../../permissions.js";
-import { deletePreview } from "../file-preview.js";
 
 const purgeBodySchema = z.object({
   confirm: z.literal(true),
@@ -29,9 +28,7 @@ async function purgeUserData(userId: string): Promise<void> {
     .where(eq(schema.userFiles.userId, userId));
 
   for (const file of userFileRows) {
-    await deleteStoredFile(file.storedName);
-    await deleteThumbnail(file.storedName);
-    await deletePreview(file.id);
+    await deleteLibraryFileStorage(file);
   }
 
   // b. Delete userFiles rows

@@ -21,8 +21,6 @@ import { auditFromRequest } from "../lib/audit.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import {
-  deleteStoredFile,
-  deleteThumbnail,
   getCachedThumbnail,
   isStorageServiceFault,
   readStoredFile,
@@ -38,11 +36,11 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
-import { deletePreview } from "./file-preview.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -730,9 +728,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       // Filesystem deletes (must loop; cannot batch across the OS)
       for (const row of deletableChainRows) {
-        await deleteStoredFile(row.stored_name);
-        await deleteThumbnail(row.stored_name);
-        await deletePreview(row.id);
+        await deleteLibraryFileStorage({ id: row.id, storedName: row.stored_name });
       }
 
       // Batch DB delete

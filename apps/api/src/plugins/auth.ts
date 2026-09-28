@@ -1201,10 +1201,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // The FK cascade below drops the user's user_files rows but not what they
+      // point at, so clear the stored files, thumbnails, and previews first (#1405).
+      // Loaded here rather than at the top: it reaches the preview route and the
+      // logger, which the auth plugin otherwise has no need to pull in.
+      const { deleteLibraryFileStorage } = await import("../lib/library-cleanup.js");
+      const libraryFiles = await db
+        .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, id));
+      for (const file of libraryFiles) {
+        await deleteLibraryFileStorage(file);
+      }
+
       // Delete associated sessions
       await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
 
-      // Delete the user (cascades to api_keys via FK)
+      // Delete the user (cascades to api_keys and user_files via FK)
       await db.delete(schema.users).where(eq(schema.users.id, id));
 
       await auditFromRequest(request)("USER_DELETED", {
