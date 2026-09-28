@@ -484,10 +484,9 @@ describe("pipelineExecutedProps", () => {
   });
 });
 
-// #1414: a failure event carried no queue age, so Sentry could not tell an
-// input that aged out behind a backed-up queue from one missing seconds after
-// upload.
-describe("worker failure reports carry the queue wait (#1414)", () => {
+// #1414: a failure event carried no job age, so Sentry could not tell an
+// input old enough for the storage sweep from one missing seconds after upload.
+describe("worker failure reports carry the job age (#1414)", () => {
   const reportErrorMock = vi.fn();
 
   afterEach(() => {
@@ -548,20 +547,33 @@ describe("worker failure reports carry the queue wait (#1414)", () => {
 
     expect(reportErrorMock).toHaveBeenCalledWith(
       expect.any(Error),
-      expect.objectContaining({ source: "worker", jobId: "job-1", queueWaitMs: 5_000 }),
+      expect.objectContaining({ source: "worker", jobId: "job-1", jobAgeMs: 5_000 }),
     );
   });
 
-  it("passes the queue wait from the system pool's failed handler too", async () => {
+  it("passes it from every tool pool, which share one handler", async () => {
+    const listeners = await failedListeners();
+    for (const pool of ["image", "media", "ai", "docs"]) {
+      reportErrorMock.mockClear();
+      const job = { id: `job-${pool}`, data: { toolId: "resize" }, timestamp: 0, processedOn: 42 };
+      listenerFor(listeners, pool)(job, new Error("boom"));
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ jobAgeMs: 42 }),
+      );
+    }
+  });
+
+  it("does not pass an age from the system pool, where it is only the schedule interval", async () => {
+    // A job scheduler enqueues each next run as a delayed job, so a weekly
+    // sweep would always read as over a day old.
     const listeners = await failedListeners();
     const job = { id: "sys-1", data: { kind: "other" }, timestamp: 1_000, processedOn: 3_500 };
 
     listenerFor(listeners, "system")(job, new Error("boom"));
 
-    expect(reportErrorMock).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({ jobId: "sys-1", queueWaitMs: 2_500 }),
-    );
+    const ctx = reportErrorMock.mock.calls[0][1] as { jobAgeMs?: number };
+    expect(ctx.jobAgeMs).toBeUndefined();
   });
 
   it("leaves the wait unset when the job never became active", async () => {
@@ -570,7 +582,7 @@ describe("worker failure reports carry the queue wait (#1414)", () => {
 
     listenerFor(listeners, "image")(job, new Error("boom"));
 
-    const ctx = reportErrorMock.mock.calls[0][1] as { queueWaitMs?: number };
-    expect(ctx.queueWaitMs).toBeUndefined();
+    const ctx = reportErrorMock.mock.calls[0][1] as { jobAgeMs?: number };
+    expect(ctx.jobAgeMs).toBeUndefined();
   });
 });

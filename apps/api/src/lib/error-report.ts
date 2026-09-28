@@ -42,24 +42,26 @@ export interface ReportContext {
   /** Tool settings; a vetted (PII-safe) projection is attached for bug events. */
   settings?: unknown;
   /**
-   * How long the job waited between enqueue and its latest attempt starting
-   * (BullMQ processedOn minus timestamp, so a retry includes its backoff).
-   * Tagged as a coarse bucket (#1414).
+   * Time from enqueue to the start of the job's latest attempt (BullMQ
+   * processedOn minus timestamp). That is job age, not pure queue wait: it
+   * includes earlier attempts and their backoff, and for a flow parent its
+   * children's run time. Tagged as a coarse bucket (#1414).
    */
-  queueWaitMs?: number;
+  jobAgeMs?: number;
 }
 
 /**
- * A low-cardinality bucket for a queue wait, so Sentry can tell an input that
- * aged out behind a backed-up queue from one that went missing right after
- * upload. Undefined for a missing, negative (clock skew), or non-finite wait.
+ * A low-cardinality bucket for a job's age, so Sentry can tell an input old
+ * enough for the storage sweep from one that went missing right after upload.
+ * Values avoid `<`/`>` so they search as plain strings. Undefined for a
+ * missing, negative (clock skew), or non-finite age.
  */
-export function queueWaitBucket(ms: number | undefined): string | undefined {
+export function jobAgeBucket(ms: number | undefined): string | undefined {
   if (ms === undefined || !Number.isFinite(ms) || ms < 0) return undefined;
-  if (ms < 10_000) return "<10s";
-  if (ms < 3_600_000) return "<1h";
-  if (ms < 86_400_000) return "<24h";
-  return ">=24h";
+  if (ms < 10_000) return "lt_10s";
+  if (ms < 3_600_000) return "lt_1h";
+  if (ms < 86_400_000) return "lt_24h";
+  return "gte_24h";
 }
 
 export function classifyError(err: unknown, source?: ReportContext["source"]): ErrorClass {
@@ -203,8 +205,8 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
       if (ctx.statusCode) scope.setTag("status_code", String(ctx.statusCode));
       if (ctx.subsystem) scope.setTag("subsystem", ctx.subsystem);
       if (ctx.jobId) scope.setTag("job_id", ctx.jobId);
-      const queueWait = queueWaitBucket(ctx.queueWaitMs);
-      if (queueWait) scope.setTag("queue_wait", queueWait);
+      const jobAge = jobAgeBucket(ctx.jobAgeMs);
+      if (jobAge) scope.setTag("job_age", jobAge);
       if (net) {
         scope.setFingerprint(["connectivity", net]);
       } else if (cls === "operational") {
