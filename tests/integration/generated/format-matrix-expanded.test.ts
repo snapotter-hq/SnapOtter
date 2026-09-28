@@ -35,7 +35,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
-import { featureUnavailableDisposition } from "../../helpers/generated-case-accounting.js";
+import {
+  featureUnavailableDisposition,
+  isEngineUnavailableResponse,
+} from "../../helpers/generated-case-accounting.js";
 import { settleAsyncFallback } from "../settle-job.js";
 import {
   buildTestApp,
@@ -1328,6 +1331,8 @@ describe("Collage cross-format", () => {
           body: payload,
         });
 
+        // A host without this format's decoder answers 503 ENGINE_UNAVAILABLE (#795).
+        if (isEngineUnavailableResponse(res.statusCode, res.body)) return;
         expect(res.statusCode).not.toBe(500);
         expect([200, 202, 400, 422]).toContain(res.statusCode);
       },
