@@ -96,6 +96,17 @@ describe("normalizeSearchQuery", () => {
     }
   });
 
+  // #1408: a joined form only splits between known formats, so every extension
+  // a tool accepts has to be one of them.
+  it("splits joined forms for every extension a tool accepts", () => {
+    const exts = new Set(TOOLS.flatMap((t) => t.acceptedInputs).map((ext) => ext.slice(1)));
+    expect(exts.size).toBeGreaterThan(50);
+    for (const ext of exts) {
+      expect(normalizeSearchQuery(`${ext}topdf`), ext).toBe(normalizeSearchQuery(`${ext} to pdf`));
+      expect(normalizeSearchQuery(`pdf2${ext}`), ext).toBe(normalizeSearchQuery(`pdf to ${ext}`));
+    }
+  });
+
   // #1327: "convert" is filler in "convert jpg to png", but in "convert image"
   // it's half of the Convert Image tool's name.
   it("keeps convert when only a bare modality word would be left", () => {

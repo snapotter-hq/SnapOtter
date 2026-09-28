@@ -32,7 +32,8 @@ export const MISSPELLINGS: Record<string, string> = {
  * Tokens that can sit on either side of a joined "xtoy" query. Only these
  * split, so "jpgtopng" becomes "jpg to png" while "vectorize" and "photograph"
  * stay whole (#1327). tests/unit/shared/search-aliases.test.ts checks every
- * preset's joined keyword and every x-to-y tool id against this list.
+ * preset's joined keyword, every x-to-y tool id, and every extension in a
+ * tool's acceptedInputs (#1408) against this list.
  */
 const JOINABLE_FORMATS = [
   ...new Set([
@@ -40,13 +41,16 @@ const JOINABLE_FORMATS = [
     ...Object.values(FORMAT_ALIASES).flat(),
     // Image and raw formats.
     ...["apng", "avif", "bmp", "eps", "gif", "ico", "jfif", "jxl", "png", "psd", "svg", "svgz"],
-    ...["tga", "webp"],
-    ...["arw", "cr2", "dng", "nef", "raw"],
+    ...["tga", "webp", "cur", "dds", "dpx", "exr", "fits", "hdr", "jp2", "pbm", "pgm", "ppm"],
+    ...["qoi", "arw", "cr2", "dng", "nef", "raw", "3fr", "cr3", "dcr", "erf", "fff", "gpr"],
+    ...["iiq", "kdc", "mef", "mrw", "nrw", "orf", "pef", "ptx", "raf", "rw2", "rwl", "srw"],
+    ...["x3f"],
     // Audio and video.
     ...["3gp", "aac", "aiff", "avi", "flac", "flv", "m4a", "mkv", "mov", "mp3", "mp4"],
-    ...["ogg", "opus", "wav", "webm", "wma", "wmv"],
+    ...["ogg", "opus", "wav", "webm", "wma", "wmv", "ac3", "amr", "m2ts", "m4v", "mpeg"],
+    ...["mpg", "mts", "ogv", "ts"],
     // Subtitles.
-    ...["srt", "vtt"],
+    ...["ass", "srt", "vtt"],
     // Documents and data.
     ...["csv", "epub", "htm", "html", "json", "odp", "ods", "odt", "pdf", "rtf", "text", "tsv"],
     ...["txt", "xml", "yaml", "yml", "zip"],
