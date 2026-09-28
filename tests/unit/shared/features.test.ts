@@ -87,9 +87,14 @@ describe("Feature bundle edge cases", () => {
     }
   });
 
-  it("every bundle has a non-empty estimated size", () => {
+  // Every web render site wraps this value in its own "~" and wording
+  // (features.requiresDownload, the Settings card), so it must be a bare
+  // size: digits and a unit, nothing to translate, no "~" (#1409).
+  it("every bundle's estimated size is a bare, locale-neutral size", () => {
     for (const bundle of Object.values(FEATURE_BUNDLES)) {
-      expect(bundle.estimatedSize.length).toBeGreaterThan(0);
+      expect(bundle.estimatedSize, bundle.id).toMatch(
+        /^\d+(\.\d+)?(-\d+(\.\d+)?)? (MB|GB|MiB|GiB)$/,
+      );
     }
   });
 

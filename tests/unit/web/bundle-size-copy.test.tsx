@@ -6,6 +6,9 @@ import { de } from "@snapotter/shared/i18n/de.js";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const useAuth = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-auth", () => ({ useAuth }));
+
 // AiFeaturesSection polls disk usage on mount; keep it off the network.
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
@@ -24,7 +27,9 @@ vi.stubGlobal("localStorage", {
 
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
 import { AiFeaturesSection } from "@/components/settings/ai-features-section";
+import { OcrQualityControl } from "@/components/tools/ocr-quality-control";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
 // No downloadBytes: the native-mode / manifest-less path that falls back to
@@ -51,6 +56,7 @@ function renderDe(ui: React.ReactNode) {
 
 beforeEach(() => {
   storage.clear();
+  useAuth.mockReturnValue({ hasPermission: () => true });
   useFeaturesStore.setState({
     bundles: [],
     loaded: true,
@@ -69,21 +75,11 @@ afterEach(() => {
 });
 
 describe("bundle size fallback copy (#1409)", () => {
-  // Every render site wraps this value in its own "~" and its own words
-  // (features.requiresDownload, the Settings card), so the data must be a
-  // bare size range: digits and a unit, nothing to translate, no "~".
-  it("keeps every estimatedSize a bare, locale-neutral size range", () => {
-    for (const bundle of Object.values(FEATURE_BUNDLES)) {
-      expect(bundle.estimatedSize, bundle.id).toMatch(
-        /^\d+(\.\d+)?(-\d+(\.\d+)?)? (MB|GB|MiB|GiB)$/,
-      );
-    }
-  });
-
   it("prints the OCR fallback size once, with one ~ and no English", async () => {
     renderDe(<FeatureInstallPrompt bundle={bundleState("ocr")} isAdmin />);
 
-    const line = await screen.findByText((text) => text.startsWith("Diese Funktion erfordert"));
+    const prefix = de.features.requiresDownload.split("(")[0];
+    const line = await screen.findByText((text) => text.startsWith(prefix));
     expect(line.textContent).toContain(`(~${FEATURE_BUNDLES.ocr.estimatedSize})`);
     expect(line.textContent).not.toContain("~~");
     // "Download" is German too; the leak was the English words after the size.
@@ -100,5 +96,18 @@ describe("bundle size fallback copy (#1409)", () => {
     expect(cards).toContain(`(~${FEATURE_BUNDLES.ocr.estimatedSize})`);
     expect(cards).not.toContain("~~");
     expect(cards).not.toMatch(/MiB (download|installed)/);
+  });
+
+  // The one product line this fix changed: with no OCR entry in the store yet
+  // (features still loading, or a failed fetch), the control reads the shared
+  // estimate instead of its own hard-coded copy of the old string.
+  it("OCR quality control falls back to the shared estimate, printed once", async () => {
+    renderDe(<OcrQualityControl quality="balanced" onChange={() => {}} language="auto" />);
+
+    const expected = format(de.features.requiresDownload, {
+      size: FEATURE_BUNDLES.ocr.estimatedSize,
+    });
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("~~");
   });
 });

@@ -2,7 +2,7 @@ export interface FeatureBundleInfo {
   id: string;
   name: string;
   description: string;
-  /** Bare download size range ("4-5 GB"). Callers add their own "~" and wording. */
+  /** Bare download size ("4-5 GB", "600 MB"). Callers add their own "~" and wording. */
   estimatedSize: string;
   enablesTools: string[];
 }

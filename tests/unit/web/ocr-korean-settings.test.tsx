@@ -33,7 +33,7 @@ function fastOnlyOcrBundle(): FeatureBundleState {
     description: "Accurate local OCR",
     status: "not_installed",
     installedVersion: null,
-    estimatedSize: "~300 MB",
+    estimatedSize: "300 MB",
     downloadBytes: 293_502_277,
     missingDownloadBytes: 293_502_277,
     compatibility: "compatible",

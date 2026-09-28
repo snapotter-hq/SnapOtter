@@ -514,7 +514,7 @@
     "ocr": {
       "name": "OCR",
       "description": "High-accuracy local OCR for images and PDFs",
-      "estimatedSize": "~208-234 MiB download / ~409-488 MiB installed",
+      "estimatedSize": "208-234 MiB",
       "runtimeFormatVersion": 3,
       "runtimeFamily": "ocr",
       "modelManifest": "docker/ocr-runtime-models.json",
@@ -550,7 +550,7 @@
     "transcription": {
       "name": "Transcription",
       "description": "Speech to text for audio and video (subtitles)",
-      "estimatedSize": "~600 MB",
+      "estimatedSize": "600 MB",
       "archives": {
         "amd64-gpu": {
           "file": "v2.0.0/transcription-amd64-gpu-r2.tar.gz",

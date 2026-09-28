@@ -81,7 +81,7 @@ const FEATURE_BUNDLES = [
     description: "Extract text from images and PDFs",
     status: "installed",
     installedVersion: "1.0.0",
-    estimatedSize: "~208-234 MiB download / ~409-488 MiB installed",
+    estimatedSize: "208-234 MiB",
     downloadBytes: 244_622_462,
     installedBytes: 510_762_511,
     compatibility: "compatible",
