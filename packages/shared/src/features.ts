@@ -2,6 +2,7 @@ export interface FeatureBundleInfo {
   id: string;
   name: string;
   description: string;
+  /** Bare download size range ("4-5 GB"). Callers add their own "~" and wording. */
   estimatedSize: string;
   enablesTools: string[];
 }
@@ -95,14 +96,14 @@ export const FEATURE_BUNDLES: Record<string, FeatureBundleInfo> = {
     id: "ocr",
     name: "OCR",
     description: "Extract text from images and PDFs",
-    estimatedSize: "~208-234 MiB download / ~409-488 MiB installed",
+    estimatedSize: "208-234 MiB",
     enablesTools: ["ocr", "ocr-pdf"],
   },
   transcription: {
     id: "transcription",
     name: "Transcription",
     description: "Speech to text for audio and video (subtitles)",
-    estimatedSize: "~600 MB",
+    estimatedSize: "600 MB",
     enablesTools: ["transcribe-audio", "auto-subtitles"],
   },
 };

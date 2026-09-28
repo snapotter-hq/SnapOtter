@@ -1,3 +1,4 @@
+import { FEATURE_BUNDLES } from "@snapotter/shared";
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -76,7 +77,7 @@ export function OcrQualityControl({
   const bytes = bundle?.missingDownloadBytes ?? bundle?.downloadBytes;
   const size = bytes
     ? formatFileSize(bytes)
-    : (bundle?.estimatedSize ?? "~208-234 MiB download / ~409-488 MiB installed");
+    : (bundle?.estimatedSize ?? FEATURE_BUNDLES.ocr.estimatedSize);
   const qualityTranslations = t.toolSettings["remove-gif-background"];
   const qualityOptions: { value: OcrQuality; label: string }[] = [
     { value: "fast", label: qualityTranslations.qualityFast },
