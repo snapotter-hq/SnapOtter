@@ -264,8 +264,23 @@ describe("canonicalRuntimeJson integer-like keys (#1411)", () => {
     expect(canonicalRuntimeJson(value)).toBe('{"b":1,"c":[null,null]}\n');
   });
 
+  it("writes array holes as null, like JSON.stringify", () => {
+    // biome-ignore lint/suspicious/noSparseArray: the hole is what's under test
+    expect(canonicalRuntimeJson({ a: [1, , 3] })).toBe('{"a":[1,null,3]}\n');
+    expect(canonicalRuntimeJson(new Array(2))).toBe("[null,null]\n");
+  });
+
+  it("escapes quotes, backslashes and control characters in keys", () => {
+    // Python: json.dumps({'a"b':1,"c\\d":2,"e\nf":3}, sort_keys=True, separators=(",",":"))
+    //   -> {"a\"b":1,"c\\d":2,"e\nf":3}
+    expect(canonicalRuntimeJson({ "e\nf": 3, "c\\d": 2, 'a"b': 1 })).toBe(
+      '{"a\\"b":1,"c\\\\d":2,"e\\nf":3}\n',
+    );
+  });
+
   it("throws on a top-level value JSON can't represent", () => {
-    expect(() => canonicalRuntimeJson(undefined)).toThrow(TypeError);
+    expect(() => canonicalRuntimeJson(undefined)).toThrow(/needs a JSON value/);
+    expect(() => canonicalRuntimeJson(() => 1)).toThrow(/needs a JSON value/);
   });
 });
 

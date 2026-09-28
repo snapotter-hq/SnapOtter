@@ -48,11 +48,12 @@ function compareCodePoints(left: string, right: string): number {
 // Writes the JSON text directly rather than building a sorted object, because
 // JS enumerates integer-like keys ("9", "10") first in numeric order whatever
 // order they were inserted in, while Python sorts them as strings (#1411).
-// Everything else follows JSON.stringify: undefined and function values drop
-// out of objects and become null in arrays.
+// Built for plain JSON values (what JSON.parse returns). As with
+// JSON.stringify, undefined and function values drop out of objects and
+// become null in arrays, array holes included; toJSON is never called.
 function stringifySorted(value: unknown): string | undefined {
   if (Array.isArray(value)) {
-    return `[${value.map((item) => stringifySorted(item) ?? "null").join(",")}]`;
+    return `[${Array.from(value, (item) => stringifySorted(item) ?? "null").join(",")}]`;
   }
   if (!isRecord(value)) return JSON.stringify(value);
   const members: string[] = [];
