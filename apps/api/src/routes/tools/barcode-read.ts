@@ -277,6 +277,24 @@ export function registerBarcodeRead(app: FastifyInstance) {
           previewUrl: downloadUrl,
         });
       } catch (err) {
+        // A WebAssembly RuntimeError is the decoder failing (it couldn't
+        // instantiate, or it trapped), never the caller's image. zxing-wasm
+        // caches a failed instantiation for good, so hand it the binary again:
+        // new overrides drop the cached instance and the next request retries
+        // (#1402).
+        if (err instanceof WebAssembly.RuntimeError) {
+          request.log.error(
+            { err, toolId: "barcode-read" },
+            "Barcode decoder failed; reloading it for the next request",
+          );
+          initZXingReader();
+          return reply.status(503).send({
+            error: "Barcode reading is temporarily unavailable on this server.",
+            details:
+              "The barcode decoder failed to start. It will be reloaded on the next request.",
+            code: "ENGINE_UNAVAILABLE",
+          });
+        }
         request.log.error({ err, toolId: "barcode-read" }, "Barcode read failed");
         return reply.status(422).send({
           error: "Barcode reading failed",
