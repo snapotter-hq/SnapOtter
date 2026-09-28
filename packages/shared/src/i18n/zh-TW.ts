@@ -1788,6 +1788,11 @@ export const zhTW: TranslationKeys = {
       deepEnhanceSkippedFailed: "這次深度增強未能執行，因此套用了標準增強。請再試一次。",
       deepEnhanceSkippedUnavailable: "深度增強需要放大與增強套件，但尚未安裝，因此套用了標準增強。",
       deepEnhanceSkippedAnimated: "深度增強不支援動態影像，因此每一格都套用了標準增強。",
+      batchDeepEnhanceSkipped: "{total} 張影像中有 {count} 張未能執行深度增強，已套用標準增強。",
+      batchDeepEnhanceSkippedFailed: "{total} 張影像中有 {count} 張深度增強失敗，已套用標準增強。",
+      batchDeepEnhanceSkippedUnavailable:
+        "由於未安裝放大與增強套件，{total} 張影像中有 {count} 張未能執行深度增強。",
+      batchDeepEnhanceSkippedAnimated: "{total} 張影像中有 {count} 張是動態影像，已略過深度增強。",
     },
     "noise-removal": {
       off: "關閉",

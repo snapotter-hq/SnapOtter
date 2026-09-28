@@ -2039,6 +2039,14 @@ export const pl: TranslationKeys = {
         "Głębokie ulepszenie wymaga pakietu powiększania i ulepszania, który nie jest zainstalowany, więc otrzymujesz standardowe ulepszenie.",
       deepEnhanceSkippedAnimated:
         "Głębokie ulepszenie nie działa na animowanych obrazach, więc każda klatka otrzymała standardowe ulepszenie.",
+      batchDeepEnhanceSkipped:
+        "Głębokie ulepszenie nie wykonało się na {count} z {total} obrazów, więc otrzymały standardowe ulepszenie.",
+      batchDeepEnhanceSkippedFailed:
+        "Głębokie ulepszenie nie powiodło się na {count} z {total} obrazów, więc otrzymały standardowe ulepszenie.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Głębokie ulepszenie nie wykonało się na {count} z {total} obrazów, bo pakiet powiększania i ulepszania nie jest zainstalowany.",
+      batchDeepEnhanceSkippedAnimated:
+        "Głębokie ulepszenie pominęło {count} z {total} obrazów, bo są animowane.",
     },
     "noise-removal": {
       off: "Wył.",

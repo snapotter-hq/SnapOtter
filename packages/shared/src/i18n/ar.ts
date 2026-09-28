@@ -2021,6 +2021,13 @@ export const ar: TranslationKeys = {
         "يتطلب التحسين العميق حزمة التكبير والتحسين، وهي غير مثبتة، لذا حصلت على التحسين العادي.",
       deepEnhanceSkippedAnimated:
         "لا يعمل التحسين العميق على الصور المتحركة، لذا حصل كل إطار على التحسين العادي.",
+      batchDeepEnhanceSkipped:
+        "لم يعمل التحسين العميق على {count} من {total} صور، لذا حصلت على التحسين العادي.",
+      batchDeepEnhanceSkippedFailed:
+        "فشل التحسين العميق في {count} من {total} صور، لذا حصلت على التحسين العادي.",
+      batchDeepEnhanceSkippedUnavailable:
+        "لم يعمل التحسين العميق على {count} من {total} صور لأن حزمة التكبير والتحسين غير مثبتة.",
+      batchDeepEnhanceSkippedAnimated: "تخطى التحسين العميق {count} من {total} صور لأنها متحركة.",
     },
     "noise-removal": {
       off: "إيقاف",

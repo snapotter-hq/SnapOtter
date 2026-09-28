@@ -2043,6 +2043,14 @@ export const it: TranslationKeys = {
         "Il miglioramento profondo richiede il pacchetto Ingrandimento e miglioramento, che non è installato, quindi hai ottenuto il miglioramento standard.",
       deepEnhanceSkippedAnimated:
         "Il miglioramento profondo non funziona sulle immagini animate, quindi ogni fotogramma ha ricevuto il miglioramento standard.",
+      batchDeepEnhanceSkipped:
+        "Il miglioramento profondo non è stato eseguito su {count} immagini su {total}, che hanno ricevuto il miglioramento standard.",
+      batchDeepEnhanceSkippedFailed:
+        "Il miglioramento profondo non è riuscito su {count} immagini su {total}, che hanno ricevuto il miglioramento standard.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Il miglioramento profondo non è stato eseguito su {count} immagini su {total} perché il pacchetto Ingrandimento e miglioramento non è installato.",
+      batchDeepEnhanceSkippedAnimated:
+        "Il miglioramento profondo ha saltato {count} immagini su {total} perché sono animate.",
     },
     "noise-removal": {
       off: "Disattivato",

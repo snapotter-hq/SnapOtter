@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gsAvailable, qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import { FILE_NOTES_ALL_FILES } from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -20,6 +21,7 @@ import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
+import { isToolInstalled } from "../../../apps/api/src/lib/feature-status.js";
 import { objectExists } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -1511,12 +1513,68 @@ describe("X-File-Notes header (#1292)", () => {
 
       expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
       const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
-      // 1 KB is out of reach for both, so both carry the miss and their target.
-      expect(notes["0"]).toEqual({ targetMet: false, targetKb: 1 });
-      expect(notes["1"]).toEqual({ targetMet: false, targetKb: 1 });
+      // 1 KB is out of reach for both, so both carry the same miss, and a note
+      // every file shares goes out once (#1303).
+      expect(notes).toEqual({ [FILE_NOTES_ALL_FILES]: { targetMet: false, targetKb: 1 } });
     },
     180_000,
   );
+
+  // #1303: a single run says when Deep Enhance didn't run (#950); a batch said
+  // nothing, so "Deep Enhance 20 photos" could return 20 standard results.
+  it("reports which files skipped Deep Enhance, and why", async () => {
+    // Per-fork data dirs start with no AI bundles, so the still reads as
+    // unavailable; the animation skips the deep pass whatever is installed.
+    expect(isToolInstalled("noise-removal")).toBe(false);
+    const gif = readFixture(fixtures.image.animated.gif);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "still.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "anim.gif", contentType: "image/gif", content: gif },
+      { name: "settings", content: JSON.stringify({ deepEnhance: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-enhancement/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    expect(notes["0"]).toEqual({ deepEnhanceSkipped: "unavailable" });
+    expect(notes["1"]).toEqual({ deepEnhanceSkipped: "animated" });
+  }, 120_000);
+
+  it("sends a note every file shares once, and keeps the per-file map on the row", async () => {
+    // The toggle shows with no bundle installed, so "unavailable" on every
+    // file is the common case; one entry per file would grow the header with
+    // the batch until a proxy rejected it (#1303).
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ deepEnhance: true }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-enhancement/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    const notes = JSON.parse(decodeURIComponent(res.headers["x-file-notes"] as string));
+    expect(notes).toEqual({ [FILE_NOTES_ALL_FILES]: { deepEnhanceSkipped: "unavailable" } });
+
+    const parentId = res.headers["x-job-id"] as string;
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    const result = (row.progress as { result?: { fileNotes?: Record<string, unknown> } }).result;
+    expect(result?.fileNotes).toEqual({
+      "0": { deepEnhanceSkipped: "unavailable" },
+      "1": { deepEnhanceSkipped: "unavailable" },
+    });
+  }, 120_000);
 
   it("sends an empty map when no file carries a note", async () => {
     const { body, contentType } = createMultipartPayload([

@@ -35,6 +35,8 @@ export interface ResultNotes {
   resizedTo?: { width: number; height: number };
   targetKb?: number;
   targetMet?: boolean;
+  /** Image Enhancement's requested Deep Enhance pass didn't run, and why (#1303). */
+  deepEnhanceSkipped?: "failed" | "unavailable" | "animated";
 }
 
 export interface FileEntry {

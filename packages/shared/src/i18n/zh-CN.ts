@@ -1789,6 +1789,11 @@ export const zhCN: TranslationKeys = {
       deepEnhanceSkippedUnavailable:
         "深度增强需要「放大与增强」功能包，但尚未安装，因此应用了标准增强。",
       deepEnhanceSkippedAnimated: "深度增强不支持动图，因此每一帧都应用了标准增强。",
+      batchDeepEnhanceSkipped: "{total} 张图片中有 {count} 张未能运行深度增强，已应用标准增强。",
+      batchDeepEnhanceSkippedFailed: "{total} 张图片中有 {count} 张深度增强失败，已应用标准增强。",
+      batchDeepEnhanceSkippedUnavailable:
+        "由于未安装「放大与增强」功能包，{total} 张图片中有 {count} 张未能运行深度增强。",
+      batchDeepEnhanceSkippedAnimated: "{total} 张图片中有 {count} 张是动图，已跳过深度增强。",
     },
     "noise-removal": {
       off: "关闭",

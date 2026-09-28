@@ -1996,6 +1996,14 @@ export const ja: TranslationKeys = {
         "ディープエンハンスにはアップスケール＆エンハンスバンドルが必要ですが、インストールされていないため、標準のエンハンスを適用しました。",
       deepEnhanceSkippedAnimated:
         "ディープエンハンスはアニメーション画像には使えないため、各フレームに標準のエンハンスを適用しました。",
+      batchDeepEnhanceSkipped:
+        "{total} 枚中 {count} 枚でディープエンハンスが実行されなかったため、標準のエンハンスを適用しました。",
+      batchDeepEnhanceSkippedFailed:
+        "{total} 枚中 {count} 枚でディープエンハンスに失敗したため、標準のエンハンスを適用しました。",
+      batchDeepEnhanceSkippedUnavailable:
+        "アップスケール＆エンハンスバンドルがインストールされていないため、{total} 枚中 {count} 枚でディープエンハンスが実行されませんでした。",
+      batchDeepEnhanceSkippedAnimated:
+        "{total} 枚中 {count} 枚はアニメーション画像のため、ディープエンハンスをスキップしました。",
     },
     "noise-removal": {
       off: "オフ",

@@ -2042,6 +2042,14 @@ export const tr: TranslationKeys = {
         "Derin İyileştirme için Büyütme ve İyileştirme paketi gerekiyor ama yüklü değil, bu yüzden standart iyileştirme uygulandı.",
       deepEnhanceSkippedAnimated:
         "Derin İyileştirme animasyonlu görüntülerde çalışmaz, bu yüzden her kareye standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkipped:
+        "Derin İyileştirme {total} görüntünün {count} tanesinde çalışmadı, bu yüzden standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkippedFailed:
+        "Derin İyileştirme {total} görüntünün {count} tanesinde başarısız oldu, bu yüzden standart iyileştirme uygulandı.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Büyütme ve İyileştirme paketi yüklü olmadığı için Derin İyileştirme {total} görüntünün {count} tanesinde çalışmadı.",
+      batchDeepEnhanceSkippedAnimated:
+        "Derin İyileştirme, animasyonlu oldukları için {total} görüntünün {count} tanesini atladı.",
     },
     "noise-removal": {
       off: "Kapalı",

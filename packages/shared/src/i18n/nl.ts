@@ -2045,6 +2045,14 @@ export const nl: TranslationKeys = {
         "Diepte-verbetering vereist de Opschalen & Verbeteren-bundel, die niet is geïnstalleerd, dus je krijgt de standaardverbetering.",
       deepEnhanceSkippedAnimated:
         "Diepte-verbetering werkt niet op geanimeerde afbeeldingen, dus elk frame kreeg de standaardverbetering.",
+      batchDeepEnhanceSkipped:
+        "Diepte-verbetering is op {count} van {total} afbeeldingen niet uitgevoerd, dus die kregen de standaardverbetering.",
+      batchDeepEnhanceSkippedFailed:
+        "Diepte-verbetering is mislukt op {count} van {total} afbeeldingen, dus die kregen de standaardverbetering.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Diepte-verbetering is op {count} van {total} afbeeldingen niet uitgevoerd, omdat de Opschalen & Verbeteren-bundel niet is geïnstalleerd.",
+      batchDeepEnhanceSkippedAnimated:
+        "Diepte-verbetering heeft {count} van {total} afbeeldingen overgeslagen, omdat ze geanimeerd zijn.",
     },
     "noise-removal": {
       off: "Uit",

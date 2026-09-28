@@ -2034,6 +2034,14 @@ export const vi: TranslationKeys = {
         "Nâng cao sâu cần gói Phóng to & Nâng cao, nhưng gói này chưa được cài đặt, nên bạn nhận được bản nâng cao tiêu chuẩn.",
       deepEnhanceSkippedAnimated:
         "Nâng cao sâu không hoạt động với ảnh động, nên mọi khung hình đều nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkipped:
+        "Nâng cao sâu không chạy trên {count} trong {total} ảnh, nên các ảnh đó nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkippedFailed:
+        "Nâng cao sâu thất bại trên {count} trong {total} ảnh, nên các ảnh đó nhận bản nâng cao tiêu chuẩn.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Nâng cao sâu không chạy trên {count} trong {total} ảnh vì gói Phóng to & Nâng cao chưa được cài đặt.",
+      batchDeepEnhanceSkippedAnimated:
+        "Nâng cao sâu đã bỏ qua {count} trong {total} ảnh vì chúng là ảnh động.",
     },
     "noise-removal": {
       off: "Tắt",

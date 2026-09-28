@@ -2002,6 +2002,14 @@ export const th: TranslationKeys = {
         "การปรับปรุงเชิงลึกต้องใช้ชุดขยายและปรับปรุง ซึ่งยังไม่ได้ติดตั้ง จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
       deepEnhanceSkippedAnimated:
         "การปรับปรุงเชิงลึกใช้กับภาพเคลื่อนไหวไม่ได้ ทุกเฟรมจึงได้รับการปรับปรุงแบบมาตรฐาน",
+      batchDeepEnhanceSkipped:
+        "การปรับปรุงเชิงลึกไม่ได้ทำงานกับ {count} จาก {total} ภาพ จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
+      batchDeepEnhanceSkippedFailed:
+        "การปรับปรุงเชิงลึกล้มเหลวกับ {count} จาก {total} ภาพ จึงได้รับการปรับปรุงแบบมาตรฐานแทน",
+      batchDeepEnhanceSkippedUnavailable:
+        "การปรับปรุงเชิงลึกไม่ได้ทำงานกับ {count} จาก {total} ภาพ เพราะยังไม่ได้ติดตั้งชุดขยายและปรับปรุง",
+      batchDeepEnhanceSkippedAnimated:
+        "การปรับปรุงเชิงลึกข้าม {count} จาก {total} ภาพ เพราะเป็นภาพเคลื่อนไหว",
     },
     "noise-removal": {
       off: "ปิด",

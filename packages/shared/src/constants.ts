@@ -2737,3 +2737,11 @@ export const PYTHON_SIDECAR_TOOLS = [
   "background-replace",
   "blur-background",
 ] as const;
+
+/**
+ * X-File-Notes key meaning "this note applies to every file with a result".
+ * Sent instead of one identical entry per file, so a batch where every file
+ * carries the same note (Deep Enhance unavailable, say) keeps a small header
+ * however many files it has (#1303).
+ */
+export const FILE_NOTES_ALL_FILES = "*";

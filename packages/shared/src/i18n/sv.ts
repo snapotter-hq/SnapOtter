@@ -2035,6 +2035,14 @@ export const sv: TranslationKeys = {
         "Djupförstärkning kräver paketet Uppskalning & Förstärkning, som inte är installerat, så du fick standardförstärkningen.",
       deepEnhanceSkippedAnimated:
         "Djupförstärkning fungerar inte på animerade bilder, så varje bildruta fick standardförstärkningen.",
+      batchDeepEnhanceSkipped:
+        "Djupförstärkningen kördes inte på {count} av {total} bilder, så de fick standardförstärkningen.",
+      batchDeepEnhanceSkippedFailed:
+        "Djupförstärkningen misslyckades på {count} av {total} bilder, så de fick standardförstärkningen.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Djupförstärkningen kördes inte på {count} av {total} bilder eftersom paketet Uppskalning & Förstärkning inte är installerat.",
+      batchDeepEnhanceSkippedAnimated:
+        "Djupförstärkningen hoppade över {count} av {total} bilder eftersom de är animerade.",
     },
     "noise-removal": {
       off: "Av",

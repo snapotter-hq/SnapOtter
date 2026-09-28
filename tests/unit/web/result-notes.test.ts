@@ -33,6 +33,17 @@ describe("pickResultNotes", () => {
   ])("gives null for %s", (_label, source) => {
     expect(pickResultNotes(source)).toBeNull();
   });
+
+  // #1303: Image Enhancement's skipped Deep Enhance rides the same notes.
+  it.each(["failed", "unavailable", "animated"])("keeps a '%s' Deep Enhance skip", (reason) => {
+    expect(pickResultNotes({ jobId: "x", deepEnhanceSkipped: reason })).toEqual({
+      deepEnhanceSkipped: reason,
+    });
+  });
+
+  it("drops a Deep Enhance reason it doesn't know", () => {
+    expect(pickResultNotes({ deepEnhanceSkipped: "sideways" })).toBeNull();
+  });
 });
 
 describe("hasResultWarning", () => {
@@ -41,6 +52,10 @@ describe("hasResultWarning", () => {
     expect(hasResultWarning({ targetMet: false })).toBe(true);
     expect(hasResultWarning({ targetKb: 20, targetMet: true })).toBe(false);
     expect(hasResultWarning(null)).toBe(false);
+  });
+
+  it("leaves a skipped Deep Enhance to the panel's summary line (#1303)", () => {
+    expect(hasResultWarning({ deepEnhanceSkipped: "failed" })).toBe(false);
   });
 });
 

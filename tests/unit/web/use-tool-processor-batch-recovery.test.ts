@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { FILE_NOTES_ALL_FILES } from "@snapotter/shared";
 import { act, renderHook } from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -993,6 +994,34 @@ describe("useToolProcessor per-file result notes (#1292)", () => {
     const entries = useFileStore.getState().entries;
     expect(entries[0].resultNotes).toBeNull();
     expect(entries[1].resultNotes).toEqual(NOTES["1"]);
+
+    unmount();
+  });
+
+  // #1303: a note every file shares arrives once, so a big batch where Deep
+  // Enhance couldn't run anywhere doesn't grow the header per file.
+  it("applies a note sent for all files to every entry with a result", async () => {
+    const { unmount } = startBatchRun();
+    const shared = { [FILE_NOTES_ALL_FILES]: { deepEnhanceSkipped: "unavailable" } };
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) => {
+        if (name === "X-File-Results") return encodedFileResults();
+        if (name === "X-File-Notes") return encodeURIComponent(JSON.stringify(shared));
+        return null;
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry.resultNotes).toEqual({ deepEnhanceSkipped: "unavailable" });
+    }
 
     unmount();
   });

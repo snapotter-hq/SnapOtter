@@ -9,6 +9,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
+import type { DeepEnhanceSkipReason } from "../../lib/batch-file-notes.js";
 import { reportError } from "../../lib/error-report.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -37,13 +38,6 @@ const settingsSchema = z.object({
 
 type EnhancementSettings = z.infer<typeof settingsSchema>;
 
-/**
- * Why a requested Deep Enhance pass did not run, returned to the client as
- * `resultPayload.deepEnhanceSkipped` so the panel can say so instead of
- * presenting the standard result as the deep one (#950).
- */
-export type DeepEnhanceSkipReason = "failed" | "unavailable" | "animated";
-
 export async function processImageEnhancement(
   rawBuffer: Buffer,
   settings: EnhancementSettings,
@@ -70,6 +64,8 @@ export async function processImageEnhancement(
     throw await asInputErrorIfUndecodable(rawBuffer, err);
   }
 
+  // Returned as resultPayload.deepEnhanceSkipped so the panel can say the deep
+  // pass didn't run instead of presenting the standard result as it (#950).
   let deepEnhanceSkipped: DeepEnhanceSkipReason | undefined;
 
   // The alpha channel is split out and rejoined through separate pipelines, and

@@ -1984,6 +1984,14 @@ export const en = {
         "Deep Enhance needs the Upscale & Enhance bundle, which isn't installed, so you got the standard enhancement.",
       deepEnhanceSkippedAnimated:
         "Deep Enhance doesn't work on animated images, so every frame got the standard enhancement.",
+      batchDeepEnhanceSkipped:
+        "Deep Enhance didn't run on {count} of {total} images, so they got the standard enhancement.",
+      batchDeepEnhanceSkippedFailed:
+        "Deep Enhance failed on {count} of {total} images, so they got the standard enhancement.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Deep Enhance didn't run on {count} of {total} images because the Upscale & Enhance bundle isn't installed.",
+      batchDeepEnhanceSkippedAnimated:
+        "Deep Enhance skipped {count} of {total} images because they're animated.",
     },
     "noise-removal": {
       off: "Off",
