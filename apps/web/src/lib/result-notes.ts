@@ -2,9 +2,10 @@ import type { ResultNotes } from "@/stores/file-store";
 
 /**
  * The per-file notes a result carries beyond the file itself (#1292): compress's
- * resizedTo, and the target-size verdict from compress and compress-pdf. Takes a
- * single run's result or one entry of a batch's fileNotes map; anything else in
- * the object is ignored, and malformed fields are dropped rather than trusted.
+ * resizedTo, the target-size verdict from compress and compress-pdf, and Image
+ * Enhancement's skipped Deep Enhance (#1303). Takes a single run's result or one
+ * entry of a batch's fileNotes map; anything else in the object is ignored, and
+ * malformed fields are dropped rather than trusted.
  */
 export function pickResultNotes(source: unknown): ResultNotes | null {
   if (!source || typeof source !== "object") return null;
@@ -16,6 +17,10 @@ export function pickResultNotes(source: unknown): ResultNotes | null {
   }
   if (typeof raw.targetKb === "number") notes.targetKb = raw.targetKb;
   if (typeof raw.targetMet === "boolean") notes.targetMet = raw.targetMet;
+  const skipped = raw.deepEnhanceSkipped;
+  if (skipped === "failed" || skipped === "unavailable" || skipped === "animated") {
+    notes.deepEnhanceSkipped = skipped;
+  }
   return Object.keys(notes).length > 0 ? notes : null;
 }
 

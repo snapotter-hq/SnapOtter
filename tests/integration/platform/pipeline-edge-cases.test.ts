@@ -196,6 +196,24 @@ describe("Multi-step pipeline chains", () => {
     expect(json.steps[2].toolId).toBe("compress");
   });
 
+  // #1303: a step records what its single run would report, such as a
+  // Deep Enhance that didn't happen, so a pipeline doesn't hide it.
+  it("records a skipped Deep Enhance on that step only", async () => {
+    const res = await executePipeline(PNG_200x150, "test.png", {
+      steps: [
+        { toolId: "image-enhancement", settings: { deepEnhance: true } },
+        { toolId: "resize", settings: { width: 100 } },
+      ],
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.stepsCompleted).toBe(2);
+    // No AI bundles in the per-fork data dir, so the deep pass is unavailable.
+    expect(json.steps[0].notes).toEqual({ deepEnhanceSkipped: "unavailable" });
+    expect(json.steps[1].notes).toBeUndefined();
+  });
+
   it("chains crop then resize", async () => {
     const res = await executePipeline(PNG_200x150, "test.png", {
       steps: [

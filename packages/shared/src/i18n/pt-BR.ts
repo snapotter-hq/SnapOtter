@@ -2041,6 +2041,14 @@ export const ptBR: TranslationKeys = {
         "A melhoria profunda requer o pacote de Ampliação e melhoria, que não está instalado, então você recebeu a melhoria padrão.",
       deepEnhanceSkippedAnimated:
         "A melhoria profunda não funciona em imagens animadas, então cada quadro recebeu a melhoria padrão.",
+      batchDeepEnhanceSkipped:
+        "A melhoria profunda não foi executada em {count} de {total} imagens, então elas receberam a melhoria padrão.",
+      batchDeepEnhanceSkippedFailed:
+        "A melhoria profunda falhou em {count} de {total} imagens, então elas receberam a melhoria padrão.",
+      batchDeepEnhanceSkippedUnavailable:
+        "A melhoria profunda não foi executada em {count} de {total} imagens porque o pacote de Ampliação e melhoria não está instalado.",
+      batchDeepEnhanceSkippedAnimated:
+        "A melhoria profunda pulou {count} de {total} imagens porque elas são animadas.",
     },
     "noise-removal": {
       off: "Desligado",

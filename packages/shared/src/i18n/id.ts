@@ -2035,6 +2035,14 @@ export const id: TranslationKeys = {
         "Peningkatan Mendalam memerlukan bundel Perbesar & Tingkatkan, yang belum terpasang, jadi Anda mendapatkan peningkatan standar.",
       deepEnhanceSkippedAnimated:
         "Peningkatan Mendalam tidak berfungsi pada gambar animasi, jadi setiap frame mendapatkan peningkatan standar.",
+      batchDeepEnhanceSkipped:
+        "Peningkatan Mendalam tidak berjalan pada {count} dari {total} gambar, jadi gambar tersebut mendapatkan peningkatan standar.",
+      batchDeepEnhanceSkippedFailed:
+        "Peningkatan Mendalam gagal pada {count} dari {total} gambar, jadi gambar tersebut mendapatkan peningkatan standar.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Peningkatan Mendalam tidak berjalan pada {count} dari {total} gambar karena bundel Perbesar & Tingkatkan belum terpasang.",
+      batchDeepEnhanceSkippedAnimated:
+        "Peningkatan Mendalam melewati {count} dari {total} gambar karena gambar tersebut animasi.",
     },
     "noise-removal": {
       off: "Mati",

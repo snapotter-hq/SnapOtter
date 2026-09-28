@@ -1849,6 +1849,14 @@ export const hi: TranslationKeys = {
         "डीप एन्हांस के लिए अपस्केल और एन्हांस बंडल चाहिए, जो इंस्टॉल नहीं है, इसलिए आपको सामान्य एन्हांसमेंट मिला।",
       deepEnhanceSkippedAnimated:
         "डीप एन्हांस एनिमेटेड इमेज पर काम नहीं करता, इसलिए हर फ़्रेम को सामान्य एन्हांसमेंट मिला।",
+      batchDeepEnhanceSkipped:
+        "{total} में से {count} इमेज पर डीप एन्हांस नहीं चला, इसलिए उन्हें सामान्य एन्हांसमेंट मिला।",
+      batchDeepEnhanceSkippedFailed:
+        "{total} में से {count} इमेज पर डीप एन्हांस विफल रहा, इसलिए उन्हें सामान्य एन्हांसमेंट मिला।",
+      batchDeepEnhanceSkippedUnavailable:
+        "{total} में से {count} इमेज पर डीप एन्हांस नहीं चला, क्योंकि अपस्केल और एन्हांस बंडल इंस्टॉल नहीं है।",
+      batchDeepEnhanceSkippedAnimated:
+        "डीप एन्हांस ने {total} में से {count} इमेज छोड़ दीं, क्योंकि वे एनिमेटेड हैं।",
     },
     "noise-removal": {
       off: "बंद",

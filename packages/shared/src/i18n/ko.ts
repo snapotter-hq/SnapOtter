@@ -1973,6 +1973,14 @@ export const ko: TranslationKeys = {
         "딥 향상에는 업스케일 및 향상 번들이 필요하지만 설치되어 있지 않아 기본 향상이 적용되었습니다.",
       deepEnhanceSkippedAnimated:
         "딥 향상은 애니메이션 이미지에서 작동하지 않아 모든 프레임에 기본 향상이 적용되었습니다.",
+      batchDeepEnhanceSkipped:
+        "{total}개 중 {count}개 이미지에서 딥 향상이 실행되지 않아 기본 향상이 적용되었습니다.",
+      batchDeepEnhanceSkippedFailed:
+        "{total}개 중 {count}개 이미지에서 딥 향상에 실패해 기본 향상이 적용되었습니다.",
+      batchDeepEnhanceSkippedUnavailable:
+        "업스케일 및 향상 번들이 설치되어 있지 않아 {total}개 중 {count}개 이미지에서 딥 향상이 실행되지 않았습니다.",
+      batchDeepEnhanceSkippedAnimated:
+        "{total}개 중 {count}개 이미지는 애니메이션이라 딥 향상을 건너뛰었습니다.",
     },
     "noise-removal": {
       off: "끄기",

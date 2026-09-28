@@ -2052,6 +2052,14 @@ export const fr: TranslationKeys = {
         "L'amélioration profonde nécessite le pack Agrandissement et amélioration, qui n'est pas installé : vous obtenez donc l'amélioration standard.",
       deepEnhanceSkippedAnimated:
         "L'amélioration profonde ne fonctionne pas sur les images animées : chaque image a reçu l'amélioration standard.",
+      batchDeepEnhanceSkipped:
+        "L'amélioration profonde ne s'est pas exécutée sur {count} images sur {total} : elles ont reçu l'amélioration standard.",
+      batchDeepEnhanceSkippedFailed:
+        "L'amélioration profonde a échoué sur {count} images sur {total} : elles ont reçu l'amélioration standard.",
+      batchDeepEnhanceSkippedUnavailable:
+        "L'amélioration profonde ne s'est pas exécutée sur {count} images sur {total}, car le pack Agrandissement et amélioration n'est pas installé.",
+      batchDeepEnhanceSkippedAnimated:
+        "L'amélioration profonde a ignoré {count} images sur {total}, car elles sont animées.",
     },
     "noise-removal": {
       off: "Désactivé",

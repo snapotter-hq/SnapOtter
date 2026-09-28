@@ -2047,6 +2047,14 @@ export const de: TranslationKeys = {
         "Die Tiefenverbesserung braucht das Bundle Hochskalierung & Verbesserung, das nicht installiert ist. Sie sehen die Standardverbesserung.",
       deepEnhanceSkippedAnimated:
         "Die Tiefenverbesserung funktioniert nicht bei animierten Bildern, deshalb hat jedes Frame die Standardverbesserung bekommen.",
+      batchDeepEnhanceSkipped:
+        "Die Tiefenverbesserung lief bei {count} von {total} Bildern nicht, sie haben die Standardverbesserung erhalten.",
+      batchDeepEnhanceSkippedFailed:
+        "Die Tiefenverbesserung ist bei {count} von {total} Bildern fehlgeschlagen, sie haben die Standardverbesserung erhalten.",
+      batchDeepEnhanceSkippedUnavailable:
+        "Die Tiefenverbesserung lief bei {count} von {total} Bildern nicht, weil das Bundle Hochskalierung & Verbesserung nicht installiert ist.",
+      batchDeepEnhanceSkippedAnimated:
+        "Die Tiefenverbesserung hat {count} von {total} Bildern übersprungen, weil sie animiert sind.",
     },
     "noise-removal": {
       off: "Aus",

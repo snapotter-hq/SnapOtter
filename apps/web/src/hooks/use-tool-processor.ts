@@ -1,6 +1,7 @@
 import {
   ANALYTICS_EVENTS,
   apiToolPath,
+  FILE_NOTES_ALL_FILES,
   PYTHON_SIDECAR_TOOLS,
   TOOLS,
   type ToolRunDegradedProperties,
@@ -1007,8 +1008,9 @@ export function useToolProcessor(toolId: string) {
               // stale processedPreviewUrl so an earlier single run's preview
               // can't win over this result (displayUrl prefers it) (#746).
               processedPreviewUrl: null,
-              // What a single run of this file would have said (#1292).
-              resultNotes: pickResultNotes(fileNotes[String(i)]),
+              // What a single run of this file would have said (#1292). A note
+              // shared by every file arrives once, under FILE_NOTES_ALL_FILES.
+              resultNotes: pickResultNotes(fileNotes[String(i)] ?? fileNotes[FILE_NOTES_ALL_FILES]),
               status: "completed",
               error: null,
             });

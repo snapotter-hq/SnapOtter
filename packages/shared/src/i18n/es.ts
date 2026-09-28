@@ -2029,6 +2029,14 @@ export const es: TranslationKeys = {
         "La mejora profunda necesita el paquete de Escalado y mejora, que no está instalado, así que se aplicó la mejora estándar.",
       deepEnhanceSkippedAnimated:
         "La mejora profunda no funciona con imágenes animadas, así que cada fotograma recibió la mejora estándar.",
+      batchDeepEnhanceSkipped:
+        "La mejora profunda no se ejecutó en {count} de {total} imágenes, así que recibieron la mejora estándar.",
+      batchDeepEnhanceSkippedFailed:
+        "La mejora profunda falló en {count} de {total} imágenes, así que recibieron la mejora estándar.",
+      batchDeepEnhanceSkippedUnavailable:
+        "La mejora profunda no se ejecutó en {count} de {total} imágenes porque el paquete de Escalado y mejora no está instalado.",
+      batchDeepEnhanceSkippedAnimated:
+        "La mejora profunda omitió {count} de {total} imágenes porque son animadas.",
     },
     "noise-removal": {
       off: "Desactivado",

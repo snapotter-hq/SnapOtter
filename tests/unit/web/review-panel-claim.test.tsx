@@ -86,7 +86,7 @@ describe("ReviewPanel claim tracking", () => {
       "fetch",
       vi.fn((input: string) =>
         input === "blob:result"
-          ? Promise.resolve({ blob: () => Promise.resolve(new Blob(["result"])) })
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
           : upload,
       ),
     );

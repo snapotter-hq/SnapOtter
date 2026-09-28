@@ -21,6 +21,7 @@ import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import { type Pool, queueName, type ToolJobData, type ToolJobResult } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
+import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
@@ -687,9 +688,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             "Content-Length": String(zip.size),
             "X-Job-Id": parentId,
             "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
-            // Per-file notes (resizedTo, targetKb, targetMet), keyed like
-            // X-File-Results, so a batch can say what a single run says (#1292).
-            "X-File-Notes": encodeURIComponent(JSON.stringify(zip.fileNotes ?? {})),
+            // Per-file notes (resizedTo, targetKb, targetMet, deepEnhanceSkipped),
+            // keyed like X-File-Results, so a batch can say what a single run
+            // says (#1292, #1303). Compacted to one entry when every file
+            // shares its note, to keep the header small.
+            "X-File-Notes": encodeURIComponent(
+              JSON.stringify(
+                compactFileNotes(
+                  (zip.fileNotes ?? {}) as Record<string, BatchFileNotes>,
+                  zip.fileResults,
+                ),
+              ),
+            ),
             ...getSecurityHeaders(),
           });
 

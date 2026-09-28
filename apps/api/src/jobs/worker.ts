@@ -974,7 +974,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   const startTime = Date.now();
   const totalSteps = data.totalSteps ?? 0;
 
-  const steps: Array<{ step: number; toolId: string; size: number }> = [];
+  const steps: Array<{ step: number; toolId: string; size: number; notes?: BatchFileNotes }> = [];
   let firstBytesIn = 0;
   let lastOutputRef = "";
   let lastBytesOut = 0;
@@ -999,10 +999,17 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       break;
     }
 
+    // What the step's own single run would have reported (#1303), such as a
+    // Deep Enhance that didn't run or a resize to fit, on the step record a
+    // single-file pipeline returns.
+    const notes = pickBatchFileNotes(
+      (row.progress as { result?: Record<string, unknown> } | null)?.result,
+    );
     steps.push({
       step: i + 1,
       toolId: row.toolId ?? "unknown",
       size: Number(row.bytesOut ?? 0),
+      ...(notes ? { notes } : {}),
     });
 
     if (i === 0) firstBytesIn = Number(row.bytesIn ?? 0);

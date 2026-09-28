@@ -416,6 +416,46 @@ export function ImageEnhancementControls({
   );
 }
 
+/**
+ * After a batch, says how many files skipped Deep Enhance and, when they all
+ * skipped for the same reason, why (#1303). Each entry's resultNotes carries
+ * its reason from the batch's per-file notes. A single file has its own notice.
+ */
+export function DeepEnhanceBatchNote() {
+  const { t } = useTranslation();
+  const { entries } = useFileStore();
+  if (entries.length < 2) return null;
+  // Only a settled batch: a note left by an earlier single run would otherwise
+  // read "1 of 2" as soon as a second file is added.
+  if (entries.some((entry) => entry.status === "pending" || entry.status === "processing")) {
+    return null;
+  }
+  const skipped = entries.filter(
+    (entry) => entry.status === "completed" && entry.resultNotes?.deepEnhanceSkipped,
+  );
+  if (skipped.length === 0) return null;
+  const reasons = new Set(skipped.map((entry) => entry.resultNotes?.deepEnhanceSkipped));
+  const reason = reasons.size === 1 ? [...reasons][0] : undefined;
+  const copy = t.toolSettings.imageEnhancement;
+  const template =
+    reason === "failed"
+      ? copy.batchDeepEnhanceSkippedFailed
+      : reason === "unavailable"
+        ? copy.batchDeepEnhanceSkippedUnavailable
+        : reason === "animated"
+          ? copy.batchDeepEnhanceSkippedAnimated
+          : copy.batchDeepEnhanceSkipped;
+  return (
+    <p
+      role="status"
+      data-testid="image-enhancement-batch-deep-skipped"
+      className="text-xs text-amber-700 dark:text-amber-400"
+    >
+      {format(template, { count: skipped.length, total: entries.length })}
+    </p>
+  );
+}
+
 // Wrapper with process/download flow
 
 export function ImageEnhancementSettings({
@@ -440,8 +480,8 @@ export function ImageEnhancementSettings({
 
   const hasFile = files.length > 0;
   // Set by the API when Deep Enhance was requested but the result is the
-  // standard pass (#950). Batch results carry no per-file payload, so this is
-  // single-file only, like the download link. resultPayload outlives a file
+  // standard pass (#950). Single-file only, like the download link: a batch
+  // gets DeepEnhanceBatchNote's summary instead (#1303). resultPayload outlives a file
   // swap while downloadUrl does not, so gating on it keeps the notice attached
   // to the result it describes.
   const skipReason =
@@ -483,6 +523,8 @@ export function ImageEnhancementSettings({
           {skipNotice}
         </p>
       )}
+
+      {!processing && <DeepEnhanceBatchNote />}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
