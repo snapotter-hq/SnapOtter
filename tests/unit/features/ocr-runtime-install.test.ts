@@ -185,6 +185,38 @@ describe("canonicalRuntimeJson (#667)", () => {
   });
 });
 
+describe("canonicalRuntimeJson key order (#800)", () => {
+  // Python's sort_keys orders by code point; a plain .sort() orders by UTF-16
+  // code unit. They disagree only where a BMP key in U+E000-U+FFFF sits beside
+  // an astral key, whose leading high surrogate (U+D800-U+DBFF) sorts first by
+  // code unit but last by code point.
+  it("orders a BMP key above U+E000 before an astral key, as Python's sort_keys does", () => {
+    // Python: json.dumps({"\U00010000":2,"￿":1}, sort_keys=True, separators=(",",":"))
+    //   -> {"￿":1,"𐀀":2}
+    expect(canonicalRuntimeJson({ "\u{10000}": 2, "￿": 1 })).toBe(
+      '{"\\uffff":1,"\\ud800\\udc00":2}\n',
+    );
+  });
+
+  it("gives the same bytes whatever order the keys arrive in", () => {
+    const keys = ["\u{1f600}", "", "a", "é", "\u{10000}", "￿"];
+    const forward = Object.fromEntries(keys.map((key, i) => [key, i]));
+    const reversed = Object.fromEntries([...keys].reverse().map((key) => [key, keys.indexOf(key)]));
+    // Python: json.dumps over these keys with sort_keys=True emits them as
+    // a, é, , ￿, 𐀀, 😀
+    const expected =
+      '{"a":2,"\\u00e9":3,"\\ue000":1,"\\uffff":5,"\\ud800\\udc00":4,"\\ud83d\\ude00":0}\n';
+    expect(canonicalRuntimeJson(forward)).toBe(expected);
+    expect(canonicalRuntimeJson(reversed)).toBe(expected);
+  });
+
+  it("applies code-point order to nested objects and objects inside arrays", () => {
+    expect(canonicalRuntimeJson({ outer: [{ "\u{10000}": 1, "￿": 0 }] })).toBe(
+      '{"outer":[{"\\uffff":0,"\\ud800\\udc00":1}]}\n',
+    );
+  });
+});
+
 describe("remainingInstallerTimeoutMs", () => {
   it("floors a fractional remaining budget to the safe integer the installer requires", () => {
     // The deadline is set at one performance.now() read and the remaining time is
