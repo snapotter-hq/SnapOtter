@@ -480,7 +480,7 @@ export function registerCollage(app: FastifyInstance) {
           // rethrow so the global handler logs and reports it as a 503 (#795).
           if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
-            error: `Failed to decode "${file.filename}" (HEIC)`,
+            error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
             details: err instanceof Error ? err.message : String(err),
           });
         }

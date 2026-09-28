@@ -1291,7 +1291,7 @@ describe("Collage cross-format", () => {
 
     it(
       `${fmt.name} + PNG collage: no crash`,
-      async () => {
+      async (context) => {
         const fixturePath = join(fixtureDir.formats, fmt.file);
         if (!existsSync(fixturePath) || !existsSync(PNG_PATH)) return;
 
@@ -1332,7 +1332,9 @@ describe("Collage cross-format", () => {
         });
 
         // A host without this format's decoder answers 503 ENGINE_UNAVAILABLE (#795).
-        if (isEngineUnavailableResponse(res.statusCode, res.body)) return;
+        if (res.statusCode === 503 && isEngineUnavailableResponse(res.statusCode, res.body)) {
+          return context.skip(`${fmt.name}: this host has no decoder for it`);
+        }
         expect(res.statusCode).not.toBe(500);
         expect([200, 202, 400, 422]).toContain(res.statusCode);
       },

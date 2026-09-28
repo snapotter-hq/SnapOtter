@@ -5,7 +5,7 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { SafeError } from "@snapotter/shared";
+import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
 
@@ -25,10 +25,22 @@ export class DecoderUnavailableError extends SafeError {
   }
 }
 
-/** Name check as well as instanceof, so a copy from another module instance still matches. */
+/** Marker check rather than instanceof, per the SafeError convention in @snapotter/shared. */
 export function isDecoderUnavailable(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  return err.name === "DecoderUnavailableError" || isBinarySpawnFailure(err);
+  return isSafeMessageError(err) && err.code === "ENGINE_UNAVAILABLE";
+}
+
+/**
+ * The error for a probe loop that found no working decoder. Only "every
+ * candidate failed to spawn" proves the decoder is absent; a `--version` that
+ * timed out on a loaded host or exited non-zero means it is there but unwell,
+ * so that stays a plain Error rather than telling the operator to install
+ * something they already have.
+ */
+export function noDecoderFound(message: string, probeFailures: unknown[]): Error {
+  const notInstalled = probeFailures.every(isBinarySpawnFailure);
+  if (notInstalled) return new DecoderUnavailableError(message, probeFailures.at(-1));
+  return new Error(message, { cause: probeFailures.find((err) => !isBinarySpawnFailure(err)) });
 }
 
 /**
@@ -429,18 +441,20 @@ let cachedMagickCmd: string | null = null;
 async function findMagickCmd(options: DecodeSafetyOptions = {}): Promise<string> {
   options.signal?.throwIfAborted();
   if (cachedMagickCmd) return cachedMagickCmd;
+  const probeFailures: unknown[] = [];
   for (const cmd of ["magick", "convert"]) {
     try {
       await execFileAsync(cmd, ["--version"], commandOptions(options, 5_000));
       cachedMagickCmd = cmd;
       return cmd;
-    } catch {
+    } catch (err) {
       options.signal?.throwIfAborted();
-      // try next
+      probeFailures.push(err);
     }
   }
-  throw new DecoderUnavailableError(
+  throw noDecoderFound(
     "No ImageMagick found. Install imagemagick (provides convert/magick).",
+    probeFailures,
   );
 }
 

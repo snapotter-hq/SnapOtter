@@ -99,6 +99,30 @@ describe("Collage decoder availability (#795)", () => {
     expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
   });
 
+  it("still builds the collage when the CLI decoder is missing but Sharp can read the file", async () => {
+    hideDecoderBinaries();
+
+    // DNG is a TIFF container, so Sharp's own fallback decodes it even with no
+    // RAW decoder on the host. A missing decoder must not cost this path.
+    const res = await collageRequest({
+      filename: "photo.dng",
+      contentType: "image/x-adobe-dng",
+      content: readFixture(fixtures.image.formats("dng")),
+    });
+
+    expect([200, 202]).toContain(res.statusCode);
+  });
+
+  it("decodes a CLI format normally when the decoder is installed", async () => {
+    const res = await collageRequest({
+      filename: "icon.ico",
+      contentType: "image/x-icon",
+      content: ICO,
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
   it("keeps 422 for a corrupt HEIC when the decoder is installed", async () => {
     // ftyp header intact (passes the magic-byte check), payload garbage.
     const corrupt = Buffer.concat([HEIC.subarray(0, 64), Buffer.alloc(4096, 0x5a)]);

@@ -15,9 +15,11 @@ import { join } from "node:path";
 import { isSafeMessageError } from "@snapotter/shared";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
+  asDecoderUnavailable,
   DecoderUnavailableError,
   decodeToSharpCompat,
   isDecoderUnavailable,
+  noDecoderFound,
 } from "../../../apps/api/src/lib/format-decoders.js";
 import { decodeHeic } from "../../../apps/api/src/lib/heic-converter.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -65,15 +67,16 @@ describe("isDecoderUnavailable", () => {
     expect(isDecoderUnavailable(new DecoderUnavailableError("x"))).toBe(true);
   });
 
-  it("recognises the error by name when it crossed a module boundary", () => {
-    const copied = Object.assign(new Error("x"), { name: "DecoderUnavailableError" });
+  it("recognises the SafeError marker when the error crossed a module boundary", () => {
+    const copied = Object.assign(new Error("x"), {
+      isSafeMessage: true,
+      code: "ENGINE_UNAVAILABLE",
+    });
     expect(isDecoderUnavailable(copied)).toBe(true);
   });
 
-  it("treats every errno of a failed spawn as unavailable", () => {
-    for (const code of ["ENOENT", "EACCES", "ENOEXEC", "ENOTDIR"]) {
-      expect(isDecoderUnavailable(spawnFailure(code, "ffmpeg"))).toBe(true);
-    }
+  it("is false for a raw spawn failure that was never classified", () => {
+    expect(isDecoderUnavailable(spawnFailure("ENOENT", "magick"))).toBe(false);
   });
 
   it("is false for a decoder that ran and rejected the file", () => {
@@ -95,6 +98,58 @@ describe("isDecoderUnavailable", () => {
       syscall: "open",
     });
     expect(isDecoderUnavailable(readFailure)).toBe(false);
+  });
+});
+
+describe("asDecoderUnavailable", () => {
+  it("converts every errno of a failed spawn, keeping the spawn error as the cause", () => {
+    for (const code of ["ENOENT", "EACCES", "ENOEXEC", "ENOTDIR"]) {
+      const spawnErr = spawnFailure(code, "ffmpeg");
+      const converted = asDecoderUnavailable(spawnErr);
+      expect(converted).toBeInstanceOf(DecoderUnavailableError);
+      expect((converted as Error).cause).toBe(spawnErr);
+    }
+  });
+
+  it("passes an abort through unchanged", () => {
+    const abort = Object.assign(new Error("The operation was aborted"), {
+      name: "AbortError",
+      code: "ABORT_ERR",
+    });
+    expect(asDecoderUnavailable(abort)).toBe(abort);
+  });
+
+  it("passes a timeout through unchanged", () => {
+    const timeout = Object.assign(new Error("Command failed: magick"), {
+      killed: true,
+      signal: "SIGTERM",
+      code: null,
+    });
+    expect(asDecoderUnavailable(timeout)).toBe(timeout);
+  });
+});
+
+describe("noDecoderFound", () => {
+  it("reports the decoder as unavailable when every probe failed to spawn", () => {
+    const err = noDecoderFound("No ImageMagick found.", [
+      spawnFailure("ENOENT", "magick"),
+      spawnFailure("ENOENT", "convert"),
+    ]);
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+  });
+
+  it("stays a plain error when a probe ran but did not answer in time", () => {
+    const timeout = Object.assign(new Error("Command failed: magick --version"), {
+      killed: true,
+      signal: "SIGTERM",
+      code: null,
+    });
+    const err = noDecoderFound("No ImageMagick found.", [
+      timeout,
+      spawnFailure("ENOENT", "convert"),
+    ]);
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.cause).toBe(timeout);
   });
 });
 
@@ -143,6 +198,21 @@ describe("decodeToSharpCompat without a decoder binary", () => {
     expect(err.message).toMatch(/No ImageMagick found/);
   });
 
+  it("ends the RAW fallback chain in DecoderUnavailableError when no RAW decoder exists", async () => {
+    hideDecoderBinaries();
+
+    // dcraw_emu and both exiftool attempts fail to spawn and fall through;
+    // the ImageMagick probe is the last word.
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "dng",
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.message).toMatch(/No ImageMagick found/);
+  });
+
   it("rejects with DecoderUnavailableError when a direct decoder cannot be spawned", async () => {
     hideDecoderBinaries();
 
@@ -162,6 +232,22 @@ describe("decodeToSharpCompat without a decoder binary", () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toMatch(/Invalid QOI header/);
     expect(err).not.toBeInstanceOf(DecoderUnavailableError);
+  });
+
+  it("surfaces a cancelled decode as an abort, not an unavailable decoder", async () => {
+    const controller = new AbortController();
+    const pending = decodeToSharpCompat(
+      readFixture(fixtures.image.formats("ico")),
+      "ico",
+      undefined,
+      { signal: controller.signal },
+    ).catch((e) => e);
+    controller.abort();
+
+    const err = await pending;
+
+    expect(err.name).toBe("AbortError");
+    expect(isDecoderUnavailable(err)).toBe(false);
   });
 });
 
