@@ -330,7 +330,9 @@ export function isStorageServiceFault(error: unknown): boolean {
  * True when a read rejected because the object is not there: ENOENT on the
  * local backend, NoSuchKey/404 in S3 mode. Anything else, including an S3
  * error while the lazy singleton is unloaded, is not proven missing and
- * returns false, so a storage outage never passes for a vanished file.
+ * returns false. One inherited blind spot: a HeadObject 404 (getObjectSize)
+ * looks the same for a missing key and a missing bucket (see the enterprise
+ * isMissingObjectError), so only GetObject reads keep NoSuchBucket a fault.
  */
 export function isMissingObjectError(error: unknown): boolean {
   if (isS3Enabled()) return !!s3Mod && s3Mod.isMissingObjectError(error);

@@ -8,6 +8,11 @@ import {
 const GENERIC = "Processing failed. The file may be in an unsupported or corrupted format.";
 
 describe("friendlyError", () => {
+  it("passes the worker's missing-input message through unchanged (#901)", () => {
+    const msg = "Input file is no longer available. Upload it again.";
+    expect(friendlyError(msg)).toBe(msg);
+  });
+
   it("collapses raw ffmpeg stderr dumps to a safe sentence", () => {
     const dump =
       "ffmpeg exited 234: Input #0, gif ... Pixel format 'gbrap' is not widely supported. Conversion failed!";

@@ -165,12 +165,26 @@ export async function loadToolInputs(
     return await readToolInputs(toolId, refs, filename, scratchDir, signal);
   } catch (err) {
     if (!isMissingObjectError(err)) throw err;
+    // The OCR PDF path also writes to scratch, where an ENOENT would be our
+    // own bug. Relabel only when storage confirms a queued input is gone.
+    const gone = await Promise.all(refs.map(isQueuedInputGone));
+    if (!gone.includes(true)) throw err;
     throw new SafeError("Input file is no longer available. Upload it again.", {
       kind: "operational",
       code: "INPUT_MISSING",
       statusCode: 410,
       cause: err,
     });
+  }
+}
+
+/** True only when storage says the object is missing; any other probe fault is not proof. */
+async function isQueuedInputGone(ref: string): Promise<boolean> {
+  try {
+    await getObjectSize(ref);
+    return false;
+  } catch (err) {
+    return isMissingObjectError(err);
   }
 }
 

@@ -18,6 +18,11 @@ function enoent(path: string): NodeJS.ErrnoException {
   });
 }
 
+/** The stat-probe rejection for a queued input that is no longer stored. */
+function gone(name: string): NodeJS.ErrnoException {
+  return Object.assign(enoent(`/data/workspace/uploads/job-1/${name}`), { syscall: "stat" });
+}
+
 async function loadWorker(basePath = "") {
   vi.resetModules();
 
@@ -236,6 +241,7 @@ describe("worker result payload behavior", () => {
     it("turns a vanished buffered input into an operational input-missing error", async () => {
       const cause = enoent("/data/workspace/uploads/job-1/photo.jpg");
       objectStorageMocks.getObjectBuffer.mockRejectedValueOnce(cause);
+      objectStorageMocks.getObjectSize.mockRejectedValueOnce(gone("photo.jpg"));
       const { loadToolInputs } = await loadWorker();
 
       const err = await loadToolInputs(
@@ -256,6 +262,10 @@ describe("worker result payload behavior", () => {
       objectStorageMocks.getObjectBuffer
         .mockResolvedValueOnce(Buffer.from("first"))
         .mockRejectedValueOnce(enoent("/data/workspace/uploads/job-1/second.png"));
+      // The confirmation probe runs per ref, in order: first is still there.
+      objectStorageMocks.getObjectSize
+        .mockResolvedValueOnce(5)
+        .mockRejectedValueOnce(gone("second.png"));
       const { loadToolInputs } = await loadWorker();
 
       await expect(
@@ -273,6 +283,7 @@ describe("worker result payload behavior", () => {
       objectStorageMocks.copyObjectToFile.mockRejectedValueOnce(
         enoent("/data/workspace/uploads/job-1/scan.pdf"),
       );
+      objectStorageMocks.getObjectSize.mockRejectedValueOnce(gone("scan.pdf"));
       const { loadToolInputs } = await loadWorker();
 
       await expect(
@@ -287,9 +298,10 @@ describe("worker result payload behavior", () => {
     });
 
     it("turns a vanished OCR image into the same error when the size probe finds nothing", async () => {
-      objectStorageMocks.getObjectSize.mockRejectedValueOnce(
-        Object.assign(enoent("/data/workspace/uploads/job-1/scan.tiff"), { syscall: "stat" }),
-      );
+      // Once for the OCR size limit, once for the confirmation probe.
+      objectStorageMocks.getObjectSize
+        .mockRejectedValueOnce(gone("scan.tiff"))
+        .mockRejectedValueOnce(gone("scan.tiff"));
       const { loadToolInputs } = await loadWorker();
 
       await expect(
@@ -320,6 +332,43 @@ describe("worker result payload behavior", () => {
           new AbortController().signal,
         ),
       ).rejects.toBe(denied);
+    });
+
+    it("keeps an ENOENT from our own scratch write a raw error while the input is still stored", async () => {
+      // The OCR PDF copy writes to scratch; a missing scratch path is our bug.
+      const scratchMiss = enoent("/tmp/job-1/input.pdf.partial");
+      objectStorageMocks.copyObjectToFile.mockRejectedValueOnce(scratchMiss);
+      objectStorageMocks.getObjectSize.mockResolvedValueOnce(42);
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "ocr-pdf",
+          ["uploads/job-1/scan.pdf"],
+          "scan.pdf",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toBe(scratchMiss);
+    });
+
+    it("keeps the raw error when the confirmation probe itself faults", async () => {
+      const cause = enoent("/data/workspace/uploads/job-1/photo.jpg");
+      objectStorageMocks.getObjectBuffer.mockRejectedValueOnce(cause);
+      objectStorageMocks.getObjectSize.mockRejectedValueOnce(
+        Object.assign(new Error("EACCES: permission denied"), { code: "EACCES", syscall: "stat" }),
+      );
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "image-enhancement",
+          ["uploads/job-1/photo.jpg"],
+          "photo.jpg",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toBe(cause);
     });
 
     it("keeps the OCR PDF size-limit mapping ahead of the missing-input check", async () => {

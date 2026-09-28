@@ -37,25 +37,34 @@ const S3_ENV = vi.hoisted(() => ({
 
 vi.mock("../../../apps/api/src/config.js", () => ({ env: S3_ENV }));
 
-vi.mock("@snapotter/enterprise", () => ({
-  loadS3Storage: vi.fn(async () => ({
-    configureS3: s3.configure,
-    putGenericObject: s3.putObject,
-    putGenericObjectStream: s3.putStream,
-    getGenericObjectStream: s3.getStream,
-    getGenericObjectSize: s3.getSize,
-    deleteGenericObject: s3.deleteObject,
-    deleteGenericPrefix: s3.deletePrefix,
-    listGenericObjects: s3.listObjects,
-    listGenericJobDirs: s3.listJobDirs,
-  })),
-}));
+vi.mock("@snapotter/enterprise", async () => {
+  // The real predicate, so the wiring in object-storage is tested against the
+  // shapes the SDK actually throws (#901).
+  const { isMissingObjectError } = await vi.importActual<
+    typeof import("../../../packages/enterprise/src/storage-s3.js")
+  >("../../../packages/enterprise/src/storage-s3.js");
+  return {
+    loadS3Storage: vi.fn(async () => ({
+      isMissingObjectError,
+      configureS3: s3.configure,
+      putGenericObject: s3.putObject,
+      putGenericObjectStream: s3.putStream,
+      getGenericObjectStream: s3.getStream,
+      getGenericObjectSize: s3.getSize,
+      deleteGenericObject: s3.deleteObject,
+      deleteGenericPrefix: s3.deletePrefix,
+      listGenericObjects: s3.listObjects,
+      listGenericJobDirs: s3.listJobDirs,
+    })),
+  };
+});
 
 import {
   deleteObject,
   deletePrefix,
   getObjectSize,
   getObjectStream,
+  isMissingObjectError,
   listJobDirs,
   listObjects,
   putObject,
@@ -178,5 +187,23 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       forcePathStyle: true,
       prefix: "tenant-a",
     });
+  });
+});
+
+describe("isMissingObjectError with the S3 module loaded (#901)", () => {
+  it("delegates to the S3 predicate: NoSuchKey is missing, service faults and local shapes are not", async () => {
+    await getObjectSize("uploads/j/a.png"); // loads the lazy singleton
+    expect(isMissingObjectError({ name: "NoSuchKey", $metadata: { httpStatusCode: 404 } })).toBe(
+      true,
+    );
+    expect(isMissingObjectError({ name: "AccessDenied", $metadata: { httpStatusCode: 403 } })).toBe(
+      false,
+    );
+    expect(isMissingObjectError({ name: "NoSuchBucket", $metadata: { httpStatusCode: 404 } })).toBe(
+      false,
+    );
+    expect(isMissingObjectError(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))).toBe(
+      false,
+    );
   });
 });
