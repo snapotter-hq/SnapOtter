@@ -7,12 +7,19 @@
  * the ErrorBoundary shows a crash screen until the user reloads by hand.
  * Vite surfaces exactly this case as a window "vite:preloadError" event.
  *
- * The handler reloads the page once. The guard (persisted in sessionStorage
- * so it survives the reload it triggers) makes a second failure inside the
- * window fall through to the error boundary instead of looping: chunks that
- * are still missing after a fresh load mean the server is broken, not
- * updated.
+ * Firefox and Safari fire the same event when the page starts navigating
+ * away with an import still in flight: they abort it. Reloading then would
+ * reload the page being left and cancel the navigation (#912), so the
+ * handler first checks that the server now serves a different build, and
+ * reloads only then.
+ *
+ * The handler reloads once. The guard (persisted in sessionStorage so it
+ * survives the reload it triggers) makes a second failure inside the window
+ * fall through to the error boundary instead of looping: chunks that are
+ * still missing after a fresh load mean the server is broken, not updated.
  */
+
+import { appUrl } from "./app-url";
 
 export const CHUNK_RELOAD_GUARD_KEY = "snapotter-chunk-reload-at";
 export const CHUNK_RELOAD_GUARD_MS = 30_000;
@@ -33,16 +40,45 @@ function markReloadedNow(): void {
   }
 }
 
+function entryScriptSrc(doc: Document): string | null {
+  return doc.querySelector('script[type="module"][src]')?.getAttribute("src") ?? null;
+}
+
+/**
+ * True when a fresh copy of the app shell boots a different entry script
+ * than this page did, i.e. a reload would load a newer build. Every build
+ * hashes its entry, and the entry names every lazy chunk, so a deploy that
+ * removed a chunk always changes it. A response that isn't the shell (an
+ * HTTP error, a proxy's error page) is false: a reload would not reach the
+ * app either. A failed request rejects.
+ */
+export async function servedBuildDiffers(fetchShell: typeof fetch = fetch): Promise<boolean> {
+  const res = await fetchShell(appUrl("/"), { cache: "no-store" });
+  if (!res.ok) return false;
+  const served = entryScriptSrc(new DOMParser().parseFromString(await res.text(), "text/html"));
+  return served !== null && served !== entryScriptSrc(document);
+}
+
 /** Returns an uninstall function (used by tests; the app installs once for its lifetime). */
 export function installChunkReloadHandler(
   reload: () => void = () => window.location.reload(),
+  isStaleBuild: () => Promise<boolean> = servedBuildDiffers,
 ): () => void {
   const onPreloadError = (event: Event) => {
     if (Date.now() - readLastReloadAt() < CHUNK_RELOAD_GUARD_MS) return;
-    markReloadedNow();
-    // Handled here: stop Vite from rethrowing into the error boundary.
+    // Handled here: stop Vite from rethrowing into the error boundary. Vite
+    // needs the answer synchronously, before the build check can finish.
     event.preventDefault();
-    reload();
+    isStaleBuild().then(
+      (stale) => {
+        if (!stale) return;
+        markReloadedNow();
+        reload();
+      },
+      // The check's own request failed. The page is most likely being left
+      // (#912), and otherwise a reload could not reach the server either.
+      () => {},
+    );
   };
   window.addEventListener("vite:preloadError", onPreloadError);
   return () => window.removeEventListener("vite:preloadError", onPreloadError);
