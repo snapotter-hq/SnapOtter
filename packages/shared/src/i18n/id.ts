@@ -5177,6 +5177,9 @@ export const id: TranslationKeys = {
     invalidCredentials: "Nama pengguna atau kata sandi salah",
     connectionError: "Kesalahan koneksi",
     fileTooLarge: "File ini melebihi batas ukuran unggahan server.",
+    featureNotInstalledForTool:
+      '{tool} memerlukan fitur "{feature}". Aktifkan di Pengaturan → Fitur AI.',
+    featureNotInstalled: 'Fitur "{feature}" belum terpasang. Aktifkan di Pengaturan → Fitur AI.',
   },
   sidebar: {
     sponsor: "Dukung kami",

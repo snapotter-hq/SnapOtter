@@ -5173,6 +5173,10 @@ export const sv: TranslationKeys = {
     invalidCredentials: "Ogiltigt användarnamn eller lösenord",
     connectionError: "Anslutningsfel",
     fileTooLarge: "Filen är större än serverns uppladdningsgräns.",
+    featureNotInstalledForTool:
+      '{tool} kräver funktionen "{feature}". Aktivera den under Inställningar → AI-funktioner.',
+    featureNotInstalled:
+      'Funktionen "{feature}" är inte installerad. Aktivera den under Inställningar → AI-funktioner.',
   },
   sidebar: {
     sponsor: "Stöd oss",

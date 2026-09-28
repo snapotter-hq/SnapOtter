@@ -5209,6 +5209,10 @@ export const fr: TranslationKeys = {
     invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
     connectionError: "Erreur de connexion",
     fileTooLarge: "Ce fichier dépasse la taille maximale d'envoi autorisée par le serveur.",
+    featureNotInstalledForTool:
+      "{tool} nécessite la fonctionnalité « {feature} ». Activez-la dans Paramètres → Fonctionnalités AI.",
+    featureNotInstalled:
+      "La fonctionnalité « {feature} » n'est pas installée. Activez-la dans Paramètres → Fonctionnalités AI.",
   },
   sidebar: {
     sponsor: "Soutenez-nous",

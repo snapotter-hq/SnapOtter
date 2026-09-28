@@ -5186,6 +5186,10 @@ export const es: TranslationKeys = {
     invalidCredentials: "Nombre de usuario o contraseña inválidos",
     connectionError: "Error de conexión",
     fileTooLarge: "Este archivo supera el límite de tamaño de carga del servidor.",
+    featureNotInstalledForTool:
+      "{tool} necesita la función «{feature}». Actívala en Configuración → Funciones de AI.",
+    featureNotInstalled:
+      "La función «{feature}» no está instalada. Actívala en Configuración → Funciones de AI.",
   },
   sidebar: {
     sponsor: "Apóyanos",

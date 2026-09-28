@@ -1,8 +1,10 @@
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
+import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -56,6 +58,7 @@ const JOB_EVIDENCE_TIMEOUT_MS = 30_000;
  * result; the batch frame carries the durable ZIP's download URL).
  */
 export function usePipelineProcessor() {
+  const { t } = useTranslation();
   const {
     processing,
     error,
@@ -574,9 +577,7 @@ export function usePipelineProcessor() {
             } else {
               const parsed = parseApiError(body, xhr.status);
               if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-                setError(
-                  `The "${parsed.featureName}" feature is not installed. Enable it in Settings → AI Features.`,
-                );
+                setError(featureNotInstalledMessage(t, parsed));
               } else {
                 setError(parsed as string);
               }
@@ -641,6 +642,7 @@ export function usePipelineProcessor() {
       resetStallTimer,
       startJobEvidenceTimer,
       trackDegrade,
+      t,
     ],
   );
 
@@ -909,7 +911,7 @@ export function usePipelineProcessor() {
             } else {
               const parsed = parseApiError(body, xhr.status);
               if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-                errorMsg = `The "${parsed.featureName}" feature is not installed. Enable it in Settings → AI Features.`;
+                errorMsg = featureNotInstalledMessage(t, parsed);
               } else {
                 errorMsg = parsed as string;
               }
@@ -960,6 +962,7 @@ export function usePipelineProcessor() {
       resetStallTimer,
       startJobEvidenceTimer,
       trackDegrade,
+      t,
     ],
   );
 

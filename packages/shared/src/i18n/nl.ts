@@ -5195,6 +5195,10 @@ export const nl: TranslationKeys = {
     invalidCredentials: "Ongeldige gebruikersnaam of wachtwoord",
     connectionError: "Verbindingsfout",
     fileTooLarge: "Dit bestand is groter dan de uploadlimiet van de server.",
+    featureNotInstalledForTool:
+      '{tool} heeft de functie "{feature}" nodig. Schakel deze in via Instellingen → AI-functies.',
+    featureNotInstalled:
+      'De functie "{feature}" is niet geïnstalleerd. Schakel deze in via Instellingen → AI-functies.',
   },
   sidebar: {
     sponsor: "Steun ons",

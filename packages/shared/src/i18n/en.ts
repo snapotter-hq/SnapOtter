@@ -5109,6 +5109,10 @@ export const en = {
     invalidCredentials: "Invalid username or password",
     connectionError: "Connection error",
     fileTooLarge: "This file is over the server's upload size limit.",
+    featureNotInstalledForTool:
+      '{tool} requires the "{feature}" feature. Enable it in Settings → AI Features.',
+    featureNotInstalled:
+      'The "{feature}" feature is not installed. Enable it in Settings → AI Features.',
   },
   sidebar: {
     tools: "Tools",

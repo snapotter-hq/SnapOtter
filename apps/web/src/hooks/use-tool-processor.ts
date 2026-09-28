@@ -11,9 +11,11 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
+import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
 import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
+import { getToolName } from "@/lib/tool-i18n";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -150,7 +152,7 @@ export function useToolProcessor(toolId: string) {
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
-  const toolName = TOOLS.find((t) => t.id === toolId)?.name ?? toolId;
+  const toolName = getToolName(t, toolId, TOOLS.find((tool) => tool.id === toolId)?.name ?? toolId);
 
   // Operator-visible record of a sync wait falling back to the async path:
   // the fallback masks the network failure from the user by design, so this
@@ -776,7 +778,7 @@ export function useToolProcessor(toolId: string) {
             const body = JSON.parse(xhr.responseText);
             const parsed = parseApiError(body, xhr.status);
             if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-              message = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
+              message = featureNotInstalledMessage(t, parsed, toolName);
             } else {
               message = parsed as string;
             }
@@ -853,7 +855,7 @@ export function useToolProcessor(toolId: string) {
       startJobEvidenceTimer,
       trackDegrade,
       toolName,
-      t.errors.fileTooLarge,
+      t,
     ],
   );
 
@@ -1248,7 +1250,7 @@ export function useToolProcessor(toolId: string) {
             if (typeof code === "string" && code.length > 0) reason = code;
             const parsed = parseApiError(body, xhr.status);
             if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-              errorMsg = `${toolName} requires the "${parsed.featureName}" feature. Enable it in Settings → AI Features.`;
+              errorMsg = featureNotInstalledMessage(t, parsed, toolName);
             } else {
               errorMsg = parsed as string;
             }
@@ -1306,7 +1308,7 @@ export function useToolProcessor(toolId: string) {
       startJobEvidenceTimer,
       trackDegrade,
       toolName,
-      t.errors.fileTooLarge,
+      t,
     ],
   );
 

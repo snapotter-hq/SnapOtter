@@ -5211,6 +5211,10 @@ export const de: TranslationKeys = {
     invalidCredentials: "Ungültiger Benutzername oder Passwort",
     connectionError: "Verbindungsfehler",
     fileTooLarge: "Diese Datei überschreitet die Upload-Größenbeschränkung des Servers.",
+    featureNotInstalledForTool:
+      "{tool} benötigt die Funktion „{feature}“. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
+    featureNotInstalled:
+      "Die Funktion „{feature}“ ist nicht installiert. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
   },
   sidebar: {
     sponsor: "Uns unterstützen",

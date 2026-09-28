@@ -4963,6 +4963,9 @@ export const hi: TranslationKeys = {
     invalidCredentials: "गलत यूज़रनेम या पासवर्ड",
     connectionError: "कनेक्शन त्रुटि",
     fileTooLarge: "यह फाइल सर्वर की अपलोड साइज़ सीमा से बड़ी है।",
+    featureNotInstalledForTool:
+      '{tool} के लिए "{feature}" फीचर ज़रूरी है। इसे सेटिंग्स → AI फीचर्स में सक्रिय करें।',
+    featureNotInstalled: '"{feature}" फीचर इंस्टॉल नहीं है। इसे सेटिंग्स → AI फीचर्स में सक्रिय करें।',
   },
   sidebar: {
     sponsor: "हमारा समर्थन करें",

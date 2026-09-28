@@ -5190,6 +5190,10 @@ export const pl: TranslationKeys = {
     invalidCredentials: "Nieprawidłowa nazwa użytkownika lub hasło",
     connectionError: "Błąd połączenia",
     fileTooLarge: "Ten plik przekracza limit rozmiaru przesyłania na serwerze.",
+    featureNotInstalledForTool:
+      "{tool} wymaga funkcji „{feature}”. Włącz ją w Ustawienia → Funkcje AI.",
+    featureNotInstalled:
+      "Funkcja „{feature}” nie jest zainstalowana. Włącz ją w Ustawienia → Funkcje AI.",
   },
   sidebar: {
     sponsor: "Wesprzyj nas",

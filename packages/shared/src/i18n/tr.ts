@@ -5186,6 +5186,10 @@ export const tr: TranslationKeys = {
     invalidCredentials: "Geçersiz kullanıcı adı veya parola",
     connectionError: "Bağlantı hatası",
     fileTooLarge: "Bu dosya sunucunun yükleme boyutu sınırını aşıyor.",
+    featureNotInstalledForTool:
+      '{tool} için "{feature}" özelliği gerekiyor. Ayarlar → AI Özellikleri bölümünden etkinleştirin.',
+    featureNotInstalled:
+      '"{feature}" özelliği yüklü değil. Ayarlar → AI Özellikleri bölümünden etkinleştirin.',
   },
   sidebar: {
     sponsor: "Bize destek olun",

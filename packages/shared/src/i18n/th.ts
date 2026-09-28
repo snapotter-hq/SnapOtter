@@ -5109,6 +5109,8 @@ export const th: TranslationKeys = {
     invalidCredentials: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
     connectionError: "ข้อผิดพลาดในการเชื่อมต่อ",
     fileTooLarge: "ไฟล์นี้มีขนาดเกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์",
+    featureNotInstalledForTool: '{tool} ต้องใช้ฟีเจอร์ "{feature}" เปิดใช้ได้ที่ ตั้งค่า → ฟีเจอร์ AI',
+    featureNotInstalled: 'ยังไม่ได้ติดตั้งฟีเจอร์ "{feature}" เปิดใช้ได้ที่ ตั้งค่า → ฟีเจอร์ AI',
   },
   sidebar: {
     sponsor: "สนับสนุนเรา",

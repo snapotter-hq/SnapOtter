@@ -5184,6 +5184,10 @@ export const ru: TranslationKeys = {
     invalidCredentials: "Неверное имя пользователя или пароль",
     connectionError: "Ошибка подключения",
     fileTooLarge: "Этот файл превышает ограничение сервера на размер загрузки.",
+    featureNotInstalledForTool:
+      "Для «{tool}» нужна функция «{feature}». Включите её в Настройки → AI-функции.",
+    featureNotInstalled:
+      "Функция «{feature}» не установлена. Включите её в Настройки → AI-функции.",
   },
   sidebar: {
     sponsor: "Поддержите нас",

@@ -5137,6 +5137,9 @@ export const ar: TranslationKeys = {
     invalidCredentials: "اسم المستخدم أو كلمة المرور غير صحيحة",
     connectionError: "خطأ في الاتصال",
     fileTooLarge: "هذا الملف يتجاوز الحد الأقصى لحجم الرفع على الخادم.",
+    featureNotInstalledForTool:
+      'تتطلب أداة {tool} ميزة "{feature}". فعّلها من الإعدادات ← ميزات AI.',
+    featureNotInstalled: 'ميزة "{feature}" غير مثبتة. فعّلها من الإعدادات ← ميزات AI.',
   },
   sidebar: {
     sponsor: "ادعمنا",

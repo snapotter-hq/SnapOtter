@@ -5122,6 +5122,10 @@ export const ja: TranslationKeys = {
     invalidCredentials: "ユーザー名またはパスワードが無効です",
     connectionError: "接続エラー",
     fileTooLarge: "このファイルはサーバーのアップロードサイズ上限を超えています。",
+    featureNotInstalledForTool:
+      "{tool}には「{feature}」機能が必要です。設定 → AI機能で有効にしてください。",
+    featureNotInstalled:
+      "「{feature}」機能がインストールされていません。設定 → AI機能で有効にしてください。",
   },
   sidebar: {
     sponsor: "支援する",

@@ -5189,6 +5189,10 @@ export const ptBR: TranslationKeys = {
     invalidCredentials: "Nome de usuário ou senha inválidos",
     connectionError: "Erro de conexão",
     fileTooLarge: "Este arquivo excede o limite de tamanho de envio do servidor.",
+    featureNotInstalledForTool:
+      '{tool} requer o recurso "{feature}". Ative-o em Configurações → Recursos de AI.',
+    featureNotInstalled:
+      'O recurso "{feature}" não está instalado. Ative-o em Configurações → Recursos de AI.',
   },
   sidebar: {
     sponsor: "Apoie-nos",

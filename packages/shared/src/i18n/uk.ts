@@ -5182,6 +5182,10 @@ export const uk: TranslationKeys = {
     invalidCredentials: "Невірне ім'я користувача або пароль",
     connectionError: "Помилка з'єднання",
     fileTooLarge: "Цей файл перевищує обмеження сервера на розмір завантаження.",
+    featureNotInstalledForTool:
+      "Для «{tool}» потрібна функція «{feature}». Увімкніть її в Налаштування → AI-функції.",
+    featureNotInstalled:
+      "Функцію «{feature}» не встановлено. Увімкніть її в Налаштування → AI-функції.",
   },
   sidebar: {
     sponsor: "Підтримайте нас",

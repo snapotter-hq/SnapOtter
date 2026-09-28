@@ -4886,6 +4886,8 @@ export const zhTW: TranslationKeys = {
     invalidCredentials: "使用者名稱或密碼無效",
     connectionError: "連線錯誤",
     fileTooLarge: "此檔案超過伺服器的上傳大小限制。",
+    featureNotInstalledForTool: "{tool}需要「{feature}」功能。請在 設定 → AI功能 中啟用。",
+    featureNotInstalled: "「{feature}」功能未安裝。請在 設定 → AI功能 中啟用。",
   },
   sidebar: {
     sponsor: "支持我們",

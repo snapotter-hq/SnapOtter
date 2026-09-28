@@ -5164,6 +5164,10 @@ export const vi: TranslationKeys = {
     invalidCredentials: "Tên đăng nhập hoặc mật khẩu không đúng",
     connectionError: "Lỗi kết nối",
     fileTooLarge: "Tệp này vượt quá giới hạn kích thước tải lên của máy chủ.",
+    featureNotInstalledForTool:
+      '{tool} cần tính năng "{feature}". Hãy bật trong Cài đặt → Tính năng AI.',
+    featureNotInstalled:
+      'Tính năng "{feature}" chưa được cài đặt. Hãy bật trong Cài đặt → Tính năng AI.',
   },
   sidebar: {
     sponsor: "Ủng hộ chúng tôi",

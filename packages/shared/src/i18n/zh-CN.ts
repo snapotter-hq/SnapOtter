@@ -4885,6 +4885,8 @@ export const zhCN: TranslationKeys = {
     invalidCredentials: "用户名或密码错误",
     connectionError: "连接错误",
     fileTooLarge: "此文件超过了服务器的上传大小限制。",
+    featureNotInstalledForTool: '{tool}需要"{feature}"功能。请在 设置 → AI 功能 中启用。',
+    featureNotInstalled: '"{feature}"功能未安装。请在 设置 → AI 功能 中启用。',
   },
   sidebar: {
     sponsor: "支持我们",

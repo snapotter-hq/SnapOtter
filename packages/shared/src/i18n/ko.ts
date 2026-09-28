@@ -5095,6 +5095,9 @@ export const ko: TranslationKeys = {
     invalidCredentials: "사용자명 또는 비밀번호가 올바르지 않습니다",
     connectionError: "연결 오류",
     fileTooLarge: "이 파일은 서버의 업로드 크기 제한을 초과합니다.",
+    featureNotInstalledForTool:
+      '{tool}에는 "{feature}" 기능이 필요합니다. 설정 → AI 기능에서 활성화하세요.',
+    featureNotInstalled: '"{feature}" 기능이 설치되지 않았습니다. 설정 → AI 기능에서 활성화하세요.',
   },
   sidebar: {
     sponsor: "후원하기",
