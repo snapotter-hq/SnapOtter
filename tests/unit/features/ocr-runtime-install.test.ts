@@ -231,6 +231,44 @@ describe("canonicalRuntimeJson key order (#800)", () => {
   });
 });
 
+describe("canonicalRuntimeJson integer-like keys (#1411)", () => {
+  // JS objects enumerate array-index keys ("0" to "4294967294") first, in
+  // numeric order, so rebuilding a sorted object loses the sort for them.
+  // Python's sort_keys orders them as strings like any other key.
+  it("orders integer-like keys as strings, as Python's sort_keys does", () => {
+    // Python: json.dumps({"9":1,"10":2}, sort_keys=True, separators=(",",":")) -> {"10":2,"9":1}
+    expect(canonicalRuntimeJson({ 9: 1, 10: 2 })).toBe('{"10":2,"9":1}\n');
+  });
+
+  it("keeps string order for integer-like keys in nested objects and arrays", () => {
+    // Python: {"a":[{"100":1,"20":2}],"b":{"10":1,"2":0}}
+    expect(canonicalRuntimeJson({ b: { 2: 0, 10: 1 }, a: [{ 100: 1, 20: 2 }] })).toBe(
+      '{"a":[{"100":1,"20":2}],"b":{"10":1,"2":0}}\n',
+    );
+  });
+
+  it("sorts keys on both sides of the array-index range as plain strings", () => {
+    // "4294967294" is the largest array index; "4294967295", "-1" and "01"
+    // are ordinary string keys. Python sorts all of them as strings:
+    // {"-1":4,"01":5,"10":1,"4294967294":7,"4294967295":6,"9":2,"a":3}
+    const value = JSON.parse(
+      '{"10":1,"9":2,"a":3,"-1":4,"01":5,"4294967295":6,"4294967294":7}',
+    ) as unknown;
+    expect(canonicalRuntimeJson(value)).toBe(
+      '{"-1":4,"01":5,"10":1,"4294967294":7,"4294967295":6,"9":2,"a":3}\n',
+    );
+  });
+
+  it("drops undefined and function values from objects and nulls them in arrays, like JSON.stringify", () => {
+    const value = { a: undefined, b: 1, c: [undefined, () => 1], d: () => 1 };
+    expect(canonicalRuntimeJson(value)).toBe('{"b":1,"c":[null,null]}\n');
+  });
+
+  it("throws on a top-level value JSON can't represent", () => {
+    expect(() => canonicalRuntimeJson(undefined)).toThrow(TypeError);
+  });
+});
+
 describe("remainingInstallerTimeoutMs", () => {
   it("floors a fractional remaining budget to the safe integer the installer requires", () => {
     // The deadline is set at one performance.now() read and the remaining time is

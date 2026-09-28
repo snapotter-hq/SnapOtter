@@ -45,14 +45,22 @@ function compareCodePoints(left: string, right: string): number {
   return a.length - b.length;
 }
 
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!isRecord(value)) return value;
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort(compareCodePoints)
-      .map((key) => [key, sortJson(value[key])]),
-  );
+// Writes the JSON text directly rather than building a sorted object, because
+// JS enumerates integer-like keys ("9", "10") first in numeric order whatever
+// order they were inserted in, while Python sorts them as strings (#1411).
+// Everything else follows JSON.stringify: undefined and function values drop
+// out of objects and become null in arrays.
+function stringifySorted(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stringifySorted(item) ?? "null").join(",")}]`;
+  }
+  if (!isRecord(value)) return JSON.stringify(value);
+  const members: string[] = [];
+  for (const key of Object.keys(value).sort(compareCodePoints)) {
+    const member = stringifySorted(value[key]);
+    if (member !== undefined) members.push(`${JSON.stringify(key)}:${member}`);
+  }
+  return `{${members.join(",")}}`;
 }
 
 /** Canonical representation shared with install_runtime.py and release signing. */
@@ -67,7 +75,8 @@ export function canonicalRuntimeJson(value: unknown): string {
   // release workflow passes on today's all-ASCII metadata (#667). Escaping each
   // UTF-16 code unit renders astral chars as surrogate pairs, exactly as
   // ensure_ascii does. Structural JSON is ASCII, so only string contents change.
-  const json = JSON.stringify(sortJson(value));
+  const json = stringifySorted(value);
+  if (json === undefined) throw new TypeError("canonicalRuntimeJson needs a JSON value");
   let ascii = "";
   for (let i = 0; i < json.length; i++) {
     const code = json.charCodeAt(i);
