@@ -248,16 +248,33 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         let tempDir: string | undefined;
 
         try {
-          tempDir = await mkdtemp(join(previewDirPath(), `${id}-`));
-          const tempInput = join(tempDir, `input${origExt}`);
-          await copyFile(inputPath, tempInput);
+          // Staging touches only the server's own disk and stored file: a full
+          // disk, an unwritable preview dir, or a stored file gone from disk is
+          // a 500 worth reporting, not a document LibreOffice can't read (#1404).
+          let stagedDir: string;
+          let tempInput: string;
+          try {
+            stagedDir = await mkdtemp(join(previewDirPath(), `${id}-`));
+            tempDir = stagedDir;
+            tempInput = join(stagedDir, `input${origExt}`);
+            await copyFile(inputPath, tempInput);
+          } catch (stageErr) {
+            request.log.error({ err: stageErr, fileId: id }, "Document preview staging failed");
+            void reportError(stageErr, {
+              source: "http",
+              route: "/api/v1/files/:id/preview",
+              method: "GET",
+              statusCode: 500,
+            });
+            return reply.status(500).send({ error: "Could not prepare document preview" });
+          }
 
-          await convertDocument(tempInput, tempDir, "pdf", {
+          await convertDocument(tempInput, stagedDir, "pdf", {
             timeoutMs: (env.LIBREOFFICE_TIMEOUT_S || 120) * 1000,
           });
 
           // convertDocument outputs next to the temp file: input.pdf
-          const producedPath = join(tempDir, "input.pdf");
+          const producedPath = join(stagedDir, "input.pdf");
           try {
             await rename(producedPath, cachedPath);
           } catch (renameErr) {
