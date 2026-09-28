@@ -5314,6 +5314,41 @@ export const sv: TranslationKeys = {
       description: "Reparera, färglägg och skala upp ett gammalt eller skadat foto med AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Bakgrundsborttagning",
+      description: "Ta bort bakgrunden från bilder med AI",
+    },
+    "face-detection": {
+      name: "Ansiktsdetektering",
+      description: "Hitta och gör ansikten oskarpa, korrigera röda ögon, smart beskärning",
+    },
+    "object-eraser-colorize": {
+      name: "Objektraderare & färgläggning",
+      description: "Radera objekt från foton och färglägg svartvita bilder",
+    },
+    "inpaint-hq": {
+      name: "Högkvalitativ inpainting",
+      description:
+        "Diffusionsbaserad objektborttagning för stora objekt, detaljerade texturer och strukturerade bakgrunder",
+    },
+    "upscale-enhance": {
+      name: "Uppskalning & förbättring",
+      description: "AI-uppskalning, ansiktsförstärkning och brusborttagning",
+    },
+    "photo-restoration": {
+      name: "Fotorestaurering",
+      description: "Restaurera gamla eller skadade foton",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extrahera text från bilder och PDF-filer",
+    },
+    transcription: {
+      name: "Transkribering",
+      description: "Tal till text för ljud och video (undertexter)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importerar...",

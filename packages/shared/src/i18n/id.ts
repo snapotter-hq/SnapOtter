@@ -5317,6 +5317,41 @@ export const id: TranslationKeys = {
       description: "Perbaiki, beri warna, dan perbesar foto lama atau rusak dengan AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Penghapusan Latar Belakang",
+      description: "Hapus latar belakang gambar dengan AI",
+    },
+    "face-detection": {
+      name: "Deteksi Wajah",
+      description: "Deteksi dan blur wajah, perbaiki mata merah, potong cerdas",
+    },
+    "object-eraser-colorize": {
+      name: "Penghapus Objek & Pewarnaan",
+      description: "Hapus objek dari foto dan warnai gambar hitam putih",
+    },
+    "inpaint-hq": {
+      name: "Inpainting Berkualitas Tinggi",
+      description:
+        "Penghapusan objek berbasis difusi untuk objek besar, tekstur detail, dan latar belakang terstruktur",
+    },
+    "upscale-enhance": {
+      name: "Perbesar & Tingkatkan",
+      description: "Pembesaran AI, peningkatan wajah, dan penghapusan noise",
+    },
+    "photo-restoration": {
+      name: "Restorasi Foto",
+      description: "Pulihkan foto lama atau rusak",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Ekstrak teks dari gambar dan PDF",
+    },
+    transcription: {
+      name: "Transkripsi",
+      description: "Ucapan ke teks untuk audio dan video (subtitle)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Mengimpor...",

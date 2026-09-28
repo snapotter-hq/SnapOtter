@@ -5102,6 +5102,40 @@ export const hi: TranslationKeys = {
       description: "एआई से पुरानी या क्षतिग्रस्त फ़ोटो की मरम्मत करें, रंग भरें और बड़ा करें।",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "बैकग्राउंड रिमूवल",
+      description: "एआई से इमेज का बैकग्राउंड हटाएँ",
+    },
+    "face-detection": {
+      name: "फेस डिटेक्शन",
+      description: "चेहरे पहचानें और ब्लर करें, रेड आई ठीक करें, स्मार्ट क्रॉप",
+    },
+    "object-eraser-colorize": {
+      name: "ऑब्जेक्ट इरेज़र और कलराइज़",
+      description: "फ़ोटो से ऑब्जेक्ट मिटाएँ और ब्लैक एंड व्हाइट इमेज में रंग भरें",
+    },
+    "inpaint-hq": {
+      name: "हाई-क्वालिटी इनपेंटिंग",
+      description: "बड़े ऑब्जेक्ट, बारीक टेक्सचर और जटिल बैकग्राउंड के लिए डिफ़्यूज़न-आधारित ऑब्जेक्ट रिमूवल",
+    },
+    "upscale-enhance": {
+      name: "अपस्केल और एन्हांस",
+      description: "एआई अपस्केलिंग, चेहरा एन्हांसमेंट और नॉइज़ रिमूवल",
+    },
+    "photo-restoration": {
+      name: "फोटो रिस्टोरेशन",
+      description: "पुरानी या क्षतिग्रस्त फ़ोटो ठीक करें",
+    },
+    ocr: {
+      name: "OCR",
+      description: "इमेज और PDF से टेक्स्ट निकालें",
+    },
+    transcription: {
+      name: "ट्रांसक्रिप्शन",
+      description: "ऑडियो और वीडियो के लिए स्पीच से टेक्स्ट (सबटाइटल)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "आयात हो रहा है...",

@@ -5248,6 +5248,41 @@ export const en = {
       description: "Repair, colorize, and upscale an old or damaged photo with AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Background Removal",
+      description: "Remove image backgrounds with AI",
+    },
+    "face-detection": {
+      name: "Face Detection",
+      description: "Detect and blur faces, fix red-eye, smart crop",
+    },
+    "object-eraser-colorize": {
+      name: "Object Eraser & Colorize",
+      description: "Erase objects from photos and colorize B&W images",
+    },
+    "inpaint-hq": {
+      name: "High-Quality Inpainting",
+      description:
+        "Diffusion-based object removal for large objects, detailed textures, and structured backgrounds",
+    },
+    "upscale-enhance": {
+      name: "Upscale & Enhance",
+      description: "AI upscaling, face enhancement, and noise removal",
+    },
+    "photo-restoration": {
+      name: "Photo Restoration",
+      description: "Restore old or damaged photos",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extract text from images and PDFs",
+    },
+    transcription: {
+      name: "Transcription",
+      description: "Speech to text for audio and video (subtitles)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importing...",

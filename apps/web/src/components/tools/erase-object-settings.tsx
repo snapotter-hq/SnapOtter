@@ -6,6 +6,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
@@ -603,7 +604,10 @@ export function EraseObjectSettings({
                 {hqInstalling || hqQueued
                   ? t.settings.aiFeatures.installing
                   : format(t.features.enableButton, {
-                      name: hqBundle?.name ?? "High-Quality Inpainting",
+                      name: bundleName(
+                        t,
+                        hqBundle ?? { id: HQ_BUNDLE_ID, name: "High-Quality Inpainting" },
+                      ),
                     })}
               </button>
             ) : (

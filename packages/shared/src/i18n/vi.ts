@@ -5303,6 +5303,41 @@ export const vi: TranslationKeys = {
       description: "Sửa chữa, tô màu và phóng to ảnh cũ hoặc hư hỏng bằng AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Xóa nền",
+      description: "Xóa nền ảnh bằng AI",
+    },
+    "face-detection": {
+      name: "Nhận diện khuôn mặt",
+      description: "Nhận diện và làm mờ khuôn mặt, sửa mắt đỏ, cắt thông minh",
+    },
+    "object-eraser-colorize": {
+      name: "Xóa đối tượng & tô màu",
+      description: "Xóa đối tượng khỏi ảnh và tô màu ảnh đen trắng",
+    },
+    "inpaint-hq": {
+      name: "Inpainting chất lượng cao",
+      description:
+        "Xóa đối tượng dựa trên khuếch tán cho vật thể lớn, kết cấu chi tiết và nền có cấu trúc",
+    },
+    "upscale-enhance": {
+      name: "Phóng to & nâng cao",
+      description: "Phóng to bằng AI, nâng cao khuôn mặt và khử nhiễu",
+    },
+    "photo-restoration": {
+      name: "Phục chế ảnh",
+      description: "Phục chế ảnh cũ hoặc hư hỏng",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Trích xuất văn bản từ ảnh và PDF",
+    },
+    transcription: {
+      name: "Phiên âm",
+      description: "Chuyển giọng nói thành văn bản cho âm thanh và video (phụ đề)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Đang nhập...",

@@ -5351,6 +5351,41 @@ export const fr: TranslationKeys = {
       description: "Répare, colorise et agrandit une photo ancienne ou abîmée avec l'IA.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Suppression d'arrière-plan",
+      description: "Supprime l'arrière-plan des images avec l'IA",
+    },
+    "face-detection": {
+      name: "Détection des visages",
+      description: "Détecte et floute les visages, corrige les yeux rouges, recadrage intelligent",
+    },
+    "object-eraser-colorize": {
+      name: "Effaceur d'objets et colorisation",
+      description: "Efface des objets des photos et colorise les images en noir et blanc",
+    },
+    "inpaint-hq": {
+      name: "Inpainting haute qualité",
+      description:
+        "Suppression d'objets par diffusion pour les grands objets, les textures détaillées et les arrière-plans structurés",
+    },
+    "upscale-enhance": {
+      name: "Agrandissement et amélioration",
+      description: "Agrandissement par IA, amélioration des visages et suppression du bruit",
+    },
+    "photo-restoration": {
+      name: "Restauration de photos",
+      description: "Restaure les photos anciennes ou abîmées",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extrait le texte des images et des PDF",
+    },
+    transcription: {
+      name: "Transcription",
+      description: "Parole en texte pour l'audio et la vidéo (sous-titres)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importation...",

@@ -5337,6 +5337,41 @@ export const nl: TranslationKeys = {
       description: "Repareer, kleur in en vergroot een oude of beschadigde foto met AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Achtergrondverwijdering",
+      description: "Verwijder achtergronden uit afbeeldingen met AI",
+    },
+    "face-detection": {
+      name: "Gezichtsdetectie",
+      description: "Detecteer en vervaag gezichten, corrigeer rode ogen, slim bijsnijden",
+    },
+    "object-eraser-colorize": {
+      name: "Objectgum & inkleuren",
+      description: "Verwijder objecten uit foto's en kleur zwart-witafbeeldingen in",
+    },
+    "inpaint-hq": {
+      name: "Hoogwaardige inpainting",
+      description:
+        "Objectverwijdering op basis van diffusie voor grote objecten, gedetailleerde texturen en gestructureerde achtergronden",
+    },
+    "upscale-enhance": {
+      name: "Opschalen & verbeteren",
+      description: "AI-opschaling, gezichtsverbetering en ruisverwijdering",
+    },
+    "photo-restoration": {
+      name: "Fotorestauratie",
+      description: "Herstel oude of beschadigde foto's",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Haal tekst uit afbeeldingen en pdf's",
+    },
+    transcription: {
+      name: "Transcriptie",
+      description: "Spraak naar tekst voor audio en video (ondertitels)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importeren...",

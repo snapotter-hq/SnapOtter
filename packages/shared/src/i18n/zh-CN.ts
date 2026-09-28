@@ -5024,6 +5024,40 @@ export const zhCN: TranslationKeys = {
       description: "用 AI 修复、上色并放大老旧或受损的照片。",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "背景移除",
+      description: "用 AI 移除图片背景",
+    },
+    "face-detection": {
+      name: "人脸检测",
+      description: "检测并模糊人脸、消除红眼、智能裁剪",
+    },
+    "object-eraser-colorize": {
+      name: "对象擦除与上色",
+      description: "从照片中擦除对象，并为黑白图片上色",
+    },
+    "inpaint-hq": {
+      name: "高质量修补",
+      description: "基于扩散模型的对象移除，适用于大型对象、精细纹理和结构化背景",
+    },
+    "upscale-enhance": {
+      name: "放大与增强",
+      description: "AI 放大、人脸增强和降噪",
+    },
+    "photo-restoration": {
+      name: "照片修复",
+      description: "修复老旧或受损的照片",
+    },
+    ocr: {
+      name: "OCR",
+      description: "从图片和 PDF 中提取文字",
+    },
+    transcription: {
+      name: "语音转写",
+      description: "将音频和视频中的语音转为文字（字幕）",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "导入中...",

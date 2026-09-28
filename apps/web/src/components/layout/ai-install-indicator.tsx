@@ -1,6 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { bundleName } from "@/lib/bundle-i18n";
 import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -29,7 +30,9 @@ export function AiInstallIndicator() {
         <Download className="h-4 w-4 text-primary shrink-0" />
         <p className="text-sm font-medium text-foreground truncate">
           {format(t.appLayout.aiInstall.installingBundle, {
-            name: activeBundle?.name ?? t.appLayout.aiInstall.defaultBundleName,
+            name: activeBundle
+              ? bundleName(t, activeBundle)
+              : t.appLayout.aiInstall.defaultBundleName,
           })}
         </p>
       </div>

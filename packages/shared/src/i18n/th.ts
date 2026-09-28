@@ -5248,6 +5248,40 @@ export const th: TranslationKeys = {
       description: "ซ่อมแซม ลงสี และขยายภาพถ่ายเก่าหรือที่เสียหายด้วย AI",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "ลบพื้นหลัง",
+      description: "ลบพื้นหลังของภาพด้วย AI",
+    },
+    "face-detection": {
+      name: "ตรวจจับใบหน้า",
+      description: "ตรวจจับและเบลอใบหน้า แก้ตาแดง ครอปอัจฉริยะ",
+    },
+    "object-eraser-colorize": {
+      name: "ลบวัตถุและลงสี",
+      description: "ลบวัตถุออกจากภาพถ่ายและลงสีภาพขาวดำ",
+    },
+    "inpaint-hq": {
+      name: "Inpainting คุณภาพสูง",
+      description: "ลบวัตถุด้วยโมเดล diffusion สำหรับวัตถุขนาดใหญ่ พื้นผิวละเอียด และพื้นหลังที่มีโครงสร้าง",
+    },
+    "upscale-enhance": {
+      name: "ขยายและปรับปรุงภาพ",
+      description: "ขยายภาพด้วย AI ปรับปรุงใบหน้า และลดสัญญาณรบกวน",
+    },
+    "photo-restoration": {
+      name: "กู้คืนภาพถ่าย",
+      description: "ซ่อมแซมภาพถ่ายเก่าหรือที่เสียหาย",
+    },
+    ocr: {
+      name: "OCR",
+      description: "แยกข้อความจากรูปภาพและ PDF",
+    },
+    transcription: {
+      name: "ถอดเสียง",
+      description: "แปลงเสียงพูดเป็นข้อความสำหรับเสียงและวิดีโอ (คำบรรยาย)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "กำลังนำเข้า...",

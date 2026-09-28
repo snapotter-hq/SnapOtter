@@ -5352,6 +5352,42 @@ export const de: TranslationKeys = {
       description: "Altes oder beschädigtes Foto per KI reparieren, kolorieren und hochskalieren.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Hintergrundentfernung",
+      description: "Bildhintergründe per KI entfernen",
+    },
+    "face-detection": {
+      name: "Gesichtserkennung",
+      description:
+        "Gesichter erkennen und weichzeichnen, rote Augen korrigieren, intelligenter Zuschnitt",
+    },
+    "object-eraser-colorize": {
+      name: "Objektentferner & Kolorierung",
+      description: "Objekte aus Fotos entfernen und Schwarzweißbilder kolorieren",
+    },
+    "inpaint-hq": {
+      name: "Hochwertiges Inpainting",
+      description:
+        "Diffusionsbasierte Objektentfernung für große Objekte, detaillierte Texturen und strukturierte Hintergründe",
+    },
+    "upscale-enhance": {
+      name: "Hochskalieren & Verbessern",
+      description: "KI-Hochskalierung, Gesichtsverbesserung und Rauschentfernung",
+    },
+    "photo-restoration": {
+      name: "Fotorestaurierung",
+      description: "Alte oder beschädigte Fotos restaurieren",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Text aus Bildern und PDFs extrahieren",
+    },
+    transcription: {
+      name: "Transkription",
+      description: "Sprache zu Text für Audio und Video (Untertitel)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Wird importiert...",

@@ -5235,6 +5235,40 @@ export const ko: TranslationKeys = {
       description: "AI로 오래되거나 손상된 사진을 복구하고 색을 입히며 업스케일합니다.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "배경 제거",
+      description: "AI로 이미지 배경을 제거합니다",
+    },
+    "face-detection": {
+      name: "얼굴 감지",
+      description: "얼굴 감지 및 블러, 적목 보정, 스마트 크롭",
+    },
+    "object-eraser-colorize": {
+      name: "개체 지우기 및 컬러화",
+      description: "사진에서 개체를 지우고 흑백 이미지에 색을 입힙니다",
+    },
+    "inpaint-hq": {
+      name: "고품질 인페인팅",
+      description: "큰 개체, 세밀한 질감, 구조적인 배경을 위한 확산 모델 기반 개체 제거",
+    },
+    "upscale-enhance": {
+      name: "업스케일 및 향상",
+      description: "AI 업스케일링, 얼굴 향상, 노이즈 제거",
+    },
+    "photo-restoration": {
+      name: "사진 복원",
+      description: "오래되거나 손상된 사진을 복원합니다",
+    },
+    ocr: {
+      name: "OCR",
+      description: "이미지와 PDF에서 텍스트를 추출합니다",
+    },
+    transcription: {
+      name: "음성 인식",
+      description: "오디오와 동영상의 음성을 텍스트로 변환합니다(자막)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "가져오는 중...",

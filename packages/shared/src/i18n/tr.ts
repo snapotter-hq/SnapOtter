@@ -5327,6 +5327,41 @@ export const tr: TranslationKeys = {
       description: "Eski veya hasarlı bir fotoğrafı yapay zekâ ile onar, renklendir ve büyüt.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Arka Plan Kaldırma",
+      description: "Görüntülerin arka planını yapay zekâ ile kaldır",
+    },
+    "face-detection": {
+      name: "Yüz Algılama",
+      description: "Yüzleri algıla ve bulanıklaştır, kırmızı gözü düzelt, akıllı kırpma",
+    },
+    "object-eraser-colorize": {
+      name: "Nesne Silici ve Renklendirme",
+      description: "Fotoğraflardan nesneleri sil ve siyah beyaz görüntüleri renklendir",
+    },
+    "inpaint-hq": {
+      name: "Yüksek Kaliteli Inpainting",
+      description:
+        "Büyük nesneler, ayrıntılı dokular ve yapılı arka planlar için difüzyon tabanlı nesne kaldırma",
+    },
+    "upscale-enhance": {
+      name: "Büyütme ve İyileştirme",
+      description: "Yapay zekâ ile büyütme, yüz iyileştirme ve gürültü giderme",
+    },
+    "photo-restoration": {
+      name: "Fotoğraf Restorasyonu",
+      description: "Eski veya hasarlı fotoğrafları onar",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Görüntülerden ve PDF'lerden metin çıkar",
+    },
+    transcription: {
+      name: "Transkripsiyon",
+      description: "Ses ve video için konuşmadan metne (altyazı)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "İçe aktarılıyor...",

@@ -5337,6 +5337,41 @@ export const it: TranslationKeys = {
       description: "Ripara, colora e ingrandisci una foto vecchia o danneggiata con l'IA.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Rimozione sfondo",
+      description: "Rimuovi lo sfondo dalle immagini con l'IA",
+    },
+    "face-detection": {
+      name: "Rilevamento volti",
+      description: "Rileva e sfoca i volti, correggi gli occhi rossi, ritaglio intelligente",
+    },
+    "object-eraser-colorize": {
+      name: "Cancella oggetti e colorizzazione",
+      description: "Cancella oggetti dalle foto e colora immagini in bianco e nero",
+    },
+    "inpaint-hq": {
+      name: "Inpainting di alta qualità",
+      description:
+        "Rimozione di oggetti basata sulla diffusione per oggetti grandi, texture dettagliate e sfondi strutturati",
+    },
+    "upscale-enhance": {
+      name: "Ingrandimento e miglioramento",
+      description: "Ingrandimento con IA, miglioramento dei volti e rimozione del rumore",
+    },
+    "photo-restoration": {
+      name: "Restauro fotografico",
+      description: "Restaura foto vecchie o danneggiate",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Estrai testo da immagini e PDF",
+    },
+    transcription: {
+      name: "Trascrizione",
+      description: "Da voce a testo per audio e video (sottotitoli)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importazione in corso...",

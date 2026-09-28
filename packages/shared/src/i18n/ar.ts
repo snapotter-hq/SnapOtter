@@ -5276,6 +5276,40 @@ export const ar: TranslationKeys = {
       description: "إصلاح صورة قديمة أو تالفة وتلوينها وتكبيرها باستخدام الذكاء الاصطناعي.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "إزالة الخلفية",
+      description: "إزالة خلفيات الصور باستخدام الذكاء الاصطناعي",
+    },
+    "face-detection": {
+      name: "اكتشاف الوجوه",
+      description: "اكتشاف الوجوه وتمويهها، وإصلاح العين الحمراء، والقص الذكي",
+    },
+    "object-eraser-colorize": {
+      name: "ممحاة الكائنات والتلوين",
+      description: "مسح الكائنات من الصور وتلوين الصور بالأبيض والأسود",
+    },
+    "inpaint-hq": {
+      name: "ملء عالي الجودة",
+      description: "إزالة الكائنات بالانتشار للكائنات الكبيرة والأنسجة الدقيقة والخلفيات المعقدة",
+    },
+    "upscale-enhance": {
+      name: "التكبير والتحسين",
+      description: "التكبير بالذكاء الاصطناعي وتحسين الوجوه وإزالة التشويش",
+    },
+    "photo-restoration": {
+      name: "استعادة الصور",
+      description: "استعادة الصور القديمة أو التالفة",
+    },
+    ocr: {
+      name: "OCR",
+      description: "استخراج النص من الصور وملفات PDF",
+    },
+    transcription: {
+      name: "تحويل الكلام إلى نص",
+      description: "تحويل الكلام إلى نص للصوت والفيديو (ترجمات)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "جارٍ الاستيراد...",

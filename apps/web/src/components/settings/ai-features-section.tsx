@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { apiGet, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -450,9 +451,9 @@ function BundleCard({
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">{bundle.name}</p>
+          <p className="text-sm font-medium text-foreground">{bundleName(t, bundle)}</p>
           <p className="text-xs text-muted-foreground">
-            {bundle.description} (~
+            {bundleDescription(t, bundle)} (~
             {bundle.downloadBytes ? formatFileSize(bundle.downloadBytes) : bundle.estimatedSize}
             {bundle.installedBytes
               ? `, ${format(t.settings.aiFeatures.sizeOnDisk, {

@@ -5332,6 +5332,41 @@ export const pl: TranslationKeys = {
       description: "Napraw, pokoloruj i powiększ stare lub uszkodzone zdjęcie za pomocą AI.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Usuwanie tła",
+      description: "Usuń tło z obrazów za pomocą AI",
+    },
+    "face-detection": {
+      name: "Wykrywanie twarzy",
+      description: "Wykrywaj i rozmywaj twarze, usuwaj czerwone oczy, inteligentne kadrowanie",
+    },
+    "object-eraser-colorize": {
+      name: "Usuwanie obiektów i koloryzacja",
+      description: "Usuń obiekty ze zdjęć i pokoloruj czarno-białe obrazy",
+    },
+    "inpaint-hq": {
+      name: "Wysokiej jakości inpainting",
+      description:
+        "Usuwanie obiektów oparte na dyfuzji dla dużych obiektów, szczegółowych tekstur i złożonych teł",
+    },
+    "upscale-enhance": {
+      name: "Powiększanie i ulepszanie",
+      description: "Powiększanie AI, ulepszanie twarzy i usuwanie szumu",
+    },
+    "photo-restoration": {
+      name: "Restauracja zdjęć",
+      description: "Przywróć stare lub uszkodzone zdjęcia",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Wyodrębnij tekst z obrazów i plików PDF",
+    },
+    transcription: {
+      name: "Transkrypcja",
+      description: "Mowa na tekst dla audio i wideo (napisy)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importowanie...",

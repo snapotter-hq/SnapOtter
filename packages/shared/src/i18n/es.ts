@@ -5328,6 +5328,41 @@ export const es: TranslationKeys = {
       description: "Repara, colorea y amplía una foto antigua o dañada con IA.",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "Eliminación de fondo",
+      description: "Quita el fondo de las imágenes con IA",
+    },
+    "face-detection": {
+      name: "Detección de rostros",
+      description: "Detecta y desenfoca rostros, corrige ojos rojos, recorte inteligente",
+    },
+    "object-eraser-colorize": {
+      name: "Borrador de objetos y colorización",
+      description: "Borra objetos de las fotos y colorea imágenes en blanco y negro",
+    },
+    "inpaint-hq": {
+      name: "Inpainting de alta calidad",
+      description:
+        "Eliminación de objetos basada en difusión para objetos grandes, texturas detalladas y fondos estructurados",
+    },
+    "upscale-enhance": {
+      name: "Ampliación y mejora",
+      description: "Ampliación con IA, mejora de rostros y eliminación de ruido",
+    },
+    "photo-restoration": {
+      name: "Restauración de fotos",
+      description: "Restaura fotos antiguas o dañadas",
+    },
+    ocr: {
+      name: "OCR",
+      description: "Extrae texto de imágenes y PDF",
+    },
+    transcription: {
+      name: "Transcripción",
+      description: "Voz a texto para audio y video (subtítulos)",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "Importando...",

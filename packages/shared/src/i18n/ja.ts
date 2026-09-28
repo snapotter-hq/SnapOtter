@@ -5261,6 +5261,41 @@ export const ja: TranslationKeys = {
       description: "AIで古い写真や傷んだ写真を修復し、着色して拡大します。",
     },
   },
+  featureBundles: {
+    "background-removal": {
+      name: "背景除去",
+      description: "AIで画像の背景を除去します",
+    },
+    "face-detection": {
+      name: "顔検出",
+      description: "顔の検出とぼかし、赤目補正、スマートクロップ",
+    },
+    "object-eraser-colorize": {
+      name: "オブジェクト消去とカラー化",
+      description: "写真からオブジェクトを消去し、白黒画像をカラー化します",
+    },
+    "inpaint-hq": {
+      name: "高品質インペインティング",
+      description:
+        "大きなオブジェクト、細かいテクスチャ、構造的な背景に対応する拡散モデルによるオブジェクト除去",
+    },
+    "upscale-enhance": {
+      name: "アップスケールと補正",
+      description: "AIアップスケール、顔エンハンスメント、ノイズ除去",
+    },
+    "photo-restoration": {
+      name: "写真修復",
+      description: "古い写真や傷んだ写真を修復します",
+    },
+    ocr: {
+      name: "OCR",
+      description: "画像とPDFから文字を抽出します",
+    },
+    transcription: {
+      name: "文字起こし",
+      description: "音声と動画の音声をテキストに変換します（字幕）",
+    },
+  },
   commonUi: {
     fileLibrary: {
       importing: "インポート中...",

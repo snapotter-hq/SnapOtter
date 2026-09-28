@@ -2,6 +2,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -135,7 +136,9 @@ export function OcrQualityControl({
               )}
               {installing || queued
                 ? t.settings.aiFeatures.installing
-                : format(t.features.enableButton, { name: bundle?.name ?? t.tools.ocr.name })}
+                : format(t.features.enableButton, {
+                    name: bundle ? bundleName(t, bundle) : t.tools.ocr.name,
+                  })}
             </button>
           )}
           {!incompatible && !isAdmin && (

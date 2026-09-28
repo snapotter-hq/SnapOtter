@@ -8,6 +8,7 @@ import {
 import { AlertCircle, Clock, Download, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -65,8 +66,8 @@ export function FeatureInstallPrompt({
   const isInstalling = !!progress;
   const isQueued = queued.includes(bundle.id);
   const startTime = startTimes[bundle.id] ?? null;
-  const displayName = toolName || bundle.name;
-  const displayDescription = toolDescription || bundle.description;
+  const displayName = toolName || bundleName(t, bundle);
+  const displayDescription = toolDescription || bundleDescription(t, bundle);
   const isRepair = bundle.status === "error";
   const requiredBundleIds = toolId ? getRequiredBundlesForTool(toolId) : [bundle.id];
   const requiredBundles = requiredBundleIds
@@ -196,7 +197,9 @@ export function FeatureInstallPrompt({
                 className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border last:border-b-0"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{candidate.name}</p>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {bundleName(t, candidate)}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {candidate.downloadBytes
                       ? formatFileSize(candidate.downloadBytes)
