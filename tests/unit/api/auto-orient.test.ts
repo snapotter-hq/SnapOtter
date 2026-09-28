@@ -1,6 +1,19 @@
 import sharp from "sharp";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const loggerMock = vi.hoisted(() => ({
+  warn: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
+
+beforeEach(() => {
+  loggerMock.warn.mockReset();
+});
 
 async function createImageWithOrientation(orientation: number): Promise<Buffer> {
   return sharp({
@@ -111,6 +124,7 @@ describe("autoOrient", () => {
     const result = await autoOrient(buf);
     const meta = await sharp(result).metadata();
     expect(meta.orientation === undefined || meta.orientation === 1).toBe(true);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("re-encodes a rotated JPEG in its own format at quality 95, not Sharp's default", async () => {
@@ -145,5 +159,24 @@ describe("autoOrient", () => {
     const empty = Buffer.alloc(0);
     const result = await autoOrient(empty);
     expect(result.equals(empty)).toBe(true);
+    expect(loggerMock.warn).toHaveBeenCalledOnce();
+    expect(loggerMock.warn.mock.calls[0][0]).toMatchObject({ err: expect.any(Error), bytes: 0 });
+  });
+
+  it("logs and passes the image through when the rotation fails", async () => {
+    const full = await createDetailedJpegWithOrientation(6);
+    const truncated = full.subarray(0, Math.floor(full.length / 2));
+    expect((await sharp(truncated).metadata()).orientation).toBe(6);
+
+    const result = await autoOrient(truncated);
+
+    expect(result.equals(truncated)).toBe(true);
+    expect(loggerMock.warn).toHaveBeenCalledOnce();
+    expect(loggerMock.warn.mock.calls[0][0]).toMatchObject({
+      err: expect.any(Error),
+      orientation: 6,
+      format: "jpeg",
+      bytes: truncated.length,
+    });
   });
 });

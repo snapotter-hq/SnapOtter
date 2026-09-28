@@ -18,6 +18,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   schema: { settings: {}, userFiles: { id: {} }, jobs: { id: {}, status: {} } },
 }));
 
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
     BASE_PATH: "",
