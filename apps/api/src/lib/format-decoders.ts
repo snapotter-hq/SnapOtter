@@ -5,9 +5,45 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { SafeError } from "@snapotter/shared";
 import sharp from "sharp";
+import { isBinarySpawnFailure } from "./binary-overrides.js";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * A decoder CLI is not installed or could not be started. That is the
+ * operator's container, not the caller's file, so it carries the same 503
+ * ENGINE_UNAVAILABLE the media and document input handlers use instead of the
+ * plain Error a corrupt upload produces (#795). As a SafeError with a status,
+ * the global error handler logs it, reports it, and shows its message.
+ */
+export class DecoderUnavailableError extends SafeError {
+  constructor(message: string, cause?: unknown) {
+    super(message, { kind: "operational", code: "ENGINE_UNAVAILABLE", statusCode: 503, cause });
+    this.name = "DecoderUnavailableError";
+  }
+}
+
+/** Name check as well as instanceof, so a copy from another module instance still matches. */
+export function isDecoderUnavailable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.name === "DecoderUnavailableError" || isBinarySpawnFailure(err);
+}
+
+/**
+ * A decoder binary that exists on PATH at probe time can still fail to start
+ * (removed since, not executable, wrong architecture), and a decoder with no
+ * probe (ffmpeg for EXR) is only ever found by spawning it. Both reject with a
+ * spawn syscall; everything else is the decoder's verdict on the file.
+ */
+export function asDecoderUnavailable(err: unknown): unknown {
+  if (err instanceof DecoderUnavailableError || !isBinarySpawnFailure(err)) return err;
+  return new DecoderUnavailableError(
+    "An image decoder on this server could not be started. Check that the container's decoder binaries are installed and executable.",
+    err,
+  );
+}
 
 export interface DecodeSafetyOptions {
   /** Maximum decoded width * height accepted by this operation. */
@@ -283,6 +319,21 @@ export async function decodeToSharpCompat(
   options.signal?.throwIfAborted();
   await preflightEncodedDimensions(buffer, format, ext, options);
   let decoded: Buffer;
+  try {
+    decoded = await decodeByFormat(buffer, format, ext, options);
+  } catch (err) {
+    throw asDecoderUnavailable(err);
+  }
+  return assertDecodedWithinLimit(decoded, options);
+}
+
+async function decodeByFormat(
+  buffer: Buffer,
+  format: string,
+  ext: string | undefined,
+  options: DecodeSafetyOptions,
+): Promise<Buffer> {
+  let decoded: Buffer;
   switch (format) {
     case "raw":
       decoded = await decodeRaw(buffer, ext, options);
@@ -337,7 +388,7 @@ export async function decodeToSharpCompat(
     default:
       decoded = buffer;
   }
-  return assertDecodedWithinLimit(decoded, options);
+  return decoded;
 }
 
 /**
@@ -388,7 +439,9 @@ async function findMagickCmd(options: DecodeSafetyOptions = {}): Promise<string>
       // try next
     }
   }
-  throw new Error("No ImageMagick found. Install imagemagick (provides convert/magick).");
+  throw new DecoderUnavailableError(
+    "No ImageMagick found. Install imagemagick (provides convert/magick).",
+  );
 }
 
 /** Build resource limits with syntax shared by ImageMagick 6 and 7. */

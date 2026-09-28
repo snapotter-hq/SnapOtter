@@ -7,7 +7,11 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -472,8 +476,11 @@ export function registerCollage(app: FastifyInstance) {
         try {
           file.buffer = await decodeHeic(file.buffer);
         } catch (err) {
+          // A missing decoder is this server's fault, not the user's file:
+          // rethrow so the global handler logs and reports it as a 503 (#795).
+          if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
-            error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
+            error: `Failed to decode "${file.filename}" (HEIC)`,
             details: err instanceof Error ? err.message : String(err),
           });
         }
@@ -482,10 +489,13 @@ export function registerCollage(app: FastifyInstance) {
         try {
           const fileExt = file.filename.split(".").pop()?.toLowerCase();
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-        } catch {
+        } catch (decodeErr) {
           try {
             await sharp(file.buffer).metadata();
           } catch (err) {
+            // Sharp can read some of these formats itself, so a missing CLI
+            // decoder only matters once that fallback fails too (#795).
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
               details: err instanceof Error ? err.message : String(err),
