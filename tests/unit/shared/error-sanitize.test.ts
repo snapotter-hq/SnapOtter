@@ -162,6 +162,43 @@ describe("extractErrorCode", () => {
     const err = new SafeError("Python script timed out", { kind: "operational", code: "timeout" });
     expect(extractErrorCode(err)).toBe("timeout");
   });
+  // #1413: a SafeError's code is authored to keep grouping stable, so it has
+  // to win over whatever it wraps, or one condition splits by its cause.
+  it("prefers a SafeError's own code over a node errno it wraps", () => {
+    const err = new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      cause: sysErr("ENOENT", "open"),
+    });
+    expect(extractErrorCode(err)).toBe("INPUT_MISSING");
+  });
+  it("prefers a SafeError's own code over a pg SQLSTATE it wraps", () => {
+    const pg = Object.assign(new Error("permission denied for table jobs"), { code: "42501" });
+    const err = new SafeError("role lacks privileges", {
+      kind: "operational",
+      code: "migration-role-not-owner",
+      cause: pg,
+    });
+    expect(extractErrorCode(err)).toBe("migration-role-not-owner");
+  });
+  it("honors the code on a marker-copied SafeError too", () => {
+    const copied = Object.assign(new Error("copied across a module boundary"), {
+      isSafeMessage: true,
+      code: "install-lock-perms",
+      cause: sysErr("EACCES", "fchmod"),
+    });
+    expect(extractErrorCode(copied)).toBe("install-lock-perms");
+  });
+  it("still walks the chain for a SafeError with no usable code of its own", () => {
+    const noCode = new SafeError("wrapped", { kind: "operational", cause: sysErr("ENOENT") });
+    expect(extractErrorCode(noCode)).toBe("ENOENT");
+    const tooLong = new SafeError("wrapped", {
+      kind: "operational",
+      code: "x".repeat(41),
+      cause: sysErr("EACCES"),
+    });
+    expect(extractErrorCode(tooLong)).toBe("EACCES");
+  });
   it("returns null when no code exists anywhere in the chain", () => {
     expect(extractErrorCode(new Error("plain boom"))).toBeNull();
     expect(extractErrorCode("string")).toBeNull();

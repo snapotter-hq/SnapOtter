@@ -140,14 +140,20 @@ export function rebuildErrorValue(err: unknown): string | null {
 
 /**
  * The most specific, non-sensitive error code in the cause chain, for the
- * Sentry `error_code` tag. Prefers a pg SQLSTATE, then a node E-code, else the
- * first short string code found (e.g. a SafeError's authored code). Returns
- * null when none is present. reportError used to read only the top-level
- * `.code`, but pg/undici bury the real code under a drizzle/wrapper Error whose
- * own `.code` is undefined, so the tag was always empty on those events.
+ * Sentry `error_code` tag. A top-level SafeError's own code wins outright: it
+ * is authored to keep grouping stable, so the same condition must not split by
+ * whatever it wraps (#1413). Otherwise prefers a pg SQLSTATE, then a node
+ * E-code, else the first short string code found. Returns null when none is
+ * present. reportError used to read only the top-level `.code`, but pg/undici
+ * bury the real code under a drizzle/wrapper Error whose own `.code` is
+ * undefined, so the tag was always empty on those events.
  */
 export function extractErrorCode(err: unknown): string | null {
   try {
+    if (isSafeMessageError(err)) {
+      const own = (err as { code?: unknown }).code;
+      if (typeof own === "string" && own.length > 0 && own.length <= 40) return own;
+    }
     let fallback: string | null = null;
     for (const l of chain(err)) {
       const code = l.code;

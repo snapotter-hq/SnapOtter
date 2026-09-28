@@ -7,6 +7,7 @@
  * call yields exactly one captureException with the ORIGINAL error object,
  * and the throttle allows one capture per distinct signature.
  */
+import { SafeError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   reportError,
@@ -95,6 +96,34 @@ describe("capture path", () => {
     const full = Object.assign(new Error("disk full"), { code: "ENOSPC" });
     await reportError(full, { source: "worker", pool: "image" });
     expect(h.scope.setFingerprint).toHaveBeenCalledWith(["operational", "ENOSPC"]);
+  });
+
+  it("groups an operational SafeError by its own code, whatever backend error it wraps (#1413)", async () => {
+    // The worker's INPUT_MISSING wraps a local ENOENT or an S3 NoSuchKey
+    // (which has no string .code). Both must land in the same Sentry issue.
+    const make = (cause: unknown) =>
+      new SafeError("Input file is no longer available. Upload it again.", {
+        kind: "operational",
+        code: "INPUT_MISSING",
+        statusCode: 410,
+        cause,
+      });
+    const local = Object.assign(new Error("ENOENT: no such file or directory, open '/x'"), {
+      code: "ENOENT",
+      syscall: "open",
+    });
+    const s3 = Object.assign(new Error("The specified key does not exist."), {
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+
+    await reportError(make(local), { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "INPUT_MISSING");
+
+    resetThrottleForTests();
+    await reportError(make(s3), { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
   });
 
   it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {
