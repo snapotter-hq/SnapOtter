@@ -326,6 +326,17 @@ export function isStorageServiceFault(error: unknown): boolean {
   return !s3Mod || !s3Mod.isMissingObjectError(error);
 }
 
+/**
+ * True when a read rejected because the object is not there: ENOENT on the
+ * local backend, NoSuchKey/404 in S3 mode. Anything else, including an S3
+ * error while the lazy singleton is unloaded, is not proven missing and
+ * returns false, so a storage outage never passes for a vanished file.
+ */
+export function isMissingObjectError(error: unknown): boolean {
+  if (isS3Enabled()) return !!s3Mod && s3Mod.isMissingObjectError(error);
+  return (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
+}
+
 export async function getObjectStream(
   key: string,
   range?: { start: number; end?: number },

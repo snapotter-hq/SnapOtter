@@ -4,8 +4,19 @@ const objectStorageMocks = vi.hoisted(() => ({
   copyObjectToFile: vi.fn(),
   getObjectBuffer: vi.fn(),
   getObjectSize: vi.fn(),
+  // Stands in for the real predicate (covered in object-storage-fault.test.ts):
+  // local-backend semantics, where a missing object is a bare ENOENT.
+  isMissingObjectError: vi.fn((err: unknown) => (err as { code?: string })?.code === "ENOENT"),
   putObject: vi.fn(),
 }));
+
+function enoent(path: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+    code: "ENOENT",
+    syscall: "open",
+    errno: -2,
+  });
+}
 
 async function loadWorker(basePath = "") {
   vi.resetModules();
@@ -16,7 +27,11 @@ async function loadWorker(basePath = "") {
     rm: vi.fn(),
   }));
 
+  const { SafeError } = await vi.importActual<
+    typeof import("../../../../packages/shared/src/tool-errors.js")
+  >("../../../../packages/shared/src/tool-errors.js");
   vi.doMock("@snapotter/shared", () => ({
+    SafeError,
     ANALYTICS_EVENTS: {},
     TOOLS: [],
     // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load.
@@ -203,6 +218,126 @@ describe("worker result payload behavior", () => {
     );
     expect(objectStorageMocks.getObjectSize).toHaveBeenCalledTimes(1);
     expect(objectStorageMocks.getObjectBuffer).toHaveBeenCalledTimes(2);
+  });
+
+  // #901: an input that vanished between enqueue and run (TTL sweep behind a
+  // backed-up queue, a team deleteAfter deadline, a GDPR erase) surfaced as a
+  // raw, stackless "ENOENT open" that Sentry filed as a code bug.
+  describe("missing queued input (#901)", () => {
+    const missingInput = {
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      message: "Input file is no longer available. Upload it again.",
+    };
+
+    it("turns a vanished buffered input into an operational input-missing error", async () => {
+      const cause = enoent("/data/workspace/uploads/job-1/photo.jpg");
+      objectStorageMocks.getObjectBuffer.mockRejectedValueOnce(cause);
+      const { loadToolInputs } = await loadWorker();
+
+      const err = await loadToolInputs(
+        "image-enhancement",
+        ["uploads/job-1/photo.jpg"],
+        "photo.jpg",
+        "/tmp/job-1",
+        new AbortController().signal,
+      ).catch((e: unknown) => e);
+
+      expect(err).toMatchObject(missingInput);
+      expect((err as Error).cause).toBe(cause);
+      // The client-facing message must not carry the server path.
+      expect((err as Error).message).not.toContain("/data/");
+    });
+
+    it("fails the whole load when any one of several inputs is gone", async () => {
+      objectStorageMocks.getObjectBuffer
+        .mockResolvedValueOnce(Buffer.from("first"))
+        .mockRejectedValueOnce(enoent("/data/workspace/uploads/job-1/second.png"));
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "collage",
+          ["uploads/job-1/first.png", "uploads/job-1/second.png"],
+          "first.png",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toMatchObject(missingInput);
+    });
+
+    it("turns a vanished OCR PDF input into the same error on the path-backed loader", async () => {
+      objectStorageMocks.copyObjectToFile.mockRejectedValueOnce(
+        enoent("/data/workspace/uploads/job-1/scan.pdf"),
+      );
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "ocr-pdf",
+          ["uploads/job-1/scan.pdf"],
+          "scan.pdf",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toMatchObject(missingInput);
+    });
+
+    it("turns a vanished OCR image into the same error when the size probe finds nothing", async () => {
+      objectStorageMocks.getObjectSize.mockRejectedValueOnce(
+        Object.assign(enoent("/data/workspace/uploads/job-1/scan.tiff"), { syscall: "stat" }),
+      );
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "ocr",
+          ["uploads/job-1/scan.tiff"],
+          "scan.tiff",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toMatchObject(missingInput);
+    });
+
+    it("leaves a storage fault that is not a missing object untouched", async () => {
+      const denied = Object.assign(new Error("EACCES: permission denied"), {
+        code: "EACCES",
+        syscall: "open",
+      });
+      objectStorageMocks.getObjectBuffer.mockRejectedValueOnce(denied);
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "image-enhancement",
+          ["uploads/job-1/photo.jpg"],
+          "photo.jpg",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toBe(denied);
+    });
+
+    it("keeps the OCR PDF size-limit mapping ahead of the missing-input check", async () => {
+      objectStorageMocks.copyObjectToFile.mockRejectedValueOnce(
+        Object.assign(new Error("too large"), { statusCode: 413 }),
+      );
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "ocr-pdf",
+          ["uploads/job-1/scan.pdf"],
+          "scan.pdf",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toMatchObject({ name: "InputValidationError", statusCode: 413 });
+    });
   });
 
   // Result URLs are persisted with the job, so they must not depend on the

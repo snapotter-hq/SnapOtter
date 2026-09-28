@@ -37,6 +37,7 @@ import {
   isToolInputError,
   ONBOARDING_FIRST_PROCESSED_KEY,
   type PipelineExecutedProperties,
+  SafeError,
   TOOLS,
 } from "@snapotter/shared";
 import archiver from "archiver";
@@ -63,6 +64,7 @@ import {
   getObjectBuffer,
   getObjectSize,
   getObjectStream,
+  isMissingObjectError,
   putObject,
   putObjectStream,
 } from "../lib/object-storage.js";
@@ -145,8 +147,35 @@ export interface LoadedToolInputs {
   originalSize: number;
 }
 
-/** Load OCR PDFs to bounded scratch storage; all other tools remain Buffer-based. */
+/**
+ * Load a job's queued inputs. A queued input can legitimately be gone by the
+ * time the job runs (the TTL sweep behind a backed-up queue, a team
+ * deleteAfter deadline, a GDPR erase), and that is the environment, not our
+ * code: surface it as an operational failure with a message the user can act
+ * on, instead of a raw, stackless ENOENT that Sentry files as a bug (#901).
+ */
 export async function loadToolInputs(
+  toolId: string,
+  refs: string[],
+  filename: string,
+  scratchDir: string,
+  signal: AbortSignal,
+): Promise<LoadedToolInputs> {
+  try {
+    return await readToolInputs(toolId, refs, filename, scratchDir, signal);
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
+    throw new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: err,
+    });
+  }
+}
+
+/** Load OCR PDFs to bounded scratch storage; all other tools remain Buffer-based. */
+async function readToolInputs(
   toolId: string,
   refs: string[],
   filename: string,

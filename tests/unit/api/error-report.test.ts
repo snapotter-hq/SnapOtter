@@ -90,6 +90,24 @@ describe("classifyError", () => {
       "bug",
     );
   });
+  it("a bare ENOENT stays a bug: only the worker input read knows a missing file is not ours (#901)", () => {
+    // A missing file anywhere else usually means our code built a wrong path,
+    // so ENOENT is deliberately NOT an operational code. The worker's input
+    // loader translates the one case it can vouch for into an operational
+    // SafeError (INPUT_MISSING), which classifies through the SafeError rule.
+    const raw = Object.assign(new Error("ENOENT: no such file or directory, open '/x'"), {
+      code: "ENOENT",
+      syscall: "open",
+    });
+    expect(classifyError(raw, "worker")).toBe("bug");
+    const translated = new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: raw,
+    });
+    expect(classifyError(translated, "worker")).toBe("operational");
+  });
   it("worker source: zod is a bug (schema drift) and bare resets are operational", () => {
     const zod = Object.assign(new Error("z"), { name: "ZodError", issues: [] });
     expect(classifyError(zod, "worker")).toBe("bug");
