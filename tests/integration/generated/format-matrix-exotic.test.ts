@@ -124,13 +124,18 @@ async function callToolWithFile(
   });
 }
 
-function assertNoServerCrash(statusCode: number) {
-  expect(statusCode).not.toBe(500);
-  expect(ACCEPTABLE_CODES).toContain(statusCode);
+/**
+ * A clean answer, or 503 ENGINE_UNAVAILABLE when this host has no decoder
+ * for the format (#1428).
+ */
+function assertNoServerCrash(res: { statusCode: number; body: string }) {
+  if (res.statusCode === 503 && isEngineUnavailableResponse(res.statusCode, res.body)) return;
+  expect(res.statusCode).not.toBe(500);
+  expect(ACCEPTABLE_CODES).toContain(res.statusCode);
 }
 
 function assertSuccessOrCleanError(res: { statusCode: number; body: string }) {
-  assertNoServerCrash(res.statusCode);
+  assertNoServerCrash(res);
   const body = JSON.parse(res.body);
   if (res.statusCode >= 400) {
     expect(body.error).toBeDefined();
@@ -221,7 +226,7 @@ describe("Format auto-detection with wrong extensions", () => {
         const res = await callToolWithFile("info", tc.wrongFilename, tc.wrongMime, buffer, {});
 
         // Must not crash; exotic formats may return 422 if decoder missing
-        assertNoServerCrash(res.statusCode);
+        assertNoServerCrash(res);
 
         if (res.statusCode === 200) {
           const body = JSON.parse(res.body);
@@ -247,7 +252,7 @@ describe("Format auto-detection with wrong extensions", () => {
           height: 50,
         });
 
-        assertNoServerCrash(res.statusCode);
+        assertNoServerCrash(res);
 
         if (res.statusCode === 200) {
           const body = JSON.parse(res.body);
@@ -269,7 +274,7 @@ describe("Format auto-detection with wrong extensions", () => {
           format: "png",
         });
 
-        assertNoServerCrash(res.statusCode);
+        assertNoServerCrash(res);
 
         if (res.statusCode === 200) {
           const body = JSON.parse(res.body);
@@ -299,7 +304,7 @@ describe("Exotic format output conversion matrix", () => {
             format: outFmt,
           });
 
-          assertNoServerCrash(res.statusCode);
+          assertNoServerCrash(res);
 
           if (res.statusCode === 200) {
             const body = JSON.parse(res.body);
@@ -331,7 +336,7 @@ describe("Exotic format output conversion matrix", () => {
           });
 
           // Extended outputs may fail with 422 if encoder not available
-          assertNoServerCrash(res.statusCode);
+          assertNoServerCrash(res);
 
           if (res.statusCode === 200) {
             const body = JSON.parse(res.body);
@@ -413,7 +418,7 @@ describe("Exotic format deep-dive: DNG", () => {
     if (!existsSync(fixturePath)) return;
     const buffer = readFileSync(fixturePath);
     const res = await callToolWithFile("color-palette", fmt.file, fmt.mime, buffer, {});
-    assertNoServerCrash(res.statusCode);
+    assertNoServerCrash(res);
     if (res.statusCode === 200) {
       const body = JSON.parse(res.body);
       expect(Array.isArray(body.colors)).toBe(true);
@@ -427,7 +432,7 @@ describe("Exotic format deep-dive: DNG", () => {
     if (!existsSync(fixturePath)) return;
     const buffer = readFileSync(fixturePath);
     const res = await callToolWithFile("image-to-base64", fmt.file, fmt.mime, buffer, {});
-    assertNoServerCrash(res.statusCode);
+    assertNoServerCrash(res);
     if (res.statusCode === 200) {
       const body = JSON.parse(res.body);
       expect(Array.isArray(body.results)).toBe(true);
@@ -834,7 +839,7 @@ describe("Exotic format deep-dive: QOI", () => {
     if (!existsSync(fixturePath)) return;
     const buffer = readFileSync(fixturePath);
     const res = await callToolWithFile("info", fmt.file, fmt.mime, buffer, {});
-    assertNoServerCrash(res.statusCode);
+    assertNoServerCrash(res);
     if (res.statusCode === 200) {
       const body = JSON.parse(res.body);
       expect(body.width).toBeGreaterThan(0);
@@ -850,7 +855,7 @@ describe("Exotic format deep-dive: QOI", () => {
       width: 32,
       height: 32,
     });
-    assertNoServerCrash(res.statusCode);
+    assertNoServerCrash(res);
     if (res.statusCode === 200) {
       const body = JSON.parse(res.body);
       expect(body.downloadUrl).toBeDefined();
@@ -877,7 +882,7 @@ describe("Exotic format deep-dive: QOI", () => {
     if (!existsSync(fixturePath)) return;
     const buffer = readFileSync(fixturePath);
     const res = await callToolWithFile("convert", fmt.file, fmt.mime, buffer, { format: "png" });
-    assertNoServerCrash(res.statusCode);
+    assertNoServerCrash(res);
     if (res.statusCode === 200) {
       const body = JSON.parse(res.body);
       expect(body.downloadUrl).toContain(".png");
@@ -1279,7 +1284,7 @@ describe("Exotic formats with multi-file tools", () => {
         body: payload,
       });
 
-      assertNoServerCrash(res.statusCode);
+      assertNoServerCrash(res);
     }, 180_000);
   }
 
@@ -1307,7 +1312,7 @@ describe("Exotic formats with multi-file tools", () => {
         body: payload,
       });
 
-      assertNoServerCrash(res.statusCode);
+      assertNoServerCrash(res);
     }, 180_000);
   }
 
@@ -1339,7 +1344,7 @@ describe("Exotic formats with multi-file tools", () => {
       if (res.statusCode === 503 && isEngineUnavailableResponse(res.statusCode, res.body)) {
         return context.skip(`${fmt.name}: this host has no decoder for it`);
       }
-      assertNoServerCrash(res.statusCode);
+      assertNoServerCrash(res);
     }, 180_000);
   }
 });
@@ -1377,7 +1382,7 @@ describe("Additional uncommon format fixtures", () => {
           if (!existsSync(fixturePath)) return;
           const buffer = readFileSync(fixturePath);
           const res = await callToolWithFile(tool.id, fmt.file, fmt.mime, buffer, tool.settings);
-          assertNoServerCrash(res.statusCode);
+          assertNoServerCrash(res);
           if (res.statusCode === 200) {
             const body = JSON.parse(res.body);
             if (tool.id === "info") {

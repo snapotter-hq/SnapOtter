@@ -226,8 +226,6 @@ export function registerBackgroundReplace(app: FastifyInstance) {
         }
         fileBuffer = await autoOrient(fileBuffer);
       } catch (err) {
-        // A missing decoder is this server's fault, not the upload:
-        // rethrow so the global handler answers 503 (#1428).
         if (isDecoderUnavailable(err)) throw err;
         request.log.error({ err, toolId }, "Input decoding failed");
         return reply.status(422).send({

@@ -18,6 +18,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import {
   deleteStoredFile,
@@ -38,6 +39,7 @@ import {
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
 import { deletePreview } from "./file-preview.js";
@@ -635,9 +637,14 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           .header("Cache-Control", "public, max-age=86400, immutable")
           .send(thumbnail);
       } catch (err) {
-        // A missing decoder is this server's fault, not the upload:
-        // rethrow so the global handler answers 503 (#1428).
-        if (isDecoderUnavailable(err)) throw err;
+        if (isDecoderUnavailable(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "user-file-thumbnail",
+            request.log,
+          );
+        }
         return reply.status(422).send({ error: "Could not generate thumbnail" });
       }
     },

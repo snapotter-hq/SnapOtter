@@ -5,7 +5,10 @@
  * parsing, object storage writes, and AI queue enqueueing before Python runs.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -278,4 +281,37 @@ describe("async AI photo routes", () => {
     expect(JSON.parse(res.body)).toMatchObject({ error: "No image file provided" });
     expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
   });
+});
+
+// #1428: a host without a HEIF decoder must answer 503 ENGINE_UNAVAILABLE,
+// not a 422 that blames the upload. PATH points at an empty directory so the
+// decoder spawn fails the way it does in a misconfigured container.
+describe("async AI photo routes: missing HEIF decoder", () => {
+  const HEIC = readFixture(fixtures.image.base.heic200);
+  const originalPath = process.env.PATH;
+  const emptyBinDir = mkdtempSync(join(tmpdir(), "ai-routes-no-decoders-"));
+
+  afterEach(() => {
+    process.env.PATH = originalPath;
+  });
+
+  afterAll(() => {
+    process.env.PATH = originalPath;
+    rmSync(emptyBinDir, { recursive: true, force: true });
+  });
+
+  for (const toolId of mocks.forcedInstalledTools) {
+    it(`${toolId} answers 503 ENGINE_UNAVAILABLE and enqueues nothing`, async () => {
+      process.env.PATH = emptyBinDir;
+
+      const res = await postTool(toolId, [
+        { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+        { name: "settings", content: JSON.stringify({}) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+      expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    });
+  }
 });

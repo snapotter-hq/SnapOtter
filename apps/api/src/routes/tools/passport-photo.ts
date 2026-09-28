@@ -311,8 +311,6 @@ export function registerPassportPhoto(app: FastifyInstance) {
           imageHeight: landmarksResult.imageHeight,
         });
       } catch (err) {
-        // A missing decoder is this server's fault, not the upload:
-        // rethrow so the global handler answers 503 (#1428).
         if (isDecoderUnavailable(err)) throw err;
         request.log.error({ err, toolId: "passport-photo" }, "Passport photo analysis failed");
         return reply.status(422).send({

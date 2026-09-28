@@ -209,8 +209,6 @@ export function registerEraseObject(app: FastifyInstance) {
           maskBuffer = await decodeToSharpCompat(maskBuffer, maskValidation.format);
         }
       } catch (err) {
-        // A missing decoder is this server's fault, not the upload:
-        // rethrow so the global handler answers 503 (#1428).
         if (isDecoderUnavailable(err)) throw err;
         request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
         return reply.status(422).send({

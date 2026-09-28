@@ -107,8 +107,6 @@ export function registerSplit(app: FastifyInstance) {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
         } catch (err) {
-          // A missing decoder is this server's fault, not the upload:
-          // rethrow so the global handler answers 503 (#1428).
           if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
@@ -243,8 +241,9 @@ export function registerSplit(app: FastifyInstance) {
 
       await archive.finalize();
     } catch (err) {
-      if (isDecoderUnavailable(err)) throw err;
       if (!reply.raw.headersSent) {
+        // Once the ZIP is streaming, a rethrow would leave the client hanging.
+        if (isDecoderUnavailable(err)) throw err;
         return reply.status(422).send({
           error: "Split failed",
           details: err instanceof Error ? err.message : "Unknown error",

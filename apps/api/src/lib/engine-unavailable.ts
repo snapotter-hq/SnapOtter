@@ -1,4 +1,4 @@
-import type { FastifyBaseLogger } from "fastify";
+import type { FastifyBaseLogger, FastifyReply } from "fastify";
 import type { InputValidationError } from "../modality/contract.js";
 import { reportError } from "./error-report.js";
 
@@ -23,4 +23,24 @@ export function reportEngineUnavailable(
   reported.add(key);
   log.warn({ code: err.code, toolId, err }, "Tool engine unavailable during input preparation");
   void reportError(err, { source: "http", toolId, statusCode: err.statusCode });
+}
+
+/**
+ * Reply with an input handler's rejection. A 5xx one is also logged and
+ * reported, once per tool, which suits endpoints the browser fires on its own
+ * (thumbnails, live previews) where a log line per request would bury the
+ * signal (#1428).
+ */
+export function sendInputValidationError(
+  reply: FastifyReply,
+  err: InputValidationError,
+  toolId: string,
+  log: Pick<FastifyBaseLogger, "warn">,
+) {
+  reportEngineUnavailable(err, toolId, log);
+  return reply.status(err.statusCode).send({
+    error: err.message,
+    ...(err.details !== undefined && { details: err.details }),
+    ...(err.code !== undefined && { code: err.code }),
+  });
 }

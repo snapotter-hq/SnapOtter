@@ -19,7 +19,11 @@ import { applyShadow } from "../../lib/beautify/shadow.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -314,6 +318,7 @@ export function registerBeautify(app: FastifyInstance) {
         processedSize: outputBuf.length,
       });
     } catch (err) {
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Processing failed",
         details: err instanceof Error ? err.message : "Image processing failed",

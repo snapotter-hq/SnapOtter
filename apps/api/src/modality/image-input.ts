@@ -188,15 +188,18 @@ export class ImageInputHandler implements InputHandler {
  * A missing decoder binary is the operator's container, not the caller's
  * file. As a 503 ENGINE_UNAVAILABLE the factory logs and reports it, the same
  * contract the media and document handlers use, instead of a 422 that blames
- * the upload (#1428). The decoder's message is a constant naming the binary.
+ * the upload (#1428). The decoder's spawn error rides along as `cause`: its
+ * path and errno are the only record of which binary failed and why.
  */
-function engineUnavailable(err: unknown): InputValidationError {
-  return new InputValidationError(
+export function engineUnavailable(err: unknown): InputValidationError {
+  const converted = new InputValidationError(
     err instanceof Error ? err.message : String(err),
     503,
     undefined,
     "ENGINE_UNAVAILABLE",
   );
+  converted.cause = err;
+  return converted;
 }
 
 function boundedSharp(buffer: Buffer, maxPixels?: number) {

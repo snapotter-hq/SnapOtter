@@ -411,8 +411,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
                       } catch (err) {
-                        // A missing decoder is this server's fault, not the upload:
-                        // rethrow so the global handler answers 503 (#1428).
                         if (isDecoderUnavailable(err)) throw err;
                         return reply.status(422).send({
                           error:

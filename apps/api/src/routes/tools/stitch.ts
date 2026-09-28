@@ -93,8 +93,6 @@ export function registerStitch(app: FastifyInstance) {
         try {
           file.buffer = await decodeHeic(file.buffer);
         } catch (err) {
-          // A missing decoder is this server's fault, not the upload:
-          // rethrow so the global handler answers 503 (#1428).
           if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
@@ -304,6 +302,7 @@ export function registerStitch(app: FastifyInstance) {
         processedSize: result.length,
       });
     } catch (err) {
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Stitch creation failed",
         details: err instanceof Error ? err.message : "Unknown error",

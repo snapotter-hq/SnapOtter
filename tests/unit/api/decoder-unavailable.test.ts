@@ -274,7 +274,9 @@ describe("decodeAnyFormat (#1428)", () => {
   // Runs after the ImageMagick tests above on purpose: this one caches the command.
   it("rejects with DecoderUnavailableError when the cached ImageMagick can no longer be spawned", async () => {
     const avif = readFixture(fixtures.image.formats("avif"));
-    await decodeAnyFormat(avif, "avif");
+    // Only the probe matters here: it caches the command whether or not this
+    // host's ImageMagick can decode AVIF.
+    await decodeAnyFormat(avif, "avif").catch(() => {});
     hideDecoderBinaries();
 
     const err = await decodeAnyFormat(avif, "avif").catch((e) => e);

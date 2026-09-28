@@ -6,6 +6,7 @@ import { seamCarve } from "@snapotter/ai";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -75,7 +76,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         filename = prepared.filename;
       } catch (err) {
         if (err instanceof InputValidationError) {
-          return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+          return sendInputValidationError(reply, err, "content-aware-resize", request.log);
         }
         return reply.status(422).send({
           error: "Failed to prepare image",

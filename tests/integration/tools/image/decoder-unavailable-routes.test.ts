@@ -121,7 +121,46 @@ const ROUTES: RouteCase[] = [
     url: "/api/v1/tools/image/image-enhancement/analyze",
     parts: (s) => [{ name: "file", ...s }, settings({})],
   },
+  {
+    name: "meme-generator upload",
+    url: "/api/v1/tools/image/meme-generator",
+    parts: (s) => [
+      { name: "file", ...s },
+      settings({ textLayout: "top-bottom", textBoxes: [{ id: "top", text: "HI" }] }),
+    ],
+  },
+  {
+    name: "pipeline execute",
+    url: "/api/v1/pipeline/execute",
+    parts: (s) => [
+      { name: "file", ...s },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 32 } }] }),
+      },
+    ],
+  },
+  // These two call the image input handler directly rather than through the
+  // factory, so they answer its 503 themselves.
+  {
+    name: "compare",
+    url: "/api/v1/tools/image/compare",
+    parts: (s) => [
+      { name: "file", ...s },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+  },
+  {
+    name: "vectorize",
+    url: "/api/v1/tools/image/vectorize",
+    parts: (s) => [{ name: "file", ...s }, settings({})],
+  },
 ];
+
+const EXPECTED_MESSAGE = {
+  heic: /HEIF decoder/,
+  ico: /ImageMagick/,
+};
 
 function post(route: RouteCase, sample: Sample) {
   const { body, contentType } = createMultipartPayload(route.parts(sample));
@@ -143,9 +182,33 @@ describe("Hand-written image routes: decoder availability (#1428)", () => {
 
         expect(res.statusCode, res.body).toBe(503);
         expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
+        expect(res.json().error).toMatch(EXPECTED_MESSAGE[format as keyof typeof SAMPLES]);
       });
     }
   }
+
+  it("stitch: Sharp's own decode still wins when the CLI decoder is missing", async () => {
+    process.env.PATH = emptyBinDir;
+
+    // DNG is a TIFF container; the guard sits behind the Sharp fallback.
+    const res = await post(ROUTES[0], {
+      filename: "photo.dng",
+      contentType: "image/x-adobe-dng",
+      content: readFixture(fixtures.image.formats("dng")),
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it("split: a corrupt ICO still answers 422 when ImageMagick is installed", async () => {
+    const ico = SAMPLES.ico.content;
+    const res = await post(ROUTES[1], {
+      ...SAMPLES.ico,
+      content: Buffer.concat([ico.subarray(0, 22), Buffer.alloc(2048, 0x5a)]),
+    });
+
+    expect(res.statusCode, res.body).toBe(422);
+  });
 
   it("info: an unrecognized upload stays 422 even with no HEIF decoder to guess with", async () => {
     process.env.PATH = emptyBinDir;

@@ -212,8 +212,6 @@ export function registerRemoveBackground(app: FastifyInstance) {
         // Auto-orient to fix EXIF rotation
         fileBuffer = await autoOrient(fileBuffer);
       } catch (err) {
-        // A missing decoder is this server's fault, not the upload:
-        // rethrow so the global handler answers 503 (#1428).
         if (isDecoderUnavailable(err)) throw err;
         request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
         return reply.status(422).send({

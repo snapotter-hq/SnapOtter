@@ -205,8 +205,6 @@ export function registerColorPalette(app: FastifyInstance) {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
         } catch (err) {
-          // A missing decoder is this server's fault, not the upload:
-          // rethrow so the global handler answers 503 (#1428).
           if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",

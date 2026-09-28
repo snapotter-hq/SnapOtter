@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -59,7 +60,7 @@ export function registerCompare(app: FastifyInstance) {
             const message = err.message.startsWith("Invalid image")
               ? err.message.replace("Invalid image", `Invalid ${which} image`)
               : `${err.message} (${which} image)`;
-            throw new InputValidationError(message, err.statusCode, err.details);
+            throw new InputValidationError(message, err.statusCode, err.details, err.code);
           }
           throw err;
         }
@@ -133,7 +134,7 @@ export function registerCompare(app: FastifyInstance) {
       });
     } catch (err) {
       if (err instanceof InputValidationError) {
-        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+        return sendInputValidationError(reply, err, "compare", request.log);
       }
       return reply.status(422).send({
         error: "Comparison failed",

@@ -308,8 +308,6 @@ export function registerMemeGenerator(app: FastifyInstance) {
         try {
           imageBuffer = await decodeHeic(imageBuffer);
         } catch (err) {
-          // A missing decoder is this server's fault, not the upload:
-          // rethrow so the global handler answers 503 (#1428).
           if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",

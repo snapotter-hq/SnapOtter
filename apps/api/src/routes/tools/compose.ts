@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import type { FastifyInstance } from "fastify";
 import sharp, { type Blend } from "sharp";
 import { z } from "zod";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -176,7 +177,7 @@ export function registerCompose(app: FastifyInstance) {
       });
     } catch (err) {
       if (err instanceof InputValidationError) {
-        return reply.status(err.statusCode).send({ error: err.message, details: err.details });
+        return sendInputValidationError(reply, err, "compose", request.log);
       }
       return reply.status(422).send({
         error: "Processing failed",
