@@ -140,17 +140,22 @@ export function rebuildErrorValue(err: unknown): string | null {
 
 /**
  * The most specific, non-sensitive error code in the cause chain, for the
- * Sentry `error_code` tag. A top-level SafeError's own code wins outright: it
- * is authored to keep grouping stable, so the same condition must not split by
- * whatever it wraps (#1413). Otherwise prefers a pg SQLSTATE, then a node
- * E-code, else the first short string code found. Returns null when none is
- * present. reportError used to read only the top-level `.code`, but pg/undici
- * bury the real code under a drizzle/wrapper Error whose own `.code` is
- * undefined, so the tag was always empty on those events.
+ * Sentry `error_code` tag. A top-level operational SafeError's own code wins
+ * outright: reportError fingerprints operational events by this code, so the
+ * same condition must not split by whatever it wraps (#1413). A bug-kind
+ * SafeError is excluded: bug events keep per-frame grouping, and its code is
+ * often derived from settings (an output format), so a wrapped errno is the
+ * better clue there. Otherwise prefers a pg SQLSTATE, then a node E-code, else
+ * the first short string code found. Returns null when none is present.
+ * reportError used to read only the top-level `.code`, but pg/undici bury the
+ * real code under a drizzle/wrapper Error whose own `.code` is undefined, so
+ * the tag was always empty on those events.
  */
 export function extractErrorCode(err: unknown): string | null {
   try {
-    if (isSafeMessageError(err)) {
+    // A marker-copied SafeError may lack `kind`; like classifyError, treat
+    // that as operational.
+    if (isSafeMessageError(err) && err.kind !== "bug") {
       const own = (err as { code?: unknown }).code;
       if (typeof own === "string" && own.length > 0 && own.length <= 40) return own;
     }

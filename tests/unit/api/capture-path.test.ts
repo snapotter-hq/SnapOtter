@@ -126,6 +126,22 @@ describe("capture path", () => {
     expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
   });
 
+  it("keeps the connectivity fingerprint for a SafeError that wraps a network failure", async () => {
+    // Connectivity is decided from the whole chain, ahead of the per-code
+    // operational fingerprint, so one outage stays one issue even though the
+    // tag now carries the SafeError's own code.
+    const err = new SafeError("upstream down", {
+      kind: "operational",
+      code: "some-op",
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "some-op");
+  });
+
   it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {
     const pg = Object.assign(new Error("Failed query: select 1"), {
       cause: Object.assign(new Error("57P01"), { code: "57P01" }),

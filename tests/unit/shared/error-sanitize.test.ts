@@ -189,6 +189,33 @@ describe("extractErrorCode", () => {
     });
     expect(extractErrorCode(copied)).toBe("install-lock-perms");
   });
+  it("keeps the wrapped errno for a bug-kind SafeError, whose code is not a grouping key", () => {
+    // withImageEncodeContext wraps with kind "bug" and a settings-derived code
+    // (the output format); ENOSPC or a missing encoder binary is the clue.
+    const encode = new SafeError("Image encode failed", {
+      kind: "bug",
+      code: "psd",
+      cause: sysErr("ENOSPC", "write"),
+    });
+    expect(extractErrorCode(encode)).toBe("ENOSPC");
+    // With nothing better in the chain, its own code is still the fallback.
+    const plain = new SafeError("Image encode failed", {
+      kind: "bug",
+      code: "psd",
+      cause: new Error("vips failed"),
+    });
+    expect(extractErrorCode(plain)).toBe("psd");
+  });
+  it("ignores a non-string or empty code on a marker-copied SafeError", () => {
+    for (const code of [42, ""]) {
+      const copied = Object.assign(new Error("copied"), {
+        isSafeMessage: true,
+        code,
+        cause: sysErr("ENOENT"),
+      });
+      expect(extractErrorCode(copied)).toBe("ENOENT");
+    }
+  });
   it("still walks the chain for a SafeError with no usable code of its own", () => {
     const noCode = new SafeError("wrapped", { kind: "operational", cause: sysErr("ENOENT") });
     expect(extractErrorCode(noCode)).toBe("ENOENT");
