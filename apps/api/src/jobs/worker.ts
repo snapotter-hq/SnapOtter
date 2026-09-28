@@ -660,9 +660,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       }
 
       // Record queue wait time and completion on the OTel span
-      if (span && job.processedOn) {
-        span.setAttribute("snapotter.queue.wait_ms", job.processedOn - job.timestamp);
-      }
+      const waitedMs = queueWaitMs(job);
+      if (span && waitedMs !== undefined) span.setAttribute("snapotter.queue.wait_ms", waitedMs);
       if (span) span.addEvent("job.completed");
 
       return jobResult;
@@ -690,8 +689,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
       }
 
-      // Record error on the OTel span
+      // Record error on the OTel span, with the queue wait the success path
+      // records too (#1414)
       if (span) {
+        const waitedMs = queueWaitMs(job);
+        if (waitedMs !== undefined) span.setAttribute("snapotter.queue.wait_ms", waitedMs);
         span.setStatus({ code: SpanStatusCode.ERROR, message: finalError });
         span.recordException(err instanceof Error ? err : String(err));
         span.addEvent("job.failed");
@@ -1688,6 +1690,11 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
 const workers: Worker[] = [];
 
+/** Enqueue to latest-attempt start; undefined if the job never became active. */
+function queueWaitMs(job: Job): number | undefined {
+  return job.processedOn ? job.processedOn - job.timestamp : undefined;
+}
+
 export function startWorkers(): void {
   const concurrency = Math.max(1, Math.floor(resolveConcurrency(env) / 2));
 
@@ -1744,6 +1751,7 @@ export function startWorkers(): void {
           pool,
           toolId: data?.toolId,
           jobId: job.id,
+          queueWaitMs: queueWaitMs(job),
         });
       });
 
@@ -1803,6 +1811,7 @@ export function startWorkers(): void {
         jobId: job.id,
         inputFormat: safeFormatTag(data?.filename),
         settings: data?.settings,
+        queueWaitMs: queueWaitMs(job),
       });
     });
 

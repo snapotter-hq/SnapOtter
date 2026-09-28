@@ -87,6 +87,30 @@ describe("capture path", () => {
     expect(h.captureException).toHaveBeenCalledTimes(2);
   });
 
+  // #1414: without queue age a sweep-aged input and a young miss look the same.
+  it.each([
+    [0, "<10s"],
+    [9_999, "<10s"],
+    [10_000, "<1h"],
+    [3_599_999, "<1h"],
+    [3_600_000, "<24h"],
+    [86_399_999, "<24h"],
+    [86_400_000, ">=24h"],
+  ])("tags a %i ms queue wait as queue_wait=%s", async (ms, bucket) => {
+    await reportError(new Error("boom"), { source: "worker", pool: "image", queueWaitMs: ms });
+    expect(h.scope.setTag).toHaveBeenCalledWith("queue_wait", bucket);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["negative (clock skew)", -5],
+    ["not a number", Number.NaN],
+  ])("sets no queue_wait tag when the wait is %s", async (_label, ms) => {
+    await reportError(new Error("boom"), { source: "worker", pool: "image", queueWaitMs: ms });
+    const tags = h.scope.setTag.mock.calls.map((c) => c[0]);
+    expect(tags).not.toContain("queue_wait");
+  });
+
   it("tags job_id so the event cross-references the DB row, logs, and PostHog stream", async () => {
     await reportError(new Error("boom"), { source: "worker", pool: "image", jobId: "job-abc" });
     expect(h.scope.setTag).toHaveBeenCalledWith("job_id", "job-abc");

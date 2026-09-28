@@ -23,7 +23,7 @@ function gone(name: string): NodeJS.ErrnoException {
   return Object.assign(enoent(`/data/workspace/uploads/job-1/${name}`), { syscall: "stat" });
 }
 
-async function loadWorker(basePath = "") {
+async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.resetModules();
 
   vi.doMock("node:fs/promises", () => ({
@@ -141,6 +141,8 @@ async function loadWorker(basePath = "") {
   vi.doMock("../../../../apps/api/src/jobs/system-jobs.js", () => ({
     runSystemJob: vi.fn(),
   }));
+
+  extraMocks?.();
 
   return import("../../../../apps/api/src/jobs/worker.js");
 }
@@ -479,5 +481,96 @@ describe("pipelineExecutedProps", () => {
         "failed",
       ),
     ).toMatchObject({ is_batch: false, file_count: 1, status: "failed" });
+  });
+});
+
+// #1414: a failure event carried no queue age, so Sentry could not tell an
+// input that aged out behind a backed-up queue from one missing seconds after
+// upload.
+describe("worker failure reports carry the queue wait (#1414)", () => {
+  const reportErrorMock = vi.fn();
+
+  afterEach(() => {
+    reportErrorMock.mockReset();
+    vi.clearAllMocks();
+  });
+
+  type FailedListener = (job: unknown, err: Error) => void;
+
+  /** Start the workers against mocks and return each queue's "failed" listener. */
+  async function failedListeners(): Promise<Map<string, FailedListener>> {
+    const worker = await loadWorker("", () => {
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: vi.fn(() => "bug"),
+        reportError: reportErrorMock,
+        safeFormatTag: vi.fn(() => undefined),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+    const { Worker } = await import("bullmq");
+    worker.startWorkers();
+    const workerMock = Worker as unknown as {
+      mock: { calls: unknown[][]; results: { value: { on: { mock: { calls: unknown[][] } } } }[] };
+    };
+    const listeners = new Map<string, FailedListener>();
+    workerMock.mock.calls.forEach((call, i) => {
+      const failed = workerMock.mock.results[i].value.on.mock.calls.find((c) => c[0] === "failed");
+      if (failed) listeners.set(call[0] as string, failed[1] as FailedListener);
+    });
+    return listeners;
+  }
+
+  function listenerFor(listeners: Map<string, FailedListener>, pool: string): FailedListener {
+    const entry = [...listeners.entries()].find(([queue]) => queue.endsWith(pool));
+    if (!entry) throw new Error(`no failed listener for the ${pool} pool`);
+    return entry[1];
+  }
+
+  it("passes processedOn minus timestamp from a tool pool's failed handler", async () => {
+    const listeners = await failedListeners();
+    const job = {
+      id: "job-1",
+      data: { toolId: "image-enhancement", filename: "photo.jpg", settings: {} },
+      timestamp: 1_000,
+      processedOn: 6_000,
+    };
+
+    listenerFor(listeners, "image")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ source: "worker", jobId: "job-1", queueWaitMs: 5_000 }),
+    );
+  });
+
+  it("passes the queue wait from the system pool's failed handler too", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "sys-1", data: { kind: "other" }, timestamp: 1_000, processedOn: 3_500 };
+
+    listenerFor(listeners, "system")(job, new Error("boom"));
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ jobId: "sys-1", queueWaitMs: 2_500 }),
+    );
+  });
+
+  it("leaves the wait unset when the job never became active", async () => {
+    const listeners = await failedListeners();
+    const job = { id: "job-2", data: { toolId: "resize" }, timestamp: 1_000 };
+
+    listenerFor(listeners, "image")(job, new Error("boom"));
+
+    const ctx = reportErrorMock.mock.calls[0][1] as { queueWaitMs?: number };
+    expect(ctx.queueWaitMs).toBeUndefined();
   });
 });
