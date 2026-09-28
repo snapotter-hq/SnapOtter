@@ -102,4 +102,56 @@ describe("ThumbnailStrip", () => {
 
     expect(screen.queryAllByLabelText(/drag to reorder/i)).toHaveLength(0);
   });
+
+  // #1292: after a batch, the files that were scaled down to fit or missed their
+  // size target are marked, so you can see which ones without opening each.
+  it("marks completed files whose result carries a warning", () => {
+    stage("fit.jpg", "shrunk.jpg", "missed.pdf", "plain.jpg", "pending.jpg");
+    const store = useFileStore.getState();
+    store.updateEntry(0, {
+      status: "completed",
+      processedUrl: "blob:0",
+      resultNotes: { targetKb: 20 },
+    });
+    store.updateEntry(1, {
+      status: "completed",
+      processedUrl: "blob:1",
+      resultNotes: { targetKb: 20, resizedTo: { width: 800, height: 600 } },
+    });
+    store.updateEntry(2, {
+      status: "completed",
+      processedUrl: "blob:2",
+      resultNotes: { targetKb: 100, targetMet: false },
+    });
+    store.updateEntry(3, { status: "completed", processedUrl: "blob:3", resultNotes: null });
+    // Stale notes on a file that isn't finished must not mark it.
+    store.updateEntry(4, { status: "pending", resultNotes: { targetMet: false } });
+    render(
+      <ThumbnailStrip
+        entries={useFileStore.getState().entries}
+        selectedIndex={0}
+        onSelect={() => {}}
+      />,
+    );
+
+    const tile = (name: string) => screen.getByRole("button", { name });
+    const badge = (name: string) => tile(name).querySelector("[data-result-warning]");
+    expect(badge("fit.jpg")).toBeNull();
+    expect(badge("plain.jpg")).toBeNull();
+    expect(badge("pending.jpg")).toBeNull();
+    expect(badge("shrunk.jpg")?.getAttribute("title")).toBe("Scaled down to fit the size target");
+    expect(badge("missed.pdf")?.getAttribute("title")).toBe("Didn't reach the size target");
+
+    // The mark replaces the check rather than sitting next to it.
+    expect(tile("shrunk.jpg").querySelector(".bg-green-500")).toBeNull();
+    expect(tile("fit.jpg").querySelector(".bg-green-500")).not.toBeNull();
+
+    // Named by the filename (e2e specs select tiles by it), described by the
+    // reason so a screen reader hears why it's flagged.
+    const describedBy = tile("shrunk.jpg").getAttribute("aria-describedby");
+    expect(describedBy && document.getElementById(describedBy)?.textContent).toBe(
+      "Scaled down to fit the size target",
+    );
+    expect(tile("fit.jpg").getAttribute("aria-describedby")).toBeNull();
+  });
 });

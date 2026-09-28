@@ -28,6 +28,50 @@ export const MISSPELLINGS: Record<string, string> = {
   resze: "resize",
 };
 
+/**
+ * Tokens that can sit on either side of a joined "xtoy" query. Only these
+ * split, so "jpgtopng" becomes "jpg to png" while "vectorize" and "photograph"
+ * stay whole (#1327). tests/unit/shared/search-aliases.test.ts checks every
+ * preset's joined keyword and every x-to-y tool id against this list.
+ */
+const JOINABLE_FORMATS = [
+  ...new Set([
+    ...Object.keys(FORMAT_ALIASES),
+    ...Object.values(FORMAT_ALIASES).flat(),
+    // Image and raw formats.
+    ...["avif", "bmp", "eps", "gif", "ico", "jfif", "jxl", "png", "psd", "svg", "tga", "webp"],
+    ...["arw", "cr2", "dng", "nef", "raw"],
+    // Audio and video.
+    ...["3gp", "aac", "aiff", "avi", "flac", "flv", "m4a", "mkv", "mov", "mp3", "mp4"],
+    ...["ogg", "opus", "wav", "webm", "wma", "wmv"],
+    // Documents and data.
+    ...["csv", "epub", "html", "json", "odt", "pdf", "rtf", "text", "txt", "xml", "zip"],
+    // Words from the x-to-y tool ids (html-to-image, video-to-gif, ...).
+    ...["base64", "frames", "images", "raster", "video"],
+  ]),
+].sort((a, b) => b.length - a.length);
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// A capture group rather than a lookbehind, so the landing hero search still
+// parses on Safari before 16.4.
+const JOINED_FORMAT = `(${JOINABLE_FORMATS.map(escapeRegExp).join("|")})`;
+const JOINED_CONVERSION = new RegExp(
+  `(^|[^a-z0-9])${JOINED_FORMAT}to${JOINED_FORMAT}(?![a-z0-9])`,
+  "g",
+);
+
+/** Words that name a whole modality, too broad to search on their own. */
+const BARE_MODALITY_WORDS = new Set([
+  "image",
+  "images",
+  "video",
+  "videos",
+  "audio",
+  "document",
+  "documents",
+]);
+
 /** Filler words stripped from queries so "convert mp4 to mp3 file" reduces to "mp4 to mp3". */
 const FILLER = new Set([
   "convert",
@@ -52,18 +96,24 @@ export function normalizeSearchQuery(raw: string): string {
   let s = raw.toLowerCase().trim();
   // Split alpha/digit boundaries so "jpg2png" -> "jpg 2 png", "mp4" stays intact only at word edges.
   s = s.replace(/([a-z])2([a-z])/g, "$1 to $2");
-  // "jpgtopng" -> "jpg to png" (only when "to" sits between two known-ish letter runs)
-  s = s.replace(/([a-z]{2,5})to([a-z]{2,5})/g, (_m, a, b) => `${a} to ${b}`);
+  // "jpgtopng" -> "jpg to png", only between known formats.
+  s = s.replace(JOINED_CONVERSION, "$1$2 to $3");
   // Collapse separators to spaces.
   s = s.replace(/[-_.]+/g, " ");
   const tokens = s.split(/\s+/).filter(Boolean);
   const out: string[] = [];
+  let droppedConvert = false;
   for (let tok of tokens) {
     if (tok === "2") tok = "to";
-    if (MISSPELLINGS[tok]) tok = MISSPELLINGS[tok];
-    if (ALIAS_TO_CANONICAL[tok]) tok = ALIAS_TO_CANONICAL[tok];
+    // Own-property checks: "constructor" must not resolve to Object's.
+    if (Object.hasOwn(MISSPELLINGS, tok)) tok = MISSPELLINGS[tok];
+    if (Object.hasOwn(ALIAS_TO_CANONICAL, tok)) tok = ALIAS_TO_CANONICAL[tok];
     if (tok === "to") {
       out.push("to");
+      continue;
+    }
+    if (tok === "convert") {
+      droppedConvert = true;
       continue;
     }
     if (FILLER.has(tok)) continue;
@@ -72,6 +122,11 @@ export function normalizeSearchQuery(raw: string): string {
   // Drop a leading/trailing dangling "to".
   while (out[0] === "to") out.shift();
   while (out[out.length - 1] === "to") out.pop();
+  // "convert" is filler in "convert jpg to png", but in "convert image" it's
+  // half the tool's name: dropping it leaves "image", which ranks the
+  // compress-image presets first (#1327). Keep it when nothing but a bare
+  // modality word would be left.
+  if (droppedConvert && out.length === 1 && BARE_MODALITY_WORDS.has(out[0])) out.unshift("convert");
   return out.join(" ");
 }
 

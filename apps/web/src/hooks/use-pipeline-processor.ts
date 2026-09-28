@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
+import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
@@ -193,6 +194,30 @@ export function usePipelineProcessor() {
     }
   }, [clearJobEvidenceTimer, clearStallTimer, clearActiveJob, setError, setProcessing]);
 
+  // Ends a run whose SSE frame handling threw (#1287). Whatever the frame
+  // was, the run is over: release the stream, the POST, both timers and any
+  // batch closure. The caller rethrows the original error. A throw after the
+  // run already settled leaves that outcome alone: the real error (or
+  // result) it recorded beats a generic one. Settled means processing is off
+  // too: the failed-frame branch clears the job id before it sets the error.
+  const failRunOnHandlerError = useCallback(
+    (es: EventSource) => {
+      if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
+      clearStallTimer();
+      clearJobEvidenceTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      es.close();
+      if (eventSourceRef.current === es) eventSourceRef.current = null;
+      xhrRef.current?.abort();
+      batchRunRef.current = null;
+      clearActiveJob();
+      setError(FRAME_HANDLING_FAILED);
+      setProcessing(false);
+      setProgress(IDLE_PROGRESS);
+    },
+    [clearStallTimer, clearJobEvidenceTimer, clearActiveJob, setError, setProcessing],
+  );
+
   const reconnectSSE = useCallback(
     (force = false) => {
       const jobId = activeJobIdRef.current;
@@ -217,8 +242,15 @@ export function usePipelineProcessor() {
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
+          // Only an unparseable frame is ignorable. Everything past the parse
+          // is our own handling, and a throw there must end the run (#1287).
+          let data: ProgressFrame;
           try {
-            const data = resolveServerUrls(JSON.parse(event.data));
+            data = resolveServerUrls(JSON.parse(event.data));
+          } catch {
+            return;
+          }
+          try {
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
               return;
@@ -285,7 +317,7 @@ export function usePipelineProcessor() {
               xhrRef.current?.abort();
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
-              const result = data.result as ProcessResult;
+              const result = data.result as unknown as ProcessResult;
               useFileStore.getState().updateEntry(idx, {
                 processedUrl: result.downloadUrl,
                 processedPreviewUrl: result.previewUrl ?? null,
@@ -325,8 +357,16 @@ export function usePipelineProcessor() {
                 stage: data.stage,
               }));
             }
-          } catch {
-            // Ignore malformed SSE
+          } catch (err) {
+            // A second throw from the teardown must not replace the root
+            // cause, which is rethrown so it reaches the console and Sentry's
+            // global handler instead of disappearing.
+            try {
+              failRunOnHandlerError(es);
+            } catch (teardownErr) {
+              console.error("SSE teardown after a frame handling error failed", teardownErr);
+            }
+            throw err;
           }
         };
 
@@ -346,6 +386,7 @@ export function usePipelineProcessor() {
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
+      failRunOnHandlerError,
       resetStallTimer,
       setError,
       setProcessing,

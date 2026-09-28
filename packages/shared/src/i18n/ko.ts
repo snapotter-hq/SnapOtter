@@ -992,6 +992,26 @@ export const ko: TranslationKeys = {
       name: "PDF 압축",
       description: "PDF 파일 크기 줄이기",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF를 100 KB로 압축",
+      description: "PDF 파일 크기를 100 KB 미만으로 축소",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF를 200 KB로 압축",
+      description: "PDF 파일 크기를 200 KB 미만으로 축소",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF를 500 KB로 압축",
+      description: "PDF 파일 크기를 500 KB 미만으로 축소",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF를 1 MB로 압축",
+      description: "PDF 파일 크기를 1 MB 미만으로 축소",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF를 2 MB로 압축",
+      description: "PDF 파일 크기를 2 MB 미만으로 축소",
+    },
     "rotate-pdf": {
       name: "PDF 회전",
       description: "PDF 페이지 회전",
@@ -1330,6 +1350,7 @@ export const ko: TranslationKeys = {
       submitBatch: "압축 ({count}개 파일)",
       submitTarget: "{size} KB로 압축",
       resizedToFit: "{size} KB에 맞추기 위해 {width} × {height} 크기로 축소했습니다",
+      batchResized: "이미지 {total}개 중 {count}개를 {size} KB에 맞추기 위해 축소했습니다.",
       progressLabel: "압축 중",
       original: "원본: {size} KB",
       processed: "처리 후: {size} KB",
@@ -1946,6 +1967,12 @@ export const ko: TranslationKeys = {
       submitDeepBatch: "딥 향상 ({count}개 파일)",
       progressLabel: "이미지 향상 중",
       progressLabelBatch: "{count}개 이미지 향상 중",
+      deepEnhanceSkippedFailed:
+        "이번에는 딥 향상이 실행되지 않아 기본 향상이 적용되었습니다. 다시 시도해 주세요.",
+      deepEnhanceSkippedUnavailable:
+        "딥 향상에는 업스케일 및 향상 번들이 필요하지만 설치되어 있지 않아 기본 향상이 적용되었습니다.",
+      deepEnhanceSkippedAnimated:
+        "딥 향상은 애니메이션 이미지에서 작동하지 않아 모든 프레임에 기본 향상이 적용되었습니다.",
     },
     "noise-removal": {
       off: "끄기",
@@ -3417,6 +3444,8 @@ export const ko: TranslationKeys = {
       printer: "인쇄용 (최고 품질)",
       submit: "압축",
       submitBatch: "압축 ({count}개 파일)",
+      submitTarget: "{size}로 압축",
+      batchMissed: "파일 {total}개 중 {count}개가 {target} 이하로 줄어들지 않았습니다.",
       progressLabel: "압축 중",
       bestEffortHint:
         "최대한 노력한 최대치입니다. 이미지 기반 PDF는 이 크기에 가깝게 도달하지만, 텍스트 전용 PDF는 이 크기까지 줄어들지 않을 수 있습니다.",
@@ -3791,6 +3820,18 @@ export const ko: TranslationKeys = {
     previewUnavailable: "처리 후 미리보기를 사용할 수 있습니다",
     generatePreview: "미리보기 생성",
     previewFailed: "미리보기 생성 실패",
+    previewEncoderMissing:
+      "이 서버의 ffmpeg에 {encoder} 인코더가 없어 미리보기를 생성할 수 없습니다. 관리자에게 문의하세요.",
+    previewProgressMessages: [
+      "수달이 몸을 푸는 중...",
+      "픽셀을 씹어 먹는 중...",
+      "코덱을 가르치는 중...",
+      "거의 다 됐어요...",
+      "미리보기를 우려내는 중...",
+      "프레임을 설득하는 중...",
+      "결과물을 다듬는 중...",
+      "잠시만요...",
+    ],
     previewNotAvailable: "미리보기를 사용할 수 없습니다",
     resultPreviewFailed: "결과 미리보기를 불러오지 못했습니다",
     resultPreviewFailedHint: "처리는 완료되었습니다. 다운로드 버튼으로 파일을 저장하세요.",
@@ -5103,6 +5144,8 @@ export const ko: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "확대/축소 컨트롤",
     dragToReorder: "드래그하여 순서 변경",
+    resultResizedToFit: "목표 크기에 맞추기 위해 축소함",
+    resultMissedTarget: "목표 크기에 도달하지 못함",
     reverseOrder: "순서 뒤집기",
     whiteBackground: "흰색 배경",
     blackBackground: "검은색 배경",

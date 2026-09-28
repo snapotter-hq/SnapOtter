@@ -9,10 +9,11 @@
 import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { isToolInstalled } from "../../../../apps/api/src/lib/feature-status.js";
 import { UNDECODABLE_IMAGE_MESSAGE } from "../../../../apps/api/src/lib/image-error.js";
 import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
-import { settleAsyncFallback } from "../../settle-job.js";
+import { settleAsyncFallback, waitForAcceptedJobOrCancel } from "../../settle-job.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -755,6 +756,41 @@ describe("Animated GIF input", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
     expect(result.processedSize).toBeGreaterThan(0);
+  });
+});
+
+// ── Deep Enhance that did not run is reported (#950, #1183) ─────
+describe("Deep Enhance skip reason", () => {
+  /** The result JSON, whether the job answered inside the sync window or fell back to 202. */
+  async function resultJson(res: { statusCode: number; body: string }) {
+    if (res.statusCode === 202) {
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      const job = await waitForAcceptedJobOrCancel(jobId, "image", 120_000);
+      return job.resultPayload ?? {};
+    }
+    expect(res.statusCode).toBe(200);
+    return JSON.parse(res.body) as Record<string, unknown>;
+  }
+
+  it("says 'unavailable' when Deep Enhance is on but the bundle is not installed", async () => {
+    // Per-fork data dirs start with no AI bundles; a lane that has them
+    // installed would run the real pass, so fail loudly on the precondition.
+    expect(isToolInstalled("noise-removal")).toBe(false);
+    const res = await postTool({ deepEnhance: true });
+    const result = await resultJson(res);
+    expect(result.deepEnhanceSkipped).toBe("unavailable");
+  });
+
+  it("says 'animated' for an animated GIF", async () => {
+    const res = await postTool({ deepEnhance: true }, GIF, "animated.gif", "image/gif");
+    const result = await resultJson(res);
+    expect(result.deepEnhanceSkipped).toBe("animated");
+  });
+
+  it("says nothing when Deep Enhance was off", async () => {
+    const res = await postTool({ deepEnhance: false });
+    const result = await resultJson(res);
+    expect(result).not.toHaveProperty("deepEnhanceSkipped");
   });
 });
 

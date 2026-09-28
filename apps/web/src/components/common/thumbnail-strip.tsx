@@ -15,6 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  AlertTriangle,
   ArrowLeftRight,
   CheckCircle2,
   File as FileIcon,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { hasResultWarning } from "@/lib/result-notes";
 import type { FileEntry, PreviewKind } from "@/stores/file-store";
 
 const BROWSER_IMG_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"]);
@@ -209,39 +211,66 @@ function ThumbTile({
   buttonRef?: React.Ref<HTMLButtonElement>;
   onSelect: (index: number) => void;
 }) {
+  const { t } = useTranslation();
   const isCompleted = entry.status === "completed";
   const isFailed = entry.status === "failed";
+  // A completed file that was scaled down to fit, or didn't reach its size
+  // target, gets a warning mark instead of the check (#1292). The mark is
+  // aria-hidden so the tile's accessible name stays the filename.
+  const warning = isCompleted && hasResultWarning(entry.resultNotes);
+  const warningLabel =
+    entry.resultNotes?.targetMet === false ? t.a11y.resultMissedTarget : t.a11y.resultResizedToFit;
   return (
-    <button
-      type="button"
-      ref={buttonRef}
-      onClick={() => onSelect(index)}
-      className={`relative shrink-0 rounded overflow-hidden transition-all ${
-        isSelected
-          ? "outline outline-2 outline-primary outline-offset-1"
-          : "hover:outline hover:outline-1 hover:outline-border"
-      }`}
-      style={{ width: 52, height: 38 }}
-      title={entry.file.name}
-    >
-      {entry.previewLoading ? (
-        <div className="w-full h-full flex items-center justify-center bg-muted">
-          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
-        </div>
-      ) : (
-        <Thumb entry={entry} />
+    <>
+      <button
+        type="button"
+        ref={buttonRef}
+        onClick={() => onSelect(index)}
+        className={`relative shrink-0 rounded overflow-hidden transition-all ${
+          isSelected
+            ? "outline outline-2 outline-primary outline-offset-1"
+            : "hover:outline hover:outline-1 hover:outline-border"
+        }`}
+        style={{ width: 52, height: 38 }}
+        title={entry.file.name}
+        aria-describedby={warning ? `result-warning-${entry.id}` : undefined}
+      >
+        {entry.previewLoading ? (
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+          </div>
+        ) : (
+          <Thumb entry={entry} />
+        )}
+        {isCompleted && !warning && (
+          <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
+            <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+          </div>
+        )}
+        {warning && (
+          <div
+            data-result-warning
+            aria-hidden="true"
+            title={warningLabel}
+            className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full flex items-center justify-center"
+          >
+            <AlertTriangle className="h-2.5 w-2.5 text-white" />
+          </div>
+        )}
+        {isFailed && (
+          <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center">
+            <XCircle className="h-2.5 w-2.5 text-white" />
+          </div>
+        )}
+      </button>
+      {warning && (
+        // Outside the button and referenced by aria-describedby: the tile's name
+        // stays the filename, and a screen reader still hears why it's flagged.
+        <span id={`result-warning-${entry.id}`} className="sr-only">
+          {warningLabel}
+        </span>
       )}
-      {isCompleted && (
-        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
-          <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-        </div>
-      )}
-      {isFailed && (
-        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full flex items-center justify-center">
-          <XCircle className="h-2.5 w-2.5 text-white" />
-        </div>
-      )}
-    </button>
+    </>
   );
 }
 

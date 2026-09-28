@@ -1,6 +1,6 @@
 import { TOOLS } from "@snapotter/shared";
 import { FileImage, FileText, ImageIcon, Music, Play, Video } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import {
@@ -12,6 +12,8 @@ import {
   type UserFile,
   type UserFileDetail,
 } from "@/lib/api";
+import { format } from "@/lib/format";
+import { previewFailureEncoder } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { useFilesPageStore } from "@/stores/files-page-store";
@@ -88,7 +90,7 @@ function isNativePlayable(mimeType: string, filename: string): boolean {
   return false;
 }
 
-function FilePreview({
+export function FilePreview({
   fileId,
   mimeType,
   name,
@@ -101,7 +103,12 @@ function FilePreview({
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState(false);
+  // Set when generating a preview failed; `encoder` names what the server's
+  // ffmpeg lacks, when that was the reason (#1290).
+  const [previewError, setPreviewError] = useState<{ encoder: string | null } | null>(null);
+  // Bumped on every file change and request, so a reply for a file that is no
+  // longer shown is dropped instead of landing on the current one.
+  const previewRequest = useRef(0);
 
   const isMedia = mimeType.startsWith("video/") || mimeType.startsWith("audio/");
   const nativePlayable = isMedia && isNativePlayable(mimeType, name);
@@ -112,12 +119,13 @@ function FilePreview({
   // Also resets server-side preview state when the file changes.
   useEffect(() => {
     // Reset server-side preview state on every file change
+    previewRequest.current += 1;
     setPreviewSrc((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
     setPreviewLoading(false);
-    setPreviewError(false);
+    setPreviewError(null);
 
     if (isPdf) {
       let revoked = false;
@@ -155,23 +163,33 @@ function FilePreview({
   }, [isMedia, nativePlayable, isPdf, fileId]);
 
   const handleGeneratePreview = useCallback(() => {
+    const request = ++previewRequest.current;
+    const current = () => previewRequest.current === request;
     setPreviewLoading(true);
-    setPreviewError(false);
+    setPreviewError(null);
+    let encoder: string | null = null;
     fetch(getFilePreviewUrl(fileId), { headers: formatHeaders() })
-      .then((res) => {
-        if (!res.ok) throw new Error("Preview generation failed");
+      .then(async (res) => {
+        if (!res.ok) {
+          encoder = await previewFailureEncoder(res);
+          throw new Error("Preview generation failed");
+        }
         return res.blob();
       })
       .then((blob) => {
-        setPreviewSrc(URL.createObjectURL(blob));
+        if (current()) setPreviewSrc(URL.createObjectURL(blob));
       })
       .catch(() => {
-        setPreviewError(true);
+        if (current()) setPreviewError({ encoder });
       })
       .finally(() => {
-        setPreviewLoading(false);
+        if (current()) setPreviewLoading(false);
       });
   }, [fileId]);
+
+  const previewErrorText = previewError?.encoder
+    ? format(t.toolPage.previewEncoderMissing, { encoder: previewError.encoder })
+    : t.files.details.previewFailedRetry;
 
   // PDF files -- render inline in iframe
   if (isPdf) {
@@ -220,11 +238,7 @@ function FilePreview({
           <Play className="h-4 w-4" />
           {t.toolPage.generatePreview}
         </button>
-        {previewError && (
-          <span className="text-xs text-muted-foreground">
-            {t.files.details.previewFailedRetry}
-          </span>
-        )}
+        {previewError && <span className="text-xs text-muted-foreground">{previewErrorText}</span>}
       </div>
     );
   }
@@ -277,11 +291,7 @@ function FilePreview({
           <Play className="h-4 w-4" />
           {t.toolPage.generatePreview}
         </button>
-        {previewError && (
-          <span className="text-xs text-muted-foreground">
-            {t.files.details.previewFailedRetry}
-          </span>
-        )}
+        {previewError && <span className="text-xs text-muted-foreground">{previewErrorText}</span>}
       </div>
     );
   }
@@ -334,11 +344,7 @@ function FilePreview({
           <Play className="h-4 w-4" />
           {t.toolPage.generatePreview}
         </button>
-        {previewError && (
-          <span className="text-xs text-muted-foreground">
-            {t.files.details.previewFailedRetry}
-          </span>
-        )}
+        {previewError && <span className="text-xs text-muted-foreground">{previewErrorText}</span>}
       </div>
     );
   }

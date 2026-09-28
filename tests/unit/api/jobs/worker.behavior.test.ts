@@ -19,6 +19,8 @@ async function loadWorker(basePath = "") {
   vi.doMock("@snapotter/shared", () => ({
     ANALYTICS_EVENTS: {},
     TOOLS: [],
+    // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load.
+    COMPRESS_PRESETS: [],
     getBundleForTool: vi.fn(() => null),
     getOptionalBundleForTool: vi.fn(() => null),
   }));

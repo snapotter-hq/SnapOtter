@@ -642,6 +642,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   filename: string;
                   size: number;
                   fileResults: Record<string, string>;
+                  fileNotes?: Record<string, unknown>;
                 };
               }
             | undefined;
@@ -686,6 +687,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             "Content-Length": String(zip.size),
             "X-Job-Id": parentId,
             "X-File-Results": encodeURIComponent(JSON.stringify(zip.fileResults)),
+            // Per-file notes (resizedTo, targetKb, targetMet), keyed like
+            // X-File-Results, so a batch can say what a single run says (#1292).
+            "X-File-Notes": encodeURIComponent(JSON.stringify(zip.fileNotes ?? {})),
             ...getSecurityHeaders(),
           });
 

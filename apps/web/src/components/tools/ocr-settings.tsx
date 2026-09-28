@@ -7,6 +7,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
@@ -104,8 +105,15 @@ export function ocrOneFile(
       return;
     }
     es.onmessage = (event) => {
+      // Only an unparseable frame is ignorable. A throw past the parse is our
+      // own handling failing, and it must end the run (#1287).
+      let data: ProgressFrame;
       try {
-        const data = resolveServerUrls(JSON.parse(event.data));
+        data = resolveServerUrls(JSON.parse(event.data));
+      } catch {
+        return;
+      }
+      try {
         if (data.type === "heartbeat") {
           if (asyncMode) armStallTimer();
           return;
@@ -125,9 +133,12 @@ export function ocrOneFile(
           return;
         }
         if (typeof data.percent === "number") {
-          callbacks.onProcessingProgress(data.percent, data.stage);
+          callbacks.onProcessingProgress(data.percent, data.stage ?? "");
         }
-      } catch {}
+      } catch (err) {
+        rejectOnce(new Error(messages.processingFailed ?? FRAME_HANDLING_FAILED));
+        throw err;
+      }
     };
     // EventSource reconnects automatically. The progress endpoint replays the
     // terminal frame, so transient network loss must not discard a queued OCR.

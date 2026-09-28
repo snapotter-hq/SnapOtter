@@ -10,6 +10,8 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
+import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -299,6 +301,46 @@ export function useToolProcessor(toolId: string) {
     setProcessing,
   ]);
 
+  // Ends a run whose SSE frame handling threw (#1287). Whatever the frame
+  // was, the run is over: release the stream, the POST, both timers and any
+  // batch closure, then fail the entries it left at "processing". A throw
+  // after the run already settled leaves that outcome alone: the real error
+  // (or result) it recorded beats a generic one. Settled means processing is
+  // off too: the failed-frame branch clears the job id before its own entry
+  // writes, so a throw there still has a live run to end.
+  const failRunOnHandlerError = useCallback(
+    (es: EventSource) => {
+      if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
+      clearStallTimer();
+      clearJobEvidenceTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      es.close();
+      if (eventSourceRef.current === es) eventSourceRef.current = null;
+      xhrRef.current?.abort();
+      batchRunRef.current = null;
+      clearActiveJob();
+      setError(FRAME_HANDLING_FAILED);
+      setProcessing(false);
+      setProgress(IDLE_PROGRESS);
+      // Last and on its own: the store write that threw may throw again, and
+      // the run-level teardown above has to happen regardless. The caller
+      // rethrows the original error; this one is only logged.
+      try {
+        settleProcessingEntries(FRAME_HANDLING_FAILED);
+      } catch (settleErr) {
+        console.error("Failing the run's entries after a frame handling error failed", settleErr);
+      }
+    },
+    [
+      clearStallTimer,
+      clearJobEvidenceTimer,
+      clearActiveJob,
+      settleProcessingEntries,
+      setError,
+      setProcessing,
+    ],
+  );
+
   const reconnectSSE = useCallback(
     (force = false) => {
       const jobId = activeJobIdRef.current;
@@ -323,8 +365,15 @@ export function useToolProcessor(toolId: string) {
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
+          // Only an unparseable frame is ignorable. Everything past the parse
+          // is our own handling, and a throw there must end the run (#1287).
+          let data: ProgressFrame;
           try {
-            const data = resolveServerUrls(JSON.parse(event.data));
+            data = resolveServerUrls(JSON.parse(event.data));
+          } catch {
+            return;
+          }
+          try {
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
               return;
@@ -397,7 +446,7 @@ export function useToolProcessor(toolId: string) {
               xhrRef.current?.abort();
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
-              const result = data.result as ProcessResult;
+              const result = data.result as unknown as ProcessResult;
               setWarning(result.warning ?? null);
               setResultPayload(result as unknown as Record<string, unknown>);
               if (result.savedFileId) {
@@ -407,6 +456,7 @@ export function useToolProcessor(toolId: string) {
                 processedUrl: result.downloadUrl,
                 processedPreviewUrl: result.previewUrl ?? null,
                 processedFilename: null,
+                resultNotes: pickResultNotes(result),
                 status: "completed",
                 originalSize: result.originalSize,
                 processedSize: result.processedSize,
@@ -449,8 +499,16 @@ export function useToolProcessor(toolId: string) {
                 stage: data.stage,
               }));
             }
-          } catch {
-            // Ignore malformed SSE
+          } catch (err) {
+            // A second throw from the teardown must not replace the root
+            // cause, which is rethrown so it reaches the console and Sentry's
+            // global handler instead of disappearing.
+            try {
+              failRunOnHandlerError(es);
+            } catch (teardownErr) {
+              console.error("SSE teardown after a frame handling error failed", teardownErr);
+            }
+            throw err;
           }
         };
 
@@ -470,6 +528,7 @@ export function useToolProcessor(toolId: string) {
       clearActiveJob,
       clearStallTimer,
       clearJobEvidenceTimer,
+      failRunOnHandlerError,
       resetStallTimer,
       settleProcessingEntries,
       setError,
@@ -529,6 +588,7 @@ export function useToolProcessor(toolId: string) {
         processedUrl: null,
         processedPreviewUrl: null,
         processedFilename: null,
+        resultNotes: null,
         status: "processing",
         error: null,
       });
@@ -693,6 +753,7 @@ export function useToolProcessor(toolId: string) {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,
               processedFilename: null,
+              resultNotes: pickResultNotes(result),
               status: "completed",
               originalSize: result.originalSize,
               processedSize: result.processedSize,
@@ -835,8 +896,9 @@ export function useToolProcessor(toolId: string) {
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
       setError(null);
-      // A batch reports no per-file payload, so a previous single run's
-      // (e.g. compress's resizedTo) must not render under the batch result.
+      // A batch's per-file notes land on each entry (#1292), not in the
+      // hook's single-run payload, so a previous single run's must not render
+      // under the batch result.
       setResultPayload(null);
       // Batch runs never auto-save to the library (no fileId is sent), so a
       // previous single run's saved indicator must not survive into this one.
@@ -854,6 +916,7 @@ export function useToolProcessor(toolId: string) {
           processedPreviewUrl: null,
           processedFilename: null,
           processedSize: null,
+          resultNotes: null,
           status: "processing",
           error: null,
         });
@@ -914,7 +977,11 @@ export function useToolProcessor(toolId: string) {
         trackBatch(canceledByUser ? "canceled" : "failed", canceledByUser ? "canceled" : reason);
       };
 
-      const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
+      const settleFromZip = async (
+        zipBlob: Blob,
+        fileResults: Record<string, string>,
+        fileNotes: Record<string, unknown> = {},
+      ) => {
         setBatchZip(zipBlob, `batch-${toolId}.zip`);
 
         // Extract files from ZIP using fflate
@@ -940,6 +1007,8 @@ export function useToolProcessor(toolId: string) {
               // stale processedPreviewUrl so an earlier single run's preview
               // can't win over this result (displayUrl prefers it) (#746).
               processedPreviewUrl: null,
+              // What a single run of this file would have said (#1292).
+              resultNotes: pickResultNotes(fileNotes[String(i)]),
               status: "completed",
               error: null,
             });
@@ -952,6 +1021,7 @@ export function useToolProcessor(toolId: string) {
               // previous result (#746).
               processedUrl: null,
               processedPreviewUrl: null,
+              resultNotes: null,
               status: "failed",
               error: canceledByUser ? "Canceled" : "File not found in batch results",
             });
@@ -971,6 +1041,7 @@ export function useToolProcessor(toolId: string) {
       const downloadAndSettle = async (result: Record<string, unknown>) => {
         const url = serverUrl(String(result.downloadUrl));
         const fileResults = (result.fileResults ?? {}) as Record<string, string>;
+        const fileNotes = asNotesMap(result.fileNotes);
         for (let attempt = 0; attempt < 3; attempt++) {
           if (activeJobIdRef.current !== clientJobId) return;
           try {
@@ -991,7 +1062,7 @@ export function useToolProcessor(toolId: string) {
             if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
             const blob = await res.blob();
             if (activeJobIdRef.current !== clientJobId) return;
-            await settleFromZip(blob, fileResults);
+            await settleFromZip(blob, fileResults, fileNotes);
             return;
           } catch {
             if (attempt < 2) {
@@ -1126,11 +1197,16 @@ export function useToolProcessor(toolId: string) {
           } catch {
             // Malformed header - fall back to empty mapping, all entries marked failed
           }
+          // Absent on servers from before #1292, which is no notes. A header
+          // that doesn't parse to an object only costs the notes, never the
+          // results, but it's logged: silently dropping it would settle every
+          // file as fine, the exact thing the notes exist to prevent.
+          const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
           const zipBlob = xhr.response as Blob;
           void (async () => {
             try {
               if (activeJobIdRef.current !== clientJobId) return;
-              await settleFromZip(zipBlob, fileResults);
+              await settleFromZip(zipBlob, fileResults, fileNotes);
             } catch {
               if (activeJobIdRef.current !== clientJobId) return;
               failRun("Batch processing failed", "unzip-failed");

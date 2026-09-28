@@ -61,4 +61,76 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     expect(onStall).toHaveBeenCalledOnce();
     cleanup();
   });
+
+  // #1287: the onmessage catch used to wrap the whole handler. A throw from
+  // onComplete was swallowed after cleanup() had already closed the stream
+  // and cleared the stall timer, so the tool sat at "processing" for good.
+  it("fails the run and rethrows when completion handling throws", () => {
+    const onFailed = vi.fn();
+    const onStall = vi.fn();
+    subscribe("job-throw", {
+      onComplete: () => {
+        throw new Error("boom");
+      },
+      onFailed,
+      onStall,
+    });
+
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: "/api/v1/download/job-throw/out.png" },
+        }),
+      }),
+    ).toThrow("boom");
+
+    expect(onFailed).toHaveBeenCalledOnce();
+    expect(onFailed).toHaveBeenCalledWith(
+      "Something went wrong while tracking this job. Try again.",
+    );
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it("rethrows the original error when onFailed itself throws", () => {
+    const onFailed = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error("onFailed broke");
+      })
+      .mockImplementation(() => {
+        throw new Error("second onFailed");
+      });
+    subscribe("job-failed-throw", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
+      }),
+    ).toThrow("onFailed broke");
+    expect(onFailed).toHaveBeenNthCalledWith(1, "server said no");
+    expect(onFailed).toHaveBeenNthCalledWith(
+      2,
+      "Something went wrong while tracking this job. Try again.",
+    );
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+  });
+
+  it("ignores a malformed frame and keeps waiting", () => {
+    const onComplete = vi.fn();
+    const onFailed = vi.fn();
+    const cleanup = subscribe("job-malformed", { onComplete, onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({ data: "not json" });
+    expect(onFailed).not.toHaveBeenCalled();
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "complete", result: { ok: true } }),
+    });
+    expect(onComplete).toHaveBeenCalledWith({ ok: true });
+    cleanup();
+  });
 });

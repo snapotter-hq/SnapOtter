@@ -9,6 +9,7 @@ import {
   qpdfRequiresPassword,
 } from "@snapotter/doc-engine";
 import { env } from "../config.js";
+import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 const ZIP_MAGIC = Buffer.from("PK");
@@ -17,6 +18,23 @@ const ZIP_MAGIC = Buffer.from("PK");
 function isQpdfTimeout(err: unknown): boolean {
   return (
     err instanceof QpdfTimeoutError || (err instanceof Error && err.name === "QpdfTimeoutError")
+  );
+}
+
+/**
+ * qpdf could not be started at all. `qpdfAvailable()` only checks that a
+ * path resolved, so a QPDF_PATH pointing at a missing or non-executable file
+ * passes it and every spawn then rejects with ENOENT or EACCES (#1310). That
+ * is the operator's container, not the caller's file: say which variable to
+ * fix instead of a masked 500 or a "Damaged PDF".
+ */
+function qpdfUnavailable(err: unknown): InputValidationError | null {
+  if (!isBinarySpawnFailure(err)) return null;
+  return new InputValidationError(
+    "PDF processing is unavailable on this server because qpdf could not be started.",
+    503,
+    "Check QPDF_PATH: it must point at an executable qpdf binary, or be unset to use the one in the container.",
+    "ENGINE_UNAVAILABLE",
   );
 }
 
@@ -51,6 +69,8 @@ export async function validatePdfPath(
   try {
     passwordProtected = await qpdfRequiresPassword(filePath);
   } catch (err) {
+    const unavailable = qpdfUnavailable(err);
+    if (unavailable) throw unavailable;
     if (!isQpdfTimeout(err)) throw err;
     // --requires-password only reads the encryption dictionary, so it does not
     // scale with content the way --check does: a stall here is anomalous (a
@@ -76,6 +96,8 @@ export async function validatePdfPath(
   try {
     await qpdfCheck(filePath);
   } catch (err) {
+    const unavailable = qpdfUnavailable(err);
+    if (unavailable) throw unavailable;
     if (!isQpdfTimeout(err)) {
       throw new InputValidationError(
         `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
@@ -101,6 +123,8 @@ export async function validatePdfPath(
     try {
       pages = await qpdfPageCount(filePath);
     } catch (err) {
+      const unavailable = qpdfUnavailable(err);
+      if (unavailable) throw unavailable;
       if (isQpdfTimeout(err)) {
         // Fail closed: the cap is a resource guard, so a file that stalls the
         // page-count probe must not slip past it. Say so instead of a 500.

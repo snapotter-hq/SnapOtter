@@ -495,3 +495,13 @@
 /tools/compress-image-to-200kb /tools/image/compress-image-to-200kb/ 301
 /tools/compress-image-to-500kb/ /tools/image/compress-image-to-500kb/ 301
 /tools/compress-image-to-500kb /tools/image/compress-image-to-500kb/ 301
+/tools/compress-pdf-to-100kb/ /tools/pdf/compress-pdf-to-100kb/ 301
+/tools/compress-pdf-to-100kb /tools/pdf/compress-pdf-to-100kb/ 301
+/tools/compress-pdf-to-200kb/ /tools/pdf/compress-pdf-to-200kb/ 301
+/tools/compress-pdf-to-200kb /tools/pdf/compress-pdf-to-200kb/ 301
+/tools/compress-pdf-to-500kb/ /tools/pdf/compress-pdf-to-500kb/ 301
+/tools/compress-pdf-to-500kb /tools/pdf/compress-pdf-to-500kb/ 301
+/tools/compress-pdf-to-1mb/ /tools/pdf/compress-pdf-to-1mb/ 301
+/tools/compress-pdf-to-1mb /tools/pdf/compress-pdf-to-1mb/ 301
+/tools/compress-pdf-to-2mb/ /tools/pdf/compress-pdf-to-2mb/ 301
+/tools/compress-pdf-to-2mb /tools/pdf/compress-pdf-to-2mb/ 301

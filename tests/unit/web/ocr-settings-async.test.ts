@@ -205,4 +205,66 @@ describe("OCR async response handling", () => {
     });
     await expect(promise).resolves.toMatchObject({ text: "still queued safely" });
   });
+
+  // #1287: the onmessage catch used to wrap the whole handler, so a throw
+  // while handling a frame was swallowed and a 202 OCR run waited out the
+  // five-minute stall timer before reporting a misleading timeout.
+  it("rejects with a real message and rethrows when frame handling throws", async () => {
+    const promise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      {
+        onUploadProgress: vi.fn(),
+        onProcessingProgress: () => {
+          throw new Error("boom");
+        },
+      },
+    );
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    xhr.status = 202;
+    xhr.onload?.();
+
+    expect(() => events.emit({ type: "single", phase: "processing", percent: 40 })).toThrow("boom");
+    await expect(promise).rejects.toThrow(
+      "Something went wrong while tracking this job. Try again.",
+    );
+    expect(events.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the caller's localized processingFailed message for a handling error", async () => {
+    const promise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      {
+        onUploadProgress: vi.fn(),
+        onProcessingProgress: () => {
+          throw new Error("boom");
+        },
+      },
+      { processingFailed: "Verarbeitung fehlgeschlagen" },
+    );
+    xhrs[0].status = 202;
+    xhrs[0].onload?.();
+
+    expect(() =>
+      MockEventSource.instances[0].emit({ type: "single", phase: "processing", percent: 40 }),
+    ).toThrow("boom");
+    await expect(promise).rejects.toThrow("Verarbeitung fehlgeschlagen");
+  });
+
+  it("ignores a malformed frame and still resolves from the next good one", async () => {
+    const promise = runOcr();
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    xhr.status = 202;
+    xhr.onload?.();
+    events.onmessage?.({ data: "not json" } as MessageEvent);
+    expect(events.close).not.toHaveBeenCalled();
+
+    events.emit({ type: "single", phase: "complete", result: { text: "after the noise" } });
+    await expect(promise).resolves.toMatchObject({ text: "after the noise" });
+  });
 });

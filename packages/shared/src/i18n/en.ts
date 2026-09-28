@@ -1000,6 +1000,26 @@ export const en = {
       name: "Compress PDF",
       description: "Shrink PDF file size",
     },
+    "compress-pdf-to-100kb": {
+      name: "Compress PDF to 100 KB",
+      description: "Compress PDF file size to under 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Compress PDF to 200 KB",
+      description: "Compress PDF file size to under 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Compress PDF to 500 KB",
+      description: "Compress PDF file size to under 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Compress PDF to 1 MB",
+      description: "Compress PDF file size to under 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Compress PDF to 2 MB",
+      description: "Compress PDF file size to under 2 MB",
+    },
     "rotate-pdf": {
       name: "Rotate PDF",
       description: "Rotate pages in a PDF",
@@ -1338,6 +1358,7 @@ export const en = {
       submitBatch: "Compress ({count} files)",
       submitTarget: "Compress to {size} KB",
       resizedToFit: "Resized to {width} × {height} to fit {size} KB",
+      batchResized: "{count} of {total} images were scaled down to fit {size} KB.",
       progressLabel: "Compressing",
       original: "Original: {size} KB",
       processed: "Processed: {size} KB",
@@ -1957,6 +1978,12 @@ export const en = {
       submitDeepBatch: "Deep Enhance ({count} files)",
       progressLabel: "Enhancing image",
       progressLabelBatch: "Enhancing {count} images",
+      deepEnhanceSkippedFailed:
+        "Deep Enhance didn't run this time, so you got the standard enhancement. Try again.",
+      deepEnhanceSkippedUnavailable:
+        "Deep Enhance needs the Upscale & Enhance bundle, which isn't installed, so you got the standard enhancement.",
+      deepEnhanceSkippedAnimated:
+        "Deep Enhance doesn't work on animated images, so every frame got the standard enhancement.",
     },
     "noise-removal": {
       off: "Off",
@@ -3428,6 +3455,8 @@ export const en = {
       printer: "Printer (best quality)",
       submit: "Compress",
       submitBatch: "Compress ({count} files)",
+      submitTarget: "Compress to {size}",
+      batchMissed: "{count} of {total} files didn't get under {target}.",
       progressLabel: "Compressing",
       bestEffortHint:
         "Best-effort maximum. Image-based PDFs land close; text-only PDFs may not shrink to this size.",
@@ -3802,6 +3831,18 @@ export const en = {
     previewUnavailable: "Preview will be available after processing",
     generatePreview: "Generate Preview",
     previewFailed: "Preview generation failed",
+    previewEncoderMissing:
+      "This server's ffmpeg is missing the {encoder} encoder, so the preview can't be generated. Contact your administrator.",
+    previewProgressMessages: [
+      "Warming up the otter...",
+      "Crunching pixels...",
+      "Teaching the codec...",
+      "Almost there...",
+      "Brewing the preview...",
+      "Convincing the frames...",
+      "Polishing the output...",
+      "Just a moment...",
+    ],
     previewNotAvailable: "Preview not available",
     resultPreviewFailed: "Result preview failed to load",
     resultPreviewFailedHint: "Processing finished. Use the download button to save your file.",
@@ -5116,6 +5157,8 @@ export const en = {
     imageControls: "Preview controls",
     zoomControls: "Zoom controls",
     dragToReorder: "Drag to reorder",
+    resultResizedToFit: "Scaled down to fit the size target",
+    resultMissedTarget: "Didn't reach the size target",
     reverseOrder: "Reverse order",
     whiteBackground: "White background",
     blackBackground: "Black background",

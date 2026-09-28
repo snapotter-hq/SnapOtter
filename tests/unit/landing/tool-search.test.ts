@@ -1,4 +1,4 @@
-import { CATEGORIES, TOOLS, toolSection } from "@snapotter/shared";
+import { CATEGORIES, en, TOOLS, toolSection } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   buildToolRequestDiscussionUrl,
@@ -310,6 +310,92 @@ describe("landing searchTools with real catalog metadata", () => {
       if (genericIndex !== -1) {
         expect(genericIndex).toBeGreaterThan(rankedIds.indexOf("convert-document"));
       }
+    }
+  });
+
+  // #1326: the five compress-image-to-N-kb presets repeat "compress" across
+  // name, keywords and description, and every repeat added to the score, so a
+  // bare "compress" ranked all five above the tool people mean.
+  it.each([
+    ["compress", "compress"],
+    ["Compress", "compress"],
+    ["compress image", "compress"],
+  ])("a bare %j leads with %s, not a size preset", (query, id) => {
+    const result = searchTools(realTools, { query, modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe(id);
+  });
+
+  it.each([
+    ["compress to 20kb", "compress-image-to-20kb"],
+    ["compress image to 50kb", "compress-image-to-50kb"],
+    ["20kb", "compress-image-to-20kb"],
+  ])("a sized query %j still leads with %s", (query, id) => {
+    const result = searchTools(realTools, { query, modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe(id);
+  });
+
+  it("does not let a related keyword outrank the tool the word names", () => {
+    // rounded-crop lists "favicon" as a keyword; the exact-keyword bonus must
+    // not hand it the query the Favicon Generator is named for.
+    const result = searchTools(realTools, { query: "favicon", modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe("favicon");
+  });
+
+  // #1327: "convert image" normalized to "image" and "vectorize" to
+  // "vec to rize"; both queries must still find the tool they name. Built
+  // from the English i18n strings like ToolGrid.astro, because the Vectorize
+  // tool's description there never says "vectorize".
+  it.each([
+    ["convert image", "convert"],
+    ["vectorize", "vectorize"],
+  ])("%j is a confident match for %s", (query, id) => {
+    const toolStrings = en.tools as Record<string, { name?: string; description?: string }>;
+    const localized = realTools.map((tool) => ({
+      ...tool,
+      name: toolStrings[tool.id]?.name ?? tool.name,
+      description: toolStrings[tool.id]?.description ?? tool.description,
+    }));
+    const result = searchTools(localized, { query, modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe(id);
+    expect(result.hasConfidentMatch).toBe(true);
+  });
+
+  it.each([
+    ["htmltopdf", "html-to-pdf"],
+    ["videotogif", "video-to-gif"],
+    ["xmltocsv", "xml-to-csv"],
+    ["pdftotext", "pdf-to-text"],
+  ])("joined %j still finds %s", (query, id) => {
+    const result = searchTools(realTools, { query, modality: "all", limit: 8 });
+    expect(result.results[0]?.item.id).toBe(id);
+    expect(result.hasConfidentMatch).toBe(true);
+  });
+
+  it("gives a bare format word no keyword bonus", () => {
+    // Converter presets list their formats as keywords and carry them in their
+    // names, so a bonus for "pdf" would lift ten pdf converters over the base
+    // PDF tools and push rotate-pdf and sign-pdf out of the 12-card grid.
+    const pdf = searchTools(realTools, { query: "pdf", modality: "all", limit: 12 });
+    expect(pdf.results.map((r) => r.reason)).not.toContain("keyword exact match");
+    expect(pdf.results.map((r) => r.item.id)).toEqual(
+      expect.arrayContaining(["rotate-pdf", "sign-pdf"]),
+    );
+
+    const xls = searchTools(realTools, { query: "xls", modality: "all", limit: 8 });
+    expect(xls.results[0]?.item.id).toBe("convert-spreadsheet");
+  });
+
+  it("keeps each modality's own compressor first for its query", () => {
+    for (const [query, id] of [
+      ["compress pdf", "compress-pdf"],
+      ["shrink pdf", "compress-pdf"],
+      ["compress video", "compress-video"],
+      // #1070: the PDF size presets take the sized queries.
+      ["compress pdf to 100kb", "compress-pdf-to-100kb"],
+      ["compress pdf to 1mb", "compress-pdf-to-1mb"],
+    ] as const) {
+      const result = searchTools(realTools, { query, modality: "all", limit: 8 });
+      expect(result.results[0]?.item.id, query).toBe(id);
     }
   });
 

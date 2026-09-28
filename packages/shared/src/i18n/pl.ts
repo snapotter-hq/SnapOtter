@@ -1044,6 +1044,26 @@ export const pl: TranslationKeys = {
       name: "Kompresuj PDF",
       description: "Zmniejsz rozmiar pliku PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Kompresuj PDF do 100 KB",
+      description: "Zmniejszenie rozmiaru pliku PDF poniżej 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Kompresuj PDF do 200 KB",
+      description: "Zmniejszenie rozmiaru pliku PDF poniżej 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Kompresuj PDF do 500 KB",
+      description: "Zmniejszenie rozmiaru pliku PDF poniżej 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Kompresuj PDF do 1 MB",
+      description: "Zmniejszenie rozmiaru pliku PDF poniżej 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Kompresuj PDF do 2 MB",
+      description: "Zmniejszenie rozmiaru pliku PDF poniżej 2 MB",
+    },
     "rotate-pdf": {
       name: "Obróć PDF",
       description: "Obróć strony w pliku PDF",
@@ -1390,6 +1410,7 @@ export const pl: TranslationKeys = {
       submitBatch: "Kompresuj ({count} plików)",
       submitTarget: "Kompresuj do {size} KB",
       resizedToFit: "Zmniejszono do {width} × {height}, aby plik zmieścił się w {size} KB",
+      batchResized: "Zmniejszono {count} z {total} obrazów, aby zmieściły się w {size} KB.",
       progressLabel: "Kompresja",
       original: "Oryginał: {size} KB",
       processed: "Przetworzono: {size} KB",
@@ -2012,6 +2033,12 @@ export const pl: TranslationKeys = {
       submitDeepBatch: "Głębokie ulepszenie ({count} plików)",
       progressLabel: "Ulepszanie obrazu",
       progressLabelBatch: "Ulepszanie {count} obrazów",
+      deepEnhanceSkippedFailed:
+        "Tym razem głębokie ulepszenie się nie wykonało, więc otrzymujesz standardowe ulepszenie. Spróbuj ponownie.",
+      deepEnhanceSkippedUnavailable:
+        "Głębokie ulepszenie wymaga pakietu powiększania i ulepszania, który nie jest zainstalowany, więc otrzymujesz standardowe ulepszenie.",
+      deepEnhanceSkippedAnimated:
+        "Głębokie ulepszenie nie działa na animowanych obrazach, więc każda klatka otrzymała standardowe ulepszenie.",
     },
     "noise-removal": {
       off: "Wył.",
@@ -3486,6 +3513,8 @@ export const pl: TranslationKeys = {
       printer: "Drukarka (najlepsza jakość)",
       submit: "Kompresuj",
       submitBatch: "Kompresuj ({count} plików)",
+      submitTarget: "Kompresuj do {size}",
+      batchMissed: "{count} z {total} plików nie zeszło poniżej {target}.",
       progressLabel: "Kompresja",
       bestEffortHint:
         "Maksimum w miarę możliwości. Pliki PDF oparte na obrazach zbliżają się do tego rozmiaru; pliki PDF zawierające tylko tekst mogą się do niego nie zmniejszyć.",
@@ -3862,6 +3891,18 @@ export const pl: TranslationKeys = {
     previewUnavailable: "Podgląd będzie dostępny po przetworzeniu",
     generatePreview: "Generuj podgląd",
     previewFailed: "Generowanie podglądu nie powiodło się",
+    previewEncoderMissing:
+      "W ffmpeg na tym serwerze brakuje kodera {encoder}, więc nie można wygenerować podglądu. Skontaktuj się z administratorem.",
+    previewProgressMessages: [
+      "Wydra się rozgrzewa...",
+      "Mielimy piksele...",
+      "Uczymy kodek...",
+      "Prawie gotowe...",
+      "Podgląd się parzy...",
+      "Przekonujemy klatki...",
+      "Szlifujemy wynik...",
+      "Chwileczkę...",
+    ],
     previewNotAvailable: "Podgląd niedostępny",
     resultPreviewFailed: "Nie udało się wczytać podglądu wyniku",
     resultPreviewFailedHint:
@@ -5198,6 +5239,8 @@ export const pl: TranslationKeys = {
     imageControls: "Sterowanie podglądem",
     zoomControls: "Kontrolki powiększenia",
     dragToReorder: "Przeciągnij, aby zmienić kolejność",
+    resultResizedToFit: "Zmniejszono, aby zmieścić się w docelowym rozmiarze",
+    resultMissedTarget: "Nie osiągnięto docelowego rozmiaru",
     reverseOrder: "Odwróć kolejność",
     whiteBackground: "Białe tło",
     blackBackground: "Czarne tło",

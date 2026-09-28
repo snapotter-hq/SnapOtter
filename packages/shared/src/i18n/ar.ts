@@ -1035,6 +1035,26 @@ export const ar: TranslationKeys = {
       name: "ضغط PDF",
       description: "تقليل حجم ملف PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "ضغط PDF إلى 100 KB",
+      description: "تقليل حجم ملف PDF إلى أقل من 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "ضغط PDF إلى 200 KB",
+      description: "تقليل حجم ملف PDF إلى أقل من 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "ضغط PDF إلى 500 KB",
+      description: "تقليل حجم ملف PDF إلى أقل من 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "ضغط PDF إلى 1 MB",
+      description: "تقليل حجم ملف PDF إلى أقل من 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "ضغط PDF إلى 2 MB",
+      description: "تقليل حجم ملف PDF إلى أقل من 2 MB",
+    },
     "rotate-pdf": {
       name: "تدوير PDF",
       description: "تدوير صفحات PDF",
@@ -1376,6 +1396,7 @@ export const ar: TranslationKeys = {
       submitBatch: "ضغط ({count} ملف)",
       submitTarget: "ضغط إلى {size} KB",
       resizedToFit: "تم تغيير الحجم إلى {width} × {height} ليناسب {size} KB",
+      batchResized: "تم تصغير {count} من أصل {total} صور لتناسب {size} KB.",
       progressLabel: "جاري الضغط",
       original: "الأصلي: {size} KB",
       processed: "المعالج: {size} KB",
@@ -1994,6 +2015,12 @@ export const ar: TranslationKeys = {
       submitDeepBatch: "تحسين عميق ({count} ملف)",
       progressLabel: "جاري تحسين الصورة",
       progressLabelBatch: "جاري تحسين {count} صورة",
+      deepEnhanceSkippedFailed:
+        "لم يعمل التحسين العميق هذه المرة، لذا حصلت على التحسين العادي. حاول مرة أخرى.",
+      deepEnhanceSkippedUnavailable:
+        "يتطلب التحسين العميق حزمة التكبير والتحسين، وهي غير مثبتة، لذا حصلت على التحسين العادي.",
+      deepEnhanceSkippedAnimated:
+        "لا يعمل التحسين العميق على الصور المتحركة، لذا حصل كل إطار على التحسين العادي.",
     },
     "noise-removal": {
       off: "إيقاف",
@@ -3464,6 +3491,8 @@ export const ar: TranslationKeys = {
       printer: "طباعة (أفضل جودة)",
       submit: "ضغط",
       submitBatch: "ضغط ({count} ملفات)",
+      submitTarget: "ضغط إلى {size}",
+      batchMissed: "لم ينخفض {count} من أصل {total} ملفات إلى أقل من {target}.",
       progressLabel: "جارٍ الضغط",
       bestEffortHint:
         "الحد الأقصى قدر الإمكان. ملفات PDF المستندة إلى الصور تقترب من هذا الحجم؛ أما ملفات PDF النصية فقد لا تنكمش إلى هذا الحجم.",
@@ -3837,6 +3866,18 @@ export const ar: TranslationKeys = {
     previewUnavailable: "ستتوفر المعاينة بعد المعالجة",
     generatePreview: "إنشاء معاينة",
     previewFailed: "فشل إنشاء المعاينة",
+    previewEncoderMissing:
+      "لا يحتوي ffmpeg على هذا الخادم على المرمِّز {encoder}، لذا لا يمكن إنشاء المعاينة. تواصل مع المسؤول.",
+    previewProgressMessages: [
+      "ثعلب الماء يستعد...",
+      "نطحن البكسلات...",
+      "نعطي برنامج الترميز درسًا...",
+      "أوشكنا على الانتهاء...",
+      "المعاينة على النار...",
+      "نقنع الإطارات...",
+      "نلمّع النتيجة...",
+      "لحظة واحدة...",
+    ],
     previewNotAvailable: "المعاينة غير متوفرة",
     resultPreviewFailed: "تعذر تحميل معاينة النتيجة",
     resultPreviewFailedHint: "اكتملت المعالجة. استخدم زر التحميل لحفظ ملفك.",
@@ -5146,6 +5187,8 @@ export const ar: TranslationKeys = {
     imageControls: "عناصر تحكم المعاينة",
     zoomControls: "أدوات التكبير",
     dragToReorder: "اسحب لإعادة الترتيب",
+    resultResizedToFit: "تم تصغيرها لتناسب الحجم المستهدف",
+    resultMissedTarget: "لم تصل إلى الحجم المستهدف",
     reverseOrder: "عكس الترتيب",
     whiteBackground: "خلفية بيضاء",
     blackBackground: "خلفية سوداء",

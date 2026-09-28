@@ -258,7 +258,7 @@ export function ToolPage() {
   const showSizeComparison =
     toolId === "compress" ||
     toolId === "optimize-for-web" ||
-    (toolId !== undefined && toolId in COMPRESS_PRESET_BY_ID);
+    (toolId !== undefined && COMPRESS_PRESET_BY_ID[toolId]?.base === "compress");
   usePageTitle(tool ? getToolName(t, tool.id, tool.name) : undefined);
   const { hasPermission } = useAuth();
   const isAdmin = hasPermission("settings:write");

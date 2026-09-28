@@ -1,16 +1,24 @@
-import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import pg from "pg";
-import { dropOrphanedForkDatabases, forkDatabaseName } from "./fork-db.js";
+import {
+  dropOrphanedForkDatabases,
+  dropOrphanedForkRoles,
+  forkDatabaseName,
+  forkRoleName,
+} from "./fork-db.js";
+import { forkDirName, removeOnExit } from "./fork-dir.js";
 
 // Each test file (forks pool, isolated) gets its own Postgres database cloned
 // from the migrated template built in tests/global-setup.ts, plus its own
 // workspace dir. setupFiles run before any app module loads, so
 // apps/api/src/config.ts captures the per-file DATABASE_URL.
-const suffix = `${process.pid}_${crypto.randomUUID().slice(0, 8).replace(/-/g, "")}`;
-const forkDir = path.join(os.tmpdir(), `SnapOtter-test-${suffix}`);
+const forkDirBase = forkDirName(process.pid);
+const suffix = forkDirBase.slice("SnapOtter-test-".length);
+const forkDir = path.join(os.tmpdir(), forkDirBase);
 process.env.WORKSPACE_PATH = path.join(forkDir, "workspace");
+// Nothing else removes it, and a full run left gigabytes behind (#1004).
+removeOnExit(forkDir);
 
 const baseUrl = process.env.TEST_PG_BASE_URL;
 if (!baseUrl) {
@@ -32,7 +40,7 @@ if (!runtimeRole || !runtimePassword) {
   );
 }
 
-// Each worker process logs in as its own member of that role rather than as the
+// Each test file logs in as its own member of that role rather than as the
 // role itself.
 //
 // ensureRuntimeRole() realigns the runtime password on every boot, and every
@@ -42,12 +50,14 @@ if (!runtimeRole || !runtimePassword) {
 // replicas share one database and the migration advisory lock (which is
 // database-scoped) serializes them. This harness is the one shape where that
 // lock does not help, since it runs a database per test file against a single
-// cluster. One login role per worker process restores the invariant: files
-// inside a process run one at a time, so no pg_authid row ever has two writers.
+// cluster. One login role per test file restores the invariant: no pg_authid
+// row ever has two writers.
 //
 // Membership is what carries the privileges: the fork role inherits exactly the
-// grant set global-setup applied to the template and nothing besides.
-const forkRole = `${runtimeRole}_${process.pid}`;
+// grant set global-setup applied to the template and nothing besides. The name
+// carries the run and the pid so the sweeps below can tell when its file has
+// finished (#1315).
+const forkRole = forkRoleName(runtimeRole, runId, process.pid);
 
 const redisBaseUrl = process.env.TEST_REDIS_BASE_URL;
 if (!redisBaseUrl) {
@@ -81,6 +91,9 @@ const dbName = forkDatabaseName(runId, process.pid); // hex and digits: identifi
 // file's own database from its afterAll would cut live connections; waiting
 // for the process to exit avoids that (#1277).
 await dropOrphanedForkDatabases(baseUrl, runId);
+// Then their login roles, which the databases no longer hold onto (#1315).
+await dropOrphanedForkRoles(baseUrl, runtimeRole, runId);
+process.env.TEST_FORK_ROLE_SWEEP_RAN = "1";
 // Evidence for test-harness-hygiene.test.ts that this setup really swept.
 process.env.TEST_FORK_SWEEP_RAN = "1";
 const admin = new pg.Client({ connectionString: baseUrl });
@@ -97,19 +110,13 @@ for (let attempt = 0; attempt < 5 && !created; attempt++) {
     await new Promise((r) => setTimeout(r, 150 + Math.floor(150 * attempt)));
   }
 }
-// Every file in this process reuses the same role, so this runs once per worker
-// and is a lookup thereafter. The name is derived from the pid and the password
-// is a harness constant, so neither can carry injection into the DDL below; the
-// shipping path quotes both server-side with format() instead (see
+// The name is built from hex and digits and the password is a harness
+// constant, so neither can carry injection into the DDL below; the shipping
+// path quotes both server-side with format() instead (see
 // apps/api/src/db/bootstrap-roles.ts).
-const { rows: roleRows } = await admin.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [
-  forkRole,
-]);
-if (roleRows.length === 0) {
-  await admin.query(
-    `CREATE ROLE ${forkRole} LOGIN PASSWORD '${runtimePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS IN ROLE ${runtimeRole}`,
-  );
-}
+await admin.query(
+  `CREATE ROLE ${forkRole} LOGIN PASSWORD '${runtimePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS IN ROLE ${runtimeRole}`,
+);
 await admin.end();
 
 const forkUrl = new URL(baseUrl);

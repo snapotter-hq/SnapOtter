@@ -135,6 +135,28 @@ async function terminalFrame(jobId: string): Promise<Record<string, unknown>> {
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
+/**
+ * Batch outcome counters as recordChildOutcome leaves them. The worker
+ * writes them after the child's own jobs row has settled, so a bare read
+ * right after terminalRow() can observe the pre-write state (#1308, same
+ * race as #1107). Polls until the counter exists and, for a failure, until
+ * its error entry has been pushed too (the counter is bumped before the
+ * list).
+ */
+async function batchOutcome(
+  parentId: string,
+  counter: "done" | "failed",
+): Promise<{ count: string; errors: Array<{ filename: string; error: string }> }> {
+  const base = `${bullPrefix()}:batch:${parentId}`;
+  return waitFor(async () => {
+    const count = await sharedRedis().get(`${base}:${counter}`);
+    if (count === null) return undefined;
+    const errors = await sharedRedis().lrange(`${base}:errors`, 0, -1);
+    if (counter === "failed" && errors.length === 0) return undefined;
+    return { count, errors: errors.map((e) => JSON.parse(e)) };
+  }, 10_000);
+}
+
 /** Insert the parent and child rows and enqueue the flow exactly the way
  * routes/batch.ts does (batch-finalize parent on the system queue, one
  * batch-child per file with attempts 1 + ignoreDependencyOnFailure).
@@ -370,13 +392,10 @@ describe("cooperative child skip and canceled finalize", () => {
     expect(row.status).toBe("canceled");
     expect((row.error as { message?: string } | null)?.message).toBe("Canceled");
 
-    const base = `${bullPrefix()}:batch:${parentId}`;
-    expect(await sharedRedis().get(`${base}:done`)).toBeNull();
-    expect(await sharedRedis().get(`${base}:failed`)).toBe("1");
-    const errors = (await sharedRedis().lrange(`${base}:errors`, 0, -1)).map(
-      (e) => JSON.parse(e) as { filename: string; error: string },
-    );
-    expect(errors).toEqual([{ filename: "skipme.png", error: "Canceled" }]);
+    const outcome = await batchOutcome(parentId, "failed");
+    expect(outcome.count).toBe("1");
+    expect(outcome.errors).toEqual([{ filename: "skipme.png", error: "Canceled" }]);
+    expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:done`)).toBeNull();
   });
 
   it("a failing skip falls through to normal processing instead of wedging the child", async () => {
@@ -419,9 +438,10 @@ describe("cooperative child skip and canceled finalize", () => {
       // stuck queued with a hard-failed job behind it.
       const row = await terminalRow(childId);
       expect(row.status).toBe("completed");
-      const base = `${bullPrefix()}:batch:${parentId}`;
-      expect(await sharedRedis().get(`${base}:done`)).toBe("1");
-      expect(await sharedRedis().get(`${base}:failed`)).toBeNull();
+      const outcome = await batchOutcome(parentId, "done");
+      expect(outcome.count).toBe("1");
+      expect(outcome.errors).toEqual([]);
+      expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:failed`)).toBeNull();
     } finally {
       cancelSkipFault.parentId = null;
     }

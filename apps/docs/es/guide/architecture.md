@@ -53,7 +53,7 @@ Tipos de TypeScript compartidos, constantes (como `APP_VERSION` y definiciones d
 
 ### API (`apps/api`) {#api-apps-api}
 
-Un servidor Fastify v5 que expone 248 rutas de herramientas en cinco modalidades (imagen, vídeo, audio, PDF, archivo) y que gestiona:
+Un servidor Fastify v5 que expone 253 rutas de herramientas en cinco modalidades (imagen, vídeo, audio, PDF, archivo) y que gestiona:
 - Subidas de archivos, gestión del espacio de trabajo temporal y almacenamiento persistente de archivos
 - Biblioteca de archivos de usuario (tabla `user_files`): una edición guardada se almacena de forma predeterminada como un nuevo archivo independiente, o como una versión enlazada a su padre cuando sobrescribes el original. Registra qué herramientas se aplicaron (`toolChain`) y obtiene una miniatura autogenerada para la página de Archivos
 - Ejecución de herramientas (dirige cada solicitud de herramienta al motor de imágenes o al puente de IA)

@@ -823,6 +823,26 @@ export const zhCN: TranslationKeys = {
       name: "压缩 PDF",
       description: "缩小 PDF 文件大小",
     },
+    "compress-pdf-to-100kb": {
+      name: "压缩 PDF 至 100 KB",
+      description: "将 PDF 文件体积压缩到 100 KB 以下",
+    },
+    "compress-pdf-to-200kb": {
+      name: "压缩 PDF 至 200 KB",
+      description: "将 PDF 文件体积压缩到 200 KB 以下",
+    },
+    "compress-pdf-to-500kb": {
+      name: "压缩 PDF 至 500 KB",
+      description: "将 PDF 文件体积压缩到 500 KB 以下",
+    },
+    "compress-pdf-to-1mb": {
+      name: "压缩 PDF 至 1 MB",
+      description: "将 PDF 文件体积压缩到 1 MB 以下",
+    },
+    "compress-pdf-to-2mb": {
+      name: "压缩 PDF 至 2 MB",
+      description: "将 PDF 文件体积压缩到 2 MB 以下",
+    },
     "rotate-pdf": {
       name: "旋转 PDF",
       description: "旋转 PDF 中的页面",
@@ -1156,6 +1176,7 @@ export const zhCN: TranslationKeys = {
       submitBatch: "压缩（{count} 个文件）",
       submitTarget: "压缩至 {size} KB",
       resizedToFit: "已缩小至 {width} × {height} 以控制在 {size} KB 内",
+      batchResized: "{total} 张图片中有 {count} 张已缩小以控制在 {size} KB 内。",
       progressLabel: "压缩中",
       original: "原始：{size} KB",
       processed: "处理后：{size} KB",
@@ -1764,6 +1785,10 @@ export const zhCN: TranslationKeys = {
       submitDeepBatch: "深度增强（{count} 个文件）",
       progressLabel: "正在增强图片",
       progressLabelBatch: "正在增强 {count} 张图片",
+      deepEnhanceSkippedFailed: "本次深度增强未能运行，因此应用了标准增强。请重试。",
+      deepEnhanceSkippedUnavailable:
+        "深度增强需要「放大与增强」功能包，但尚未安装，因此应用了标准增强。",
+      deepEnhanceSkippedAnimated: "深度增强不支持动图，因此每一帧都应用了标准增强。",
     },
     "noise-removal": {
       off: "关闭",
@@ -3231,6 +3256,8 @@ export const zhCN: TranslationKeys = {
       printer: "打印（最佳质量）",
       submit: "压缩",
       submitBatch: "压缩（{count} 个文件）",
+      submitTarget: "压缩至 {size}",
+      batchMissed: "{total} 个文件中有 {count} 个未能压到 {target} 以下。",
       progressLabel: "正在压缩",
       bestEffortHint:
         "尽力压缩的上限。基于图像的 PDF 会接近该大小；纯文本 PDF 可能无法缩小到此大小。",
@@ -3602,6 +3629,17 @@ export const zhCN: TranslationKeys = {
     previewUnavailable: "处理完成后可预览",
     generatePreview: "生成预览",
     previewFailed: "预览生成失败",
+    previewEncoderMissing: "此服务器的 ffmpeg 缺少 {encoder} 编码器，无法生成预览。请联系管理员。",
+    previewProgressMessages: [
+      "水獭正在热身...",
+      "正在嚼碎像素...",
+      "正在给编解码器上课...",
+      "快好了...",
+      "预览正在酝酿...",
+      "正在说服每一帧...",
+      "正在打磨输出...",
+      "稍等片刻...",
+    ],
     previewNotAvailable: "预览不可用",
     resultPreviewFailed: "结果预览加载失败",
     resultPreviewFailedHint: "处理已完成。请使用下载按钮保存文件。",
@@ -4899,6 +4937,8 @@ export const zhCN: TranslationKeys = {
     imageControls: "预览控件",
     zoomControls: "缩放控件",
     dragToReorder: "拖动以重新排序",
+    resultResizedToFit: "已缩小以符合目标大小",
+    resultMissedTarget: "未达到目标大小",
     reverseOrder: "反转顺序",
     whiteBackground: "白色背景",
     blackBackground: "黑色背景",

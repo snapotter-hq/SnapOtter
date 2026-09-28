@@ -1046,6 +1046,26 @@ export const nl: TranslationKeys = {
       name: "PDF comprimeren",
       description: "Verklein de bestandsgrootte van PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDF comprimeren tot 100 KB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDF comprimeren tot 200 KB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDF comprimeren tot 500 KB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDF comprimeren tot 1 MB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDF comprimeren tot 2 MB",
+      description: "Bestandsgrootte van een PDF verkleinen tot onder 2 MB",
+    },
     "rotate-pdf": {
       name: "PDF roteren",
       description: "Roteer pagina's in een PDF",
@@ -1395,6 +1415,8 @@ export const nl: TranslationKeys = {
       submitBatch: "Comprimeren ({count} bestanden)",
       submitTarget: "Comprimeren tot {size} KB",
       resizedToFit: "Verkleind tot {width} × {height} om binnen {size} KB te passen",
+      batchResized:
+        "{count} van {total} afbeeldingen zijn verkleind om binnen {size} KB te passen.",
       progressLabel: "Comprimeren",
       original: "Origineel: {size} KB",
       processed: "Verwerkt: {size} KB",
@@ -2017,6 +2039,12 @@ export const nl: TranslationKeys = {
       submitDeepBatch: "Diepte-verbetering ({count} bestanden)",
       progressLabel: "Afbeelding verbeteren",
       progressLabelBatch: "{count} afbeeldingen verbeteren",
+      deepEnhanceSkippedFailed:
+        "Diepte-verbetering is deze keer niet uitgevoerd, dus je krijgt de standaardverbetering. Probeer het opnieuw.",
+      deepEnhanceSkippedUnavailable:
+        "Diepte-verbetering vereist de Opschalen & Verbeteren-bundel, die niet is geïnstalleerd, dus je krijgt de standaardverbetering.",
+      deepEnhanceSkippedAnimated:
+        "Diepte-verbetering werkt niet op geanimeerde afbeeldingen, dus elk frame kreeg de standaardverbetering.",
     },
     "noise-removal": {
       off: "Uit",
@@ -3497,6 +3525,8 @@ export const nl: TranslationKeys = {
       printer: "Printer (beste kwaliteit)",
       submit: "Comprimeren",
       submitBatch: "Comprimeren ({count} bestanden)",
+      submitTarget: "Comprimeren tot {size}",
+      batchMissed: "{count} van {total} bestanden kwamen niet onder {target}.",
       progressLabel: "Comprimeren",
       bestEffortHint:
         "Maximaal haalbaar. Op afbeeldingen gebaseerde PDF's komen dichtbij; PDF's met alleen tekst worden mogelijk niet tot deze grootte verkleind.",
@@ -3873,6 +3903,18 @@ export const nl: TranslationKeys = {
     previewUnavailable: "Voorbeeld beschikbaar na verwerking",
     generatePreview: "Voorbeeld genereren",
     previewFailed: "Voorbeeld genereren mislukt",
+    previewEncoderMissing:
+      "De ffmpeg van deze server mist de encoder {encoder}, dus het voorbeeld kan niet worden gemaakt. Neem contact op met je beheerder.",
+    previewProgressMessages: [
+      "De otter warmt op...",
+      "Pixels worden vermalen...",
+      "De codec krijgt les...",
+      "Bijna klaar...",
+      "Het voorbeeld staat te trekken...",
+      "De frames worden overgehaald...",
+      "Het resultaat wordt opgepoetst...",
+      "Even geduld...",
+    ],
     previewNotAvailable: "Voorbeeld niet beschikbaar",
     resultPreviewFailed: "Resultaatvoorbeeld kon niet worden geladen",
     resultPreviewFailedHint:
@@ -5202,6 +5244,8 @@ export const nl: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Zoombediening",
     dragToReorder: "Sleep om te herordenen",
+    resultResizedToFit: "Verkleind om binnen de doelgrootte te passen",
+    resultMissedTarget: "Doelgrootte niet gehaald",
     reverseOrder: "Volgorde omkeren",
     whiteBackground: "Witte achtergrond",
     blackBackground: "Zwarte achtergrond",

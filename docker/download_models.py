@@ -216,9 +216,7 @@ def _register_birefnet_matting():
 def _register_birefnet_hr_matting():
     """Register BiRefNet HR-matting ONNX session for 2048x2048 high-res matting."""
     import os
-    import numpy as np
     import pooch
-    from PIL import Image
     from rembg.sessions import sessions_class
     from rembg.sessions.birefnet_general import BiRefNetSessionGeneral
 
@@ -239,22 +237,10 @@ def _register_birefnet_hr_matting():
         def name(cls, *args, **kwargs):
             return "birefnet-hr-matting"
 
-        def predict(self, img, *args, **kwargs):
-            ort_outs = self.inner_session.run(
-                None,
-                self.normalize(
-                    img, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225), (2048, 2048)
-                ),
-            )
-            pred = ort_outs[0][:, 0, :, :]
-            ma = np.max(pred)
-            mi = np.min(pred)
-            denom = ma - mi
-            pred = (pred - mi) / denom if denom > 0 else pred * 0
-            pred = np.squeeze(pred)
-            mask = Image.fromarray((pred * 255).astype("uint8"), mode="L")
-            mask = mask.resize(img.size, Image.LANCZOS)
-            return [mask]
+        # Same as packages/ai/python/remove_bg.py: only the input size differs
+        # from rembg's BiRefNet session, whose predict applies the sigmoid (#1298).
+        def normalize(self, img, mean, std, size, *args, **kwargs):
+            return super().normalize(img, mean, std, (2048, 2048), *args, **kwargs)
 
     sessions_class.append(BiRefNetHRMattingSession)
 

@@ -325,6 +325,56 @@ describe("useFeaturesStore", () => {
       await promise;
     });
 
+    it("ignores a malformed progress frame and keeps listening", async () => {
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-malformed" });
+
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+
+      const es = FakeEventSource.instances[0];
+      expect(() => es.onmessage?.({ data: "not json" })).not.toThrow();
+      expect(es.closed).toBe(false);
+      expect(useFeaturesStore.getState().installing["test-bundle"]).toBeDefined();
+
+      es.onmessage?.({ data: JSON.stringify({ phase: "complete" }) });
+      await promise;
+      expect(useFeaturesStore.getState().installing["test-bundle"]).toBeUndefined();
+    });
+
+    // #1287: the onmessage catch used to wrap the whole handler, so a throw
+    // while handling a frame was swallowed. A terminal frame closes the stream
+    // before it settles, so a throw there left nothing to settle the pill.
+    // Any handling throw now hands the bundle to the status poller; a frame
+    // that parses to null is the simplest way to throw inside the handler.
+    it("falls back to polling and rethrows when frame handling throws", async () => {
+      apiPostMock.mockResolvedValueOnce({ jobId: "job-throw" });
+
+      const promise = useFeaturesStore.getState().installBundle("test-bundle");
+      await vi.waitFor(() => {
+        expect(FakeEventSource.instances).toHaveLength(1);
+      });
+      await promise;
+
+      vi.useFakeTimers();
+      try {
+        apiGetMock.mockResolvedValue({
+          bundles: [makeBundleState({ id: "test-bundle", status: "installed" })],
+        });
+        const es = FakeEventSource.instances[0];
+        // A frame that parses but is not an object: reading .type throws.
+        expect(() => es.onmessage?.({ data: "null" })).toThrow(TypeError);
+        expect(es.closed).toBe(true);
+
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect(apiGetMock).toHaveBeenCalledWith("/v1/features");
+        expect(useFeaturesStore.getState().installing["test-bundle"]).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("on API failure: sets error and clears installing", async () => {
       apiPostMock.mockRejectedValueOnce(new Error("Server error"));
 

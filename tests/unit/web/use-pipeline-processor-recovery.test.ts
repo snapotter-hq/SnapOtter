@@ -728,3 +728,109 @@ describe("usePipelineProcessor batch recovery (#766)", () => {
     unmount();
   });
 });
+
+// #1287: the onmessage catch used to wrap the whole handler, so a throw while
+// handling a completion frame was swallowed and the run sat at "processing"
+// until the stall timer, which only reconnected into the same throw.
+describe("usePipelineProcessor handler errors (#1287)", () => {
+  const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
+  // Zustand copies state on every set, so a spy on getState().updateEntry
+  // rides along into later states; put the real action back explicitly.
+  const realUpdateEntry = useFileStore.getState().updateEntry;
+  afterEach(() => {
+    useFileStore.setState({ updateEntry: realUpdateEntry });
+  });
+
+  function startAsyncSingleRun() {
+    const hook = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    return hook;
+  }
+
+  it("fails the run with a real message when completion handling throws", () => {
+    vi.useFakeTimers();
+    const { unmount } = startAsyncSingleRun();
+    vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    expect(() =>
+      act(() => {
+        sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+      }),
+    ).toThrow("boom");
+
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    expect(latestSse().close).toHaveBeenCalled();
+
+    // Settled for good: the stall timer must not reconnect into the same throw.
+    const sources = MockEventSource.instances.length;
+    act(() => {
+      vi.advanceTimersByTime(600_001);
+    });
+    expect(MockEventSource.instances).toHaveLength(sources);
+    expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+
+    unmount();
+  });
+
+  it("keeps the real outcome when the throw lands after the run settled", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    // Breaks finishRun's clearActiveJob write, after failRun has recorded the
+    // real error (setError also turns processing off).
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("listener broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          sendBatchFrame({
+            status: "failed",
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: 2,
+            errors: [],
+          });
+        }),
+      ).toThrow("listener broke");
+
+      expect(useFileStore.getState().error).toBe("All files failed processing");
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      unsubscribe();
+      unmount();
+    }
+  });
+
+  it("still ignores a malformed frame", () => {
+    const { unmount } = startAsyncSingleRun();
+
+    act(() => {
+      latestSse().onmessage?.({ data: "not json" } as MessageEvent);
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+});

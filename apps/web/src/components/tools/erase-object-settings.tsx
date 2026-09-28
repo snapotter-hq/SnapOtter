@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, formatFileSize } from "@/lib/format";
+import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
@@ -92,8 +93,15 @@ export function subscribeEraseObjectJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      // Only an unparseable frame is ignorable. A throw past the parse is our
+      // own handling failing, and it must end the run (#1287).
+      let data: ProgressFrame;
       try {
-        const data = resolveServerUrls(JSON.parse(event.data));
+        data = resolveServerUrls(JSON.parse(event.data));
+      } catch {
+        return;
+      }
+      try {
         if (data.type === "heartbeat") {
           resetStall();
           return;
@@ -102,7 +110,7 @@ export function subscribeEraseObjectJobProgress(
         resetStall();
         if (data.phase === "complete" && data.result) {
           cleanup();
-          handlers.onComplete(data.result as Record<string, unknown>);
+          handlers.onComplete(data.result);
           return;
         }
         if (data.phase === "failed") {
@@ -111,8 +119,16 @@ export function subscribeEraseObjectJobProgress(
           return;
         }
         if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
-      } catch {
-        // Ignore malformed SSE frames
+      } catch (err) {
+        // cleanup() already ran if onComplete threw, taking the stall timer
+        // with it, so nothing else would ever settle the run.
+        cleanup();
+        try {
+          handlers.onFailed(FRAME_HANDLING_FAILED);
+        } catch {
+          // onFailed may be what threw; the original error is rethrown below.
+        }
+        throw err;
       }
     };
     // A transient drop triggers the browser's built-in reconnect; on reconnect

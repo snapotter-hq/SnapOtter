@@ -176,14 +176,21 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     esRefs[bundleId] = es;
 
     es.onmessage = (event) => {
+      // Only an unparseable frame is ignorable. A throw past the parse is our
+      // own handling failing, and must not vanish (#1287).
+      let data: {
+        type?: string;
+        phase: string;
+        percent: number;
+        stage: string;
+        error?: string;
+      };
       try {
-        const data = JSON.parse(event.data) as {
-          type?: string;
-          phase: string;
-          percent: number;
-          stage: string;
-          error?: string;
-        };
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      try {
         if (data.type === "heartbeat") return;
         if (data.phase === "complete") {
           es.close();
@@ -211,7 +218,15 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           },
           queued: get().queued.filter((id) => id !== bundleId),
         });
-      } catch {}
+      } catch (err) {
+        // The stream may already be closed (a terminal frame threw partway),
+        // so hand the bundle to the poller, which settles it from the
+        // server's own status, and let the error surface.
+        es.close();
+        if (esRefs[bundleId] === es) delete esRefs[bundleId];
+        startPolling(bundleId);
+        throw err;
+      }
     };
 
     es.onerror = () => {

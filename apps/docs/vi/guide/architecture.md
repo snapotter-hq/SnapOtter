@@ -53,7 +53,7 @@ Các kiểu TypeScript dùng chung, các hằng số (như `APP_VERSION` và đ�
 
 ### API (`apps/api`) {#api-apps-api}
 
-Một máy chủ Fastify v5 phơi bày 248 tuyến công cụ trên năm phương thức (image, video, audio, PDF, file) xử lý:
+Một máy chủ Fastify v5 phơi bày 253 tuyến công cụ trên năm phương thức (image, video, audio, PDF, file) xử lý:
 - Tải tệp lên, quản lý không gian làm việc tạm thời, và lưu trữ tệp bền vững
 - Thư viện tệp người dùng (bảng `user_files`): theo mặc định, một chỉnh sửa đã lưu được lưu thành một tệp mới độc lập, hoặc thành một phiên bản liên kết với tệp cha khi bạn ghi đè lên tệp gốc. Nó ghi lại những công cụ nào đã được áp dụng (`toolChain`) và nhận một ảnh thu nhỏ tự sinh cho trang Files
 - Thực thi công cụ (định tuyến mỗi yêu cầu công cụ đến image engine hoặc cầu nối AI)

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath, kbToBytes } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PDFDocument from "pdfkit";
@@ -34,13 +34,12 @@ const PAGE_SIZES: Record<string, [number, number]> = {
   A5: [419.53, 595.28],
 };
 
+/** Decimal units, like upload portals: 1 MB = 1000 KB = 1,000,000 bytes (#1288). */
 function computeTargetBytes(targetSize: { value: number; unit: "KB" | "MB" }): number {
-  return targetSize.unit === "MB"
-    ? Math.round(targetSize.value * 1024 * 1024)
-    : Math.round(targetSize.value * 1024);
+  return kbToBytes(targetSize.unit === "MB" ? targetSize.value * 1000 : targetSize.value);
 }
 
-const MIN_TARGET_BYTES = 50 * 1024;
+const MIN_TARGET_BYTES = kbToBytes(50);
 
 async function compressImagesForTarget(
   imageBuffers: Buffer[],

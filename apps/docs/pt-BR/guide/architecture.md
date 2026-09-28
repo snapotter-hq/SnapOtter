@@ -53,7 +53,7 @@ Tipos TypeScript compartilhados, constantes (como `APP_VERSION` e as definiçõe
 
 ### API (`apps/api`) {#api-apps-api}
 
-Um servidor Fastify v5 que expõe 248 rotas de ferramentas em cinco modalidades (image, video, audio, PDF, file) e lida com:
+Um servidor Fastify v5 que expõe 253 rotas de ferramentas em cinco modalidades (image, video, audio, PDF, file) e lida com:
 - Uploads de arquivos, gerenciamento de espaço de trabalho temporário e armazenamento persistente de arquivos
 - Biblioteca de arquivos do usuário (tabela `user_files`): uma edição salva é armazenada por padrão como um novo arquivo independente, ou como uma versão vinculada ao pai quando você sobrescreve o original. Ela registra quais ferramentas foram aplicadas (`toolChain`) e recebe uma miniatura gerada automaticamente para a página Files
 - Execução de ferramentas (roteia cada requisição de ferramenta para o motor de imagem ou para a ponte de IA)

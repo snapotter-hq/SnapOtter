@@ -86,7 +86,41 @@ describe("on-demand preview encoders (#1270)", () => {
       readFixture(fixtures.audio.tiny("wav")),
     );
     expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).error).toContain("has no libmp3lame encoder");
+    const body = JSON.parse(res.body);
+    expect(body.error).toContain("has no libmp3lame encoder");
+    // Structured, so the web UI can show a translated reason (#1290).
+    expect(body.code).toBe("ENCODER_MISSING");
+    expect(body.encoder).toBe("libmp3lame");
+  });
+
+  it("names a missing encoder the same way on the stored-file preview (#1290)", async () => {
+    const upload = createMultipartPayload([
+      {
+        name: "file",
+        filename: "stored.wav",
+        contentType: "audio/wav",
+        content: readFixture(fixtures.audio.tiny("wav")),
+      },
+    ]);
+    const uploaded = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": upload.contentType },
+      body: upload.body,
+    });
+    expect(uploaded.statusCode, uploaded.body).toBe(201);
+    const { id } = JSON.parse(uploaded.body).files[0];
+
+    setEncoderInventoryForTests(new Set(SHIPPED.filter((n) => n !== "libmp3lame")));
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/files/${id}/preview`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("ENCODER_MISSING");
+    expect(body.encoder).toBe("libmp3lame");
   });
 
   it("keeps any other failure behind the generic message", async () => {
@@ -99,6 +133,6 @@ describe("on-demand preview encoders (#1270)", () => {
       Buffer.from("not really a wav file"),
     );
     expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).error).toBe("Could not generate preview");
+    expect(JSON.parse(res.body)).toEqual({ error: "Could not generate preview" });
   });
 });

@@ -1007,6 +1007,26 @@ export const ja: TranslationKeys = {
       name: "PDF 圧縮",
       description: "PDF のファイルサイズを圧縮",
     },
+    "compress-pdf-to-100kb": {
+      name: "PDFを100 KBに圧縮",
+      description: "PDFのファイルサイズを100 KB未満に削減",
+    },
+    "compress-pdf-to-200kb": {
+      name: "PDFを200 KBに圧縮",
+      description: "PDFのファイルサイズを200 KB未満に削減",
+    },
+    "compress-pdf-to-500kb": {
+      name: "PDFを500 KBに圧縮",
+      description: "PDFのファイルサイズを500 KB未満に削減",
+    },
+    "compress-pdf-to-1mb": {
+      name: "PDFを1 MBに圧縮",
+      description: "PDFのファイルサイズを1 MB未満に削減",
+    },
+    "compress-pdf-to-2mb": {
+      name: "PDFを2 MBに圧縮",
+      description: "PDFのファイルサイズを2 MB未満に削減",
+    },
     "rotate-pdf": {
       name: "PDF 回転",
       description: "PDF のページを回転",
@@ -1350,6 +1370,7 @@ export const ja: TranslationKeys = {
       submitBatch: "圧縮（{count}ファイル）",
       submitTarget: "{size} KBに圧縮",
       resizedToFit: "{size} KBに収めるため{width} × {height}に縮小しました",
+      batchResized: "{total}枚中{count}枚の画像を{size} KBに収めるため縮小しました。",
       progressLabel: "圧縮中",
       original: "元：{size} KB",
       processed: "処理後：{size} KB",
@@ -1969,6 +1990,12 @@ export const ja: TranslationKeys = {
       submitDeepBatch: "ディープエンハンス（{count}ファイル）",
       progressLabel: "画像をエンハンス中",
       progressLabelBatch: "{count}枚の画像をエンハンス中",
+      deepEnhanceSkippedFailed:
+        "今回はディープエンハンスが実行されなかったため、標準のエンハンスを適用しました。もう一度お試しください。",
+      deepEnhanceSkippedUnavailable:
+        "ディープエンハンスにはアップスケール＆エンハンスバンドルが必要ですが、インストールされていないため、標準のエンハンスを適用しました。",
+      deepEnhanceSkippedAnimated:
+        "ディープエンハンスはアニメーション画像には使えないため、各フレームに標準のエンハンスを適用しました。",
     },
     "noise-removal": {
       off: "オフ",
@@ -3440,6 +3467,8 @@ export const ja: TranslationKeys = {
       printer: "印刷用（最高品質）",
       submit: "圧縮",
       submitBatch: "圧縮 ({count}ファイル)",
+      submitTarget: "{size}に圧縮",
+      batchMissed: "{total}件中{count}件のファイルが{target}を下回りませんでした。",
       progressLabel: "圧縮中",
       bestEffortHint:
         "可能な限りの上限です。画像ベースのPDFはこのサイズに近づきますが、テキストのみのPDFはこのサイズまで縮小できない場合があります。",
@@ -3813,6 +3842,18 @@ export const ja: TranslationKeys = {
     previewUnavailable: "プレビューは処理後に表示されます",
     generatePreview: "プレビューを生成",
     previewFailed: "プレビューの生成に失敗しました",
+    previewEncoderMissing:
+      "このサーバーの ffmpeg に {encoder} エンコーダーがないため、プレビューを生成できません。管理者にお問い合わせください。",
+    previewProgressMessages: [
+      "カワウソが準備運動中...",
+      "ピクセルを噛み砕いています...",
+      "コーデックに教えています...",
+      "もうすぐです...",
+      "プレビューを淹れています...",
+      "フレームを説得しています...",
+      "仕上げを磨いています...",
+      "少々お待ちください...",
+    ],
     previewNotAvailable: "プレビューを利用できません",
     resultPreviewFailed: "結果のプレビューを読み込めませんでした",
     resultPreviewFailedHint:
@@ -5130,6 +5171,8 @@ export const ja: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "ズームコントロール",
     dragToReorder: "ドラッグして並べ替え",
+    resultResizedToFit: "目標サイズに収めるため縮小しました",
+    resultMissedTarget: "目標サイズに届きませんでした",
     reverseOrder: "順序を逆にする",
     whiteBackground: "白背景",
     blackBackground: "黒背景",

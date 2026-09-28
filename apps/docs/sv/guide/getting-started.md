@@ -100,7 +100,7 @@ pnpm dev
 | **Bild** | 112 | Ändra storlek, beskär, komprimera, konvertera, ta bort bakgrund, uppskala, OCR, vattenmärke, collage, färglägg, GIF-verktyg, formatförinställningar |
 | **Video** | 57 | Klipp, beskär, komprimera, konvertera, slå samman, extrahera ljud, autotextning, video till GIF, ändra storlek, stabilisera, formatförinställningar |
 | **Ljud** | 27 | Klipp, slå samman, konvertera, normalisera, brusreducering, transkribera, tonhöjdsskift, tona, ringsignalsskapare, formatförinställningar |
-| **PDF / dokument** | 29 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |
+| **PDF / dokument** | 34 | Slå samman, dela, komprimera, OCR, vattenmärke, redigera bort, Word till PDF, Excel till PDF, rotera, skydda, reparera |
 | **Filer** | 23 | CSV till JSON, JSON till XML, slå samman CSV-filer, dela CSV, skapa ZIP, extrahera ZIP, diagramskapare, YAML/JSON |
 
 ### Pipelines {#pipelines}

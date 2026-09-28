@@ -24,6 +24,19 @@ export function previewKindFor(modality: Modality): PreviewKind {
   }
 }
 
+/**
+ * What the server said about one result beyond the file itself (#1292): compress
+ * scaled the image down to fit (resizedTo), and the target-size verdict from
+ * compress and compress-pdf (targetKb, targetMet). Set per file by single runs
+ * and by batches alike, so a panel or the thumbnail strip can speak for the
+ * file on screen rather than for whichever run happened last.
+ */
+export interface ResultNotes {
+  resizedTo?: { width: number; height: number };
+  targetKb?: number;
+  targetMet?: boolean;
+}
+
 export interface FileEntry {
   /** Stable identity for this entry, unchanged across reordering. */
   id: string;
@@ -38,6 +51,8 @@ export interface FileEntry {
   originalWidth: number | null;
   originalHeight: number | null;
   status: "pending" | "processing" | "completed" | "failed";
+  /** Notes on this entry's result; null when it has none or no result. */
+  resultNotes: ResultNotes | null;
   /**
    * The user took this result: downloaded it, saved it, or it auto-saved.
    *
@@ -72,6 +87,7 @@ function createEntry(file: File): FileEntry {
     processedPreviewUrl: null,
     processedFilename: null,
     processedSize: null,
+    resultNotes: null,
     originalSize: file.size,
     originalWidth: null,
     originalHeight: null,
@@ -443,6 +459,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         processedUrl: null,
         processedPreviewUrl: null,
         processedFilename: null,
+        resultNotes: null,
         status: "pending",
         claimed: false,
       };
@@ -479,6 +496,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       processedPreviewUrl: null,
       processedFilename: null,
       processedSize: null,
+      resultNotes: null,
       status: "pending" as const,
       claimed: false,
       error: null,

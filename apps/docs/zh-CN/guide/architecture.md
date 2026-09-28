@@ -53,7 +53,7 @@ Python 脚本位于 `packages/ai/python/` 中。大型可选模型包根据需�
 
 ### API（`apps/api`） {#api-apps-api}
 
-一个 Fastify v5 服务器，暴露跨五种模态（image、video、audio、PDF、file）的 248 个工具路由，负责处理：
+一个 Fastify v5 服务器，暴露跨五种模态（image、video、audio、PDF、file）的 253 个工具路由，负责处理：
 - 文件上传、临时工作区管理以及持久化文件存储
 - 用户文件库（`user_files` 表）：默认情况下，保存的编辑会存储为一个独立的新文件；而当你覆盖原文件时，则存储为一个与父文件链接的版本。它记录所应用的工具（`toolChain`），并为 Files 页面自动生成缩略图
 - 工具执行（将每个工具请求路由到图像引擎或 AI 桥接层）

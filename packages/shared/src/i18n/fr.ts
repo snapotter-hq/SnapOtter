@@ -1050,6 +1050,26 @@ export const fr: TranslationKeys = {
       name: "Compresser un PDF",
       description: "Réduisez la taille du fichier PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Compresser un PDF à 100 KB",
+      description: "Réduisez la taille du fichier PDF sous 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Compresser un PDF à 200 KB",
+      description: "Réduisez la taille du fichier PDF sous 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Compresser un PDF à 500 KB",
+      description: "Réduisez la taille du fichier PDF sous 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Compresser un PDF à 1 MB",
+      description: "Réduisez la taille du fichier PDF sous 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Compresser un PDF à 2 MB",
+      description: "Réduisez la taille du fichier PDF sous 2 MB",
+    },
     "rotate-pdf": {
       name: "Pivoter un PDF",
       description: "Pivotez les pages d’un PDF",
@@ -1399,6 +1419,7 @@ export const fr: TranslationKeys = {
       submitBatch: "Compresser ({count} fichiers)",
       submitTarget: "Compresser à {size} KB",
       resizedToFit: "Redimensionnée en {width} × {height} pour tenir dans {size} KB",
+      batchResized: "{count} images sur {total} ont été réduites pour tenir dans {size} KB.",
       progressLabel: "Compression en cours",
       original: "Original : {size} KB",
       processed: "Traité : {size} KB",
@@ -2025,6 +2046,12 @@ export const fr: TranslationKeys = {
       submitDeepBatch: "Amélioration profonde ({count} fichiers)",
       progressLabel: "Amélioration de l'image",
       progressLabelBatch: "Amélioration de {count} images",
+      deepEnhanceSkippedFailed:
+        "L'amélioration profonde n'a pas pu s'exécuter cette fois, vous obtenez donc l'amélioration standard. Veuillez réessayer.",
+      deepEnhanceSkippedUnavailable:
+        "L'amélioration profonde nécessite le pack Agrandissement et amélioration, qui n'est pas installé : vous obtenez donc l'amélioration standard.",
+      deepEnhanceSkippedAnimated:
+        "L'amélioration profonde ne fonctionne pas sur les images animées : chaque image a reçu l'amélioration standard.",
     },
     "noise-removal": {
       off: "Désactivé",
@@ -3503,6 +3530,8 @@ export const fr: TranslationKeys = {
       printer: "Imprimante (meilleure qualité)",
       submit: "Compresser",
       submitBatch: "Compresser ({count} fichiers)",
+      submitTarget: "Compresser à {size}",
+      batchMissed: "{count} fichiers sur {total} ne sont pas descendus sous {target}.",
       progressLabel: "Compression",
       bestEffortHint:
         "Maximum au mieux. Les PDF composés d'images s'en approchent ; les PDF uniquement texte peuvent ne pas atteindre cette taille.",
@@ -3879,6 +3908,18 @@ export const fr: TranslationKeys = {
     previewUnavailable: "L'aperçu sera disponible après le traitement",
     generatePreview: "Générer l'aperçu",
     previewFailed: "Échec de la génération de l'aperçu",
+    previewEncoderMissing:
+      "Il manque l'encodeur {encoder} au ffmpeg de ce serveur, l'aperçu ne peut donc pas être généré. Contactez votre administrateur.",
+    previewProgressMessages: [
+      "La loutre s'échauffe...",
+      "On mouline les pixels...",
+      "On explique tout au codec...",
+      "Presque fini...",
+      "L'aperçu infuse...",
+      "On négocie avec les images...",
+      "On peaufine le résultat...",
+      "Un instant...",
+    ],
     previewNotAvailable: "Aperçu non disponible",
     resultPreviewFailed: "Échec du chargement de l'aperçu du résultat",
     resultPreviewFailedHint:
@@ -5217,6 +5258,8 @@ export const fr: TranslationKeys = {
     imageControls: "Contrôles d'aperçu",
     zoomControls: "Contrôles de zoom",
     dragToReorder: "Glisser pour réorganiser",
+    resultResizedToFit: "Réduite pour tenir dans la taille cible",
+    resultMissedTarget: "Taille cible non atteinte",
     reverseOrder: "Inverser l'ordre",
     whiteBackground: "Arrière-plan blanc",
     blackBackground: "Arrière-plan noir",

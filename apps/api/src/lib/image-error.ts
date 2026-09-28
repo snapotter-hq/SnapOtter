@@ -1,7 +1,7 @@
 import { isSafeMessageError, isToolInputError, SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import { isPixelSafetyError } from "../modality/image-input.js";
-import type { ToolProcessCtx } from "../routes/tool-factory.js";
+import type { LegacyToolProcessResult, ToolProcessCtx } from "../routes/tool-factory.js";
 import { logger } from "./logger.js";
 
 /** Short single-line messages so friendlyError() passes them to the client verbatim. */
@@ -15,7 +15,7 @@ type ImageProcess<T> = (
   settings: T,
   filename: string,
   ctx?: ToolProcessCtx,
-) => Promise<{ buffer: Buffer; filename: string; contentType: string }>;
+) => Promise<LegacyToolProcessResult>;
 
 /**
  * Wrap an image tool's process function so an otherwise-opaque failure (most

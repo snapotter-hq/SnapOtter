@@ -24,7 +24,6 @@ export function CompressPresetSettings() {
     originalSize,
     processedSize,
     progress,
-    resultPayload,
   } = useToolProcessor(toolId);
 
   const hasFile = files.length > 0;
@@ -75,9 +74,11 @@ export function CompressPresetSettings() {
                 originalSize > 0 ? ((1 - processedSize / originalSize) * 100).toFixed(1) : "0",
             })}
           </p>
-          <CompressResizeNote resultPayload={resultPayload} />
         </div>
       )}
+
+      {/* Scaled-down notes: the selected file, and a batch summary (#1292) */}
+      <CompressResizeNote />
 
       {/* Process button or Progress */}
       {processing ? (

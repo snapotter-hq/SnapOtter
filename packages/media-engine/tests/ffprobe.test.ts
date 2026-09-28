@@ -1,5 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MediaInfo } from "../src/ffprobe.js";
@@ -75,34 +78,45 @@ describe("probeMedia: argv construction", () => {
   });
 
   it("routes argv through the memory-limit wrapper when the cap is set", async () => {
+    // The wrapper preflights a path-shaped binary before handing it to sh
+    // (#1310), so the override has to be a real executable here.
+    const dir = mkdtempSync(join(tmpdir(), "snapotter-ffprobe-stub-"));
+    const stub = join(dir, "ffprobe");
+    writeFileSync(stub, "#!/bin/sh\n");
+    chmodSync(stub, 0o755);
+    process.env.FFPROBE_PATH = stub;
     process.env.SUBPROCESS_MEMORY_LIMIT_MB = "64";
-    const child = makeChild();
-    vi.mocked(spawn).mockReturnValue(child.proc);
-    const { probeMedia } = await import("../src/ffprobe.js");
-    const p = probeMedia("/media/input.mkv");
-    const [bin, args] = vi.mocked(spawn).mock.calls[0];
-    expect(bin).toBe("/bin/sh");
-    expect(args).toEqual([
-      "-c",
-      'ulimit -v "$1" 2>/dev/null || true; shift; exec "$@"',
-      "sh",
-      "65536", // 64 * 1024
-      "/fake/ffprobe",
-      "-v",
-      "error",
-      "-analyzeduration",
-      "10M",
-      "-probesize",
-      "25M",
-      "-print_format",
-      "json",
-      "-show_format",
-      "-show_streams",
-      "/media/input.mkv",
-    ]);
-    child.stdout.emit("data", Buffer.from("{}"));
-    child.proc.emit("close", 0, null);
-    await p;
+    try {
+      const child = makeChild();
+      vi.mocked(spawn).mockReturnValue(child.proc);
+      const { probeMedia } = await import("../src/ffprobe.js");
+      const p = probeMedia("/media/input.mkv");
+      const [bin, args] = vi.mocked(spawn).mock.calls[0];
+      expect(bin).toBe("/bin/sh");
+      expect(args).toEqual([
+        "-c",
+        'ulimit -v "$1" 2>/dev/null || true; shift; exec "$@"',
+        "sh",
+        "65536", // 64 * 1024
+        stub,
+        "-v",
+        "error",
+        "-analyzeduration",
+        "10M",
+        "-probesize",
+        "25M",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        "/media/input.mkv",
+      ]);
+      child.stdout.emit("data", Buffer.from("{}"));
+      child.proc.emit("close", 0, null);
+      await p;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

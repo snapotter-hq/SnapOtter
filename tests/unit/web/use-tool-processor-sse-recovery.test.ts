@@ -155,4 +155,176 @@ describe("useToolProcessor SSE recovery", () => {
 
     unmount();
   });
+
+  // #1287: the onmessage catch used to wrap the whole handler, so a throw
+  // while handling a completion frame was swallowed and the run sat at
+  // "processing" until the stall timer, which only reconnected into the same
+  // throw. Only a malformed frame may be ignored; a handling error fails the
+  // run with a real message and still surfaces.
+  describe("handler errors (#1287)", () => {
+    const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
+    const COMPLETE_FRAME = {
+      data: JSON.stringify({
+        type: "single",
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: "server-job",
+          downloadUrl: "/api/v1/download/server-job/upscaled.png",
+          originalSize: 64,
+          processedSize: 128,
+        },
+      }),
+    } as MessageEvent;
+    // Zustand copies state on every set, so a spy on getState().updateEntry
+    // rides along into later states; put the real action back explicitly.
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    afterEach(() => {
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+    });
+
+    function startRun(opts: { async: boolean }) {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const hook = renderHook(() => useToolProcessor("upscale"));
+      act(() => {
+        hook.result.current.processFiles([file], {});
+      });
+      if (opts.async) {
+        act(() => {
+          xhrs[0].status = 202;
+          xhrs[0].responseText = JSON.stringify({ jobId: "server-job", async: true });
+          xhrs[0].onload?.();
+        });
+      }
+      return hook;
+    }
+
+    it("fails an async run with a real message when completion handling throws", () => {
+      const { unmount } = startRun({ async: true });
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(() => {
+          throw new Error("boom");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      expect(() =>
+        act(() => {
+          MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
+        }),
+      ).toThrow("boom");
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: HANDLER_FAILURE,
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+
+      // Settled for good: the stall timer must not reconnect into the same throw.
+      act(() => {
+        vi.advanceTimersByTime(600_001);
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+
+      unmount();
+    });
+
+    it("settles a sync run even when every store write keeps throwing", () => {
+      const { unmount } = startRun({ async: false });
+      vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+        throw new Error("boom");
+      });
+
+      // The original error is the one that surfaces, not the failed settle.
+      expect(() =>
+        act(() => {
+          MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
+        }),
+      ).toThrow("boom");
+
+      expect(xhrs[0].abort).toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+
+      unmount();
+    });
+
+    it("still ends the run when the failed-frame settle throws", () => {
+      const { unmount } = startRun({ async: true });
+      // The failed branch clears the job id before its entry write, so the
+      // handler-error path must not read that as an already-settled run.
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(() => {
+          throw new Error("boom");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      expect(() =>
+        act(() => {
+          MockEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
+          } as MessageEvent);
+        }),
+      ).toThrow("boom");
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+
+      unmount();
+    });
+
+    it("rethrows the root cause when the teardown itself throws", () => {
+      const { unmount } = startRun({ async: true });
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      // A store listener that breaks on every write: the completion write
+      // throws the root cause, then the teardown's first write throws again.
+      let writes = 0;
+      const unsubscribe = useFileStore.subscribe(() => {
+        writes++;
+        throw new Error(writes === 1 ? "root cause" : "teardown broke");
+      });
+
+      try {
+        expect(() =>
+          act(() => {
+            MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
+          }),
+        ).toThrow("root cause");
+        expect(consoleError).toHaveBeenCalledWith(
+          "SSE teardown after a frame handling error failed",
+          expect.objectContaining({ message: "teardown broke" }),
+        );
+      } finally {
+        unsubscribe();
+        consoleError.mockRestore();
+        unmount();
+      }
+    });
+
+    it("still ignores a malformed frame", () => {
+      const { unmount } = startRun({ async: true });
+
+      act(() => {
+        MockEventSource.instances[0].onmessage?.({ data: "not json" } as MessageEvent);
+      });
+
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(useFileStore.getState().error).toBeNull();
+      expect(useFileStore.getState().entries[0].status).toBe("processing");
+
+      // The run carries on and settles from the next good frame.
+      act(() => {
+        MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
+      });
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+      unmount();
+    });
+  });
 });

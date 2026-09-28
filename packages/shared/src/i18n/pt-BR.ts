@@ -1045,6 +1045,26 @@ export const ptBR: TranslationKeys = {
       name: "Comprimir PDF",
       description: "Reduza o tamanho do arquivo PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Comprimir PDF para 100 KB",
+      description: "Reduza o tamanho do arquivo PDF para menos de 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Comprimir PDF para 200 KB",
+      description: "Reduza o tamanho do arquivo PDF para menos de 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Comprimir PDF para 500 KB",
+      description: "Reduza o tamanho do arquivo PDF para menos de 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Comprimir PDF para 1 MB",
+      description: "Reduza o tamanho do arquivo PDF para menos de 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Comprimir PDF para 2 MB",
+      description: "Reduza o tamanho do arquivo PDF para menos de 2 MB",
+    },
     "rotate-pdf": {
       name: "Girar PDF",
       description: "Gire as páginas de um PDF",
@@ -1393,6 +1413,7 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Comprimir ({count} arquivos)",
       submitTarget: "Comprimir para {size} KB",
       resizedToFit: "Redimensionada para {width} × {height} para caber em {size} KB",
+      batchResized: "{count} de {total} imagens foram reduzidas para caber em {size} KB.",
       progressLabel: "Comprimindo",
       original: "Original: {size} KB",
       processed: "Processado: {size} KB",
@@ -2014,6 +2035,12 @@ export const ptBR: TranslationKeys = {
       submitDeepBatch: "Melhoria profunda ({count} arquivos)",
       progressLabel: "Melhorando imagem",
       progressLabelBatch: "Melhorando {count} imagens",
+      deepEnhanceSkippedFailed:
+        "A melhoria profunda não foi executada desta vez, então você recebeu a melhoria padrão. Tente novamente.",
+      deepEnhanceSkippedUnavailable:
+        "A melhoria profunda requer o pacote de Ampliação e melhoria, que não está instalado, então você recebeu a melhoria padrão.",
+      deepEnhanceSkippedAnimated:
+        "A melhoria profunda não funciona em imagens animadas, então cada quadro recebeu a melhoria padrão.",
     },
     "noise-removal": {
       off: "Desligado",
@@ -3490,6 +3517,8 @@ export const ptBR: TranslationKeys = {
       printer: "Impressora (melhor qualidade)",
       submit: "Comprimir",
       submitBatch: "Comprimir ({count} arquivos)",
+      submitTarget: "Comprimir para {size}",
+      batchMissed: "{count} de {total} arquivos não ficaram abaixo de {target}.",
       progressLabel: "Comprimindo",
       bestEffortHint:
         "Máximo possível. PDFs baseados em imagens chegam perto; PDFs somente com texto podem não reduzir para este tamanho.",
@@ -3865,6 +3894,18 @@ export const ptBR: TranslationKeys = {
     previewUnavailable: "A pré-visualização estará disponível após o processamento",
     generatePreview: "Gerar pré-visualização",
     previewFailed: "Falha ao gerar pré-visualização",
+    previewEncoderMissing:
+      "O ffmpeg deste servidor não tem o codificador {encoder}, por isso não é possível gerar a pré-visualização. Entre em contato com o administrador.",
+    previewProgressMessages: [
+      "A lontra está se aquecendo...",
+      "Triturando pixels...",
+      "Ensinando o codec...",
+      "Quase lá...",
+      "Preparando a pré-visualização...",
+      "Convencendo os quadros...",
+      "Dando um polimento no resultado...",
+      "Só um momento...",
+    ],
     previewNotAvailable: "Pré-visualização indisponível",
     resultPreviewFailed: "Falha ao carregar a pré-visualização do resultado",
     resultPreviewFailedHint:
@@ -5197,6 +5238,8 @@ export const ptBR: TranslationKeys = {
     imageControls: "Controles de visualização",
     zoomControls: "Controles de zoom",
     dragToReorder: "Arraste para reordenar",
+    resultResizedToFit: "Reduzida para caber no tamanho desejado",
+    resultMissedTarget: "Não atingiu o tamanho desejado",
     reverseOrder: "Inverter ordem",
     whiteBackground: "Fundo branco",
     blackBackground: "Fundo preto",

@@ -51,6 +51,7 @@
     "QA_WORKERS",
     "REDIS_URL",
     "REQUIRE_AI_FEATURES",
+    "REQUIRE_REMBG",
     "U2NET_HOME"
   ],
   "tasks": {

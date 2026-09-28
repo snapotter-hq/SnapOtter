@@ -124,6 +124,29 @@ describe.each(["", "/snapotter", "/apps/snapotter"])("deployment at '%s'", (base
       await app.close();
     }
   });
+
+  it("404s missing assets after the prefix is stripped, and keeps the shell for deep links (#1275)", async () => {
+    config.BASE_PATH = basePath;
+    const app = Fastify({ rewriteUrl: (request) => stripBasePath(request.url ?? "/", basePath) });
+    await registerStatic(app, root);
+    try {
+      // Prefix kept by the proxy, and prefix already stripped by it.
+      for (const url of [
+        `${basePath}/assets/gone.js`,
+        `${basePath}/assets/gone.css?v=1`,
+        "/assets/gone.js",
+      ]) {
+        const response = await app.inject(url);
+        expect(response.statusCode, url).toBe(404);
+        expect(response.headers["content-type"]).toContain("text/plain");
+      }
+      const deepLink = await app.inject(`${basePath}/image/resize`);
+      expect(deepLink.statusCode).toBe(200);
+      expect(deepLink.body).toContain(`<base href="${basePath}/"`);
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 it("does not strip a similar prefix or alter query strings", () => {
@@ -201,6 +224,162 @@ describe("index.html <base> rewrite", () => {
     } finally {
       await app.close();
       rmSync(stale, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("SPA fallback disambiguation (#1275)", () => {
+  function captureWarnings(app: ReturnType<typeof Fastify>) {
+    const warnings: string[] = [];
+    vi.spyOn(app.log, "warn").mockImplementation((message: unknown) => {
+      warnings.push(String(message));
+    });
+    return warnings;
+  }
+
+  it("answers asset-shaped misses with 404 instead of the shell", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const url of [
+        "/assets/gone.js",
+        "/assets/gone.css",
+        "/assets/gone.js?v=9a3b",
+        "/assets/pdf.worker.mjs",
+        "/assets/app.js.map",
+        "/assets/gone.png",
+        "/deep/gone.js",
+        "/gone.css",
+        "/gone.wasm",
+        // A prefix-preserving proxy with BASE_PATH unset reaches the same spots.
+        "/snapotter/assets/gone.js",
+        "/apps/snapotter/gone.css",
+      ]) {
+        const response = await app.inject(url);
+        expect(response.statusCode, url).toBe(404);
+        expect(response.headers["content-type"]).toContain("text/plain");
+      }
+      // Router deep links keep the shell. An image outside /assets/ is not
+      // asset-shaped on purpose: only build output (/assets/, scripts, styles,
+      // source maps, wasm) can never be a page.
+      for (const url of ["/files", "/image/resize", "/deep/route?lang=fr", "/snapotter/gone.png"]) {
+        const response = await app.inject(url);
+        expect(response.statusCode, url).toBe(200);
+        expect(response.body).toContain("<base href");
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("still serves real public files, including root scripts", async () => {
+    const dist = mkdtempSync(join(tmpdir(), "snapotter-public-"));
+    writeFileSync(join(dist, "index.html"), '<html><head><base href="/" /></head></html>');
+    writeFileSync(join(dist, "manifest.json"), '{"name":"SnapOtter"}');
+    writeFileSync(join(dist, "sw.js"), "self.addEventListener('fetch', () => {})");
+    const app = Fastify();
+    await registerStatic(app, dist);
+    try {
+      expect((await app.inject("/manifest.json")).json()).toEqual({ name: "SnapOtter" });
+      const sw = await app.inject("/sw.js");
+      expect(sw.statusCode).toBe(200);
+      expect(sw.body).toContain("addEventListener");
+    } finally {
+      await app.close();
+      rmSync(dist, { recursive: true, force: true });
+    }
+  });
+
+  it("answers non-GET misses with 404 instead of the shell", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const method of ["POST", "PUT", "DELETE"] as const) {
+        const response = await app.inject({ method, url: "/snapotter/api/v1/tools/image/resize" });
+        expect(response.statusCode, method).toBe(404);
+        expect(response.body).not.toContain("<html");
+      }
+      expect((await app.inject({ method: "HEAD", url: "/files" })).statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("warns once per undeclared prefix, including for missing chunks", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warnings = captureWarnings(app);
+    try {
+      // The shell (200) is still served for the page; the warning is the diagnostic.
+      for (const call of [1, 2, 3]) {
+        const response = await app.inject(`/snapotter/api/v1/config/analytics?n=${call}`);
+        expect(response.statusCode).toBe(200);
+      }
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("BASE_PATH=/snapotter");
+      expect(warnings[0]).not.toContain("config/analytics");
+
+      // A missing chunk under another undeclared prefix is a 404 and still warns.
+      expect((await app.inject("/other/assets/index-abc.js")).statusCode).toBe(404);
+      expect(warnings).toHaveLength(2);
+      expect(warnings[1]).toContain("BASE_PATH=/other");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("stops recording prefixes after a small cap", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warnings = captureWarnings(app);
+    try {
+      for (let i = 0; i < 50; i++) await app.inject(`/p${i}/api/x`);
+      expect(warnings).toHaveLength(8);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("never suggests a prefix BASE_PATH would reject", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warnings = captureWarnings(app);
+    try {
+      for (const url of ["//api/x", "/a.b/api/x", "/%2e%2e/api/x", "/a%20b/assets/x"]) {
+        await app.inject(url);
+      }
+      expect(warnings).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("stays silent once BASE_PATH is set", async () => {
+    config.BASE_PATH = "/snapotter";
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warnings = captureWarnings(app);
+    try {
+      await app.inject("/other/api/x");
+      await app.inject("/other/assets/x.js");
+      expect(warnings).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps the warning silent when the second segment is unrelated", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    const warnings = captureWarnings(app);
+    try {
+      await app.inject("/snapotter");
+      await app.inject("/snapotter/login");
+      await app.inject("/files");
+      await app.inject("/snapotter/image/resize");
+      expect(warnings).toEqual([]);
+    } finally {
+      await app.close();
     }
   });
 });

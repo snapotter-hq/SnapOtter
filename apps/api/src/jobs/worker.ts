@@ -46,6 +46,12 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
+import { type BatchFileNotes, pickBatchFileNotes } from "../lib/batch-file-notes.js";
+import {
+  binaryOverrideWarning,
+  checkBinaryOverrides,
+  probeFailureLevel,
+} from "../lib/binary-overrides.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError, sharedFailureReason } from "../lib/errors.js";
@@ -1420,6 +1426,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     filename: string;
     outputRef?: string;
     error?: string;
+    notes?: BatchFileNotes;
   }> = [];
 
   let canceledChildren = 0;
@@ -1434,7 +1441,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
     if (row.status === "completed" && row.outputRefs?.[0]) {
       const outFilename = row.outputRefs[0].split("/").pop() ?? "output";
-      manifest.push({ index: i, filename: outFilename, outputRef: row.outputRefs[0] });
+      const notes = pickBatchFileNotes(
+        (row.progress as { result?: Record<string, unknown> } | null)?.result,
+      );
+      manifest.push({
+        index: i,
+        filename: outFilename,
+        outputRef: row.outputRefs[0],
+        ...(notes ? { notes } : {}),
+      });
     } else {
       if (row.status === "canceled") canceledChildren++;
       const errorMsg = (row.error as { message?: string } | null)?.message ?? "Processing failed";
@@ -1447,12 +1462,17 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   // frame's fileResults, and the route's X-File-Results header cannot drift.
   const getUniqueName = createUniqueNamer();
   const fileResults: Record<string, string> = {};
+  // Per-file notes a single run shows (#1292), keyed exactly like fileResults
+  // so they land on the same upload after the flow-to-upload remap.
+  const fileNotes: Record<string, BatchFileNotes> = {};
   const successEntries: Array<{ filename: string; outputRef: string }> = [];
   for (const entry of manifest) {
     if (!entry.outputRef) continue;
     const uniqueName = getUniqueName(entry.filename);
     entry.filename = uniqueName;
-    fileResults[String(fileIndexMap?.[entry.index] ?? entry.index)] = uniqueName;
+    const uploadIndex = String(fileIndexMap?.[entry.index] ?? entry.index);
+    fileResults[uploadIndex] = uniqueName;
+    if (entry.notes) fileNotes[uploadIndex] = entry.notes;
     successEntries.push({ filename: uniqueName, outputRef: entry.outputRef });
   }
 
@@ -1553,6 +1573,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     downloadUrl: `/api/v1/download/${data.jobId}/${encodeURIComponent(zipFilename)}`,
     zipFilename,
     fileResults,
+    fileNotes,
     processedSize: zipSize,
   };
 
@@ -1589,7 +1610,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     resultPayload: {
       manifest,
       ...(canceled ? { canceled: true } : {}),
-      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults },
+      zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults, fileNotes },
     },
   };
 }
@@ -1722,21 +1743,36 @@ export function startWorkers(): void {
   logger.info(
     `Workers started: ${POOLS.map((p) => `${p}(${p === "system" || p === "ai" ? 1 : concurrency})`).join(", ")}`,
   );
+  logBinaryOverrides();
   logHwAccel();
   logMissingSoftwareEncoders();
 }
 
 /**
+ * Name every *_PATH override that does not point at an executable file, so
+ * the admin learns it at boot rather than from a masked 500 on the first
+ * upload (#1310). The resolvers return the override unchecked, so nothing
+ * falls back: every job that needs the binary fails until it is fixed.
+ */
+function logBinaryOverrides(): void {
+  for (const problem of checkBinaryOverrides(process.env)) {
+    logger.warn({ variable: problem.variable, path: problem.path }, binaryOverrideWarning(problem));
+  }
+}
+
+/**
  * Name the software encoders a custom FFMPEG_PATH build lacks, so an admin
  * learns it at boot rather than from the first failed job (#1092). A failed
- * probe is only info: jobs fail open on it, so nothing breaks, but the check
- * is off for the life of the process and that should leave a trace.
+ * probe is info for the image's own binary: jobs fail open on it, so nothing
+ * breaks, but the check is off for the life of the process and that should
+ * leave a trace. With an explicit FFMPEG_PATH it is a misconfiguration and
+ * goes out at warn, where production log filters still show it (#1310).
  */
 function logMissingSoftwareEncoders(): void {
   const { missing, probeError } = softwareEncoderStatus();
   if (probeError) {
-    logger.info(
-      { probeError },
+    logger[probeFailureLevel(process.env.FFMPEG_PATH)](
+      { probeError, ffmpegPath: process.env.FFMPEG_PATH },
       `Could not read the ffmpeg encoder list (${probeError}); software encoders will not be checked before use`,
     );
     return;

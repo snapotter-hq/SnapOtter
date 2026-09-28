@@ -1,8 +1,11 @@
 import crypto from "node:crypto";
 import { createRequire } from "node:module";
+import os from "node:os";
 import { join } from "node:path";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
+import { dropRunLeftovers } from "./setup/fork-db.js";
+import { removeOrphanedForkDirs } from "./setup/fork-dir.js";
 
 // pg and drizzle-orm live in the api workspace's node_modules. Global-setup
 // files run outside Vite's transform pipeline, so vitest resolve.alias does
@@ -32,6 +35,12 @@ const TEST_RUNTIME_ROLE = "snapotter_app_test";
 const TEST_RUNTIME_PASSWORD = "snapotter_app_test_pw";
 
 export async function setup(): Promise<void> {
+  // Workers killed before their exit handler ran leave their workspace behind
+  // (#1004); clear those from earlier runs before this one adds its own.
+  const swept = removeOrphanedForkDirs(os.tmpdir());
+  if (swept.length > 0) {
+    console.log(`[fork-dir] removed ${swept.length} orphaned test workspaces`);
+  }
   // Base server: testcontainer by default, or an existing server via
   // TEST_DATABASE_URL (must allow CREATE DATABASE, e.g. postgres://...:5432/postgres).
   let baseUrl: string;
@@ -114,6 +123,24 @@ export async function setup(): Promise<void> {
 }
 
 export async function teardown(): Promise<void> {
+  // Every fork has exited by now, so whatever per-file databases and roles the
+  // run's own sweeps didn't get to can go. Only on a TEST_DATABASE_URL server,
+  // where they'd otherwise pile up run after run (#1315); our own testcontainer
+  // is about to be thrown away with everything in it.
+  const baseUrl = process.env.TEST_PG_BASE_URL;
+  const runId = process.env.TEST_RUN_ID;
+  if (!container && baseUrl && runId) {
+    try {
+      const { failed } = await dropRunLeftovers(baseUrl, TEST_RUNTIME_ROLE, runId);
+      if (failed.length > 0) {
+        console.warn(
+          `[global-setup] could not drop these test databases and roles; remove them by hand: ${failed.join(", ")}`,
+        );
+      }
+    } catch (err) {
+      console.warn("[global-setup] could not clear this run's test databases and roles", err);
+    }
+  }
   await redisContainer?.stop();
   await container?.stop();
 }

@@ -117,7 +117,7 @@ test.describe("Editor Navigation", () => {
   });
 
   test("editor skip link focuses the main landmark", async ({ editorPage: page }) => {
-    const skipLink = page.locator('a[href="#main-content"]');
+    const skipLink = page.locator('a[href$="#main-content"]');
     await skipLink.focus();
 
     await page.keyboard.press("Enter");

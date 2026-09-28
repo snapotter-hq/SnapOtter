@@ -5,8 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   dropForkDatabase,
   dropOrphanedForkDatabases,
+  dropOrphanedForkRoles,
+  dropRunLeftovers,
   forkDatabaseName,
   forkDatabaseOwner,
+  forkRoleName,
+  forkRoleOwner,
 } from "../../setup/fork-db.js";
 
 /**
@@ -24,6 +28,19 @@ import {
 const baseUrl = process.env.TEST_PG_BASE_URL as string;
 const runId = process.env.TEST_RUN_ID as string;
 const ownDb = new URL(process.env.TEST_PRIVILEGED_DATABASE_URL as string).pathname.slice(1);
+
+/** A pid that just exited, so nothing can own a database or role named after it. */
+function deadPid(): number {
+  const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"]);
+  const pid = Number(child.stdout.toString());
+  if (child.status !== 0 || !Number.isInteger(pid)) {
+    throw new Error(`could not get a dead pid: ${child.error ?? child.stderr.toString()}`);
+  }
+  return pid;
+}
+
+/** A run id no other run shares, so tests on one shared server can't collide. */
+const otherRunId = () => crypto.randomBytes(4).toString("hex");
 
 // TEST_DATABASE_URL points the suite at a server someone else runs; there is
 // no testcontainer of ours to inspect then. Otherwise global-setup recorded it.
@@ -53,12 +70,6 @@ describe("per-file database cleanup (#1277)", () => {
 
   const exists = async (name: string) =>
     (await adminQuery("SELECT 1 FROM pg_database WHERE datname = $1", [name])).length > 0;
-
-  /** A pid that just exited, so nothing can own a database named after it. */
-  function deadPid(): number {
-    const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"]);
-    return Number(child.stdout.toString());
-  }
 
   it("ran the sweep in this file's own setup", () => {
     // tests/setup/per-fork-env.ts sets this right after sweeping. Without the
@@ -110,8 +121,7 @@ describe("per-file database cleanup (#1277)", () => {
   it("leaves another run's databases alone, even with a dead owner", async () => {
     // Another run's pids may belong to another pid namespace, where "not
     // running here" says nothing about whether they're alive.
-    const otherRunId = runId === "00000000" ? "11111111" : "00000000";
-    const otherRun = forkDatabaseName(otherRunId, deadPid());
+    const otherRun = forkDatabaseName(otherRunId(), deadPid());
     await adminQuery(`CREATE DATABASE ${otherRun}`);
     try {
       expect(forkDatabaseOwner(otherRun, runId)).toBeNull();
@@ -140,5 +150,105 @@ describe("per-file database cleanup (#1277)", () => {
   it("is a no-op for a database that is already gone", async () => {
     const name = `snapotter_hygiene_${crypto.randomUUID().slice(0, 8)}`;
     await expect(dropForkDatabase(baseUrl, name)).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * #1315. Each test file also logs in as its own role, and nothing dropped
+ * those either: harmless on the throwaway testcontainer, but on a long-lived
+ * TEST_DATABASE_URL server every run left one role per file behind, plus its
+ * last files' databases, which only a later sweep of the same run would clear.
+ */
+describe("per-file login role cleanup (#1315)", () => {
+  const runtimeRole = process.env.TEST_RUNTIME_ROLE as string;
+
+  async function adminQuery<T extends pg.QueryResultRow>(sql: string, params: unknown[] = []) {
+    const admin = new pg.Client({ connectionString: baseUrl });
+    await admin.connect();
+    try {
+      return (await admin.query<T>(sql, params)).rows;
+    } finally {
+      await admin.end();
+    }
+  }
+
+  const roleExists = async (name: string) =>
+    (await adminQuery("SELECT 1 FROM pg_roles WHERE rolname = $1", [name])).length > 0;
+  const dbExists = async (name: string) =>
+    (await adminQuery("SELECT 1 FROM pg_database WHERE datname = $1", [name])).length > 0;
+
+  it("ran the role sweep in this file's own setup", () => {
+    expect(process.env.TEST_FORK_ROLE_SWEEP_RAN).toBe("1");
+  });
+
+  it("logs this file in as a role named in the format the sweep reads back", async () => {
+    const ownRole = decodeURIComponent(new URL(process.env.DATABASE_URL as string).username);
+    expect(forkRoleOwner(ownRole, runtimeRole, runId)).toBe(process.pid);
+    expect(await roleExists(ownRole)).toBe(true);
+  });
+
+  it("gives two roles for the same pid different names", () => {
+    // A reused pid must never find an old role and skip CREATE ROLE while a
+    // sweeper is about to drop that old role out from under it.
+    expect(forkRoleName(runtimeRole, runId, 4242)).not.toBe(forkRoleName(runtimeRole, runId, 4242));
+  });
+
+  it("drops this run's roles whose test process has exited and keeps live ones", async () => {
+    const orphan = forkRoleName(runtimeRole, runId, deadPid());
+    const live = forkRoleName(runtimeRole, runId, process.pid);
+    await adminQuery(`CREATE ROLE ${orphan} LOGIN IN ROLE ${runtimeRole}`);
+    await adminQuery(`CREATE ROLE ${live} LOGIN IN ROLE ${runtimeRole}`);
+    try {
+      const dropped = await dropOrphanedForkRoles(baseUrl, runtimeRole, runId);
+      expect(dropped).not.toContain(live);
+      // End state: another fork's sweep may be the one that drops it.
+      expect(await roleExists(orphan)).toBe(false);
+      expect(await roleExists(live)).toBe(true);
+      expect(await roleExists(runtimeRole)).toBe(true);
+    } finally {
+      await adminQuery(`DROP ROLE IF EXISTS ${live}`);
+    }
+  });
+
+  it("leaves another run's roles alone, even with a dead owner", async () => {
+    const other = forkRoleName(runtimeRole, otherRunId(), deadPid());
+    await adminQuery(`CREATE ROLE ${other} LOGIN IN ROLE ${runtimeRole}`);
+    try {
+      expect(forkRoleOwner(other, runtimeRole, runId)).toBeNull();
+      await dropOrphanedForkRoles(baseUrl, runtimeRole, runId);
+      expect(await roleExists(other)).toBe(true);
+    } finally {
+      await adminQuery(`DROP ROLE IF EXISTS ${other}`);
+    }
+  });
+
+  it("clears a finished run's databases and roles at the end of the run", async () => {
+    // Stands in for global teardown: a separate run with a dead file's
+    // database and role still present, and one whose pid is alive (a reused
+    // pid, say). Teardown drops both, since every fork of the run is gone.
+    const finishedRun = otherRunId();
+    const pid = deadPid();
+    const db = forkDatabaseName(finishedRun, pid);
+    const role = forkRoleName(runtimeRole, finishedRun, pid);
+    const liveDb = forkDatabaseName(finishedRun, process.pid);
+    const liveRole = forkRoleName(runtimeRole, finishedRun, process.pid);
+    const otherRunDb = forkDatabaseName(otherRunId(), pid);
+    await adminQuery(`CREATE DATABASE ${db}`);
+    await adminQuery(`CREATE DATABASE ${liveDb}`);
+    await adminQuery(`CREATE DATABASE ${otherRunDb}`);
+    await adminQuery(`CREATE ROLE ${role} LOGIN IN ROLE ${runtimeRole}`);
+    await adminQuery(`CREATE ROLE ${liveRole} LOGIN IN ROLE ${runtimeRole}`);
+    try {
+      const cleared = await dropRunLeftovers(baseUrl, runtimeRole, finishedRun);
+      expect(cleared.databases.sort()).toEqual([db, liveDb].sort());
+      expect(cleared.roles.sort()).toEqual([role, liveRole].sort());
+      expect(cleared.failed).toEqual([]);
+      for (const name of [db, liveDb]) expect(await dbExists(name)).toBe(false);
+      for (const name of [role, liveRole]) expect(await roleExists(name)).toBe(false);
+      expect(await dbExists(otherRunDb)).toBe(true);
+    } finally {
+      for (const name of [otherRunDb, db, liveDb]) await dropForkDatabase(baseUrl, name);
+      for (const name of [role, liveRole]) await adminQuery(`DROP ROLE IF EXISTS ${name}`);
+    }
   });
 });

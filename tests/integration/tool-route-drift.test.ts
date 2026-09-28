@@ -1,4 +1,4 @@
-import { apiToolPath, CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
+import { apiToolPath, COMPRESS_PRESETS, CONVERSION_PRESETS, TOOLS } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getRegisteredToolIds, getToolConfig } from "../../apps/api/src/routes/tool-factory.js";
@@ -94,7 +94,8 @@ describe("tool route drift", () => {
    */
   it("every batch-dispatched conversion preset answers on POST .../batch", async () => {
     const { body, contentType } = createMultipartPayload([{ name: "settings", content: "{}" }]);
-    for (const preset of CONVERSION_PRESETS) {
+    // Compress presets batch through the same panels (#1070 added PDF ones).
+    for (const preset of [...CONVERSION_PRESETS, ...COMPRESS_PRESETS]) {
       if (MULTI_FILE_TOOLS.has(preset.id)) continue;
       const res = await testApp.app.inject({
         method: "POST",

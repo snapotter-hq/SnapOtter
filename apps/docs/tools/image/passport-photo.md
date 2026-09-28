@@ -89,7 +89,7 @@ Crops, resizes, and optionally tiles the photo onto a print sheet. Uses cached i
 | documentType | string | No | `"passport"` | Document type (from country spec) |
 | bgColor | string | No | `"#FFFFFF"` | Background color hex |
 | printLayout | string | No | `"none"` | Print paper layout: `none`, `4x6`, `a4` |
-| maxFileSizeKb | number | No | `0` | Max file size constraint in KB (0 = no limit) |
+| maxFileSizeKb | number | No | `0` | Max file size in KB, where 1 KB = 1000 bytes (0 = no limit) |
 | dpi | number | No | `300` | Output DPI (72-1200) |
 | customWidthMm | number | No | - | Custom photo width in mm (overrides country spec) |
 | customHeightMm | number | No | - | Custom photo height in mm (overrides country spec) |
@@ -167,4 +167,4 @@ Returns guidance to use the correct sub-endpoint.
 - The `preview` field in the analyze response is a base64-encoded PNG (max 800px wide) for fast display.
 - Country specs include document dimensions, head height ratios, and eye-line positioning based on official passport photo requirements.
 - The `printLayout` option generates a tiled sheet on 4x6" or A4 paper with 2mm gutters between photos.
-- When `maxFileSizeKb` is set, the output is iteratively compressed to fit within the size limit.
+- When `maxFileSizeKb` is set, the output's JPEG quality is lowered step by step until it fits. The pixel size is fixed by the country spec, so if the photo still doesn't fit at the lowest quality, `/generate` returns 422 with a message saying so, rather than a file over the limit.

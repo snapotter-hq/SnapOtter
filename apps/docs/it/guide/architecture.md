@@ -53,7 +53,7 @@ Tipi TypeScript condivisi, costanti (come `APP_VERSION` e le definizioni degli s
 
 ### API (`apps/api`) {#api-apps-api}
 
-Un server Fastify v5 che espone 248 route di strumenti su cinque modalità (immagine, video, audio, PDF, file) e gestisce:
+Un server Fastify v5 che espone 253 route di strumenti su cinque modalità (immagine, video, audio, PDF, file) e gestisce:
 - Upload di file, gestione dello spazio di lavoro temporaneo e archiviazione persistente dei file
 - Libreria di file utente (tabella `user_files`): per impostazione predefinita, una modifica salvata viene archiviata come nuovo file indipendente, oppure come versione collegata al genitore quando sovrascrivi l'originale. Registra quali strumenti sono stati applicati (`toolChain`) e ottiene una miniatura auto-generata per la pagina File
 - Esecuzione degli strumenti (instrada ogni richiesta di strumento all'image engine o all'AI bridge)

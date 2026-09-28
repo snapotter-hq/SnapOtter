@@ -100,6 +100,9 @@ const BASE_TOOLS: Tool[] = [
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
     executionHint: "fast",
+    // An exact "compress" keeps this ahead of the compress-image-to-N-kb
+    // presets, whose many "compress ..." keywords otherwise win a bare query (#1322).
+    keywords: ["compress", "compress image", "reduce file size", "shrink image"],
   },
   // Optimization
   {
@@ -831,6 +834,9 @@ const BASE_TOOLS: Tool[] = [
     modality: "image",
     acceptedInputs: IMAGE_INPUTS,
     executionHint: "fast",
+    // The tool's name and localized description never say "vectorize", so
+    // searching the id word only matched the id (#1327).
+    keywords: ["vectorize"],
   },
   {
     id: "gif-tools",
@@ -1386,6 +1392,9 @@ const BASE_TOOLS: Tool[] = [
     // "long": the target-size mode runs several ghostscript passes; async keeps
     // the request off the sync window and surfaces a real progress bar.
     executionHint: "long",
+    // The compress-pdf-to-N presets repeat these words in every keyword; without
+    // its own, the base tool lost "shrink pdf" to them (#1070, same as #1322).
+    keywords: ["compress pdf", "shrink pdf", "reduce pdf size", "pdf compressor"],
   },
   {
     id: "rotate-pdf",

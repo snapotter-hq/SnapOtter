@@ -29,7 +29,7 @@ Accepts multipart form data with one or more image files and a JSON `settings` f
 | value | number | Yes | Target size value |
 | unit | string | Yes | Unit: `KB` or `MB` |
 
-Minimum target size is 50 KB.
+Units are decimal, the way upload portals count them: 1 KB = 1000 bytes and 1 MB = 1,000,000 bytes. Minimum target size is 50 KB (50,000 bytes).
 
 ## Example Request {#example-request}
 

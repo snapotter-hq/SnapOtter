@@ -6,18 +6,9 @@ import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
+import { format } from "@/lib/format";
+import { previewFailureEncoder } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
-
-const PROGRESS_MESSAGES = [
-  "Warming up the otter...",
-  "Crunching pixels...",
-  "Teaching the codec...",
-  "Almost there...",
-  "Brewing the preview...",
-  "Convincing the frames...",
-  "Polishing the output...",
-  "Just a moment...",
-];
 
 type PreviewState = "idle" | "generating" | "ready" | "error";
 
@@ -40,6 +31,9 @@ export function NonNativePreview({
   const { t } = useTranslation();
   const [state, setState] = useState<PreviewState>("idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Set when the server's ffmpeg lacks the encoder this preview needs (#1290).
+  const [missingEncoder, setMissingEncoder] = useState<string | null>(null);
+  // Set when the upload is over the server's size limit (#1280).
   const [tooLarge, setTooLarge] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -54,10 +48,26 @@ export function NonNativePreview({
     };
   }, [previewUrl]);
 
+  // A new file starts from scratch. Without this, the last file's preview, or
+  // an error naming the encoder it needed, stayed on screen for the next one.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resets on a file change, which these props are
+  useEffect(() => {
+    abortRef.current?.abort();
+    setState("idle");
+    setMissingEncoder(null);
+    setTooLarge(false);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, [file, src, filename, modality]);
+
   const startMessageRotation = useCallback(() => {
     setMessageIndex(0);
     intervalRef.current = setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+      // Wrapped at render against the live locale's array, so a locale switch
+      // mid-rotation can't leave the index past its end.
+      setMessageIndex((prev) => prev + 1);
     }, 2500);
   }, []);
 
@@ -68,25 +78,13 @@ export function NonNativePreview({
     }
   }, []);
 
-  // The call sites don't key this component per file, so a new input has to
-  // reset it here. Otherwise the last file's error (a 413 with no Retry) or
-  // its finished preview shows under this one, and a request still in flight
-  // for the old file could land after the switch.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: file, src, and filename are the triggers
-  useEffect(() => {
-    abortRef.current?.abort();
-    stopMessageRotation();
-    setState("idle");
-    setTooLarge(false);
-    setPreviewUrl(null);
-  }, [file, src, filename, stopMessageRotation]);
-
   const generatePreview = useCallback(async () => {
     setState("generating");
     startMessageRotation();
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let encoder: string | null = null;
 
     try {
       let fileToUpload = file;
@@ -109,6 +107,7 @@ export function NonNativePreview({
       });
 
       if (!response.ok) {
+        encoder = await previewFailureEncoder(response);
         // The status goes in the message: Sentry's scrubber keeps a
         // SafeError's message but drops its code.
         throw new SafeError(`Media preview generation failed (HTTP ${response.status})`, {
@@ -126,14 +125,17 @@ export function NonNativePreview({
       setPreviewUrl(url);
       setState("ready");
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
+      // Checked on the signal, not the error: an abort while the error body
+      // was being read surfaces as an ordinary failure.
+      if (!controller.signal.aborted) {
         const status = err instanceof SafeError ? err.statusCode : undefined;
+        setMissingEncoder(encoder);
         setTooLarge(status === 413);
         setState("error");
-        // A 413 (over the upload limit) or 422 (ffmpeg couldn't decode it) is
-        // about the file, and the panel says so. Anything else, whether a 5xx,
-        // an expired session, a rate limit, or a failed request, is a fault
-        // nobody would otherwise hear about (#1280).
+        // A 413 (over the upload limit) or 422 (ffmpeg couldn't decode it, or
+        // lacks the encoder) is about the file, and the panel says so.
+        // Anything else, whether a 5xx, an expired session, a rate limit, or a
+        // failed request, is a fault nobody would otherwise hear about (#1280).
         if (status !== 413 && status !== 422) {
           void captureHandledError(
             err instanceof SafeError
@@ -182,6 +184,7 @@ export function NonNativePreview({
 
   // Generating state: progress bar + rotating messages
   if (state === "generating") {
+    const previewMessages = t.toolPage.previewProgressMessages;
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center p-8 max-w-xs w-full">
@@ -201,7 +204,9 @@ export function NonNativePreview({
               )}
             />
           </div>
-          <p className="text-sm text-muted-foreground">{PROGRESS_MESSAGES[messageIndex]}</p>
+          <p className="text-sm text-muted-foreground">
+            {previewMessages[messageIndex % previewMessages.length]}
+          </p>
         </div>
       </div>
     );
@@ -216,7 +221,11 @@ export function NonNativePreview({
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
           <p className="font-medium text-foreground mb-1">
-            {tooLarge ? t.errors.fileTooLarge : t.toolPage.previewFailed}
+            {tooLarge
+              ? t.errors.fileTooLarge
+              : missingEncoder
+                ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
+                : t.toolPage.previewFailed}
           </p>
           <p className="text-sm text-muted-foreground mb-3">
             {filename}

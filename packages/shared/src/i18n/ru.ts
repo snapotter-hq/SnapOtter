@@ -1046,6 +1046,26 @@ export const ru: TranslationKeys = {
       name: "Сжатие PDF",
       description: "Уменьшение размера файла PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Сжатие PDF до 100 KB",
+      description: "Уменьшение размера файла PDF до 100 KB и меньше",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Сжатие PDF до 200 KB",
+      description: "Уменьшение размера файла PDF до 200 KB и меньше",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Сжатие PDF до 500 KB",
+      description: "Уменьшение размера файла PDF до 500 KB и меньше",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Сжатие PDF до 1 MB",
+      description: "Уменьшение размера файла PDF до 1 MB и меньше",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Сжатие PDF до 2 MB",
+      description: "Уменьшение размера файла PDF до 2 MB и меньше",
+    },
     "rotate-pdf": {
       name: "Поворот PDF",
       description: "Поворот страниц в PDF",
@@ -1392,6 +1412,7 @@ export const ru: TranslationKeys = {
       submitBatch: "Сжать ({count} файлов)",
       submitTarget: "Сжать до {size} KB",
       resizedToFit: "Уменьшено до {width} × {height}, чтобы уложиться в {size} KB",
+      batchResized: "Уменьшено изображений: {count} из {total}, чтобы уложиться в {size} KB.",
       progressLabel: "Сжатие",
       original: "Оригинал: {size} KB",
       processed: "Обработано: {size} KB",
@@ -2013,6 +2034,12 @@ export const ru: TranslationKeys = {
       submitDeepBatch: "Глубокое улучшение ({count} файлов)",
       progressLabel: "Улучшение изображения",
       progressLabelBatch: "Улучшение {count} изображений",
+      deepEnhanceSkippedFailed:
+        "Глубокое улучшение в этот раз не сработало, поэтому применено стандартное улучшение. Попробуйте снова.",
+      deepEnhanceSkippedUnavailable:
+        "Для глубокого улучшения нужен пакет увеличения и улучшения, но он не установлен, поэтому применено стандартное улучшение.",
+      deepEnhanceSkippedAnimated:
+        "Глубокое улучшение не работает с анимированными изображениями, поэтому к каждому кадру применено стандартное улучшение.",
     },
     "noise-removal": {
       off: "Выкл.",
@@ -3488,6 +3515,8 @@ export const ru: TranslationKeys = {
       printer: "Печать (лучшее качество)",
       submit: "Сжать",
       submitBatch: "Сжать ({count} файлов)",
+      submitTarget: "Сжать до {size}",
+      batchMissed: "Файлов, не уложившихся в {target}: {count} из {total}.",
       progressLabel: "Сжатие",
       bestEffortHint:
         "Максимум по возможности. PDF на основе изображений приближаются к этому размеру; PDF только с текстом могут не уменьшиться до него.",
@@ -3864,6 +3893,18 @@ export const ru: TranslationKeys = {
     previewUnavailable: "Предпросмотр будет доступен после обработки",
     generatePreview: "Сгенерировать предпросмотр",
     previewFailed: "Не удалось сгенерировать предпросмотр",
+    previewEncoderMissing:
+      "В ffmpeg на этом сервере нет кодировщика {encoder}, поэтому не удаётся создать предпросмотр. Обратитесь к администратору.",
+    previewProgressMessages: [
+      "Выдра разминается...",
+      "Перемалываем пиксели...",
+      "Объясняем всё кодеку...",
+      "Почти готово...",
+      "Предпросмотр заваривается...",
+      "Уговариваем кадры...",
+      "Наводим лоск на результат...",
+      "Минуточку...",
+    ],
     previewNotAvailable: "Предпросмотр недоступен",
     resultPreviewFailed: "Не удалось загрузить предпросмотр результата",
     resultPreviewFailedHint:
@@ -5192,6 +5233,8 @@ export const ru: TranslationKeys = {
     imageControls: "Управление предпросмотром",
     zoomControls: "Управление масштабом",
     dragToReorder: "Перетащите для изменения порядка",
+    resultResizedToFit: "Уменьшено, чтобы уложиться в целевой размер",
+    resultMissedTarget: "Целевой размер не достигнут",
     reverseOrder: "Обратить порядок",
     whiteBackground: "Белый фон",
     blackBackground: "Чёрный фон",

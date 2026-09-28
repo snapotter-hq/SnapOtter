@@ -16,7 +16,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -36,6 +36,13 @@ const settingsSchema = z.object({
 });
 
 type EnhancementSettings = z.infer<typeof settingsSchema>;
+
+/**
+ * Why a requested Deep Enhance pass did not run, returned to the client as
+ * `resultPayload.deepEnhanceSkipped` so the panel can say so instead of
+ * presenting the standard result as the deep one (#950).
+ */
+export type DeepEnhanceSkipReason = "failed" | "unavailable" | "animated";
 
 export async function processImageEnhancement(
   rawBuffer: Buffer,
@@ -63,10 +70,12 @@ export async function processImageEnhancement(
     throw await asInputErrorIfUndecodable(rawBuffer, err);
   }
 
+  let deepEnhanceSkipped: DeepEnhanceSkipReason | undefined;
+
   // The alpha channel is split out and rejoined through separate pipelines, and
   // a rejoin re-opens the buffer as a still, so animation is handled a frame at
   // a time (#1083).
-  const core = async (frameBuffer: Buffer): Promise<Buffer> => {
+  const core = async (frameBuffer: Buffer, allowDeep: boolean): Promise<Buffer> => {
     let inputBuffer = frameBuffer;
     const inputMeta = await sharp(inputBuffer).metadata();
     if (inputMeta.depth && inputMeta.depth !== "uchar") {
@@ -98,6 +107,13 @@ export async function processImageEnhancement(
       { width: meta.width ?? 1, height: meta.height ?? 1 },
     );
 
+    // SCUNet takes a PNG and hands back a PNG, so when the deep pass runs the
+    // Sharp pass stays a lossless PNG and the output format is encoded once, at
+    // the end. Encoding to JPEG first would quantize twice (#1302).
+    const runDeep = settings.deepEnhance && allowDeep && isToolInstalled("noise-removal");
+    if (settings.deepEnhance && allowDeep && !runDeep) deepEnhanceSkipped = "unavailable";
+    const passFormat = runDeep ? outputFormatFor("png") : outputFormat;
+
     let buffer: Buffer;
     if (alphaBuffer) {
       // The corrected color pass has to land as a named lossless intermediate
@@ -112,7 +128,7 @@ export async function processImageEnhancement(
       const colorBuffer = await image.png().toBuffer();
       buffer = await sharp(colorBuffer)
         .joinChannel(alphaBuffer)
-        .toFormat(outputFormat.format, outputFormat.encoderOptions)
+        .toFormat(passFormat.format, passFormat.encoderOptions)
         .toBuffer();
     } else {
       // No intermediate to break the lineage on this branch, so the encoder
@@ -120,42 +136,62 @@ export async function processImageEnhancement(
       // corrected pixels back onto their pre-correction colours: the tool
       // returned the input unchanged, with a 200 (#1219). encoderOptions
       // carries the fresh-palette request that fixes it.
-      buffer = await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+      buffer = await image.toFormat(passFormat.format, passFormat.encoderOptions).toBuffer();
     }
 
-    if (settings.deepEnhance && isToolInstalled("noise-removal")) {
-      const scratchDir = join(tmpdir(), "snapotter-scratch", randomUUID());
-      try {
-        await mkdir(scratchDir, { recursive: true });
-        const result = await noiseRemoval(buffer, scratchDir, {
-          tier: "quality",
-          strength: 35,
-          detailPreservation: 70,
-          colorNoise: 20,
-        });
-        buffer = result.buffer;
-      } catch (err) {
-        // isToolInstalled() only filters out bundles the install record says
-        // are absent, so what lands here is a pass that was meant to run and
-        // broke: a sidecar crash, an OOM, a bad scratch dir, missing or corrupt
-        // model files. The Sharp-only result is still the right response, but
-        // the failure has to stay visible in the logs and in Sentry.
-        logger.warn(
-          { err, toolId: "image-enhancement" },
-          "deep enhance failed, returning the Sharp-only result",
-        );
-        void reportError(err, { source: "worker", toolId: "image-enhancement" });
-      } finally {
-        await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
+    if (!runDeep) return buffer;
+
+    const scratchDir = join(tmpdir(), "snapotter-scratch", randomUUID());
+    let denoised: Buffer;
+    try {
+      await mkdir(scratchDir, { recursive: true });
+      const result = await noiseRemoval(buffer, scratchDir, {
+        tier: "quality",
+        strength: 35,
+        detailPreservation: 70,
+        colorNoise: 20,
+      });
+      denoised = result.buffer;
+    } catch (err) {
+      // isToolInstalled() only filters out bundles the install record says
+      // are absent, so what lands here is a pass that was meant to run and
+      // broke: a sidecar crash, an OOM, a bad scratch dir, missing or corrupt
+      // model files. The Sharp-only result is still the right response, but
+      // the failure has to stay visible in the logs, in Sentry, and to the user.
+      logger.warn(
+        { err, toolId: "image-enhancement" },
+        "deep enhance failed, returning the Sharp-only result",
+      );
+      void reportError(err, { source: "worker", toolId: "image-enhancement" });
+      deepEnhanceSkipped = "failed";
+      denoised = buffer;
+    } finally {
+      await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
     }
 
-    return buffer;
+    // Both the denoised result and the fallback are the PNG intermediate, so
+    // this is where they become the format the filename and Content-Type
+    // promise. Outside the try: an encode failure is ours, not a skipped pass.
+    if (outputFormat.format === "png") return denoised;
+    return await sharp(denoised)
+      .toFormat(outputFormat.format, outputFormat.encoderOptions)
+      .toBuffer();
   };
 
-  const finalBuffer =
-    (await runPerFrame(rawBuffer, outputFormat.format, core)) ?? (await core(rawBuffer));
-  return { buffer: finalBuffer, filename, contentType: outputFormat.contentType };
+  // Deep Enhance never runs per frame (#1183): one SCUNet call per frame is up
+  // to 500 sidecar round trips for one job, and denoising each frame on its
+  // own plays back as flicker. Animations get the standard pass on every frame
+  // and a reason the client can show.
+  const perFrame = await runPerFrame(rawBuffer, outputFormat.format, (frame) => core(frame, false));
+  if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
+  const finalBuffer = perFrame ?? (await core(rawBuffer, true));
+
+  return {
+    buffer: finalBuffer,
+    filename,
+    contentType: outputFormat.contentType,
+    ...(deepEnhanceSkipped && { resultPayload: { deepEnhanceSkipped } }),
+  };
 }
 
 export function registerImageEnhancement(app: FastifyInstance) {

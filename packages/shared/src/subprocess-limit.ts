@@ -21,6 +21,41 @@
 export function wrapWithMemoryLimit(bin: string, args: string[]): [string, string[]] {
   const mb = Number.parseInt(process.env.SUBPROCESS_MEMORY_LIMIT_MB ?? "", 10);
   if (!Number.isFinite(mb) || mb <= 0) return [bin, args];
+  assertSpawnable(bin);
   const script = 'ulimit -v "$1" 2>/dev/null || true; shift; exec "$@"';
   return ["/bin/sh", ["-c", script, "sh", String(mb * 1024), bin, ...args]];
+}
+
+/**
+ * Fail the way a direct spawn of `bin` would. Under the shim /bin/sh starts
+ * fine and a bad binary path only shows up as exit 126 or 127, so callers
+ * that key on the errno of a spawn failure (a wrong QPDF_PATH, #1310) would
+ * otherwise read it as the binary's own error. A bare command name is left
+ * to the shell's PATH lookup, exactly as execvp would.
+ */
+function assertSpawnable(bin: string): void {
+  if (!bin.includes("/")) return;
+  // Resolved here, not imported at the top: this package is also loaded by the
+  // web app, and the Vite dev server can't link a named import from Node's fs,
+  // so a top-level `import ... from "node:fs"` blanks `pnpm dev` (#1394). Only
+  // the server ever reaches this line.
+  const { accessSync, constants, statSync } = process.getBuiltinModule(
+    "node:fs",
+  ) as typeof import("node:fs");
+  let isFile: boolean;
+  try {
+    isFile = statSync(bin).isFile();
+  } catch (err) {
+    throw spawnFailure(bin, (err as NodeJS.ErrnoException).code ?? "ENOENT");
+  }
+  if (!isFile) throw spawnFailure(bin, "EACCES");
+  try {
+    accessSync(bin, constants.X_OK);
+  } catch {
+    throw spawnFailure(bin, "EACCES");
+  }
+}
+
+function spawnFailure(bin: string, code: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(`spawn ${bin} ${code}`), { code, syscall: "spawn", path: bin });
 }

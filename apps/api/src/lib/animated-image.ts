@@ -1,3 +1,4 @@
+import { isToolInputError, ToolInputError } from "@snapotter/shared";
 import sharp, { type Metadata, type Sharp } from "sharp";
 import { assertGifWorkload } from "./gif-limits.js";
 import { logger } from "./logger.js";
@@ -127,6 +128,24 @@ function animatedContainerFor(format: string): AnimatedContainer | undefined {
 }
 
 /**
+ * Refuse an animation whose transformed frames would outgrow the GIF workload
+ * cap. readAnimation capped the input, but a tool that grows each frame
+ * (padding, borders) multiplies past it, and mapFrames keeps every frame for
+ * the join. Frames share one canvas and one set of settings, so the first
+ * result shows the output size before the rest is done (#1183).
+ */
+function assertOutputWorkload(width: number, height: number, pages: number): void {
+  try {
+    assertGifWorkload({ width, height, pages }, "Animated output");
+  } catch (err) {
+    if (!isToolInputError(err)) throw err;
+    throw new ToolInputError(
+      `This edit would make the animation too large (${pages} frames at ${width}x${height}). Use a smaller setting, fewer frames, or a still format such as PNG.`,
+    );
+  }
+}
+
+/**
  * Run a still-image transform over each frame and rebuild the animation.
  *
  * For tools whose pipeline cannot survive the strip at all: `rotate` throws on
@@ -150,11 +169,11 @@ async function mapFrames(
     // quality 80), and a GIF frame would cost a palette pass; joining encoded
     // GIF frames also loses the page count outright.
     const frame = await sharp(buffer, { page, pages: 1 }).png().toBuffer();
-    rebuilt.push(
-      await sharp(await transform(frame, page))
-        .png()
-        .toBuffer(),
-    );
+    const { data: out, info: outInfo } = await sharp(await transform(frame, page))
+      .png()
+      .toBuffer({ resolveWithObject: true });
+    if (page === 0) assertOutputWorkload(outInfo.width, outInfo.height, info.pages);
+    rebuilt.push(out);
   }
 
   const joined = sharp(rebuilt, { join: { across: 1, animated: true } });

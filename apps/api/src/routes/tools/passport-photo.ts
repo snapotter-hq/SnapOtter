@@ -3,7 +3,13 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectFaceLandmarks, removeBackground } from "@snapotter/ai";
-import { FEATURE_BUNDLES, PASSPORT_SPECS, PRINT_LAYOUTS } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  formatTargetKb,
+  kbToBytes,
+  PASSPORT_SPECS,
+  PRINT_LAYOUTS,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
@@ -491,15 +497,22 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         // Compress to fit within max file size if specified
         if (maxFileSizeKb > 0) {
-          const targetBytes = maxFileSizeKb * 1024;
+          const targetBytes = kbToBytes(maxFileSizeKb);
           let quality = 90;
-          while (cropped.length > targetBytes && quality > 10) {
-            quality -= 5;
+          while (cropped.length > targetBytes && quality > 1) {
+            quality = Math.max(1, quality - 5);
             cropped = await sharp(sourceForCrop)
               .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
               .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
               .jpeg({ quality })
               .toBuffer();
+          }
+          // The spec fixes the pixel dimensions, so there is nothing left to
+          // trade: say so instead of returning a photo over the cap (#1288).
+          if (cropped.length > targetBytes) {
+            throw new Error(
+              `Couldn't get this photo under ${formatTargetKb(targetBytes)} at the required dimensions. Try a larger size limit.`,
+            );
           }
         }
 

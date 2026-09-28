@@ -6561,6 +6561,146 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
       },
     ],
   },
+  "compress-pdf-to-100kb": {
+    searchTitle: "Compress PDF to 100 KB Online - Reduce PDF to 100KB",
+    longDescription:
+      "Shrink a PDF to 100 KB or less, the strict limit on many government and exam application portals. It's a best-effort ceiling: SnapOtter shrinks the images inside the PDF, lowering resolution only as far as the target needs. A PDF that is mostly text or vector drawings has little to squeeze, and if it can't get under 100 KB the result says so and gives you the smallest version it could make.",
+    useCases: [
+      "Fit ID proofs and certificates under a portal's 100 KB upload cap",
+      "Shrink a scanned signature page for an online application form",
+      "Get a one-page scanned letter small enough for a web form attachment",
+      "Prepare scanned mark sheets for university admission portals",
+    ],
+    features: [
+      "Target-size compression locked to 100 KB",
+      "Reports whether the target was reached, and the size it got to",
+      "Recompresses embedded images; text and vector graphics stay sharp",
+      "Never returns a file larger than the one you uploaded",
+      "Self-hosted: documents are processed on your own server",
+    ],
+    faqs: [
+      {
+        q: "Why won't my PDF go under 100 KB?",
+        a: "Text and vector content barely compresses, and a long document has a floor no matter how hard the images are squeezed. The result tells you the smallest size it reached, so you know to split the file or drop pages.",
+      },
+      {
+        q: "Can I compress a confidential PDF to 100 KB?",
+        a: "Yes. SnapOtter runs on your own server, so the document is never uploaded to a third-party service.",
+      },
+    ],
+  },
+  "compress-pdf-to-200kb": {
+    searchTitle: "Compress PDF to 200 KB Online - Reduce PDF to 200KB",
+    longDescription:
+      "Shrink a PDF to 200 KB or less, a common cap for scanned documents on job, visa and admission forms. It's a best-effort ceiling: SnapOtter shrinks the images inside the PDF, lowering resolution only as far as the target needs. A PDF that is mostly text or vector drawings has little to squeeze, and if it can't get under 200 KB the result says so and gives you the smallest version it could make.",
+    useCases: [
+      "Upload scanned passports and visa documents under a 200 KB limit",
+      "Attach degree certificates to job application portals",
+      "Shrink multi-page scanned forms for insurance or bank submissions",
+      "Send scanned receipts through expense tools with small file caps",
+    ],
+    features: [
+      "Target-size compression locked to 200 KB",
+      "Reports whether the target was reached, and the size it got to",
+      "Recompresses embedded images; text and vector graphics stay sharp",
+      "Never returns a file larger than the one you uploaded",
+      "Self-hosted: documents are processed on your own server",
+    ],
+    faqs: [
+      {
+        q: "Will a 200 KB PDF still be readable?",
+        a: "For scanned pages, usually yes. SnapOtter lowers JPEG quality first, keeping images at up to 300 DPI, and only drops resolution when that isn't enough, so text on a scan stays legible at this size in most cases.",
+      },
+      {
+        q: "Can I compress a confidential PDF to 200 KB?",
+        a: "Yes. SnapOtter runs on your own server, so the document is never uploaded to a third-party service.",
+      },
+    ],
+  },
+  "compress-pdf-to-500kb": {
+    searchTitle: "Compress PDF to 500 KB Online - Reduce PDF to 500KB",
+    longDescription:
+      "Shrink a PDF to 500 KB or less, a comfortable size for multi-page scans on most submission portals. It's a best-effort ceiling: SnapOtter shrinks the images inside the PDF, lowering resolution only as far as the target needs. A PDF that is mostly text or vector drawings has little to squeeze, and if it can't get under 500 KB the result says so and gives you the smallest version it could make.",
+    useCases: [
+      "Compress a scanned multi-page contract for an e-signature platform",
+      "Fit a portfolio or research paper under a 500 KB submission limit",
+      "Reduce scanned tax documents before uploading to an accountant's portal",
+      "Shrink image-heavy handouts for learning management systems",
+    ],
+    features: [
+      "Target-size compression locked to 500 KB",
+      "Reports whether the target was reached, and the size it got to",
+      "Recompresses embedded images; text and vector graphics stay sharp",
+      "Never returns a file larger than the one you uploaded",
+      "Self-hosted: documents are processed on your own server",
+    ],
+    faqs: [
+      {
+        q: "Does compressing to 500 KB change the text?",
+        a: "No. Text and vector drawings are left alone; only the embedded images are recompressed. That's also why a text-only PDF may already be as small as it can get.",
+      },
+      {
+        q: "Can I compress a confidential PDF to 500 KB?",
+        a: "Yes. SnapOtter runs on your own server, so the document is never uploaded to a third-party service.",
+      },
+    ],
+  },
+  "compress-pdf-to-1mb": {
+    searchTitle: "Compress PDF to 1 MB Online - Reduce PDF to 1MB",
+    longDescription:
+      "Shrink a PDF to 1 MB or less, the attachment limit on many HR systems, portals and older mail servers. It's a best-effort ceiling: SnapOtter shrinks the images inside the PDF, lowering resolution only as far as the target needs. A PDF that is mostly text or vector drawings has little to squeeze, and if it can't get under 1 MB the result says so and gives you the smallest version it could make.",
+    useCases: [
+      "Get a scanned report under a 1 MB email or portal attachment limit",
+      "Compress a photo-heavy brochure for an HR or procurement upload",
+      "Shrink a scanned book chapter to share through a messaging app",
+      "Prepare slide decks exported to PDF for course submission systems",
+    ],
+    features: [
+      "Target-size compression locked to 1 MB",
+      "Reports whether the target was reached, and the size it got to",
+      "Recompresses embedded images; text and vector graphics stay sharp",
+      "Never returns a file larger than the one you uploaded",
+      "Self-hosted: documents are processed on your own server",
+    ],
+    faqs: [
+      {
+        q: "Is 1 MB here 1,000,000 bytes or 1,048,576?",
+        a: "1,000,000 bytes. SnapOtter uses decimal units, the same way upload forms and most operating systems count, so a file it reports as under 1 MB is under the limit a portal will check.",
+      },
+      {
+        q: "Can I compress a confidential PDF to 1 MB?",
+        a: "Yes. SnapOtter runs on your own server, so the document is never uploaded to a third-party service.",
+      },
+    ],
+  },
+  "compress-pdf-to-2mb": {
+    searchTitle: "Compress PDF to 2 MB Online - Reduce PDF to 2MB",
+    longDescription:
+      "Shrink a PDF to 2 MB or less, a typical cap for photo-heavy documents and long scans. It's a best-effort ceiling: SnapOtter shrinks the images inside the PDF, lowering resolution only as far as the target needs. A PDF that is mostly text or vector drawings has little to squeeze, and if it can't get under 2 MB the result says so and gives you the smallest version it could make.",
+    useCases: [
+      "Bring a long scanned document under a 2 MB upload limit",
+      "Compress an image-heavy catalogue or lookbook for sharing",
+      "Shrink scanned medical records for a patient portal upload",
+      "Reduce a photo report from a site inspection before emailing it",
+    ],
+    features: [
+      "Target-size compression locked to 2 MB",
+      "Reports whether the target was reached, and the size it got to",
+      "Recompresses embedded images; text and vector graphics stay sharp",
+      "Never returns a file larger than the one you uploaded",
+      "Self-hosted: documents are processed on your own server",
+    ],
+    faqs: [
+      {
+        q: "What if my PDF is already under 2 MB?",
+        a: "It still goes through the same search, so you may get a smaller copy back, but never a bigger one. If nothing smaller comes out, you get the original bytes.",
+      },
+      {
+        q: "Can I compress a confidential PDF to 2 MB?",
+        a: "Yes. SnapOtter runs on your own server, so the document is never uploaded to a third-party service.",
+      },
+    ],
+  },
   "rotate-pdf": {
     searchTitle: "Rotate PDF Pages Online Free",
     longDescription:

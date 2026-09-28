@@ -1045,6 +1045,26 @@ export const uk: TranslationKeys = {
       name: "Стиснення PDF",
       description: "Зменшити розмір файлу PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Стиснення PDF до 100 KB",
+      description: "Зменшення розміру файлу PDF до 100 KB і менше",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Стиснення PDF до 200 KB",
+      description: "Зменшення розміру файлу PDF до 200 KB і менше",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Стиснення PDF до 500 KB",
+      description: "Зменшення розміру файлу PDF до 500 KB і менше",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Стиснення PDF до 1 MB",
+      description: "Зменшення розміру файлу PDF до 1 MB і менше",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Стиснення PDF до 2 MB",
+      description: "Зменшення розміру файлу PDF до 2 MB і менше",
+    },
     "rotate-pdf": {
       name: "Обертання PDF",
       description: "Обернути сторінки в PDF",
@@ -1391,6 +1411,7 @@ export const uk: TranslationKeys = {
       submitBatch: "Стиснути ({count} файлів)",
       submitTarget: "Стиснути до {size} KB",
       resizedToFit: "Зменшено до {width} × {height}, щоб вміститися в {size} KB",
+      batchResized: "Зменшено зображень: {count} з {total}, щоб уміститися в {size} KB.",
       progressLabel: "Стиснення",
       original: "Оригінал: {size} KB",
       processed: "Оброблено: {size} KB",
@@ -2012,6 +2033,12 @@ export const uk: TranslationKeys = {
       submitDeepBatch: "Глибоке поліпшення ({count} файлів)",
       progressLabel: "Поліпшення зображення",
       progressLabelBatch: "Поліпшення {count} зображень",
+      deepEnhanceSkippedFailed:
+        "Цього разу глибоке поліпшення не спрацювало, тому застосовано стандартне поліпшення. Спробуйте ще раз.",
+      deepEnhanceSkippedUnavailable:
+        "Для глибокого поліпшення потрібен пакет збільшення й поліпшення, але його не встановлено, тому застосовано стандартне поліпшення.",
+      deepEnhanceSkippedAnimated:
+        "Глибоке поліпшення не працює з анімованими зображеннями, тому до кожного кадру застосовано стандартне поліпшення.",
     },
     "noise-removal": {
       off: "Вимкнено",
@@ -3487,6 +3514,8 @@ export const uk: TranslationKeys = {
       printer: "Друк (найкраща якість)",
       submit: "Стиснути",
       submitBatch: "Стиснути ({count} файлів)",
+      submitTarget: "Стиснути до {size}",
+      batchMissed: "Файлів, що не вмістилися в {target}: {count} з {total}.",
       progressLabel: "Стиснення",
       bestEffortHint:
         "Максимум за можливості. PDF на основі зображень наближаються до цього розміру; PDF лише з текстом можуть не зменшитися до нього.",
@@ -3862,6 +3891,18 @@ export const uk: TranslationKeys = {
     previewUnavailable: "Попередній перегляд буде доступний після обробки",
     generatePreview: "Створити попередній перегляд",
     previewFailed: "Не вдалося створити попередній перегляд",
+    previewEncoderMissing:
+      "У ffmpeg на цьому сервері немає кодувальника {encoder}, тому не вдається створити попередній перегляд. Зверніться до адміністратора.",
+    previewProgressMessages: [
+      "Видра розминається...",
+      "Перемелюємо пікселі...",
+      "Пояснюємо все кодеку...",
+      "Майже готово...",
+      "Попередній перегляд заварюється...",
+      "Умовляємо кадри...",
+      "Наводимо лиск на результат...",
+      "Хвилинку...",
+    ],
     previewNotAvailable: "Попередній перегляд недоступний",
     resultPreviewFailed: "Не вдалося завантажити попередній перегляд результату",
     resultPreviewFailedHint:
@@ -5190,6 +5231,8 @@ export const uk: TranslationKeys = {
     imageControls: "Елементи керування переглядом",
     zoomControls: "Керування масштабом",
     dragToReorder: "Перетягніть для зміни порядку",
+    resultResizedToFit: "Зменшено, щоб уміститися в цільовий розмір",
+    resultMissedTarget: "Цільовий розмір не досягнуто",
     reverseOrder: "Змінити порядок на зворотний",
     whiteBackground: "Біле тло",
     blackBackground: "Чорне тло",

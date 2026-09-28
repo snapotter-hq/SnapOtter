@@ -53,7 +53,7 @@ Hem ön uç hem de arka uç tarafından kullanılan paylaşılan TypeScript tür
 
 ### API (`apps/api`) {#api-apps-api}
 
-Beş modalite (image, video, audio, PDF, file) genelinde 248 araç rotası sunan bir Fastify v5 sunucusu; şunları yönetir:
+Beş modalite (image, video, audio, PDF, file) genelinde 253 araç rotası sunan bir Fastify v5 sunucusu; şunları yönetir:
 - Dosya yüklemeleri, geçici çalışma alanı yönetimi ve kalıcı dosya depolama
 - Kullanıcı dosya kütüphanesi (`user_files` tablosu): kaydedilen bir düzenleme, varsayılan olarak bağımsız yeni bir dosya olarak veya özgün dosyanın üzerine yazdığınızda üst öğeye bağlı bir sürüm olarak saklanır. Hangi araçların uygulandığını kaydeder (`toolChain`) ve Files sayfası için otomatik oluşturulan bir küçük resim alır
 - Araç yürütme (her araç isteğini görüntü motoruna veya AI köprüsüne yönlendirir)

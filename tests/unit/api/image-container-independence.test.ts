@@ -177,7 +177,7 @@ const NOT_RUNNABLE: Record<string, string> = {
   "lqip-placeholder": "v2-only contract: no single-buffer process to call",
   "sprite-sheet": "v2-only contract: no single-buffer process to call",
   ...Object.fromEntries(
-    COMPRESS_PRESETS.map((preset) => [
+    COMPRESS_PRESETS.filter((preset) => preset.base === "compress").map((preset) => [
       preset.id,
       "v2-only preset over compress with a locked target size; compress itself is covered above",
     ]),

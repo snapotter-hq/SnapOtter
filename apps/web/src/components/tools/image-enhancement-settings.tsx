@@ -434,10 +434,26 @@ export function ImageEnhancementSettings({
     originalSize,
     processedSize,
     progress,
+    resultPayload,
   } = useToolProcessor("image-enhancement");
   const [settings, setSettings] = useState<Record<string, unknown>>({});
 
   const hasFile = files.length > 0;
+  // Set by the API when Deep Enhance was requested but the result is the
+  // standard pass (#950). Batch results carry no per-file payload, so this is
+  // single-file only, like the download link. resultPayload outlives a file
+  // swap while downloadUrl does not, so gating on it keeps the notice attached
+  // to the result it describes.
+  const skipReason =
+    files.length <= 1 && downloadUrl ? resultPayload?.deepEnhanceSkipped : undefined;
+  const skipNotice =
+    skipReason === "failed"
+      ? t.toolSettings.imageEnhancement.deepEnhanceSkippedFailed
+      : skipReason === "unavailable"
+        ? t.toolSettings.imageEnhancement.deepEnhanceSkippedUnavailable
+        : skipReason === "animated"
+          ? t.toolSettings.imageEnhancement.deepEnhanceSkippedAnimated
+          : null;
 
   const handleProcess = () => {
     if (files.length > 1) {
@@ -457,6 +473,16 @@ export function ImageEnhancementSettings({
       <ImageEnhancementControls onChange={setSettings} onPreviewFilter={onPreviewFilter} />
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
+
+      {skipNotice && !processing && (
+        <p
+          role="status"
+          data-testid="image-enhancement-deep-skipped"
+          className="text-xs text-amber-700 dark:text-amber-400"
+        >
+          {skipNotice}
+        </p>
+      )}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">

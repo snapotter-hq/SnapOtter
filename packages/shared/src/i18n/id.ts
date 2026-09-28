@@ -1044,6 +1044,26 @@ export const id: TranslationKeys = {
       name: "Kompres PDF",
       description: "Perkecil ukuran file PDF",
     },
+    "compress-pdf-to-100kb": {
+      name: "Kompres PDF ke 100 KB",
+      description: "Kurangi ukuran file PDF hingga di bawah 100 KB",
+    },
+    "compress-pdf-to-200kb": {
+      name: "Kompres PDF ke 200 KB",
+      description: "Kurangi ukuran file PDF hingga di bawah 200 KB",
+    },
+    "compress-pdf-to-500kb": {
+      name: "Kompres PDF ke 500 KB",
+      description: "Kurangi ukuran file PDF hingga di bawah 500 KB",
+    },
+    "compress-pdf-to-1mb": {
+      name: "Kompres PDF ke 1 MB",
+      description: "Kurangi ukuran file PDF hingga di bawah 1 MB",
+    },
+    "compress-pdf-to-2mb": {
+      name: "Kompres PDF ke 2 MB",
+      description: "Kurangi ukuran file PDF hingga di bawah 2 MB",
+    },
     "rotate-pdf": {
       name: "Putar PDF",
       description: "Putar halaman dalam PDF",
@@ -1387,6 +1407,7 @@ export const id: TranslationKeys = {
       submitBatch: "Kompres ({count} file)",
       submitTarget: "Kompres ke {size} KB",
       resizedToFit: "Diubah ukurannya menjadi {width} × {height} agar muat dalam {size} KB",
+      batchResized: "{count} dari {total} gambar diperkecil agar muat dalam {size} KB.",
       progressLabel: "Mengompresi",
       original: "Asli: {size} KB",
       processed: "Diproses: {size} KB",
@@ -2008,6 +2029,12 @@ export const id: TranslationKeys = {
       submitDeepBatch: "Deep Enhance ({count} file)",
       progressLabel: "Meningkatkan gambar",
       progressLabelBatch: "Meningkatkan {count} gambar",
+      deepEnhanceSkippedFailed:
+        "Peningkatan Mendalam tidak berjalan kali ini, jadi Anda mendapatkan peningkatan standar. Silakan coba lagi.",
+      deepEnhanceSkippedUnavailable:
+        "Peningkatan Mendalam memerlukan bundel Perbesar & Tingkatkan, yang belum terpasang, jadi Anda mendapatkan peningkatan standar.",
+      deepEnhanceSkippedAnimated:
+        "Peningkatan Mendalam tidak berfungsi pada gambar animasi, jadi setiap frame mendapatkan peningkatan standar.",
     },
     "noise-removal": {
       off: "Mati",
@@ -3483,6 +3510,8 @@ export const id: TranslationKeys = {
       printer: "Printer (kualitas terbaik)",
       submit: "Kompres",
       submitBatch: "Kompres ({count} file)",
+      submitTarget: "Kompres ke {size}",
+      batchMissed: "{count} dari {total} file tidak bisa di bawah {target}.",
       progressLabel: "Mengompres",
       bestEffortHint:
         "Maksimum sebisa mungkin. PDF berbasis gambar mendekati ukuran ini; PDF berisi teks saja mungkin tidak menyusut ke ukuran ini.",
@@ -3859,6 +3888,18 @@ export const id: TranslationKeys = {
     previewUnavailable: "Pratinjau akan tersedia setelah pemrosesan",
     generatePreview: "Buat Pratinjau",
     previewFailed: "Pembuatan pratinjau gagal",
+    previewEncoderMissing:
+      "ffmpeg di server ini tidak memiliki encoder {encoder}, jadi pratinjau tidak dapat dibuat. Hubungi administrator Anda.",
+    previewProgressMessages: [
+      "Berang-berang sedang pemanasan...",
+      "Mengunyah piksel...",
+      "Mengajari codec...",
+      "Sebentar lagi...",
+      "Pratinjau sedang diseduh...",
+      "Membujuk frame...",
+      "Memoles hasilnya...",
+      "Tunggu sebentar...",
+    ],
     previewNotAvailable: "Pratinjau tidak tersedia",
     resultPreviewFailed: "Pratinjau hasil gagal dimuat",
     resultPreviewFailedHint: "Pemrosesan selesai. Gunakan tombol unduh untuk menyimpan file Anda.",
@@ -5185,6 +5226,8 @@ export const id: TranslationKeys = {
     imageControls: "Image controls",
     zoomControls: "Kontrol zoom",
     dragToReorder: "Seret untuk mengurutkan ulang",
+    resultResizedToFit: "Diperkecil agar muat dalam ukuran target",
+    resultMissedTarget: "Tidak mencapai ukuran target",
     reverseOrder: "Balik urutan",
     whiteBackground: "Latar belakang putih",
     blackBackground: "Latar belakang hitam",

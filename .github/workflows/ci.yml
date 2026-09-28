@@ -39,6 +39,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       landing: ${{ steps.filter.outputs.landing }}
       docs: ${{ steps.filter.outputs.docs }}
+      aipython: ${{ steps.filter.outputs.aipython }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - id: filter
@@ -55,11 +56,13 @@ jobs:
           fi
           # `code`: anything outside the docs/landing surfaces changed (gates the
           # main pipeline). `landing` and `docs`: that surface's own files changed
-          # (gates its e2e job). All three fail open to true when the base is
-          # unknown.
+          # (gates its e2e job). `aipython`: the Python sidecar or its rembg test
+          # changed (gates the AI Sidecar (rembg) job). All fail open to true
+          # when the base is unknown.
           code=true
           landing=true
           docs=true
+          aipython=true
           if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ]; then
             if git fetch --no-tags --depth=1 origin "$base" && git cat-file -e "$base" 2>/dev/null; then
               changed=$(git diff --name-only "$base" HEAD)
@@ -84,6 +87,12 @@ jobs:
                   apps/docs/*|tests/e2e-docs/*|playwright.docs.config.ts) docs=true; break ;;
                 esac
               done
+              aipython=false
+              for f in $changed; do
+                case "$f" in
+                  packages/ai/python/*|docker/feature-manifest.json|scripts/rembg-test-pins.mjs|tests/unit/ai/remove-bg-hr-matting.test.ts|tests/helpers/python-gate.ts|.github/workflows/ci.yml) aipython=true; break ;;
+                esac
+              done
             else
               echo "Base commit unavailable; running the full pipeline"
             fi
@@ -93,6 +102,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "landing=$landing" >> "$GITHUB_OUTPUT"
           echo "docs=$docs" >> "$GITHUB_OUTPUT"
+          echo "aipython=$aipython" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint
@@ -477,6 +487,87 @@ jobs:
             docker/ocr-runtime-requirements-arm64.txt; do
             pip-audit -r "${requirements}" --no-deps --disable-pip --aliases
           done
+
+  ai-sidecar-rembg:
+    # tests/unit/ai/remove-bg-hr-matting.test.ts has a test that needs the real
+    # rembg, which Unit Tests doesn't install, so it skipped everywhere. This
+    # job runs it with REQUIRE_REMBG=1, which turns a missing rembg into a
+    # failure, against both rembg pin sets that reach users: the
+    # background-removal bundle's (docker/feature-manifest.json) and the
+    # sidecar requirements' (Dependabot bumps these). A rembg release that
+    # stops routing the HR model's input through normalize() can't pass
+    # unnoticed (#1299).
+    name: AI Sidecar (rembg, ${{ matrix.pins }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.aipython == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        pins: [bundle, requirements]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install the pinned rembg
+        # Only what the HR matting session imports, at the exact pins, under
+        # the bundle's constraints for everything they pull in.
+        env:
+          PINS: ${{ matrix.pins }}
+        run: |
+          node scripts/rembg-test-pins.mjs "$PINS" .rembg-pins
+          python -m venv .venv-rembg
+          .venv-rembg/bin/pip install -r .rembg-pins/pins.txt -c .rembg-pins/constraints.txt
+          # The first import in a fresh venv spends about 40s while pymatting
+          # JIT-compiles and caches; pay it here, not inside the test timeout.
+          .venv-rembg/bin/python -c "import rembg"
+
+      - name: Pre-pull testcontainer images (retry transient Docker Hub errors)
+        run: |
+          for img in postgres:17-alpine redis:8-alpine; do
+            ok=
+            for attempt in 1 2 3 4 5; do
+              if docker pull "$img"; then ok=1; break; fi
+              echo "::warning::docker pull $img failed (attempt $attempt/5); retrying in $((attempt * 5))s"
+              sleep "$((attempt * 5))"
+            done
+            [ -n "$ok" ] || { echo "::error::could not pull $img after 5 attempts"; exit 1; }
+          done
+      - name: Run the rembg-gated HR matting test
+        run: pnpm vitest run tests/unit/ai/remove-bg-hr-matting.test.ts --reporter=verbose
+        env:
+          PYTHON_VENV_PATH: .venv-rembg
+          REQUIRE_REMBG: "1"
+
+  ai-sidecar-rembg-result:
+    # The one name branch protection requires (#1386). A skipped matrix job
+    # reports under its unexpanded name ("AI Sidecar (rembg, ${{ matrix.pins }})"),
+    # so neither leg can be required directly: a PR that doesn't touch the AI
+    # Python would wait on it forever. This always reports, and passes when
+    # both legs passed or the path filter skipped them. A skip from a failed
+    # changes job also passes here, which is fine: Changes is required itself.
+    # Keep always(), not !cancelled(): a job skipped by its own if: reports as
+    # success, so a cancelled run would pass this check.
+    name: AI Sidecar (rembg)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: ai-sidecar-rembg
+    if: always()
+    steps:
+      - name: Check both pin sets
+        env:
+          RESULT: ${{ needs.ai-sidecar-rembg.result }}
+        run: |
+          echo "ai-sidecar-rembg: $RESULT"
+          case "$RESULT" in
+            success | skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
 
   build:
     name: Build
