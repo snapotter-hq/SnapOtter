@@ -10,7 +10,7 @@
  * calling runSystemJob); anything else is a bug.
  */
 import type { Job } from "bullmq";
-import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
@@ -360,28 +360,35 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
 
   // Age alone would delete the input of a job still waiting behind a backed-up
   // queue, so an expired dir survives while any job that owns it is in flight
-  // (#1412). Stranded rows are settled by job-reconciliation, so this cannot
-  // pin a dir forever.
+  // (#1412). Only rows job-reconciliation settles count (same criteria as its
+  // candidate query): a stranded one goes terminal within a minute, so a stuck
+  // row cannot pin a dir forever. Selected by status, not by an id list, so a
+  // huge backlog of expired dirs cannot overflow the bind-parameter limit.
   const inFlightIds = new Set<string>();
-  const ownerIds = [...new Set(expiredDirs.flatMap((dir) => owningJobIds(dir.key.split("/")[1])))];
-  if (ownerIds.length > 0) {
+  if (expiredDirs.length > 0) {
     const rows = await db
       .select({ id: schema.jobs.id })
       .from(schema.jobs)
       .where(
         and(
-          inArray(schema.jobs.id, ownerIds),
           inArray(schema.jobs.status, [...IN_FLIGHT_STATUSES]),
+          isNotNull(schema.jobs.toolId),
+          ne(schema.jobs.toolId, ""),
+          ne(schema.jobs.type, "system"),
         ),
       );
     for (const r of rows) inFlightIds.add(r.id);
   }
 
   let removed = 0;
+  let kept = 0;
   const errors: string[] = [];
   for (const dir of expiredDirs) {
     const jobId = dir.key.split("/")[1];
-    if (owningJobIds(jobId).some((id) => inFlightIds.has(id))) continue;
+    if (owningJobIds(jobId).some((id) => inFlightIds.has(id))) {
+      kept++;
+      continue;
+    }
     // Skip deletion if the job's user is under legal hold
     const userId = jobUserMap.get(jobId);
     if (userId && heldUserIds.has(userId)) continue;
@@ -399,6 +406,9 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   }
   if (removed > 0) {
     console.log(`Storage TTL: removed ${removed} expired job dirs`);
+  }
+  if (kept > 0) {
+    console.log(`Storage TTL: kept ${kept} expired job dirs whose jobs are still in flight`);
   }
   return { removed: removed + deleteAfterCleaned, failed: errors.length };
 }

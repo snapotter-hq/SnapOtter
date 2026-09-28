@@ -159,6 +159,7 @@ async function loadSystemJobs(
     inArray: vi.fn(() => "inArray"),
     isNotNull: vi.fn(() => "isNotNull"),
     lt: vi.fn(() => "lt"),
+    ne: vi.fn(() => "ne"),
     // Capturing tagged-template mock: records the literal strings and the
     // interpolated values so SQL-text and window-arithmetic mutants are visible.
     sql: vi.fn((strings: readonly string[], ...values: unknown[]) => {

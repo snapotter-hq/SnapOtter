@@ -262,12 +262,18 @@ describe("runSystemJob", () => {
       id: string,
       type: string,
       status: "queued" | "processing" | "completed" | "failed" | "canceled",
-      extra: { deleteAfter?: Date } = {},
+      extra: { deleteAfter?: Date; toolId?: string | null } = {},
     ): Promise<void> {
       createdIds.push(id);
-      await db
-        .insert(schema.jobs)
-        .values({ id, userId: testUserId, type, status, createdAt: past, ...extra });
+      await db.insert(schema.jobs).values({
+        id,
+        userId: testUserId,
+        toolId: "resize",
+        type,
+        status,
+        createdAt: past,
+        ...extra,
+      });
     }
 
     /** A job dir with one file, both backdated past the TTL cutoff. */
@@ -285,18 +291,38 @@ describe("runSystemJob", () => {
       const queuedId = `q-${randomUUID()}`;
       const processingId = `p-${randomUUID()}`;
       const doneId = `d-${randomUUID()}`;
+      const failedId = `f-${randomUUID()}`;
+      const canceledId = `c-${randomUUID()}`;
       await insertJob(queuedId, "single", "queued");
       await insertJob(processingId, "single", "processing");
       await insertJob(doneId, "single", "completed");
+      await insertJob(failedId, "single", "failed");
+      await insertJob(canceledId, "single", "canceled");
       const queuedDir = staleDir("uploads", queuedId);
       const processingDir = staleDir("uploads", processingId);
-      const doneDir = staleDir("uploads", doneId);
+      const finishedDirs = [doneId, failedId, canceledId].map((id) => staleDir("uploads", id));
 
       await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
 
       expect(existsSync(queuedDir)).toBe(true);
       expect(existsSync(processingDir)).toBe(true);
-      expect(existsSync(doneDir)).toBe(false);
+      for (const dir of finishedDirs) expect(existsSync(dir)).toBe(false);
+    });
+
+    it("does not let a row job-reconciliation never settles pin a stale dir", async () => {
+      // A gdpr-export row (type system) or a progress placeholder (no tool id)
+      // can stay non-terminal forever, so neither counts as in flight.
+      const systemId = `sys-${randomUUID()}`;
+      const placeholderId = `ph-${randomUUID()}`;
+      await insertJob(systemId, "system", "queued", { toolId: "gdpr-export" });
+      await insertJob(placeholderId, "batch", "processing", { toolId: null });
+      const systemDir = staleDir("outputs", systemId);
+      const placeholderChildDir = staleDir("outputs", `${placeholderId}-f0`);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(systemDir)).toBe(false);
+      expect(existsSync(placeholderChildDir)).toBe(false);
     });
 
     it("keeps a finished pipeline step's output while its pipeline is still running", async () => {

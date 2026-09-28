@@ -26,6 +26,7 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
     inArray: vi.fn(() => "inArray"),
     isNotNull: vi.fn(() => "isNotNull"),
     lt: vi.fn(() => "lt"),
+    ne: vi.fn(() => "ne"),
     sql: vi.fn(() => "sql"),
   }));
 

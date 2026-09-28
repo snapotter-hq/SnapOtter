@@ -48,6 +48,8 @@ const schemaMock = vi.hoisted(() => ({
     completedAt: "jobs.completedAt",
     deleteAfter: "jobs.deleteAfter",
     status: "jobs.status",
+    toolId: "jobs.toolId",
+    type: "jobs.type",
   },
   settings: { key: "settings.key", value: "settings.value" },
 }));
@@ -135,6 +137,7 @@ async function loadSystemJobs(
     inArray: vi.fn(() => "inArray"),
     isNotNull: vi.fn(() => "isNotNull"),
     lt: vi.fn(() => "lt"),
+    ne: vi.fn(() => "ne"),
     sql: vi.fn(() => "sql"),
   }));
 
@@ -658,11 +661,47 @@ describe("storageTtlSweep keeps dirs of in-flight jobs (#1412)", () => {
       return [{ key: "outputs/pipe-s0", size: 0, mtimeMs: old }];
     });
 
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const drizzle = await import("drizzle-orm");
+
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
 
     expect(result).toEqual({ removed: 1, failed: 0 });
     expect(deletePrefixMock).toHaveBeenCalledTimes(1);
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/gone");
+    // In flight means queued or processing, and only rows job-reconciliation
+    // settles (a tool id, not a system row), so a stuck row cannot pin a dir.
+    expect(drizzle.inArray).toHaveBeenCalledWith("jobs.status", ["queued", "processing"]);
+    expect(drizzle.isNotNull).toHaveBeenCalledWith("jobs.toolId");
+    expect(drizzle.ne).toHaveBeenCalledWith("jobs.toolId", "");
+    expect(drizzle.ne).toHaveBeenCalledWith("jobs.type", "system");
+    expect(logSpy.mock.calls.map((c) => c[0])).toContain(
+      "Storage TTL: kept 3 expired job dirs whose jobs are still in flight",
+    );
+    logSpy.mockRestore();
+  });
+
+  it("keeps an S3 dir (no mtime) whose job is queued even though its row is past the cutoff", async () => {
+    // On S3, decideExpiry ages a queued row from createdAt, so the in-flight
+    // check is the only thing between a queued job and the loss of its input.
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []); // no deleteAfter jobs
+    const old = new Date(Date.now() - 7_200_000);
+    queueSelect("jobs", [{ id: "s3-q", createdAt: old, completedAt: null }]); // rowsById
+    queueSelect("jobs", [{ id: "s3-q" }]); // in flight
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") =>
+      prefix === "uploads" ? [{ key: "uploads/s3-q", size: 0, mtimeMs: 0 }] : [],
+    );
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 0, failed: 0 });
+    expect(deletePrefixMock).not.toHaveBeenCalled();
   });
 
   it("does not look up owners when nothing has expired", async () => {
