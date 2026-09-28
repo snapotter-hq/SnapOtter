@@ -10,7 +10,11 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { containerMemoryLimitBytes, hqCpuMemoryRefusal } from "../../lib/hq-memory-gate.js";
@@ -205,6 +209,9 @@ export function registerEraseObject(app: FastifyInstance) {
           maskBuffer = await decodeToSharpCompat(maskBuffer, maskValidation.format);
         }
       } catch (err) {
+        // A missing decoder is this server's fault, not the upload:
+        // rethrow so the global handler answers 503 (#1428).
+        if (isDecoderUnavailable(err)) throw err;
         request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
         return reply.status(422).send({
           error: "Object erasing failed",

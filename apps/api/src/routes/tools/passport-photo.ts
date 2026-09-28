@@ -18,7 +18,11 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
@@ -307,6 +311,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
           imageHeight: landmarksResult.imageHeight,
         });
       } catch (err) {
+        // A missing decoder is this server's fault, not the upload:
+        // rethrow so the global handler answers 503 (#1428).
+        if (isDecoderUnavailable(err)) throw err;
         request.log.error({ err, toolId: "passport-photo" }, "Passport photo analysis failed");
         return reply.status(422).send({
           error: "Passport photo analysis failed",

@@ -31,11 +31,17 @@ vi.mock("../../../apps/api/src/lib/file-validation.js", () => ({
   validateImageBuffer: mocks.validateImageBuffer,
 }));
 
-vi.mock("../../../apps/api/src/lib/format-decoders.js", () => ({
-  decodeAnyFormat: mocks.decodeAnyFormat,
-  decodeToSharpCompat: mocks.decodeToSharpCompat,
-  needsCliDecode: (format: string) => format === "raw",
-}));
+vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
+  return {
+    DecoderUnavailableError: actual.DecoderUnavailableError,
+    isDecoderUnavailable: actual.isDecoderUnavailable,
+    decodeAnyFormat: mocks.decodeAnyFormat,
+    decodeToSharpCompat: mocks.decodeToSharpCompat,
+    needsCliDecode: (format: string) => format === "raw",
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
   decodeHeic: mocks.decodeHeic,
@@ -46,6 +52,7 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
   sanitizeSvg: mocks.sanitizeSvg,
 }));
 
+import { DecoderUnavailableError } from "../../../apps/api/src/lib/format-decoders.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { ImageInputHandler } from "../../../apps/api/src/modality/image-input.js";
 
@@ -178,5 +185,84 @@ describe("ImageInputHandler resource bounds", () => {
       signal,
     });
     expect(result).toEqual({ buffer: ORIENTED, filename: "scan.png" });
+  });
+});
+
+describe("ImageInputHandler decoder availability (#1428)", () => {
+  const missingHeif = () => new DecoderUnavailableError("No HEIF decoder found.");
+  const missingMagick = () => new DecoderUnavailableError("No ImageMagick found.");
+
+  function prepare(filename: string) {
+    return new ImageInputHandler().prepare(RAW, filename, { scratchDir: "/tmp/in" });
+  }
+
+  function detected(format: string) {
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format, width: 1, height: 1 });
+  }
+
+  it("turns a missing HEIF decoder into 503 ENGINE_UNAVAILABLE", async () => {
+    detected("heif");
+    mocks.decodeHeic.mockRejectedValue(missingHeif());
+
+    await expect(prepare("photo.heic")).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      message: "No HEIF decoder found.",
+    });
+  });
+
+  it("keeps 422 for a HEIC the decoder rejected", async () => {
+    detected("heif");
+    mocks.decodeHeic.mockRejectedValue(new Error("Command failed: heif-convert"));
+
+    await expect(prepare("photo.heic")).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it("turns a missing CLI decoder into 503 once Sharp cannot read the file either", async () => {
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(missingMagick());
+    mocks.metadata.mockRejectedValue(new Error("Input buffer contains unsupported image format"));
+
+    await expect(prepare("photo.nef")).rejects.toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+
+  it("uses Sharp's own decode when the CLI decoder is missing but Sharp reads the file", async () => {
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(missingMagick());
+
+    const result = await prepare("photo.dng");
+
+    expect(result.buffer).toBe(ORIENTED);
+  });
+
+  it("keeps 422 for a CLI format the decoder rejected", async () => {
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(new Error("Command failed: magick"));
+    mocks.metadata.mockRejectedValue(new Error("Input buffer contains unsupported image format"));
+
+    await expect(prepare("photo.nef")).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it("turns a missing ImageMagick on the AVIF fallback into 503", async () => {
+    detected("avif");
+    mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
+    mocks.decodeAnyFormat.mockRejectedValue(missingMagick());
+
+    await expect(prepare("photo.avif")).rejects.toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+
+  it("keeps 422 when ImageMagick ran and still could not decode the AVIF", async () => {
+    detected("avif");
+    mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
+    mocks.decodeAnyFormat.mockRejectedValue(new Error("Command failed: magick"));
+
+    await expect(prepare("photo.avif")).rejects.toMatchObject({ statusCode: 422 });
   });
 });

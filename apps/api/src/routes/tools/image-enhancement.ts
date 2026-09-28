@@ -13,7 +13,11 @@ import type { DeepEnhanceSkipReason } from "../../lib/batch-file-notes.js";
 import { reportError } from "../../lib/error-report.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
@@ -239,6 +243,9 @@ export function registerImageEnhancement(app: FastifyInstance) {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
         } catch (err) {
+          // A missing decoder is this server's fault, not the upload:
+          // rethrow so the global handler answers 503 (#1428).
+          if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file",
             details: err instanceof Error ? err.message : String(err),
@@ -251,6 +258,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
         try {
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
         } catch (err) {
+          if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode ${validation.format} file`,
             details: err instanceof Error ? err.message : String(err),

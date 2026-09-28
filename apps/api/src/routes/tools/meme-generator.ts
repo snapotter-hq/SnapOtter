@@ -7,7 +7,11 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -304,6 +308,9 @@ export function registerMemeGenerator(app: FastifyInstance) {
         try {
           imageBuffer = await decodeHeic(imageBuffer);
         } catch (err) {
+          // A missing decoder is this server's fault, not the upload:
+          // rethrow so the global handler answers 503 (#1428).
+          if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
             details: err instanceof Error ? err.message : String(err),
@@ -314,10 +321,11 @@ export function registerMemeGenerator(app: FastifyInstance) {
         try {
           const fileExt = filename.split(".").pop()?.toLowerCase();
           imageBuffer = await decodeToSharpCompat(imageBuffer, validation.format, fileExt);
-        } catch {
+        } catch (decodeErr) {
           try {
             await sharp(imageBuffer).metadata();
           } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file`,
               details: err instanceof Error ? err.message : String(err),
@@ -349,6 +357,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
         processedSize: output.buffer.length,
       });
     } catch (err) {
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Processing failed",
         details: err instanceof Error ? err.message : "Meme generation failed",

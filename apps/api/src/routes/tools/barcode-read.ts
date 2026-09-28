@@ -10,7 +10,11 @@ import { reportError } from "../../lib/error-report.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -168,6 +172,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
           try {
             fileBuffer = await decodeHeic(fileBuffer);
           } catch (err) {
+            // A missing decoder is this server's fault, not the upload:
+            // rethrow so the global handler answers 503 (#1428).
+            if (isDecoderUnavailable(err)) throw err;
             return reply.status(422).send({
               error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
               details: err instanceof Error ? err.message : String(err),
@@ -178,10 +185,11 @@ export function registerBarcodeRead(app: FastifyInstance) {
           try {
             const fileExt = filename.split(".").pop()?.toLowerCase();
             fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-          } catch {
+          } catch (decodeErr) {
             try {
               await sharp(fileBuffer).metadata();
             } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
               return reply.status(422).send({
                 error: `Failed to decode ${validation.format.toUpperCase()} file`,
                 details: err instanceof Error ? err.message : String(err),
@@ -285,6 +293,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
           previewUrl: downloadUrl,
         });
       } catch (err) {
+        if (isDecoderUnavailable(err)) throw err;
         // A WebAssembly RuntimeError is the decoder itself failing: it couldn't
         // instantiate (the glue wraps every instantiate error this way), or it
         // trapped mid-decode, after which the instance can't be trusted.

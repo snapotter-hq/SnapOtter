@@ -263,6 +263,14 @@ async function preflightEncodedDimensions(
   } catch (error) {
     options.signal?.throwIfAborted();
     if (isImageSafetyError(error)) throw error;
+    // Without exiftool the safety limits can't be checked at all, whatever
+    // the file: that's the host, not the upload (#1428).
+    if (isBinarySpawnFailure(error)) {
+      throw new DecoderUnavailableError(
+        "No exiftool found. Install exiftool (libimage-exiftool-perl) to check image dimensions safely.",
+        error,
+      );
+    }
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
   }
@@ -426,7 +434,9 @@ export async function decodeAnyFormat(
       cmd,
       magickArgs(cmd, [inputPath, "-colorspace", "sRGB", `png:${outputPath}`], options),
       commandOptions(options, 120_000),
-    );
+    ).catch((err: unknown) => {
+      throw asDecoderUnavailable(err);
+    });
     return await assertDecodedWithinLimit(await readFile(outputPath), options);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});

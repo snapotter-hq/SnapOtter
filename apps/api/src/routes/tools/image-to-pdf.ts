@@ -9,7 +9,11 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
@@ -204,6 +208,9 @@ export function registerImageToPdfRoute(
           try {
             buf = await decodeHeic(buf);
           } catch (err) {
+            // A missing decoder is this server's fault, not the upload:
+            // rethrow so the global handler answers 503 (#1428).
+            if (isDecoderUnavailable(err)) throw err;
             return reply.status(422).send({
               error: `Failed to decode HEIC file "${file.filename}"`,
               details: err instanceof Error ? err.message : String(err),
@@ -213,10 +220,11 @@ export function registerImageToPdfRoute(
           try {
             const fileExt = file.filename.split(".").pop()?.toLowerCase();
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch {
+          } catch (decodeErr) {
             try {
               await sharp(buf).metadata();
             } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
               return reply.status(422).send({
                 error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
                 details: err instanceof Error ? err.message : String(err),
@@ -354,6 +362,7 @@ export function registerImageToPdfRoute(
         ...(compression ? { compression } : {}),
       });
     } catch (err) {
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "PDF creation failed",
         details: err instanceof Error ? err.message : "Unknown error",

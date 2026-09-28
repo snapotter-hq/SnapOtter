@@ -7,7 +7,11 @@ import { reportError } from "../lib/error-report.js";
 import { readImageDimensions } from "../lib/exiftool.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import {
   getObjectSize,
@@ -314,7 +318,10 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (validation.format === "heif") {
       try {
         buffer = await decodeHeic(buffer);
-      } catch {
+      } catch (err) {
+        // A missing decoder is this server's fault, not the upload:
+        // rethrow so the global handler answers 503 (#1428).
+        if (isDecoderUnavailable(err)) throw err;
         return reply.status(422).send({ error: "Failed to decode HEIC/HEIF file" });
       }
     }
@@ -323,11 +330,12 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (needsCliDecode(validation.format)) {
       try {
         buffer = await decodeToSharpCompat(buffer, validation.format);
-      } catch {
+      } catch (decodeErr) {
         // CLI decoder unavailable -- try Sharp directly as fallback for preview
         try {
           await sharp(buffer).metadata();
         } catch {
+          if (isDecoderUnavailable(decodeErr)) throw decodeErr;
           return reply.status(422).send({
             error: `Failed to decode ${validation.format.toUpperCase()} file`,
           });

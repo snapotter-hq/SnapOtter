@@ -7,7 +7,11 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -89,6 +93,9 @@ export function registerStitch(app: FastifyInstance) {
         try {
           file.buffer = await decodeHeic(file.buffer);
         } catch (err) {
+          // A missing decoder is this server's fault, not the upload:
+          // rethrow so the global handler answers 503 (#1428).
+          if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
             details: err instanceof Error ? err.message : String(err),
@@ -100,10 +107,11 @@ export function registerStitch(app: FastifyInstance) {
         const fileExt = file.filename.split(".").pop()?.toLowerCase();
         try {
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-        } catch {
+        } catch (decodeErr) {
           try {
             await sharp(file.buffer).metadata();
           } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
               details: err instanceof Error ? err.message : String(err),

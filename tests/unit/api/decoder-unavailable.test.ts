@@ -17,6 +17,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
   asDecoderUnavailable,
   DecoderUnavailableError,
+  decodeAnyFormat,
   decodeToSharpCompat,
   isDecoderUnavailable,
   noDecoderFound,
@@ -248,6 +249,38 @@ describe("decodeToSharpCompat without a decoder binary", () => {
 
     expect(err.name).toBe("AbortError");
     expect(isDecoderUnavailable(err)).toBe(false);
+  });
+});
+
+describe("dimension preflight without exiftool (#1428)", () => {
+  it("rejects with DecoderUnavailableError when safety limits need exiftool and it is missing", async () => {
+    hideDecoderBinaries();
+
+    // RAW has no header the module can read dimensions from, so the limits
+    // can only be checked through exiftool.
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "dng",
+      { maxPixels: 100_000_000 },
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.message).toMatch(/No exiftool found/);
+  });
+});
+
+describe("decodeAnyFormat (#1428)", () => {
+  // Runs after the ImageMagick tests above on purpose: this one caches the command.
+  it("rejects with DecoderUnavailableError when the cached ImageMagick can no longer be spawned", async () => {
+    const avif = readFixture(fixtures.image.formats("avif"));
+    await decodeAnyFormat(avif, "avif");
+    hideDecoderBinaries();
+
+    const err = await decodeAnyFormat(avif, "avif").catch((e) => e);
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(isBinarySpawnCause(err.cause)).toBe(true);
   });
 });
 

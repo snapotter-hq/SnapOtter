@@ -25,7 +25,11 @@ import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
@@ -407,6 +411,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
                       } catch (err) {
+                        // A missing decoder is this server's fault, not the upload:
+                        // rethrow so the global handler answers 503 (#1428).
+                        if (isDecoderUnavailable(err)) throw err;
                         return reply.status(422).send({
                           error:
                             "Failed to decode HEIC file. Ensure libheif-examples is installed.",
@@ -427,6 +434,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
                       } catch (err) {
+                        if (isDecoderUnavailable(err)) throw err;
                         return reply.status(422).send({
                           error: `Failed to decode ${validation.format} file`,
                           details: err instanceof Error ? err.message : String(err),

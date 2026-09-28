@@ -8,7 +8,11 @@ import sharp from "sharp";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 
@@ -67,7 +71,12 @@ export function registerInfo(app: FastifyInstance) {
           sharpDirectFailed = true;
         }
         if (sharpDirectFailed) {
-          metaBuffer = await decodeHeic(fileBuffer);
+          // A guess: the upload wasn't detected as HEIF, so a missing HEIF
+          // decoder says nothing about this server's ability to read it.
+          metaBuffer = await decodeHeic(fileBuffer).catch((err: unknown) => {
+            if (!isDecoderUnavailable(err)) throw err;
+            throw new Error("Unrecognized image format", { cause: err });
+          });
         }
       }
 
@@ -108,6 +117,9 @@ export function registerInfo(app: FastifyInstance) {
         histogram,
       });
     } catch (err) {
+      // A missing decoder is this server's fault, not the upload:
+      // rethrow so the global handler answers 503 (#1428).
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Failed to read image metadata",
         details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

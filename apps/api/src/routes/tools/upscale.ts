@@ -14,7 +14,11 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -222,6 +226,9 @@ export function registerUpscale(app: FastifyInstance) {
       }
       fileBuffer = await autoOrient(fileBuffer);
     } catch (err) {
+      // A missing decoder is this server's fault, not the upload:
+      // rethrow so the global handler answers 503 (#1428).
+      if (isDecoderUnavailable(err)) throw err;
       request.log.error({ err, toolId: "upscale" }, "Input decoding failed");
       return reply.status(422).send({
         error: "Upscaling failed",

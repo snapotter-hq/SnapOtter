@@ -31,7 +31,11 @@ import {
 } from "../lib/file-storage.js";
 import { type ValidationResult, validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
@@ -630,7 +634,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           .header("Content-Type", "image/jpeg")
           .header("Cache-Control", "public, max-age=86400, immutable")
           .send(thumbnail);
-      } catch {
+      } catch (err) {
+        // A missing decoder is this server's fault, not the upload:
+        // rethrow so the global handler answers 503 (#1428).
+        if (isDecoderUnavailable(err)) throw err;
         return reply.status(422).send({ error: "Could not generate thumbnail" });
       }
     },

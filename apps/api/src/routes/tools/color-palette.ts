@@ -3,7 +3,11 @@ import sharp from "sharp";
 import { z } from "zod";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -201,6 +205,9 @@ export function registerColorPalette(app: FastifyInstance) {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
         } catch (err) {
+          // A missing decoder is this server's fault, not the upload:
+          // rethrow so the global handler answers 503 (#1428).
+          if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
             details: err instanceof Error ? err.message : String(err),
@@ -211,10 +218,11 @@ export function registerColorPalette(app: FastifyInstance) {
         try {
           const fileExt = filename.split(".").pop()?.toLowerCase();
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch {
+        } catch (decodeErr) {
           try {
             await sharp(fileBuffer).metadata();
           } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file`,
               details: err instanceof Error ? err.message : String(err),
@@ -249,6 +257,7 @@ export function registerColorPalette(app: FastifyInstance) {
         count: colors.length,
       });
     } catch (err) {
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Color extraction failed",
         details: err instanceof Error ? err.message : "Unknown error",
