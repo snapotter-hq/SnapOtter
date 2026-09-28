@@ -118,9 +118,15 @@ describe("document preview failure classification (#1404)", () => {
     expect(res.json()).toEqual({ error: "Could not prepare document preview" });
     expect(mocks.convert).not.toHaveBeenCalled();
     expect(previewReports()).toHaveLength(1);
-    // The temp dir mkdtemp made before the copy failed is gone.
+    // The temp dir mkdtemp made before the copy failed is removed. The route's
+    // finally runs after the reply is sent, so inject can resolve first: wait.
     const previewDir = join(env.FILES_STORAGE_PATH, ".previews");
-    expect((await readdir(previewDir)).filter((n) => n.startsWith(`${id}-`))).toEqual([]);
+    await vi.waitFor(
+      async () => {
+        expect((await readdir(previewDir)).filter((n) => n.startsWith(`${id}-`))).toEqual([]);
+      },
+      { timeout: 5_000 },
+    );
   });
 
   // Root ignores directory permissions, so an unwritable dir can't be staged there.
