@@ -5034,12 +5034,12 @@ export const zhCN: TranslationKeys = {
       description: "检测并模糊人脸、消除红眼、智能裁剪",
     },
     "object-eraser-colorize": {
-      name: "对象擦除与上色",
-      description: "从照片中擦除对象，并为黑白图片上色",
+      name: "物体擦除与上色",
+      description: "从照片中擦除物体，并为黑白图片上色",
     },
     "inpaint-hq": {
       name: "高质量修补",
-      description: "基于扩散模型的对象移除，适用于大型对象、精细纹理和结构化背景",
+      description: "基于扩散模型的物体移除，适用于大型物体、精细纹理和结构化背景",
     },
     "upscale-enhance": {
       name: "放大与增强",

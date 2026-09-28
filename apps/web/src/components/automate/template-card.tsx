@@ -56,8 +56,10 @@ export function TemplateCard({ template, onUse }: TemplateCardProps) {
           {requiredBundles.map((bundleId) => {
             const installed = bundles.find((b) => b.id === bundleId)?.status === "installed";
             const isInstalling = Boolean(installing[bundleId]);
-            const info = FEATURE_BUNDLES[bundleId];
-            const label = info ? bundleName(t, info) : bundleId;
+            const label = bundleName(
+              t,
+              FEATURE_BUNDLES[bundleId] ?? { id: bundleId, name: bundleId },
+            );
             return (
               <span
                 key={bundleId}

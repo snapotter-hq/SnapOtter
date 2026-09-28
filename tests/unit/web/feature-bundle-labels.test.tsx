@@ -24,9 +24,16 @@ vi.stubGlobal("localStorage", {
   clear: () => storage.clear(),
 });
 
+// AiFeaturesSection polls disk usage on mount; keep it off the network.
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  apiGet: vi.fn(async () => ({ totalBytes: 0 })),
+}));
+
 import { TemplateCard } from "@/components/automate/template-card";
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
 import { AiInstallIndicator } from "@/components/layout/ai-install-indicator";
+import { AiFeaturesSection } from "@/components/settings/ai-features-section";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { useFeaturesStore } from "@/stores/features-store";
@@ -101,6 +108,22 @@ describe("feature bundle labels are translatable (#910)", () => {
     }
   });
 
+  it("translates every non-English locale rather than copying English", async () => {
+    const enBlock = en.featureBundles as Record<string, { description: string }>;
+    for (const locale of SUPPORTED_LOCALES) {
+      if (locale.code === "en") continue;
+      const translations = await loadTranslations(locale.code);
+      // loadTranslations falls back to en when a locale fails to load, so this
+      // also catches a broken locale module, not only a pasted-English block.
+      expect(translations, locale.code).not.toBe(en);
+      const block = translations.featureBundles as Record<string, { description: string }>;
+      const translated = Object.keys(FEATURE_BUNDLES).filter(
+        (id) => block[id].description !== enBlock[id].description,
+      );
+      expect(translated.length, locale.code).toBe(Object.keys(FEATURE_BUNDLES).length);
+    }
+  });
+
   it("resolves by bundle id in the active locale and falls back to the server string", () => {
     const bg = bundleState("background-removal");
     expect(bundleName(de, bg)).toBe(deBundles["background-removal"].name);
@@ -147,10 +170,26 @@ describe("feature bundle labels are translatable (#910)", () => {
     });
     renderDe(<AiInstallIndicator />);
 
-    expect(
-      await screen.findByText(new RegExp(deBundles["face-detection"].name)),
-    ).toBeInTheDocument();
+    const name = deBundles["face-detection"].name;
+    expect(await screen.findByText((text) => text.includes(name))).toBeInTheDocument();
     expect(screen.queryByText(/Face Detection/)).not.toBeInTheDocument();
+  });
+
+  it("renders the Settings bundle cards in the active locale", async () => {
+    useFeaturesStore.setState({
+      bundles: [bundleState("photo-restoration"), bundleState("transcription")],
+    });
+    renderDe(<AiFeaturesSection />);
+
+    expect(await screen.findByText(deBundles["photo-restoration"].name)).toBeInTheDocument();
+    expect(screen.getByText(deBundles.transcription.name)).toBeInTheDocument();
+    expect(
+      screen.getByText((text) => text.startsWith(deBundles["photo-restoration"].description)),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Photo Restoration")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText((text) => text.includes(FEATURE_BUNDLES.transcription.description)),
+    ).toBeNull();
   });
 
   it("labels a template's required bundles in the active locale", async () => {

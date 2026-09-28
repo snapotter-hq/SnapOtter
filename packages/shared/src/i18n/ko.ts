@@ -5245,12 +5245,12 @@ export const ko: TranslationKeys = {
       description: "얼굴 감지 및 블러, 적목 보정, 스마트 크롭",
     },
     "object-eraser-colorize": {
-      name: "개체 지우기 및 컬러화",
-      description: "사진에서 개체를 지우고 흑백 이미지에 색을 입힙니다",
+      name: "객체 지우기 및 컬러화",
+      description: "사진에서 객체를 지우고 흑백 이미지에 색을 입힙니다",
     },
     "inpaint-hq": {
       name: "고품질 인페인팅",
-      description: "큰 개체, 세밀한 질감, 구조적인 배경을 위한 확산 모델 기반 개체 제거",
+      description: "큰 객체, 세밀한 텍스처, 구조적인 배경을 위한 확산 모델 기반 객체 제거",
     },
     "upscale-enhance": {
       name: "업스케일 및 향상",
