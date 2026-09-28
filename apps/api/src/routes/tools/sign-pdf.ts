@@ -9,11 +9,13 @@ import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -137,6 +139,16 @@ export function registerSignPdf(app: FastifyInstance) {
         rejectPasswordProtected: true,
       });
     } catch (err) {
+      // A broken qpdf is the server's fault, not a bad document: keep its 503,
+      // code, and operator hint, and report it (#1403).
+      if (err instanceof InputValidationError && err.statusCode >= 500) {
+        reportEngineUnavailable(err, TOOL_ID, request.log);
+        return reply.status(err.statusCode).send({
+          error: err.message,
+          ...(err.details && { details: err.details }),
+          ...(err.code && { code: err.code }),
+        });
+      }
       return reply.status(400).send({
         error: "Invalid PDF",
         details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

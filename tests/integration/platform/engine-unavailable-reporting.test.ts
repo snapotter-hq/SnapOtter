@@ -23,6 +23,7 @@ import {
 } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
+import { DocumentInputHandler } from "../../../apps/api/src/modality/document-input.js";
 import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -34,6 +35,8 @@ import {
 
 const mocks = vi.hoisted(() => ({
   reportError: vi.fn(),
+  /** Wraps the real helper, so each call site is visible past its once-per-process dedupe. */
+  reportEngineUnavailable: vi.fn(),
   /** validatePdfPath calls to let through before it starts failing. */
   pdfPassesLeft: Number.POSITIVE_INFINITY,
 }));
@@ -41,6 +44,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
   return { ...actual, reportError: mocks.reportError };
+});
+
+vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/engine-unavailable.js")>();
+  mocks.reportEngineUnavailable.mockImplementation(actual.reportEngineUnavailable);
+  return { reportEngineUnavailable: mocks.reportEngineUnavailable };
 });
 
 vi.mock("../../../apps/api/src/modality/document-input.js", async (importOriginal) => {
@@ -66,6 +76,7 @@ vi.mock("../../../apps/api/src/modality/document-input.js", async (importOrigina
 
 const VIDEO = readFixture(fixtures.video.tiny("mp4"));
 const PDF = readFixture(fixtures.document.pdf3);
+const SIG = readFixture(fixtures.image.base.png200);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -95,6 +106,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   mocks.reportError.mockReset();
+  mocks.reportEngineUnavailable.mockClear();
   mocks.pdfPassesLeft = Number.POSITIVE_INFINITY;
   prepareSpy.mockReset();
   prepareSpy.mockRejectedValue(ffmpegMissing());
@@ -112,6 +124,17 @@ async function post(url: string, parts: Parameters<typeof createMultipartPayload
 
 function videoPart(filename: string) {
   return { name: "file", filename, contentType: "video/mp4", content: VIDEO };
+}
+
+/** Whether a route handed an engine-unavailable error for this tool to the helper. */
+function helperSawEngineDown(toolId: string): boolean {
+  return mocks.reportEngineUnavailable.mock.calls.some(
+    ([err, id]) => (err as { code?: string }).code === "ENGINE_UNAVAILABLE" && id === toolId,
+  );
+}
+
+function pdfPart(filename = "scan.pdf") {
+  return { name: "file", filename, contentType: "application/pdf", content: PDF };
 }
 
 /** The reportError calls that carried an engine-unavailable error for this tool. */
@@ -180,6 +203,64 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
     expect(engineReports("ocr-pdf")).toHaveLength(1);
   });
 
+  it("the ocr-pdf batch ingest reports it", async () => {
+    mocks.pdfPassesLeft = 0;
+    const res = await post("/api/v1/tools/pdf/ocr-pdf/batch", [
+      pdfPart("a.pdf"),
+      pdfPart("b.pdf"),
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+    ]);
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(helperSawEngineDown("ocr-pdf")).toBe(true);
+  });
+
+  it("pipeline execute with an ocr-pdf first step reports it and keeps the code", async () => {
+    mocks.pdfPassesLeft = 0;
+    const res = await post("/api/v1/pipeline/execute", [
+      pdfPart(),
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+        }),
+      },
+    ]);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    expect(helperSawEngineDown("ocr-pdf")).toBe(true);
+  });
+
+  it("sign-pdf answers a broken qpdf with its 503 instead of Invalid PDF", async () => {
+    const docSpy = vi
+      .spyOn(DocumentInputHandler.prototype, "prepare")
+      .mockRejectedValueOnce(
+        new InputValidationError(
+          "PDF processing is unavailable on this server because qpdf could not be started.",
+          503,
+          "Check QPDF_PATH: it must point at an executable qpdf binary.",
+          "ENGINE_UNAVAILABLE",
+        ),
+      );
+    try {
+      const res = await post("/api/v1/tools/pdf/sign-pdf", [
+        pdfPart("in.pdf"),
+        { name: "sig0", filename: "sig0.png", contentType: "image/png", content: SIG },
+        {
+          name: "placements",
+          content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+        },
+      ]);
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        details: expect.stringContaining("QPDF_PATH"),
+      });
+      expect(engineReports("sign-pdf")).toHaveLength(1);
+    } finally {
+      docSpy.mockRestore();
+    }
+  });
+
   it("a 503 raised inside the worker keeps its code and details on the job row", async () => {
     // The route's pre-validation passes; qpdf breaks before the worker runs.
     mocks.pdfPassesLeft = 1;
@@ -198,6 +279,19 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
     }
     expect(row?.status).toBe("failed");
     expect(row?.error).toMatchObject({
+      code: "ENGINE_UNAVAILABLE",
+      details: expect.stringContaining("QPDF_PATH"),
+    });
+
+    // A client reconnecting after the failure replays the same code and hint.
+    const replay = await app.inject({
+      method: "GET",
+      url: `/api/v1/jobs/${jobId}/progress`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+    expect(frame).toMatchObject({
+      phase: "failed",
       code: "ENGINE_UNAVAILABLE",
       details: expect.stringContaining("QPDF_PATH"),
     });
