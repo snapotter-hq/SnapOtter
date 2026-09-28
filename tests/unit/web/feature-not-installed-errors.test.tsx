@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { en, type TranslationKeys } from "@snapotter/shared";
+import { en, loadTranslations, SUPPORTED_LOCALES, type TranslationKeys } from "@snapotter/shared";
 import { de } from "@snapotter/shared/i18n/de.js";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -153,6 +153,18 @@ describe("feature-not-installed errors are translated (#1410)", () => {
     expect(enErrors.featureNotInstalledForTool).toContain("{tool}");
     expect(enErrors.featureNotInstalledForTool).toContain("{feature}");
     expect(enErrors.featureNotInstalled).toContain("{feature}");
+  });
+
+  // format() leaves an unknown placeholder in the text, so a translated or
+  // dropped token would show users a raw "{feature}" (repo-wide check: #934).
+  it("keeps exactly en's placeholders in every locale", async () => {
+    const tokens = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
+    for (const locale of SUPPORTED_LOCALES) {
+      const errors = (await loadTranslations(locale.code)).errors as Record<string, string>;
+      for (const key of ["featureNotInstalledForTool", "featureNotInstalled"]) {
+        expect(tokens(errors[key]), `${locale.code} ${key}`).toEqual(tokens(enErrors[key]));
+      }
+    }
   });
 
   it("tool run: names the tool and bundle in the active locale", async () => {

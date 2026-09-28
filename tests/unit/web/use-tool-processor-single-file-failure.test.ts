@@ -17,7 +17,11 @@ vi.mock("@/lib/api", () => ({
   formatHeaders: () => new Map<string, string>(),
   parseApiError: (body: { code?: string }) =>
     body?.code === "feature_not_installed"
-      ? { type: "feature_not_installed", featureName: "Background Removal" }
+      ? {
+          type: "feature_not_installed",
+          feature: "background-removal",
+          featureName: "Background Removal",
+        }
       : "error",
 }));
 
@@ -27,6 +31,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
@@ -307,7 +312,12 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
 
     const entry = useFileStore.getState().entries[0];
     expect(entry.status).toBe("failed");
-    expect(entry.error).toContain('requires the "Background Removal" feature');
+    expect(entry.error).toBe(
+      format(en.errors.featureNotInstalledForTool, {
+        tool: en.tools["trim-video"].name,
+        feature: en.featureBundles["background-removal"].name,
+      }),
+    );
     expect(useFileStore.getState().error).toBe(entry.error);
 
     unmount();
