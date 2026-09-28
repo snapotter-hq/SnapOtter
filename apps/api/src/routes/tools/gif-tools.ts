@@ -10,6 +10,7 @@ import {
   resolveGifResizeDimensions,
 } from "../../lib/gif-limits.js";
 import { withImageEncodeContext } from "../../lib/image-error.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { createToolRoute } from "../tool-factory.js";
 
 /**
@@ -139,8 +140,9 @@ export function registerGifTools(app: FastifyInstance) {
             fileBuffer = Buffer.concat(chunks);
           }
         }
-      } catch {
-        return reply.status(400).send({ error: "Failed to parse request" });
+      } catch (err) {
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {

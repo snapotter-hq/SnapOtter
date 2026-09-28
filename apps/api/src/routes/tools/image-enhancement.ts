@@ -17,6 +17,7 @@ import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.j
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -221,10 +222,8 @@ export function registerImageEnhancement(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse request",
-          details: err instanceof Error ? err.message : String(err),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       if (!fileBuffer || fileBuffer.length === 0) {

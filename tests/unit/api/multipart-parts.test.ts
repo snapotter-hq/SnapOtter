@@ -205,9 +205,27 @@ describe("multipartFailure (#1341)", () => {
     throw new Error("expected the over-limit read to fail");
   }
 
-  it("answers an over-limit file with 413 and the configured limit", async () => {
-    // vitest runs with MAX_UPLOAD_SIZE_MB=10 (vitest.config.ts).
+  it("answers an over-limit file with 413, naming the limit that fired", async () => {
+    // limitError() reads with a route-specific 1024-byte cap, not the global one.
     expect(multipartFailure(await limitError())).toEqual({
+      status: 413,
+      body: { error: "File exceeds the 1 KB upload limit" },
+    });
+  });
+
+  it("names a storage-side limit carried on the error", () => {
+    // putObjectStream's maxBytes error (object-storage.ts) carries limitBytes too.
+    const err = Object.assign(new Error("Object exceeds the maximum allowed size"), {
+      statusCode: 413,
+      limitBytes: 25 * 1024 * 1024,
+    });
+    expect(multipartFailure(err).body).toEqual({ error: "File exceeds the 25 MB upload limit" });
+  });
+
+  it("falls back to MAX_UPLOAD_SIZE_MB when a 413 doesn't say its limit", () => {
+    // vitest runs with MAX_UPLOAD_SIZE_MB=10 (vitest.config.ts).
+    const err = Object.assign(new Error("too large"), { statusCode: 413 });
+    expect(multipartFailure(err)).toEqual({
       status: 413,
       body: { error: "File exceeds the 10 MB upload limit" },
     });

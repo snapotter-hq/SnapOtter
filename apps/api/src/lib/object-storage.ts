@@ -355,9 +355,11 @@ export interface CopyReadableToFileOptions {
   signal?: AbortSignal;
 }
 
-function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413 } {
+function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413; limitBytes: number } {
+  // limitBytes lets multipartFailure name the limit that actually fired (#1341).
   return Object.assign(new Error(`Object exceeds the maximum allowed size (${maxBytes} bytes)`), {
     statusCode: 413 as const,
+    limitBytes: maxBytes,
   });
 }
 

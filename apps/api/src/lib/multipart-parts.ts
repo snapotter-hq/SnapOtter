@@ -37,29 +37,44 @@ const DONE = Symbol("multipart-done");
  * @fastify/multipart uses for the same condition, so a route that lets it
  * escape answers 413 through the error handler instead of a bare-Error 500
  * (#1280). Routes that catch it answer through multipartFailure below.
+ * limitBytes is the cap that fired, so the answer names it (#1341).
  */
-function fileTooLargeError(): Error {
+function fileTooLargeError(limitBytes: number): Error {
   return Object.assign(new Error("request file too large"), {
     statusCode: 413,
     code: "FST_REQ_FILE_TOO_LARGE",
+    limitBytes,
   });
 }
 
+const MIB = 1024 * 1024;
+
+function formatLimit(bytes: number): string {
+  if (bytes < MIB) return `${Math.ceil(bytes / 1024)} KB`;
+  const mb = bytes / MIB;
+  return `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB`;
+}
+
 /**
- * The response for a multipart read that threw: 413 naming the limit when a
- * file part was over MAX_UPLOAD_SIZE_MB, 400 for anything else. Routes that
- * catch around their read loop answer with this rather than a hard-coded 400,
- * so a client can tell "too big" from "malformed" (#1341).
+ * The response for a multipart read that threw: 413 naming the limit that
+ * fired when a file was over it, 400 for anything else. Routes that catch
+ * around their read loop answer with this rather than a hard-coded 400, so a
+ * client can tell "too big" from "malformed" (#1341). The limit comes from the
+ * error (busboy's and putObjectStream's both carry it), falling back to
+ * MAX_UPLOAD_SIZE_MB.
  */
 export function multipartFailure(
   err: unknown,
 ):
   | { status: 413; body: { error: string } }
   | { status: 400; body: { error: string; details: string } } {
-  if ((err as { statusCode?: unknown } | null)?.statusCode === 413) {
+  const e = err as { statusCode?: unknown; limitBytes?: unknown } | null;
+  if (e?.statusCode === 413) {
+    const limitBytes =
+      typeof e.limitBytes === "number" ? e.limitBytes : env.MAX_UPLOAD_SIZE_MB * MIB;
     return {
       status: 413,
-      body: { error: `File exceeds the ${env.MAX_UPLOAD_SIZE_MB} MB upload limit` },
+      body: { error: `File exceeds the ${formatLimit(limitBytes)} upload limit` },
     };
   }
   return {
@@ -92,12 +107,12 @@ export async function* multipartParts(
   limits: { fileSize?: number; files?: number } = {},
 ): AsyncGenerator<MultipartPart> {
   const raw = request.raw;
+  const fileSizeLimit =
+    limits.fileSize ?? (env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * MIB : undefined);
   const bb = new Busboy({
     headers: raw.headers as BusboyHeaders,
     limits: {
-      fileSize:
-        limits.fileSize ??
-        (env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * 1024 * 1024 : undefined),
+      fileSize: fileSizeLimit,
       files: limits.files ?? (env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined),
       fieldSize: MULTIPART_FIELD_SIZE_BYTES,
       fields: MULTIPART_MAX_FIELDS,
@@ -129,7 +144,8 @@ export async function* multipartParts(
     // throws it normally, since EventEmitter delivers "error" to every
     // registered listener, not just the first.
     stream.on("error", () => {});
-    stream.on("limit", () => stream.destroy(fileTooLargeError()));
+    // "limit" only fires when a fileSize limit is set, so fileSizeLimit is defined.
+    stream.on("limit", () => stream.destroy(fileTooLargeError(fileSizeLimit ?? 0)));
     push({
       type: "file",
       fieldname,

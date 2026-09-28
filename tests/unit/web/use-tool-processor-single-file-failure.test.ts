@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { en } from "@snapotter/shared";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -142,6 +143,29 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     });
     expect(useFileStore.getState().error).toBe("error");
     expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  // #1341: a 413 reads the same to the user whether our API or a reverse
+  // proxy sent it, and in their language, not "error" or "Processing failed".
+  it.each([
+    ["our API's JSON body", JSON.stringify({ error: "File exceeds the 10 MB upload limit" })],
+    ["a proxy's HTML page", "<html>413 Request Entity Too Large</html>"],
+  ])("shows the translated too-large message for a 413 with %s", (_label, body) => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].status = 413;
+      xhrs[0].responseText = body;
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: en.errors.fileTooLarge,
+    });
+    expect(useFileStore.getState().error).toBe(en.errors.fileTooLarge);
 
     unmount();
   });

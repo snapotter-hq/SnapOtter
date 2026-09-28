@@ -783,6 +783,9 @@ export function useToolProcessor(toolId: string) {
           } catch {
             message = `Processing failed: ${xhr.status}`;
           }
+          // Our API's 413 and a reverse proxy's (an HTML body-size page) mean
+          // the same thing to the user, in their language (#1341).
+          if (xhr.status === 413) message = t.errors.fileTooLarge;
           setError(message);
           failEntry(message);
         }
@@ -850,6 +853,7 @@ export function useToolProcessor(toolId: string) {
       startJobEvidenceTimer,
       trackDegrade,
       toolName,
+      t.errors.fileTooLarge,
     ],
   );
 
@@ -1259,6 +1263,8 @@ export function useToolProcessor(toolId: string) {
             }
             errorMsg = `Batch processing failed: ${xhr.status}`;
           }
+          // Our API's 413 and a reverse proxy's mean the same thing (#1341).
+          if (xhr.status === 413) errorMsg = t.errors.fileTooLarge;
           // "Canceled" (not the route's message) so the existing i18n
           // mapping renders it localized.
           failRun(serverCanceled ? "Canceled" : errorMsg, reason);
@@ -1300,6 +1306,7 @@ export function useToolProcessor(toolId: string) {
       startJobEvidenceTimer,
       trackDegrade,
       toolName,
+      t.errors.fileTooLarge,
     ],
   );
 
