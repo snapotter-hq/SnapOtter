@@ -32,8 +32,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 // Python's sort_keys orders keys by code point, the default .sort() by UTF-16
-// code unit. They split on a BMP key in U+E000-U+FFFF next to an astral key,
-// whose high surrogate sorts first by code unit but last by code point (#800).
+// code unit. They split where a key char in U+D800-U+FFFF (a BMP char or a
+// lone surrogate) meets an astral char, whose high surrogate sorts first by
+// code unit but last by code point (#800).
 function compareCodePoints(left: string, right: string): number {
   const a = Array.from(left, (char) => char.codePointAt(0) ?? 0);
   const b = Array.from(right, (char) => char.codePointAt(0) ?? 0);
