@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { prepareZXingModule, readBarcodes } from "zxing-wasm/reader";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { reportError } from "../../lib/error-report.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -15,6 +16,13 @@ import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
+/**
+ * Hand zxing-wasm the packaged binary. Also how the route resets a failed
+ * decoder (#1402): zxing compares overrides value by value and keeps its
+ * cached instance, even a failed one, while they match. Each call reads a
+ * fresh Buffer, which is what makes it a reset; caching the Buffer here would
+ * silently stop that.
+ */
 export function initZXingReader(): void {
   const require = createRequire(import.meta.url);
   let wasmBinary: Buffer;
@@ -277,21 +285,23 @@ export function registerBarcodeRead(app: FastifyInstance) {
           previewUrl: downloadUrl,
         });
       } catch (err) {
-        // A WebAssembly RuntimeError is the decoder failing (it couldn't
-        // instantiate, or it trapped), never the caller's image. zxing-wasm
-        // caches a failed instantiation for good, so hand it the binary again:
-        // new overrides drop the cached instance and the next request retries
-        // (#1402).
+        // A WebAssembly RuntimeError is the decoder itself failing: it couldn't
+        // instantiate (the glue wraps every instantiate error this way), or it
+        // trapped mid-decode, after which the instance can't be trusted.
+        // Either way it's a server fault, not a bad image. zxing-wasm caches a
+        // failed instantiation for good, so hand it the binary again: new
+        // overrides drop the cached instance and the next request starts a
+        // fresh one (#1402).
         if (err instanceof WebAssembly.RuntimeError) {
           request.log.error(
             { err, toolId: "barcode-read" },
             "Barcode decoder failed; reloading it for the next request",
           );
+          void reportError(err, { source: "http", toolId: "barcode-read", statusCode: 503 });
           initZXingReader();
           return reply.status(503).send({
-            error: "Barcode reading is temporarily unavailable on this server.",
-            details:
-              "The barcode decoder failed to start. It will be reloaded on the next request.",
+            error: "Barcode reading failed on this server.",
+            details: "The barcode decoder failed and has been reloaded. Try again.",
             code: "ENGINE_UNAVAILABLE",
           });
         }

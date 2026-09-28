@@ -9,7 +9,7 @@
  */
 
 import sharp from "sharp";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { initZXingReader } from "../../../../apps/api/src/routes/tools/barcode-read.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -1111,15 +1111,6 @@ describe("Barcode Read", () => {
 // ── Decoder that fails to start (#1402) ──────────────────────────
 
 describe("Barcode Read when the decoder fails to start", () => {
-  // The route's own zxing-wasm instance (the module the route imports).
-  const zxing = () =>
-    import(
-      new URL(
-        "../../../../apps/api/node_modules/zxing-wasm/dist/es/reader/index.js",
-        import.meta.url,
-      ).href
-    );
-
   async function readQr() {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "qr.png", contentType: "image/png", content: qrCodePng },
@@ -1133,15 +1124,22 @@ describe("Barcode Read when the decoder fails to start", () => {
   }
 
   afterEach(() => {
+    vi.restoreAllMocks();
     // Leave the decoder working for anything that runs after this block.
     initZXingReader();
   });
 
   it("answers 503, not 422, and the next request decodes normally", async () => {
-    // A binary that can't instantiate: zxing caches that rejection, so before
-    // #1402 every later request failed too, reported as a bad image (422).
-    const { prepareZXingModule } = await zxing();
-    prepareZXingModule({ overrides: { wasmBinary: new Uint8Array([0, 1, 2, 3]) } });
+    // The real binary, failing to instantiate once (as under memory
+    // pressure). zxing caches that rejection, so before #1402 every later
+    // request failed too, reported as a bad image (422).
+    const realInstantiate = WebAssembly.instantiate;
+    vi.spyOn(WebAssembly, "instantiate").mockImplementationOnce(() =>
+      Promise.reject(new RangeError("could not allocate memory")),
+    );
+    // Force a fresh instantiation: the one the spy fails.
+    initZXingReader();
+    expect(WebAssembly.instantiate).not.toBe(realInstantiate);
 
     const failed = await readQr();
     expect(failed.statusCode).toBe(503);
