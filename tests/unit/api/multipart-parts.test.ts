@@ -13,7 +13,7 @@
 import { PassThrough } from "node:stream";
 import type { FastifyRequest } from "fastify";
 import { describe, expect, it } from "vitest";
-import { multipartParts } from "../../../apps/api/src/lib/multipart-parts.js";
+import { multipartFailure, multipartParts } from "../../../apps/api/src/lib/multipart-parts.js";
 
 const BOUNDARY = "----UnitBoundary1234";
 
@@ -187,5 +187,45 @@ describe("multipartParts", () => {
         if (part.type === "file") await drain(part.file);
       }
     }).rejects.toThrow("files limit");
+  });
+});
+
+describe("multipartFailure (#1341)", () => {
+  async function limitError(): Promise<unknown> {
+    const body = multipartBody([
+      { name: "file", filename: "big.bin", content: Buffer.alloc(4096, 1) },
+    ]);
+    try {
+      for await (const part of multipartParts(fakeRequest(body), { fileSize: 1024 })) {
+        if (part.type === "file") await drain(part.file);
+      }
+    } catch (err) {
+      return err;
+    }
+    throw new Error("expected the over-limit read to fail");
+  }
+
+  it("answers an over-limit file with 413 and the configured limit", async () => {
+    // vitest runs with MAX_UPLOAD_SIZE_MB=10 (vitest.config.ts).
+    expect(multipartFailure(await limitError())).toEqual({
+      status: 413,
+      body: { error: "File exceeds the 10 MB upload limit" },
+    });
+  });
+
+  it("keeps any other parse failure a 400, with internal paths stripped", () => {
+    const failure = multipartFailure(new Error("Unexpected end of form at /tmp/uploads/abc"));
+    expect(failure.status).toBe(400);
+    expect(failure.body).toEqual({
+      error: "Failed to parse multipart request",
+      details: "Unexpected end of form at [internal]",
+    });
+  });
+
+  it("treats a non-Error throw as a 400", () => {
+    expect(multipartFailure("boom")).toEqual({
+      status: 400,
+      body: { error: "Failed to parse multipart request", details: "boom" },
+    });
   });
 });
