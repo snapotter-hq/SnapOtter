@@ -234,6 +234,25 @@ export function decideExpiry(
   return ageMs < cutoffMs ? "expired" : "keep";
 }
 
+/**
+ * The job rows whose liveness keeps a storage dir: the dir's own job, plus the
+ * pipeline or batch it belongs to. Pipeline steps are `<pipelineId>-s<i>` and
+ * the next step reads a finished step's output, so the pipeline row is what
+ * says it is still needed. Batch children and per-file pipeline flows are
+ * `<parentId>-f<i>`, per-file steps `<parentId>-f<i>-s<j>`.
+ */
+export function owningJobIds(dirJobId: string): string[] {
+  const ids = new Set([
+    dirJobId,
+    dirJobId.replace(/-s\d+$/, ""),
+    dirJobId.replace(/-f\d+(?:-s\d+)?$/, ""),
+  ]);
+  return [...ids];
+}
+
+const IN_FLIGHT_STATUSES = ["queued", "processing"] as const;
+const FINISHED_STATUSES = ["completed", "failed", "canceled"] as const;
+
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Build set of user IDs under legal hold (direct or via team) once per sweep
   const heldUserRows = await db
@@ -260,13 +279,21 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   }
 
   // --- Per-job deleteAfter sweep (team retention overrides) ---
-  // Runs regardless of the global TTL; deleteAfter is an absolute deadline.
+  // Runs regardless of the global TTL; deleteAfter is an absolute deadline,
+  // but only for a finished job: one still queued or running needs its input
+  // (#1412), and the next sweep after it finishes honors the deadline.
   let deleteAfterCleaned = 0;
   try {
     const expiredJobs = await db
       .select({ id: schema.jobs.id, userId: schema.jobs.userId })
       .from(schema.jobs)
-      .where(and(isNotNull(schema.jobs.deleteAfter), lt(schema.jobs.deleteAfter, new Date())));
+      .where(
+        and(
+          isNotNull(schema.jobs.deleteAfter),
+          lt(schema.jobs.deleteAfter, new Date()),
+          inArray(schema.jobs.status, [...FINISHED_STATUSES]),
+        ),
+      );
 
     for (const job of expiredJobs) {
       // Skip jobs belonging to users under legal hold
@@ -329,22 +356,42 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     }
   }
 
+  const expiredDirs = allDirs.filter((dir) => decideExpiry(dir, cutoffMs, rowsById) === "expired");
+
+  // Age alone would delete the input of a job still waiting behind a backed-up
+  // queue, so an expired dir survives while any job that owns it is in flight
+  // (#1412). Stranded rows are settled by job-reconciliation, so this cannot
+  // pin a dir forever.
+  const inFlightIds = new Set<string>();
+  const ownerIds = [...new Set(expiredDirs.flatMap((dir) => owningJobIds(dir.key.split("/")[1])))];
+  if (ownerIds.length > 0) {
+    const rows = await db
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(
+        and(
+          inArray(schema.jobs.id, ownerIds),
+          inArray(schema.jobs.status, [...IN_FLIGHT_STATUSES]),
+        ),
+      );
+    for (const r of rows) inFlightIds.add(r.id);
+  }
+
   let removed = 0;
   const errors: string[] = [];
-  for (const dir of allDirs) {
-    if (decideExpiry(dir, cutoffMs, rowsById) === "expired") {
-      // Skip deletion if the job's user is under legal hold
-      const jobId = dir.key.split("/")[1];
-      const userId = jobUserMap.get(jobId);
-      if (userId && heldUserIds.has(userId)) continue;
+  for (const dir of expiredDirs) {
+    const jobId = dir.key.split("/")[1];
+    if (owningJobIds(jobId).some((id) => inFlightIds.has(id))) continue;
+    // Skip deletion if the job's user is under legal hold
+    const userId = jobUserMap.get(jobId);
+    if (userId && heldUserIds.has(userId)) continue;
 
-      try {
-        await deletePrefix(dir.key);
-        removed++;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errors.push(`${dir.key}: ${message}`);
-      }
+    try {
+      await deletePrefix(dir.key);
+      removed++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${dir.key}: ${message}`);
     }
   }
   if (errors.length > 0) {

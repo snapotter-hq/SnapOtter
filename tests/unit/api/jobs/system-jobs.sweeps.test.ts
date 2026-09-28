@@ -47,6 +47,7 @@ const schemaMock = vi.hoisted(() => ({
     createdAt: "jobs.createdAt",
     completedAt: "jobs.completedAt",
     deleteAfter: "jobs.deleteAfter",
+    status: "jobs.status",
   },
   settings: { key: "settings.key", value: "settings.value" },
 }));
@@ -614,5 +615,92 @@ describe("storageTtlSweep", () => {
     expect(result).toEqual({ removed: 1, failed: 0 });
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/s3-old");
     expect(deletePrefixMock).not.toHaveBeenCalledWith("uploads/s3-new");
+  });
+});
+
+// -- in-flight jobs (#1412) ---------------------------------------------------
+
+describe("storageTtlSweep keeps dirs of in-flight jobs (#1412)", () => {
+  it("maps a dir to its own job plus the pipeline or batch it belongs to", async () => {
+    const { owningJobIds } = await loadSystemJobs();
+    expect(owningJobIds("abc")).toEqual(["abc"]);
+    // Pipeline step output: <pipelineId>-s<i>.
+    expect(owningJobIds("pipe-s2")).toEqual(["pipe-s2", "pipe"]);
+    // Batch child (or per-file pipeline flow): <parentId>-f<i>.
+    expect(owningJobIds("batch-f3")).toEqual(["batch-f3", "batch"]);
+    // Per-file pipeline step: <parentId>-f<i>-s<j>, owned by the flow and the batch.
+    expect(owningJobIds("batch-f1-s0")).toEqual(["batch-f1-s0", "batch-f1", "batch"]);
+    // UUID dashes are not step or file suffixes.
+    const uuid = "6f1c2d9e-8a4b-4c3d-9e2f-1a2b3c4d5e6f";
+    expect(owningJobIds(uuid)).toEqual([uuid]);
+  });
+
+  it("skips an expired dir while any owning job is queued or processing", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []); // no deleteAfter jobs
+    // Active owners among the expired candidates.
+    queueSelect("jobs", [{ id: "live" }, { id: "pipe" }, { id: "batch" }]);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+
+    const old = Date.now() - 7_200_000;
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") => {
+      if (prefix === "uploads") {
+        return [
+          { key: "uploads/live", size: 0, mtimeMs: old },
+          { key: "uploads/batch-f0-s0", size: 0, mtimeMs: old },
+          { key: "uploads/gone", size: 0, mtimeMs: old },
+        ];
+      }
+      return [{ key: "outputs/pipe-s0", size: 0, mtimeMs: old }];
+    });
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 1, failed: 0 });
+    expect(deletePrefixMock).toHaveBeenCalledTimes(1);
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/gone");
+  });
+
+  it("does not look up owners when nothing has expired", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    // Would make every dir look live if it were (wrongly) consumed.
+    queueSelect("jobs", [{ id: "fresh" }]);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") =>
+      prefix === "uploads" ? [{ key: "uploads/fresh", size: 0, mtimeMs: Date.now() }] : [],
+    );
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(deletePrefixMock).not.toHaveBeenCalled();
+    expect(selectQueues.jobs).toHaveLength(1);
+  });
+
+  it("restricts the deleteAfter sweep to finished jobs", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const drizzle = await import("drizzle-orm");
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(drizzle.inArray).toHaveBeenCalledWith("jobs.status", [
+      "completed",
+      "failed",
+      "canceled",
+    ]);
   });
 });

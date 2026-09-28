@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Job } from "bullmq";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -242,6 +242,109 @@ describe("runSystemJob", () => {
       await rm(failDir, { recursive: true, force: true }).catch(() => {});
       await rm(okDir, { recursive: true, force: true }).catch(() => {});
     }
+  });
+
+  // #1412: the sweep expired dirs by age alone, so a job that waited in the
+  // queue past FILE_MAX_AGE_HOURS lost its input before the worker ran it.
+  describe("in-flight jobs (#1412)", () => {
+    const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const createdIds: string[] = [];
+    const createdDirs: string[] = [];
+
+    afterAll(async () => {
+      for (const d of createdDirs) await rm(d, { recursive: true, force: true }).catch(() => {});
+      if (createdIds.length > 0) {
+        await db.delete(schema.jobs).where(inArray(schema.jobs.id, createdIds));
+      }
+    });
+
+    async function insertJob(
+      id: string,
+      type: string,
+      status: "queued" | "processing" | "completed" | "failed" | "canceled",
+      extra: { deleteAfter?: Date } = {},
+    ): Promise<void> {
+      createdIds.push(id);
+      await db
+        .insert(schema.jobs)
+        .values({ id, userId: testUserId, type, status, createdAt: past, ...extra });
+    }
+
+    /** A job dir with one file, both backdated past the TTL cutoff. */
+    function staleDir(prefix: "uploads" | "outputs", dirId: string): string {
+      const dir = join(env.WORKSPACE_PATH, prefix, dirId);
+      createdDirs.push(dir);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "f.bin"), "x");
+      utimesSync(join(dir, "f.bin"), past, past);
+      utimesSync(dir, past, past);
+      return dir;
+    }
+
+    it("keeps a queued or processing job's stale input and still expires a finished job's", async () => {
+      const queuedId = `q-${randomUUID()}`;
+      const processingId = `p-${randomUUID()}`;
+      const doneId = `d-${randomUUID()}`;
+      await insertJob(queuedId, "single", "queued");
+      await insertJob(processingId, "single", "processing");
+      await insertJob(doneId, "single", "completed");
+      const queuedDir = staleDir("uploads", queuedId);
+      const processingDir = staleDir("uploads", processingId);
+      const doneDir = staleDir("uploads", doneId);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(queuedDir)).toBe(true);
+      expect(existsSync(processingDir)).toBe(true);
+      expect(existsSync(doneDir)).toBe(false);
+    });
+
+    it("keeps a finished pipeline step's output while its pipeline is still running", async () => {
+      // The next step reads outputs/<pipelineId>-s0 after step 0's row is
+      // already completed, so the pipeline row is what says it is in use.
+      const pipelineId = randomUUID();
+      await insertJob(pipelineId, "pipeline", "processing");
+      await insertJob(`${pipelineId}-s0`, "pipeline-step", "completed");
+      const inputDir = staleDir("uploads", pipelineId);
+      const stepOutputDir = staleDir("outputs", `${pipelineId}-s0`);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(inputDir)).toBe(true);
+      expect(existsSync(stepOutputDir)).toBe(true);
+    });
+
+    it("keeps batch child and per-file pipeline dirs while the batch parent is queued", async () => {
+      const parentId = randomUUID();
+      await insertJob(parentId, "batch", "queued");
+      const childDir = staleDir("uploads", `${parentId}-f0`);
+      const perFileStepDir = staleDir("uploads", `${parentId}-f1-s0`);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(childDir)).toBe(true);
+      expect(existsSync(perFileStepDir)).toBe(true);
+    });
+
+    it("waits for a queued job to finish before honoring its passed deleteAfter deadline", async () => {
+      const id = `da-${randomUUID()}`;
+      await insertJob(id, "single", "queued", { deleteAfter: new Date(Date.now() - 60_000) });
+      // Fresh mtime, so only the deleteAfter sweep could remove it.
+      const dir = join(env.WORKSPACE_PATH, "uploads", id);
+      createdDirs.push(dir);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "f.bin"), "x");
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      expect(existsSync(dir)).toBe(true);
+
+      await db
+        .update(schema.jobs)
+        .set({ status: "completed", completedAt: new Date() })
+        .where(eq(schema.jobs.id, id));
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      expect(existsSync(dir)).toBe(false);
+    });
   });
 });
 

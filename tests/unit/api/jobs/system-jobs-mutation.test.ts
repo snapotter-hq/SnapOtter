@@ -666,8 +666,10 @@ describe("storageTtlSweep legal-hold select gating", () => {
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
 
     // Kills the `&&` -> `||` / `size >= 0` mutants (line 308): a truthy guard
-    // would run a 4th select (jobUserMap). Only 3 selects should occur.
-    expect(dbSelectMock).toHaveBeenCalledTimes(3);
+    // would run a 5th select (jobUserMap). Only 4 should occur: held users,
+    // held teams, deleteAfter jobs, and the in-flight owner lookup for the
+    // expired dir (#1412).
+    expect(dbSelectMock).toHaveBeenCalledTimes(4);
     // And the dir is still deleted (no hold in effect).
     expect(result).toEqual({ removed: 1, failed: 0 });
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/stale");
