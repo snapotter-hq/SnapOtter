@@ -182,7 +182,13 @@ describe("Hand-written image routes: decoder availability (#1428)", () => {
 
         expect(res.statusCode, res.body).toBe(503);
         expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
-        expect(res.json().error).toMatch(EXPECTED_MESSAGE[format as keyof typeof SAMPLES]);
+        // Routes that rethrow reach the test app's default Fastify handler,
+        // which puts the message under `message`; the production handler and
+        // sendInputValidationError put it under `error`.
+        const body = res.json();
+        expect(body.message ?? body.error).toMatch(
+          EXPECTED_MESSAGE[format as keyof typeof SAMPLES],
+        );
       });
     }
   }
