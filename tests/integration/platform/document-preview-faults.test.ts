@@ -1,4 +1,4 @@
-import { chmod, rm, writeFile } from "node:fs/promises";
+import { chmod, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -118,6 +118,9 @@ describe("document preview failure classification (#1404)", () => {
     expect(res.json()).toEqual({ error: "Could not prepare document preview" });
     expect(mocks.convert).not.toHaveBeenCalled();
     expect(previewReports()).toHaveLength(1);
+    // The temp dir mkdtemp made before the copy failed is gone.
+    const previewDir = join(env.FILES_STORAGE_PATH, ".previews");
+    expect((await readdir(previewDir)).filter((n) => n.startsWith(`${id}-`))).toEqual([]);
   });
 
   // Root ignores directory permissions, so an unwritable dir can't be staged there.
