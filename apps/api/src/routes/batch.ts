@@ -23,6 +23,7 @@ import { type Pool, queueName, type ToolJobData, type ToolJobResult } from "../j
 import { autoOrient } from "../lib/auto-orient.js";
 import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
@@ -380,6 +381,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 uncommittedKeys.add(key);
               } catch (err) {
                 if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(err, toolId, request.log);
                   preFailures.push({
                     originalIndex: i,
                     filename: file.filename,
@@ -404,6 +406,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(err, toolId, request.log);
                     preFailures.push({
                       originalIndex: i,
                       filename: file.filename,
@@ -479,6 +482,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(err, toolId, request.log);
                     preFailures.push({
                       originalIndex: i,
                       filename: file.filename,

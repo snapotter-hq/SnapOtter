@@ -256,6 +256,21 @@ function toolUsedBaseProps(data: ToolJobData, durationMs: number): Record<string
   };
 }
 
+/**
+ * The machine-readable half of an InputValidationError, kept on the failed job
+ * row next to the message. An ENGINE_UNAVAILABLE raised inside the worker (qpdf
+ * breaking between enqueue and pickup, say) otherwise loses the code and the
+ * "Check QPDF_PATH" hint the route would have sent (#1403).
+ */
+function validationErrorFields(err: unknown): { code?: string; details?: string } {
+  if (!(err instanceof Error) || err.name !== "InputValidationError") return {};
+  const { code, details } = err as { code?: unknown; details?: unknown };
+  return {
+    ...(typeof code === "string" && { code }),
+    ...(typeof details === "string" && { details }),
+  };
+}
+
 async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
   const { jobId } = data;
@@ -662,7 +677,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             status: isCanceled ? "canceled" : "failed",
             completedAt: new Date(),
             durationMs,
-            error: { message: friendlyError(finalError) },
+            error: { message: friendlyError(finalError), ...validationErrorFields(err) },
           })
           .where(eq(schema.jobs.id, jobId))
           .catch((writeErr) => {
@@ -726,6 +741,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             phase: "failed",
             percent: 0,
             error: friendlyError(finalError),
+            ...validationErrorFields(err),
           });
         }
       }

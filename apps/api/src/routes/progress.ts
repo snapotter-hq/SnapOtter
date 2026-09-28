@@ -53,6 +53,10 @@ export interface SingleFileProgress {
   stage?: string;
   percent: number;
   error?: string;
+  /** Machine-readable reason for a failed frame, such as ENGINE_UNAVAILABLE. */
+  code?: string;
+  /** Operator hint that goes with `code` ("Check QPDF_PATH ..."). */
+  details?: string;
   result?: Record<string, unknown>;
 }
 
@@ -122,12 +126,17 @@ export function buildSingleFileReplayEvent(row: SingleFileReplayRow): SingleFile
       : row.status === "canceled"
         ? "Canceled"
         : "Processing failed";
+  const code = isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
+  const details =
+    isRecord(row.error) && typeof row.error.details === "string" ? row.error.details : "";
   return {
     jobId: row.jobId,
     type: "single",
     phase: "failed",
     percent,
     error,
+    ...(code && { code }),
+    ...(details && { details }),
   };
 }
 
@@ -286,6 +295,23 @@ async function persistJobProgress(progress: JobProgress): Promise<void> {
   }
 }
 
+/**
+ * The persisted form of a failed frame's error. The terminal frame is written
+ * after the worker's own failure write, so it has to carry the code and
+ * details too or it overwrites them with a bare message (#1403).
+ */
+function singleFileErrorRow(progress: Omit<SingleFileProgress, "type">): {
+  message: string;
+  code?: string;
+  details?: string;
+} {
+  return {
+    message: progress.error ?? "",
+    ...(progress.code && { code: progress.code }),
+    ...(progress.details && { details: progress.details }),
+  };
+}
+
 async function persistSingleFileProgress(
   progress: Omit<SingleFileProgress, "type">,
   executor: Pick<typeof db, "select" | "insert" | "update"> = db,
@@ -309,7 +335,7 @@ async function persistSingleFileProgress(
       .set({
         status,
         progress: progressJsonb,
-        error: progress.error ? { message: progress.error } : null,
+        error: progress.error ? singleFileErrorRow(progress) : null,
         completedAt: isTerminalFrame ? new Date() : null,
       })
       // Progress is published fire and forget, so a nonterminal frame can still
@@ -334,7 +360,7 @@ async function persistSingleFileProgress(
       status,
       progress: progressJsonb,
       inputRefs: [],
-      error: progress.error ? { message: progress.error } : null,
+      error: progress.error ? singleFileErrorRow(progress) : null,
     });
   }
 }

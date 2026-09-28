@@ -17,7 +17,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../jobs/types.js";
-import { reportError } from "../lib/error-report.js";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
@@ -31,8 +31,6 @@ import { MediaInputHandler, type MediaInputKind } from "../modality/media-input.
 import { requireToolAccess } from "../permissions.js";
 import { buildAsyncAcceptedPayload } from "./async-response.js";
 import { updateSingleFileProgress } from "./progress.js";
-
-const loggedUnavailableEngines = new Set<string>();
 
 /** Context passed to tool process functions for cooperative cancellation, scratch storage, and progress. */
 export interface ToolProcessCtx {
@@ -454,22 +452,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             fname = prepared.filename;
           } catch (err) {
             if (err instanceof InputValidationError) {
-              if (err.statusCode >= 500) {
-                const toolId = config.toolId;
-                const dedupeKey = `${err.code ?? "unknown"}:${toolId}`;
-                if (!loggedUnavailableEngines.has(dedupeKey)) {
-                  loggedUnavailableEngines.add(dedupeKey);
-                  request.log.warn(
-                    { code: err.code, toolId, err },
-                    "Tool engine unavailable during input preparation",
-                  );
-                  void reportError(err, {
-                    source: "http",
-                    toolId,
-                    statusCode: err.statusCode,
-                  });
-                }
-              }
+              reportEngineUnavailable(err, config.toolId, request.log);
               const errorMsg = maxInputs > 1 ? `${fname}: ${err.message}` : err.message;
               const body: Record<string, string> = { error: errorMsg };
               if (err.details) body.details = err.details;
@@ -537,8 +520,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             await config.preValidate({ inputs: preparedInputs, settings });
           } catch (err) {
             if (err instanceof InputValidationError) {
+              reportEngineUnavailable(err, config.toolId, request.log);
               const body: Record<string, string> = { error: err.message };
               if (err.details) body.details = err.details;
+              if (err.code) body.code = err.code;
               return reply.status(err.statusCode).send(body);
             }
             if (isToolInputError(err)) {

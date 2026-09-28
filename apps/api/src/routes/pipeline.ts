@@ -21,6 +21,7 @@ import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue
 import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
@@ -382,8 +383,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       filename = prepared.filename;
                     } catch (err) {
                       if (err instanceof InputValidationError) {
+                        reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
                         const body: Record<string, string> = { error: err.message };
                         if (err.details) body.details = err.details;
+                        if (err.code) body.code = err.code;
                         return reply.status(err.statusCode).send(body);
                       }
                       throw err;
@@ -453,8 +456,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       filename = prepared.filename;
                     } catch (err) {
                       if (err instanceof InputValidationError) {
+                        reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
                         const body: Record<string, string> = { error: err.message };
                         if (err.details) body.details = err.details;
+                        if (err.code) body.code = err.code;
                         return reply.status(err.statusCode).send(body);
                       }
                       throw err;
@@ -594,8 +599,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               uncommittedOcrKey = uploadKey;
             } catch (err) {
               if (err instanceof InputValidationError) {
+                reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
                 const body: Record<string, string> = { error: err.message };
                 if (err.details) body.details = err.details;
+                if (err.code) body.code = err.code;
                 return reply.status(err.statusCode).send(body);
               }
               const statusCode = ocrUploadErrorStatus(err);
@@ -1195,6 +1202,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 uncommittedOcrKeys.add(uploadKey);
               } catch (err) {
                 if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(
+                    err,
+                    pipeline.steps[0]?.toolId ?? "pipeline",
+                    request.log,
+                  );
                   preFailures.push({
                     originalIndex: fi,
                     filename: file.filename,
@@ -1220,6 +1232,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(
+                      err,
+                      pipeline.steps[0]?.toolId ?? "pipeline",
+                      request.log,
+                    );
                     preFailures.push({
                       originalIndex: fi,
                       filename: file.filename,
@@ -1290,6 +1307,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   processFilename = prepared.filename;
                 } catch (err) {
                   if (err instanceof InputValidationError) {
+                    reportEngineUnavailable(
+                      err,
+                      pipeline.steps[0]?.toolId ?? "pipeline",
+                      request.log,
+                    );
                     preFailures.push({
                       originalIndex: fi,
                       filename: file.filename,

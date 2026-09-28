@@ -8,6 +8,7 @@ import { env } from "../../config.js";
 import { registerAiPathJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { copyObjectToFile, deleteObject } from "../../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
@@ -239,6 +240,7 @@ export function registerOcrPdf(app: FastifyInstance) {
       } catch (err) {
         await deleteObject(uploadedInputKey).catch(() => {});
         if (err instanceof InputValidationError) {
+          reportEngineUnavailable(err, toolId, request.log);
           return reply.status(err.statusCode).send({
             error: err.message,
             ...(err.details && { details: err.details }),
