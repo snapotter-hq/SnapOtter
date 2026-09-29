@@ -139,26 +139,56 @@ describe.skipIf(!hasPython)("doc_text.has_readable_text", () => {
 
 interface FakeFont {
   type: string;
-  toUnicode: [string, string];
+  /** "stream" is a real map; "name" is /Identity-H; "dangling" points at no object. */
+  toUnicode: "stream" | "none" | "name" | "dangling";
+  /** On the descendant CIDFont. "stream" is the tFPDF/TCPDF CID = Unicode shape. */
+  cidToGid?: "absent" | "identity" | "stream";
+  /** Defaults to an indirect font; 0 is how get_fonts reports an inline font dict. */
+  xref?: number;
 }
 
 /** Run draws_unmapped_composite_font against a fake page, so the font rule is
- *  tested without PyMuPDF. The fakes mirror the shapes PyMuPDF returns:
- *  page.get_fonts() rows and doc.xref_get_key() pairs. */
+ *  tested without PyMuPDF. The fake doc mirrors the PyMuPDF calls it answers:
+ *  get_fonts() rows, xref_get_key() pairs, xref_object() text, xref_is_stream(),
+ *  and "bad xref" for an object number out of range, as the real one raises. */
 function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
   const code = [
     "import sys, json",
     `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
     "from doc_text import draws_unmapped_composite_font",
     "fonts = json.loads(sys.argv[1])",
+    "LENGTH = 1000",
+    "TO_UNICODE = {'stream': ('xref', '%d 0 R'), 'none': ('null', 'null'),",
+    "              'name': ('name', '/Identity-H'), 'dangling': ('xref', '5000 0 R')}",
+    "CID_TO_GID = {'absent': '', 'identity': '/CIDToGIDMap/Identity', 'stream': '/CIDToGIDMap %d 0 R'}",
+    "def font_at(xref):",
+    "    if not 0 < xref < LENGTH:",
+    "        raise ValueError('bad xref')",
+    "    return fonts[xref - 1]",
     "class Doc:",
+    "    def xref_length(self):",
+    "        return LENGTH",
+    "    def xref_is_stream(self, xref):",
+    "        return 100 <= xref < 200 or 300 <= xref < 400",
     "    def xref_get_key(self, xref, key):",
-    "        assert key == 'ToUnicode', key",
-    "        return tuple(fonts[xref - 1]['toUnicode'])",
+    "        font_at(xref)",
+    "        i = xref - 1",
+    "        if key == 'ToUnicode':",
+    "            kind, value = TO_UNICODE[fonts[i]['toUnicode']]",
+    "            return (kind, value % (100 + i) if '%d' in value else value)",
+    "        assert key == 'DescendantFonts', key",
+    "        return ('array', '[%d 0 R]' % (200 + i))",
+    "    def xref_object(self, xref, compressed=False):",
+    "        assert 200 <= xref < 300, xref",
+    "        i = xref - 200",
+    "        entry = CID_TO_GID[fonts[i].get('cidToGid', 'absent')]",
+    "        entry = entry % (300 + i) if '%d' in entry else entry",
+    "        return '<</Type/Font/Subtype/CIDFontType2/BaseFont/ABCDEF+Font%s>>' % entry",
     "class Page:",
     "    parent = Doc()",
     "    def get_fonts(self):",
-    "        return [(i + 1, 'ttf', f['type'], 'ABCDEF+Font', 'F%d' % i, '') for i, f in enumerate(fonts)]",
+    "        return [(f.get('xref', i + 1), 'ttf', f['type'], 'ABCDEF+Font', 'F%d' % i, '')",
+    "                for i, f in enumerate(fonts)]",
     "sys.stdout.write(json.dumps(draws_unmapped_composite_font(Page())))",
   ].join("\n");
   const res = spawnSync("python3", ["-c", code, JSON.stringify(fonts)], {
@@ -169,33 +199,54 @@ function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
   return JSON.parse(res.stdout) as boolean;
 }
 
-const NO_MAP: [string, string] = ["null", "null"];
-const MAPPED: [string, string] = ["xref", "12 0 R"];
-
 describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
   it("flags a Type0 font with no ToUnicode map, the glyph-id fallback case (#955)", () => {
-    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: NO_MAP }])).toBe(true);
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "none" }])).toBe(true);
+  });
+
+  it("flags it when the descendant says CIDToGIDMap /Identity outright", () => {
+    expect(
+      drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", cidToGid: "identity" }]),
+    ).toBe(true);
+  });
+
+  it("flags a ToUnicode reference that points at no object", () => {
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "dangling" }])).toBe(true);
   });
 
   it("does not flag a Type0 font that carries a ToUnicode map", () => {
-    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: MAPPED }])).toBe(false);
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "stream" }])).toBe(false);
+  });
+
+  it("does not flag CID = Unicode through a CIDToGIDMap stream, which reads fine today", () => {
+    // tFPDF and TCPDF write this. PyMuPDF's fallback emits the CID, which here is
+    // the right character, so judging it on U+FFFD would 422 a good PDF.
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", cidToGid: "stream" }])).toBe(
+      false,
+    );
+  });
+
+  it("skips an inline font dict instead of raising on xref 0", () => {
+    // get_fonts reports an inline dict as xref 0 and xref_get_key(0) raises; an
+    // exception here would fail an extraction that succeeds today.
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", xref: 0 }])).toBe(false);
   });
 
   it("does not flag a simple TrueType font with no ToUnicode map", () => {
     // MuPDF falls back to the character code for simple fonts, not the glyph id,
     // and those codes are often plain ASCII that reads correctly today.
-    expect(drawsUnmappedComposite([{ type: "TrueType", toUnicode: NO_MAP }])).toBe(false);
+    expect(drawsUnmappedComposite([{ type: "TrueType", toUnicode: "none" }])).toBe(false);
   });
 
   it("does not flag base-14 Type1 with no ToUnicode, the shape of test-3page.pdf", () => {
-    expect(drawsUnmappedComposite([{ type: "Type1", toUnicode: NO_MAP }])).toBe(false);
+    expect(drawsUnmappedComposite([{ type: "Type1", toUnicode: "none" }])).toBe(false);
   });
 
   it("flags a page that mixes a mapped simple font with an unmapped Type0 font", () => {
     expect(
       drawsUnmappedComposite([
-        { type: "TrueType", toUnicode: MAPPED },
-        { type: "Type0", toUnicode: NO_MAP },
+        { type: "TrueType", toUnicode: "stream" },
+        { type: "Type0", toUnicode: "none" },
       ]),
     ).toBe(true);
   });
@@ -204,7 +255,6 @@ describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
     expect(drawsUnmappedComposite([])).toBe(false);
   });
 });
-
 // The helpers above are only worth anything if extraction actually calls them,
 // and PyMuPDF is absent from CI so no test here can run main(). Guard the wiring
 // at the source level instead, the way pymupdf-message-redirect.test.ts does.

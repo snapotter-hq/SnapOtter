@@ -67,26 +67,72 @@ def has_readable_text(text):
     )
 
 
-def draws_unmapped_composite_font(page):
-    """True when the page uses a composite (Type0) font with no ToUnicode map.
+# Leading object number of an indirect reference such as "10 0 R" or "[10 0 R]".
+_REF_RE = re.compile(r"\[?\s*(\d+)\s+\d+\s+R")
+# A CIDToGIDMap that points at a stream rather than being /Identity.
+_CID_TO_GID_STREAM_RE = re.compile(r"/CIDToGIDMap\s*\d+\s+\d+\s+R")
 
-    That is the one font shape whose unmapped glyphs come back as glyph ids:
+
+def _object_number(doc, text):
+    """The object a reference string points at, or None if it is not one or is out of range."""
+    ref = _REF_RE.match(text)
+    if not ref:
+        return None
+    number = int(ref.group(1))
+    return number if 0 < number < doc.xref_length() else None
+
+
+def _falls_back_to_glyph_ids(doc, xref):
+    """True when an unmapped glyph in this Type0 font would come back as its glyph id.
+
+    Needs both halves. No ToUnicode stream: a missing key, a name such as
+    /Identity-H, or a reference to nothing all leave MuPDF without a map. And a
+    CID that is the glyph id: the descendant font's CIDToGIDMap absent or
+    /Identity. Producers that store Unicode as the CID and map it to glyphs
+    through a CIDToGIDMap stream (the tFPDF and TCPDF style) fall back to the
+    CID too, but there the CID is the right character, so that text reads fine
+    today and must not be sent to OCR.
+
+    Only reads objects whose numbers are in range, so a damaged font dict makes
+    this answer False (the behaviour before #955) instead of raising.
+    """
+    if not 0 < xref < doc.xref_length():
+        return False
+    to_unicode = _object_number(doc, doc.xref_get_key(xref, "ToUnicode")[1])
+    if to_unicode is not None and doc.xref_is_stream(to_unicode):
+        return False
+    descendant = doc.xref_get_key(xref, "DescendantFonts")[1]
+    # DescendantFonts is an array holding the CIDFont, sometimes itself behind a
+    # reference; follow at most those two hops, then read the CIDFont's text.
+    for _hop in range(2):
+        number = _object_number(doc, descendant)
+        if number is None:
+            break
+        descendant = doc.xref_object(number, compressed=True)
+    return not _CID_TO_GID_STREAM_RE.search(descendant)
+
+
+def draws_unmapped_composite_font(page):
+    """True when the page uses a composite (Type0) font whose fallback is glyph ids.
+
     PyMuPDF's default text flags include TEXT_CID_FOR_UNKNOWN_UNICODE, which
-    swaps each glyph MuPDF could not map for its CID, and under Identity-H the
-    CID is the glyph id, so "Hello" reads as "+HOOR" (#955). Simple fonts are
-    left out on purpose. Their fallback is the character code rather than the
-    glyph id, those codes are often plain ASCII that reads correctly, and
-    base-14 fonts extract through their standard encoding with no ToUnicode at
-    all (tests/fixtures/document/valid/test-3page.pdf).
+    swaps each glyph MuPDF could not map for its CID. For a Type0 font with no
+    ToUnicode map and CID = glyph id, "Hello" then reads as "+HOOR" (#955).
+    Simple fonts are left out on purpose. Their fallback is the character code
+    rather than the glyph id, those codes are often plain ASCII that reads
+    correctly, and base-14 fonts extract through their standard encoding with
+    no ToUnicode at all (tests/fixtures/document/valid/test-3page.pdf).
 
     Reads the page's font resources, not what it actually draws, so an unused
     unmapped Type0 font in shared resources also answers True. The caller then
     judges that page on MuPDF's U+FFFD marker, which leaves correctly mapped
-    text readable, so the only cost is a second get_text on that page.
+    text readable, so the only cost is a second get_text on that page. A font
+    dict written inline in the resources has no object number (get_fonts
+    reports xref 0) and is not checked.
     """
     doc = page.parent
     return any(
-        ftype == "Type0" and doc.xref_get_key(xref, "ToUnicode")[0] == "null"
+        ftype == "Type0" and _falls_back_to_glyph_ids(doc, xref)
         for xref, _ext, ftype, *_rest in page.get_fonts()
     )
 
