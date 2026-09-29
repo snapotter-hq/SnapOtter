@@ -11,6 +11,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
+import { SafeError } from "@snapotter/shared";
 import { and, desc, eq, inArray, isNotNull, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -308,18 +309,27 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       let stagedBytes = 0;
       // The request has already failed and no row points at a staged blob, so
       // one this can't delete is orphaned for good: report it, don't just warn
-      // (#1472). The client still gets the refusal that caused the discard.
+      // (#1472). It's wrapped so orphans group on their own in Sentry, and so
+      // an S3 connection reset isn't taken for this client hanging up. The
+      // client still gets the refusal that caused the discard.
       const discardStaged = async () => {
         await Promise.all(
           staged.map(({ storedName }) =>
             deleteStoredFile(storedName).catch((err) => {
               request.log.error({ err, storedName }, "Failed to discard a staged upload");
-              void reportError(err, {
-                source: "http",
-                route: "/api/v1/files/upload",
-                method: "POST",
-                subsystem: "library-storage",
-              });
+              void reportError(
+                new SafeError("Could not discard a staged upload", {
+                  kind: "operational",
+                  code: "STAGED_DISCARD_FAILED",
+                  cause: err,
+                }),
+                {
+                  source: "http",
+                  route: "/api/v1/files/upload",
+                  method: "POST",
+                  subsystem: "library-storage",
+                },
+              );
             }),
           ),
         );

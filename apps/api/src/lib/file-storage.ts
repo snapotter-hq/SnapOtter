@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, statfs, unlink, writeFile } from "node:fs/promises";
+import {
+  type FileHandle,
+  mkdir,
+  open,
+  readFile,
+  statfs,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { basename, extname, isAbsolute, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
@@ -149,16 +157,32 @@ export async function ensureStorageDir(): Promise<void> {
  * Delete what a failed write left behind. A write that fails partway (the disk
  * filling after the free-space check, an I/O error) leaves a partial file, and
  * its name never reaches the caller, so nothing else could ever remove it
- * (#1472). If this delete fails too, the file is orphaned: say so, with its
- * name, and let the caller see the write error that caused it.
+ * (#1472). Only called once the file was created, so a delete that fails here
+ * leaves a real orphan: log it by name, with the write error behind it.
  */
-async function removePartialWrite(path: string, storedName: string): Promise<void> {
+async function removePartialWrite(
+  path: string,
+  storedName: string,
+  writeErr: unknown,
+): Promise<void> {
   try {
     await unlink(path);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
-    logger.error({ err, storedName }, "Could not remove a partly written library file");
+    logger.error({ err, writeErr, storedName }, "Could not remove a partly written library file");
   }
+}
+
+function storageWriteError(e: unknown): unknown {
+  if ((e as NodeJS.ErrnoException | null)?.code === "EACCES") {
+    return new SafeError("Storage directory is not writable", {
+      kind: "operational",
+      code: "EACCES",
+      statusCode: 503,
+      cause: e,
+    });
+  }
+  return e;
 }
 
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
@@ -171,18 +195,24 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
   await ensureStorageDir();
   await assertDiskSpace(env.FILES_STORAGE_PATH);
   const path = join(env.FILES_STORAGE_PATH, storedName);
+  // Create, then write. If creating fails (a read-only volume, no permission)
+  // nothing is on disk, and a cleanup would only log an orphan that doesn't
+  // exist. "wx" also means a write never lands on an existing file.
+  let handle: FileHandle;
   try {
-    await writeFile(path, buffer);
+    handle = await open(path, "wx");
   } catch (e) {
-    await removePartialWrite(path, storedName);
-    if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
-      throw new SafeError("Storage directory is not writable", {
-        kind: "operational",
-        code: (e as NodeJS.ErrnoException).code,
-        statusCode: 503,
-      });
-    }
-    throw e;
+    throw storageWriteError(e);
+  }
+  try {
+    await handle.writeFile(buffer);
+    await handle.close();
+  } catch (e) {
+    // The write error is the one the caller needs; a close failing on top of
+    // it adds nothing.
+    await handle.close().catch(() => {});
+    await removePartialWrite(path, storedName, e);
+    throw storageWriteError(e);
   }
   return storedName;
 }

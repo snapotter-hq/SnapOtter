@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const config = vi.hoisted(() => ({
@@ -13,10 +13,17 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   env: config,
 }));
 
-// Passthrough fs mock. statfs can report a full disk; writeFile can fail
-// halfway through (the disk filling after the free-space check passed); unlink
-// can fail with EBUSY.
-const diskState = vi.hoisted(() => ({ lowDisk: false, failWriteMidway: false, failUnlink: false }));
+// Passthrough fs mock. statfs can report a full disk. Opening a file for
+// writing can fail outright (failOpenWith), or succeed and then have the write
+// through its handle stop halfway (the disk filling after the free-space check
+// passed), recording where it wrote. unlink can fail with EBUSY.
+const diskState = vi.hoisted(() => ({
+  lowDisk: false,
+  failOpenWith: "",
+  failWriteMidway: false,
+  failUnlink: false,
+  partialPath: "",
+}));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -25,13 +32,22 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     ...actual,
     statfs: (path: string) =>
       diskState.lowDisk ? Promise.resolve({ bfree: 0, bsize: 4096 }) : actual.statfs(path),
-    writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
-      const [path, data] = args;
-      if (diskState.failWriteMidway && Buffer.isBuffer(data)) {
-        await actual.writeFile(path, data.subarray(0, Math.floor(data.length / 2)));
-        throw errno("ENOSPC");
+    open: async (...args: Parameters<typeof actual.open>) => {
+      const [path, flags] = args;
+      const forWriting = typeof flags === "string" && /[wax]/.test(flags);
+      if (forWriting && diskState.failOpenWith) throw errno(diskState.failOpenWith);
+      const handle = await actual.open(...args);
+      if (forWriting && diskState.failWriteMidway) {
+        const write = handle.writeFile.bind(handle);
+        Object.assign(handle, {
+          writeFile: async (data: Buffer) => {
+            diskState.partialPath = String(path);
+            await write(data.subarray(0, Math.floor(data.length / 2)));
+            throw errno("ENOSPC");
+          },
+        });
       }
-      return actual.writeFile(...args);
+      return handle;
     },
     unlink: (path: Parameters<typeof actual.unlink>[0]) =>
       diskState.failUnlink ? Promise.reject(errno("EBUSY")) : actual.unlink(path),
@@ -49,8 +65,10 @@ beforeEach(async () => {
 
 afterEach(async () => {
   diskState.lowDisk = false;
+  diskState.failOpenWith = "";
   diskState.failWriteMidway = false;
   diskState.failUnlink = false;
+  diskState.partialPath = "";
   vi.restoreAllMocks();
   await rm(testDir, { recursive: true, force: true });
 });
@@ -377,6 +395,8 @@ describe("storage not writable (EACCES)", () => {
   });
 
   it.skipIf(isRoot)("saveFile throws a SafeError when the directory is read-only", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
     const { saveFile } = await importModule();
     try {
       await chmod(testDir, 0o555);
@@ -388,6 +408,28 @@ describe("storage not writable (EACCES)", () => {
       expect(err?.message).toBe("Storage directory is not writable");
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.statusCode).toBe(503);
+      // Nothing was created, so there's no orphan to report (#1472).
+      expect(logError).not.toHaveBeenCalled();
+    } finally {
+      await chmod(testDir, 0o755).catch(() => {});
+    }
+  });
+
+  // #1472: with no search permission even the cleanup's unlink fails with
+  // EACCES, which used to log an orphan that was never created.
+  it.skipIf(isRoot)("saveFile logs no orphan when the directory can't be entered", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const { saveFile } = await importModule();
+    try {
+      await chmod(testDir, 0o000);
+      const err = (await saveFile(Buffer.from("x"), "a.png").then(
+        () => null,
+        (e: unknown) => e,
+      )) as StorageError | null;
+      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.statusCode).toBe(503);
+      expect(logError).not.toHaveBeenCalled();
     } finally {
       await chmod(testDir, 0o755).catch(() => {});
     }
@@ -496,6 +538,27 @@ describe("saveFile after a failed write", () => {
     )) as StorageError | null;
 
     expect(err?.code).toBe("ENOSPC");
+    // The half-write really happened in the storage root, and is gone.
+    expect(dirname(diskState.partialPath)).toBe(testDir);
+    expect(existsSync(diskState.partialPath)).toBe(false);
+    expect(await storedFiles()).toEqual([]);
+  });
+
+  it("cleans up nothing, and logs nothing, when the file was never created", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const { saveFile } = await importModule();
+    // A read-only volume: creating fails, and so would any unlink.
+    diskState.failOpenWith = "EROFS";
+    diskState.failUnlink = true;
+
+    const err = (await saveFile(Buffer.alloc(16), "photo.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("EROFS");
+    expect(logError).not.toHaveBeenCalled();
     expect(await storedFiles()).toEqual([]);
   });
 
@@ -514,10 +577,13 @@ describe("saveFile after a failed write", () => {
     expect(err?.code).toBe("ENOSPC");
     const [leftover, ...rest] = await storedFiles();
     expect(rest).toEqual([]);
+    expect(diskState.partialPath).toBe(join(testDir, leftover));
+    expect((await readFile(join(testDir, leftover))).length).toBe(2048);
     expect(logError).toHaveBeenCalledWith(
       expect.objectContaining({
         storedName: leftover,
         err: expect.objectContaining({ code: "EBUSY" }),
+        writeErr: expect.objectContaining({ code: "ENOSPC" }),
       }),
       expect.any(String),
     );
