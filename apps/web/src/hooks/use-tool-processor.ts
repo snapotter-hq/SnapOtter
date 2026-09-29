@@ -12,7 +12,11 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import {
+  FRAME_HANDLING_FAILED,
+  failedFrameMessage,
+  type ProgressFrame,
+} from "@/lib/progress-frames";
 import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
@@ -485,7 +489,7 @@ export function useToolProcessor(toolId: string) {
               // cannot replace this specific error with a generic one.
               xhrRef.current?.abort();
               clearActiveJob();
-              const message = data.error || "Processing failed";
+              const message = failedFrameMessage(data, "Processing failed");
               settleProcessingEntries(message);
               setError(message);
               setProcessing(false);

@@ -154,8 +154,17 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
       videoPart("b.mp4"),
       { name: "settings", content: "{}" },
     ]);
-    // The per-file failure behavior is unchanged; the report is additive.
-    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    // Every file failed on the same missing engine, so the batch says so
+    // instead of a generic 422, and each file keeps its code (#1432).
+    expect(res.statusCode).toBe(503);
+    const body = res.json() as {
+      code?: string;
+      details?: string;
+      errors: Array<{ filename: string; code?: string }>;
+    };
+    expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    expect(body.details).toContain("FFPROBE_PATH");
+    expect(body.errors.map((e) => e.code)).toEqual(["ENGINE_UNAVAILABLE", "ENGINE_UNAVAILABLE"]);
     expect(engineReports("mute-video")).toHaveLength(1);
 
     await post("/api/v1/tools/video/mute-video/batch", [
@@ -189,7 +198,12 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
         content: JSON.stringify({ steps: [{ toolId: "extract-audio", settings: {} }] }),
       },
     ]);
-    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      code: "ENGINE_UNAVAILABLE",
+      details: expect.stringContaining("FFPROBE_PATH"),
+      errors: [{ code: "ENGINE_UNAVAILABLE" }, { code: "ENGINE_UNAVAILABLE" }],
+    });
     expect(engineReports("extract-audio")).toHaveLength(1);
   });
 

@@ -471,6 +471,28 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     hook.unmount();
   });
 
+  it("shows the operator hint a failed frame carries (#1432)", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      sendSingleFrame({
+        phase: "failed",
+        percent: 0,
+        error: "PDF processing is unavailable on this server because qpdf could not be started.",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH: it must point at an executable qpdf binary.",
+      });
+    });
+
+    const expected =
+      "PDF processing is unavailable on this server because qpdf could not be started.: " +
+      "Check QPDF_PATH: it must point at an executable qpdf binary.";
+    expect(useFileStore.getState().entries[0]).toMatchObject({ status: "failed", error: expected });
+    expect(useFileStore.getState().error).toBe(expected);
+
+    unmount();
+  });
+
   it("falls back to a generic message when the failed frame carries no error", () => {
     const { unmount } = startRun();
 

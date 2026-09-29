@@ -57,3 +57,53 @@ describe("reportEngineUnavailable (#1403)", () => {
     expect(reportError).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("sharedServerFault (#1432)", () => {
+  async function helpers() {
+    return await import("../../../apps/api/src/lib/engine-unavailable.js");
+  }
+  const down = {
+    error: "engine down",
+    statusCode: 503,
+    code: "ENGINE_UNAVAILABLE",
+    details: "set FFPROBE_PATH",
+  };
+
+  it("returns the fault when every file failed with the same 5xx code", async () => {
+    const { sharedServerFault } = await helpers();
+    expect(sharedServerFault([down, down])).toEqual({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      error: "engine down",
+      details: "set FFPROBE_PATH",
+    });
+  });
+
+  it("returns null when the files failed for different reasons", async () => {
+    const { sharedServerFault } = await helpers();
+    expect(sharedServerFault([down, { error: "corrupt", statusCode: 400 }])).toBeNull();
+    expect(sharedServerFault([down, { ...down, code: "OTHER" }])).toBeNull();
+  });
+
+  it("returns null for a shared 4xx, which is still the files' fault", async () => {
+    const { sharedServerFault } = await helpers();
+    const bad = { error: "corrupt", statusCode: 400, code: "BAD_INPUT" };
+    expect(sharedServerFault([bad, bad])).toBeNull();
+  });
+
+  it("returns null for no failures or failures without a code", async () => {
+    const { sharedServerFault } = await helpers();
+    expect(sharedServerFault([])).toBeNull();
+    expect(sharedServerFault([{ error: "x", statusCode: 503 }])).toBeNull();
+  });
+
+  it("preFailureFaultFields keeps status, code, and details", async () => {
+    const { preFailureFaultFields } = await helpers();
+    expect(preFailureFaultFields(engineDown())).toEqual({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      details: "set FFPROBE_PATH",
+    });
+    expect(preFailureFaultFields(new InputValidationError("bad"))).toEqual({ statusCode: 400 });
+  });
+});

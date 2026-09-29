@@ -7,7 +7,11 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import {
+  FRAME_HANDLING_FAILED,
+  failedFrameMessage,
+  type ProgressFrame,
+} from "@/lib/progress-frames";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
@@ -120,7 +124,7 @@ export function ocrOneFile(
           return;
         }
         if (data.phase === "failed") {
-          rejectOnce(new Error(typeof data.error === "string" ? data.error : "OCR failed"));
+          rejectOnce(new Error(failedFrameMessage(data, "OCR failed")));
           return;
         }
         if (typeof data.percent === "number") {
