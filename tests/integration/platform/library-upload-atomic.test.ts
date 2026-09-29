@@ -4,14 +4,31 @@
  * that failed (over the upload limit, over quota) left the earlier ones saved
  * while the client got an error and assumed nothing was.
  *
- * Every case checks all three places a file lands: the user_files rows, the
- * users.storage_used counter, and the files on disk.
+ * Every case checks all three places a file lands: the user_files rows and the
+ * users.storage_used counter (this fork's own database), and the blobs this
+ * request wrote. The blobs are tracked by name through a saveFile wrapper
+ * rather than by counting the folder: FILES_STORAGE_PATH isn't per-fork, so
+ * other test files write and delete there while this one runs.
  */
-import { readdir } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { env } from "../../../apps/api/src/config.js";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const savedNames = vi.hoisted(() => [] as string[]);
+vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
+  return {
+    ...actual,
+    saveFile: async (buffer: Buffer, originalName: string) => {
+      const storedName = await actual.saveFile(buffer, originalName);
+      savedNames.push(storedName);
+      return storedName;
+    },
+  };
+});
+
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { getStoredFilePath } from "../../../apps/api/src/lib/file-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -43,12 +60,16 @@ afterAll(async () => {
   await testApp.cleanup();
 }, 10_000);
 
+beforeEach(() => {
+  savedNames.length = 0;
+});
+
 afterEach(async () => {
   vi.restoreAllMocks();
   await db.update(schema.users).set({ storageQuota: null }).where(eq(schema.users.id, adminId));
 });
 
-async function snapshot() {
+async function dbState() {
   const rows = await db
     .select({ id: schema.userFiles.id })
     .from(schema.userFiles)
@@ -57,12 +78,20 @@ async function snapshot() {
     .select({ storageUsed: schema.users.storageUsed })
     .from(schema.users)
     .where(eq(schema.users.id, adminId));
-  // Blobs only: thumbnails go in a .thumbs directory inside the same folder,
-  // created lazily, so counting every entry flaps when an earlier test's
-  // thumbnail write creates it mid-run.
-  const entries = await readdir(env.FILES_STORAGE_PATH, { withFileTypes: true }).catch(() => []);
-  const onDisk = entries.filter((e) => e.isFile()).length;
-  return { rows: rows.length, storageUsed: user.storageUsed, onDisk };
+  return { rows: rows.length, storageUsed: user.storageUsed };
+}
+
+/** The blobs this request wrote that are still on disk. */
+async function survivingBlobs(): Promise<string[]> {
+  const present = await Promise.all(
+    savedNames.map((name) =>
+      access(getStoredFilePath(name)).then(
+        () => name,
+        () => null,
+      ),
+    ),
+  );
+  return present.filter((n): n is string => n !== null);
 }
 
 function upload(files: { name: string; content: Buffer; type: string }[]) {
@@ -79,7 +108,7 @@ function upload(files: { name: string; content: Buffer; type: string }[]) {
 
 describe("multi-file library upload is all-or-nothing (#1342)", () => {
   it("saves nothing when a later file is over the upload limit", async () => {
-    const before = await snapshot();
+    const before = await dbState();
 
     const res = await upload([
       { name: "ok.png", content: PNG, type: "image/png" },
@@ -87,11 +116,14 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
     ]);
 
     expect(res.statusCode).toBe(413);
-    expect(await snapshot()).toEqual(before);
+    expect(await dbState()).toEqual(before);
+    // The first file was written before the second failed; it must be gone.
+    expect(savedNames).toHaveLength(1);
+    expect(await survivingBlobs()).toEqual([]);
   });
 
   it("saves nothing when a later file puts the batch over quota", async () => {
-    const before = await snapshot();
+    const before = await dbState();
     // Room for the PNG but not the PNG plus the JPG.
     await db
       .update(schema.users)
@@ -104,11 +136,13 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
     ]);
 
     expect(res.statusCode).toBe(413);
-    expect(await snapshot()).toEqual(before);
+    expect(await dbState()).toEqual(before);
+    expect(savedNames).toHaveLength(1);
+    expect(await survivingBlobs()).toEqual([]);
   });
 
   it("removes the staged files when the database commit fails", async () => {
-    const before = await snapshot();
+    const before = await dbState();
     vi.spyOn(db, "transaction").mockRejectedValueOnce(new Error("connection reset"));
 
     const res = await upload([
@@ -117,11 +151,13 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
     ]);
 
     expect(res.statusCode).toBe(409);
-    expect(await snapshot()).toEqual(before);
+    expect(await dbState()).toEqual(before);
+    expect(savedNames).toHaveLength(2);
+    expect(await survivingBlobs()).toEqual([]);
   });
 
   it("saves every file and charges the quota once when all of them are fine", async () => {
-    const before = await snapshot();
+    const before = await dbState();
 
     const res = await upload([
       { name: "a.png", content: PNG, type: "image/png" },
@@ -132,10 +168,11 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
     expect(JSON.parse(res.body).files.map((f: { originalName: string }) => f.originalName)).toEqual(
       ["a.png", "b.jpg"],
     );
-    expect(await snapshot()).toEqual({
+    expect(await dbState()).toEqual({
       rows: before.rows + 2,
       storageUsed: before.storageUsed + PNG.length + JPG.length,
-      onDisk: before.onDisk + 2,
     });
+    expect(await survivingBlobs()).toEqual(savedNames);
+    expect(savedNames).toHaveLength(2);
   });
 });
