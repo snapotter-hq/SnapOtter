@@ -7,8 +7,9 @@
  * Every failure case checks all three places a file lands: the user_files rows
  * and the users.storage_used counter (this fork's own database), and the blobs
  * this request wrote. The blobs are tracked by name through a saveFile wrapper
- * rather than by counting the folder: FILES_STORAGE_PATH isn't per-fork, so
- * other test files write and delete there while this one runs (#1471).
+ * rather than by counting the folder: the folder is this file's own since
+ * #1471, but the tests in this file share it, and a name says which blob is
+ * which.
  */
 import { access } from "node:fs/promises";
 import { eq, inArray, sql } from "drizzle-orm";

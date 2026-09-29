@@ -11,12 +11,16 @@ import { forkDirName, removeOnExit } from "./fork-dir.js";
 
 // Each test file (forks pool, isolated) gets its own Postgres database cloned
 // from the migrated template built in tests/global-setup.ts, plus its own
-// workspace dir. setupFiles run before any app module loads, so
-// apps/api/src/config.ts captures the per-file DATABASE_URL.
+// workspace and library-file dirs. setupFiles run before any app module loads,
+// so apps/api/src/config.ts captures the per-file values.
 const forkDirBase = forkDirName(process.pid);
 const suffix = forkDirBase.slice("SnapOtter-test-".length);
 const forkDir = path.join(os.tmpdir(), forkDirBase);
 process.env.WORKSPACE_PATH = path.join(forkDir, "workspace");
+// Library files otherwise land in ./data/files for the whole run, so a test
+// that reads or counts blobs races every other file's uploads and deletes,
+// and a local run leaves blobs in the checkout (#1471).
+process.env.FILES_STORAGE_PATH = path.join(forkDir, "files");
 // Nothing else removes it, and a full run left gigabytes behind (#1004).
 removeOnExit(forkDir);
 

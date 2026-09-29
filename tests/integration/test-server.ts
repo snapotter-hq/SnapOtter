@@ -2,7 +2,7 @@
  * Test server helper -- builds a real Fastify app with an isolated Postgres
  * database for integration tests.
  *
- * Environment variables (DATABASE_URL, WORKSPACE_PATH) are set per-fork in
+ * Environment variables (DATABASE_URL, WORKSPACE_PATH, FILES_STORAGE_PATH) are set per-fork in
  * tests/setup/per-fork-env.ts BEFORE this module is loaded, ensuring
  * apps/api/src/config.ts picks them up.
  *
