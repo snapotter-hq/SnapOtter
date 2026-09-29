@@ -187,9 +187,6 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
       .select({ id: schema.teams.id })
       .from(schema.teams)
       .where(eq(schema.teams.name, "Default"));
-    // users.team holds a team id for users created through the API; the
-    // bootstrap admin keeps the column default, so point it at the real row.
-    await db.update(schema.users).set({ team: team.id }).where(eq(schema.users.id, adminId));
     // Summed the way checkStorageQuota does: other users in this fork's
     // database may share the team.
     const [{ total }] = await db
