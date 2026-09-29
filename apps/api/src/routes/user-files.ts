@@ -136,7 +136,8 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
  * row, and the team's row when the team has a quota, before reading. A
  * concurrent upload by the same user or a teammate then waits here until this
  * one commits and sees its charge, so two uploads that each fit can't both
- * land over the limit.
+ * land over the limit. NO KEY UPDATE is enough for that and, unlike UPDATE,
+ * doesn't hold up inserts elsewhere that reference the user.
  */
 async function quotaRefusal(
   conn: Pick<typeof db, "select">,
@@ -153,7 +154,7 @@ async function quotaRefusal(
     .from(schema.users)
     .where(eq(schema.users.id, userId))
     .limit(1);
-  const [user] = lock ? await userQuery.for("update") : await userQuery;
+  const [user] = lock ? await userQuery.for("no key update") : await userQuery;
 
   if (!user) return null;
   const { storageUsed, storageQuota, team } = user;
@@ -174,7 +175,7 @@ async function quotaRefusal(
       .from(schema.teams)
       .where(and(eq(schema.teams.id, team), isNotNull(schema.teams.storageQuota)))
       .limit(1);
-    const [teamRow] = lock ? await teamQuery.for("update") : await teamQuery;
+    const [teamRow] = lock ? await teamQuery.for("no key update") : await teamQuery;
 
     if (teamRow?.storageQuota) {
       const [teamUsed] = await conn

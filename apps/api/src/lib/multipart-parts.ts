@@ -116,8 +116,8 @@ export function multipartFailure(
  * against @fastify/multipart 9.4.0 and 10.0.0. Busboy's own "finish" fires
  * only after every part has been emitted, so iteration ends there instead,
  * and the request stream's "close" is deliberately not treated as an end
- * signal (a client abort surfaces as an "error" on the stream and as a
- * truncated-part error from busboy).
+ * signal (a client abort surfaces as an "error" on the stream, which also
+ * fails the part being read).
  */
 export async function* multipartParts(
   request: FastifyRequest,
@@ -126,15 +126,24 @@ export async function* multipartParts(
   const raw = request.raw;
   const fileSizeLimit =
     limits.fileSize ?? (env.MAX_UPLOAD_SIZE_MB > 0 ? env.MAX_UPLOAD_SIZE_MB * MIB : undefined);
-  const bb = new Busboy({
-    headers: raw.headers as BusboyHeaders,
-    limits: {
-      fileSize: fileSizeLimit,
-      files: limits.files ?? (env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined),
-      fieldSize: MULTIPART_FIELD_SIZE_BYTES,
-      fields: MULTIPART_MAX_FIELDS,
-    },
-  });
+  let bb: Busboy;
+  try {
+    bb = new Busboy({
+      headers: raw.headers as BusboyHeaders,
+      limits: {
+        fileSize: fileSizeLimit,
+        files: limits.files ?? (env.MAX_BATCH_SIZE > 0 ? env.MAX_BATCH_SIZE : undefined),
+        fieldSize: MULTIPART_FIELD_SIZE_BYTES,
+        fields: MULTIPART_MAX_FIELDS,
+      },
+    });
+  } catch (err) {
+    // A multipart Content-Type with no boundary, which a client that sets the
+    // header by hand on a FormData body sends.
+    throw requestError(err);
+  }
+  // The file part being read, if any: see the request "error" listener below.
+  let openFile: Readable | null = null;
 
   const queue: Array<MultipartPart | Error | typeof DONE> = [];
   let wake: (() => void) | null = null;
@@ -160,9 +169,25 @@ export async function* multipartParts(
     // in receiveUpload -> putObjectStream) still receives the same event and
     // throws it normally, since EventEmitter delivers "error" to every
     // registered listener, not just the first.
-    stream.on("error", () => {});
+    //
+    // Busboy itself fails a part cut short by emitting "error" without
+    // destroying the stream, which then ends as if complete: a reader that
+    // wasn't attached yet would take the truncated bytes for the whole file.
+    // Destroying the stream with that error makes it stick (#1473). Anything
+    // that destroyed the stream itself (the size limit's 413, a consumer's
+    // pipeline failing on a storage error) arrives already destroyed and is
+    // left alone.
+    stream.on("error", (err: unknown) => {
+      if (!stream.destroyed) stream.destroy(requestError(err));
+    });
     // "limit" only fires when a fileSize limit is set, so fileSizeLimit is defined.
     stream.on("limit", () => stream.destroy(fileTooLargeError(fileSizeLimit ?? 0)));
+    openFile = stream;
+    const settled = () => {
+      if (openFile === stream) openFile = null;
+    };
+    stream.once("end", settled);
+    stream.once("close", settled);
     push({
       type: "file",
       fieldname,
@@ -186,7 +211,15 @@ export async function* multipartParts(
   bb.on("partsLimit", () => push(requestError(new Error("reached parts limit"))));
   bb.on("error", (err: unknown) => push(requestError(err)));
   bb.on("finish", () => push(DONE));
-  raw.on("error", (err: Error) => push(requestError(err)));
+  raw.on("error", (err: Error) => {
+    const error = requestError(err);
+    // A dropped connection errors the request and never ends it, so busboy
+    // never hears about it: a reader waiting on the open part would wait
+    // forever, and the route could never undo what it had staged (#1473).
+    // Fail that part with the same error.
+    openFile?.destroy(error);
+    push(error);
+  });
 
   raw.pipe(bb);
 
@@ -211,10 +244,10 @@ export async function* multipartParts(
 
 /**
  * Read a file part into memory. Any failure here is the request's: the part
- * is over the size limit (413, kept), or the body ends partway through it
- * because the client went away (busboy fails the part stream itself when the
- * reader is already waiting on it), which becomes a 400 instead of a reported
- * 500 (#1473). Only for a part read straight into memory: a part piped into
+ * is over the size limit (413, kept), the multipart content stops partway
+ * through it (busboy fails the part), or the connection drops (multipartParts
+ * fails the part), and the last two become a 400 instead of a reported 500
+ * (#1473). Only for a part read straight into memory: a part piped into
  * storage can also fail with the storage's own error, which must stay a 5xx.
  */
 export async function readFilePart(file: Readable): Promise<Buffer> {
