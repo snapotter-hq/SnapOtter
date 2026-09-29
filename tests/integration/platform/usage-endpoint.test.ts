@@ -164,6 +164,35 @@ describe("GET /api/v1/admin/usage", () => {
     expect(typeof body.storage.libraryFiles).toBe("number");
   });
 
+  it("labels per-team storage with the team's name, not its id (#1474)", async () => {
+    // users.team holds a team id: register stores the Default team's id, and
+    // so does the column default the bootstrap admin gets.
+    const regRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: "usage_team_member", password: "TestPass1", team: "Default" },
+    });
+    expect(regRes.statusCode).toBe(201);
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/admin/usage",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const rows: Array<{ teamName: string; userCount: number }> = JSON.parse(res.body).teamStorage;
+
+    const teamIds = new Set(
+      (await db.select({ id: schema.teams.id }).from(schema.teams)).map((t) => t.id),
+    );
+    expect(rows.filter((r) => teamIds.has(r.teamName))).toEqual([]);
+    const defaultRows = rows.filter((r) => r.teamName === "Default");
+    expect(defaultRows).toHaveLength(1);
+    // The admin and the member registered above, at least.
+    expect(defaultRows[0].userCount).toBeGreaterThanOrEqual(2);
+  });
+
   it("defaults days to 30 when omitted", async () => {
     const res = await app.inject({
       method: "GET",
