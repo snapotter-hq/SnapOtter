@@ -322,17 +322,17 @@ function normalizeNoopFormatAliasToken(token: string): string {
 }
 
 function expandCompactConversionToken(token: string): string {
-  const match = token.match(/^([a-z0-9]+)(?:2|to)([a-z0-9]+)$/);
-  if (!match) return token;
-
-  const [, sourceToken, destinationToken] = match;
-  if (
-    sourceToken &&
-    destinationToken &&
-    isCompactConversionFormatToken(sourceToken) &&
-    isCompactConversionFormatToken(destinationToken)
-  ) {
-    return `${sourceToken} to ${destinationToken}`;
+  // Try every "2"/"to" in the token: formats contain both ("m2ts", "photo"),
+  // so the first or last one isn't always the connective ("mp32m2ts").
+  for (const match of token.matchAll(/2|to/g)) {
+    const sourceToken = token.slice(0, match.index);
+    const destinationToken = token.slice(match.index + match[0].length);
+    if (
+      isCompactConversionFormatToken(sourceToken) &&
+      isCompactConversionFormatToken(destinationToken)
+    ) {
+      return `${sourceToken} to ${destinationToken}`;
+    }
   }
 
   return token;

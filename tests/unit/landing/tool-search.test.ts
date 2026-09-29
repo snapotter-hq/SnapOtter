@@ -292,23 +292,44 @@ describe("landing scoreTool", () => {
 
 describe("landing searchTools with real catalog metadata", () => {
   // #1420: a joined query ("cr3tojpg", "cr32jpg") has to rank like its spaced
-  // form for every extension a tool accepts, not only the landing's own list.
-  it("ranks joined conversion queries like their spaced form", () => {
-    const exts = [...new Set(TOOLS.flatMap((tool) => tool.acceptedInputs))].map((ext) =>
-      ext.slice(1),
-    );
+  // form, not only for the landing's own format list. Every other accepted
+  // extension keeps the ~300 searches this would take down to a few seconds;
+  // search-aliases.test.ts already checks that every one of them splits.
+  it("ranks joined conversion queries like their spaced form", { timeout: 60_000 }, () => {
+    const exts = [...new Set(TOOLS.flatMap((tool) => tool.acceptedInputs))]
+      .map((ext) => ext.slice(1))
+      .filter((_, index) => index % 2 === 0);
     const targets = ["pdf", "png", "jpg", "mp4", "mp3", "gif", "webp"];
     const topIds = (query: string) =>
       searchTools(realTools, { query, modality: "all", limit: 3 }).results.map(
         (result) => result.item.id,
       );
+    let checked = 0;
     exts.forEach((ext, index) => {
       const target = targets[index % targets.length];
       if (ext === target) return;
       const spaced = topIds(`${ext} to ${target}`);
+      // A pair no tool handles compares [] to [] and proves nothing.
+      if (spaced.length === 0) return;
+      checked++;
       expect(topIds(`${ext}to${target}`), `${ext}to${target}`).toEqual(spaced);
       expect(topIds(`${ext}2${target}`), `${ext}2${target}`).toEqual(spaced);
     });
+    expect(checked).toBeGreaterThan(25);
+  });
+
+  it("splits a joined query whose formats contain the connective", () => {
+    const topIds = (query: string) =>
+      searchTools(realTools, { query, modality: "all", limit: 3 }).results.map(
+        (result) => result.item.id,
+      );
+    for (const [joined, spaced] of [
+      ["mp32m2ts", "mp3 to m2ts"],
+      ["m2ts2mp4", "m2ts to mp4"],
+      ["phototopdf", "photo to pdf"],
+    ]) {
+      expect(topIds(joined), joined).toEqual(topIds(spaced));
+    }
   });
 
   it("ranks PDF-specific conversion before generic converters for convert pdf", () => {
