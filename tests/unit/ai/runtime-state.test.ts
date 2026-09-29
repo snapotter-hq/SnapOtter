@@ -9,6 +9,7 @@ import {
   rmSync,
   symlinkSync,
   unlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -650,6 +651,11 @@ describe("readActiveRuntime", () => {
 
     expect(readActiveRuntime("ocr", options)).not.toBeNull();
     writeFileSync(fixture.sitePackagePath, "rapidocr-v2\n", "utf-8");
+    // A real edit lands long after the last check. Kernels before 6.13 keep
+    // file timestamps at clock-tick granularity, so a rewrite in the same
+    // tick keeps its mtime; set it as a later edit would leave it (#1481).
+    const later = new Date(Date.now() + 60_000);
+    utimesSync(fixture.sitePackagePath, later, later);
 
     expect(readActiveRuntime("ocr", options)).toBeNull();
   });
@@ -948,9 +954,11 @@ describe("invalid runtime diagnostics (#1433)", () => {
 
     writeFileSync(fixture.smallModelPath, "broken", "utf-8");
     getOcrRuntimeCapability(options);
-    // Put the model back so only one thing is wrong at a time.
+    // Put the model back so only one thing is wrong at a time. The adapter
+    // was hashed by the first read; a different length keeps its rewrite
+    // visible on kernels with coarse file timestamps (#1481).
     writeFileSync(fixture.smallModelPath, "small", "utf-8");
-    writeFileSync(fixture.adapterPath, "# evil adapter\n", "utf-8");
+    writeFileSync(fixture.adapterPath, "# a much more evil adapter\n", "utf-8");
     getOcrRuntimeCapability(options);
 
     expect(warnings(warn)).toEqual([
