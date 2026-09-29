@@ -55,15 +55,39 @@ def has_readable_text(text):
     either unreadable would reject a PDF whose text layer decoded fine, on one
     architecture only.
 
-    This does not catch every unmappable font, and cannot. A subset font with
-    more than 31 glyphs produces ids at or above 0x20, so "Hello" arrives as
-    "+HOOR": ordinary letters, indistinguishable from real text at this level.
+    Glyph ids at or above 0x20 are ordinary letters ("Hello" arrives as "+HOOR")
+    and no per-character test can separate them from real text. main() handles
+    that case before calling this, with draws_unmapped_composite_font (#955).
     """
     return any(
         not char.isspace()
         and char != "\uFFFD"
         and unicodedata.category(char) not in ("Cc", "Cf")
         for char in text
+    )
+
+
+def draws_unmapped_composite_font(page):
+    """True when the page uses a composite (Type0) font with no ToUnicode map.
+
+    That is the one font shape whose unmapped glyphs come back as glyph ids:
+    PyMuPDF's default text flags include TEXT_CID_FOR_UNKNOWN_UNICODE, which
+    swaps each glyph MuPDF could not map for its CID, and under Identity-H the
+    CID is the glyph id, so "Hello" reads as "+HOOR" (#955). Simple fonts are
+    left out on purpose. Their fallback is the character code rather than the
+    glyph id, those codes are often plain ASCII that reads correctly, and
+    base-14 fonts extract through their standard encoding with no ToUnicode at
+    all (tests/fixtures/document/valid/test-3page.pdf).
+
+    Reads the page's font resources, not what it actually draws, so an unused
+    unmapped Type0 font in shared resources also answers True. The caller then
+    judges that page on MuPDF's U+FFFD marker, which leaves correctly mapped
+    text readable, so the only cost is a second get_text on that page.
+    """
+    doc = page.parent
+    return any(
+        ftype == "Type0" and doc.xref_get_key(xref, "ToUnicode")[0] == "null"
+        for xref, _ext, ftype, *_rest in page.get_fonts()
     )
 
 
@@ -93,17 +117,31 @@ def main():
         print(json.dumps({"error": "PyMuPDF not installed"}))
         sys.exit(1)
     try:
+        # Same as the default flags minus the glyph-id substitution, so a glyph
+        # MuPDF could not map comes back as U+FFFD instead of a plausible letter.
+        unmapped_as_fffd = fitz.TEXTFLAGS_TEXT & ~fitz.TEXT_CID_FOR_UNKNOWN_UNICODE
         doc = fitz.open(path)
-        parts = [normalize_presentation_forms(page.get_text()) for page in doc]
+        parts, judged = [], []
+        for page in doc:
+            part = normalize_presentation_forms(page.get_text())
+            parts.append(part)
+            # The .txt keeps the default extraction either way; only the
+            # readability verdict looks through the glyph ids (#955).
+            judged.append(
+                page.get_text(flags=unmapped_as_fffd)
+                if draws_unmapped_composite_font(page)
+                else part
+            )
         doc.close()
         text = "\n".join(parts)
         # hasText separates a PDF with a usable text layer from one that has
         # nothing to give: a scanned or image-only page returns "" so only the
-        # join newlines remain (#589), and a page whose font carries no ToUnicode
-        # map returns raw glyph ids that render blank (#724). len(text) alone
-        # can't tell any of them apart, so the caller uses this to offer OCR
-        # instead of handing back a file the user will read as empty.
-        has_text = any(has_readable_text(part) for part in parts)
+        # join newlines remain (#589), a page whose font carries no ToUnicode
+        # map returns raw glyph ids that render blank (#724), and a composite
+        # font with no map returns glyph ids that look like letters (#955).
+        # len(text) alone can't tell any of them apart, so the caller uses this
+        # to offer OCR instead of handing back a file the user can't read.
+        has_text = any(has_readable_text(part) for part in judged)
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(text)
         print(json.dumps({"chars": len(text), "hasText": has_text}))

@@ -137,6 +137,74 @@ describe.skipIf(!hasPython)("doc_text.has_readable_text", () => {
   });
 });
 
+interface FakeFont {
+  type: string;
+  toUnicode: [string, string];
+}
+
+/** Run draws_unmapped_composite_font against a fake page, so the font rule is
+ *  tested without PyMuPDF. The fakes mirror the shapes PyMuPDF returns:
+ *  page.get_fonts() rows and doc.xref_get_key() pairs. */
+function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
+  const code = [
+    "import sys, json",
+    `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+    "from doc_text import draws_unmapped_composite_font",
+    "fonts = json.loads(sys.argv[1])",
+    "class Doc:",
+    "    def xref_get_key(self, xref, key):",
+    "        assert key == 'ToUnicode', key",
+    "        return tuple(fonts[xref - 1]['toUnicode'])",
+    "class Page:",
+    "    parent = Doc()",
+    "    def get_fonts(self):",
+    "        return [(i + 1, 'ttf', f['type'], 'ABCDEF+Font', 'F%d' % i, '') for i, f in enumerate(fonts)]",
+    "sys.stdout.write(json.dumps(draws_unmapped_composite_font(Page())))",
+  ].join("\n");
+  const res = spawnSync("python3", ["-c", code, JSON.stringify(fonts)], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+  return JSON.parse(res.stdout) as boolean;
+}
+
+const NO_MAP: [string, string] = ["null", "null"];
+const MAPPED: [string, string] = ["xref", "12 0 R"];
+
+describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
+  it("flags a Type0 font with no ToUnicode map, the glyph-id fallback case (#955)", () => {
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: NO_MAP }])).toBe(true);
+  });
+
+  it("does not flag a Type0 font that carries a ToUnicode map", () => {
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: MAPPED }])).toBe(false);
+  });
+
+  it("does not flag a simple TrueType font with no ToUnicode map", () => {
+    // MuPDF falls back to the character code for simple fonts, not the glyph id,
+    // and those codes are often plain ASCII that reads correctly today.
+    expect(drawsUnmappedComposite([{ type: "TrueType", toUnicode: NO_MAP }])).toBe(false);
+  });
+
+  it("does not flag base-14 Type1 with no ToUnicode, the shape of test-3page.pdf", () => {
+    expect(drawsUnmappedComposite([{ type: "Type1", toUnicode: NO_MAP }])).toBe(false);
+  });
+
+  it("flags a page that mixes a mapped simple font with an unmapped Type0 font", () => {
+    expect(
+      drawsUnmappedComposite([
+        { type: "TrueType", toUnicode: MAPPED },
+        { type: "Type0", toUnicode: NO_MAP },
+      ]),
+    ).toBe(true);
+  });
+
+  it("does not flag a page with no fonts", () => {
+    expect(drawsUnmappedComposite([])).toBe(false);
+  });
+});
+
 // The helpers above are only worth anything if extraction actually calls them,
 // and PyMuPDF is absent from CI so no test here can run main(). Guard the wiring
 // at the source level instead, the way pymupdf-message-redirect.test.ts does.
@@ -149,7 +217,17 @@ describe("doc_text.main wiring", () => {
   });
 
   it("decides hasText with the readability test", () => {
-    expect(main).toMatch(/has_text = any\(has_readable_text\(part\) for part in parts\)/);
+    expect(main).toMatch(/has_text = any\(has_readable_text\(part\) for part in judged\)/);
+  });
+
+  it("judges unmapped composite-font pages on MuPDF's own U+FFFD, not glyph ids (#955)", () => {
+    // PyMuPDF's default flags swap an unmapped glyph for its glyph id, which reads
+    // as ordinary letters; dropping that flag hands back the U+FFFD MuPDF meant.
+    expect(main).toMatch(
+      /unmapped_as_fffd = fitz\.TEXTFLAGS_TEXT & ~fitz\.TEXT_CID_FOR_UNKNOWN_UNICODE/,
+    );
+    expect(main).toMatch(/page\.get_text\(flags=unmapped_as_fffd\)/);
+    expect(main).toMatch(/if draws_unmapped_composite_font\(page\)/);
   });
 
   it("reports the character count of the text it actually wrote", () => {
