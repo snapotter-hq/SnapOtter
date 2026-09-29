@@ -169,17 +169,7 @@ export async function* multipartParts(
     // in receiveUpload -> putObjectStream) still receives the same event and
     // throws it normally, since EventEmitter delivers "error" to every
     // registered listener, not just the first.
-    //
-    // Busboy itself fails a part cut short by emitting "error" without
-    // destroying the stream, which then ends as if complete: a reader that
-    // wasn't attached yet would take the truncated bytes for the whole file.
-    // Destroying the stream with that error makes it stick (#1473). Anything
-    // that destroyed the stream itself (the size limit's 413, a consumer's
-    // pipeline failing on a storage error) arrives already destroyed and is
-    // left alone.
-    stream.on("error", (err: unknown) => {
-      if (!stream.destroyed) stream.destroy(requestError(err));
-    });
+    stream.on("error", () => {});
     // "limit" only fires when a fileSize limit is set, so fileSizeLimit is defined.
     stream.on("limit", () => stream.destroy(fileTooLargeError(fileSizeLimit ?? 0)));
     openFile = stream;
@@ -209,17 +199,21 @@ export async function* multipartParts(
   bb.on("filesLimit", () => push(requestError(new Error("reached files limit"))));
   bb.on("fieldsLimit", () => push(requestError(new Error("reached fields limit"))));
   bb.on("partsLimit", () => push(requestError(new Error("reached parts limit"))));
-  bb.on("error", (err: unknown) => push(requestError(err)));
-  bb.on("finish", () => push(DONE));
-  raw.on("error", (err: Error) => {
+  // A request that fails can leave its last part open (#1473). A dropped
+  // connection errors the request and never ends it, so busboy never hears
+  // about it: a reader waiting on the part would wait forever, and the route
+  // could never undo what it had staged. And when the body stops partway
+  // through a part, busboy reports that on itself but ends the part as if it
+  // were complete, so its reader would take the truncated bytes for the whole
+  // file. Either way, fail the open part with the same error.
+  const fail = (err: unknown) => {
     const error = requestError(err);
-    // A dropped connection errors the request and never ends it, so busboy
-    // never hears about it: a reader waiting on the open part would wait
-    // forever, and the route could never undo what it had staged (#1473).
-    // Fail that part with the same error.
     openFile?.destroy(error);
     push(error);
-  });
+  };
+  bb.on("error", fail);
+  bb.on("finish", () => push(DONE));
+  raw.on("error", fail);
 
   raw.pipe(bb);
 

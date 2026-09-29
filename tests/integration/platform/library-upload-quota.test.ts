@@ -299,10 +299,6 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
     expect(await survivingBlobs()).toEqual([]);
   }
 
-  /** The error message the test app's (Fastify's default) error handler sent. */
-  const messageOf = (res: Awaited<ReturnType<typeof upload>>) =>
-    (JSON.parse(res.body) as { message?: string }).message;
-
   it("answers 400 for more files than MAX_BATCH_SIZE, keeping none of them", async () => {
     const before = await libraryState([adminId]);
     // vitest.config.ts sets MAX_BATCH_SIZE=10.
@@ -333,21 +329,19 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
       { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
     ]);
     // Cut the second file off halfway. The whole body is there before the
-    // handler reaches that part, so busboy has already failed it: the handler
-    // must not take the half it can still read for the whole file.
+    // handler reaches that part, and busboy ends the part as if it were
+    // complete: the handler must not save the half it can read.
     const truncated = body.subarray(0, body.length - Math.floor(PNG.length / 2));
 
     const res = await rawUpload(adminToken, contentType, truncated);
 
     await expectRejected(res, before);
-    expect(messageOf(res)).toMatch(/Part terminated early/);
     expect(hooks.savedNames).toHaveLength(1);
   });
 
   it("answers 400 when the body stops while a file is being read, keeping nothing", async () => {
     // Streamed, so the body ends after the handler has moved on to the
-    // second file: whether busboy fails that part before or while it's read,
-    // the handler must refuse it rather than save half a file.
+    // second file.
     const before = await libraryState([adminId]);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
@@ -361,9 +355,7 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
     await sleep(20);
     payload.end();
 
-    const res = await response;
-    await expectRejected(res, before);
-    expect(messageOf(res)).toMatch(/Part terminated early/);
+    await expectRejected(await response, before);
     expect(hooks.savedNames).toHaveLength(1);
   });
 

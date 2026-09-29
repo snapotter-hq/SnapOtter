@@ -280,8 +280,7 @@ describe("readFilePart (#1473)", () => {
   }
 
   it("marks a part the body ends in the middle of as a 400", async () => {
-    // The reader is already waiting on the part when the body stops, so
-    // busboy fails the part stream itself.
+    // The reader is already waiting on the part when the body stops.
     const { raw, generator, file } = await halfSentFile();
 
     const reading = readFilePart(file);
@@ -292,10 +291,10 @@ describe("readFilePart (#1473)", () => {
     await generator.return(undefined);
   });
 
-  it("fails a part busboy cut short even when nothing was reading it yet", async () => {
-    // A complete body whose multipart content stops mid-part: busboy fails
-    // the part before the route gets to it. Reading it later must still fail,
-    // not hand back the truncated bytes as if they were the whole file.
+  it("fails a part the body stopped in even when nothing was reading it yet", async () => {
+    // Busboy reports the cut on itself and ends the part as if it were
+    // complete. Reading it later must fail, not hand back the truncated bytes
+    // as if they were the whole file.
     const { raw, generator, file } = await halfSentFile();
     raw.end();
     await sleep(10);
