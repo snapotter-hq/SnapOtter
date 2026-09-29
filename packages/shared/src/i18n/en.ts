@@ -4441,8 +4441,6 @@ export const en = {
       newPasswordPlaceholder: "New Password",
       confirmPasswordPlaceholder: "Confirm New Password",
       passwordsMismatch: "Passwords do not match",
-      passwordTooShort:
-        "Password must be at least 8 characters with uppercase, lowercase, and a number",
       changeSuccess: "Password changed successfully",
       changeFailed: "Failed to change password",
       currentPasswordIncorrect: "Current password is incorrect",
@@ -4501,6 +4499,10 @@ export const en = {
       securitySettingsSaved: "Security settings saved",
       securitySettingsFailed: "Failed to save security settings",
       adminSettingsLoadFailed: "Couldn't load the security settings.",
+      twoFactorStateChanged:
+        "Two-factor authentication changed in another window. Reload and try again.",
+      twoFactorUnreadable:
+        "Your two-factor settings can't be read on the server. Ask an administrator.",
     },
     people: {
       heading: "People",
@@ -4556,6 +4558,9 @@ export const en = {
         "Copy this password now. You won't be able to see it after creating the user.",
       memberCount: "{count} member",
       memberCountPlural: "{count} members",
+      usernameTaken: "That username is already taken",
+      lastAdmin: "There must always be at least one admin",
+      cannotDeleteSelf: "You can't delete your own account",
     },
     teams: {
       heading: "Teams",
@@ -4592,6 +4597,7 @@ export const en = {
       teamRetentionHoursDesc:
         "Processing file retention for this team. Leave empty to use global default.",
       quotaSaved: "Team settings saved",
+      quotaSaveFailed: "Failed to save team settings",
     },
     roles: {
       heading: "Roles",
@@ -5127,6 +5133,8 @@ export const en = {
     passwordNeedsDigit: "Password must contain a number.",
     passwordNeedsSpecial: "Password must contain a special character.",
     tooManyRequests: "Too many attempts. Wait a minute and try again.",
+    escalationDenied: "You can't grant a role or permissions beyond your own.",
+    featureNotLicensed: "This needs an enterprise license.",
   },
   sidebar: {
     tools: "Tools",

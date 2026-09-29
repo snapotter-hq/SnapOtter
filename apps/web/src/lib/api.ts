@@ -73,16 +73,49 @@ export function formatHeaders(init?: HeadersInit): Headers {
   return headers;
 }
 
+/**
+ * A request the API answered with a non-2xx status. `message` is still the
+ * server's `error` text, for logs and for callers that haven't moved over,
+ * but that text is always English: UI copy should be chosen from `status`
+ * and `code` instead (#1445). `body` is the parsed JSON, or `{}`.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string | undefined,
+    readonly body: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/**
+ * Translated copy for a failed request: the message `byCode` gives the
+ * error's code, else `fallback`. Never the server's English text (#1445).
+ */
+export function apiErrorMessage(
+  err: unknown,
+  byCode: Partial<Record<string, string>>,
+  fallback: string,
+): string {
+  const code = err instanceof ApiError ? err.code : undefined;
+  return (code !== undefined && byCode[code]) || fallback;
+}
+
 async function throwWithMessage(res: Response): Promise<never> {
   let msg = `API error: ${res.status}`;
+  let body: Record<string, unknown> = {};
   try {
-    const body = await res.json();
-    if (body.error) msg = body.error;
-    else if (body.message) msg = body.message;
+    const parsed = await res.json();
+    if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>;
+    if (typeof body.error === "string" && body.error) msg = body.error;
+    else if (typeof body.message === "string" && body.message) msg = body.message;
   } catch {
     // response wasn't JSON — use the default message
   }
-  throw new Error(msg);
+  throw new ApiError(msg, res.status, typeof body.code === "string" ? body.code : undefined, body);
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

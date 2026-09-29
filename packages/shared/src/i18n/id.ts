@@ -4499,7 +4499,6 @@ export const id: TranslationKeys = {
       newPasswordPlaceholder: "Kata Sandi Baru",
       confirmPasswordPlaceholder: "Konfirmasi Kata Sandi Baru",
       passwordsMismatch: "Kata sandi tidak cocok",
-      passwordTooShort: "Kata sandi harus minimal 4 karakter",
       changeSuccess: "Kata sandi berhasil diubah",
       changeFailed: "Gagal mengubah kata sandi",
       currentPasswordIncorrect: "Kata sandi saat ini salah",
@@ -4558,6 +4557,10 @@ export const id: TranslationKeys = {
       securitySettingsSaved: "Pengaturan keamanan tersimpan",
       securitySettingsFailed: "Gagal menyimpan pengaturan keamanan",
       adminSettingsLoadFailed: "Gagal memuat pengaturan keamanan.",
+      twoFactorStateChanged:
+        "Autentikasi dua faktor diubah di jendela lain. Muat ulang lalu coba lagi.",
+      twoFactorUnreadable:
+        "Server tidak dapat membaca pengaturan autentikasi dua faktor Anda. Hubungi administrator.",
     },
     people: {
       heading: "Anggota",
@@ -4613,6 +4616,9 @@ export const id: TranslationKeys = {
         "Salin kata sandi ini sekarang. Anda tidak akan bisa melihatnya setelah membuat pengguna.",
       memberCount: "{count} anggota",
       memberCountPlural: "{count} anggota",
+      usernameTaken: "Nama pengguna itu sudah dipakai",
+      lastAdmin: "Harus selalu ada setidaknya satu admin",
+      cannotDeleteSelf: "Tidak dapat menghapus akun Anda sendiri",
     },
     teams: {
       heading: "Tim",
@@ -4650,6 +4656,7 @@ export const id: TranslationKeys = {
       teamRetentionHoursDesc:
         "Retensi file pemrosesan untuk tim ini. Kosongkan untuk menggunakan default global.",
       quotaSaved: "Pengaturan tim tersimpan",
+      quotaSaveFailed: "Gagal menyimpan pengaturan tim",
     },
     roles: {
       heading: "Peran",
@@ -5194,6 +5201,8 @@ export const id: TranslationKeys = {
     passwordNeedsDigit: "Kata sandi harus mengandung angka.",
     passwordNeedsSpecial: "Kata sandi harus mengandung karakter khusus.",
     tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
+    escalationDenied: "Anda tidak dapat memberikan peran atau izin melebihi milik Anda sendiri.",
+    featureNotLicensed: "Ini memerlukan lisensi enterprise.",
   },
   sidebar: {
     sponsor: "Dukung kami",

@@ -4504,7 +4504,6 @@ export const uk: TranslationKeys = {
       newPasswordPlaceholder: "Новий пароль",
       confirmPasswordPlaceholder: "Підтвердіть новий пароль",
       passwordsMismatch: "Паролі не збігаються",
-      passwordTooShort: "Пароль має містити щонайменше 4 символи",
       changeSuccess: "Пароль успішно змінено",
       changeFailed: "Не вдалося змінити пароль",
       currentPasswordIncorrect: "Поточний пароль невірний",
@@ -4564,6 +4563,10 @@ export const uk: TranslationKeys = {
       securitySettingsSaved: "Налаштування безпеки збережено",
       securitySettingsFailed: "Не вдалося зберегти налаштування безпеки",
       adminSettingsLoadFailed: "Не вдалося завантажити налаштування безпеки.",
+      twoFactorStateChanged:
+        "Двофакторну автентифікацію змінено в іншому вікні. Оновіть сторінку й спробуйте ще раз.",
+      twoFactorUnreadable:
+        "Сервер не може прочитати налаштування двофакторної автентифікації. Зверніться до адміністратора.",
     },
     people: {
       heading: "Користувачі",
@@ -4619,6 +4622,9 @@ export const uk: TranslationKeys = {
         "Скопіюйте цей пароль зараз. Після створення користувача ви не зможете його побачити.",
       memberCount: "{count} учасник",
       memberCountPlural: "{count} учасників",
+      usernameTaken: "Це ім'я користувача вже зайняте",
+      lastAdmin: "Завжди має залишатися щонайменше один адміністратор",
+      cannotDeleteSelf: "Неможливо видалити власний обліковий запис",
     },
     teams: {
       heading: "Команди",
@@ -4656,6 +4662,7 @@ export const uk: TranslationKeys = {
       teamRetentionHoursDesc:
         "Час зберігання файлів обробки для цієї команди. Залиште порожнім для глобального значення.",
       quotaSaved: "Налаштування команди збережено",
+      quotaSaveFailed: "Не вдалося зберегти налаштування команди",
     },
     roles: {
       heading: "Ролі",
@@ -5200,6 +5207,8 @@ export const uk: TranslationKeys = {
     passwordNeedsDigit: "Пароль має містити цифру.",
     passwordNeedsSpecial: "Пароль має містити спеціальний символ.",
     tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
+    escalationDenied: "Не можна надати роль або дозволи понад власні.",
+    featureNotLicensed: "Для цього потрібна корпоративна ліцензія.",
   },
   sidebar: {
     sponsor: "Підтримайте нас",

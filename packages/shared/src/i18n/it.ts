@@ -4513,7 +4513,6 @@ export const it: TranslationKeys = {
       newPasswordPlaceholder: "Nuova password",
       confirmPasswordPlaceholder: "Conferma nuova password",
       passwordsMismatch: "Le password non corrispondono",
-      passwordTooShort: "La password deve contenere almeno 4 caratteri",
       changeSuccess: "Password modificata con successo",
       changeFailed: "Modifica della password non riuscita",
       currentPasswordIncorrect: "La password attuale non è corretta",
@@ -4576,6 +4575,10 @@ export const it: TranslationKeys = {
       securitySettingsSaved: "Impostazioni di sicurezza salvate",
       securitySettingsFailed: "Impossibile salvare le impostazioni di sicurezza",
       adminSettingsLoadFailed: "Impossibile caricare le impostazioni di sicurezza.",
+      twoFactorStateChanged:
+        "L'autenticazione a due fattori è cambiata in un'altra finestra. Ricarica e riprova.",
+      twoFactorUnreadable:
+        "Il server non riesce a leggere le tue impostazioni di autenticazione a due fattori. Rivolgiti a un amministratore.",
     },
     people: {
       heading: "Persone",
@@ -4632,6 +4635,9 @@ export const it: TranslationKeys = {
         "Copia questa password adesso. Non potrai vederla dopo aver creato l'utente.",
       memberCount: "{count} membro",
       memberCountPlural: "{count} membri",
+      usernameTaken: "Questo nome utente è già in uso",
+      lastAdmin: "Deve esserci sempre almeno un amministratore",
+      cannotDeleteSelf: "Non è possibile eliminare il proprio account",
     },
     teams: {
       heading: "Team",
@@ -4668,6 +4674,7 @@ export const it: TranslationKeys = {
       teamRetentionHoursDesc:
         "Retention dei file elaborati per questo team. Lascia vuoto per usare il valore globale predefinito.",
       quotaSaved: "Impostazioni del team salvate",
+      quotaSaveFailed: "Salvataggio delle impostazioni del team non riuscito",
     },
     roles: {
       heading: "Ruoli",
@@ -5213,6 +5220,8 @@ export const it: TranslationKeys = {
     passwordNeedsDigit: "La password deve contenere un numero.",
     passwordNeedsSpecial: "La password deve contenere un carattere speciale.",
     tooManyRequests: "Troppi tentativi. Attendi un minuto e riprova.",
+    escalationDenied: "Non puoi assegnare un ruolo o permessi superiori ai tuoi.",
+    featureNotLicensed: "Serve una licenza enterprise.",
   },
   sidebar: {
     sponsor: "Sostienici",

@@ -4499,7 +4499,6 @@ export const es: TranslationKeys = {
       newPasswordPlaceholder: "Nueva contraseña",
       confirmPasswordPlaceholder: "Confirmar nueva contraseña",
       passwordsMismatch: "Las contraseñas no coinciden",
-      passwordTooShort: "La contraseña debe tener al menos 4 caracteres",
       changeSuccess: "Contraseña cambiada correctamente",
       changeFailed: "Error al cambiar la contraseña",
       currentPasswordIncorrect: "La contraseña actual es incorrecta",
@@ -4562,6 +4561,10 @@ export const es: TranslationKeys = {
       securitySettingsSaved: "Configuración de seguridad guardada",
       securitySettingsFailed: "Error al guardar la configuración de seguridad",
       adminSettingsLoadFailed: "No se pudo cargar la configuración de seguridad.",
+      twoFactorStateChanged:
+        "La autenticación en dos pasos cambió en otra ventana. Recarga e inténtalo de nuevo.",
+      twoFactorUnreadable:
+        "El servidor no puede leer tu configuración de verificación en dos pasos. Consulta a un administrador.",
     },
     people: {
       heading: "Personas",
@@ -4617,6 +4620,9 @@ export const es: TranslationKeys = {
         "Copia esta contraseña ahora. No podrás verla después de crear el usuario.",
       memberCount: "{count} miembro",
       memberCountPlural: "{count} miembros",
+      usernameTaken: "Ese nombre de usuario ya está en uso",
+      lastAdmin: "Siempre debe haber al menos un administrador",
+      cannotDeleteSelf: "No puedes eliminar tu propia cuenta",
     },
     teams: {
       heading: "Equipos",
@@ -4654,6 +4660,7 @@ export const es: TranslationKeys = {
       teamRetentionHoursDesc:
         "Retención de archivos procesados para este equipo. Dejar vacío para usar el valor predeterminado global.",
       quotaSaved: "Configuración de equipo guardada",
+      quotaSaveFailed: "Error al guardar la configuración del equipo",
     },
     roles: {
       heading: "Roles",
@@ -5204,6 +5211,8 @@ export const es: TranslationKeys = {
     passwordNeedsDigit: "La contraseña debe contener un número.",
     passwordNeedsSpecial: "La contraseña debe contener un carácter especial.",
     tooManyRequests: "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
+    escalationDenied: "No puedes otorgar un rol o permisos que superen los tuyos.",
+    featureNotLicensed: "Esto requiere una licencia empresarial.",
   },
   sidebar: {
     sponsor: "Apóyanos",

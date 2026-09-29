@@ -4495,7 +4495,6 @@ export const vi: TranslationKeys = {
       newPasswordPlaceholder: "Mật khẩu mới",
       confirmPasswordPlaceholder: "Xác nhận mật khẩu mới",
       passwordsMismatch: "Mật khẩu không khớp",
-      passwordTooShort: "Mật khẩu phải có ít nhất 4 ký tự",
       changeSuccess: "Đã đổi mật khẩu thành công",
       changeFailed: "Đổi mật khẩu thất bại",
       currentPasswordIncorrect: "Mật khẩu hiện tại không đúng",
@@ -4553,6 +4552,10 @@ export const vi: TranslationKeys = {
       securitySettingsSaved: "Đã lưu cài đặt bảo mật",
       securitySettingsFailed: "Không thể lưu cài đặt bảo mật",
       adminSettingsLoadFailed: "Không thể tải cài đặt bảo mật.",
+      twoFactorStateChanged:
+        "Xác thực hai yếu tố đã thay đổi ở cửa sổ khác. Hãy tải lại rồi thử lại.",
+      twoFactorUnreadable:
+        "Máy chủ không đọc được cài đặt xác thực hai yếu tố của bạn. Hãy liên hệ quản trị viên.",
     },
     people: {
       heading: "Thành viên",
@@ -4609,6 +4612,9 @@ export const vi: TranslationKeys = {
         "Sao chép mật khẩu này ngay bây giờ. Bạn sẽ không thể xem lại sau khi tạo người dùng.",
       memberCount: "{count} thành viên",
       memberCountPlural: "{count} thành viên",
+      usernameTaken: "Tên người dùng này đã được sử dụng",
+      lastAdmin: "Luôn phải có ít nhất một quản trị viên",
+      cannotDeleteSelf: "Không thể xóa tài khoản của chính bạn",
     },
     teams: {
       heading: "Nhóm",
@@ -4646,6 +4652,7 @@ export const vi: TranslationKeys = {
       teamRetentionHoursDesc:
         "Thời gian lưu giữ tệp xử lý cho nhóm này. Để trống để dùng mặc định chung.",
       quotaSaved: "Đã lưu cài đặt nhóm",
+      quotaSaveFailed: "Lưu cài đặt nhóm thất bại",
     },
     roles: {
       heading: "Vai trò",
@@ -5182,6 +5189,8 @@ export const vi: TranslationKeys = {
     passwordNeedsDigit: "Mật khẩu phải chứa một chữ số.",
     passwordNeedsSpecial: "Mật khẩu phải chứa một ký tự đặc biệt.",
     tooManyRequests: "Quá nhiều lần thử. Hãy đợi một phút rồi thử lại.",
+    escalationDenied: "Bạn không thể cấp vai trò hoặc quyền vượt quá quyền của chính bạn.",
+    featureNotLicensed: "Tính năng này cần giấy phép doanh nghiệp.",
   },
   sidebar: {
     sponsor: "Ủng hộ chúng tôi",

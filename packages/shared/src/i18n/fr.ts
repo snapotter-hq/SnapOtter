@@ -4523,7 +4523,6 @@ export const fr: TranslationKeys = {
       newPasswordPlaceholder: "Nouveau mot de passe",
       confirmPasswordPlaceholder: "Confirmer le nouveau mot de passe",
       passwordsMismatch: "Les mots de passe ne correspondent pas",
-      passwordTooShort: "Le mot de passe doit contenir au moins 4 caractères",
       changeSuccess: "Mot de passe modifié avec succès",
       changeFailed: "Échec de la modification du mot de passe",
       currentPasswordIncorrect: "Le mot de passe actuel est incorrect",
@@ -4586,6 +4585,10 @@ export const fr: TranslationKeys = {
       securitySettingsSaved: "Paramètres de sécurité enregistrés",
       securitySettingsFailed: "Échec de l'enregistrement des paramètres de sécurité",
       adminSettingsLoadFailed: "Impossible de charger les paramètres de sécurité.",
+      twoFactorStateChanged:
+        "L'authentification à deux facteurs a été modifiée dans une autre fenêtre. Rechargez la page et réessayez.",
+      twoFactorUnreadable:
+        "Le serveur ne parvient pas à lire vos paramètres d'authentification à deux facteurs. Contactez un administrateur.",
     },
     people: {
       heading: "Personnes",
@@ -4641,6 +4644,9 @@ export const fr: TranslationKeys = {
         "Copiez ce mot de passe maintenant. Vous ne pourrez plus le voir après la création de l'utilisateur.",
       memberCount: "{count} membre",
       memberCountPlural: "{count} membres",
+      usernameTaken: "Ce nom d'utilisateur est déjà pris",
+      lastAdmin: "Il doit toujours y avoir au moins un administrateur",
+      cannotDeleteSelf: "Vous ne pouvez pas supprimer votre propre compte",
     },
     teams: {
       heading: "Équipes",
@@ -4679,6 +4685,7 @@ export const fr: TranslationKeys = {
       teamRetentionHoursDesc:
         "Rétention des fichiers traités pour cette équipe. Laisser vide pour la valeur par défaut.",
       quotaSaved: "Paramètres d'équipe enregistrés",
+      quotaSaveFailed: "Échec de l'enregistrement des paramètres d'équipe",
     },
     roles: {
       heading: "Rôles",
@@ -5227,6 +5234,9 @@ export const fr: TranslationKeys = {
     passwordNeedsDigit: "Le mot de passe doit contenir un chiffre.",
     passwordNeedsSpecial: "Le mot de passe doit contenir un caractère spécial.",
     tooManyRequests: "Trop de tentatives. Patientez une minute puis réessayez.",
+    escalationDenied:
+      "Vous ne pouvez pas attribuer un rôle ou des autorisations au-delà des vôtres.",
+    featureNotLicensed: "Cette fonction nécessite une licence entreprise.",
   },
   sidebar: {
     sponsor: "Soutenez-nous",

@@ -4498,7 +4498,6 @@ export const sv: TranslationKeys = {
       newPasswordPlaceholder: "Nytt lösenord",
       confirmPasswordPlaceholder: "Bekräfta nytt lösenord",
       passwordsMismatch: "Lösenorden matchar inte",
-      passwordTooShort: "Lösenordet måste vara minst 4 tecken",
       changeSuccess: "Lösenordet ändrat",
       changeFailed: "Kunde inte ändra lösenordet",
       currentPasswordIncorrect: "Nuvarande lösenord är felaktigt",
@@ -4558,6 +4557,10 @@ export const sv: TranslationKeys = {
       securitySettingsSaved: "Säkerhetsinställningar sparade",
       securitySettingsFailed: "Kunde inte spara säkerhetsinställningar",
       adminSettingsLoadFailed: "Kunde inte läsa in säkerhetsinställningar.",
+      twoFactorStateChanged:
+        "Tvåfaktorsautentiseringen ändrades i ett annat fönster. Ladda om och försök igen.",
+      twoFactorUnreadable:
+        "Servern kan inte läsa dina inställningar för tvåfaktorsautentisering. Kontakta en administratör.",
     },
     people: {
       heading: "Personer",
@@ -4614,6 +4617,9 @@ export const sv: TranslationKeys = {
         "Kopiera detta lösenord nu. Du kan inte se det efter att användaren har skapats.",
       memberCount: "{count} medlem",
       memberCountPlural: "{count} medlemmar",
+      usernameTaken: "Det användarnamnet är redan upptaget",
+      lastAdmin: "Det måste alltid finnas minst en administratör",
+      cannotDeleteSelf: "Du kan inte ta bort ditt eget konto",
     },
     teams: {
       heading: "Team",
@@ -4650,6 +4656,7 @@ export const sv: TranslationKeys = {
       teamRetentionHoursDesc:
         "Bevarande av bearbetningsfiler för detta team. Lämna tomt för att använda globalt standardvärde.",
       quotaSaved: "Teaminställningar sparade",
+      quotaSaveFailed: "Kunde inte spara teaminställningar",
     },
     roles: {
       heading: "Roller",
@@ -5191,6 +5198,8 @@ export const sv: TranslationKeys = {
     passwordNeedsDigit: "Lösenordet måste innehålla en siffra.",
     passwordNeedsSpecial: "Lösenordet måste innehålla ett specialtecken.",
     tooManyRequests: "För många försök. Vänta en minut och försök igen.",
+    escalationDenied: "Du kan inte ge en roll eller behörigheter utöver dina egna.",
+    featureNotLicensed: "Det här kräver en enterprise-licens.",
   },
   sidebar: {
     sponsor: "Stöd oss",

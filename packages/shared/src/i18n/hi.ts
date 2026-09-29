@@ -4304,7 +4304,6 @@ export const hi: TranslationKeys = {
       newPasswordPlaceholder: "नया पासवर्ड",
       confirmPasswordPlaceholder: "नए पासवर्ड की पुष्टि करें",
       passwordsMismatch: "पासवर्ड मेल नहीं खाते",
-      passwordTooShort: "पासवर्ड कम से कम 4 अक्षर का होना चाहिए",
       changeSuccess: "पासवर्ड सफलतापूर्वक बदला गया",
       changeFailed: "पासवर्ड बदलने में विफल",
       currentPasswordIncorrect: "मौजूदा पासवर्ड गलत है",
@@ -4360,6 +4359,9 @@ export const hi: TranslationKeys = {
       securitySettingsSaved: "सुरक्षा सेटिंग्स सहेजी गईं",
       securitySettingsFailed: "सुरक्षा सेटिंग्स सहेजना विफल",
       adminSettingsLoadFailed: "सुरक्षा सेटिंग्स लोड नहीं हो सकीं।",
+      twoFactorStateChanged:
+        "टू-फ़ैक्टर प्रमाणीकरण किसी दूसरी विंडो में बदला गया। रीलोड करके फिर से प्रयास करें।",
+      twoFactorUnreadable: "सर्वर आपकी टू-फ़ैक्टर सेटिंग्स नहीं पढ़ पा रहा है। किसी एडमिन से संपर्क करें।",
     },
     people: {
       heading: "सदस्य",
@@ -4414,6 +4416,9 @@ export const hi: TranslationKeys = {
       copyPasswordWarning: "इस पासवर्ड को अभी कॉपी करें। उपयोगकर्ता बनाने के बाद आप इसे नहीं देख पाएंगे।",
       memberCount: "{count} सदस्य",
       memberCountPlural: "{count} सदस्य",
+      usernameTaken: "यह उपयोगकर्ता नाम पहले से लिया जा चुका है",
+      lastAdmin: "कम से कम एक एडमिन हमेशा होना चाहिए",
+      cannotDeleteSelf: "अपना खुद का खाता नहीं हटा सकते",
     },
     teams: {
       heading: "टीमें",
@@ -4449,6 +4454,7 @@ export const hi: TranslationKeys = {
       teamRetentionHours: "अवधारण (घंटे)",
       teamRetentionHoursDesc: "इस टीम के लिए प्रोसेसिंग फ़ाइल अवधारण। वैश्विक डिफ़ॉल्ट के लिए खाली छोड़ें।",
       quotaSaved: "टीम सेटिंग्स सहेजी गईं",
+      quotaSaveFailed: "टीम सेटिंग्स सहेजना विफल",
     },
     roles: {
       heading: "भूमिकाएं",
@@ -4980,6 +4986,8 @@ export const hi: TranslationKeys = {
     passwordNeedsDigit: "पासवर्ड में एक संख्या होनी चाहिए।",
     passwordNeedsSpecial: "पासवर्ड में एक विशेष वर्ण होना चाहिए।",
     tooManyRequests: "बहुत अधिक प्रयास। एक मिनट रुककर फिर से प्रयास करें।",
+    escalationDenied: "आप अपनी भूमिका से ऊपर की भूमिका या अनुमतियां नहीं दे सकते।",
+    featureNotLicensed: "इसके लिए एंटरप्राइज़ लाइसेंस आवश्यक है।",
   },
   sidebar: {
     sponsor: "हमारा समर्थन करें",

@@ -32,10 +32,20 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
-import { apiDelete, apiGet, apiPost, apiPut, clearToken, formatHeaders } from "@/lib/api";
+import {
+  ApiError,
+  apiDelete,
+  apiErrorMessage,
+  apiGet,
+  apiPost,
+  apiPut,
+  clearToken,
+  formatHeaders,
+} from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
+import { passwordErrorMessage } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
@@ -906,7 +916,7 @@ export function SystemSection() {
 
 /* ────────────────────── Security ────────────────────── */
 
-function SecuritySection() {
+export function SecuritySection() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -925,11 +935,6 @@ function SecuritySection() {
         setMessage({ type: "error", text: t.settings.security.passwordsMismatch });
         return;
       }
-      if (newPassword.length < 8) {
-        setMessage({ type: "error", text: t.settings.security.passwordTooShort });
-        return;
-      }
-
       setSubmitting(true);
       setMessage(null);
       try {
@@ -939,25 +944,19 @@ function SecuritySection() {
         setNewPassword("");
         setConfirmPassword("");
       } catch (err) {
-        const msg = err instanceof Error ? err.message : t.settings.security.changeFailed;
+        // The server knows the password policy (the length rule included), so
+        // its named rule answers here, in the user's language (#1445).
         setMessage({
           type: "error",
-          text: msg.includes("401") ? t.settings.security.currentPasswordIncorrect : msg,
+          text:
+            (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
+            t.settings.security.changeFailed,
         });
       } finally {
         setSubmitting(false);
       }
     },
-    [
-      currentPassword,
-      newPassword,
-      confirmPassword,
-      t.settings.security.changeFailed,
-      t.settings.security.currentPasswordIncorrect,
-      t.settings.security.changeSuccess,
-      t.settings.security.passwordsMismatch,
-      t.settings.security.passwordTooShort,
-    ],
+    [currentPassword, newPassword, confirmPassword, t],
   );
 
   return (
@@ -1128,7 +1127,14 @@ export function AdminSecuritySettings() {
     } catch (err) {
       setSaveMsg({
         type: "error",
-        text: err instanceof Error ? err.message : t.settings.security.securitySettingsFailed,
+        text: apiErrorMessage(
+          err,
+          {
+            FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
+            ESCALATION_DENIED: t.errors.escalationDenied,
+          },
+          t.settings.security.securitySettingsFailed,
+        ),
       });
     } finally {
       setSaving(false);
@@ -1525,26 +1531,24 @@ export function PeopleSection() {
         setActionMsg({ type: "success", text: t.settings.people.createSuccess });
         await loadUsers();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : t.settings.people.createFailed;
         setAddError(
-          msg.includes("403") ? format(t.settings.people.userLimitReached, { max: maxUsers }) : msg,
+          (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
+            apiErrorMessage(
+              err,
+              {
+                USER_LIMIT_REACHED: format(t.settings.people.userLimitReached, { max: maxUsers }),
+                CONFLICT: t.settings.people.usernameTaken,
+                ESCALATION_DENIED: t.errors.escalationDenied,
+              },
+              t.settings.people.createFailed,
+            ),
         );
       } finally {
         setAdding(false);
         setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [
-      newUsername,
-      newPassword,
-      newRole,
-      newTeam,
-      maxUsers,
-      loadUsers,
-      t.settings.people.createFailed,
-      t.settings.people.createSuccess,
-      t.settings.people.userLimitReached,
-    ],
+    [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers, t],
   );
 
   const handleDeleteUser = useCallback(
@@ -1557,18 +1561,23 @@ export function PeopleSection() {
           text: format(t.settings.people.deleteSuccess, { username }),
         });
         await loadUsers();
-      } catch {
-        setActionMsg({ type: "error", text: t.settings.people.deleteFailed });
+      } catch (err) {
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            err,
+            {
+              SELF_DELETE: t.settings.people.cannotDeleteSelf,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.people.deleteFailed,
+          ),
+        });
       }
       setOpenMenuId(null);
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      loadUsers,
-      t.settings.people.deleteSuccess,
-      t.settings.people.deleteFailed,
-      t.settings.people.deleteConfirm,
-    ],
+    [loadUsers, t],
   );
 
   const handleUpdateUser = useCallback(
@@ -1584,22 +1593,22 @@ export function PeopleSection() {
         setActionMsg({ type: "success", text: t.settings.people.updateSuccess });
         await loadUsers();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to update user";
         setActionMsg({
           type: "error",
-          text: msg.includes("400") ? t.settings.people.cannotRemoveOwnAdmin : msg,
+          text: apiErrorMessage(
+            err,
+            {
+              SELF_DEMOTE: t.settings.people.cannotRemoveOwnAdmin,
+              LAST_ADMIN: t.settings.people.lastAdmin,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.people.updateFailed,
+          ),
         });
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      editingUser,
-      editRole,
-      editTeam,
-      loadUsers,
-      t.settings.people.cannotRemoveOwnAdmin,
-      t.settings.people.updateSuccess,
-    ],
+    [editingUser, editRole, editTeam, loadUsers, t],
   );
 
   const handleResetPassword = useCallback(
@@ -1614,12 +1623,20 @@ export function PeopleSection() {
         setResetPassword("");
         setActionMsg({ type: "success", text: t.settings.people.resetSuccess });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to reset password";
-        setActionMsg({ type: "error", text: msg });
+        setActionMsg({
+          type: "error",
+          text:
+            (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
+            apiErrorMessage(
+              err,
+              { ESCALATION_DENIED: t.errors.escalationDenied },
+              t.settings.people.resetFailed,
+            ),
+        });
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [resetPasswordUser, resetPassword, t.settings.people.resetSuccess],
+    [resetPasswordUser, resetPassword, t],
   );
 
   // A picker whose list fell back (built-in roles, Default) may not hold the
@@ -2486,17 +2503,20 @@ export function TeamsSection() {
         setActionMsg({ type: "success", text: t.settings.teams.createSuccess });
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to create team";
         setActionMsg({
           type: "error",
-          text: msg.includes("409") ? t.settings.teams.duplicateName : msg,
+          text: apiErrorMessage(
+            err,
+            { CONFLICT: t.settings.teams.duplicateName },
+            t.settings.teams.createFailed,
+          ),
         });
       } finally {
         setCreating(false);
         setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [newTeamName, loadTeams, t.settings.teams.duplicateName, t.settings.teams.createSuccess],
+    [newTeamName, loadTeams, t],
   );
 
   const handleRename = useCallback(
@@ -2509,12 +2529,18 @@ export function TeamsSection() {
         setActionMsg({ type: "success", text: t.settings.teams.renameSuccess });
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to rename team";
-        setActionMsg({ type: "error", text: msg });
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            err,
+            { CONFLICT: t.settings.teams.duplicateName },
+            t.settings.teams.renameFailed,
+          ),
+        });
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [editingTeamName, loadTeams, t.settings.teams.renameSuccess],
+    [editingTeamName, loadTeams, t],
   );
 
   const handleDelete = useCallback(
@@ -2525,16 +2551,21 @@ export function TeamsSection() {
         setActionMsg({ type: "success", text: `Team "${name}" deleted` });
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to delete team";
+        // Both refusals (the Default team, a team with members) are 400s with
+        // VALIDATION_ERROR, and this one line covers both.
         setActionMsg({
           type: "error",
-          text: msg.includes("400") ? t.settings.teams.cannotDeleteDefault : msg,
+          text: apiErrorMessage(
+            err,
+            { VALIDATION_ERROR: t.settings.teams.cannotDeleteDefault },
+            t.settings.teams.deleteFailed,
+          ),
         });
       }
       setOpenMenuId(null);
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [loadTeams, t.settings.teams.deleteConfirm, t.settings.teams.cannotDeleteDefault],
+    [loadTeams, t],
   );
 
   const handleExpandTeam = useCallback(
@@ -2564,14 +2595,16 @@ export function TeamsSection() {
         setExpandedTeamId(null);
         await loadTeams();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to save";
-        setActionMsg({ type: "error", text: msg });
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(err, {}, t.settings.teams.quotaSaveFailed),
+        });
       } finally {
         setSavingQuota(false);
         setTimeout(() => setActionMsg(null), 3000);
       }
     },
-    [quotaMb, retention, loadTeams, t.settings.teams.quotaSaved],
+    [quotaMb, retention, loadTeams, t],
   );
 
   if (loading) {
@@ -2747,6 +2780,8 @@ export function TeamsSection() {
                       setOpenMenuId(openMenuId === tm.id ? null : tm.id);
                     }}
                     className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title={t.common.actions}
+                    aria-label={t.common.actions}
                   >
                     <MoreVertical className="h-4 w-4" />
                   </button>
@@ -2937,22 +2972,21 @@ export function RolesSection() {
         setActionMsg({ type: "success", text: t.settings.roles.createSuccess });
         await loadRoles();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to create role";
         setActionMsg({
           type: "error",
-          text: msg.includes("409") ? t.settings.roles.duplicateRoleError : msg,
+          text: apiErrorMessage(
+            err,
+            {
+              CONFLICT: t.settings.roles.duplicateRoleError,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.roles.createFailed,
+          ),
         });
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      newName,
-      newDescription,
-      newPermissions,
-      loadRoles,
-      t.settings.roles.duplicateRoleError,
-      t.settings.roles.createSuccess,
-    ],
+    [newName, newDescription, newPermissions, loadRoles, t],
   );
 
   const handleUpdate = useCallback(
@@ -2969,39 +3003,50 @@ export function RolesSection() {
         setActionMsg({ type: "success", text: t.settings.roles.updateSuccess });
         await loadRoles();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to update role";
-        setActionMsg({ type: "error", text: msg });
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            err,
+            {
+              CONFLICT: t.settings.roles.duplicateRoleError,
+              ESCALATION_DENIED: t.errors.escalationDenied,
+            },
+            t.settings.roles.updateFailed,
+          ),
+        });
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [
-      editingRole,
-      editName,
-      editDescription,
-      editPermissions,
-      loadRoles,
-      t.settings.roles.updateSuccess,
-    ],
+    [editingRole, editName, editDescription, editPermissions, loadRoles, t],
   );
 
   const handleDelete = useCallback(
     async (role: RoleEntry) => {
-      const msg =
+      const question =
         role.userCount > 0
-          ? `Delete role "${role.name}"? ${role.userCount} user${role.userCount !== 1 ? "s" : ""} will need to be reassigned.`
-          : `Delete role "${role.name}"?`;
-      if (!confirm(msg)) return;
+          ? format(t.settings.roles.deleteConfirm, { name: role.name, count: role.userCount })
+          : format(t.settings.roles.deleteConfirmSimple, { name: role.name });
+      if (!confirm(question)) return;
       try {
         await apiDelete(`/v1/roles/${role.id}`);
-        setActionMsg({ type: "success", text: `Role "${role.name}" deleted` });
+        setActionMsg({
+          type: "success",
+          text: format(t.settings.roles.deleteSuccess, { name: role.name }),
+        });
         await loadRoles();
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : "Failed to delete role";
-        setActionMsg({ type: "error", text: errMsg });
+        setActionMsg({
+          type: "error",
+          text: apiErrorMessage(
+            err,
+            { ESCALATION_DENIED: t.errors.escalationDenied },
+            t.settings.roles.deleteFailed,
+          ),
+        });
       }
       setTimeout(() => setActionMsg(null), 3000);
     },
-    [loadRoles],
+    [loadRoles, t],
   );
 
   const togglePermission = (perm: string, list: string[], setter: (v: string[]) => void) => {

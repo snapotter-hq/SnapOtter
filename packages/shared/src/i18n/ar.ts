@@ -4476,7 +4476,6 @@ export const ar: TranslationKeys = {
       newPasswordPlaceholder: "كلمة المرور الجديدة",
       confirmPasswordPlaceholder: "تأكيد كلمة المرور الجديدة",
       passwordsMismatch: "كلمتا المرور غير متطابقتين",
-      passwordTooShort: "يجب أن تتكون كلمة المرور من 4 أحرف على الأقل",
       changeSuccess: "تم تغيير كلمة المرور بنجاح",
       changeFailed: "فشل تغيير كلمة المرور",
       currentPasswordIncorrect: "كلمة المرور الحالية غير صحيحة",
@@ -4531,6 +4530,9 @@ export const ar: TranslationKeys = {
       securitySettingsSaved: "تم حفظ إعدادات الأمان",
       securitySettingsFailed: "فشل حفظ إعدادات الأمان",
       adminSettingsLoadFailed: "تعذّر تحميل إعدادات الأمان.",
+      twoFactorStateChanged: "تغيّرت المصادقة الثنائية في نافذة أخرى. أعد التحميل ثم حاول مرة أخرى.",
+      twoFactorUnreadable:
+        "تعذّر على الخادم قراءة إعدادات المصادقة الثنائية الخاصة بك. تواصل مع المسؤول.",
     },
     people: {
       heading: "الأعضاء",
@@ -4585,6 +4587,9 @@ export const ar: TranslationKeys = {
       copyPasswordWarning: "انسخ كلمة المرور الآن. لن تتمكن من رؤيتها بعد إنشاء المستخدم.",
       memberCount: "{count} عضو",
       memberCountPlural: "{count} أعضاء",
+      usernameTaken: "اسم المستخدم هذا مستخدم بالفعل",
+      lastAdmin: "يجب أن يبقى مسؤول واحد على الأقل دائمًا",
+      cannotDeleteSelf: "لا يمكنك حذف حسابك الخاص",
     },
     teams: {
       heading: "الفرق",
@@ -4621,6 +4626,7 @@ export const ar: TranslationKeys = {
       teamRetentionHoursDesc:
         "مدة الاحتفاظ بملفات المعالجة لهذا الفريق. اتركه فارغًا لاستخدام الإعداد الافتراضي.",
       quotaSaved: "تم حفظ إعدادات الفريق",
+      quotaSaveFailed: "فشل حفظ إعدادات الفريق",
     },
     roles: {
       heading: "الأدوار",
@@ -5154,6 +5160,8 @@ export const ar: TranslationKeys = {
     passwordNeedsDigit: "يجب أن تحتوي كلمة المرور على رقم.",
     passwordNeedsSpecial: "يجب أن تحتوي كلمة المرور على حرف خاص.",
     tooManyRequests: "محاولات كثيرة جدًا. انتظر دقيقة ثم حاول مرة أخرى.",
+    escalationDenied: "لا يمكنك منح دور أو صلاحيات تتجاوز صلاحياتك.",
+    featureNotLicensed: "يتطلب هذا ترخيص المؤسسات.",
   },
   sidebar: {
     sponsor: "ادعمنا",

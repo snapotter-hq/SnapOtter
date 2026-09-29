@@ -4453,7 +4453,6 @@ export const ja: TranslationKeys = {
       newPasswordPlaceholder: "新しいパスワード",
       confirmPasswordPlaceholder: "新しいパスワードの確認",
       passwordsMismatch: "パスワードが一致しません",
-      passwordTooShort: "パスワードは4文字以上必要です",
       changeSuccess: "パスワードを変更しました",
       changeFailed: "パスワードの変更に失敗しました",
       currentPasswordIncorrect: "現在のパスワードが正しくありません",
@@ -4510,6 +4509,10 @@ export const ja: TranslationKeys = {
       securitySettingsSaved: "セキュリティ設定を保存しました",
       securitySettingsFailed: "セキュリティ設定の保存に失敗しました",
       adminSettingsLoadFailed: "セキュリティ設定を読み込めませんでした。",
+      twoFactorStateChanged:
+        "二要素認証が別のウィンドウで変更されました。再読み込みしてもう一度お試しください。",
+      twoFactorUnreadable:
+        "サーバーで二要素認証の設定を読み取れません。管理者に問い合わせてください。",
     },
     people: {
       heading: "メンバー",
@@ -4565,6 +4568,9 @@ export const ja: TranslationKeys = {
         "今すぐこのパスワードをコピーしてください。ユーザー作成後は表示できません。",
       memberCount: "{count}人のメンバー",
       memberCountPlural: "{count}人のメンバー",
+      usernameTaken: "このユーザー名は既に使われています",
+      lastAdmin: "管理者は常に1人以上必要です",
+      cannotDeleteSelf: "自分のアカウントは削除できません",
     },
     teams: {
       heading: "チーム",
@@ -4600,6 +4606,7 @@ export const ja: TranslationKeys = {
       teamRetentionHours: "保持期間（時間）",
       teamRetentionHoursDesc: "チームの処理ファイル保持期間。空欄でグローバルデフォルトを使用。",
       quotaSaved: "チーム設定を保存しました",
+      quotaSaveFailed: "チーム設定の保存に失敗しました",
     },
     roles: {
       heading: "ロール",
@@ -5141,6 +5148,8 @@ export const ja: TranslationKeys = {
     passwordNeedsDigit: "パスワードには数字を含める必要があります。",
     passwordNeedsSpecial: "パスワードには特殊文字を含める必要があります。",
     tooManyRequests: "試行回数が多すぎます。1分待ってからもう一度お試しください。",
+    escalationDenied: "自分の権限を超えるロールや権限は付与できません。",
+    featureNotLicensed: "エンタープライズライセンスが必要です。",
   },
   sidebar: {
     sponsor: "支援する",

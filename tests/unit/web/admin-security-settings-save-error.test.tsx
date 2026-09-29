@@ -12,7 +12,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return { ...actual, apiGet, apiPut };
 });
 
+import { en } from "@snapotter/shared";
 import { AdminSecuritySettings } from "@/components/settings/settings-dialog";
+import { ApiError } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
@@ -21,15 +23,17 @@ afterEach(() => {
 });
 
 describe("AdminSecuritySettings save errors", () => {
-  it("shows the server's specific error message when a save is rejected", async () => {
-    apiPut.mockRejectedValue(new Error("MFA requires an enterprise license"));
+  it("names the missing licence when a save is rejected for it (#1445)", async () => {
+    apiPut.mockRejectedValue(
+      new ApiError("MFA requires an enterprise license", 403, "FEATURE_NOT_LICENSED", {}),
+    );
 
     render(<AdminSecuritySettings />);
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
     fireEvent.click(await screen.findByRole("button", { name: /save/i }));
 
-    const message = await screen.findByText("MFA requires an enterprise license");
+    const message = await screen.findByText(en.errors.featureNotLicensed);
     expect(message).toHaveClass("text-destructive");
   });
 

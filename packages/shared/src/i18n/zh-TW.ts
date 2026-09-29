@@ -4232,7 +4232,6 @@ export const zhTW: TranslationKeys = {
       newPasswordPlaceholder: "新密碼",
       confirmPasswordPlaceholder: "確認新密碼",
       passwordsMismatch: "密碼不符",
-      passwordTooShort: "密碼至少4個字元",
       changeSuccess: "密碼變更成功",
       changeFailed: "密碼變更失敗",
       currentPasswordIncorrect: "目前密碼不正確",
@@ -4287,6 +4286,8 @@ export const zhTW: TranslationKeys = {
       securitySettingsSaved: "安全設定已儲存",
       securitySettingsFailed: "儲存安全設定失敗",
       adminSettingsLoadFailed: "無法載入安全設定。",
+      twoFactorStateChanged: "雙重驗證已在另一個視窗中變更。請重新載入後再試一次。",
+      twoFactorUnreadable: "伺服器無法讀取你的雙重驗證設定。請聯絡管理員。",
     },
     people: {
       heading: "成員",
@@ -4341,6 +4342,9 @@ export const zhTW: TranslationKeys = {
       copyPasswordWarning: "請立即複製此密碼。建立使用者後將無法再次查看。",
       memberCount: "{count}位成員",
       memberCountPlural: "{count}位成員",
+      usernameTaken: "此使用者名稱已被使用",
+      lastAdmin: "必須始終保留至少一位管理員",
+      cannotDeleteSelf: "無法刪除自己的帳戶",
     },
     teams: {
       heading: "團隊",
@@ -4376,6 +4380,7 @@ export const zhTW: TranslationKeys = {
       teamRetentionHours: "保留時間（小時）",
       teamRetentionHoursDesc: "此團隊的處理檔案保留時間。留空則使用全域預設值。",
       quotaSaved: "團隊設定已儲存",
+      quotaSaveFailed: "團隊設定儲存失敗",
     },
     roles: {
       heading: "角色",
@@ -4902,6 +4907,8 @@ export const zhTW: TranslationKeys = {
     passwordNeedsDigit: "密碼必須包含一個數字。",
     passwordNeedsSpecial: "密碼必須包含一個特殊字元。",
     tooManyRequests: "嘗試次數過多。請等待一分鐘後再試一次。",
+    escalationDenied: "無法授予超出自身權限的角色或權限。",
+    featureNotLicensed: "這需要企業版授權。",
   },
   sidebar: {
     sponsor: "支持我們",

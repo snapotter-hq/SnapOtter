@@ -27,7 +27,13 @@ vi.mock("qr-code-styling", () => ({
   },
 }));
 
+import { en } from "@snapotter/shared";
 import { TwoFactorSettings } from "@/components/settings/two-factor-settings";
+import { ApiError } from "@/lib/api";
+
+/** A rejected request as api.ts throws it; the message is the server's English. */
+const apiError = (status: number, code: string, message: string) =>
+  new ApiError(message, status, code, { error: message, code });
 
 const ENROLL_RESPONSE = {
   uri: "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&issuer=SnapOtter",
@@ -73,14 +79,16 @@ describe("TwoFactorSettings", () => {
     expect(screen.getByText("bbbb2222")).toBeInTheDocument();
   });
 
-  it("surfaces the server's error when enrollment is rejected (e.g. unlicensed)", async () => {
+  it("names the missing licence when enrollment is rejected (#1445)", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockRejectedValueOnce(new Error("MFA requires an enterprise license"));
+    apiPost.mockRejectedValueOnce(
+      apiError(403, "FEATURE_NOT_LICENSED", "MFA requires an enterprise license"),
+    );
 
     render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
 
-    expect(await screen.findByText("MFA requires an enterprise license")).toBeInTheDocument();
+    expect(await screen.findByText(en.errors.featureNotLicensed)).toBeInTheDocument();
   });
 
   it("falls back to a generic message when enrollment rejects with a non-Error value", async () => {
@@ -114,10 +122,10 @@ describe("TwoFactorSettings", () => {
     expect(await screen.findByText(/is now enabled/i)).toBeInTheDocument();
   });
 
-  it("shows the server's specific error and stays on the verify step when the code is wrong", async () => {
+  it("says the code is wrong and stays on the verify step", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
     apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
-    apiPost.mockRejectedValueOnce(new Error("Invalid TOTP or recovery code"));
+    apiPost.mockRejectedValueOnce(apiError(400, "INVALID_CODE", "Invalid TOTP or recovery code"));
 
     render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
@@ -126,15 +134,17 @@ describe("TwoFactorSettings", () => {
     fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "000000" } });
     fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
 
-    expect(await screen.findByText("Invalid TOTP or recovery code")).toBeInTheDocument();
+    expect(await screen.findByText(en.auth.mfaInvalidCode)).toBeInTheDocument();
     // Still on the verify step, not bounced back to the idle "Enable" button.
     expect(screen.getByPlaceholderText("000000")).toBeInTheDocument();
   });
 
-  it("surfaces the server's specific error when verify fails for a reason other than a wrong code", async () => {
+  it("doesn't blame the code when verify fails on the server's side", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
     apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
-    apiPost.mockRejectedValueOnce(new Error("Failed to decrypt TOTP secret"));
+    apiPost.mockRejectedValueOnce(
+      apiError(500, "DECRYPTION_FAILED", "Failed to decrypt TOTP secret"),
+    );
 
     render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
@@ -146,7 +156,7 @@ describe("TwoFactorSettings", () => {
     // Must not be mislabeled as a wrong code -- a decryption/config failure
     // needs its own diagnosable message, not a generic "invalid code" that
     // sends the user into an unwinnable retry loop.
-    expect(await screen.findByText("Failed to decrypt TOTP secret")).toBeInTheDocument();
+    expect(await screen.findByText(en.settings.security.twoFactorUnreadable)).toBeInTheDocument();
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
   });
 
@@ -187,9 +197,11 @@ describe("TwoFactorSettings", () => {
     expect(await screen.findByText(/has been disabled/i)).toBeInTheDocument();
   });
 
-  it("surfaces the server's specific error when disable fails for a reason other than a wrong code", async () => {
+  it("doesn't blame the code when disable fails on the server's side", async () => {
     useAuth.mockReturnValue({ totpEnabled: true });
-    apiPost.mockRejectedValueOnce(new Error("Failed to decrypt TOTP secret"));
+    apiPost.mockRejectedValueOnce(
+      apiError(500, "DECRYPTION_FAILED", "Failed to decrypt TOTP secret"),
+    );
 
     render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /disable two-factor authentication/i }));
@@ -198,7 +210,7 @@ describe("TwoFactorSettings", () => {
     fireEvent.change(codeInput, { target: { value: "654321" } });
     fireEvent.click(screen.getByRole("button", { name: /disable two-factor authentication/i }));
 
-    expect(await screen.findByText("Failed to decrypt TOTP secret")).toBeInTheDocument();
+    expect(await screen.findByText(en.settings.security.twoFactorUnreadable)).toBeInTheDocument();
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
   });
 

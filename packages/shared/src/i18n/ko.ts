@@ -4430,7 +4430,6 @@ export const ko: TranslationKeys = {
       newPasswordPlaceholder: "새 비밀번호",
       confirmPasswordPlaceholder: "새 비밀번호 확인",
       passwordsMismatch: "비밀번호가 일치하지 않습니다",
-      passwordTooShort: "비밀번호는 4자 이상이어야 합니다",
       changeSuccess: "비밀번호가 변경되었습니다",
       changeFailed: "비밀번호 변경에 실패했습니다",
       currentPasswordIncorrect: "현재 비밀번호가 올바르지 않습니다",
@@ -4487,6 +4486,9 @@ export const ko: TranslationKeys = {
       securitySettingsSaved: "보안 설정이 저장되었습니다",
       securitySettingsFailed: "보안 설정 저장에 실패했습니다",
       adminSettingsLoadFailed: "보안 설정을 불러오지 못했습니다.",
+      twoFactorStateChanged:
+        "다른 창에서 2단계 인증이 변경되었습니다. 새로고침한 후 다시 시도하세요.",
+      twoFactorUnreadable: "서버에서 2단계 인증 설정을 읽을 수 없습니다. 관리자에게 문의하세요.",
     },
     people: {
       heading: "멤버",
@@ -4541,6 +4543,9 @@ export const ko: TranslationKeys = {
       copyPasswordWarning: "지금 이 비밀번호를 복사하세요. 사용자 생성 후에는 확인할 수 없습니다.",
       memberCount: "멤버 {count}명",
       memberCountPlural: "멤버 {count}명",
+      usernameTaken: "이미 사용 중인 사용자 이름입니다",
+      lastAdmin: "관리자는 항상 한 명 이상 있어야 합니다",
+      cannotDeleteSelf: "자신의 계정은 삭제할 수 없습니다",
     },
     teams: {
       heading: "팀",
@@ -4577,6 +4582,7 @@ export const ko: TranslationKeys = {
       teamRetentionHoursDesc:
         "이 팀의 처리 파일 보관 기간입니다. 전역 기본값을 사용하려면 비워 두세요.",
       quotaSaved: "팀 설정이 저장되었습니다",
+      quotaSaveFailed: "팀 설정 저장에 실패했습니다",
     },
     roles: {
       heading: "역할",
@@ -5112,6 +5118,8 @@ export const ko: TranslationKeys = {
     passwordNeedsDigit: "비밀번호에 숫자를 포함해야 합니다.",
     passwordNeedsSpecial: "비밀번호에 특수 문자를 포함해야 합니다.",
     tooManyRequests: "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요.",
+    escalationDenied: "자신의 권한을 넘는 역할이나 권한은 부여할 수 없습니다.",
+    featureNotLicensed: "엔터프라이즈 라이선스가 필요합니다.",
   },
   sidebar: {
     sponsor: "후원하기",

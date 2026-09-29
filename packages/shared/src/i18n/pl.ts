@@ -4505,7 +4505,6 @@ export const pl: TranslationKeys = {
       newPasswordPlaceholder: "Nowe hasło",
       confirmPasswordPlaceholder: "Potwierdź nowe hasło",
       passwordsMismatch: "Hasła nie są zgodne",
-      passwordTooShort: "Hasło musi mieć co najmniej 4 znaki",
       changeSuccess: "Hasło zostało zmienione",
       changeFailed: "Nie udało się zmienić hasła",
       currentPasswordIncorrect: "Bieżące hasło jest nieprawidłowe",
@@ -4567,6 +4566,10 @@ export const pl: TranslationKeys = {
       securitySettingsSaved: "Ustawienia zabezpieczeń zapisane",
       securitySettingsFailed: "Nie udało się zapisać ustawień zabezpieczeń",
       adminSettingsLoadFailed: "Nie udało się wczytać ustawień zabezpieczeń.",
+      twoFactorStateChanged:
+        "Uwierzytelnianie dwuskładnikowe zmieniono w innym oknie. Odśwież stronę i spróbuj ponownie.",
+      twoFactorUnreadable:
+        "Serwer nie może odczytać ustawień uwierzytelniania dwuskładnikowego. Skontaktuj się z administratorem.",
     },
     people: {
       heading: "Użytkownicy",
@@ -4623,6 +4626,9 @@ export const pl: TranslationKeys = {
         "Skopiuj to hasło teraz. Nie będziesz mógł go zobaczyć po utworzeniu użytkownika.",
       memberCount: "{count} członek",
       memberCountPlural: "{count} członków",
+      usernameTaken: "Ta nazwa użytkownika jest już zajęta",
+      lastAdmin: "Zawsze musi być co najmniej jeden administrator",
+      cannotDeleteSelf: "Nie można usunąć własnego konta",
     },
     teams: {
       heading: "Zespoły",
@@ -4660,6 +4666,7 @@ export const pl: TranslationKeys = {
       teamRetentionHoursDesc:
         "Czas przechowywania przetworzonych plików dla tego zespołu. Pozostaw puste, aby użyć domyślnej wartości.",
       quotaSaved: "Ustawienia zespołu zapisane",
+      quotaSaveFailed: "Nie udało się zapisać ustawień zespołu",
     },
     roles: {
       heading: "Role",
@@ -5208,6 +5215,8 @@ export const pl: TranslationKeys = {
     passwordNeedsDigit: "Hasło musi zawierać cyfrę.",
     passwordNeedsSpecial: "Hasło musi zawierać znak specjalny.",
     tooManyRequests: "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
+    escalationDenied: "Nie możesz nadać roli ani uprawnień wykraczających poza własne.",
+    featureNotLicensed: "Wymaga to licencji enterprise.",
   },
   sidebar: {
     sponsor: "Wesprzyj nas",

@@ -4517,7 +4517,6 @@ export const nl: TranslationKeys = {
       newPasswordPlaceholder: "Nieuw wachtwoord",
       confirmPasswordPlaceholder: "Nieuw wachtwoord bevestigen",
       passwordsMismatch: "Wachtwoorden komen niet overeen",
-      passwordTooShort: "Wachtwoord moet minimaal 4 tekens lang zijn",
       changeSuccess: "Wachtwoord succesvol gewijzigd",
       changeFailed: "Wachtwoord wijzigen mislukt",
       currentPasswordIncorrect: "Huidig wachtwoord is onjuist",
@@ -4577,6 +4576,10 @@ export const nl: TranslationKeys = {
       securitySettingsSaved: "Beveiligingsinstellingen opgeslagen",
       securitySettingsFailed: "Beveiligingsinstellingen opslaan mislukt",
       adminSettingsLoadFailed: "Beveiligingsinstellingen laden mislukt.",
+      twoFactorStateChanged:
+        "Tweestapsverificatie is in een ander venster gewijzigd. Laad opnieuw en probeer het nog eens.",
+      twoFactorUnreadable:
+        "De server kan je tweestapsverificatie-instellingen niet lezen. Neem contact op met een beheerder.",
     },
     people: {
       heading: "Personen",
@@ -4632,6 +4635,9 @@ export const nl: TranslationKeys = {
         "Kopieer dit wachtwoord nu. U kunt het niet meer zien na het aanmaken van de gebruiker.",
       memberCount: "{count} lid",
       memberCountPlural: "{count} leden",
+      usernameTaken: "Die gebruikersnaam is al in gebruik",
+      lastAdmin: "Er moet altijd minstens één beheerder zijn",
+      cannotDeleteSelf: "Je kunt je eigen account niet verwijderen",
     },
     teams: {
       heading: "Teams",
@@ -4668,6 +4674,7 @@ export const nl: TranslationKeys = {
       teamRetentionHoursDesc:
         "Bewaartermijn voor verwerkingsbestanden van dit team. Laat leeg voor de standaardwaarde.",
       quotaSaved: "Teaminstellingen opgeslagen",
+      quotaSaveFailed: "Teaminstellingen opslaan mislukt",
     },
     roles: {
       heading: "Rollen",
@@ -5213,6 +5220,8 @@ export const nl: TranslationKeys = {
     passwordNeedsDigit: "Het wachtwoord moet een cijfer bevatten.",
     passwordNeedsSpecial: "Het wachtwoord moet een speciaal teken bevatten.",
     tooManyRequests: "Te veel pogingen. Wacht een minuut en probeer het opnieuw.",
+    escalationDenied: "Je kunt geen rol of rechten toekennen die verder gaan dan die van jezelf.",
+    featureNotLicensed: "Hiervoor is een enterprise-licentie nodig.",
   },
   sidebar: {
     sponsor: "Steun ons",

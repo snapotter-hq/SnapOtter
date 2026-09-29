@@ -4454,7 +4454,6 @@ export const th: TranslationKeys = {
       newPasswordPlaceholder: "รหัสผ่านใหม่",
       confirmPasswordPlaceholder: "ยืนยันรหัสผ่านใหม่",
       passwordsMismatch: "รหัสผ่านไม่ตรงกัน",
-      passwordTooShort: "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร",
       changeSuccess: "เปลี่ยนรหัสผ่านสำเร็จ",
       changeFailed: "เปลี่ยนรหัสผ่านล้มเหลว",
       currentPasswordIncorrect: "รหัสผ่านปัจจุบันไม่ถูกต้อง",
@@ -4509,6 +4508,8 @@ export const th: TranslationKeys = {
       securitySettingsSaved: "บันทึกการตั้งค่าความปลอดภัยแล้ว",
       securitySettingsFailed: "บันทึกการตั้งค่าความปลอดภัยไม่สำเร็จ",
       adminSettingsLoadFailed: "โหลดการตั้งค่าความปลอดภัยไม่สำเร็จ",
+      twoFactorStateChanged: "การยืนยันตัวตนสองขั้นตอนถูกเปลี่ยนในหน้าต่างอื่น โหลดใหม่แล้วลองอีกครั้ง",
+      twoFactorUnreadable: "เซิร์ฟเวอร์อ่านการตั้งค่าการยืนยันตัวตนสองขั้นตอนของคุณไม่ได้ ติดต่อผู้ดูแลระบบ",
     },
     people: {
       heading: "สมาชิก",
@@ -4563,6 +4564,9 @@ export const th: TranslationKeys = {
       copyPasswordWarning: "คัดลอกรหัสผ่านนี้ตอนนี้ คุณจะไม่สามารถดูได้หลังจากสร้างผู้ใช้",
       memberCount: "{count} สมาชิก",
       memberCountPlural: "{count} สมาชิก",
+      usernameTaken: "ชื่อผู้ใช้นี้ถูกใช้แล้ว",
+      lastAdmin: "ต้องมีผู้ดูแลระบบอย่างน้อยหนึ่งคนเสมอ",
+      cannotDeleteSelf: "ไม่สามารถลบบัญชีของตัวเองได้",
     },
     teams: {
       heading: "ทีม",
@@ -4598,6 +4602,7 @@ export const th: TranslationKeys = {
       teamRetentionHours: "ระยะเวลาเก็บรักษา (ชั่วโมง)",
       teamRetentionHoursDesc: "ระยะเวลาเก็บรักษาไฟล์ประมวลผลสำหรับทีมนี้ เว้นว่างไว้เพื่อใช้ค่าเริ่มต้น",
       quotaSaved: "บันทึกการตั้งค่าทีมแล้ว",
+      quotaSaveFailed: "บันทึกการตั้งค่าทีมไม่สำเร็จ",
     },
     roles: {
       heading: "บทบาท",
@@ -5125,6 +5130,8 @@ export const th: TranslationKeys = {
     passwordNeedsDigit: "รหัสผ่านต้องมีตัวเลข",
     passwordNeedsSpecial: "รหัสผ่านต้องมีอักขระพิเศษ",
     tooManyRequests: "ลองหลายครั้งเกินไป รอหนึ่งนาทีแล้วลองอีกครั้ง",
+    escalationDenied: "ไม่สามารถให้บทบาทหรือสิทธิ์ที่เกินกว่าของตัวเองได้",
+    featureNotLicensed: "ต้องใช้ใบอนุญาตระดับองค์กร",
   },
   sidebar: {
     sponsor: "สนับสนุนเรา",

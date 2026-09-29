@@ -4522,7 +4522,6 @@ export const de: TranslationKeys = {
       newPasswordPlaceholder: "Neues Passwort",
       confirmPasswordPlaceholder: "Neues Passwort bestätigen",
       passwordsMismatch: "Passwörter stimmen nicht überein",
-      passwordTooShort: "Passwort muss mindestens 4 Zeichen lang sein",
       changeSuccess: "Passwort erfolgreich geändert",
       changeFailed: "Passwort konnte nicht geändert werden",
       currentPasswordIncorrect: "Aktuelles Passwort ist falsch",
@@ -4583,6 +4582,10 @@ export const de: TranslationKeys = {
       securitySettingsSaved: "Sicherheitseinstellungen gespeichert",
       securitySettingsFailed: "Sicherheitseinstellungen konnten nicht gespeichert werden",
       adminSettingsLoadFailed: "Sicherheitseinstellungen konnten nicht geladen werden.",
+      twoFactorStateChanged:
+        "Die Zwei-Faktor-Authentifizierung wurde in einem anderen Fenster geändert. Laden Sie neu und versuchen Sie es erneut.",
+      twoFactorUnreadable:
+        "Ihre Zwei-Faktor-Einstellungen können auf dem Server nicht gelesen werden. Wenden Sie sich an einen Administrator.",
     },
     people: {
       heading: "Personen",
@@ -4639,6 +4642,9 @@ export const de: TranslationKeys = {
         "Kopieren Sie dieses Passwort jetzt. Nach dem Erstellen des Benutzers ist es nicht mehr sichtbar.",
       memberCount: "{count} Mitglied",
       memberCountPlural: "{count} Mitglieder",
+      usernameTaken: "Dieser Benutzername ist bereits vergeben",
+      lastAdmin: "Es muss immer mindestens einen Administrator geben",
+      cannotDeleteSelf: "Sie können Ihr eigenes Konto nicht löschen",
     },
     teams: {
       heading: "Teams",
@@ -4677,6 +4683,7 @@ export const de: TranslationKeys = {
       teamRetentionHoursDesc:
         "Aufbewahrungsdauer für Verarbeitungsdateien dieses Teams. Leer lassen für globalen Standard.",
       quotaSaved: "Team-Einstellungen gespeichert",
+      quotaSaveFailed: "Team-Einstellungen konnten nicht gespeichert werden",
     },
     roles: {
       heading: "Rollen",
@@ -5230,6 +5237,9 @@ export const de: TranslationKeys = {
     passwordNeedsDigit: "Das Passwort muss eine Zahl enthalten.",
     passwordNeedsSpecial: "Das Passwort muss ein Sonderzeichen enthalten.",
     tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
+    escalationDenied:
+      "Sie können keine Rolle oder Berechtigungen vergeben, die über Ihre eigenen hinausgehen.",
+    featureNotLicensed: "Dafür ist eine Enterprise-Lizenz erforderlich.",
   },
   sidebar: {
     sponsor: "Uns unterstützen",

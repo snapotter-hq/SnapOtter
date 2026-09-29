@@ -4233,7 +4233,6 @@ export const zhCN: TranslationKeys = {
       newPasswordPlaceholder: "新密码",
       confirmPasswordPlaceholder: "确认新密码",
       passwordsMismatch: "两次密码输入不一致",
-      passwordTooShort: "密码长度至少为 4 个字符",
       changeSuccess: "密码修改成功",
       changeFailed: "密码修改失败",
       currentPasswordIncorrect: "当前密码不正确",
@@ -4288,6 +4287,8 @@ export const zhCN: TranslationKeys = {
       securitySettingsSaved: "安全设置已保存",
       securitySettingsFailed: "保存安全设置失败",
       adminSettingsLoadFailed: "无法加载安全设置。",
+      twoFactorStateChanged: "双重身份验证已在另一个窗口中更改。请刷新后重试。",
+      twoFactorUnreadable: "服务器无法读取你的双重身份验证设置。请联系管理员。",
     },
     people: {
       heading: "成员",
@@ -4342,6 +4343,9 @@ export const zhCN: TranslationKeys = {
       copyPasswordWarning: "请立即复制此密码。创建用户后将无法再次查看。",
       memberCount: "{count} 个成员",
       memberCountPlural: "{count} 个成员",
+      usernameTaken: "该用户名已被使用",
+      lastAdmin: "必须始终保留至少一名管理员",
+      cannotDeleteSelf: "无法删除自己的账户",
     },
     teams: {
       heading: "团队",
@@ -4377,6 +4381,7 @@ export const zhCN: TranslationKeys = {
       teamRetentionHours: "保留时间（小时）",
       teamRetentionHoursDesc: "此团队的处理文件保留时间。留空使用全局默认值。",
       quotaSaved: "团队设置已保存",
+      quotaSaveFailed: "团队设置保存失败",
     },
     roles: {
       heading: "角色",
@@ -4901,6 +4906,8 @@ export const zhCN: TranslationKeys = {
     passwordNeedsDigit: "密码必须包含一个数字。",
     passwordNeedsSpecial: "密码必须包含一个特殊字符。",
     tooManyRequests: "尝试次数过多。请等待一分钟后重试。",
+    escalationDenied: "无法授予超出自身权限的角色或权限。",
+    featureNotLicensed: "这需要企业版许可证。",
   },
   sidebar: {
     sponsor: "支持我们",

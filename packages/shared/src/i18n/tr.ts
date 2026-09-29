@@ -4506,7 +4506,6 @@ export const tr: TranslationKeys = {
       newPasswordPlaceholder: "Yeni Parola",
       confirmPasswordPlaceholder: "Yeni Parolayı Onayla",
       passwordsMismatch: "Parolalar eşleşmiyor",
-      passwordTooShort: "Parola en az 4 karakter olmalıdır",
       changeSuccess: "Parola başarıyla değiştirildi",
       changeFailed: "Parola değiştirilemedi",
       currentPasswordIncorrect: "Mevcut parola yanlış",
@@ -4567,6 +4566,10 @@ export const tr: TranslationKeys = {
       securitySettingsSaved: "Güvenlik ayarları kaydedildi",
       securitySettingsFailed: "Güvenlik ayarları kaydedilemedi",
       adminSettingsLoadFailed: "Güvenlik ayarları yüklenemedi.",
+      twoFactorStateChanged:
+        "İki faktörlü kimlik doğrulama başka bir pencerede değiştirildi. Sayfayı yenileyip tekrar deneyin.",
+      twoFactorUnreadable:
+        "Sunucu iki faktörlü kimlik doğrulama ayarlarınızı okuyamıyor. Bir yöneticiye başvurun.",
     },
     people: {
       heading: "Kişiler",
@@ -4623,6 +4626,9 @@ export const tr: TranslationKeys = {
         "Bu şifreyi şimdi kopyalayın. Kullanıcıyı oluşturduktan sonra göremezsiniz.",
       memberCount: "{count} üye",
       memberCountPlural: "{count} üye",
+      usernameTaken: "Bu kullanıcı adı zaten alınmış",
+      lastAdmin: "Her zaman en az bir yönetici olmalıdır",
+      cannotDeleteSelf: "Kendi hesabınızı silemezsiniz",
     },
     teams: {
       heading: "Takımlar",
@@ -4660,6 +4666,7 @@ export const tr: TranslationKeys = {
       teamRetentionHoursDesc:
         "Bu takım için işleme dosyası saklama süresi. Genel varsayılanı kullanmak için boş bırakın.",
       quotaSaved: "Takım ayarları kaydedildi",
+      quotaSaveFailed: "Takım ayarları kaydedilemedi",
     },
     roles: {
       heading: "Roller",
@@ -5204,6 +5211,8 @@ export const tr: TranslationKeys = {
     passwordNeedsDigit: "Parola bir rakam içermelidir.",
     passwordNeedsSpecial: "Parola bir özel karakter içermelidir.",
     tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
+    escalationDenied: "Kendi yetkilerinizin ötesinde bir rol veya izin veremezsiniz.",
+    featureNotLicensed: "Bunun için kurumsal lisans gerekir.",
   },
   sidebar: {
     sponsor: "Bize destek olun",

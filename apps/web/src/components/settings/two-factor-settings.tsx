@@ -2,10 +2,39 @@ import QRCodeStyling from "qr-code-styling";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { apiPost } from "@/lib/api";
+import { ApiError, apiErrorMessage, apiPost } from "@/lib/api";
 import { cn, copyToClipboard } from "@/lib/utils";
 
 type Step = "idle" | "enrolling" | "disabling";
+
+/**
+ * Translated copy for a failed enroll, verify or disable (#1445): by status
+ * and code, never the server's English text.
+ */
+function mfaErrorMessage(
+  t: ReturnType<typeof useTranslation>["t"],
+  err: unknown,
+  fallback: string,
+): string {
+  // A plain rate-limit 429 carries no code.
+  if (err instanceof ApiError && err.status === 429) return t.auth.mfaThrottledUnknownWait;
+  return apiErrorMessage(
+    err,
+    {
+      INVALID_CODE: t.auth.mfaInvalidCode,
+      VALIDATION_ERROR: t.auth.mfaInvalidCode,
+      FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
+      // Two-factor was turned on or off (or setup restarted) in another window.
+      MFA_ALREADY_ENABLED: t.settings.security.twoFactorStateChanged,
+      MFA_NOT_ENABLED: t.settings.security.twoFactorStateChanged,
+      NO_PENDING_ENROLLMENT: t.settings.security.twoFactorStateChanged,
+      // The server can't read the stored secret (its encryption key changed):
+      // not the user's code, and nothing they can fix themselves.
+      DECRYPTION_FAILED: t.settings.security.twoFactorUnreadable,
+    },
+    fallback,
+  );
+}
 
 interface EnrollResponse {
   uri: string;
@@ -81,7 +110,7 @@ export function TwoFactorSettings() {
     } catch (err) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : t.settings.security.securitySettingsFailed,
+        text: mfaErrorMessage(t, err, t.settings.security.securitySettingsFailed),
       });
     } finally {
       setSubmitting(false);
@@ -100,10 +129,7 @@ export function TwoFactorSettings() {
       setCode("");
       setCodesCopied(false);
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err instanceof Error ? err.message : t.auth.mfaInvalidCode,
-      });
+      setMessage({ type: "error", text: mfaErrorMessage(t, err, t.errors.generic) });
     } finally {
       setSubmitting(false);
     }
@@ -119,10 +145,7 @@ export function TwoFactorSettings() {
       setStep("idle");
       setCode("");
     } catch (err) {
-      setMessage({
-        type: "error",
-        text: err instanceof Error ? err.message : t.auth.mfaInvalidCode,
-      });
+      setMessage({ type: "error", text: mfaErrorMessage(t, err, t.errors.generic) });
     } finally {
       setSubmitting(false);
     }

@@ -4508,7 +4508,6 @@ export const ptBR: TranslationKeys = {
       newPasswordPlaceholder: "Nova senha",
       confirmPasswordPlaceholder: "Confirmar nova senha",
       passwordsMismatch: "As senhas não coincidem",
-      passwordTooShort: "A senha deve ter pelo menos 4 caracteres",
       changeSuccess: "Senha alterada com sucesso",
       changeFailed: "Falha ao alterar a senha",
       currentPasswordIncorrect: "A senha atual está incorreta",
@@ -4570,6 +4569,10 @@ export const ptBR: TranslationKeys = {
       securitySettingsSaved: "Configurações de segurança salvas",
       securitySettingsFailed: "Falha ao salvar configurações de segurança",
       adminSettingsLoadFailed: "Não foi possível carregar as configurações de segurança.",
+      twoFactorStateChanged:
+        "A autenticação em dois fatores foi alterada em outra janela. Recarregue e tente novamente.",
+      twoFactorUnreadable:
+        "O servidor não consegue ler suas configurações de autenticação em dois fatores. Fale com um administrador.",
     },
     people: {
       heading: "Pessoas",
@@ -4624,6 +4627,9 @@ export const ptBR: TranslationKeys = {
       copyPasswordWarning: "Copie esta senha agora. Você não poderá vê-la após criar o usuário.",
       memberCount: "{count} membro",
       memberCountPlural: "{count} membros",
+      usernameTaken: "Esse nome de usuário já está em uso",
+      lastAdmin: "Sempre deve haver pelo menos um administrador",
+      cannotDeleteSelf: "Não é possível excluir sua própria conta",
     },
     teams: {
       heading: "Equipes",
@@ -4661,6 +4667,7 @@ export const ptBR: TranslationKeys = {
       teamRetentionHoursDesc:
         "Retenção de arquivos processados desta equipe. Deixe vazio para usar o padrão global.",
       quotaSaved: "Configurações da equipe salvas",
+      quotaSaveFailed: "Falha ao salvar as configurações da equipe",
     },
     roles: {
       heading: "Funções",
@@ -5207,6 +5214,8 @@ export const ptBR: TranslationKeys = {
     passwordNeedsDigit: "A senha deve conter um número.",
     passwordNeedsSpecial: "A senha deve conter um caractere especial.",
     tooManyRequests: "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    escalationDenied: "Você não pode conceder uma função ou permissões acima das suas.",
+    featureNotLicensed: "Isso requer uma licença empresarial.",
   },
   sidebar: {
     sponsor: "Apoie-nos",

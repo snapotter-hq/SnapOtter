@@ -4505,7 +4505,6 @@ export const ru: TranslationKeys = {
       newPasswordPlaceholder: "Новый пароль",
       confirmPasswordPlaceholder: "Подтвердите новый пароль",
       passwordsMismatch: "Пароли не совпадают",
-      passwordTooShort: "Пароль должен содержать не менее 4 символов",
       changeSuccess: "Пароль успешно изменён",
       changeFailed: "Не удалось изменить пароль",
       currentPasswordIncorrect: "Текущий пароль неверен",
@@ -4565,6 +4564,10 @@ export const ru: TranslationKeys = {
       securitySettingsSaved: "Настройки безопасности сохранены",
       securitySettingsFailed: "Не удалось сохранить настройки безопасности",
       adminSettingsLoadFailed: "Не удалось загрузить настройки безопасности.",
+      twoFactorStateChanged:
+        "Двухфакторная аутентификация изменена в другом окне. Обновите страницу и попробуйте снова.",
+      twoFactorUnreadable:
+        "Сервер не может прочитать настройки двухфакторной аутентификации. Обратитесь к администратору.",
     },
     people: {
       heading: "Пользователи",
@@ -4620,6 +4623,9 @@ export const ru: TranslationKeys = {
         "Скопируйте этот пароль сейчас. После создания пользователя вы не сможете его увидеть.",
       memberCount: "{count} участник",
       memberCountPlural: "{count} участников",
+      usernameTaken: "Это имя пользователя уже занято",
+      lastAdmin: "Всегда должен оставаться хотя бы один администратор",
+      cannotDeleteSelf: "Нельзя удалить собственную учётную запись",
     },
     teams: {
       heading: "Команды",
@@ -4657,6 +4663,7 @@ export const ru: TranslationKeys = {
       teamRetentionHoursDesc:
         "Срок хранения обработанных файлов для этой команды. Оставьте пустым для значения по умолчанию.",
       quotaSaved: "Настройки команды сохранены",
+      quotaSaveFailed: "Не удалось сохранить настройки команды",
     },
     roles: {
       heading: "Роли",
@@ -5202,6 +5209,8 @@ export const ru: TranslationKeys = {
     passwordNeedsDigit: "Пароль должен содержать цифру.",
     passwordNeedsSpecial: "Пароль должен содержать специальный символ.",
     tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
+    escalationDenied: "Нельзя выдать роль или права выше собственных.",
+    featureNotLicensed: "Для этого нужна корпоративная лицензия.",
   },
   sidebar: {
     sponsor: "Поддержите нас",

@@ -272,7 +272,10 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
       }
       onImported();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
+      // The import's reasons are specific and technical (a bad signature, a
+      // missing file in the archive) and carry no code to translate, so the
+      // detail stays inside the translated sentence.
+      const msg = err instanceof Error ? err.message : t.errors.generic;
       setFeedback({
         type: "error",
         message: format(t.settings.aiFeatures.importError, { error: msg }),
