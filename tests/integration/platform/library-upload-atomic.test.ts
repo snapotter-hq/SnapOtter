@@ -57,8 +57,12 @@ async function snapshot() {
     .select({ storageUsed: schema.users.storageUsed })
     .from(schema.users)
     .where(eq(schema.users.id, adminId));
-  const onDisk = await readdir(env.FILES_STORAGE_PATH).catch(() => [] as string[]);
-  return { rows: rows.length, storageUsed: user.storageUsed, onDisk: onDisk.length };
+  // Blobs only: thumbnails go in a .thumbs directory inside the same folder,
+  // created lazily, so counting every entry flaps when an earlier test's
+  // thumbnail write creates it mid-run.
+  const entries = await readdir(env.FILES_STORAGE_PATH, { withFileTypes: true }).catch(() => []);
+  const onDisk = entries.filter((e) => e.isFile()).length;
+  return { rows: rows.length, storageUsed: user.storageUsed, onDisk };
 }
 
 function upload(files: { name: string; content: Buffer; type: string }[]) {
