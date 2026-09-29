@@ -85,6 +85,16 @@ components:
               error:
                 type: string
                 example: Rate limit exceeded
+    PayloadTooLarge:
+      description: >-
+        A file in the upload is over the server's upload limit
+        (`MAX_UPLOAD_SIZE_MB`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: File exceeds the 100 MB upload limit
 
   schemas:
     Error:
@@ -305,6 +315,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/content-aware-resize:
     post:
@@ -364,6 +376,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/crop:
     post:
@@ -413,6 +427,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/rotate:
     post:
@@ -460,6 +476,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/convert:
     post:
@@ -506,6 +524,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/compress:
     post:
@@ -553,6 +573,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/compress-image-to-20kb:
     post:
@@ -602,6 +624,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -657,6 +681,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -712,6 +738,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -767,6 +795,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -822,6 +852,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -877,6 +909,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/border:
     post:
@@ -932,6 +966,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/beautify:
     post:
@@ -1004,6 +1040,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/adjust-colors:
     post:
@@ -1063,6 +1101,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/sharpening:
     post:
@@ -1120,6 +1160,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/optimize-for-web:
     post:
@@ -1170,6 +1212,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/optimize-for-web/preview:
     post:
@@ -1224,6 +1268,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -1287,6 +1333,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/image-enhancement/analyze:
     post:
@@ -1330,6 +1378,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Analysis failed
           content:
@@ -1398,6 +1448,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -1470,6 +1522,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -1545,6 +1599,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -1676,6 +1732,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: No face detected or analysis failed
           content:
@@ -1883,6 +1941,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -1955,6 +2015,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -2058,6 +2120,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/watermark-text:
     post:
@@ -2108,6 +2172,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/text-overlay:
     post:
@@ -2159,6 +2225,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/replace-color:
     post:
@@ -2207,6 +2275,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/color-blindness:
     post:
@@ -2252,6 +2322,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/gif-tools:
     post:
@@ -2313,6 +2385,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/gif-tools/info:
     post:
@@ -2367,6 +2441,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/smart-crop:
     post:
@@ -2423,6 +2499,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/vectorize:
     post:
@@ -2475,6 +2553,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/svg-to-raster:
     post:
@@ -2525,6 +2605,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/svg-to-raster/batch:
     post:
@@ -2574,6 +2656,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: All files failed processing
           content:
@@ -2653,6 +2737,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -2745,6 +2831,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdf-to-image/info:
     post:
@@ -2781,6 +2869,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdf-to-image/preview:
     post:
@@ -2831,6 +2921,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/split:
     post:
@@ -2882,6 +2974,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/bulk-rename:
     post:
@@ -2931,6 +3025,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/favicon:
     post:
@@ -2972,6 +3068,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/watermark-image:
     post:
@@ -3023,6 +3121,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/compose:
     post:
@@ -3075,6 +3175,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/meme-generator:
     post:
@@ -3147,6 +3249,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -3371,6 +3475,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -3441,6 +3547,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -3519,6 +3627,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -3585,6 +3695,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/stitch:
     post:
@@ -3641,6 +3753,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/remove-gif-background:
     post:
@@ -3710,6 +3824,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "501":
           description: Feature not installed
           content:
@@ -3779,6 +3895,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -3916,6 +4034,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -3987,6 +4107,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -4054,6 +4176,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -4133,7 +4257,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
         "413":
-          description: Encoded OCR input exceeds the hard 512 MiB safety limit
+          description: >-
+            The image is over the upload limit (`MAX_UPLOAD_SIZE_MB`, never more
+            than 512 MiB for OCR).
           content:
             application/json:
               schema:
@@ -4240,6 +4366,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -4296,6 +4424,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/barcode-read:
     post:
@@ -4380,6 +4510,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -4478,6 +4610,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -4680,6 +4814,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Failed to read image metadata
           content:
@@ -4752,6 +4888,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/edit-metadata/inspect:
     post:
@@ -4793,6 +4931,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Failed to read image metadata
           content:
@@ -4867,6 +5007,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          description: >-
+            A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`). For `ocr` and
+            `ocr-pdf`, files are also capped at 512 MiB each and 512 MiB together.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # --- Pipelines ------------------------------------------------------------
 
@@ -4927,6 +5075,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          description: >-
+            The file is over the upload limit (`MAX_UPLOAD_SIZE_MB`). A file sent
+            before the `pipeline` field, or any file when the first step is OCR, is
+            also capped at 512 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "422":
           description: Processing failed
           content:
@@ -5188,6 +5345,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          description: >-
+            A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`). Files sent
+            before the `pipeline` field, and every file when the first step is OCR,
+            are also held to OCR's caps: 512 MiB each and 512 MiB together.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # --- Files ----------------------------------------------------------------
 
@@ -5243,6 +5409,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/download/{jobId}/{filename}:
     get:
@@ -5312,6 +5480,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/files:
     get:
@@ -5472,6 +5642,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          description: >-
+            A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`), or storing
+            it would take the account over its storage quota.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Storage quota exceeded. Used 1030.0MB of 1024.0MB
 
   /api/v1/files/save-result:
     post:
@@ -5528,6 +5708,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "413":
+          description: >-
+            A file is over the upload limit (`MAX_UPLOAD_SIZE_MB`), or storing
+            it would take the account over its storage quota.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: Storage quota exceeded. Used 1030.0MB of 1024.0MB
 
   /api/v1/files/{id}:
     get:
@@ -7544,6 +7734,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -7605,6 +7797,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -7658,6 +7852,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/mute-video:
     post:
@@ -7698,6 +7894,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-to-gif:
     post:
@@ -7755,6 +7953,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -7808,6 +8008,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/crop-video:
     post:
@@ -7856,6 +8058,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/rotate-video:
     post:
@@ -7901,6 +8105,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/change-fps:
     post:
@@ -7946,6 +8152,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-color:
     post:
@@ -7994,6 +8202,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-speed:
     post:
@@ -8040,6 +8250,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/reverse-video:
     post:
@@ -8080,6 +8292,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-loudnorm:
     post:
@@ -8120,6 +8334,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/aspect-pad:
     post:
@@ -8166,6 +8382,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/blur-pad:
     post:
@@ -8212,6 +8430,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/watermark-video:
     post:
@@ -8261,6 +8481,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/stabilize-video:
     post:
@@ -8315,6 +8537,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -8366,6 +8590,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-to-webp:
     post:
@@ -8414,6 +8640,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-to-frames:
     post:
@@ -8462,6 +8690,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/merge-videos:
     post:
@@ -8515,6 +8745,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -8563,6 +8795,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/burn-subtitles:
     post:
@@ -8619,6 +8853,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -8672,6 +8908,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/extract-subtitles:
     post:
@@ -8712,6 +8950,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/images-to-video:
     post:
@@ -8761,6 +9001,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/video-metadata:
     post:
@@ -8801,6 +9043,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/video/auto-subtitles:
     post:
@@ -8859,6 +9103,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -8916,6 +9162,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
   /api/v1/tools/audio/convert-audio:
     post:
       operationId: convertAudio
@@ -8961,6 +9209,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/trim-audio:
     post:
@@ -9007,6 +9257,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/volume-adjust:
     post:
@@ -9052,6 +9304,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/normalize-audio:
     post:
@@ -9092,6 +9346,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/fade-audio:
     post:
@@ -9138,6 +9394,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/reverse-audio:
     post:
@@ -9178,6 +9436,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/audio-speed:
     post:
@@ -9223,6 +9483,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/pitch-shift:
     post:
@@ -9268,6 +9530,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/audio-channels:
     post:
@@ -9313,6 +9577,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/silence-removal:
     post:
@@ -9359,6 +9625,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/noise-reduction:
     post:
@@ -9404,6 +9672,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/merge-audio:
     post:
@@ -9451,6 +9721,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/split-audio:
     post:
@@ -9502,6 +9774,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/ringtone-maker:
     post:
@@ -9548,6 +9822,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/waveform-image:
     post:
@@ -9595,6 +9871,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/audio-metadata:
     post:
@@ -9646,6 +9924,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/audio/transcribe-audio:
     post:
@@ -9704,6 +9984,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -9757,6 +10039,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/split-pdf:
     post:
@@ -9807,6 +10091,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/compress-pdf:
     post:
@@ -9858,6 +10144,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/compress-pdf-to-100kb:
     post:
@@ -9916,6 +10204,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/compress-pdf-to-200kb:
     post:
@@ -9974,6 +10264,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/compress-pdf-to-500kb:
     post:
@@ -10032,6 +10324,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/compress-pdf-to-1mb:
     post:
@@ -10090,6 +10384,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/compress-pdf-to-2mb:
     post:
@@ -10148,6 +10444,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/rotate-pdf:
     post:
@@ -10194,6 +10492,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/extract-pages:
     post:
@@ -10239,6 +10539,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/remove-pages:
     post:
@@ -10284,6 +10586,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/organize-pdf:
     post:
@@ -10329,6 +10633,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/protect-pdf:
     post:
@@ -10375,6 +10681,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/unlock-pdf:
     post:
@@ -10420,6 +10728,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/repair-pdf:
     post:
@@ -10460,6 +10770,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/linearize-pdf:
     post:
@@ -10500,6 +10812,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/grayscale-pdf:
     post:
@@ -10540,6 +10854,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdfa-convert:
     post:
@@ -10580,6 +10896,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/crop-pdf:
     post:
@@ -10625,6 +10943,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/nup-pdf:
     post:
@@ -10670,6 +10990,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/booklet-pdf:
     post:
@@ -10715,6 +11037,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/watermark-pdf:
     post:
@@ -10764,6 +11088,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdf-page-numbers:
     post:
@@ -10810,6 +11136,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
   /api/v1/tools/files/convert-document:
     post:
       operationId: convertDocument
@@ -10863,6 +11191,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/convert-presentation:
     post:
@@ -10917,6 +11247,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/convert-spreadsheet:
     post:
@@ -10971,6 +11303,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/excel-to-pdf:
     post:
@@ -11020,6 +11354,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/word-to-pdf:
     post:
@@ -11069,6 +11405,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/powerpoint-to-pdf:
     post:
@@ -11118,6 +11456,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/html-to-pdf:
     post:
@@ -11167,6 +11507,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/markdown-to-docx:
     post:
@@ -11207,6 +11549,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/markdown-to-html:
     post:
@@ -11247,6 +11591,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/markdown-to-pdf:
     post:
@@ -11296,6 +11642,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/epub-convert:
     post:
@@ -11350,6 +11698,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/to-epub:
     post:
@@ -11399,6 +11749,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/flatten-pdf:
     post:
@@ -11439,6 +11791,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/redact-pdf:
     post:
@@ -11491,6 +11845,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdf-to-text:
     post:
@@ -11537,6 +11893,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdf-to-word:
     post:
@@ -11586,6 +11944,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/pdf-metadata:
     post:
@@ -11640,6 +12000,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/pdf/ocr-pdf:
     post:
@@ -11715,7 +12077,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "413":
-          description: Encoded PDF exceeds the hard 512 MiB safety limit
+          description: >-
+            The PDF is over the upload limit (`MAX_UPLOAD_SIZE_MB`, never more
+            than 512 MiB for OCR).
           content:
             application/json:
               schema:
@@ -11779,6 +12143,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/csv-excel:
     post:
@@ -11824,6 +12190,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/csv-json:
     post:
@@ -11869,6 +12237,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/json-xml:
     post:
@@ -11914,6 +12284,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/split-csv:
     post:
@@ -11960,6 +12332,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/merge-csvs:
     post:
@@ -12002,6 +12376,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/yaml-json:
     post:
@@ -12042,6 +12418,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/xml-to-csv:
     post:
@@ -12082,6 +12460,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/create-zip:
     post:
@@ -12124,6 +12504,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/files/extract-zip:
     post:
@@ -12164,6 +12546,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
   /api/v1/tools/image/background-replace:
     post:
       operationId: backgroundReplace
@@ -12226,6 +12610,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -12297,6 +12683,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -12416,6 +12804,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/rounded-crop:
     post:
@@ -12469,6 +12859,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/duotone:
     post:
@@ -12516,6 +12908,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/image-pad:
     post:
@@ -12566,6 +12960,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/pixelate:
     post:
@@ -12616,6 +13012,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/vignette:
     post:
@@ -12667,6 +13065,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/gif-webp:
     post:
@@ -12714,6 +13114,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/histogram:
     post:
@@ -12845,6 +13247,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/lqip-placeholder:
     post:
@@ -12921,6 +13325,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   /api/v1/tools/image/sprite-sheet:
     post:
@@ -13013,6 +13419,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
 
   # Generated catalog and docs parity paths. Keep in sync with packages/shared/src/constants.ts.
   /api/v1/tools/image/passport-photo:
@@ -13112,6 +13520,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13168,6 +13578,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13224,6 +13636,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13280,6 +13694,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13336,6 +13752,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13392,6 +13810,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13448,6 +13868,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13504,6 +13926,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13560,6 +13984,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13616,6 +14042,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13672,6 +14100,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13728,6 +14158,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13784,6 +14216,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13840,6 +14274,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13896,6 +14332,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -13952,6 +14390,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14008,6 +14448,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14064,6 +14506,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14120,6 +14564,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14176,6 +14622,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14232,6 +14680,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14288,6 +14738,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14344,6 +14796,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14400,6 +14854,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14456,6 +14912,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14512,6 +14970,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14568,6 +15028,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14624,6 +15086,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14680,6 +15144,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14736,6 +15202,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14792,6 +15260,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14848,6 +15318,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14904,6 +15376,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -14960,6 +15434,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15016,6 +15492,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15074,6 +15552,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15132,6 +15612,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15190,6 +15672,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15248,6 +15732,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15306,6 +15792,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15364,6 +15852,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15422,6 +15912,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15478,6 +15970,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15534,6 +16028,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15590,6 +16086,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15652,6 +16150,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15714,6 +16214,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15776,6 +16278,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15838,6 +16342,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15900,6 +16406,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -15962,6 +16470,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16024,6 +16534,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16086,6 +16598,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16148,6 +16662,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16210,6 +16726,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16272,6 +16790,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16334,6 +16854,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16396,6 +16918,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16458,6 +16982,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16520,6 +17046,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16582,6 +17110,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16644,6 +17174,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16700,6 +17232,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16756,6 +17290,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16812,6 +17348,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16868,6 +17406,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16924,6 +17464,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -16980,6 +17522,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17036,6 +17580,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17092,6 +17638,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17148,6 +17696,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17204,6 +17754,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17260,6 +17812,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17316,6 +17870,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17372,6 +17928,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17428,6 +17986,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17484,6 +18044,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17540,6 +18102,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17596,6 +18160,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17652,6 +18218,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17708,6 +18276,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17764,6 +18334,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17820,6 +18392,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -17882,6 +18456,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnauthorizedError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Processing failed
           content:
@@ -18186,6 +18762,8 @@ paths:
           description: Preview binary
         "400":
           description: Unsupported file type or missing file
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "422":
           description: Could not generate preview
 
@@ -18365,6 +18943,10 @@ paths:
           description: Insufficient permissions
         "409":
           description: Import lock is held
+        "413":
+          description: >-
+            A file in the import is over 20 GiB. This route has its own size
+            limits; `MAX_UPLOAD_SIZE_MB` doesn't apply to it.
         "507":
           description: Insufficient storage for the authenticated archive and expanded runtime
 
