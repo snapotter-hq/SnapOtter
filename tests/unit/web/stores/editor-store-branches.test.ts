@@ -214,7 +214,7 @@ describe("editor store branch helpers", () => {
 
     expect(state().objects[0].attrs).toMatchObject({ x: 15, y: 17 });
     expect((state().objects[1].attrs as { points: number[] }).points).toEqual([5, -3, 15, 7]);
-    expect(state().lastAction).toBe("Nudge");
+    expect(state().lastAction).toEqual({ id: "nudge" });
     expect(state()._historyVersion).toBe(version + 1);
   });
 

@@ -10,7 +10,6 @@ import {
   Layers,
   MousePointer2,
   Move,
-  Paintbrush,
   Pencil,
   Redo2,
   RotateCcw,
@@ -23,61 +22,95 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
+import type { HistoryAction } from "@/types/editor";
 
-// Map action labels to icons for the history list
-const ACTION_ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
-  "Brush Stroke": Brush,
-  "Add Line": Pencil,
-  "Eraser Stroke": Eraser,
-  "Add Rect": Square,
-  "Add Ellipse": Square,
-  "Add Text": Type,
-  "Add Arrow": ArrowUp,
-  "Add Polygon": Square,
-  "Add Star": Square,
-  "Add Image": Square,
-  Move: Move,
-  Transform: Move,
-  "Text Edit": Type,
-  "Add Layer": Layers,
-  "Delete Layer": Trash2,
-  "Duplicate Layer": Copy,
-  "Reorder Layers": ArrowDown,
-  "Merge Down": Layers,
-  "Flatten All": Layers,
-  Crop: Crop,
-  Delete: Trash2,
-  Paste: Copy,
-  "Paste in Place": Copy,
-  Fill: Paintbrush,
-  "Resize Canvas": Square,
-  "Resize Image": Square,
-  "Rotate Canvas 90": RotateCcw,
-  "Rotate Canvas 180": RotateCcw,
-  "Rotate Canvas 270": RotateCcw,
-  "Flip Horizontal": ArrowUp,
-  "Flip Vertical": ArrowDown,
-  "Trim Canvas": Scissors,
-  "Load Image": Square,
-  "Bring to Front": ArrowUp,
-  "Bring Forward": ArrowUp,
-  "Send Backward": ArrowDown,
-  "Send to Back": ArrowDown,
+type IconComponent = React.ComponentType<{ size?: number }>;
+
+const ACTION_ICONS: Partial<Record<HistoryAction["id"], IconComponent>> = {
+  brushStroke: Brush,
+  eraserStroke: Eraser,
+  addLayer: Layers,
+  deleteLayer: Trash2,
+  duplicateLayer: Copy,
+  reorderLayers: ArrowDown,
+  mergeDown: Layers,
+  flattenAll: Layers,
+  layerEffect: Layers,
+  crop: Crop,
+  delete: Trash2,
+  cut: Scissors,
+  paste: Copy,
+  pasteInPlace: Copy,
+  resizeCanvas: Square,
+  resizeImage: Square,
+  rotateCanvas: RotateCcw,
+  flipHorizontal: ArrowUp,
+  flipVertical: ArrowDown,
+  trimCanvas: Scissors,
+  loadImage: Square,
+  bringToFront: ArrowUp,
+  bringForward: ArrowUp,
+  sendBackward: ArrowDown,
+  sendToBack: ArrowDown,
+  nudge: Move,
+  adjust: Sliders,
+  toggleFilter: Sliders,
+  setFilterParam: Sliders,
+  levels: Sliders,
+  curves: Sliders,
 };
 
-function getActionIcon(label: string): React.ComponentType<{ size?: number }> {
-  if (ACTION_ICON_MAP[label]) return ACTION_ICON_MAP[label];
-  if (label.startsWith("Add ")) return Square;
-  if (label.includes("Layer")) return Layers;
-  if (label.includes("Adjust") || label.includes("Filter")) return Sliders;
-  return MousePointer2;
+const OBJECT_ICONS: Partial<Record<string, IconComponent>> = {
+  line: Pencil,
+  text: Type,
+  arrow: ArrowUp,
+};
+
+function getActionIcon(action: HistoryAction | undefined): IconComponent {
+  if (!action) return MousePointer2;
+  if (action.id === "addObject") return OBJECT_ICONS[action.objectType] ?? Square;
+  return ACTION_ICONS[action.id] ?? MousePointer2;
+}
+
+type Translations = ReturnType<typeof useTranslation>["t"];
+
+/**
+ * Display text for a history step. Filter and param names come from the
+ * adjustments panel's own labels; an id this build has no name for (a filter
+ * added later, a stale snapshot) falls back to the raw id rather than to blank.
+ */
+export function historyActionLabel(t: Translations, action: HistoryAction | undefined): string {
+  const h = t.editor.panels.history;
+  if (!action) return h.unknown;
+  const adj = t.editor.panels.adjustments;
+  const filterName = (filter: string) =>
+    (adj.filters as Record<string, string>)[filter] ??
+    (filter === "vignette" ? adj.vignette : filter === "grain" ? adj.grain : filter);
+  switch (action.id) {
+    case "rotateCanvas":
+      return format(h.actions.rotateCanvas, { degrees: action.degrees });
+    case "addObject":
+      return format(h.actions.addObject, { type: h.objectTypes[action.objectType] });
+    case "adjust":
+      return format(h.actions.adjust, { name: adj.sliders[action.key] });
+    case "toggleFilter":
+      return format(h.actions.toggleFilter, { name: filterName(action.filter) });
+    case "setFilterParam":
+      return format(h.actions.setFilterParam, {
+        filter: filterName(action.filter),
+        param: (adj.params as Record<string, string>)[action.param] ?? action.param,
+      });
+    default:
+      return h.actions[action.id];
+  }
 }
 
 interface HistoryEntry {
   index: number;
-  label: string;
+  action: HistoryAction | undefined;
 }
 
 export function HistoryPanel() {
@@ -110,38 +143,28 @@ export function HistoryPanel() {
   // Build the history list from past states
   const entries = useMemo((): HistoryEntry[] => {
     const temporal = useEditorStore.temporal.getState();
-    const past = temporal.pastStates as Array<{ lastAction?: string }>;
-    const future = temporal.futureStates as Array<{ lastAction?: string }>;
+    const past = temporal.pastStates as Array<{ lastAction?: HistoryAction }>;
+    const future = temporal.futureStates as Array<{ lastAction?: HistoryAction }>;
 
-    const unknownLabel = t.editor.panels.history.unknown;
     const result: HistoryEntry[] = [];
 
     // Future states (dimmed, above current in reverse order)
     for (let i = future.length - 1; i >= 0; i--) {
-      result.push({
-        index: -(i + 1),
-        label: (future[i] as { lastAction?: string })?.lastAction || unknownLabel,
-      });
+      result.push({ index: -(i + 1), action: future[i]?.lastAction });
     }
 
     // Current state (highlighted)
-    result.push({
-      index: 0,
-      label: lastAction,
-    });
+    result.push({ index: 0, action: lastAction });
 
     // Past states (newest first, below current)
     for (let i = past.length - 1; i >= 0; i--) {
-      result.push({
-        index: past.length - i,
-        label: (past[i] as { lastAction?: string })?.lastAction || unknownLabel,
-      });
+      result.push({ index: past.length - i, action: past[i]?.lastAction });
     }
 
     return result;
     // pastStates and futureStates are intentionally not reactive deps;
     // we read them inside via getState(). lastAction triggers recalculation.
-  }, [lastAction, t]);
+  }, [lastAction]);
 
   const jumpToState = useCallback((entry: HistoryEntry) => {
     const temporal = useEditorStore.temporal.getState();
@@ -201,7 +224,7 @@ export function HistoryPanel() {
         {entries.map((entry) => {
           const isCurrent = entry.index === 0;
           const isFuture = entry.index < 0;
-          const Icon = getActionIcon(entry.label);
+          const Icon = getActionIcon(entry.action);
 
           return (
             <button
@@ -218,7 +241,7 @@ export function HistoryPanel() {
               )}
             >
               <Icon size={12} />
-              <span className="truncate">{entry.label}</span>
+              <span className="truncate">{historyActionLabel(t, entry.action)}</span>
             </button>
           );
         })}

@@ -232,6 +232,55 @@ export interface CropState {
   aspectRatio: string | null;
 }
 
+/**
+ * What an undo step did, as a stable id plus the values its label needs. The
+ * History panel turns it into display text through i18n (#1592), so nothing
+ * here is English copy.
+ */
+export type HistoryActionId =
+  | "initialState"
+  | "loadImage"
+  | "loadProject"
+  | "restoreAutosave"
+  | "resizeCanvas"
+  | "resizeImage"
+  | "flipHorizontal"
+  | "flipVertical"
+  | "trimCanvas"
+  | "layerEffect"
+  | "delete"
+  | "bringToFront"
+  | "bringForward"
+  | "sendBackward"
+  | "sendToBack"
+  | "addLayer"
+  | "deleteLayer"
+  | "duplicateLayer"
+  | "reorderLayers"
+  | "mergeDown"
+  | "flattenAll"
+  | "resetAdjustments"
+  | "levels"
+  | "curves"
+  | "resetLevels"
+  | "resetCurves"
+  | "resetAll"
+  | "crop"
+  | "cut"
+  | "paste"
+  | "pasteInPlace"
+  | "nudge"
+  | "brushStroke"
+  | "eraserStroke";
+
+export type HistoryAction =
+  | { id: HistoryActionId }
+  | { id: "rotateCanvas"; degrees: number }
+  | { id: "addObject"; objectType: CanvasObject["type"] }
+  | { id: "adjust"; key: keyof AdjustmentValues }
+  | { id: "toggleFilter"; filter: string }
+  | { id: "setFilterParam"; filter: string; param: string };
+
 export interface AdjustmentValues {
   brightness: number;
   contrast: number;
@@ -386,7 +435,7 @@ export interface EditorState {
   loadingState: LoadingState | null;
 
   // History tracking
-  lastAction: string;
+  lastAction: HistoryAction;
   _historyVersion: number;
 
   // --- Actions ---

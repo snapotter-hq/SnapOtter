@@ -20,6 +20,7 @@ import type {
   EditorState,
   EraserMode,
   FilterConfig,
+  HistoryAction,
   SelectionMode,
   StrokeDashStyle,
   ToolType,
@@ -113,7 +114,7 @@ function rebakeSourceRaster(
 // Extended store state with additional fields/methods not yet in the shared interface
 interface EditorStateExtensions {
   canvasBackground: string;
-  commitHistory: (action: string) => void;
+  commitHistory: (action: HistoryAction) => void;
   batchNudge: (objectIds: string[], dx: number, dy: number) => void;
   updateLayerThumbnail: (layerId: string, thumbnailDataUrl: string) => void;
   // Levels / Curves tone adjustments (applied to the source image as LUTs)
@@ -334,7 +335,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       loadingState: null,
 
       // --- History ---
-      lastAction: "Initial State",
+      lastAction: { id: "initialState" },
       _historyVersion: 0,
 
       // ===== ACTIONS =====
@@ -407,7 +408,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           editingTextId: null,
           layers: [createDefaultLayer(DEFAULT_LAYER_ID, "Layer 1")],
           activeLayerId: DEFAULT_LAYER_ID,
-          lastAction: "Load Image",
+          lastAction: { id: "loadImage" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -459,7 +460,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
                 })
               : objects,
           isDirty: true,
-          lastAction: "Resize Canvas",
+          lastAction: { id: "resizeCanvas" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -499,7 +500,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...obj, attrs } as CanvasObject;
           }),
           isDirty: true,
-          lastAction: "Resize Image",
+          lastAction: { id: "resizeImage" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -584,7 +585,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...obj, attrs } as CanvasObject;
           }),
           isDirty: true,
-          lastAction: `Rotate Canvas ${degrees}`,
+          lastAction: { id: "rotateCanvas", degrees },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -621,7 +622,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...obj, attrs } as CanvasObject;
           }),
           isDirty: true,
-          lastAction: "Flip Horizontal",
+          lastAction: { id: "flipHorizontal" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -658,7 +659,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...obj, attrs } as CanvasObject;
           }),
           isDirty: true,
-          lastAction: "Flip Vertical",
+          lastAction: { id: "flipVertical" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -752,7 +753,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...obj, attrs } as CanvasObject;
           }),
           isDirty: true,
-          lastAction: "Trim Canvas",
+          lastAction: { id: "trimCanvas" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -795,7 +796,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           objects: [...get().objects, { ...obj, layerId: targetLayerId }],
           isDirty: true,
-          lastAction: `Add ${obj.type.charAt(0).toUpperCase() + obj.type.slice(1)}`,
+          lastAction: { id: "addObject", objectType: obj.type },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -820,7 +821,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           objects: get().objects.map((obj) => (obj.id === id ? { ...obj, effects } : obj)),
           isDirty: true,
-          lastAction: "Layer Effect",
+          lastAction: { id: "layerEffect" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -840,7 +841,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: objects.filter((obj) => !idSet.has(obj.id)),
           selectedObjectIds: selectedObjectIds.filter((id) => !idSet.has(id)),
           isDirty: true,
-          lastAction: "Delete",
+          lastAction: { id: "delete" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -862,7 +863,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         newObjects.splice(insertIdx, 0, obj);
         set({
           objects: newObjects,
-          lastAction: "Bring to Front",
+          lastAction: { id: "bringToFront" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -884,7 +885,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         [newObjects[idx], newObjects[swapIdx]] = [newObjects[swapIdx], newObjects[idx]];
         set({
           objects: newObjects,
-          lastAction: "Bring Forward",
+          lastAction: { id: "bringForward" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -906,7 +907,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         [newObjects[swapIdx], newObjects[idx]] = [newObjects[idx], newObjects[swapIdx]];
         set({
           objects: newObjects,
-          lastAction: "Send Backward",
+          lastAction: { id: "sendBackward" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -939,7 +940,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         newObjects.splice(insertIdx, 0, obj);
         set({
           objects: newObjects,
-          lastAction: "Send to Back",
+          lastAction: { id: "sendToBack" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -957,7 +958,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           layers: newLayers,
           activeLayerId: id,
           isDirty: true,
-          lastAction: "Add Layer",
+          lastAction: { id: "addLayer" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -974,7 +975,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: objects.filter((o) => o.layerId !== id),
           activeLayerId: newActiveId,
           isDirty: true,
-          lastAction: "Delete Layer",
+          lastAction: { id: "deleteLayer" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1001,7 +1002,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: [...objects, ...sourceObjects],
           activeLayerId: newId,
           isDirty: true,
-          lastAction: "Duplicate Layer",
+          lastAction: { id: "duplicateLayer" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1023,7 +1024,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           layers: newLayers,
           isDirty: true,
-          lastAction: "Reorder Layers",
+          lastAction: { id: "reorderLayers" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1041,7 +1042,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: mergedObjects,
           activeLayerId: belowLayer.id,
           isDirty: true,
-          lastAction: "Merge Down",
+          lastAction: { id: "mergeDown" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1054,7 +1055,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: objects.map((o) => ({ ...o, layerId: bottomLayer.id }) as CanvasObject),
           activeLayerId: bottomLayer.id,
           isDirty: true,
-          lastAction: "Flatten All",
+          lastAction: { id: "flattenAll" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1079,7 +1080,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             [key]: Math.max(min, Math.min(max, value)),
           },
           isDirty: true,
-          lastAction: `Adjust ${key.charAt(0).toUpperCase() + key.slice(1)}`,
+          lastAction: { id: "adjust", key },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1088,7 +1089,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           adjustments: { ...DEFAULT_ADJUSTMENTS },
           isDirty: true,
-          lastAction: "Reset Adjustments",
+          lastAction: { id: "resetAdjustments" },
           _historyVersion: get()._historyVersion + 1,
         }),
 
@@ -1099,7 +1100,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             [channel]: { ...get().levels[channel], ...values },
           },
           isDirty: true,
-          lastAction: "Levels",
+          lastAction: { id: "levels" },
           _historyVersion: get()._historyVersion + 1,
         }),
 
@@ -1107,7 +1108,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           curves: { ...get().curves, [channel]: points },
           isDirty: true,
-          lastAction: "Curves",
+          lastAction: { id: "curves" },
           _historyVersion: get()._historyVersion + 1,
         }),
 
@@ -1115,7 +1116,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           levels: defaultLevelsState(),
           isDirty: true,
-          lastAction: "Reset Levels",
+          lastAction: { id: "resetLevels" },
           _historyVersion: get()._historyVersion + 1,
         }),
 
@@ -1123,7 +1124,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           curves: defaultCurvesState(),
           isDirty: true,
-          lastAction: "Reset Curves",
+          lastAction: { id: "resetCurves" },
           _historyVersion: get()._historyVersion + 1,
         }),
 
@@ -1136,7 +1137,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           levels: defaultLevelsState(),
           curves: defaultCurvesState(),
           isDirty: true,
-          lastAction: "Reset All",
+          lastAction: { id: "resetAll" },
           _historyVersion: get()._historyVersion + 1,
         }),
 
@@ -1155,7 +1156,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...f, enabled, params };
           }),
           isDirty: true,
-          lastAction: `Toggle ${type.charAt(0).toUpperCase() + type.slice(1)} Filter`,
+          lastAction: { id: "toggleFilter", filter: type },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1166,7 +1167,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             f.type === type ? { ...f, params: { ...f.params, [key]: value } } : f,
           ),
           isDirty: true,
-          lastAction: `Set ${type} ${key}`,
+          lastAction: { id: "setFilterParam", filter: type, param: key },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1278,7 +1279,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           cropState: null,
           isCropping: false,
           isDirty: true,
-          lastAction: "Crop",
+          lastAction: { id: "crop" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1307,7 +1308,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: state.objects.filter((o) => !idSet.has(o.id)),
           selectedObjectIds: [],
           isDirty: true,
-          lastAction: "Cut",
+          lastAction: { id: "cut" },
           _historyVersion: state._historyVersion + 1,
         });
       },
@@ -1332,7 +1333,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: [...get().objects, ...pasted],
           selectedObjectIds: pasted.map((o) => o.id),
           isDirty: true,
-          lastAction: "Paste",
+          lastAction: { id: "paste" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1352,7 +1353,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           objects: [...get().objects, ...pasted],
           selectedObjectIds: pasted.map((o) => o.id),
           isDirty: true,
-          lastAction: "Paste in Place",
+          lastAction: { id: "pasteInPlace" },
           _historyVersion: get()._historyVersion + 1,
         });
       },
@@ -1463,7 +1464,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             return { ...obj, attrs } as CanvasObject;
           }),
           isDirty: true,
-          lastAction: "Nudge",
+          lastAction: { id: "nudge" },
           _historyVersion: get()._historyVersion + 1,
         });
       },

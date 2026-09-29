@@ -121,7 +121,7 @@ export function useBrushTool() {
       // Bumping the version again would create a second history entry whose
       // objects array still contains the line, so the first undo would
       // restore the same objects reference and the canvas would not repaint.
-      useEditorStore.setState({ lastAction: "Brush Stroke" });
+      useEditorStore.setState({ lastAction: { id: "brushStroke" } });
     }
     strokeRef.current = null;
   }, []);

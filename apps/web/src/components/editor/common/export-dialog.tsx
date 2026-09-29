@@ -392,7 +392,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             selectedObjectIds: [],
             clipboard: [],
             isDirty: false,
-            lastAction: "Load Project",
+            lastAction: { id: "loadProject" },
             _historyVersion: store._historyVersion + 1,
           });
 
@@ -780,7 +780,7 @@ export function restoreAutosave(data: AutosaveData): void {
   useEditorStore.setState({
     ...data.state,
     isDirty: true,
-    lastAction: "Restore Autosave",
+    lastAction: { id: "restoreAutosave" },
     _historyVersion: store._historyVersion + 1,
   });
 }

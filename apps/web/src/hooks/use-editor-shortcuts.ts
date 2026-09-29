@@ -918,6 +918,6 @@ function nudgeSelected(dx: number, dy: number): void {
   // Create a history entry so the nudge is undoable
   useEditorStore.setState((s) => ({
     _historyVersion: s._historyVersion + 1,
-    lastAction: "Nudge",
+    lastAction: { id: "nudge" },
   }));
 }

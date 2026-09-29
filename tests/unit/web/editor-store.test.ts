@@ -1669,7 +1669,7 @@ describe("cutObjects atomic", () => {
     act((s) => s.setSelectedObjects(["r1"]));
     const versionBefore = state()._historyVersion;
     act((s) => s.cutObjects());
-    expect(state().lastAction).toBe("Cut");
+    expect(state().lastAction).toEqual({ id: "cut" });
     expect(state()._historyVersion).toBe(versionBefore + 1);
   });
 
@@ -1765,7 +1765,7 @@ describe("batchNudge", () => {
     act((s) => s.addObject(makeRect({ id: "r1", x: 10, y: 20 })));
     const versionBefore = state()._historyVersion;
     act((s) => s.batchNudge(["r1"], 1, 1));
-    expect(state().lastAction).toBe("Nudge");
+    expect(state().lastAction).toEqual({ id: "nudge" });
     expect(state()._historyVersion).toBe(versionBefore + 1);
   });
 });
@@ -1777,13 +1777,13 @@ describe("batchNudge", () => {
 describe("commitHistory", () => {
   it("increments _historyVersion", () => {
     const versionBefore = state()._historyVersion;
-    act((s) => s.commitHistory("Test Action"));
+    act((s) => s.commitHistory({ id: "nudge" }));
     expect(state()._historyVersion).toBe(versionBefore + 1);
   });
 
-  it("sets lastAction to provided string", () => {
-    act((s) => s.commitHistory("My Custom Action"));
-    expect(state().lastAction).toBe("My Custom Action");
+  it("sets lastAction to the provided action", () => {
+    act((s) => s.commitHistory({ id: "rotateCanvas", degrees: 90 }));
+    expect(state().lastAction).toEqual({ id: "rotateCanvas", degrees: 90 });
   });
 });
 
