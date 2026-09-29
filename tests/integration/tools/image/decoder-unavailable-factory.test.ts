@@ -131,18 +131,27 @@ describe("Factory image input: decoder availability (#1428)", () => {
 
   it("reports an ImageMagick without the JXL delegate, and no djxl, as 503 (#1429)", async () => {
     // The only decoder on PATH is an ImageMagick that runs but has no JXL
-    // delegate, the stock-Ubuntu situation the issue describes.
+    // delegate, the stock-Ubuntu situation the issue describes. The factory's
+    // pixel-limit preflight reads JXL dimensions through exiftool, so give it
+    // one that answers; otherwise its own missing-binary 503 fires first.
     const shimDir = mkdtempSync(join(tmpdir(), "factory-jxl-shims-"));
     try {
-      writeFileSync(
-        join(shimDir, "magick"),
-        `#!/bin/sh
+      const imagemagick = `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "Version: ImageMagick 7"; exit 0; fi
 echo "magick: no decode delegate for this image format" >&2
 exit 1
-`,
-      );
-      chmodSync(join(shimDir, "magick"), 0o755);
+`;
+      // Both names: an earlier test may have cached either one, and an
+      // ImageMagick 6 host caches `convert`.
+      const shims = {
+        magick: imagemagick,
+        convert: imagemagick,
+        exiftool: "#!/bin/sh\necho 1\necho 1\n",
+      };
+      for (const [name, script] of Object.entries(shims)) {
+        writeFileSync(join(shimDir, name), script);
+        chmodSync(join(shimDir, name), 0o755);
+      }
       process.env.PATH = shimDir;
 
       const res = await resizeRequest({
@@ -153,6 +162,7 @@ exit 1
 
       expect(res.statusCode, res.body).toBe(503);
       expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
+      expect(res.json().error).toMatch(/no support for this format/);
     } finally {
       rmSync(shimDir, { recursive: true, force: true });
     }
