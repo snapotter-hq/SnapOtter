@@ -44,6 +44,21 @@ function markReloadedNow(): void {
   }
 }
 
+// The exact errors left alone while the page was being left. Vite rethrows
+// the same object, so the boundary can tell them apart from real crashes
+// without matching engine-specific messages.
+const abortedByLeaving = new WeakSet<object>();
+
+/**
+ * True for a chunk error this handler left unhandled because the page was
+ * being left: the browser aborted the import, nothing crashed. Released
+ * builds reported these as Firefox and Safari "crashes", never Chrome's
+ * (Chrome doesn't abort), in bursts as several imports died at once (#1480).
+ */
+export function isAbortedByLeaving(error: unknown): boolean {
+  return typeof error === "object" && error !== null && abortedByLeaving.has(error);
+}
+
 /** Returns an uninstall function (used by tests; the app installs once for its lifetime). */
 export function installChunkReloadHandler(
   reload: () => void = () => window.location.reload(),
@@ -59,7 +74,11 @@ export function installChunkReloadHandler(
   const onPreloadError = (event: Event) => {
     // Unhandled on purpose: if the leave is cancelled after all, the error
     // boundary shows the real chunk error rather than an undefined module.
-    if (Date.now() - leavingAt < LEAVING_WINDOW_MS) return;
+    if (Date.now() - leavingAt < LEAVING_WINDOW_MS) {
+      const { payload } = event as Event & { payload?: unknown };
+      if (typeof payload === "object" && payload !== null) abortedByLeaving.add(payload);
+      return;
+    }
     if (Date.now() - readLastReloadAt() < CHUNK_RELOAD_GUARD_MS) return;
     markReloadedNow();
     // Handled here: stop Vite from rethrowing into the error boundary.

@@ -1,4 +1,4 @@
-import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
+import { en } from "@snapotter/shared";
 import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useEffect } from "react";
 import {
   type ClientOnErrorFunction,
@@ -22,8 +22,9 @@ import { UsageSurveyOverlay } from "./components/onboarding/usage-survey-overlay
 import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
-import { initAnalytics, isAnalyticsActive, optOut, track } from "./lib/analytics";
+import { initAnalytics, isAnalyticsActive, optOut } from "./lib/analytics";
 import { AUTH_GUARD_UNGATED_PATHS } from "./lib/auth-routes";
+import { reportRenderError } from "./lib/report-render-error";
 import { useAnalyticsStore } from "./stores/analytics-store";
 
 // Lazy-load all pages so each page's JS (and its icons/deps) is only
@@ -47,27 +48,6 @@ const ToolPage = lazy(() => import("./pages/tool-page").then((m) => ({ default: 
 const NotFoundPage = lazy(() =>
   import("./pages/not-found-page").then((m) => ({ default: m.NotFoundPage })),
 );
-
-/**
- * The one place render crashes turn into telemetry. Both boundaries that can
- * catch one (ours and react-router's) report through here, so the analytics
- * opt-out gate cannot drift between them.
- */
-function reportRenderError(error: unknown, errorInfo?: ErrorInfo): void {
-  console.error("Uncaught render error:", error, errorInfo?.componentStack);
-  if (!isAnalyticsActive()) return; // respect the runtime opt-out
-  // Mirror the crash class only (no PII). track() and Sentry are best-effort.
-  track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, {
-    error_name: error instanceof Error ? error.name : typeof error,
-  });
-  void import("@sentry/react")
-    .then((Sentry) => {
-      // errorInfo is absent for loader and middleware errors.
-      if (errorInfo) Sentry.captureReactException(error, errorInfo);
-      else Sentry.captureException(error);
-    })
-    .catch(() => {});
-}
 
 class ErrorBoundary extends Component<
   { children: ReactNode },

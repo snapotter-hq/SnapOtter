@@ -19,8 +19,15 @@ import {
   CHUNK_RELOAD_GUARD_KEY,
   CHUNK_RELOAD_GUARD_MS,
   installChunkReloadHandler,
+  isAbortedByLeaving,
   LEAVING_WINDOW_MS,
 } from "@/lib/chunk-reload";
+
+function fireChunkErrorWith(payload: unknown): Event {
+  const event = Object.assign(new Event("vite:preloadError", { cancelable: true }), { payload });
+  window.dispatchEvent(event);
+  return event;
+}
 
 function fireChunkError(): Event {
   const event = new Event("vite:preloadError", { cancelable: true });
@@ -102,6 +109,36 @@ describe("installChunkReloadHandler", () => {
 
     setItem.mockRestore();
     getItem.mockRestore();
+  });
+
+  describe("isAbortedByLeaving (#1480)", () => {
+    it("recognises exactly the error it left alone while leaving", () => {
+      startLeaving();
+      const aborted = new TypeError("error loading dynamically imported module: /assets/a.js");
+      fireChunkErrorWith(aborted);
+
+      expect(isAbortedByLeaving(aborted)).toBe(true);
+      // Same message, different object: a real failure elsewhere still counts.
+      expect(isAbortedByLeaving(new TypeError(aborted.message))).toBe(false);
+    });
+
+    it("does not mark an error the handler reloaded for", () => {
+      const stale = new TypeError("Importing a module script failed.");
+      fireChunkErrorWith(stale);
+
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(isAbortedByLeaving(stale)).toBe(false);
+    });
+
+    it("ignores payloads that are not objects", () => {
+      startLeaving();
+      expect(() => fireChunkErrorWith("string payload")).not.toThrow();
+      expect(() => fireChunkErrorWith(undefined)).not.toThrow();
+
+      expect(isAbortedByLeaving("string payload")).toBe(false);
+      expect(isAbortedByLeaving(undefined)).toBe(false);
+      expect(isAbortedByLeaving(null)).toBe(false);
+    });
   });
 
   describe("while the page is being left (#912)", () => {
