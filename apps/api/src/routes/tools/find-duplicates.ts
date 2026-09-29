@@ -5,7 +5,11 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -171,7 +175,14 @@ export function registerFindDuplicates(app: FastifyInstance) {
         if (validation.format === "heif") {
           try {
             file.buffer = await decodeHeic(file.buffer);
-          } catch {
+          } catch (err) {
+            // A missing decoder is the operator's problem, not this file's:
+            // the outer catch rethrows it so the request answers 503.
+            if (isDecoderUnavailable(err)) throw err;
+            logger.warn(
+              { err, filename: file.filename, format: validation.format },
+              "find-duplicates: skipping file, HEIC decode failed",
+            );
             skippedFiles.push({ filename: file.filename, reason: "Failed to decode HEIC" });
             continue;
           }
@@ -180,10 +191,24 @@ export function registerFindDuplicates(app: FastifyInstance) {
           try {
             const fileExt = file.filename.split(".").pop()?.toLowerCase();
             file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-          } catch {
+          } catch (decodeErr) {
+            // Sharp reads some of these formats itself (DNG is a TIFF), so the
+            // decoder's failure only matters once that fallback fails too.
             try {
               await sharp(file.buffer).metadata();
-            } catch {
+            } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              // pino serializes only the `err` key as an Error, so the decoder's
+              // failure goes in as its message or it would land as `{}`.
+              logger.warn(
+                {
+                  err,
+                  decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                  filename: file.filename,
+                  format: validation.format,
+                },
+                "find-duplicates: skipping file, decode failed",
+              );
               skippedFiles.push({
                 filename: file.filename,
                 reason: `Failed to decode ${validation.format.toUpperCase()}`,
@@ -196,7 +221,11 @@ export function registerFindDuplicates(app: FastifyInstance) {
           try {
             file.buffer = decompressSvgz(file.buffer);
             file.buffer = sanitizeSvg(file.buffer);
-          } catch {
+          } catch (err) {
+            logger.warn(
+              { err, filename: file.filename, format: validation.format },
+              "find-duplicates: skipping file, SVG sanitize failed",
+            );
             skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
             continue;
           }
@@ -340,6 +369,9 @@ export function registerFindDuplicates(app: FastifyInstance) {
         skippedFiles: skippedFiles.length > 0 ? skippedFiles : undefined,
       });
     } catch (err) {
+      // Let the global handler answer a missing decoder as 503 and report it,
+      // the way the other custom routes do (#795, #1428).
+      if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Duplicate detection failed",
         details: err instanceof Error ? err.message : "Unknown error",
