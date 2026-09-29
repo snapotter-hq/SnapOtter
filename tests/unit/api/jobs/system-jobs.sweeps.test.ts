@@ -429,8 +429,11 @@ describe("storageTtlSweep", () => {
     expect(deletePrefixMock).not.toHaveBeenCalled();
   });
 
-  it("swallows a deleteAfter deletePrefix failure without incrementing the counter", async () => {
+  // #1442: these failures used to vanish in an empty catch, so a team's
+  // retention deadline could stop being honored with no trace anywhere.
+  it("counts and logs a deleteAfter deletePrefix failure instead of swallowing it", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -441,8 +444,39 @@ describe("storageTtlSweep", () => {
 
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
 
-    // The try/catch swallows the failure; deleteAfterCleaned stays 0.
-    expect(result).toEqual({ removed: 0, failed: 0 });
+    // Neither prefix went, so the job isn't cleaned, and both failures count
+    // (per dir, like the global sweep) on the early-return path too.
+    expect(result).toEqual({ removed: 0, failed: 2 });
+    const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("deleteAfter");
+    expect(logged).toContain("uploads/boom: S3 down");
+    expect(logged).toContain("outputs/boom: S3 down");
+    errSpy.mockRestore();
+  });
+
+  it("still deletes outputs/ when uploads/ fails, and doesn't count the job as cleaned", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", [{ id: "half", userId: null }]);
+    deletePrefixMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "uploads/half") throw new Error("EACCES: permission denied");
+    });
+    getMaxAgeMsMock.mockResolvedValue(0);
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/half");
+    expect(result).toEqual({ removed: 0, failed: 1 });
+    expect(logSpy.mock.calls.map((c) => c[0])).not.toContain(
+      "Storage TTL: cleaned up 1 jobs by deleteAfter",
+    );
+    errSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it("recovers when the whole deleteAfter query throws (best-effort), then runs the global sweep", async () => {
@@ -461,11 +495,18 @@ describe("storageTtlSweep", () => {
       return [];
     });
 
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
 
     // deleteAfterCleaned stayed 0 (query threw); the global sweep still removed 1.
     expect(result).toEqual({ removed: 1, failed: 0 });
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/after-throw");
+    // The query failure is logged rather than swallowed (#1442).
+    const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("deleteAfter");
+    expect(logged).toContain("select failed");
+    errSpy.mockRestore();
   });
 
   it("expires stale local dirs in the global sweep and logs the removal", async () => {
