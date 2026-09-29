@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type AiLogger, aiLog, setAiLogger } from "../../../packages/ai/src/log.js";
 
@@ -61,5 +64,16 @@ describe("packages/ai log sink (#1500)", () => {
     aiLog.warn("back on the console");
 
     expect(warn).toHaveBeenCalledWith("back on the console");
+  });
+
+  it("is the only thing in packages/ai/src that writes to the console", () => {
+    // A direct console call skips the sink, so its line misses LOG_DIR again.
+    const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../packages/ai/src");
+    const direct = /\bconsole\.(log|info|warn|error|debug|trace)\(|process\.std(out|err)\.write\(/;
+    const offenders = readdirSync(srcDir, { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".ts") && file !== "log.ts")
+      .filter((file) => direct.test(readFileSync(join(srcDir, file), "utf8")));
+
+    expect(offenders).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@
  * branches that the integration suite exercises only on the happy path:
  *   - storageTtlSweep: legal-hold users/teams, deleteAfter sweep (ok + error),
  *     maxAgeMs<=0 and empty-dir early returns, per-dir deletePrefix failure,
- *     legal-hold skip on expired dirs, and the console.log/error side effects.
+ *     legal-hold skip on expired dirs, and what each outcome logs.
  *   - retentionSweep: jobs/audit retention on and off, tamper-resistant guard.
  *   - scheduleSystemJobs: the CLEANUP_INTERVAL_MINUTES>0 upsert path.
  *   - enqueueSystemJob: one-shot enqueue.
@@ -202,6 +202,8 @@ async function loadSystemJobs(
     runSiemForward: runSiemForwardMock,
   }));
 
+  // restoreAllMocks() keeps a vi.fn()'s calls, so start each load with none.
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
   return import("../../../../apps/api/src/jobs/system-jobs.js");
@@ -659,6 +661,38 @@ describe("storageTtlSweep", () => {
     expect(result).toEqual({ removed: 1, failed: 1 });
     expect(errCalls.some((m) => String(m).includes("uploads/broken: perm denied"))).toBe(true);
     errSpy.mockRestore();
+  });
+
+  it("caps the logged global-sweep failures when every delete is refused (#1500)", async () => {
+    // A store that refuses every delete (say, dirs left behind by a root
+    // container) fails every expired dir, every sweep. The line now lands in
+    // the size-limited LOG_DIR, so it must not grow with the dir count.
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+
+    const oldMtime = Date.now() - 7_200_000;
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") =>
+      Array.from({ length: 15 }, (_, i) => ({
+        key: `${prefix}/job-${i}`,
+        size: 0,
+        mtimeMs: oldMtime,
+      })),
+    );
+    deletePrefixMock.mockRejectedValue(new Error("EACCES: permission denied"));
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 0, failed: 30 });
+    const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("30 dir(s) failed to delete");
+    expect(logged.match(/: EACCES: permission denied/g)).toHaveLength(20);
+    expect(logged).toContain("...and 10 more");
   });
 
   it("stringifies non-Error rejections from a failed deletePrefix", async () => {

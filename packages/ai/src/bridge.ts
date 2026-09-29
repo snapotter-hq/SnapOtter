@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
-import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
+import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import { missingBundleForScript } from "./feature-gate.js";
 import { aiLog } from "./log.js";
@@ -357,15 +357,22 @@ export class PythonDispatcher {
     const gen = this.generation;
 
     try {
-      const proc = spawn(getPythonPath(), [resolve(PYTHON_DIR, "dispatcher.py")], {
-        stdio: ["pipe", "pipe", "pipe"],
-        env: this.buildEnv(),
-      });
+      // Under the root context: the child outlives whichever job started
+      // it, and its pipe events inherit the context it was spawned in, so
+      // every line it logs would carry that one job's trace id (#1500).
+      // Each request's own trace context goes to Python with the request.
+      const proc = context.with(ROOT_CONTEXT, () =>
+        spawn(getPythonPath(), [resolve(PYTHON_DIR, "dispatcher.py")], {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: this.buildEnv(),
+        }),
+      );
 
       proc.stdin?.on("error", (err: NodeJS.ErrnoException) => {
         if (err.code === "EPIPE" || err.code === "ERR_STREAM_DESTROYED") {
           aiLog.error(
             `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
+            err,
           );
           this.rejectPendingForGeneration(
             gen,
@@ -482,7 +489,7 @@ export class PythonDispatcher {
       });
 
       proc.on("error", (err: NodeJS.ErrnoException) => {
-        aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`);
+        aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`, err);
         if (err.code === "ENOENT") {
           this.childFailed = true;
         } else if (!this.stoppedChildren.has(proc)) {

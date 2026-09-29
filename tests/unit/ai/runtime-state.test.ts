@@ -995,12 +995,11 @@ describe("invalid runtime diagnostics (#1433)", () => {
 
     getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64 });
 
-    expect(sinkWarn).toHaveBeenCalledWith(
+    expect(sinkWarn.mock.calls.map((call) => call[0])).toEqual([
       expect.stringMatching(
         /^\[ocr-runtime\] .* is unavailable: model file .*small\.onnx is the wrong size$/,
       ),
-      undefined,
-    );
+    ]);
     expect(consoleWarn).not.toHaveBeenCalled();
   });
 

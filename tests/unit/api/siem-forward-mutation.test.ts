@@ -113,6 +113,8 @@ async function loadSiemForward(options: { dataEncryptionKey?: string } = {}) {
 
   vi.doMock("@snapotter/enterprise", () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 
+  // restoreAllMocks() keeps a vi.fn()'s calls, so start each load with none.
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
   vi.doMock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
   return import("../../../apps/api/src/jobs/siem-forward.js");

@@ -253,7 +253,14 @@ export function owningJobIds(dirJobId: string): string[] {
 }
 
 const FINISHED_STATUSES = ["completed", "failed", "canceled"] as const;
-const DELETE_AFTER_ERRORS_LOGGED = 20;
+const SWEEP_ERRORS_LOGGED = 20;
+
+/** A store-wide fault fails every dir, every sweep, so list only the first few. */
+function listSweepErrors(errors: string[]): string {
+  const shown = errors.slice(0, SWEEP_ERRORS_LOGGED);
+  const more = errors.length - shown.length;
+  return `${shown.join("\n")}${more > 0 ? `\n...and ${more} more` : ""}`;
+}
 
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Build set of user IDs under legal hold (direct or via team) once per sweep
@@ -330,11 +337,8 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     logger.error({ err }, "Storage TTL: deleteAfter sweep failed");
   }
   if (deleteAfterErrors.length > 0) {
-    // Capped: a store-wide fault fails every past-deadline job, every sweep.
-    const shown = deleteAfterErrors.slice(0, DELETE_AFTER_ERRORS_LOGGED);
-    const more = deleteAfterErrors.length - shown.length;
     logger.error(
-      `Storage TTL: ${deleteAfterErrors.length} deleteAfter dir(s) failed to delete:\n${shown.join("\n")}${more > 0 ? `\n...and ${more} more` : ""}`,
+      `Storage TTL: ${deleteAfterErrors.length} deleteAfter dir(s) failed to delete:\n${listSweepErrors(deleteAfterErrors)}`,
     );
   }
 
@@ -419,7 +423,9 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     }
   }
   if (errors.length > 0) {
-    logger.error(`Storage TTL: ${errors.length} dir(s) failed to delete:\n${errors.join("\n")}`);
+    logger.error(
+      `Storage TTL: ${errors.length} dir(s) failed to delete:\n${listSweepErrors(errors)}`,
+    );
   }
   if (removed > 0) {
     logger.info(`Storage TTL: removed ${removed} expired job dirs`);
