@@ -71,6 +71,13 @@
       "when": 1790672544999,
       "tag": "0009_users_team_id",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790688000604,
+      "tag": "0010_users_scim_external_id",
+      "breakpoints": true
     }
   ]
 }

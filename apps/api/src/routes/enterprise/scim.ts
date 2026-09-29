@@ -26,13 +26,12 @@ function scimError(status: number, detail: string, scimType?: string) {
   };
 }
 
-// A user UPDATE can trip either unique index on users: userName, or the
-// (auth_provider, external_id) identity index from issue #969. Name the one
-// that fired (issue #1006) instead of blaming userName for both, and don't
-// guess at an index added later.
+// A SCIM user UPDATE can trip either unique index it writes to: userName, or
+// the SCIM externalId (issue #1510). Name the one that fired (issue #1006)
+// instead of blaming userName for both, and don't guess at an index added later.
 function userUpdateConflict(err: unknown, log: FastifyBaseLogger) {
   const constraint = uniqueViolationConstraint(err);
-  if (constraint === "users_auth_provider_external_id_unique") {
+  if (constraint === "users_scim_external_id_unique") {
     return scimError(409, "externalId already assigned to another user", "uniqueness");
   }
   if (constraint === "users_username_unique") {
@@ -81,8 +80,8 @@ function scimActiveValue(value: unknown): boolean {
 }
 
 // A blank externalId means no external identity. Stored as "", it takes the
-// (auth_provider, external_id) index slot that NULL leaves free, so the next
-// blank one collides (issue #1008). Non-blank values are kept verbatim so the
+// unique index slot that NULL leaves free, so the next blank one collides
+// (issue #1008). Non-blank values are kept verbatim so the
 // externalId filter still matches exactly what the IdP sent. This does no type
 // checking: SCIM bodies have no schema yet, so a non-string passes through as
 // it did before.
@@ -192,7 +191,7 @@ function toScimUser(
     id: string;
     username: string;
     email: string | null;
-    externalId: string | null;
+    scimExternalId: string | null;
     role: string;
     team: string;
     legalHold: boolean;
@@ -206,7 +205,7 @@ function toScimUser(
     schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
     id: user.id,
     userName: user.username,
-    ...(user.externalId ? { externalId: user.externalId } : {}),
+    ...(user.scimExternalId ? { externalId: user.scimExternalId } : {}),
     active: user.role !== "disabled" && !user.role.startsWith("disabled:"),
     emails: user.email ? [{ value: user.email, primary: true }] : [],
     name: { formatted: user.username },
@@ -442,9 +441,9 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       // commits (issue #927). MAX_USERS binds provisioning too (issue #966):
       // the locked count and the insert share one transaction, same as the
       // register route, so concurrent creates can't overshoot the cap. The
-      // guard is unqualified so it also covers the (auth_provider,
-      // external_id) index (issue #969): a retry under a fresh userName but
-      // the same externalId is the same identity, and gets the same 409.
+      // guard is unqualified so it also covers the SCIM externalId index
+      // (issues #969, #1510): a retry under a fresh userName but the same
+      // externalId is the same identity, and gets the same 409.
       const inserted = await db.transaction(async (tx) => {
         if (await userLimitReached(tx)) return "limit" as const;
         return tx
@@ -453,7 +452,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             id,
             username: userName,
             email,
-            externalId,
+            scimExternalId: externalId,
             role: active ? "user" : "disabled",
             team: teamId,
             authProvider: "scim",
@@ -488,7 +487,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         id,
         username: userName,
         email,
-        externalId,
+        scimExternalId: externalId,
         role: active ? "user" : "disabled",
         team: teamId,
         legalHold: false,
@@ -565,7 +564,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           users = await db
             .select()
             .from(schema.users)
-            .where(eq(schema.users.externalId, parsed.value));
+            .where(eq(schema.users.scimExternalId, parsed.value));
         } else {
           return reply
             .status(400)
@@ -634,7 +633,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (body.externalId !== undefined) {
-        updates.externalId = scimExternalId(body.externalId);
+        updates.scimExternalId = scimExternalId(body.externalId);
       }
 
       const email = emails?.find((e) => e.primary)?.value ?? emails?.[0]?.value;
@@ -752,7 +751,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           if (op.path === "userName") {
             updates.username = op.value as string;
           } else if (op.path === "externalId") {
-            updates.externalId = scimExternalId(op.value);
+            updates.scimExternalId = scimExternalId(op.value);
           } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
             const emails = Array.isArray(op.value)
               ? (op.value as Array<{ value: string; primary?: boolean }>)
@@ -767,7 +766,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             const valObj = op.value as Record<string, unknown>;
             if (valObj.userName) updates.username = valObj.userName as string;
             if (valObj.externalId !== undefined) {
-              updates.externalId = scimExternalId(valObj.externalId);
+              updates.scimExternalId = scimExternalId(valObj.externalId);
             }
             if (valObj.emails) {
               const emails = valObj.emails as Array<{ value: string; primary?: boolean }>;
@@ -776,7 +775,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           }
         } else if (opType === "remove") {
           if (op.path === "externalId") {
-            updates.externalId = null;
+            updates.scimExternalId = null;
           } else if (op.path === "emails") {
             updates.email = null;
           }

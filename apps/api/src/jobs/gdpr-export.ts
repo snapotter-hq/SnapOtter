@@ -31,6 +31,7 @@ export async function gdprExportJob(userId: string, jobId: string): Promise<{ ou
       email: schema.users.email,
       authProvider: schema.users.authProvider,
       externalId: schema.users.externalId,
+      scimExternalId: schema.users.scimExternalId,
       mustChangePassword: schema.users.mustChangePassword,
       legalHold: schema.users.legalHold,
       storageUsed: schema.users.storageUsed,

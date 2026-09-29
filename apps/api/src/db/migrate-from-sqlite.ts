@@ -257,10 +257,17 @@ export function detachedIdentityWarning(d: DetachedIdentity): string {
   return `1.x import: ${who} was imported without its ${identity}, which an account already in this database holds. The imported row keeps its files and its provider, but no longer answers to that identity.`;
 }
 
-/** External identities the target already answers for. Empty on a fresh import. */
+/**
+ * External identities the target already answers for. Empty on a fresh import.
+ * SCIM ids live in scim_external_id since #1510 but arrive from 1.x as a scim
+ * row's external_id, so they are keyed as scim identities here, whatever the
+ * holder signs in with.
+ */
 async function heldIdentities(tx: { execute: typeof db.execute }): Promise<Set<string>> {
   const res = await tx.execute(
-    sql`SELECT auth_provider, external_id FROM users WHERE external_id IS NOT NULL`,
+    sql`SELECT auth_provider, external_id FROM users WHERE external_id IS NOT NULL
+        UNION ALL
+        SELECT 'scim', scim_external_id FROM users WHERE scim_external_id IS NOT NULL`,
   );
   const held = new Set<string>();
   for (const row of res.rows) {
@@ -285,6 +292,17 @@ async function mapUserTeamNamesToIds(tx: { execute: typeof db.execute }): Promis
   await tx.execute(sql`
     UPDATE users SET team = ${DEFAULT_TEAM_ID}
     WHERE team = 'Default' AND NOT EXISTS (SELECT 1 FROM teams x WHERE x.id = 'Default')`);
+}
+
+/**
+ * 1.x kept SCIM's externalId in external_id; it lives in scim_external_id since
+ * #1510. Mirrors migration 0010 for the rows this import brings. Twins were
+ * already detached above, so the moved values are distinct.
+ */
+async function moveScimExternalIds(tx: { execute: typeof db.execute }): Promise<void> {
+  await tx.execute(sql`
+    UPDATE users SET scim_external_id = external_id, external_id = NULL
+    WHERE auth_provider = 'scim' AND external_id IS NOT NULL`);
 }
 
 /** Live target columns for a public table (drizzle transaction handle). */
@@ -385,6 +403,7 @@ export async function migrateFromSqlite(
       }
 
       await mapUserTeamNamesToIds(tx);
+      await moveScimExternalIds(tx);
     });
   } finally {
     sqlite.close();

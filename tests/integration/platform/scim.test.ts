@@ -931,7 +931,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const row = await userRow(body.id);
       expect(row?.username).toBe(username);
       expect(row?.email).toBe("primary@example.com");
-      expect(row?.externalId).toBe("ext-create-full");
+      expect(row?.scimExternalId).toBe("ext-create-full");
       expect(row?.role).toBe("user");
       expect(row?.team).toBe(DEFAULT_TEAM_ID);
       expect(row?.authProvider).toBe("scim");
@@ -962,7 +962,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const rows = await db
         .select()
         .from(schema.users)
-        .where(eq(schema.users.externalId, externalId));
+        .where(eq(schema.users.scimExternalId, externalId));
       expect(rows.map((r) => r.id)).toEqual([first.id]);
     });
 
@@ -989,7 +989,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       );
 
       for (const id of ids) {
-        expect((await userRow(id))?.externalId).toBeNull();
+        expect((await userRow(id))?.scimExternalId).toBeNull();
       }
     });
 
@@ -997,7 +997,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const externalId = ` ${uniqueName("scim-pad-ext")} `;
       const { id } = await createScimUser({ userName: uniqueName("scim-pad"), externalId });
 
-      expect((await userRow(id))?.externalId).toBe(externalId);
+      expect((await userRow(id))?.scimExternalId).toBe(externalId);
       const res = await crudApp.app.inject({
         method: "GET",
         url: "/api/v1/scim/v2/Users",
@@ -1345,7 +1345,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         detail: "externalId already assigned to another user",
       });
       const row = await userRow(victim.id);
-      expect(row?.externalId).toBeNull();
+      expect(row?.scimExternalId).toBeNull();
     });
 
     it("a deactivation that 409s keeps the user's sessions and role", async () => {
@@ -1407,7 +1407,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
       const row = await userRow(id);
       expect(row?.username).toBe(renamed);
-      expect(row?.externalId).toBe("put-ext-1");
+      expect(row?.scimExternalId).toBe("put-ext-1");
       expect(row?.email).toBe("put-primary@example.com");
     });
 
@@ -1435,7 +1435,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         });
         expect(res.statusCode, res.body).toBe(200);
         expect(JSON.parse(res.body)).not.toHaveProperty("externalId");
-        expect((await userRow(user.id))?.externalId).toBeNull();
+        expect((await userRow(user.id))?.scimExternalId).toBeNull();
       }
     });
 
@@ -1455,7 +1455,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
       expect(res.statusCode, res.body).toBe(200);
       expect(JSON.parse(res.body).externalId).toBe(externalId);
-      expect((await userRow(id))?.externalId).toBe(externalId);
+      expect((await userRow(id))?.scimExternalId).toBe(externalId);
     });
 
     it("deactivation revokes sessions, stores a restorable role, and stays canonical", async () => {
@@ -1613,7 +1613,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           detail: "externalId already assigned to another user",
         });
         const row = await userRow(victim.id);
-        expect(row?.externalId).toBeNull();
+        expect(row?.scimExternalId).toBeNull();
       },
     );
 
@@ -1677,7 +1677,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(res.statusCode, res.body).toBe(200);
       expect(JSON.parse(res.body).externalId).toBe("patched-ext");
       const row = await userRow(id);
-      expect(row?.externalId).toBe("patched-ext");
+      expect(row?.scimExternalId).toBe("patched-ext");
     });
 
     it("clears externalId to NULL when a PATCH replace sends a blank one, by path or value object", async () => {
@@ -1700,7 +1700,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
       expect(byPath.statusCode, byPath.body).toBe(200);
       expect(JSON.parse(byPath.body)).not.toHaveProperty("externalId");
-      expect((await userRow(a.id))?.externalId).toBeNull();
+      expect((await userRow(a.id))?.scimExternalId).toBeNull();
 
       const byValue = await crudApp.app.inject({
         method: "PATCH",
@@ -1710,7 +1710,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
       expect(byValue.statusCode, byValue.body).toBe(200);
       expect(JSON.parse(byValue.body)).not.toHaveProperty("externalId");
-      expect((await userRow(b.id))?.externalId).toBeNull();
+      expect((await userRow(b.id))?.scimExternalId).toBeNull();
     });
 
     it("updates email via the emails array and the work-email value path", async () => {
@@ -1801,7 +1801,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(res.statusCode, res.body).toBe(200);
       const row = await userRow(id);
       expect(row?.username).toBe(renamed);
-      expect(row?.externalId).toBe("bulk-ext");
+      expect(row?.scimExternalId).toBe("bulk-ext");
       expect(row?.email).toBe("bulk@example.com");
     });
 
@@ -1871,7 +1871,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(body.emails).toEqual([]);
 
       const row = await userRow(id);
-      expect(row?.externalId).toBeNull();
+      expect(row?.scimExternalId).toBeNull();
       expect(row?.email).toBeNull();
     });
 

@@ -36,7 +36,12 @@ export const users = pgTable(
     team: text("team").notNull().default(DEFAULT_TEAM_ID),
     mustChangePassword: boolean("must_change_password").notNull().default(true),
     authProvider: text("auth_provider").notNull().default("local"),
+    // The sign-in identity: OIDC subject or SAML NameID, keyed by authProvider.
     externalId: text("external_id"),
+    // The id the SCIM client provisioned this user under (#1510). Separate from
+    // externalId because an OIDC or SAML link rewrites that one, and the IdP
+    // still has to find the user by this one to update or deprovision them.
+    scimExternalId: text("scim_external_id"),
     email: text("email"),
     legalHold: boolean("legal_hold").notNull().default(false),
     storageUsed: bigint("storage_used", { mode: "number" }).notNull().default(0),
@@ -60,6 +65,10 @@ export const users = pgTable(
     uniqueIndex("users_auth_provider_external_id_unique")
       .on(table.authProvider, table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),
+    // One user per SCIM identity, whatever provider the user signs in with.
+    uniqueIndex("users_scim_external_id_unique")
+      .on(table.scimExternalId)
+      .where(sql`${table.scimExternalId} IS NOT NULL`),
   ],
 );
 
