@@ -1572,6 +1572,13 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       );
       const statuses = results.map((r) => r.statusCode).sort();
       expect(statuses).toEqual([200, 409]);
+      const conflict = results.find((r) => r.statusCode === 409);
+      expect(JSON.parse(conflict?.body ?? "{}")).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "userName already taken",
+        scimType: "uniqueness",
+      });
 
       const rows = await db.select().from(schema.users).where(eq(schema.users.username, target));
       expect(rows).toHaveLength(1);
@@ -2339,6 +2346,34 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         payload: { displayName: "ghost" },
       });
       expect(missing.statusCode).toBe(404);
+    });
+
+    it("PUT rejects renaming onto a case twin of an existing group name", async () => {
+      // The PUT pre-check is exact-case, so a case twin gets past it and trips
+      // the lower(name) index on the UPDATE (#970). That makes this the one
+      // sequential request that reaches the catch, not the pre-check.
+      const first = await createScimGroup({ displayName: uniqueName("scim-group-put-case-a") });
+      const second = await createScimGroup({ displayName: uniqueName("scim-group-put-case-b") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Groups/${second.id}`,
+        headers: authHeaders(),
+        payload: { displayName: first.displayName.toUpperCase() },
+      });
+
+      expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        detail: "Group name already taken",
+        scimType: "uniqueness",
+      });
+      const [secondRow] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, second.id));
+      expect(secondRow?.name).toBe(second.displayName);
     });
 
     it("PUT with an empty body leaves name and membership untouched", async () => {
