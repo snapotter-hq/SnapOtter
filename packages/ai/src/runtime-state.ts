@@ -128,6 +128,8 @@ interface ActiveRuntimeFailure {
   descriptor: null;
   status: "missing" | "invalid" | "incompatible";
   reason: OcrRuntimeUnavailableReason;
+  /** Which check failed, for the server log only; it can hold paths (#1433). */
+  detail?: string;
 }
 
 interface ActiveRuntimeSuccess {
@@ -145,6 +147,7 @@ interface DescriptorValidationFailure {
     | "artifact-incompatible"
     | "insufficient-memory"
     | "memory-capacity-unknown";
+  detail?: string;
 }
 
 interface DescriptorValidationSuccess {
@@ -154,11 +157,9 @@ interface DescriptorValidationSuccess {
 
 type DescriptorValidation = DescriptorValidationFailure | DescriptorValidationSuccess;
 
-const INVALID_DESCRIPTOR: DescriptorValidationFailure = {
-  descriptor: null,
-  status: "invalid",
-  reason: "descriptor-invalid",
-};
+function invalidDescriptor(detail: string): DescriptorValidationFailure {
+  return { descriptor: null, status: "invalid", reason: "descriptor-invalid", detail };
+}
 
 const INCOMPATIBLE_ARTIFACT: DescriptorValidationFailure = {
   descriptor: null,
@@ -825,7 +826,7 @@ function parseOcrDescriptor(
   memoryOptions: OcrRuntimeMemoryOptions,
   activationDescriptorSha256: string,
 ): DescriptorValidation {
-  if (!isRecord(value)) return INVALID_DESCRIPTOR;
+  if (!isRecord(value)) return invalidDescriptor("active descriptor is not a JSON object");
 
   const artifact = value.artifact;
   const runtime = value.runtime;
@@ -839,7 +840,7 @@ function parseOcrDescriptor(
     !isRecord(capabilities) ||
     !isRecord(health)
   ) {
-    return INVALID_DESCRIPTOR;
+    return invalidDescriptor("active descriptor is missing a section");
   }
   const expectedArch = expectedArtifactArch(target);
 
@@ -866,7 +867,7 @@ function parseOcrDescriptor(
     !isIsoTimestamp(health.checkedAt) ||
     (health.detail !== undefined && typeof health.detail !== "string")
   ) {
-    return INVALID_DESCRIPTOR;
+    return invalidDescriptor("active descriptor has a missing or malformed field");
   }
   if (
     artifact.target !== target ||
@@ -879,9 +880,17 @@ function parseOcrDescriptor(
   }
 
   const signedIndexPath = resolveSignedIndex(v3Root, artifact.signedIndex);
-  if (!signedIndexPath) return INVALID_DESCRIPTOR;
+  if (!signedIndexPath) {
+    return invalidDescriptor(
+      `signed index ${artifact.signedIndex.path} is missing, outside indexes/, or behind a symlink`,
+    );
+  }
   const rawIndex = readPinnedIndex(signedIndexPath, artifact.signedIndex);
-  if (!rawIndex) return INVALID_DESCRIPTOR;
+  if (!rawIndex) {
+    return invalidDescriptor(
+      `signed index ${artifact.signedIndex.path} doesn't match its pinned size or digest`,
+    );
+  }
   let signedArtifact: Record<string, unknown>;
   try {
     const verified = verifyRuntimeIndex(rawIndex, target, trustKeys, APP_VERSION);
@@ -893,25 +902,29 @@ function parseOcrDescriptor(
       return UNKNOWN_MEMORY_CAPACITY;
     }
     signedArtifact = verified.artifact;
-  } catch {
-    return INVALID_DESCRIPTOR;
+  } catch (error) {
+    return invalidDescriptor(`signed index failed verification: ${errorMessage(error)}`);
   }
   const payloadManifest = validateSignedArtifact(signedArtifact, value, target);
-  if (!payloadManifest) return INVALID_DESCRIPTOR;
+  if (!payloadManifest) {
+    return invalidDescriptor("active descriptor doesn't match its signed artifact");
+  }
 
   const pythonPath = resolveRuntimeFile(v3Root, target, value.generation, runtime.pythonPath);
   const entrypoint = resolveRuntimeFile(v3Root, target, value.generation, runtime.entrypoint);
-  if (!pythonPath || !entrypoint) return INVALID_DESCRIPTOR;
+  if (!pythonPath || !entrypoint) {
+    return invalidDescriptor("runtime python or entrypoint is missing or outside its generation");
+  }
   if (
     runtime.integrityFiles.python.path !== runtime.pythonPath ||
     runtime.integrityFiles.entrypoint.path !== runtime.entrypoint
   ) {
-    return INVALID_DESCRIPTOR;
+    return invalidDescriptor("runtime integrity files don't name the python and entrypoint");
   }
   for (const file of Object.values(runtime.integrityFiles)) {
     const integrityPath = resolveRuntimeFile(v3Root, target, value.generation, file.path);
     if (!integrityPath || !verifyRuntimeFileDigest(integrityPath, file.size, file.sha256)) {
-      return INVALID_DESCRIPTOR;
+      return invalidDescriptor(`runtime file ${file.path} is missing or failed its digest check`);
     }
   }
   const modelRoot = resolve(v3Root, "runtimes", "ocr", target, value.generation, "models");
@@ -922,12 +935,18 @@ function parseOcrDescriptor(
       !isContainedPath(modelRoot, modelPath) ||
       lstatSync(modelPath).size !== file.size
     ) {
-      return INVALID_DESCRIPTOR;
+      return invalidDescriptor(
+        `model file ${file.path} is missing, outside models/, or the wrong size`,
+      );
     }
-    if (!verifyRuntimeFileDigest(modelPath, file.size, file.sha256)) return INVALID_DESCRIPTOR;
+    if (!verifyRuntimeFileDigest(modelPath, file.size, file.sha256)) {
+      return invalidDescriptor(`model file ${file.path} failed its digest check`);
+    }
   }
   const generationRoot = resolve(v3Root, "runtimes", "ocr", target, value.generation);
-  if (!verifyPayloadTree(generationRoot, payloadManifest)) return INVALID_DESCRIPTOR;
+  if (!verifyPayloadTree(generationRoot, payloadManifest)) {
+    return invalidDescriptor("runtime payload tree doesn't match the signed file list");
+  }
 
   return {
     status: "ready",
@@ -980,20 +999,27 @@ function inspectActiveRuntime(
   options: RuntimeStateOptions,
   requiredStatus: ActivationStatus = "committed",
 ): ActiveRuntimeResult {
-  if (family !== "ocr") return INVALID_DESCRIPTOR;
+  if (family !== "ocr") return invalidDescriptor(`unknown runtime family ${family}`);
   const v3Root = join(resolveAiDataDir(options), "v3");
   const target = selectOcrRuntimeTarget(options);
   if (!target) return UNSUPPORTED_HOST;
 
   try {
     const rootStat = lstatSync(v3Root);
-    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return INVALID_DESCRIPTOR;
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+      return invalidDescriptor("the v3 root is not a plain directory");
+    }
 
     const descriptorPath = join(v3Root, "active", `${family}.json`);
-    if (!isSymlinkFreePath(v3Root, descriptorPath)) return INVALID_DESCRIPTOR;
+    if (!isSymlinkFreePath(v3Root, descriptorPath)) {
+      return invalidDescriptor("the active descriptor path runs through a symlink");
+    }
     const rawDescriptor = readBoundedStateFile(descriptorPath, ACTIVE_DESCRIPTOR_MAX_BYTES);
-    if (!rawDescriptor || !activationStateMatches(v3Root, family, rawDescriptor, requiredStatus)) {
-      return INVALID_DESCRIPTOR;
+    if (!rawDescriptor) {
+      return invalidDescriptor("the active descriptor is empty, too large, or not a plain file");
+    }
+    if (!activationStateMatches(v3Root, family, rawDescriptor, requiredStatus)) {
+      return invalidDescriptor("activation marker doesn't match the active descriptor");
     }
 
     const trustKeys =
@@ -1012,8 +1038,12 @@ function inspectActiveRuntime(
     );
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return MISSING_DESCRIPTOR;
-    return INVALID_DESCRIPTOR;
+    return invalidDescriptor(`active runtime could not be read: ${errorMessage(error)}`);
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export interface OcrRuntimeActivationIdentity {
@@ -1080,8 +1110,24 @@ export function readPendingOcrRuntimeForHandoff(
   return inspectActiveRuntime("ocr", options, "pending").descriptor;
 }
 
+// The capability is polled by feature status and read on every OCR request, so
+// an invalid runtime is logged once per distinct failure, not on every read.
+let lastReportedInvalidRuntime: string | null = null;
+
+function reportInvalidRuntime(options: RuntimeStateOptions, result: ActiveRuntimeResult): void {
+  if (result.descriptor || result.reason !== "descriptor-invalid") {
+    lastReportedInvalidRuntime = null;
+    return;
+  }
+  const message = `[ocr-runtime] Accurate OCR runtime at ${join(resolveAiDataDir(options), "v3")} is invalid: ${result.detail ?? "no detail recorded"}`;
+  if (message === lastReportedInvalidRuntime) return;
+  lastReportedInvalidRuntime = message;
+  console.warn(message);
+}
+
 export function getOcrRuntimeCapability(options: RuntimeStateOptions = {}): OcrRuntimeCapability {
   const result = inspectActiveRuntime("ocr", options);
+  reportInvalidRuntime(options, result);
   if (!result.descriptor) {
     return {
       available: false,
