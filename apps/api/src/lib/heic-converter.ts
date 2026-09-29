@@ -20,7 +20,9 @@ const execFileAsync = promisify(execFile);
  * killed with SIGKILL, the kernel OOM killer's signal (execFile's own timeout
  * and abort send SIGTERM). It gets the same 503 ENGINE_UNAVAILABLE as a
  * missing decoder, so every caller that already lets isDecoderUnavailable
- * through answers it that way instead of a 422 blaming libheif (#1577).
+ * through answers it that way instead of a 422 blaming libheif (#1577). The
+ * message doesn't promise a retry will work: with no pixel limits passed, a
+ * very large image can exhaust memory every time.
  */
 function asDecoderOutOfMemory(err: unknown): unknown {
   const outOfMemory =
@@ -28,7 +30,7 @@ function asDecoderOutOfMemory(err: unknown): unknown {
     (err as { signal?: unknown } | null)?.signal === "SIGKILL";
   if (!outOfMemory) return err;
   return new DecoderUnavailableError(
-    "The HEIF decoder ran out of memory on this server. Try again, or give the container more memory.",
+    "The HEIF decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
     err,
   );
 }

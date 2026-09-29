@@ -220,7 +220,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
             fileBuffer = await decodeHeic(fileBuffer);
           } catch (err) {
             // A server fault (no decoder, no memory for its output) is not a
-            // bad file: the outer catch answers those as 503 (#1533).
+            // bad file. decodeHeic reports running out of memory as decoder
+            // unavailable (#1577), which the outer catch hands to the global
+            // handler as a 503 (#1533).
             if (isDecoderUnavailable(err) || isDecoderFault(err)) throw err;
             return reply.status(422).send({
               error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
@@ -358,8 +360,10 @@ export function registerBarcodeRead(app: FastifyInstance) {
           const reload = !(err instanceof RangeError);
           // The size tells memory pressure (retry works) from an image too
           // big for this server (it never will). It's set once the image is
-          // decoded, so without it the failure came earlier: decoding the
-          // upload itself (HEIC, #1533), not zxing.
+          // decoded, so without it the failure came earlier, in orienting or
+          // reading the image, not zxing. A HEIC decode that runs out of
+          // memory doesn't get here: it's rethrown above as decoder
+          // unavailable (#1577).
           const stage = imageSize ? "barcode decoder" : "image decode";
           request.log.error(
             { err, toolId: "barcode-read", stage, imageSize, reload },

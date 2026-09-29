@@ -17,7 +17,7 @@ const failures = vi.hoisted(() => ({
   next: null as Error | null,
   // Which output read fails: heif-dec's single-image name or the -1 fallback.
   pattern: /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/,
-  kill: false,
+  kill: null as Record<string, unknown> | null,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -45,14 +45,9 @@ vi.mock("node:child_process", async (importOriginal) => {
   const execFile = Object.assign((...args: unknown[]) => actual.execFile(...(args as [string])), {
     [promisify.custom]: (file: string, argv: string[], options?: unknown) => {
       if (failures.kill && argv.some((arg) => /heic-in-[^/\\]*\.heic$/.test(arg))) {
-        failures.kill = false;
-        return Promise.reject(
-          Object.assign(new Error("Command failed: heif-dec"), {
-            killed: false,
-            code: null,
-            signal: "SIGKILL",
-          }),
-        );
+        const fields = failures.kill;
+        failures.kill = null;
+        return Promise.reject(Object.assign(new Error("Command failed: heif-dec"), fields));
       }
       return execFileAsync(file, argv, options);
     },
@@ -69,7 +64,7 @@ const SUFFIXED = /heic-out-[^/\\]*-1\.png$/;
 afterEach(() => {
   failures.next = null;
   failures.pattern = SINGLE;
-  failures.kill = false;
+  failures.kill = null;
 });
 
 async function decodeError(buffer: Buffer): Promise<Error & { cause?: unknown }> {
@@ -92,10 +87,25 @@ describe("decodeHeic reading its output", () => {
   });
 
   it("does the same when the multi-image fallback read runs out of memory", async () => {
+    const outOfMemory = new RangeError("Array buffer allocation failed");
     failures.pattern = SUFFIXED;
-    failures.next = new RangeError("Array buffer allocation failed");
+    failures.next = outOfMemory;
     const multi = readFixture(path.join(fixtureDir.image.edge, "multi-image-2.heic"));
-    expect(isDecoderUnavailable(await decodeError(multi))).toBe(true);
+    const err = await decodeError(multi);
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.cause).toBe(outOfMemory);
+  });
+
+  it("leaves a RangeError that isn't an allocation failure alone", async () => {
+    // readFile's own limit on a >2 GiB output. Not the server running out of
+    // memory, so it isn't reported as one.
+    const tooLarge = Object.assign(new RangeError("File size is greater than 2 GiB"), {
+      code: "ERR_FS_FILE_TOO_LARGE",
+    });
+    failures.next = tooLarge;
+    const err = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(err).toBe(tooLarge);
+    expect(isDecoderUnavailable(err)).toBe(false);
   });
 
   it("surfaces any other read failure unchanged, without the fallback's ENOENT", async () => {
@@ -123,9 +133,16 @@ describe("decodeHeic reading its output", () => {
 
 describe("decodeHeic when heif-dec is killed", () => {
   it("answers a SIGKILL, the kernel OOM killer's signal, as a 503 (#1577)", async () => {
-    failures.kill = true;
+    failures.kill = { killed: false, code: null, signal: "SIGKILL" };
     const err = await decodeError(readFixture(fixtures.image.formats("heic")));
     expect(isDecoderUnavailable(err)).toBe(true);
     expect((err.cause as { signal?: string }).signal).toBe("SIGKILL");
+  });
+
+  it("keeps its own timeout out of the 503, since that SIGTERM is often a hostile file", async () => {
+    failures.kill = { killed: true, code: null, signal: "SIGTERM" };
+    const err = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect((err as { signal?: string }).signal).toBe("SIGTERM");
   });
 });
