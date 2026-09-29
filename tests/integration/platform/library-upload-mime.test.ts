@@ -1,11 +1,11 @@
 /**
- * The MIME type the library upload stores (#1349).
+ * The MIME type the library upload and save-result routes store (#1349).
  *
- * The route validates image bytes itself, so an image/* type in the library
- * must be one the server read off the bytes, never the client's claim for
- * bytes that don't decode. Non-image uploads (video, audio, PDF, Office) have
- * no server-side sniff here and keep the type the client sent, which is what
- * their previews branch on.
+ * Both validate image bytes themselves, so an image/* type they store must be
+ * one the server read off the bytes, never a claim (the client's header, or
+ * the filename's extension) for bytes that don't decode. Non-image files
+ * (video, audio, PDF, Office) have no server-side sniff here and keep the
+ * claimed type, which is what their previews branch on.
  */
 
 import { eq } from "drizzle-orm";
@@ -76,6 +76,15 @@ describe("library upload MIME type (#1349)", () => {
     expect(created.mimeType).toBe("application/octet-stream");
     expect(created.width).toBeNull();
     expect(created.height).toBeNull();
+
+    // What a download of it hands back, which is where the wrong type bit.
+    const download = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${created.id}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["content-type"]).toBe("application/octet-stream");
   });
 
   it("doesn't store any client-claimed image type for bytes that aren't an image", async () => {
@@ -93,6 +102,19 @@ describe("library upload MIME type (#1349)", () => {
       filename: "shouty.png",
       contentType: "Image/PNG",
       content: JSON_ERROR_BODY,
+    });
+
+    expect(storedMimeType).toBe("application/octet-stream");
+  });
+
+  // The XXE payload fails validation on its raw bytes and is stored sanitized.
+  // It gets application/octet-stream, the same type a benign SVG gets today
+  // because formatToMime() has no svg entry (#1550 covers both).
+  it("stores a sanitized hostile SVG without its image/svg+xml claim", async () => {
+    const { storedMimeType } = await uploadOne({
+      filename: "xxe.svg",
+      contentType: "image/svg+xml",
+      content: readFixture(fixtures.security.svgXxeFile),
     });
 
     expect(storedMimeType).toBe("application/octet-stream");
@@ -131,5 +153,49 @@ describe("library upload MIME type (#1349)", () => {
     expect(video.storedMimeType).toBe("video/mp4");
     expect(pdf.storedMimeType).toBe("application/pdf");
     expect(docx.storedMimeType).toBe(DOCX_MIME);
+  });
+});
+
+describe("save-result MIME type (#1349)", () => {
+  async function saveResult(parentId: string, filename: string, content: Buffer) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename, contentType: "image/png", content },
+      { name: "parentId", content: parentId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    return JSON.parse(res.body).file as { mimeType: string };
+  }
+
+  // save-result reads the type off the name, so result.png claims image/png.
+  it("doesn't store image/png for a JSON body saved as result.png", async () => {
+    const { created: parent } = await uploadOne({
+      filename: "parent.png",
+      contentType: "image/png",
+      content: PNG,
+    });
+
+    const saved = await saveResult(parent.id, "result.png", JSON_ERROR_BODY);
+
+    expect(saved.mimeType).toBe("application/octet-stream");
+  });
+
+  it("keeps the extension's type for a non-image result, and the sniffed one for a PNG", async () => {
+    const { created: parent } = await uploadOne({
+      filename: "parent.png",
+      contentType: "image/png",
+      content: PNG,
+    });
+
+    const pdf = await saveResult(parent.id, "result.pdf", PDF);
+    const png = await saveResult(parent.id, "result.png", PNG);
+
+    expect(pdf.mimeType).toBe("application/pdf");
+    expect(png.mimeType).toBe("image/png");
   });
 });

@@ -90,18 +90,16 @@ function extToMime(ext: string): string {
 }
 
 /**
- * The MIME type to store for an upload that didn't validate as an image.
+ * The MIME type to store for a file that didn't validate as an image, given
+ * the type it claims (the client's part header, or one read off its name).
  *
- * Only the route's own image check can vouch for an image type, so a client
- * claiming image/* for bytes that failed it gets application/octet-stream
- * (#1349). Anything else keeps the client's type: video, audio, PDF and Office
- * uploads have no sniff here, and their previews branch on that type.
+ * Only validateImageBuffer() can vouch for an image type, so an image/* claim
+ * for bytes that failed it becomes application/octet-stream (#1349). Any other
+ * claim is kept: video, audio, PDF and Office files have no sniff here, and
+ * their previews branch on that type.
  */
-function unverifiedUploadMime(clientMime: string | undefined): string {
-  if (!clientMime || clientMime.toLowerCase().startsWith("image/")) {
-    return "application/octet-stream";
-  }
-  return clientMime;
+function unverifiedMime(claimedMime: string): string {
+  return claimedMime.startsWith("image/") ? "application/octet-stream" : claimedMime;
 }
 
 /**
@@ -287,7 +285,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
    * Multipart form with one or more file parts. Each is checked as an image
    * (magic bytes + dimensions); one that passes is stored with its sniffed
    * type, one that doesn't is still kept, under a type from
-   * unverifiedUploadMime(). Stores to disk, creates DB record.
+   * unverifiedMime(). Stores to disk, creates DB record.
    */
   app.post(
     "/api/v1/files/upload",
@@ -382,7 +380,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           const safeName = sanitizeFilename(part.filename ?? "upload");
           const mimeType = isValidImage
             ? formatToMime(validation.format)
-            : unverifiedUploadMime(part.mimetype);
+            : unverifiedMime(part.mimetype || "application/octet-stream");
           const dimensions = measuredDimensions(isValidImage ? validation : null);
 
           const storedName = await saveFile(safeBuffer, safeName);
@@ -913,7 +911,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const baseName = parent.originalName.replace(/\.[^.]+$/, "");
     const resultName = `${baseName}${ext}`;
 
-    const mimeType = isValidImage ? formatToMime(validation.format) : extToMime(ext);
+    const mimeType = isValidImage
+      ? formatToMime(validation.format)
+      : unverifiedMime(extToMime(ext));
     const dimensions = measuredDimensions(isValidImage ? validation : null);
 
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
