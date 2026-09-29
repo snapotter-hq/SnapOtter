@@ -93,6 +93,7 @@ const envSchema = z
     MAX_AUDIO_DURATION_S: z.coerce.number().default(0),
     MAX_VIDEO_BITRATE_KBPS: z.coerce.number().default(0),
     LIBREOFFICE_TIMEOUT_S: z.coerce.number().default(120),
+    PREVIEW_TIMEOUT_S: z.coerce.number().default(300),
     SESSION_DURATION_HOURS: z.coerce.number().default(168),
     LOGIN_ATTEMPT_LIMIT: z.coerce.number().default(10),
     // Per-username sliding-window throttle on failed password logins: once a

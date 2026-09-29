@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const config = vi.hoisted(() => ({
   FILES_STORAGE_PATH: "",
-  JOB_TIMEOUT_LONG_S: 7200,
+  PREVIEW_TIMEOUT_S: 300,
   LIBREOFFICE_TIMEOUT_S: 120,
 }));
 
@@ -74,7 +74,7 @@ describe("deletePreview (#1320)", () => {
 
 describe("ensurePreviewDir startup sweep (#1320)", () => {
   async function makeStale(path: string): Promise<void> {
-    const old = new Date(Date.now() - (config.JOB_TIMEOUT_LONG_S + 60) * 1000);
+    const old = new Date(Date.now() - (config.PREVIEW_TIMEOUT_S + 60) * 1000);
     await utimes(path, old, old);
   }
 
