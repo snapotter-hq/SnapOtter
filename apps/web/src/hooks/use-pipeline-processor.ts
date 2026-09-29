@@ -901,7 +901,11 @@ export function usePipelineProcessor() {
               failRun("Canceled");
               return;
             }
-            if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
+            // A body with its own code (ENGINE_UNAVAILABLE when every file
+            // failed on a missing engine) carries the batch's reason and hint;
+            // the per-file list would hide the hint behind a count (#1432).
+            const coded = typeof body.code === "string" && body.code.length > 0;
+            if (!coded && body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
               // Show the first file's step-level error (all files typically fail at the same step)
               const first = body.errors[0];
               errorMsg = first.error;

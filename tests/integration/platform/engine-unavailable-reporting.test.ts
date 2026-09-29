@@ -51,7 +51,7 @@ vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/engine-unavailable.js")>();
   mocks.reportEngineUnavailable.mockImplementation(actual.reportEngineUnavailable);
-  return { reportEngineUnavailable: mocks.reportEngineUnavailable };
+  return { ...actual, reportEngineUnavailable: mocks.reportEngineUnavailable };
 });
 
 vi.mock("../../../apps/api/src/modality/document-input.js", async (importOriginal) => {
@@ -156,7 +156,7 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
     ]);
     // Every file failed on the same missing engine, so the batch says so
     // instead of a generic 422, and each file keeps its code (#1432).
-    expect(res.statusCode).toBe(503);
+    expect(res.statusCode, res.body).toBe(503);
     const body = res.json() as {
       code?: string;
       details?: string;
@@ -198,7 +198,7 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
         content: JSON.stringify({ steps: [{ toolId: "extract-audio", settings: {} }] }),
       },
     ]);
-    expect(res.statusCode).toBe(503);
+    expect(res.statusCode, res.body).toBe(503);
     expect(res.json()).toMatchObject({
       code: "ENGINE_UNAVAILABLE",
       details: expect.stringContaining("FFPROBE_PATH"),

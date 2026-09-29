@@ -834,3 +834,32 @@ describe("usePipelineProcessor handler errors (#1287)", () => {
     unmount();
   });
 });
+
+describe("usePipelineProcessor batch failure message (#1432)", () => {
+  it("reads a coded batch failure through parseApiError instead of the first file", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 503;
+      // The batch path reads its body from `response` (a Blob in the browser).
+      xhrs[0].response = JSON.stringify({
+        error: "Media processing is unavailable on this server because ffmpeg is not installed.",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Install ffmpeg in the container or set FFMPEG_PATH and FFPROBE_PATH.",
+        errors: [
+          { filename: "first.png", error: "engine down", code: "ENGINE_UNAVAILABLE" },
+          { filename: "second.jpg", error: "engine down", code: "ENGINE_UNAVAILABLE" },
+        ],
+      });
+      xhrs[0].onload?.();
+    });
+
+    // parseApiError is mocked to "error"; the first file's "engine down (2
+    // files failed)" is what a coded body used to be reduced to. The batch
+    // path reads the body asynchronously.
+    await settled(() => expect(useFileStore.getState().error).toBe("error"));
+
+    unmount();
+  });
+});

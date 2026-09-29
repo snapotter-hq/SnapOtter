@@ -583,7 +583,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               totalFiles: files.length,
               completedFiles: files.length,
               failedFiles: files.length,
-              errors,
+              // A blank-name entry is the run's own error to an SSE client
+              // (the worker finalize's #1161 convention), so one that lost
+              // this reply still sees the fault and its hint.
+              errors: shared
+                ? [
+                    ...errors,
+                    {
+                      filename: "",
+                      error: shared.details ? `${shared.error}: ${shared.details}` : shared.error,
+                    },
+                  ]
+                : errors,
               message: shared?.error ?? "All files failed processing",
               ...(shared && { code: shared.code }),
             }).catch((err) => {
