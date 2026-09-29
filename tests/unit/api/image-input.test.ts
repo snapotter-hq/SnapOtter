@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   autoOrient: vi.fn(),
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
   decodeAnyFormat: vi.fn(),
   decodeHeic: vi.fn(),
   decodeToSharpCompat: vi.fn(),
@@ -45,6 +46,12 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
 
 vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
   decodeHeic: mocks.decodeHeic,
+}));
+
+// Keep the process logger off the real pino transport: an unlogged AVIF
+// probe failure would otherwise build it and write under data/logs.
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: mocks.logger,
 }));
 
 vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
@@ -276,13 +283,121 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
     });
+    // the probe's refusal is logged before the decoder's absence is raised
+    expect(mocks.logger.info).toHaveBeenCalledOnce();
   });
 
-  it("keeps 422 when ImageMagick ran and still could not decode the AVIF", async () => {
+  it("keeps 422 when ImageMagick ran and still could not decode the AVIF, naming both failures", async () => {
     detected("avif");
     mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
-    mocks.decodeAnyFormat.mockRejectedValue(new Error("Command failed: magick"));
+    // execFile ends its message with the tool's stderr, newline and all
+    mocks.decodeAnyFormat.mockRejectedValue(
+      new Error("Command failed: magick\nmagick: no decode delegate for `AVIF'\n"),
+    );
 
-    await expect(prepare("photo.avif")).rejects.toMatchObject({ statusCode: 422 });
+    // both reasons survive, fallback first, then Sharp's, on one line (#1548)
+    await expect(prepare("photo.avif")).rejects.toMatchObject({
+      statusCode: 422,
+      details:
+        "Command failed: magick\nmagick: no decode delegate for `AVIF'; native decode: heif: Unsupported bitstream",
+    });
+  });
+
+  it("answers 400 when the AVIF probe trips the pixel cap, without trying the CLI decoder", async () => {
+    detected("avif");
+    mocks.toBuffer.mockRejectedValue(new Error("Input image exceeds pixel limit"));
+
+    await expect(prepare("photo.avif")).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Input image exceeds pixel limit",
+    });
+    expect(mocks.decodeAnyFormat).not.toHaveBeenCalled();
+    expect(mocks.logger.info).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 when the AVIF CLI decoder's output exceeds the pixel cap", async () => {
+    detected("avif");
+    mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
+    mocks.decodeAnyFormat.mockRejectedValue(
+      new Error("Decoded image exceeds the 50000000 pixel safety limit (9000x9000)"),
+    );
+
+    await expect(prepare("photo.avif")).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Decoded image exceeds the 50000000 pixel safety limit (9000x9000)",
+    });
+  });
+});
+
+describe("ImageInputHandler AVIF fallback logging (#1548)", () => {
+  function detected(format: string) {
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format, width: 1, height: 1 });
+  }
+
+  it("logs Sharp's refusal through the request logger when the CLI decoder takes over", async () => {
+    detected("avif");
+    mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+    const result = await new ImageInputHandler().prepare(RAW, "photo.avif", {
+      scratchDir: "/tmp/in",
+      log: log as never,
+    });
+
+    expect(result).toEqual({ buffer: ORIENTED, filename: "photo.png" });
+    expect(mocks.decodeAnyFormat).toHaveBeenCalledWith(RAW, "avif", expect.any(Object));
+    // the CLI decoder's output is what goes on to autoOrient, with the same logger
+    expect(mocks.autoOrient).toHaveBeenCalledWith(DECODED, log);
+    expect(log.info).toHaveBeenCalledOnce();
+    expect(log.info.mock.calls[0][0]).toMatchObject({
+      err: expect.objectContaining({ message: "heif: Unsupported bitstream" }),
+      format: "avif",
+    });
+    expect(log.info.mock.calls[0][1]).toBe(
+      "image-input: native AVIF decode failed, trying the CLI decoder",
+    );
+  });
+
+  it("falls back to the process logger when no request logger is given", async () => {
+    detected("avif");
+    mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
+
+    await new ImageInputHandler().prepare(RAW, "photo.avif", { scratchDir: "/tmp/in" });
+
+    expect(mocks.logger.info).toHaveBeenCalledOnce();
+    expect(mocks.logger.info.mock.calls[0][1]).toBe(
+      "image-input: native AVIF decode failed, trying the CLI decoder",
+    );
+  });
+
+  it("does not log an abort during the probe as a decode failure", async () => {
+    detected("avif");
+    const controller = new AbortController();
+    controller.abort();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "photo.avif", {
+        scratchDir: "/tmp/in",
+        signal: controller.signal,
+        log: log as never,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(log.info).not.toHaveBeenCalled();
+    expect(mocks.decodeAnyFormat).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when the native AVIF decode succeeds", async () => {
+    detected("avif");
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+
+    await new ImageInputHandler().prepare(RAW, "photo.avif", {
+      scratchDir: "/tmp/in",
+      log: log as never,
+    });
+
+    expect(mocks.decodeAnyFormat).not.toHaveBeenCalled();
+    expect(log.info).not.toHaveBeenCalled();
   });
 });

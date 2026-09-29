@@ -10,6 +10,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { logger } from "../lib/logger.js";
 import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
@@ -128,7 +129,18 @@ export class ImageInputHandler implements InputHandler {
       try {
         opts.signal?.throwIfAborted();
         await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
-      } catch {
+      } catch (probeErr) {
+        opts.signal?.throwIfAborted();
+        // The safety cap tripping is not a decoder gap: answer 400 like the
+        // HEIC and CLI branches do, and don't hand the file to ImageMagick.
+        if (isPixelSafetyError(probeErr)) throw new InputValidationError(errorMessage(probeErr));
+        // Say why the native decode was refused before trying the CLI decoder:
+        // a successful fallback is otherwise a silent re-encode, and a double
+        // failure would lose Sharp's reason (#1548).
+        (opts.log ?? logger).info(
+          { err: probeErr, format: "avif" },
+          "image-input: native AVIF decode failed, trying the CLI decoder",
+        );
         try {
           opts.signal?.throwIfAborted();
           fileBuffer = await decodeAnyFormat(fileBuffer, "avif", {
@@ -141,12 +153,17 @@ export class ImageInputHandler implements InputHandler {
           if (ext) name = `${name.slice(0, -ext.length)}.png`;
         } catch (fallbackErr) {
           opts.signal?.throwIfAborted();
+          if (isPixelSafetyError(fallbackErr)) {
+            throw new InputValidationError(errorMessage(fallbackErr));
+          }
           if (isDecoderUnavailable(fallbackErr)) throw engineUnavailable(fallbackErr);
+          // execFile's message ends with the tool's stderr, newline included,
+          // so trim before joining or the second reason starts its own line.
           throw new InputValidationError(
             "Failed to decode AVIF file",
             422,
             stripInternalPaths(
-              fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+              `${errorMessage(fallbackErr).trim()}; native decode: ${errorMessage(probeErr)}`,
             ),
           );
         }
@@ -231,6 +248,10 @@ function assertWithinImageLimits(
       `Image exceeds the ${formatPixelLimit(maxPixels)} pixel safety limit (${width}x${height})`,
     );
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function isPixelSafetyError(error: unknown): boolean {

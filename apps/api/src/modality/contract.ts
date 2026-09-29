@@ -55,8 +55,9 @@ export interface InputHandler {
       /** Abort validation, external decoders, and normalization with the job. */
       signal?: AbortSignal;
       /**
-       * Request-scoped logger for warn lines the handler emits while
-       * normalizing (autoOrient's rotate failures, the qpdf timeout skip).
+       * Request-scoped logger for the lines the handler emits while
+       * normalizing (autoOrient's rotate failures, the qpdf timeout skip,
+       * the AVIF decoder fallback).
        * Defaults to the process logger, which has no request binding (#1417).
        */
       log?: FastifyBaseLogger;
