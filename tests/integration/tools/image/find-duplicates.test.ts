@@ -21,6 +21,28 @@ const WEBP = readFixture(fixtures.image.base.webp50);
 // Use a content photo that is perceptually very different from the test images
 const PORTRAIT = readFixture(fixtures.image.portrait.jpg);
 
+/**
+ * A JPEG whose EXIF orientation reads fine but whose scan data is cut in half.
+ * `sharp().metadata()` succeeds on it, so validation passes, while any decode
+ * fails with "premature end of JPEG". autoOrient's rotate fails on it too.
+ */
+async function truncatedOrientedJpeg(): Promise<Buffer> {
+  const width = 128;
+  const height = 128;
+  const channels = 3;
+  const raw = Buffer.alloc(width * height * channels);
+  let seed = 12345;
+  for (let i = 0; i < raw.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    raw[i] = (seed >> 16) & 0xff;
+  }
+  const full = await sharp(raw, { raw: { width, height, channels } })
+    .withMetadata({ orientation: 6 })
+    .jpeg()
+    .toBuffer();
+  return full.subarray(0, Math.floor(full.length / 2));
+}
+
 let testApp: TestApp;
 let app: TestApp["app"];
 let adminToken: string;
@@ -1369,5 +1391,53 @@ describe("Find Duplicates", () => {
     const result = JSON.parse(res.body);
     expect(result.totalImages).toBe(3);
     // At max threshold, more images might be grouped together
+  });
+
+  it("skips an oriented JPEG that fails to decode at the hash step and still compares the rest", async () => {
+    const broken = await truncatedOrientedJpeg();
+    expect((await sharp(broken).metadata()).orientation).toBe(6);
+    await expect(sharp(broken).raw().toBuffer()).rejects.toThrow();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good1.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "good2.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "sideways.jpg", contentType: "image/jpeg", content: broken },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/find-duplicates",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.totalImages).toBe(2);
+    expect(result.skippedFiles).toEqual([
+      { filename: "sideways.jpg", reason: "Failed to compute image hash" },
+    ]);
+    expect(result.duplicateGroups).toHaveLength(1);
+  });
+
+  it("answers 400 when hash failures leave fewer than 2 processable images", async () => {
+    const broken = await truncatedOrientedJpeg();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "sideways.jpg", contentType: "image/jpeg", content: broken },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/find-duplicates",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toContain("At least 2");
+    expect(result.skippedFiles).toEqual([
+      { filename: "sideways.jpg", reason: "Failed to compute image hash" },
+    ]);
   });
 });

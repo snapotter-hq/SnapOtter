@@ -194,15 +194,10 @@ export function registerFindDuplicates(app: FastifyInstance) {
             continue;
           }
         }
-        try {
-          file.buffer = await autoOrient(file.buffer);
-        } catch {
-          skippedFiles.push({
-            filename: file.filename,
-            reason: "Failed to read image orientation",
-          });
-          continue;
-        }
+        // autoOrient never throws: it logs and returns the input when the
+        // rotation fails, and the hash step below is what rejects a buffer
+        // Sharp can't decode.
+        file.buffer = await autoOrient(file.buffer);
         processableFiles.push(file);
       }
 
