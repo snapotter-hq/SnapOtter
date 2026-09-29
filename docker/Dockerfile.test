@@ -70,6 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjxl-tools \
     ghostscript \
     qpdf \
+    python3-venv \
     tesseract-ocr \
     tesseract-ocr-eng tesseract-ocr-deu tesseract-ocr-fra \
     tesseract-ocr-spa tesseract-ocr-chi-sim tesseract-ocr-jpn \
@@ -127,6 +128,18 @@ COPY packages/enterprise/package.json packages/enterprise/tsconfig.json ./packag
 
 # Install ALL dependencies (including devDependencies for testing).
 RUN pnpm install --frozen-lockfile
+
+# PyMuPDF for the fitz-gated suites (pdf-to-text, the generated format and fuzz
+# matrices). PR CI shards don't install it, so without this they skip in every
+# lane (#1610). Pinned to the production image's version. It lives at
+# /app/.venv, the repo-root venv tests/helpers/python-gate.ts and the sidecar
+# bridge try first, rather than /opt/venv plus PYTHON_VENV_PATH: the API reads
+# /opt/venv as the baked base it reseeds AI venvs from and PYTHON_VENV_PATH as
+# the venv bundle installs write into, and the feature tests must not see
+# either one.
+RUN python3 -m venv /app/.venv && \
+    /app/.venv/bin/pip install --no-cache-dir PyMuPDF==1.27.2.3 && \
+    /app/.venv/bin/python -c "import fitz"
 
 # Copy source code
 COPY . .
