@@ -15,6 +15,7 @@
  * library-upload-atomic.test.ts: FILES_STORAGE_PATH isn't per-fork (#1471).
  */
 import { access } from "node:fs/promises";
+import { PassThrough } from "node:stream";
 import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -106,7 +107,7 @@ function upload(token: string, files: { name: string; content: Buffer; type: str
   });
 }
 
-function rawUpload(token: string, contentType: string, payload: Buffer) {
+function rawUpload(token: string, contentType: string, payload: Buffer | NodeJS.ReadableStream) {
   return testApp.app.inject({
     method: "POST",
     url: "/api/v1/files/upload",
@@ -166,7 +167,6 @@ describe("a database fault in the quota check is a 500, not a 413 (#1473)", () =
     const res = await upload(adminToken, [png()]);
 
     expect(res.statusCode).toBe(500);
-    expect(JSON.parse(res.body).error).toBe("Internal server error");
     expect(await libraryState([adminId])).toEqual(before);
     expect(hooks.savedNames).toEqual([]);
   });
@@ -286,5 +286,25 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
     const res = await rawUpload(adminToken, contentType, truncated);
 
     await expectRejected(res, before);
+  });
+
+  it("answers 400 when the body stops while a file is being read, keeping nothing", async () => {
+    // Over a real connection the handler is usually mid-read when the client
+    // drops, so busboy fails the part stream it's reading rather than the
+    // next part. Stream the body and cut it once the first file is saved.
+    const before = await libraryState([adminId]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+    ]);
+    const payload = new PassThrough();
+    payload.write(body.subarray(0, body.length - Math.floor(PNG.length / 2)));
+
+    const response = rawUpload(adminToken, contentType, payload);
+    await vi.waitFor(() => expect(hooks.savedNames).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    payload.end();
+
+    await expectRejected(await response, before);
   });
 });

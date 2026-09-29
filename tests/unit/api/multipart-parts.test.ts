@@ -13,7 +13,11 @@
 import { PassThrough } from "node:stream";
 import type { FastifyRequest } from "fastify";
 import { describe, expect, it } from "vitest";
-import { multipartFailure, multipartParts } from "../../../apps/api/src/lib/multipart-parts.js";
+import {
+  multipartFailure,
+  multipartParts,
+  readFilePart,
+} from "../../../apps/api/src/lib/multipart-parts.js";
 
 const BOUNDARY = "----UnitBoundary1234";
 
@@ -175,6 +179,42 @@ describe("multipartParts", () => {
     }).rejects.toThrow("field value too large");
   });
 
+  it.each([
+    [
+      "too many text fields",
+      multipartBody(Array.from({ length: 101 }, (_, i) => ({ name: `f${i}`, content: "x" }))),
+    ],
+    [
+      "a text field over the cap",
+      multipartBody([{ name: "settings", content: Buffer.alloc(1024 * 1024 + 1, 0x61) }]),
+    ],
+    [
+      "more files than MAX_BATCH_SIZE",
+      multipartBody(
+        Array.from({ length: 11 }, (_, i) => ({
+          name: "file",
+          filename: `${i}.bin`,
+          content: "x",
+        })),
+      ),
+    ],
+    ["a body that isn't multipart", Buffer.from("this is not multipart at all")],
+  ])("marks %s as the client's error, a 400 (#1473)", async (_label, body) => {
+    // A bare Error reaches the error handler as a reported 500. These are all
+    // the request's fault, so the status travels with the error.
+    let caught: unknown;
+    try {
+      for await (const part of multipartParts(fakeRequest(body))) {
+        if (part.type === "file") await drain(part.file);
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toMatchObject({ statusCode: 400 });
+  });
+
   it("honors a route-specific two-file limit", async () => {
     const body = multipartBody([
       { name: "index", filename: "ocr-runtime-index.json", content: "index" },
@@ -187,6 +227,50 @@ describe("multipartParts", () => {
         if (part.type === "file") await drain(part.file);
       }
     }).rejects.toThrow("files limit");
+  });
+});
+
+describe("readFilePart (#1473)", () => {
+  it("reads a file part into memory", async () => {
+    const body = multipartBody([{ name: "file", filename: "a.bin", content: "hello" }]);
+    for await (const part of multipartParts(fakeRequest(body))) {
+      if (part.type === "file") expect((await readFilePart(part.file)).toString()).toBe("hello");
+    }
+  });
+
+  it("keeps the 413 of a part over the size limit", async () => {
+    const body = multipartBody([
+      { name: "file", filename: "big.bin", content: Buffer.alloc(4096, 1) },
+    ]);
+    const generator = multipartParts(fakeRequest(body), { fileSize: 1024 });
+    const { value: part } = await generator.next();
+    if (part?.type !== "file") throw new Error("expected a file part");
+
+    await expect(readFilePart(part.file)).rejects.toMatchObject({ statusCode: 413 });
+    await generator.return(undefined);
+  });
+
+  it("marks a part the body ends in the middle of as a 400", async () => {
+    // The client went away mid-upload: the reader is already waiting on the
+    // part when the body stops, so busboy fails the part stream itself.
+    const raw = new PassThrough();
+    Object.assign(raw, {
+      headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+    });
+    raw.write(
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="file"; filename="a.bin"\r\n` +
+        "Content-Type: application/octet-stream\r\n\r\npartial content",
+    );
+    const generator = multipartParts({ raw } as unknown as FastifyRequest);
+    const { value: part } = await generator.next();
+    if (part?.type !== "file") throw new Error("expected a file part");
+
+    const reading = readFilePart(part.file);
+    await sleep(10);
+    raw.end();
+
+    await expect(reading).rejects.toMatchObject({ statusCode: 400 });
+    await generator.return(undefined);
   });
 });
 
