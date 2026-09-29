@@ -92,6 +92,9 @@ async function purgeOcrRuntimeDownloads(aiDataDir: string) {
 }
 
 afterEach(() => {
+  // A test that fakes timers and then times out never reaches its own
+  // finally, so restore them here or every later test runs on a frozen clock.
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   for (const directory of temporaryDirectories.splice(0)) {
@@ -2047,7 +2050,10 @@ describe("downloadVerifiedRuntimeRelease", () => {
     // (#1617). Fake timers hold the deadline until the read is actually
     // stalled, then fire it. The stall watchdog's timer never advances, so if
     // the deadline couldn't interrupt the read, this would hang until the
-    // test's timeout instead of rejecting.
+    // test's timeout instead of rejecting. The outer "timed out" message
+    // wraps any error once the deadline has aborted, so the cause is what
+    // proves the read itself was interrupted, and one attempt keeps a stall
+    // plus a retry sleep from standing in for it.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
       const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-deadline-"));
@@ -2056,6 +2062,7 @@ describe("downloadVerifiedRuntimeRelease", () => {
       const reading = new Promise<void>((resolve) => {
         bodyRead = resolve;
       });
+      const cancel = vi.fn();
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
         new Response(
           new ReadableStream<Uint8Array>(
@@ -2064,6 +2071,7 @@ describe("downloadVerifiedRuntimeRelease", () => {
                 bodyRead();
                 return new Promise(() => {});
               },
+              cancel,
             },
             // No read-ahead: pull runs only once the installer reads the body.
             { highWaterMark: 0 },
@@ -2081,12 +2089,21 @@ describe("downloadVerifiedRuntimeRelease", () => {
         fetchImpl,
         timeoutMs: 10,
         stallTimeoutMs: 1_000,
+        retry: { maxAttempts: 1 },
       });
-      const outcome = expect(download).rejects.toThrow("timed out after 10ms");
-      await reading;
+      const outcome = expect(download).rejects.toMatchObject({
+        message: expect.stringContaining("timed out after 10ms"),
+        cause: expect.objectContaining({
+          message: expect.stringContaining("download was canceled or timed out"),
+        }),
+      });
+      // A download that fails before it reads the body settles first and
+      // surfaces its own error here, instead of a bare timeout.
+      await Promise.race([reading, download]);
       await vi.advanceTimersByTimeAsync(10);
       await outcome;
       expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(cancel).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
     }
