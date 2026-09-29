@@ -1,18 +1,26 @@
+import { chmod, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   isSafeMessageError,
   isToolInputError,
   markToolInputError,
   SafeError,
 } from "@snapotter/shared";
+import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import {
   asInputErrorIfUndecodable,
+  DESCRIPTOR_ENVIRONMENT_MESSAGE,
+  DISK_ENVIRONMENT_MESSAGE,
   PIXEL_LIMIT_IMAGE_MESSAGE,
   UNDECODABLE_IMAGE_MESSAGE,
   withImageEncodeContext,
 } from "../../../apps/api/src/lib/image-error.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 interface Settings {
@@ -88,7 +96,7 @@ describe("withImageEncodeContext", () => {
 // environment, not our code. Wrapped as a bug-kind SafeError it reported up to
 // 10 bug events an hour instead of one operational warning.
 describe("withImageEncodeContext and environmental errnos (#1450)", () => {
-  const failingWith = (err: Error) =>
+  const failingWith = (err: unknown) =>
     withImageEncodeContext(
       "Image conversion failed",
       (s: Settings) => s.format,
@@ -97,33 +105,88 @@ describe("withImageEncodeContext and environmental errnos (#1450)", () => {
       },
     );
 
-  it.each(["ENOSPC", "EACCES", "EROFS", "EMFILE", "ENFILE"])(
-    "rethrows a %s untouched so it classifies as operational",
-    async (code) => {
-      const err = Object.assign(new Error(`${code}: write '/tmp/snapotter-psd/in.psd'`), {
-        code,
-        syscall: "write",
-      });
+  it.each([
+    ["ENOSPC", DISK_ENVIRONMENT_MESSAGE],
+    ["EACCES", DISK_ENVIRONMENT_MESSAGE],
+    ["EROFS", DISK_ENVIRONMENT_MESSAGE],
+    ["EMFILE", DESCRIPTOR_ENVIRONMENT_MESSAGE],
+    ["ENFILE", DESCRIPTOR_ENVIRONMENT_MESSAGE],
+  ])("turns a %s into an operational SafeError grouped by the errno", async (code, message) => {
+    const err = Object.assign(new Error(`${code}: write '/tmp/snapotter-psd/in.psd'`), {
+      code,
+      syscall: "write",
+    });
 
-      const thrown = await failingWith(err)(input, settings, "in.png").catch((e: unknown) => e);
+    const thrown = await failingWith(err)(input, settings, "in.png").catch((e: unknown) => e);
 
-      expect(thrown).toBe(err);
-      expect(classifyError(thrown, "worker")).toBe("operational");
+    expect(thrown).toMatchObject({ name: "SafeError", kind: "operational", code, message });
+    expect((thrown as Error).cause).toBe(err);
+    expect(classifyError(thrown, "worker")).toBe("operational");
+    // The user never sees Node's text, which can carry temp paths.
+    expect((thrown as Error).message).not.toContain("/tmp");
+  });
+
+  it.each([
+    // A missing file or binary can be our own wrong path: the same line
+    // error-report.ts draws by keeping ENOENT out of the operational set.
+    [
+      "a missing binary (ENOENT)",
+      Object.assign(new Error("spawn magick ENOENT"), { code: "ENOENT" }),
+    ],
+    // An encoder that fails on its own (even on a full disk) exits non-zero,
+    // and execFile then sets code to the exit status, a number.
+    [
+      "an encoder's numeric exit code",
+      Object.assign(new Error("Command failed: magick"), { code: 1 }),
+    ],
+    ["an opaque failure", new Error("")],
+  ])("still wraps %s as a bug", async (_label, err) => {
+    const thrown = await failingWith(err)(input, settings, "in.png").catch((e: unknown) => e);
+    expect(thrown).toMatchObject({ name: "SafeError", kind: "bug", code: "webp" });
+    expect(classifyError(thrown, "worker")).toBe("bug");
+  });
+
+  it("wraps a thrown non-Error with an errno-looking code as a bug, not a pass-through", async () => {
+    const thrown = await failingWith({ code: "ENOSPC" })(input, settings, "in.png").catch(
+      (e: unknown) => e,
+    );
+    expect(thrown).toMatchObject({ name: "SafeError", kind: "bug" });
+  });
+
+  // End to end through a real caller: convert's PSD path writes a temp file
+  // before it ever looks for ImageMagick, so a read-only temp dir fails there.
+  it.skipIf(process.getuid?.() === 0)(
+    "convert's PSD path reports an unwritable temp dir as operational",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "i1450-ro-"));
+      await chmod(dir, 0o500);
+      const previous = process.env.TMPDIR;
+      process.env.TMPDIR = dir;
+      try {
+        registerConvert({
+          post: () => undefined,
+          get: () => undefined,
+        } as unknown as FastifyInstance);
+        const convert = getToolConfig("convert");
+        const thrown = await convert
+          ?.process(readFixture(fixtures.image.base.png200), { format: "psd" }, "in.png")
+          .catch((e: unknown) => e);
+
+        expect(thrown).toMatchObject({
+          name: "SafeError",
+          kind: "operational",
+          code: "EACCES",
+          message: DISK_ENVIRONMENT_MESSAGE,
+        });
+        expect(classifyError(thrown, "worker")).toBe("operational");
+      } finally {
+        if (previous === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = previous;
+        await chmod(dir, 0o700);
+        await rm(dir, { recursive: true, force: true });
+      }
     },
   );
-
-  it("still wraps a missing binary (ENOENT) and a plain failure as bugs", async () => {
-    // A missing file or binary can be our own wrong path, so ENOENT stays out
-    // of the operational set, the same line error-report.ts draws.
-    for (const err of [
-      Object.assign(new Error("spawn magick ENOENT"), { code: "ENOENT", syscall: "spawn magick" }),
-      new Error(""),
-    ]) {
-      const thrown = await failingWith(err)(input, settings, "in.png").catch((e: unknown) => e);
-      expect(isSafeMessageError(thrown)).toBe(true);
-      expect(classifyError(thrown, "worker")).toBe("bug");
-    }
-  });
 });
 
 describe("asInputErrorIfUndecodable", () => {
