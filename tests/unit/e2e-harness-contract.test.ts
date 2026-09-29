@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 const root = process.cwd();
@@ -692,6 +693,32 @@ test("the canonical E2E command exactly covers every release browser and device 
   expect(win32Plan.flat()).not.toContain("--project=chromium-visual");
   expect(win32Plan.flat()).not.toContain("--project=chromium-legacy-visual");
   expect(win32Plan).toHaveLength(2);
+});
+
+test("pnpm test:e2e runs every lane even when an earlier one fails (#1390)", async () => {
+  const { runPlan } = (await import(pathToFileURL(e2eRunnerPath).href)) as {
+    runPlan: (plan: string[][], runCommand: (args: string[]) => number | null) => number;
+  };
+  const plan = [
+    ["test", "--project=chromium"],
+    ["test", "--project=chromium-serial", "--workers=1"],
+    ["test", "--project=chromium-visual"],
+  ];
+  const statuses = [1, 0, 2];
+  const ran: string[][] = [];
+
+  // On a Mac the standard lane is red for known reasons (#912), and stopping
+  // there hid every chromium-serial and chromium-visual failure behind it.
+  const status = runPlan(plan, (args) => {
+    ran.push(args);
+    return statuses[ran.length - 1] ?? 0;
+  });
+
+  expect(ran).toEqual(plan);
+  expect(status).toBe(1);
+  expect(runPlan(plan, () => 0)).toBe(0);
+  // A lane killed by a signal reports a null status; that is a failure too.
+  expect(runPlan(plan, () => null)).toBe(1);
 });
 
 test("Vitest excludes every Playwright spec directory", () => {
