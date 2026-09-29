@@ -61,6 +61,10 @@ const ACTION_ICONS: Partial<Record<HistoryAction["id"], IconComponent>> = {
   setFilterParam: Sliders,
   levels: Sliders,
   curves: Sliders,
+  resetAdjustments: Sliders,
+  resetLevels: Sliders,
+  resetCurves: Sliders,
+  resetAll: Sliders,
 };
 
 const OBJECT_ICONS: Partial<Record<string, IconComponent>> = {
@@ -79,8 +83,9 @@ type Translations = ReturnType<typeof useTranslation>["t"];
 
 /**
  * Display text for a history step. Filter and param names come from the
- * adjustments panel's own labels; an id this build has no name for (a filter
- * added later, a stale snapshot) falls back to the raw id rather than to blank.
+ * adjustments panel's own labels. Anything this build has no name for falls
+ * back to its raw id (or to "Unknown" for an unrecognised action), never to
+ * blank text or an unfilled placeholder.
  */
 export function historyActionLabel(t: Translations, action: HistoryAction | undefined): string {
   const h = t.editor.panels.history;
@@ -93,9 +98,11 @@ export function historyActionLabel(t: Translations, action: HistoryAction | unde
     case "rotateCanvas":
       return format(h.actions.rotateCanvas, { degrees: action.degrees });
     case "addObject":
-      return format(h.actions.addObject, { type: h.objectTypes[action.objectType] });
+      return format(h.actions.addObject, {
+        type: h.objectTypes[action.objectType] ?? action.objectType,
+      });
     case "adjust":
-      return format(h.actions.adjust, { name: adj.sliders[action.key] });
+      return format(h.actions.adjust, { name: adj.sliders[action.key] ?? action.key });
     case "toggleFilter":
       return format(h.actions.toggleFilter, { name: filterName(action.filter) });
     case "setFilterParam":
@@ -104,7 +111,7 @@ export function historyActionLabel(t: Translations, action: HistoryAction | unde
         param: (adj.params as Record<string, string>)[action.param] ?? action.param,
       });
     default:
-      return h.actions[action.id];
+      return h.actions[action.id] ?? h.unknown;
   }
 }
 

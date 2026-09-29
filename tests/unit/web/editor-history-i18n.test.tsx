@@ -3,7 +3,7 @@
 import "@testing-library/jest-dom/vitest";
 import { de } from "@snapotter/shared/i18n/de.js";
 import { en } from "@snapotter/shared/i18n/en.js";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -22,10 +22,11 @@ vi.stubGlobal("localStorage", {
 });
 
 import { HistoryPanel, historyActionLabel } from "@/components/editor/panels/history-panel";
-import { I18nProvider } from "@/contexts/i18n-context";
+import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { useEditorStore } from "@/stores/editor-store";
 
+const INITIAL_STATE = useEditorStore.getState();
 const h = de.editor.panels.history.actions;
 const adj = de.editor.panels.adjustments;
 
@@ -40,6 +41,7 @@ function renderIn(locale: "de" | "en") {
 
 beforeEach(() => {
   storage.clear();
+  useEditorStore.setState(INITIAL_STATE, true);
   useEditorStore.temporal.getState().clear();
 });
 
@@ -87,6 +89,42 @@ describe("editor history labels (#1592)", () => {
     expect(screen.getByText("Rotate Canvas 90")).toBeInTheDocument();
     expect(en.editor.panels.history.actions.flipHorizontal).toBe("Flip Horizontal");
   });
+
+  it("labels redo (future) steps too", async () => {
+    const s = useEditorStore.getState();
+    s.flipCanvasHorizontal();
+    s.rotateCanvas(90);
+    useEditorStore.temporal.getState().undo();
+    renderIn("de");
+
+    expect(await screen.findByText(format(h.rotateCanvas, { degrees: 90 }))).toBeInTheDocument();
+    expect(screen.getByText(h.flipHorizontal)).toBeInTheDocument();
+  });
+
+  it("re-labels the list when the locale changes, without a new step", async () => {
+    useEditorStore.getState().flipCanvasHorizontal();
+    function SwitchToGerman() {
+      const { setLocale } = useTranslation();
+      return (
+        <button type="button" onClick={() => setLocale("de")}>
+          switch
+        </button>
+      );
+    }
+    localStorage.setItem("snapotter-locale", "en");
+    render(
+      <I18nProvider>
+        <SwitchToGerman />
+        <HistoryPanel />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText("Flip Horizontal")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByText("switch"));
+    });
+    expect(await screen.findByText(h.flipHorizontal)).toBeInTheDocument();
+  });
 });
 
 describe("history actions recorded by the store (#1592)", () => {
@@ -124,6 +162,16 @@ describe("historyActionLabel (#1592)", () => {
     expect(
       historyActionLabel(t, { id: "setFilterParam", filter: "grain", param: "dotAngle" }),
     ).toBe("Set Grain dotAngle");
+  });
+
+  it.each(INITIAL_STATE.filters)("has a translated name for filter $type and its params", (f) => {
+    const raw = format(en.editor.panels.history.actions.toggleFilter, { name: f.type });
+    expect(historyActionLabel(t, { id: "toggleFilter", filter: f.type })).not.toBe(raw);
+    for (const param of Object.keys(f.params)) {
+      expect(historyActionLabel(t, { id: "setFilterParam", filter: f.type, param })).not.toMatch(
+        new RegExp(`\\b${param}$`),
+      );
+    }
   });
 
   it("names every shape type and every adjustment slider", () => {
