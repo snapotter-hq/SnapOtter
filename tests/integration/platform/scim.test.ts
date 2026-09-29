@@ -1360,7 +1360,10 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         payload: { userName: victim.userName, externalId, active: false },
       });
 
+      // The detail proves the 409 came from the identity index at the UPDATE,
+      // not the last-admin guard or the userName pre-check.
       expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body).detail).toBe("externalId already assigned to another user");
       const row = await userRow(victim.id);
       expect(row?.role).toBe("user");
       const sessions = await db
@@ -1599,9 +1602,12 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       },
     );
 
-    it.each(["externalId", "userName"] as const)(
+    it.each([
+      ["externalId", "externalId already assigned to another user"],
+      ["userName", "userName already taken"],
+    ] as const)(
       "a deactivating PATCH that 409s on %s keeps the user's sessions and role",
-      async (path) => {
+      async (path, detail) => {
         // Issue #1508: the session delete ran inside the operations loop,
         // before the UPDATE that then hit the unique index.
         const externalId = uniqueName("scim-patch-deact-ext");
@@ -1629,7 +1635,10 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           },
         });
 
+        // The detail proves the 409 came from the unique index at the UPDATE,
+        // not the last-admin guard or a pre-check that runs before any write.
         expect(res.statusCode, res.body).toBe(409);
+        expect(JSON.parse(res.body).detail).toBe(detail);
         const row = await userRow(victim.id);
         expect(row?.role).toBe("user");
         const sessions = await db
