@@ -291,6 +291,26 @@ describe("landing scoreTool", () => {
 });
 
 describe("landing searchTools with real catalog metadata", () => {
+  // #1420: a joined query ("cr3tojpg", "cr32jpg") has to rank like its spaced
+  // form for every extension a tool accepts, not only the landing's own list.
+  it("ranks joined conversion queries like their spaced form", () => {
+    const exts = [...new Set(TOOLS.flatMap((tool) => tool.acceptedInputs))].map((ext) =>
+      ext.slice(1),
+    );
+    const targets = ["pdf", "png", "jpg", "mp4", "mp3", "gif", "webp"];
+    const topIds = (query: string) =>
+      searchTools(realTools, { query, modality: "all", limit: 3 }).results.map(
+        (result) => result.item.id,
+      );
+    exts.forEach((ext, index) => {
+      const target = targets[index % targets.length];
+      if (ext === target) return;
+      const spaced = topIds(`${ext} to ${target}`);
+      expect(topIds(`${ext}to${target}`), `${ext}to${target}`).toEqual(spaced);
+      expect(topIds(`${ext}2${target}`), `${ext}2${target}`).toEqual(spaced);
+    });
+  });
+
   it("ranks PDF-specific conversion before generic converters for convert pdf", () => {
     const result = searchTools(realTools, { query: "convert pdf", modality: "all", limit: 8 });
     const firstId = result.results[0]?.item.id;

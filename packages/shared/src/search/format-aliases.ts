@@ -61,6 +61,13 @@ const JOINABLE_FORMATS = [
   ]),
 ].sort((a, b) => b.length - a.length);
 
+const JOINABLE_FORMAT_SET = new Set(JOINABLE_FORMATS);
+
+/** Whether a token can sit on either side of a joined "xtoy" or "x2y" query. */
+export function isJoinableFormat(token: string): boolean {
+  return JOINABLE_FORMAT_SET.has(token);
+}
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // A capture group rather than a lookbehind, so the landing hero search still
