@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath } from "@snapotter/shared";
+import { apiToolPath, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
@@ -7,7 +7,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
@@ -19,7 +19,7 @@ import {
   putObject,
 } from "../../lib/object-storage.js";
 import { requireToolAccess } from "../../permissions.js";
-import { updateJobProgress } from "../progress.js";
+import { failBatchJob, updateJobProgress } from "../progress.js";
 
 // ── Settings schema ──────────────────────────────────────────────
 const settingsSchema = z.object({
@@ -526,7 +526,33 @@ export function registerPdfToImageRoute(
           // A storage or infrastructure fault is not a bad document. Let it
           // reach the error handler (which logs it, reports it, and honors its
           // status) instead of telling the user their PDF is broken.
-          if (typeof (err as { statusCode?: number })?.statusCode === "number") throw err;
+          if (typeof (err as { statusCode?: number })?.statusCode === "number") {
+            // But settle the progress row first: skipping the terminal frame
+            // below left a client watching this job over SSE on "processing"
+            // until the next restart (#1443). Guarded, so it never overwrites a
+            // terminal row, and a failed settle can't mask the real fault.
+            const message = friendlyError(err instanceof Error ? err.message : String(err));
+            await failBatchJob({
+              jobId,
+              totalFiles: files.length,
+              completedFiles: files.length,
+              failedFiles: files.length,
+              errors: [{ filename: "", error: message }],
+              message,
+              ...(isSafeMessageError(err) && err.code ? { code: err.code } : {}),
+            }).catch((settleErr) =>
+              request.log.error({ err: settleErr, jobId }, "failed to settle a faulted PDF batch"),
+            );
+            // Nothing will be sent, so what this run already rendered (every
+            // document up to this one) is only stranded storage with no jobs
+            // row for retention to find.
+            await Promise.all(
+              files
+                .slice(0, i + 1)
+                .map((_, n) => deletePrefix(`outputs/${jobId}-f${n}`).catch(() => {})),
+            );
+            throw err;
+          }
           if (err instanceof PdfInputError) {
             errors.push({ filename: file.filename, error: err.message });
           } else {
