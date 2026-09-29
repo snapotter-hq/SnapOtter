@@ -105,3 +105,25 @@ describe("admin user delete removes the user's library storage (#1405)", () => {
     expect(existsSync(getStoredFilePath(kept.storedName))).toBe(true);
   });
 });
+
+describe("library delete removes cached previews (#1320, #1407)", () => {
+  it("deletes every cached preview for the file along with it", async () => {
+    const { token } = await createUserAndLogin(testApp.app, "library-1407");
+    const file = await uploadAs(token);
+    const previews = [".mp4", ".mp3", ".pdf"].map((ext) =>
+      join(env.FILES_STORAGE_PATH, ".previews", `${file.id}${ext}`),
+    );
+    await mkdir(join(env.FILES_STORAGE_PATH, ".previews"), { recursive: true });
+    for (const path of previews) await writeFile(path, "preview");
+
+    const res = await testApp.app.inject({
+      method: "DELETE",
+      url: "/api/v1/files",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { ids: [file.id] },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    for (const path of previews) expect(existsSync(path), path).toBe(false);
+    expect(existsSync(getStoredFilePath(file.storedName))).toBe(false);
+  });
+});

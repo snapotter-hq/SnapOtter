@@ -1,5 +1,5 @@
-import { chmod, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { chmod, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
@@ -128,6 +128,49 @@ describe("document preview failure classification (#1404)", () => {
       { timeout: 5_000 },
     );
   });
+
+  it("gives concurrent cold requests their own conversion and caches a complete PDF (#1319)", async () => {
+    const outDirs: string[] = [];
+    mocks.convert.mockImplementation(async (_input: string, outDir: string) => {
+      outDirs.push(outDir);
+      // Hold both conversions open at once, then write a whole file per request.
+      await new Promise((r) => setTimeout(r, 300));
+      await writeFile(join(outDir, "input.pdf"), `%PDF complete ${basename(outDir)}`);
+    });
+    const { id } = await uploadDocx();
+
+    const [a, b] = await Promise.all([getPreview(id), getPreview(id)]);
+    expect([a.statusCode, b.statusCode]).toEqual([200, 200]);
+    expect(outDirs).toHaveLength(2);
+    expect(new Set(outDirs).size, "each request converts in its own temp dir").toBe(2);
+
+    const cached = await readFile(join(env.FILES_STORAGE_PATH, ".previews", `${id}.pdf`), "utf8");
+    expect(outDirs.map((d) => `%PDF complete ${basename(d)}`)).toContain(cached);
+  });
+
+  // Root ignores directory permissions, so these can't make the preview dir unwritable.
+  it.skipIf(process.getuid?.() === 0)(
+    "answers a failed cache write with a reported 500 (#1319)",
+    async () => {
+      const previewDir = join(env.FILES_STORAGE_PATH, ".previews");
+      await getPreview((await uploadDocx()).id); // make sure the dir exists
+      mocks.reportError.mockReset();
+      // Converting succeeds, then the preview dir turns read-only before the rename.
+      mocks.convert.mockImplementationOnce(async (_input: string, outDir: string) => {
+        await writeFile(join(outDir, "input.pdf"), "%PDF-1.4 converted");
+        await chmod(previewDir, 0o555);
+      });
+      const { id } = await uploadDocx();
+      try {
+        const res = await getPreview(id);
+        expect(res.statusCode).toBe(500);
+        expect(res.json()).toEqual({ error: "Could not store preview" });
+        expect(previewReports()).toHaveLength(1);
+      } finally {
+        await chmod(previewDir, 0o755);
+      }
+    },
+  );
 
   // Root ignores directory permissions, so an unwritable dir can't be staged there.
   it.skipIf(process.getuid?.() === 0)(

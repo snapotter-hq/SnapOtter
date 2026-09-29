@@ -22,6 +22,7 @@ import {
   vi,
 } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { DocumentInputHandler } from "../../../apps/api/src/modality/document-input.js";
 import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
@@ -261,7 +262,24 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
     }
   });
 
+  it("the single-file tool route answers every upload with the code, reporting once (#1407)", async () => {
+    const upload = () =>
+      post("/api/v1/tools/video/resize-video", [
+        videoPart("clip.mp4"),
+        { name: "settings", content: JSON.stringify({ width: 320 }) },
+      ]);
+    for (const res of [await upload(), await upload()]) {
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    }
+    expect(
+      engineReports("resize-video"),
+      "a busy instance must not report per upload",
+    ).toHaveLength(1);
+  });
+
   it("a 503 raised inside the worker keeps its code and details on the job row", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
     // The route's pre-validation passes; qpdf breaks before the worker runs.
     mocks.pdfPassesLeft = 1;
     const res = await post("/api/v1/tools/pdf/ocr-pdf", [
@@ -282,6 +300,13 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
       code: "ENGINE_UNAVAILABLE",
       details: expect.stringContaining("QPDF_PATH"),
     });
+
+    // The worker logs it as a fault instead of skipping it as bad input (#1330, #1407).
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId, toolId: "ocr-pdf" }),
+      "tool job failed",
+    );
+    errorSpy.mockRestore();
 
     // A client reconnecting after the failure replays the same code and hint.
     const replay = await app.inject({

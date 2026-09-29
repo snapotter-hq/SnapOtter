@@ -118,6 +118,14 @@ describe("Remove GIF Background (#496)", () => {
     expect(JSON.parse(res.body).error).toMatch(/background image/i);
   });
 
+  it("rejects an unknown model name instead of swapping in a default (#1337)", async () => {
+    setInstalled(["background-removal"]);
+    const res = await post(GIF, "a.gif", "image/gif", { model: "birefnet-hr-mating" });
+    expect(res.statusCode).toBe(400);
+    // The reply names the valid models so an API client can fix the typo.
+    expect(res.body).toContain("birefnet-hr-matting");
+  });
+
   it("rejects invalid settings JSON", async () => {
     setInstalled(["background-removal"]);
     const { body, contentType } = createMultipartPayload([
@@ -138,4 +146,22 @@ describe("Remove GIF Background (#496)", () => {
   // asserted here: it would enqueue a job the CI worker can't process (no models),
   // producing async noise. It is verified live on a GPU box. These reject-before-
   // enqueue cases fully exercise the route's own logic.
+});
+
+describe("Remove Background model validation (#1337)", () => {
+  it("rejects an unknown model name instead of swapping in a default", async () => {
+    setInstalled(["background-removal"]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "still.png", contentType: "image/png", content: STILL_PNG },
+      { name: "settings", content: JSON.stringify({ model: "birefnet-hr-mating" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("birefnet-hr-matting");
+  });
 });
