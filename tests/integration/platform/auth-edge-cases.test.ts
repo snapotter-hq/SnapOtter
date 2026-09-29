@@ -1187,14 +1187,14 @@ describe("Admin user-management guards", () => {
   });
 
   it("change-password names the special-character rule when the policy requires one", async () => {
+    // The user first: createUser's own password has no special character.
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
     await db
       .insert(schema.settings)
       .values({ key: "passwordRequireSpecial", value: "true" })
       .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
     try {
-      const { username, password } = await createUser();
-      const token = await loginAs(username, password);
-
       const res = await testApp.app.inject({
         method: "POST",
         url: "/api/auth/change-password",
