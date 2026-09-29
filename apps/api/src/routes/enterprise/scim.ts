@@ -42,6 +42,22 @@ function userUpdateConflict(err: unknown, log: FastifyBaseLogger) {
   return scimError(409, "Update conflicts with an existing user", "uniqueness");
 }
 
+// Deactivating revokes the user's sessions. Doing that in the same
+// transaction as the UPDATE means a 409 on the UPDATE rolls the revoke back
+// too, instead of leaving an active user logged out (issue #1508).
+async function updateScimUser(
+  id: string,
+  updates: Record<string, unknown>,
+  revokeSessions: boolean,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
+    if (revokeSessions) {
+      await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+    }
+  });
+}
+
 async function rejectLastActiveAdminDeactivation(
   user: { role: string },
   reply: FastifyReply,
@@ -631,18 +647,16 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         updates.role = restoredScimRole(existing.role);
       } else if (!active) {
         updates.role = canonicalDisabledScimRole(existing.role);
-        if (!isDisabledRole(existing.role)) {
-          // Revoke all sessions when transitioning from active to disabled.
-          await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
-        }
       }
+      // Revoke all sessions when transitioning from active to disabled.
+      const revokeSessions = !active && !isDisabledRole(existing.role);
 
       // The pre-check above can't close the race: two concurrent renames
       // onto the same userName both pass it before either UPDATE commits
       // (issue #968), so the loser's 23505 maps to the pre-check's 409.
       // externalId has no pre-check; its collisions always land here.
       try {
-        await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+        await updateScimUser(id, updates, revokeSessions);
       } catch (err) {
         if (isUniqueViolation(err)) {
           return reply.status(409).send(userUpdateConflict(err, request.log));
@@ -711,6 +725,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const updates: Record<string, unknown> = { updatedAt: new Date() };
+      let revokeSessions = false;
 
       for (const op of operations) {
         const opType = op.op.toLowerCase();
@@ -730,9 +745,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
               updates.role = restoredScimRole(existing.role);
             } else if (!active) {
               updates.role = canonicalDisabledScimRole(existing.role);
-              if (!isDisabledRole(existing.role)) {
-                await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
-              }
+              revokeSessions = !isDisabledRole(existing.role);
             }
           }
 
@@ -774,7 +787,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       // #968 even a sequential rename onto a taken name surfaced the 23505
       // as a 500. The 409 aborts the whole patch, nothing was applied.
       try {
-        await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
+        await updateScimUser(id, updates, revokeSessions);
       } catch (err) {
         if (isUniqueViolation(err)) {
           return reply.status(409).send(userUpdateConflict(err, request.log));
