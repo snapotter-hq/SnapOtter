@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { request as httpRequest } from "node:http";
+import { type ClientRequest, request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,13 +21,16 @@ import {
  *
  * The ffmpeg here is a stand-in that records its pid and then hangs, so the
  * test can check the process is actually gone rather than trusting the HTTP
- * status. (It hands `-encoders` to the real binary when there is one.)
+ * status. With the mode file set to "slow-ok" it instead writes a finished
+ * preview after a couple of seconds. (It hands `-encoders` to the real binary
+ * when there is one.)
  */
 const realFfmpeg = (spawnSync("which", ["ffmpeg"], { encoding: "utf8" }).stdout ?? "").trim();
 const originalFfmpegPath = process.env.FFMPEG_PATH;
 const stubDir = mkdtempSync(join(tmpdir(), "snapotter-preview-limits-"));
 const stub = join(stubDir, "ffmpeg");
 const pidFile = join(stubDir, "encode.pid");
+const modeFile = join(stubDir, "mode");
 writeFileSync(
   stub,
   [
@@ -38,6 +41,14 @@ writeFileSync(
     "  fi",
     "done",
     `echo $$ > '${pidFile}'`,
+    `if [ "$(cat '${modeFile}' 2>/dev/null)" = "slow-ok" ]; then`,
+    // The output path is the argument before runFfmpeg's trailing `-progress pipe:1`.
+    '  out=""; prev=""',
+    '  for a in "$@"; do [ "$a" = "-progress" ] && out="$prev"; prev="$a"; done',
+    "  sleep 2",
+    "  printf 'FINISHED-PREVIEW' > \"$out\"",
+    "  exit 0",
+    "fi",
     "exec sleep 120",
     "",
   ].join("\n"),
@@ -69,6 +80,7 @@ afterEach(() => {
   const pid = encodePid();
   if (pid && isAlive(pid)) process.kill(pid, "SIGKILL");
   rmSync(pidFile, { force: true });
+  rmSync(modeFile, { force: true });
 });
 
 function encodePid(): number | null {
@@ -103,6 +115,43 @@ async function uploadWav(): Promise<string> {
   return (JSON.parse(res.body).files[0] as { id: string }).id;
 }
 
+function wavUpload() {
+  return createMultipartPayload([
+    {
+      name: "file",
+      filename: "clip.wav",
+      contentType: "audio/wav",
+      content: readFixture(fixtures.audio.tiny("wav")),
+    },
+  ]);
+}
+
+/**
+ * Start a request over a real socket so the test can hang up on it; inject has
+ * no client to disconnect. The app's own cleanup closes the listener.
+ */
+async function openPreviewRequest(
+  method: "GET" | "POST",
+  path: string,
+  upload?: ReturnType<typeof createMultipartPayload>,
+): Promise<ClientRequest> {
+  if (!testApp.app.server.listening) await testApp.app.listen({ port: 0, host: "127.0.0.1" });
+  const { port } = testApp.app.server.address() as AddressInfo;
+  const req = httpRequest({
+    host: "127.0.0.1",
+    port,
+    method,
+    path,
+    headers: {
+      authorization: `Bearer ${adminToken}`,
+      ...(upload && { "content-type": upload.contentType }),
+    },
+  });
+  req.on("error", () => {}); // the hangup surfaces here
+  req.end(upload?.body);
+  return req;
+}
+
 describe("preview encode limits (#1406)", () => {
   it("stops a stored-file preview encode at PREVIEW_TIMEOUT_S", async () => {
     env.PREVIEW_TIMEOUT_S = 1;
@@ -123,14 +172,7 @@ describe("preview encode limits (#1406)", () => {
 
   it("stops an on-demand preview encode at PREVIEW_TIMEOUT_S", async () => {
     env.PREVIEW_TIMEOUT_S = 1;
-    const payload = createMultipartPayload([
-      {
-        name: "file",
-        filename: "clip.wav",
-        contentType: "audio/wav",
-        content: readFixture(fixtures.audio.tiny("wav")),
-      },
-    ]);
+    const payload = wavUpload();
     const res = await testApp.app.inject({
       method: "POST",
       url: "/api/v1/preview/generate",
@@ -143,21 +185,9 @@ describe("preview encode limits (#1406)", () => {
     await vi.waitFor(() => expect(isAlive(pid as number)).toBe(false), { timeout: 5_000 });
   });
 
-  it("kills the encode when the client disconnects", async () => {
+  it("kills an on-demand encode when the client disconnects", async () => {
     env.PREVIEW_TIMEOUT_S = 600;
-    const id = await uploadWav();
-    // A real socket: inject has no client to hang up. The app's own cleanup
-    // closes the listener.
-    await testApp.app.listen({ port: 0, host: "127.0.0.1" });
-    const { port } = testApp.app.server.address() as AddressInfo;
-    const req = httpRequest({
-      host: "127.0.0.1",
-      port,
-      path: `/api/v1/files/${id}/preview`,
-      headers: { authorization: `Bearer ${adminToken}` },
-    });
-    req.on("error", () => {}); // the abort below surfaces here
-    req.end();
+    const req = await openPreviewRequest("POST", "/api/v1/preview/generate", wavUpload());
 
     await vi.waitFor(() => expect(encodePid()).not.toBeNull(), { timeout: 10_000 });
     const pid = encodePid() as number;
@@ -165,5 +195,20 @@ describe("preview encode limits (#1406)", () => {
 
     req.destroy();
     await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 5_000 });
+  });
+
+  it("lets a stored-file encode finish into the cache after the client disconnects", async () => {
+    env.PREVIEW_TIMEOUT_S = 600;
+    writeFileSync(modeFile, "slow-ok");
+    const id = await uploadWav();
+    const req = await openPreviewRequest("GET", `/api/v1/files/${id}/preview`);
+
+    await vi.waitFor(() => expect(encodePid()).not.toBeNull(), { timeout: 10_000 });
+    req.destroy();
+
+    // The retry a proxy timeout leads to is then a cache hit.
+    const cached = join(env.FILES_STORAGE_PATH, ".previews", `${id}.mp3`);
+    await vi.waitFor(() => expect(existsSync(cached)).toBe(true), { timeout: 10_000 });
+    expect(readFileSync(cached, "utf8")).toBe("FINISHED-PREVIEW");
   });
 });
