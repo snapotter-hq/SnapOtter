@@ -883,6 +883,90 @@ describe("migrate-from-sqlite (an identity the target already holds)", () => {
   });
 });
 
+/**
+ * 1.x kept SCIM's externalId in users.external_id like every other provider's.
+ * The import runs after migrations, so it has to move SCIM rows' id into
+ * scim_external_id itself, the way the #1510 migration does for rows that were
+ * already in Postgres.
+ */
+describe("migrate-from-sqlite (SCIM identities, #1510)", () => {
+  const scimDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-scim-"));
+  const scimPath = join(scimDir, "scim-1x.db");
+  const heldPath = join(scimDir, "scim-held-1x.db");
+  const incomingPath = join(scimDir, "scim-incoming-1x.db");
+
+  beforeAll(() => {
+    buildTwinSource(scimPath, [
+      {
+        id: "u-scim",
+        username: "scim-user",
+        provider: "scim",
+        externalId: "idp-1",
+        createdAt: 1748000000,
+      }, // prettier-ignore
+      // Same value under OIDC: a different identity, and it stays put.
+      {
+        id: "u-oidc",
+        username: "oidc-user",
+        provider: "oidc",
+        externalId: "idp-1",
+        createdAt: 1748000000,
+      }, // prettier-ignore
+    ]);
+    buildTwinSource(heldPath, [
+      {
+        id: "u-scim-held",
+        username: "scim-held",
+        provider: "scim",
+        externalId: "idp-held",
+        createdAt: 1748000000,
+      }, // prettier-ignore
+    ]);
+    buildTwinSource(incomingPath, [
+      {
+        id: "u-scim-incoming",
+        username: "scim-incoming",
+        provider: "scim",
+        externalId: "idp-held",
+        createdAt: 1700000000,
+      }, // prettier-ignore
+    ]);
+  });
+
+  afterAll(async () => {
+    await truncateMigratedTables();
+  });
+
+  it("moves a SCIM row's external_id into scim_external_id and leaves OIDC alone", async () => {
+    await truncateMigratedTables();
+    const run = await importCapturingWarnings(scimPath, { force: false });
+    expect(run.error).toBeNull();
+
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    const scim = rows.find((u) => u.id === "u-scim");
+    expect(scim?.external_id).toBeNull();
+    expect(scim?.scim_external_id).toBe("idp-1");
+    const oidc = rows.find((u) => u.id === "u-oidc");
+    expect(oidc?.external_id).toBe("idp-1");
+    expect(oidc?.scim_external_id).toBeNull();
+  });
+
+  it("keeps a SCIM id with the account already in the target under --force", async () => {
+    await truncateMigratedTables();
+    await migrateFromSqlite(heldPath, { force: false });
+
+    const run = await importCapturingWarnings(incomingPath, { force: true });
+    expect(run.error).toBeNull();
+
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows.find((u) => u.id === "u-scim-held")?.scim_external_id).toBe("idp-held");
+    const incoming = rows.find((u) => u.id === "u-scim-incoming");
+    expect(incoming?.scim_external_id).toBeNull();
+    expect(incoming?.external_id).toBeNull();
+    expect(run.warnings.find((w) => w.includes("u-scim-incoming"))).toContain("idp-held");
+  });
+});
+
 describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
   const realDir = mkdtempSync(join(tmpdir(), "snapotter-migrator-real-"));
   const realPath = join(realDir, "real-1x.db");

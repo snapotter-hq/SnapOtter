@@ -66,6 +66,7 @@ async function loadGdprExport() {
         email: "users.email",
         authProvider: "users.auth_provider",
         externalId: "users.external_id",
+        scimExternalId: "users.scim_external_id",
         mustChangePassword: "users.must_change_password",
         legalHold: "users.legal_hold",
         storageUsed: "users.storage_used",
@@ -126,6 +127,9 @@ describe("GDPR export job behavior", () => {
     expect(selected).not.toContain("recoveryCodesHash");
     // Personal data the subject is genuinely owed still ships.
     expect(selected).toEqual(expect.arrayContaining(["id", "username", "email", "createdAt"]));
+    // Both identifiers an IdP knows the subject by: the OIDC/SAML one and, since
+    // #1510 gave it its own column, the SCIM one.
+    expect(selected).toEqual(expect.arrayContaining(["externalId", "scimExternalId"]));
   });
 
   it("throws before writing output when the user does not exist", async () => {

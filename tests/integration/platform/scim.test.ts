@@ -1971,6 +1971,125 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
   });
 
+  // Issue #1510: SCIM's externalId used to share users.external_id with the
+  // OIDC subject and SAML NameID, so the two identities overwrote and shadowed
+  // each other. SCIM now keeps its own column.
+  describe("Users externalId alongside OIDC identities (issue #1510)", () => {
+    async function insertOidcUser(sub: string): Promise<{ id: string; userName: string }> {
+      const id = randomUUID();
+      const userName = uniqueName("scim-oidc-user");
+      const now = new Date();
+      await db.insert(schema.users).values({
+        id,
+        username: userName,
+        authProvider: "oidc",
+        externalId: sub,
+        mustChangePassword: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { id, userName };
+    }
+
+    async function filterByExternalId(externalId: string) {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        query: { filter: `externalId eq "${externalId}"` },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      return JSON.parse(res.body) as { totalResults: number; Resources: Array<{ id: string }> };
+    }
+
+    it("a SCIM user sharing an OIDC user's subject is the only externalId match", async () => {
+      const shared = uniqueName("idp-user-id");
+      await insertOidcUser(shared);
+      const scimUser = await createScimUser({
+        userName: uniqueName("scim-shared"),
+        externalId: shared,
+      });
+
+      const body = await filterByExternalId(shared);
+
+      expect(body.totalResults).toBe(1);
+      expect(body.Resources.map((r) => r.id)).toEqual([scimUser.id]);
+    });
+
+    it("a SCIM PUT with an externalId leaves an OIDC user's sign-in subject alone", async () => {
+      const sub = uniqueName("oidc-sub");
+      const oidcUser = await insertOidcUser(sub);
+      const scimId = uniqueName("scim-assigned");
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${oidcUser.id}`,
+        headers: authHeaders(),
+        payload: { userName: oidcUser.userName, externalId: scimId, active: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).externalId).toBe(scimId);
+      const row = await userRow(oidcUser.id);
+      expect(row?.externalId).toBe(sub);
+      expect(row?.authProvider).toBe("oidc");
+      expect(row?.scimExternalId).toBe(scimId);
+    });
+
+    it("a SCIM user linked by an OIDC sign-in still answers to its externalId and can be deactivated", async () => {
+      const scimId = uniqueName("scim-linked");
+      const email = `${uniqueName("linked")}@example.com`;
+      const scimUser = await createScimUser({
+        userName: uniqueName("scim-linked-user"),
+        externalId: scimId,
+        emails: [{ value: email, primary: true }],
+      });
+
+      // The real OIDC auto-link path: it rewrites auth_provider and
+      // external_id on the row it links.
+      const { resolveExternalUser } = await import(
+        "../../../apps/api/src/lib/external-auth-resolver.js"
+      );
+      const linked = await resolveExternalUser({
+        provider: "oidc",
+        externalId: uniqueName("oidc-sub"),
+        email,
+        emailVerified: true,
+        username: uniqueName("oidc-name"),
+        autoCreate: false,
+        autoLink: true,
+        defaultRole: "user",
+        logger: crudApp.app.log,
+        ip: "127.0.0.1",
+        requestId: "test-1510",
+      });
+      expect(linked.action).toBe("linked");
+      expect(linked.user?.id).toBe(scimUser.id);
+
+      const found = await filterByExternalId(scimId);
+      expect(found.Resources.map((r) => r.id)).toEqual([scimUser.id]);
+
+      const get = await crudApp.app.inject({
+        method: "GET",
+        url: `/api/v1/scim/v2/Users/${scimUser.id}`,
+        headers: authHeaders(),
+      });
+      expect(JSON.parse(get.body).externalId).toBe(scimId);
+
+      const deactivate = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${scimUser.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "replace", path: "active", value: false }],
+        },
+      });
+      expect(deactivate.statusCode, deactivate.body).toBe(200);
+      expect((await userRow(scimUser.id))?.role).toBe("disabled:user");
+    });
+  });
+
   describe("Groups CRUD", () => {
     it("rejects group creation without displayName", async () => {
       const res = await crudApp.app.inject({
