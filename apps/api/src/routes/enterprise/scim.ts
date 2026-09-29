@@ -36,7 +36,7 @@ function userUpdateConflict(err: unknown, log: FastifyBaseLogger) {
     return scimError(409, "externalId already assigned to another user", "uniqueness");
   }
   if (constraint === "users_username_unique") {
-    return scimError(409, "userName already taken");
+    return scimError(409, "userName already taken", "uniqueness");
   }
   log.warn({ constraint }, "SCIM user update hit an unmapped unique constraint");
   return scimError(409, "Update conflicts with an existing user", "uniqueness");
@@ -423,7 +423,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.users.username, userName));
 
       if (existing) {
-        return reply.status(409).send(scimError(409, "User already exists"));
+        return reply.status(409).send(scimError(409, "User already exists", "uniqueness"));
       }
 
       const id = randomUUID();
@@ -469,7 +469,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       if (!inserted.rowCount) {
-        return reply.status(409).send(scimError(409, "User already exists"));
+        return reply.status(409).send(scimError(409, "User already exists", "uniqueness"));
       }
 
       await auditLog(
@@ -628,7 +628,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           .from(schema.users)
           .where(eq(schema.users.username, userName));
         if (conflict && conflict.id !== id) {
-          return reply.status(409).send(scimError(409, "userName already taken"));
+          return reply.status(409).send(scimError(409, "userName already taken", "uniqueness"));
         }
         updates.username = userName;
       }
@@ -892,7 +892,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.teams.name, displayName));
 
       if (existing) {
-        return reply.status(409).send(scimError(409, "Group already exists"));
+        return reply.status(409).send(scimError(409, "Group already exists", "uniqueness"));
       }
 
       const id = randomUUID();
@@ -913,7 +913,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         .onConflictDoNothing();
 
       if (!inserted.rowCount) {
-        return reply.status(409).send(scimError(409, "Group already exists"));
+        return reply.status(409).send(scimError(409, "Group already exists", "uniqueness"));
       }
 
       // Assign members to the team
@@ -1070,7 +1070,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           .from(schema.teams)
           .where(eq(schema.teams.name, displayName));
         if (conflict && conflict.id !== id) {
-          return reply.status(409).send(scimError(409, "Group name already taken"));
+          return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
         }
         // The pre-check can't close the race: two concurrent renames onto
         // the same displayName both pass it before either UPDATE commits
@@ -1079,7 +1079,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           await db.update(schema.teams).set({ name: displayName }).where(eq(schema.teams.id, id));
         } catch (err) {
           if (isUniqueViolation(err)) {
-            return reply.status(409).send(scimError(409, "Group name already taken"));
+            return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
           }
           throw err;
         }
@@ -1201,7 +1201,9 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
               await db.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
             } catch (err) {
               if (isUniqueViolation(err)) {
-                return reply.status(409).send(scimError(409, "Group name already taken"));
+                return reply
+                  .status(409)
+                  .send(scimError(409, "Group name already taken", "uniqueness"));
               }
               throw err;
             }
