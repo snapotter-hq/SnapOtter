@@ -66,35 +66,62 @@ describe("BASE_PATH configuration", () => {
     expect(loadEnv().BASE_PATH).toBe("/apis");
   });
 
-  describe("with OIDC enabled", () => {
-    const enableOidc = (externalUrl: string) => {
+  // Both SSO providers build their callback URLs from EXTERNAL_URL while the
+  // session cookie follows BASE_PATH, so the boot check has to cover each one
+  // on its own (#1356).
+  const enableSso = {
+    OIDC: () => {
       vi.stubEnv("OIDC_ENABLED", "true");
       vi.stubEnv("OIDC_ISSUER_URL", "https://idp.example.com");
       vi.stubEnv("OIDC_CLIENT_ID", "client");
       vi.stubEnv("OIDC_CLIENT_SECRET", "secret");
-      vi.stubEnv("EXTERNAL_URL", externalUrl);
-    };
+    },
+    SAML: () => {
+      vi.stubEnv("SAML_ENABLED", "true");
+      vi.stubEnv("SAML_IDP_SSO_URL", "https://idp.example.com/sso");
+      vi.stubEnv("SAML_IDP_CERTIFICATE", "MIIC-test-certificate");
+    },
+  };
 
-    it.each([
-      ["", "https://example.com"],
-      ["", "https://example.com/"],
-      ["/snapotter", "https://example.com/snapotter"],
-      ["/snapotter/", "https://example.com/snapotter/"],
-    ])("accepts BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
-      enableOidc(externalUrl);
-      vi.stubEnv("BASE_PATH", basePath);
-      expect(() => loadEnv()).not.toThrow();
-    });
+  describe.each(Object.keys(enableSso) as (keyof typeof enableSso)[])(
+    "with %s enabled",
+    (provider) => {
+      const configure = (basePath: string, externalUrl: string) => {
+        enableSso[provider]();
+        vi.stubEnv("EXTERNAL_URL", externalUrl);
+        vi.stubEnv("BASE_PATH", basePath);
+      };
 
-    it.each([
-      ["/snapotter", "https://example.com"],
-      ["", "https://example.com/snapotter"],
-      ["/snapotter", "not a url"],
-    ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
-      enableOidc(externalUrl);
-      vi.stubEnv("BASE_PATH", basePath);
-      expect(() => loadEnv()).toThrow("EXTERNAL_URL");
-    });
+      it.each([
+        ["", "https://example.com"],
+        ["", "https://example.com/"],
+        ["/snapotter", "https://example.com/snapotter"],
+        ["/snapotter/", "https://example.com/snapotter/"],
+      ])("accepts BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).not.toThrow();
+      });
+
+      it.each([
+        ["/snapotter", "https://example.com"],
+        ["", "https://example.com/snapotter"],
+        ["/snapotter", "https://example.com/other"],
+      ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL path .* must match BASE_PATH/);
+      });
+
+      it("rejects an EXTERNAL_URL that is not an absolute URL", () => {
+        configure("/snapotter", "not a url");
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL must be an absolute URL/);
+      });
+    },
+  );
+
+  it("leaves EXTERNAL_URL unchecked against BASE_PATH when no SSO provider is on", () => {
+    vi.stubEnv("BASE_PATH", "/snapotter");
+    vi.stubEnv("EXTERNAL_URL", "https://example.com");
+    expect(() => loadEnv()).not.toThrow();
   });
 });
 
