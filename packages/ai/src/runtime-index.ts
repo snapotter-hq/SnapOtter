@@ -53,18 +53,24 @@ function compareCodePoints(left: string, right: string): number {
 // become null in arrays, array holes included; toJSON is never called.
 // Numbers must be safe integers: Python writes floats as 1.0 or 1e-07 and
 // keeps big integers exact, neither of which JS can reproduce after
-// JSON.parse, so the signer refuses them too (#1415).
-function stringifySorted(value: unknown): string | undefined {
+// JSON.parse, so the signer refuses them too (#1415). The error names where
+// the number sits, not its value, because JSON.parse has already rounded it.
+// A whole-number float such as 1.0 parses to a safe integer and is caught by
+// the byte comparison instead.
+function stringifySorted(value: unknown, path = ""): string | undefined {
   if (typeof value === "number" && !Number.isSafeInteger(value)) {
-    throw new TypeError(`canonical runtime JSON only allows safe integers, got ${value}`);
+    throw new TypeError(
+      `canonical runtime JSON only allows safe integers; ${path || "the top-level value"} is not one`,
+    );
   }
   if (Array.isArray(value)) {
-    return `[${Array.from(value, (item) => stringifySorted(item) ?? "null").join(",")}]`;
+    const items = Array.from(value, (item, i) => stringifySorted(item, `${path}[${i}]`) ?? "null");
+    return `[${items.join(",")}]`;
   }
   if (!isRecord(value)) return JSON.stringify(value);
   const members: string[] = [];
   for (const key of Object.keys(value).sort(compareCodePoints)) {
-    const member = stringifySorted(value[key]);
+    const member = stringifySorted(value[key], path ? `${path}.${key}` : key);
     if (member !== undefined) members.push(`${JSON.stringify(key)}:${member}`);
   }
   return `{${members.join(",")}}`;

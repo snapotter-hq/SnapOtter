@@ -313,6 +313,12 @@ describe("canonicalRuntimeJson numbers (#1415)", () => {
       expect(() => canonicalRuntimeJson(value)).toThrow(/safe integer/);
     }
   });
+
+  it("names where the offending number sits", () => {
+    expect(() => canonicalRuntimeJson({ a: { b: [1, 2, 0.5] } })).toThrow(/a\.b\[2\] is not one/);
+    expect(() => canonicalRuntimeJson({ ok: 1, z: 1.5 })).toThrow(/ z is not one/);
+    expect(() => canonicalRuntimeJson(0.5)).toThrow(/the top-level value is not one/);
+  });
 });
 
 describe("remainingInstallerTimeoutMs", () => {
@@ -394,18 +400,23 @@ describe("verifyRuntimeIndex", () => {
     );
   });
 
-  it("names the offending number when a signed index carries a non-integer (#1415)", () => {
-    // Python's signer writes 1000.5 and 1e-07 as floats; JSON.parse turns them
-    // into numbers JS would re-serialize differently, so the verifier must say
-    // why instead of reporting a generic canonical-bytes mismatch.
+  it("names the offending field when a signed index carries a non-integer (#1415)", () => {
+    // Python's signer writes 1000.5 and 1e-07 as floats and keeps big integers
+    // exact; JSON.parse turns all three into numbers JS would re-serialize
+    // differently, so the verifier must say where instead of reporting a
+    // generic canonical-bytes mismatch.
     const fixture = signedIndex();
-    for (const replacement of ['"expandedSize":1000.5', '"expandedSize":1e-07']) {
+    for (const replacement of [
+      '"expandedSize":1000.5',
+      '"expandedSize":1e-07',
+      '"expandedSize":9007199254740993',
+    ]) {
       const raw = Buffer.from(
         fixture.raw.toString("utf8").replace('"expandedSize":1000', replacement),
       );
       expect(raw.equals(fixture.raw)).toBe(false);
       expect(() => verifyRuntimeIndex(raw, TARGET, [fixture.trustKey], "2.1.0")).toThrow(
-        /safe integer/,
+        /artifacts\[0\]\.archive\.expandedSize is not one/,
       );
     }
   });

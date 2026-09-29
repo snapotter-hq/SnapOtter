@@ -909,11 +909,13 @@ jobs:
               if isinstance(value, dict):
                   for key, item in value.items():
                       require_canonical_numbers(item, f"{path}.{key}")
-              elif isinstance(value, list):
+              elif isinstance(value, (list, tuple)):
                   for position, item in enumerate(value):
                       require_canonical_numbers(item, f"{path}[{position}]")
               elif isinstance(value, float) or (
-                  type(value) is int and abs(value) > MAX_CANONICAL_INTEGER
+                  isinstance(value, int)
+                  and not isinstance(value, bool)
+                  and abs(value) > MAX_CANONICAL_INTEGER
               ):
                   raise SystemExit(
                       f"OCR runtime index value {path} must be an integer within "

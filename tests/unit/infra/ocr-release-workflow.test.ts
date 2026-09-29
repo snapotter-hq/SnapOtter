@@ -746,22 +746,26 @@ describe("OCR v3 bundle release workflow", () => {
     const check = (indexJson: string) =>
       execFileSync("python3", ["-c", python, indexJson], { stdio: "pipe" });
 
-    // The contract must run on the index before its canonical bytes are written.
-    const call = signJob.indexOf("require_canonical_numbers(index)");
+    // The contract must run, uncommented, on the index before its canonical
+    // bytes are written.
+    const call = signJob.search(/^ {10}require_canonical_numbers\(index\)$/m);
     expect(call).toBeGreaterThan(end);
     expect(call).toBeLessThan(signJob.indexOf('"ocr-runtime-index.unsigned.json").write_bytes'));
 
     expect(() =>
       check('{"a":1,"b":[true,null,"x"],"c":{"d":-9007199254740991,"e":9007199254740991}}'),
     ).not.toThrow();
-    for (const bad of [
-      '{"a":1.0}',
-      '{"a":[1e-07]}',
-      '{"a":{"b":-0.0}}',
-      '{"a":9007199254740992}',
-      '{"a":[{"b":-9007199254740992}]}',
+    for (const [bad, path] of [
+      ['{"a":1.0}', "index.a "],
+      ['{"a":[1e-07]}', "index.a[0] "],
+      ['{"a":{"b":-0.0}}', "index.a.b "],
+      ['{"a":9007199254740992}', "index.a "],
+      ['{"a":[{"b":-9007199254740992}]}', "index.a[0].b "],
+      // Offenders after the first member, so a loop that stops early fails.
+      ['{"a":1,"z":1.5}', "index.z "],
+      ['{"a":[1,2,3.5]}', "index.a[2] "],
     ]) {
-      expect(() => check(bad), bad).toThrow(/must be an integer/);
+      expect(() => check(bad), bad).toThrow(`value ${path}must be an integer`);
     }
   });
 
