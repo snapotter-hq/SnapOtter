@@ -132,7 +132,9 @@ def _inline_font_location(page, referencer, refname):
     its Resources.
 
     A missing key reads as ('null', 'null'), the same as /ToUnicode null, so
-    the dict itself has to resolve before any of its keys are trusted.
+    the dict itself has to resolve before any of its keys are trusted. A
+    refname that decodes to contain "/" (written /F#2F1) splits the key path
+    and is not found, which leaves that font unchecked as it was before #1566.
     """
     doc = page.parent
     holder = referencer or page.xref
@@ -169,7 +171,9 @@ def draws_unmapped_composite_font(page):
     reports xref 0) and is read through its resources instead (#1566).
     """
     doc = page.parent
-    for xref, _ext, ftype, _name, refname, _encoding, referencer in page.get_fonts(full=True):
+    for xref, _ext, ftype, _name, refname, _encoding, referencer, *_rest in page.get_fonts(
+        full=True
+    ):
         if ftype != "Type0":
             continue
         location = (xref, "") if xref else _inline_font_location(page, referencer, refname)

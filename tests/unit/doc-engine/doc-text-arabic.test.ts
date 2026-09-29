@@ -296,6 +296,23 @@ describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
     ).toBe(true);
   });
 
+  it("reads each inline font through its own refname", () => {
+    const mapped = { type: "Type0", toUnicode: "stream", xref: 0 } as const;
+    const unmapped = { type: "Type0", toUnicode: "none", xref: 0 } as const;
+    expect(drawsUnmappedComposite([mapped, unmapped])).toBe(true);
+    expect(drawsUnmappedComposite([unmapped, mapped])).toBe(true);
+    expect(drawsUnmappedComposite([mapped, mapped])).toBe(false);
+  });
+
+  it("keeps scanning after an inline font it can't find", () => {
+    expect(
+      drawsUnmappedComposite([
+        { type: "Type0", toUnicode: "none", xref: 0, location: "missing" },
+        { type: "Type0", toUnicode: "none" },
+      ]),
+    ).toBe(true);
+  });
+
   it("does not flag an inline font whose dict can't be found, and doesn't raise", () => {
     // A missing key reads as ('null', 'null'), the same as /ToUnicode null. Without
     // checking the dict exists first, a failed lookup would look like an unmapped
@@ -328,6 +345,37 @@ describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
     expect(drawsUnmappedComposite([])).toBe(false);
   });
 });
+describe.skipIf(!hasPython)("doc_text._inline_font_location", () => {
+  it("gives up on a Parent loop instead of climbing forever", () => {
+    // Two page tree nodes, neither holding Resources, each naming the other as
+    // Parent. MuPDF's get_fonts normally trips on a cycle first; this pins the
+    // depth cap for the case where it doesn't.
+    const code = [
+      "import sys, json",
+      `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+      "from doc_text import _inline_font_location",
+      "class Doc:",
+      "    calls = 0",
+      "    def xref_length(self):",
+      "        return 100",
+      "    def xref_get_key(self, xref, key):",
+      "        Doc.calls += 1",
+      "        if key == 'Parent':",
+      "            return ('xref', '%d 0 R' % (11 if xref == 10 else 10))",
+      "        return ('null', 'null')",
+      "class Page:",
+      "    parent = Doc()",
+      "    xref = 10",
+      "print(json.dumps([_inline_font_location(Page(), 0, 'F0'), Doc.calls]))",
+    ].join("\n");
+    const res = spawnSync("python3", ["-c", code], { encoding: "utf8", timeout: 5000 });
+    if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+    const [location, calls] = JSON.parse(res.stdout) as [unknown, number];
+    expect(location).toBeNull();
+    expect(calls).toBeLessThan(200);
+  });
+});
+
 // The helpers above are only worth anything if extraction actually calls them,
 // and PyMuPDF is absent from CI so no test here can run main(). Guard the wiring
 // at the source level instead, the way pymupdf-message-redirect.test.ts does.

@@ -120,6 +120,9 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "        names = ' '.join('/zz%d' % i for i in range(256))",
     "        d.xref_set_key(xref, 'Encoding', '<</Type/Encoding/Differences[0 %s]>>' % names)",
     "d.save(out); d.close()",
+    "if kind.startswith('type0-inline'):",
+    "    rows = [r for r in fitz.open(out)[0].get_fonts() if r[2] == 'Type0']",
+    "    assert rows and all(r[0] == 0 for r in rows), 'font dict is not inline: %r' % rows",
   ].join("\n");
   const res = spawnSync(pythonBin as string, ["-c", script, kind, font, FONT_TEXT, out], {
     encoding: "utf8",
