@@ -129,10 +129,11 @@ describe("library delete removes cached previews (#1320, #1407)", () => {
 });
 
 /**
- * Make one stored file undeletable without touching anything shared:
- * FILES_STORAGE_PATH is common to every fork, so chmod on it would break other
- * files' uploads mid-run. A non-empty directory in the file's place makes
- * unlink fail (EPERM on macOS, EISDIR on Linux) for this file alone.
+ * Make one stored file undeletable without touching the rest of the folder:
+ * chmod on FILES_STORAGE_PATH would make every file in it undeletable, and
+ * the other tests in this file upload into it. A non-empty directory in the
+ * file's place makes unlink fail (EPERM on macOS, EISDIR on Linux) for this
+ * file alone.
  */
 async function makeUndeletable(storedName: string): Promise<void> {
   const path = getStoredFilePath(storedName);

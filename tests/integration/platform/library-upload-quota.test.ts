@@ -12,7 +12,7 @@
  *   fault: 4xx with nothing kept, not a reported 500 or a handler left hanging.
  *
  * Blobs are tracked by name through a saveFile wrapper, as in
- * library-upload-atomic.test.ts: FILES_STORAGE_PATH isn't per-fork (#1471).
+ * library-upload-atomic.test.ts.
  */
 import { access } from "node:fs/promises";
 import { request as httpRequest } from "node:http";

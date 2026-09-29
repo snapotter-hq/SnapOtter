@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute } from "node:path";
+import { basename, dirname, isAbsolute } from "node:path";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
@@ -15,6 +15,7 @@ import {
   forkRoleName,
   forkRoleOwner,
 } from "../../setup/fork-db.js";
+import { forkDirOwner } from "../../setup/fork-dir.js";
 
 /**
  * #1277. The test Postgres used to keep its data in the anonymous volume the
@@ -272,6 +273,9 @@ describe("per-file library storage (#1471)", () => {
     expect(isAbsolute(files)).toBe(true);
     expect(dirname(files)).toBe(dirname(workspace));
     expect(dirname(files).startsWith(tmpdir())).toBe(true);
+    // The fork dir this worker owns, so its exit handler and the orphan sweep
+    // both remove the files with it.
+    expect(forkDirOwner(basename(dirname(files)))).toBe(process.pid);
   });
 
   it("is the path the app's config reads", () => {
