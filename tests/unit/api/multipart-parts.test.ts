@@ -215,6 +215,19 @@ describe("multipartParts", () => {
     expect(caught).toMatchObject({ statusCode: 400 });
   });
 
+  it("marks a multipart header with no boundary as a 400 (#1473)", async () => {
+    // A client that sets Content-Type by hand on a FormData body sends this.
+    const raw = new PassThrough();
+    Object.assign(raw, { headers: { "content-type": "multipart/form-data" } });
+    raw.end("anything");
+
+    await expect(async () => {
+      for await (const part of multipartParts({ raw } as unknown as FastifyRequest)) {
+        if (part.type === "file") await drain(part.file);
+      }
+    }).rejects.toMatchObject({ statusCode: 400 });
+  });
+
   it("honors a route-specific two-file limit", async () => {
     const body = multipartBody([
       { name: "index", filename: "ocr-runtime-index.json", content: "index" },
@@ -250,9 +263,8 @@ describe("readFilePart (#1473)", () => {
     await generator.return(undefined);
   });
 
-  it("marks a part the body ends in the middle of as a 400", async () => {
-    // The client went away mid-upload: the reader is already waiting on the
-    // part when the body stops, so busboy fails the part stream itself.
+  /** A request whose body so far is half of one file part, and the part. */
+  async function halfSentFile() {
     const raw = new PassThrough();
     Object.assign(raw, {
       headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
@@ -264,13 +276,72 @@ describe("readFilePart (#1473)", () => {
     const generator = multipartParts({ raw } as unknown as FastifyRequest);
     const { value: part } = await generator.next();
     if (part?.type !== "file") throw new Error("expected a file part");
+    return { raw, generator, file: part.file };
+  }
 
-    const reading = readFilePart(part.file);
+  it("marks a part the body ends in the middle of as a 400", async () => {
+    // The reader is already waiting on the part when the body stops, so
+    // busboy fails the part stream itself.
+    const { raw, generator, file } = await halfSentFile();
+
+    const reading = readFilePart(file);
     await sleep(10);
     raw.end();
 
     await expect(reading).rejects.toMatchObject({ statusCode: 400 });
     await generator.return(undefined);
+  });
+
+  it("fails a part busboy cut short even when nothing was reading it yet", async () => {
+    // A complete body whose multipart content stops mid-part: busboy fails
+    // the part before the route gets to it. Reading it later must still fail,
+    // not hand back the truncated bytes as if they were the whole file.
+    const { raw, generator, file } = await halfSentFile();
+    raw.end();
+    await sleep(10);
+
+    await expect(readFilePart(file)).rejects.toMatchObject({ statusCode: 400 });
+    await generator.return(undefined);
+  });
+
+  it("fails the part being read with a 400 when the client drops the connection", async () => {
+    // A dropped connection errors the request stream and never ends it, so
+    // busboy never notices. The reader used to wait on the part forever, and
+    // the upload never got to discard what it had already staged.
+    const { raw, generator, file } = await halfSentFile();
+
+    const reading = readFilePart(file).then(
+      () => "resolved",
+      (err: unknown) => err,
+    );
+    await sleep(10);
+    raw.emit("error", Object.assign(new Error("aborted"), { code: "ECONNRESET" }));
+
+    const outcome = await Promise.race([reading, sleep(1000).then(() => "still waiting")]);
+    expect(outcome).toMatchObject({ statusCode: 400, code: "ECONNRESET" });
+    await generator.return(undefined);
+  });
+
+  it("fails the next part with a 400 when the client drops the connection between parts", async () => {
+    const raw = new PassThrough();
+    Object.assign(raw, {
+      headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+    });
+    // A whole field, then the start of the next part: busboy only emits the
+    // field once it sees the boundary after it.
+    raw.write(
+      `--${BOUNDARY}\r\nContent-Disposition: form-data; name="toolId"\r\n\r\nresize\r\n--${BOUNDARY}\r\n`,
+    );
+    const generator = multipartParts({ raw } as unknown as FastifyRequest);
+    expect((await generator.next()).value).toMatchObject({ type: "field", value: "resize" });
+
+    const next = generator.next().then(
+      () => "resolved",
+      (err: unknown) => err,
+    );
+    raw.emit("error", Object.assign(new Error("aborted"), { code: "ECONNRESET" }));
+
+    expect(await next).toMatchObject({ statusCode: 400, code: "ECONNRESET" });
   });
 });
 

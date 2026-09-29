@@ -8,27 +8,19 @@
  *   quota before anything was charged and outside any transaction, so two
  *   uploads that each fit could both pass and together go over.
  * - A request the multipart parser rejects (too many files, an oversized
- *   field, a body that ends mid-part) is the client's fault: 4xx, not a
- *   reported 500.
+ *   field, a body cut off mid-file, a dropped connection) is the client's
+ *   fault: 4xx with nothing kept, not a reported 500 or a handler left hanging.
  *
  * Blobs are tracked by name through a saveFile wrapper, as in
  * library-upload-atomic.test.ts: FILES_STORAGE_PATH isn't per-fork (#1471).
  */
 import { access } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
 import { PassThrough } from "node:stream";
 import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const hooks = vi.hoisted(() => ({
-  savedNames: [] as string[],
-  /**
-   * When above 0, every saveFile call waits until this many files have been
-   * saved in total, so concurrent uploads all pass their per-file quota check
-   * before any of them commits.
-   */
-  gate: 0,
-  waiting: [] as Array<() => void>,
-}));
+const hooks = vi.hoisted(() => ({ savedNames: [] as string[] }));
 
 vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
@@ -37,13 +29,6 @@ vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
     saveFile: async (buffer: Buffer, originalName: string) => {
       const storedName = await actual.saveFile(buffer, originalName);
       hooks.savedNames.push(storedName);
-      if (hooks.gate > 0) {
-        if (hooks.savedNames.length >= hooks.gate) {
-          for (const release of hooks.waiting.splice(0)) release();
-        } else {
-          await new Promise<void>((resolve) => hooks.waiting.push(resolve));
-        }
-      }
       return storedName;
     },
   };
@@ -85,8 +70,6 @@ afterAll(async () => {
 
 beforeEach(() => {
   hooks.savedNames.length = 0;
-  hooks.gate = 0;
-  hooks.waiting.length = 0;
 });
 
 afterEach(async () => {
@@ -95,16 +78,13 @@ afterEach(async () => {
   await db.update(schema.teams).set({ storageQuota: null });
 });
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function upload(token: string, files: { name: string; content: Buffer; type: string }[]) {
   const { body, contentType } = createMultipartPayload(
     files.map((f) => ({ name: "file", filename: f.name, contentType: f.type, content: f.content })),
   );
-  return testApp.app.inject({
-    method: "POST",
-    url: "/api/v1/files/upload",
-    headers: { authorization: `Bearer ${token}`, "content-type": contentType },
-    payload: body,
-  });
+  return rawUpload(token, contentType, body);
 }
 
 function rawUpload(token: string, contentType: string, payload: Buffer | NodeJS.ReadableStream) {
@@ -186,19 +166,87 @@ describe("a database fault in the quota check is a 500, not a 413 (#1473)", () =
 });
 
 describe("the quota holds under concurrent uploads (#1473)", () => {
+  /**
+   * Lock a row the way a slow upload's commit would, in a transaction of its
+   * own, until release() is called.
+   */
+  async function holdRowLock(table: "users" | "teams", id: string) {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const isLocked = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const done = db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT 1 FROM ${sql.identifier(table)} WHERE id = ${id} FOR UPDATE`);
+      locked();
+      await released;
+    });
+    await isLocked;
+    return async () => {
+      release();
+      await done;
+    };
+  }
+
+  async function sessionsWaitingOnALock(): Promise<number> {
+    const { rows } = await db.execute(
+      sql`SELECT count(*)::int AS n FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+    );
+    return Number((rows[0] as { n: number }).n);
+  }
+
+  /**
+   * Start the uploads while a row they need is locked, wait until both are
+   * queued on it (so both have passed every check that runs before the
+   * commit), then let them go. Deterministic: without the commit's locked
+   * re-check, both land.
+   */
+  async function raceBehindLock(
+    release: () => Promise<void>,
+    uploads: Array<() => ReturnType<typeof upload>>,
+  ) {
+    let settled = 0;
+    const pending = uploads.map((start) =>
+      start().finally(() => {
+        settled++;
+      }),
+    );
+    let bothQueued = false;
+    try {
+      await vi.waitFor(
+        async () => {
+          if ((await sessionsWaitingOnALock()) >= uploads.length) {
+            bothQueued = true;
+            return;
+          }
+          if (settled === uploads.length) return;
+          throw new Error("the uploads haven't reached the lock yet");
+        },
+        { timeout: 10_000, interval: 20 },
+      );
+    } finally {
+      await release();
+    }
+    return { results: await Promise.all(pending), bothQueued };
+  }
+
   it("refuses one of two uploads that each fit the user's quota but not together", async () => {
     const before = await libraryState([adminId]);
     await db
       .update(schema.users)
       .set({ storageQuota: before.storageUsed + PNG.length + Math.floor(PNG.length / 2) })
       .where(eq(schema.users.id, adminId));
-    hooks.gate = 2;
 
-    const results = await Promise.all([
-      upload(adminToken, [png("a.png")]),
-      upload(adminToken, [png("b.png")]),
+    const { results, bothQueued } = await raceBehindLock(await holdRowLock("users", adminId), [
+      () => upload(adminToken, [png("a.png")]),
+      () => upload(adminToken, [png("b.png")]),
     ]);
 
+    expect(bothQueued, "both uploads should queue on the user's row").toBe(true);
     expect(results.map((r) => r.statusCode).sort()).toEqual([201, 413]);
     const refused = results.find((r) => r.statusCode === 413);
     expect(JSON.parse(refused?.body ?? "{}").error).toMatch(/^Storage quota exceeded/);
@@ -225,13 +273,14 @@ describe("the quota holds under concurrent uploads (#1473)", () => {
       .set({ storageQuota: Number(total) + PNG.length + Math.floor(PNG.length / 2) })
       .where(eq(schema.teams.id, TEAM_ID));
     const before = await libraryState(members);
-    hooks.gate = 2;
 
-    const results = await Promise.all([
-      upload(first.token, [png("a.png")]),
-      upload(second.token, [png("b.png")]),
+    const { results, bothQueued } = await raceBehindLock(await holdRowLock("teams", TEAM_ID), [
+      () => upload(first.token, [png("a.png")]),
+      () => upload(second.token, [png("b.png")]),
     ]);
 
+    // Different users, so only the team's row can make them wait.
+    expect(bothQueued, "both uploads should queue on the team's row").toBe(true);
     expect(results.map((r) => r.statusCode).sort()).toEqual([201, 413]);
     const refused = results.find((r) => r.statusCode === 413);
     expect(JSON.parse(refused?.body ?? "{}").error).toMatch(/^Team storage quota exceeded/);
@@ -249,6 +298,10 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
     expect(await libraryState([adminId])).toEqual(before);
     expect(await survivingBlobs()).toEqual([]);
   }
+
+  /** The error message the test app's (Fastify's default) error handler sent. */
+  const messageOf = (res: Awaited<ReturnType<typeof upload>>) =>
+    (JSON.parse(res.body) as { message?: string }).message;
 
   it("answers 400 for more files than MAX_BATCH_SIZE, keeping none of them", async () => {
     const before = await libraryState([adminId]);
@@ -279,19 +332,21 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
       { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
     ]);
-    // Cut the second file off halfway: what the server sees when a client
-    // drops the connection mid-upload.
+    // Cut the second file off halfway. The whole body is there before the
+    // handler reaches that part, so busboy has already failed it: the handler
+    // must not take the half it can still read for the whole file.
     const truncated = body.subarray(0, body.length - Math.floor(PNG.length / 2));
 
     const res = await rawUpload(adminToken, contentType, truncated);
 
     await expectRejected(res, before);
+    expect(messageOf(res)).toMatch(/Part terminated early/);
+    expect(hooks.savedNames).toHaveLength(1);
   });
 
   it("answers 400 when the body stops while a file is being read, keeping nothing", async () => {
-    // Over a real connection the handler is usually mid-read when the client
-    // drops, so busboy fails the part stream it's reading rather than the
-    // next part. Stream the body and cut it once the first file is saved.
+    // Here the handler is already waiting on the second file when the body
+    // ends, so the part fails under the reader (readFilePart).
     const before = await libraryState([adminId]);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
@@ -302,9 +357,102 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
 
     const response = rawUpload(adminToken, contentType, payload);
     await vi.waitFor(() => expect(hooks.savedNames).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await sleep(20);
     payload.end();
 
-    await expectRejected(await response, before);
+    const res = await response;
+    await expectRejected(res, before);
+    expect(messageOf(res)).toMatch(/Part terminated early/);
+    expect(hooks.savedNames).toHaveLength(1);
+  });
+
+  it("discards the staged files when the client drops the connection mid-file", async () => {
+    // A real dropped connection errors the request and never ends it, so
+    // busboy never fails the part the handler is reading. The handler used to
+    // wait on it forever and never discard the file it had already staged.
+    const before = await libraryState([adminId]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+    ]);
+    const address = await testApp.app.listen({ port: 0, host: "127.0.0.1" });
+    const client = httpRequest(`${address}/api/v1/files/upload`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+        "content-length": body.length,
+      },
+    });
+    client.on("error", () => {}); // the socket is dropped on purpose
+    client.write(body.subarray(0, body.length - Math.floor(PNG.length / 2)));
+
+    await vi.waitFor(() => expect(hooks.savedNames).toHaveLength(1), { timeout: 5_000 });
+    await sleep(20);
+    client.destroy();
+
+    await vi.waitFor(async () => expect(await survivingBlobs()).toEqual([]), { timeout: 5_000 });
+    expect(await libraryState([adminId])).toEqual(before);
+  });
+});
+
+describe("save-result answers quota refusals and faults the same way (#1473)", () => {
+  let parentId: string;
+
+  beforeAll(async () => {
+    const res = await upload(adminToken, [png("parent.png")]);
+    expect(res.statusCode).toBe(201);
+    parentId = JSON.parse(res.body).files[0].id;
+  });
+
+  function saveResult() {
+    const { body, contentType } = createMultipartPayload([
+      { name: "parentId", content: parentId },
+      { name: "toolId", content: "resize" },
+      { name: "file", filename: "result.png", contentType: "image/png", content: PNG },
+    ]);
+    return testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      payload: body,
+    });
+  }
+
+  async function setAdminQuota(quota: (used: number) => number) {
+    const { storageUsed } = await libraryState([adminId]);
+    await db
+      .update(schema.users)
+      .set({ storageQuota: quota(storageUsed) })
+      .where(eq(schema.users.id, adminId));
+  }
+
+  it("answers 500, not 413, when the quota lookup fails", async () => {
+    failQuotaLookup(1);
+
+    const res = await saveResult();
+
+    expect(res.statusCode).toBe(500);
+    expect(hooks.savedNames).toEqual([]);
+  });
+
+  it("answers 413 and stores nothing for a user already over quota", async () => {
+    await setAdminQuota(() => 1);
+
+    const res = await saveResult();
+
+    expect(res.statusCode).toBe(413);
+    expect(JSON.parse(res.body).error).toMatch(/^Storage quota exceeded/);
+    expect(hooks.savedNames).toEqual([]);
+  });
+
+  it("answers 413 and stores nothing for a result that doesn't fit", async () => {
+    await setAdminQuota((used) => used + 1);
+
+    const res = await saveResult();
+
+    expect(res.statusCode).toBe(413);
+    expect(JSON.parse(res.body).error).toMatch(/^Storage quota exceeded/);
+    expect(hooks.savedNames).toEqual([]);
   });
 });
