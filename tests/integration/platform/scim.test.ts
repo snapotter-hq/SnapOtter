@@ -1341,6 +1341,35 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.externalId).toBeNull();
     });
 
+    it("a deactivation that 409s keeps the user's sessions and role", async () => {
+      // Issue #1508: sessions were deleted before the UPDATE, so a 409 left
+      // the user logged out but still active.
+      const externalId = uniqueName("scim-put-deact-ext");
+      await createScimUser({ userName: uniqueName("scim-put-deact-holder"), externalId });
+      const victim = await createScimUser({ userName: uniqueName("scim-put-deact-victim") });
+      await db.insert(schema.sessions).values({
+        id: randomUUID(),
+        userId: victim.id,
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${victim.id}`,
+        headers: authHeaders(),
+        payload: { userName: victim.userName, externalId, active: false },
+      });
+
+      expect(res.statusCode, res.body).toBe(409);
+      const row = await userRow(victim.id);
+      expect(row?.role).toBe("user");
+      const sessions = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, victim.id));
+      expect(sessions).toHaveLength(1);
+    });
+
     it("replaces userName, externalId, and primary email", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-put-src") });
       const renamed = uniqueName("scim-put-renamed");
@@ -1567,6 +1596,47 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         });
         const row = await userRow(victim.id);
         expect(row?.externalId).toBeNull();
+      },
+    );
+
+    it.each(["externalId", "userName"] as const)(
+      "a deactivating PATCH that 409s on %s keeps the user's sessions and role",
+      async (path) => {
+        // Issue #1508: the session delete ran inside the operations loop,
+        // before the UPDATE that then hit the unique index.
+        const externalId = uniqueName("scim-patch-deact-ext");
+        const holder = await createScimUser({
+          userName: uniqueName("scim-patch-deact-holder"),
+          externalId,
+        });
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-deact-victim") });
+        await db.insert(schema.sessions).values({
+          id: randomUUID(),
+          userId: victim.id,
+          expiresAt: new Date(Date.now() + 3_600_000),
+        });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [
+              { op: "replace", path: "active", value: false },
+              { op: "replace", path, value: path === "userName" ? holder.userName : externalId },
+            ],
+          },
+        });
+
+        expect(res.statusCode, res.body).toBe(409);
+        const row = await userRow(victim.id);
+        expect(row?.role).toBe("user");
+        const sessions = await db
+          .select()
+          .from(schema.sessions)
+          .where(eq(schema.sessions.userId, victim.id));
+        expect(sessions).toHaveLength(1);
       },
     );
 
