@@ -181,6 +181,151 @@ describe("scanToolUiLiterals", () => {
     expect(texts(dir)).toEqual(["Retry the upload"]);
   });
 
+  it("reports labels held in a data structure and read back through a property (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `const SAMPLE_SIZES = [
+        { label: "Point (1x1)", value: 1 },
+        { label: "3x3 Average", value: 3 },
+      ];
+      export const A = ({ size }: { size: number }) => (
+        <span>{SAMPLE_SIZES.find((s) => s.value === size)?.label}</span>
+      );`,
+    });
+    expect(texts(dir).sort()).toEqual(["3x3 Average", "Point (1x1)"]);
+  });
+
+  it("reports every user-facing property name, whether or not this file renders it (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const OPTIONS = [
+        { title: "Blend mode", description: "How layers mix", desc: "Short blurb" },
+        { name: "Fast preset", hint: "Lower quality", tooltip: "Hover text" },
+        { placeholder: "Search layers", text: "Body copy", message: "Saved it" },
+        { label: \`Tile size\` },
+      ];`,
+    });
+    expect(texts(dir).sort()).toEqual(
+      [
+        "Blend mode",
+        "Body copy",
+        "Fast preset",
+        "Hover text",
+        "How layers mix",
+        "Lower quality",
+        "Saved it",
+        "Search layers",
+        "Short blurb",
+        "Tile size",
+      ].sort(),
+    );
+  });
+
+  it("reports both branches of a conditional property value (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const item = (on: boolean) => ({ label: on ? "Hide grid" : "Show grid" });`,
+    });
+    expect(texts(dir).sort()).toEqual(["Hide grid", "Show grid"]);
+  });
+
+  it("ignores identifier-shaped values and non-copy property names (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const CURSORS = [
+        { name: "crosshair", label: "move-tool", text: "text" },
+        { value: "Not a copy slot", id: "Also Not Copy", className: "Utility Classes" },
+      ];`,
+    });
+    expect(texts(dir)).toEqual([]);
+  });
+
+  it("reports a destructured local whose source object holds the literal (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `const config = { title: "Export settings" };
+      export const A = () => {
+        const { title } = config;
+        return <h2>{title}</h2>;
+      };`,
+    });
+    expect(texts(dir)).toEqual(["Export settings"]);
+  });
+
+  it("reports a parameter default that renders (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export function A({ label = "Cancel changes" }: { label?: string }) {
+        return <button>{label}</button>;
+      }
+      export function B(caption = "Untitled layer") {
+        return <p>{caption}</p>;
+      }`,
+    });
+    expect(texts(dir).sort()).toEqual(["Cancel changes", "Untitled layer"]);
+  });
+
+  it("does not report a parameter default that never renders (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export function A({ mode = "Compare Mode" }: { mode?: string }) {
+        return <div data-mode={mode} />;
+      }`,
+    });
+    expect(texts(dir)).toEqual([]);
+  });
+
+  it("reports literals assigned to a rendered let after its declaration (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = ({ code }: { code: number }) => {
+        let msg = "";
+        if (code === 404) msg = "File not found";
+        else if (code === 413) msg = code > 1 ? "File too large" : "Too big";
+        return <p>{msg}</p>;
+      };`,
+    });
+    expect(texts(dir).sort()).toEqual(["File not found", "File too large", "Too big"]);
+  });
+
+  it("does not report assignments to a let that never renders (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = ({ code }: { code: number }) => {
+        let cls = "";
+        if (code) cls = "Bold Red Text";
+        return <p className={cls}>{code}</p>;
+      };`,
+    });
+    expect(texts(dir)).toEqual([]);
+  });
+
+  it("reports literals handed to an error or message setter, and to confirm() (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = ({ data }: { data: { error?: string } }) => {
+        setError(data.error || "Failed to change password");
+        setInspectError(\`Failed to inspect \${"x"}\`);
+        setStatusMessage(data.error ? "Retrying now" : "Saved it");
+        if (!confirm("Delete this role?")) return null;
+        window.confirm("Discard the draft?");
+        return null;
+      };`,
+    });
+    expect(texts(dir).sort()).toEqual(
+      [
+        "Delete this role?",
+        "Discard the draft?",
+        "Failed to change password",
+        "Failed to inspect",
+        "Retrying now",
+        "Saved it",
+      ].sort(),
+    );
+  });
+
+  it("does not report literals handed to other setters (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = () => {
+        setPreset("Custom Preset");
+        setMode("Grid Mode");
+        setError(null);
+        return null;
+      };`,
+    });
+    expect(texts(dir)).toEqual([]);
+  });
+
   it("scans every directory it is given", () => {
     const one = fixture({ "one.tsx": `export const A = () => <p>First message here</p>;` });
     const two = fixture({ "two.tsx": `export const B = () => <p>Second message here</p>;` });

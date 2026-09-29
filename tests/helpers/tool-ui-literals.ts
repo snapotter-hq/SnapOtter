@@ -8,18 +8,47 @@ import ts from "typescript";
  * JSX text nodes, user-facing string attributes, string literals rendered as
  * JSX children (ternary branches, && right sides, || / ?? fallbacks, string
  * concatenation, template literals), and literals that reach the screen via a
- * local variable. Everything user-visible must go through i18n keys;
- * intentional literals (format names, placeholder examples, units) live in
- * tool-ui-literal-allowlist.json.
+ * local variable (its initializer, a parameter or destructuring default, or a
+ * later assignment to a `let`). Everything user-visible must go through i18n
+ * keys; intentional literals (format names, placeholder examples, units) live
+ * in tool-ui-literal-allowlist.json.
  *
- * Known limits: a literal that travels through two locals before rendering, or
- * that lives in a module-scope object/array read back through a property
- * access, is still invisible here. Those have to be caught by review.
+ * Labels held in data structures (#922) are reported without tracing them to a
+ * render site: any literal assigned to a copy-named property (PROP_NAMES) in an
+ * object literal counts, because a label array is read back through property
+ * accesses, lookups and child components that no file-local analysis can
+ * follow. So does a literal handed to an error/message state setter or to
+ * confirm()/alert(), which reaches the screen through state or a native dialog.
+ *
+ * Known limits: a literal that travels through two locals before rendering,
+ * object keys used as display text (`Object.keys(PRESETS)`), and strings built
+ * in .ts files are still invisible here. Those have to be caught by review.
  */
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const ATTRS = new Set(["placeholder", "title", "aria-label", "alt", "label"]);
+
+/** Object-literal property names that hold display copy (#922). */
+const PROP_NAMES = new Set([
+  "label",
+  "title",
+  "description",
+  "desc",
+  "placeholder",
+  "hint",
+  "tooltip",
+  "text",
+  "name",
+  "message",
+]);
+
+/** State setters and native dialogs whose string argument reaches the screen. */
+const MESSAGE_SINK = /^(set\w*(Error|Message)|confirm|alert)$/;
+
+// A property value shaped like an identifier ("crosshair", "move-tool") is a
+// key or a mode, not copy; display labels in this app are capitalized.
+const IDENTIFIER_SHAPED = /^[a-z][a-zA-Z0-9]*([-_][a-zA-Z0-9]+)*$/;
 
 // Never user-copy: units, separators, symbols, hex masks, ALL-CAPS format
 // names, HTML entities, template variables, bare domains, ellipsis-only.
@@ -130,46 +159,136 @@ function hasStatements(
   );
 }
 
-/** Does this binding (plain, destructured or nested) introduce `name`? */
-function bindingIntroduces(binding: ts.BindingName, name: string): boolean {
-  if (ts.isIdentifier(binding)) return binding.text === name;
-  return binding.elements.some(
-    (element) => ts.isBindingElement(element) && bindingIntroduces(element.name, name),
-  );
+/**
+ * The binding (parameter, variable or destructuring element) that introduces
+ * `name` inside `binding`, if any.
+ */
+function findBinding(
+  binding: ts.BindingName,
+  name: string,
+): ts.BindingElement | ts.Identifier | null {
+  if (ts.isIdentifier(binding)) return binding.text === name ? binding : null;
+  for (const element of binding.elements) {
+    if (!ts.isBindingElement(element)) continue;
+    if (ts.isIdentifier(element.name) && element.name.text === name) return element;
+    const nested = findBinding(element.name, name);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/** The value a binding defaults to: `{ label = "Cancel" }` or `(caption = "x")`. */
+function bindingDefault(
+  found: ts.BindingElement | ts.Identifier,
+  owner: ts.ParameterDeclaration | ts.VariableDeclaration,
+): ts.Expression[] {
+  if (ts.isBindingElement(found)) return found.initializer ? [found.initializer] : [];
+  return owner.initializer ? [owner.initializer] : [];
+}
+
+/** Right-hand sides of every `name = ...` assignment under `scope`. */
+function assignmentsTo(scope: ts.Node, name: string): ts.Expression[] {
+  const found: ts.Expression[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left) &&
+      node.left.text === name
+    ) {
+      found.push(node.right);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(scope);
+  return found;
 }
 
 /**
- * Resolve a rendered identifier to its nearest lexical `const`/`let`
- * declaration. Approximates scope by walking enclosing statement lists, so an
- * inner declaration shadows an outer one of the same name.
+ * Resolve a rendered identifier to the expressions that can supply its value:
+ * the nearest lexical `const`/`let` initializer (plus later assignments when
+ * it is a `let`), or the default of the parameter that binds it. Approximates
+ * scope by walking enclosing statement lists, so an inner declaration shadows
+ * an outer one of the same name.
  *
  * Parameters shadow too, and in React they shadow constantly: `label`, `title`
  * and `name` are all prop names here. Walking past a function that binds the
  * identifier as a parameter would attribute a prop's value to an unrelated
- * outer const and report a string that never renders, so stop there instead.
+ * outer const and report a string that never renders, so stop there and take
+ * only the parameter's own default.
  */
-function resolveLocalDeclaration(id: ts.Identifier): ts.VariableDeclaration | null {
+function resolveLocalSources(id: ts.Identifier): ts.Expression[] {
   let cur: ts.Node | undefined = id.parent;
   while (cur) {
     if (hasStatements(cur)) {
       for (const statement of cur.statements) {
         if (!ts.isVariableStatement(statement)) continue;
-        for (const decl of statement.declarationList.declarations) {
-          if (ts.isIdentifier(decl.name) && decl.name.text === id.text && decl.initializer) {
-            return decl;
-          }
+        const list = statement.declarationList;
+        for (const decl of list.declarations) {
+          const found = findBinding(decl.name, id.text);
+          if (!found) continue;
+          const sources = ts.isIdentifier(decl.name)
+            ? decl.initializer
+              ? [decl.initializer]
+              : []
+            : bindingDefault(found, decl);
+          if (list.flags & ts.NodeFlags.Let) sources.push(...assignmentsTo(cur, id.text));
+          return sources;
         }
       }
     }
-    if (
-      ts.isFunctionLike(cur) &&
-      cur.parameters.some((parameter) => bindingIntroduces(parameter.name, id.text))
-    ) {
-      return null;
+    if (ts.isFunctionLike(cur)) {
+      for (const parameter of cur.parameters) {
+        const found = findBinding(parameter.name, id.text);
+        if (found) return bindingDefault(found, parameter);
+      }
     }
     cur = cur.parent;
   }
-  return null;
+  return [];
+}
+
+/** Walk up through render-transparent wrappers; returns the outermost node. */
+function outermostTransparent(node: ts.Node): ts.Node {
+  let cur: ts.Node = node;
+  while (cur.parent) {
+    const next = transparentParent(cur, cur.parent);
+    if (!next) break;
+    cur = next;
+  }
+  return cur;
+}
+
+/** `{ label: "Grid" }`: a literal that is the value of a copy-named property. */
+function isCopyPropertyValue(node: ts.Node): boolean {
+  const top = outermostTransparent(node);
+  const prop = top.parent;
+  return (
+    !!prop &&
+    ts.isPropertyAssignment(prop) &&
+    prop.initializer === top &&
+    ts.isObjectLiteralExpression(prop.parent) &&
+    (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)) &&
+    PROP_NAMES.has(prop.name.text)
+  );
+}
+
+/** `setError("Failed")`, `confirm("Delete?")`: a literal handed to a message sink. */
+function isMessageSinkArgument(node: ts.Node): boolean {
+  const top = outermostTransparent(node);
+  const call = top.parent;
+  if (!call || !ts.isCallExpression(call) || !call.arguments.includes(top as ts.Expression)) {
+    return false;
+  }
+  const callee = call.expression;
+  const name = ts.isIdentifier(callee)
+    ? callee.text
+    : ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        callee.expression.text === "window"
+      ? callee.name.text
+      : null;
+  return !!name && MESSAGE_SINK.test(name);
 }
 
 function literalText(node: ts.Node): string | null {
@@ -211,15 +330,14 @@ function scanDirectory(dir: string, hits: LiteralHit[]): void {
     };
     /** Literals inside a local's initializer that the local renders verbatim. */
     const addViaLocal = (id: ts.Identifier) => {
-      const decl = resolveLocalDeclaration(id);
-      const init = decl?.initializer;
-      if (!init) return;
-      const visit = (node: ts.Node) => {
-        const text = literalText(node);
-        if (text != null && flowsTo(node, init)) add("LOCAL", node.getStart(), text);
-        ts.forEachChild(node, visit);
-      };
-      visit(init);
+      for (const source of resolveLocalSources(id)) {
+        const visit = (node: ts.Node) => {
+          const text = literalText(node);
+          if (text != null && flowsTo(node, source)) add("LOCAL", node.getStart(), text);
+          ts.forEachChild(node, visit);
+        };
+        visit(source);
+      }
     };
     const walk = (node: ts.Node) => {
       if (ts.isJsxText(node)) add("TEXT", node.getStart(), node.text);
@@ -235,6 +353,9 @@ function scanDirectory(dir: string, hits: LiteralHit[]): void {
       if (text != null) {
         if (isRenderedString(node)) add("EXPR", node.getStart(), text);
         else if (isUserFacingAttrExpr(node)) add("ATTREXPR", node.getStart(), text);
+        else if (isCopyPropertyValue(node)) {
+          if (!IDENTIFIER_SHAPED.test(text.trim())) add("PROP", node.getStart(), text);
+        } else if (isMessageSinkArgument(node)) add("SINK", node.getStart(), text);
       } else if (ts.isIdentifier(node) && (isRenderedString(node) || isUserFacingAttrExpr(node))) {
         addViaLocal(node);
       }
