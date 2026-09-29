@@ -8,7 +8,7 @@
  * it back with barcode-read, guaranteeing a clean, machine-readable input.
  */
 
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -1168,8 +1168,9 @@ describe("Barcode Read server-side failures", () => {
   /**
    * Leave the decoder's heap with a single free hole of `bytes`: reserve it,
    * fill everything else, then free the reserve. For the 400x400 QR these
-   * tests read, zxing throws "Failed to allocate" below about 0.16 MB, returns
-   * a std::bad_alloc result from about 0.17 to 0.6 MB, and decodes above that.
+   * tests read, zxing throws "Failed to allocate" below 0.16 MB (its one-byte
+   * grayscale copy of the image), returns a std::bad_alloc result from there
+   * to about 0.6 MB, and decodes above that.
    */
   async function squeezeDecoderHeap(bytes: number) {
     const { getZXingModule } = await zxing();
@@ -1227,12 +1228,14 @@ describe("Barcode Read server-side failures", () => {
     expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
   });
 
-  it.skipIf(process.getuid?.() === 0)(
+  // chmod means nothing to root, and S3 storage never touches WORKSPACE_PATH.
+  it.skipIf(process.getuid?.() === 0 || process.env.STORAGE_MODE === "s3")(
     "answers 500, not 422, when the result can't be stored",
     async () => {
       // Local storage writes under WORKSPACE_PATH/uploads; make it read-only.
       const uploads = path.join(process.env.WORKSPACE_PATH as string, "uploads");
       mkdirSync(uploads, { recursive: true });
+      const mode = statSync(uploads).mode & 0o777;
       chmodSync(uploads, 0o500);
       try {
         // The error now propagates instead of being caught as a 422. The test
@@ -1241,7 +1244,7 @@ describe("Barcode Read server-side failures", () => {
         const res = await readQr();
         expect(res.statusCode).toBe(500);
       } finally {
-        chmodSync(uploads, 0o700);
+        chmodSync(uploads, mode);
       }
     },
   );

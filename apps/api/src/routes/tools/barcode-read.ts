@@ -45,7 +45,26 @@ export function initZXingReader(): void {
 initZXingReader();
 
 /** zxing ran out of heap mid-read, which it reports as a result (#1425). */
-class DecoderOutOfMemory extends Error {}
+class DecoderOutOfMemory extends Error {
+  override name = "DecoderOutOfMemory";
+}
+
+/**
+ * zxing catches any C++ exception during a read and returns it as a single
+ * `{ isValid: false, error: e.what() }` in place of the whole list, so partial
+ * results never come back beside it. The route never asks for invalid reads
+ * (`returnErrors`), so a non-empty `error` can only be such an exception.
+ * Filtering it out as an invalid read answered "no barcodes found" (#1425).
+ * Returns the error to throw for such a result, or null for a normal read.
+ */
+export function failedRead(results: readonly { isValid: boolean; error: string }[]): Error | null {
+  const failed = results.find((r) => !r.isValid && r.error !== "");
+  if (!failed) return null;
+  if (/bad_alloc|bad_array_new_length/.test(failed.error)) {
+    return new DecoderOutOfMemory(failed.error);
+  }
+  return new Error(`Barcode decoder raised: ${failed.error}`);
+}
 
 /**
  * The decoder failing on this server's side rather than on the image:
@@ -53,7 +72,7 @@ class DecoderOutOfMemory extends Error {}
  *   instantiate error this way) or it trapped mid-read, after which the
  *   instance can't be trusted (#1402);
  * - no room in its heap for the image, which zxing throws as a plain Error;
- * - no room mid-read (DecoderOutOfMemory) (#1425).
+ * - no room mid-read (DecoderOutOfMemory, from failedRead) (#1425).
  */
 function isDecoderFault(err: unknown): boolean {
   return (
@@ -252,10 +271,8 @@ export function registerBarcodeRead(app: FastifyInstance) {
           tryHarder,
           maxNumberOfSymbols: 255,
         });
-        // zxing reports running out of heap mid-read as a result, not a throw;
-        // filtering it out as an invalid read turned it into "no barcodes".
-        const outOfMemory = results.find((r) => r.error.includes("bad_alloc"));
-        if (outOfMemory) throw new DecoderOutOfMemory(outOfMemory.error);
+        const readError = failedRead(results);
+        if (readError) throw readError;
 
         const validResults = results.filter((r) => r.isValid);
 
