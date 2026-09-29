@@ -328,10 +328,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
           // an external entity, say) makes Sharp fail validation, and gating the
           // sanitizer on a successful decode would store the payload untouched.
-          // Throwing out of the multipart loop gets rewritten to a generic 400 by
-          // the stream teardown, so handle it here like the quota check below:
-          // return the sanitizer's reason for a size/element-cap rejection, and
-          // report + 500 for anything unexpected rather than storing the file.
+          // Handled here rather than thrown so the answer stays specific: the
+          // sanitizer's reason for a size/element-cap rejection (400), and a
+          // reported 500 for anything unexpected. Either way the batch so far
+          // is discarded first.
           let safeBuffer: Buffer = buffer;
           if (isSvgBuffer(buffer)) {
             try {
@@ -417,16 +417,27 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           return inserted;
         });
       } catch (err) {
-        request.log.error({ err }, "Library upload commit failed; discarding the batch");
+        // user_files has no unique constraint, so this isn't a conflict: it's a
+        // database fault (connection lost, timeout, the user deleted mid-upload).
+        // Discard the blobs, then let the error handler answer 500 and report
+        // it. Known edge: if the connection drops after Postgres committed but
+        // before the ack, the rows exist and this deletes their blobs. That's
+        // rare, and it's the price of never leaving orphans on the common path.
         await discardStaged();
-        return reply.status(409).send({ error: "Failed to save file record" });
+        throw err;
       }
       // Keep the response in upload order; RETURNING doesn't promise one.
       const byId = new Map(rows.map((r) => [r.id, r]));
-      const created = staged
-        .map((s) => byId.get(s.values.id as string))
-        .filter((r): r is typeof schema.userFiles.$inferSelect => r !== undefined)
-        .map(serializeFile);
+      const created = staged.flatMap((s) => {
+        const row = byId.get(s.values.id as string);
+        return row ? [serializeFile(row)] : [];
+      });
+      if (created.length !== staged.length) {
+        request.log.error(
+          { staged: staged.length, returned: created.length },
+          "Library upload commit returned fewer rows than it inserted",
+        );
+      }
 
       await auditFromRequest(request)("FILE_UPLOADED", {
         userId,
