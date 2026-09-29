@@ -109,8 +109,14 @@ const hoisted = vi.hoisted(() => {
   const runOcrRuntimeMaintenanceMock = vi.fn(async (action: string) =>
     action === "rollback" ? { restoredGeneration: "previous-generation" } : { removed: [] },
   );
+  // Wraps the real helper, so the tests see what each failure path logged.
+  const logErrorWithCausesMock = vi.fn();
+  // The progress phase whose update should throw, or null for none.
+  const failProgressPhase = { value: null as string | null };
 
   return {
+    logErrorWithCausesMock,
+    failProgressPhase,
     spawnCalls,
     spawnMock,
     acquireVenvLockMock,
@@ -166,6 +172,28 @@ vi.mock("../../../apps/api/src/lib/ocr-runtime-install.js", async (importOrigina
     runOcrRuntimeInstaller: hoisted.runOcrRuntimeInstallerMock,
     runOcrRuntimeMaintenance: hoisted.runOcrRuntimeMaintenanceMock,
     waitWithOcrRuntimeHeartbeat: async <T>(operation: Promise<T>) => operation,
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/log-error-with-causes.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/log-error-with-causes.js")>();
+  hoisted.logErrorWithCausesMock.mockImplementation(actual.logErrorWithCauses);
+  return { logErrorWithCauses: hoisted.logErrorWithCausesMock };
+});
+
+vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
+  return {
+    ...actual,
+    updateSingleFileProgress: async (
+      update: Parameters<typeof actual.updateSingleFileProgress>[0],
+    ) => {
+      if (update.phase === hoisted.failProgressPhase.value) {
+        throw new Error("progress store unavailable");
+      }
+      return actual.updateSingleFileProgress(update);
+    },
   };
 });
 
@@ -269,6 +297,8 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     invalidateCache();
     hoisted.spawnCalls.length = 0;
     hoisted.spawnMock.mockClear();
+    hoisted.logErrorWithCausesMock.mockClear();
+    hoisted.failProgressPhase.value = null;
     hoisted.acquireVenvLockMock.mockClear();
     hoisted.getOcrRuntimeEffectiveMemoryBytesMock.mockReset();
     hoisted.getOcrRuntimeEffectiveMemoryBytesMock.mockReturnValue(8 * 1024 ** 3);
@@ -524,6 +554,53 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(hoisted.rotateOcrDispatcherMock).toHaveBeenCalledTimes(1);
   });
 
+  it("logs a failed OCR install with its whole cause chain (#1504)", async () => {
+    hoisted.runOcrRuntimeMaintenanceMock.mockImplementation(async (action: string) => {
+      if (action === "commit") throw new Error("commit write failed");
+      if (action === "rollback") throw new Error("runtime state unavailable");
+      return { removed: [] };
+    });
+
+    const res = await postInstall("ocr");
+    expect(res.statusCode).toBe(202);
+    const { jobId } = JSON.parse(res.body);
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
+
+    expect(hoisted.logErrorWithCausesMock).toHaveBeenCalledTimes(1);
+    const [, fields, message] = hoisted.logErrorWithCausesMock.mock.calls[0];
+    expect(message).toBe("[ocr-runtime] OCR install failed");
+    expect(fields).toMatchObject({ bundleId: "ocr", jobId });
+    const err = fields.err as Error;
+    expect(err.message).toBe("OCR runtime handoff failed and activation rollback also failed");
+    // Both errors that say what went wrong, which the UI message leaves out.
+    const [activationError, rollbackError] = (err.cause as AggregateError).errors as Error[];
+    expect(activationError.message).toBe("OCR runtime activation commit failed twice");
+    expect((activationError as AggregateError).errors.map((e: Error) => e.message)).toEqual([
+      "commit write failed",
+      "commit write failed",
+    ]);
+    expect(rollbackError.message).toBe("runtime state unavailable");
+  });
+
+  it("logs an OCR install that finished but could not report itself complete (#1504)", async () => {
+    hoisted.failProgressPhase.value = "complete";
+
+    const res = await postInstall("ocr");
+    expect(res.statusCode).toBe(202);
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
+
+    const [, fields, message] = hoisted.logErrorWithCausesMock.mock.calls[0];
+    expect(message).toBe(
+      "[ocr-runtime] OCR runtime installed, but reporting the install as complete failed",
+    );
+    expect((fields.err as Error).message).toBe("progress store unavailable");
+    // The install itself went through: nothing was rolled back.
+    expect(hoisted.runOcrRuntimeMaintenanceMock).not.toHaveBeenCalledWith(
+      "rollback",
+      expect.anything(),
+    );
+  });
+
   it("returns 500 when the offline OCR installer fails after validation", async () => {
     hoisted.runOcrRuntimeInstallerMock.mockRejectedValueOnce(
       new Error("installer process could not start"),
@@ -598,6 +675,15 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     expect(
       hoisted.runOcrRuntimeMaintenanceMock.mock.calls.filter(([action]) => action === "commit"),
     ).toHaveLength(2);
+    // The log keeps both failures the response leaves out (#1504).
+    expect(hoisted.logErrorWithCausesMock).toHaveBeenCalledTimes(1);
+    const [, fields, message] = hoisted.logErrorWithCausesMock.mock.calls[0];
+    expect(message).toBe("Offline feature import failed");
+    const causes = ((fields.err as Error).cause as AggregateError).errors as Error[];
+    expect(causes.map((e) => e.message)).toEqual([
+      "OCR runtime activation commit failed twice",
+      "runtime state unavailable",
+    ]);
     expect(hoisted.runOcrRuntimeMaintenanceMock).toHaveBeenCalledWith(
       "rollback",
       expect.objectContaining({ expectedGeneration: "test-generation" }),
