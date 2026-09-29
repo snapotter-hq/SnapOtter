@@ -196,7 +196,9 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
             request.log,
           );
         }
-        const message = err instanceof Error ? err.message : "Preview processing failed";
+        const message = stripInternalPaths(
+          err instanceof Error ? err.message : "Preview processing failed",
+        );
         request.log.error({ err }, "Optimize preview failed");
         return reply.status(422).send({ error: "Preview failed", details: message });
       }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   friendlyError,
   stripControlChars,
@@ -122,20 +122,57 @@ describe("stripInternalPaths", () => {
     expect(stripInternalPaths("Region exceeds image bounds")).toBe("Region exceeds image bounds");
   });
 
-  it("strips paths under the host's temp dir, wherever TMPDIR points (#1430)", () => {
-    // macOS puts it under /var/folders, and a job runner may point it anywhere;
-    // decoder errors carry temp paths built from os.tmpdir().
+  describe("the host's temp dir (#1430)", () => {
+    // os.tmpdir() reads TMPDIR on every call, so each case points it somewhere.
     const original = process.env.TMPDIR;
-    process.env.TMPDIR = "/Users/runner/jobs/42/tmp";
-    try {
-      expect(
-        stripInternalPaths(
-          "Command failed: heif-convert /Users/runner/jobs/42/tmp/heic-in-7-abc.heic /Users/runner/jobs/42/tmp/heic-out-7-abc.png",
-        ),
-      ).toBe("Command failed: heif-convert [internal] [internal]");
-    } finally {
+    afterEach(() => {
       if (original === undefined) delete process.env.TMPDIR;
       else process.env.TMPDIR = original;
-    }
+    });
+    const withTmp = (dir: string, message: string) => {
+      process.env.TMPDIR = dir;
+      return stripInternalPaths(message);
+    };
+
+    it("strips paths under it wherever it points, outside every hard-coded root", () => {
+      // macOS puts it under /var/folders, and a job runner may point it anywhere.
+      expect(
+        withTmp(
+          "/Users/runner/work/_temp",
+          "Command failed: heif-convert /Users/runner/work/_temp/heic-in-7-abc.heic /Users/runner/work/_temp/heic-out-7-abc.png",
+        ),
+      ).toBe("Command failed: heif-convert [internal] [internal]");
+    });
+
+    it("strips ImageMagick's backtick-quoted form and the macOS realpath form", () => {
+      expect(
+        withTmp("/srv/work/t", "magick: improper image header `/srv/work/t/ico-in-1.ico' @ x"),
+      ).toBe("magick: improper image header `[internal]' @ x");
+      expect(
+        withTmp("/var/folders/ab/T/", "failed on /private/var/folders/ab/T/heic-in-1.heic"),
+      ).toBe("failed on /private[internal]");
+    });
+
+    it("escapes regex characters in the temp dir", () => {
+      expect(withTmp("/srv/a.b+(c)[d]$", "at /srv/a.b+(c)[d]$/in.heic")).toBe("at [internal]");
+      expect(withTmp("/srv/a.b+(c)[d]$", "at /srv/aXb+(c)[d]$/y")).toBe("at /srv/aXb+(c)[d]$/y");
+    });
+
+    it.each([".", "tmp", "/var", "/"])(
+      "leaves ordinary text alone when TMPDIR is %j (relative or too shallow)",
+      (dir) => {
+        expect(withTmp(dir, "Invalid file photo.png: expected 1.5x")).toBe(
+          "Invalid file photo.png: expected 1.5x",
+        );
+        expect(withTmp(dir, "Route GET:/api/v1/tools/various not found")).toBe(
+          "Route GET:/api/v1/tools/various not found",
+        );
+      },
+    );
+
+    it("matches the temp dir only as a whole path segment", () => {
+      expect(withTmp("/srv/work/t", "see /srv/work/tx/secret")).toBe("see /srv/work/tx/secret");
+      expect(withTmp("/tmp", "see /tmpfoo/x")).toBe("see /tmpfoo/x");
+    });
   });
 });

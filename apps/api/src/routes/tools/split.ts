@@ -246,7 +246,7 @@ export function registerSplit(app: FastifyInstance) {
         if (isDecoderUnavailable(err)) throw err;
         return reply.status(422).send({
           error: "Split failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
       // The ZIP stream already started; end the connection so clients see a

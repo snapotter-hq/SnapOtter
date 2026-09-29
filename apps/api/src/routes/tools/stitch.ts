@@ -305,7 +305,7 @@ export function registerStitch(app: FastifyInstance) {
       if (isDecoderUnavailable(err)) throw err;
       return reply.status(422).send({
         error: "Stitch creation failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });
