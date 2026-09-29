@@ -24,6 +24,11 @@ describe("classifyFeedbackError", () => {
     expect(classifyFeedbackError(de.errors.fileTooLarge, "upload_error")).toBe("upload_error");
   });
 
+  it("reports unknown when there is no message, whatever category is left", () => {
+    expect(classifyFeedbackError(null, "timeout")).toBe("unknown");
+    expect(classifyFeedbackError("", "upload_error")).toBe("unknown");
+  });
+
   it("still reads English server text when no category was stored", () => {
     expect(classifyFeedbackError("Request timed out", null)).toBe("timeout");
     expect(classifyFeedbackError("Unsupported file type", undefined)).toBe("unsupported_format");
@@ -84,6 +89,17 @@ describe("file store errorCategory", () => {
     updateEntry(0, { status: "failed", error: "Unsupported file type", errorCategory: "timeout" });
     updateEntry(0, { status: "failed", error: "Something else broke" });
     expect(useFileStore.getState().entries[0].errorCategory).toBeNull();
+  });
+
+  it("drops the category when undo resets the entries", () => {
+    // undoProcessing writes entries directly, not through updateEntry.
+    useFileStore.getState().updateEntry(0, {
+      status: "failed",
+      error: de.errors.requestTimedOut,
+      errorCategory: "timeout",
+    });
+    useFileStore.getState().undoProcessing();
+    expect(useFileStore.getState().entries[0]).toMatchObject({ error: null, errorCategory: null });
   });
 
   it("leaves the category alone when the patch doesn't touch the error", () => {

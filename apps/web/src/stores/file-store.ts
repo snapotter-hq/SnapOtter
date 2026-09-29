@@ -513,6 +513,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       status: "pending" as const,
       claimed: false,
       error: null,
+      errorCategory: null,
     }));
     set({
       entries: resetEntries,

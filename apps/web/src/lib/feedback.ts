@@ -172,9 +172,10 @@ export function classifyFeedbackError(
   message: string | null | undefined,
   category?: FeedbackErrorCategory | null,
 ): FeedbackErrorCategory {
-  if (category) return category;
   const value = (message ?? "").toLowerCase();
+  // A category means nothing without the failure it describes.
   if (!value) return "unknown";
+  if (category) return category;
   if (value.includes("timed out") || value.includes("timeout")) return "timeout";
   if (value.includes("upload") || value.includes("interrupted")) return "upload_error";
   if (value.includes("validation") || value.includes("invalid") || value.includes("required")) {
