@@ -5,6 +5,7 @@ import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { resolveFfmpeg } from "@snapotter/media-engine";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
@@ -56,11 +57,52 @@ export function noDecoderFound(message: string, probeFailures: unknown[]): Error
  * spawn syscall; everything else is the decoder's verdict on the file.
  */
 export function asDecoderUnavailable(err: unknown): unknown {
-  if (err instanceof DecoderUnavailableError || !isBinarySpawnFailure(err)) return err;
-  return new DecoderUnavailableError(
-    "An image decoder on this server could not be started. Check that the container's decoder binaries are installed and executable.",
-    err,
+  if (err instanceof DecoderUnavailableError) return err;
+  if (isBinarySpawnFailure(err)) {
+    return new DecoderUnavailableError(
+      "An image decoder on this server could not be started. Check that the container's decoder binaries are installed and executable.",
+      err,
+    );
+  }
+  if (lacksFormatSupport(err)) {
+    return new DecoderUnavailableError(
+      "An image decoder on this server has no support for this format. Install the missing ImageMagick delegate or libheif decoder plugin.",
+      err,
+    );
+  }
+  return err;
+}
+
+/**
+ * The decoder ran but can't handle the format at all, so it never judged the
+ * file: ImageMagick without the delegate, libheif without its HEVC plugin, or
+ * a binary whose shared libraries won't load (exit 127, execFile uses no
+ * shell) (#1429).
+ */
+const MISSING_SUPPORT =
+  /no decode delegate for this image format|delegate library support not built-in|No decoding plugin installed|No decoder for this image format/i;
+
+function lacksFormatSupport(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const { code, stderr } = err as Error & { code?: unknown; stderr?: unknown };
+  if (code === 127) return true;
+  return MISSING_SUPPORT.test(`${err.message}\n${stderr ?? ""}`);
+}
+
+/**
+ * The error a failed fallback chain surfaces: the first decoder that actually
+ * judged the file, so a real rejection keeps its 422 even when a later
+ * fallback can't read the format at all. With no verdict, the last failure,
+ * which asDecoderUnavailable then classifies (#1429).
+ */
+function chainFailure(failures: unknown[]): unknown {
+  const verdict = failures.find(
+    (err) =>
+      !(err instanceof DecoderUnavailableError) &&
+      !isBinarySpawnFailure(err) &&
+      !lacksFormatSupport(err),
   );
+  return verdict ?? failures.at(-1);
 }
 
 export interface DecodeSafetyOptions {
@@ -577,6 +619,7 @@ async function decodeRaw(
     await writeTempExclusive(inputPath, buffer);
 
     // Attempt 1: dcraw_emu (direct LibRaw decode to TIFF) -- full resolution.
+    let dcrawFailure: unknown;
     try {
       await execFileAsync(
         "dcraw_emu",
@@ -592,6 +635,7 @@ async function decodeRaw(
       options.signal?.throwIfAborted();
       if (error instanceof Error && /pixel safety limit/i.test(error.message)) throw error;
       // dcraw_emu not available or unsupported format -- fall through
+      dcrawFailure = error;
     }
 
     // Attempt 2: ExifTool full-size embedded JPEG (JpgFromRaw). Many formats
@@ -639,16 +683,21 @@ async function decodeRaw(
 
     // Attempt 4: ImageMagick (last resort -- its RAW delegate may be the
     // deprecated ufraw-batch, which fails on modern formats).
-    const cmd = await findMagickCmd(options);
-    await execFileAsync(
-      cmd,
-      magickArgs(
+    try {
+      const cmd = await findMagickCmd(options);
+      await execFileAsync(
         cmd,
-        [inputPath, "-colorspace", "sRGB", "-auto-orient", `png:${outputPath}`],
-        options,
-      ),
-      commandOptions(options, 120_000),
-    );
+        magickArgs(
+          cmd,
+          [inputPath, "-colorspace", "sRGB", "-auto-orient", `png:${outputPath}`],
+          options,
+        ),
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([dcrawFailure, error].filter((err) => err !== undefined));
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -719,6 +768,7 @@ async function decodeExr(buffer: Buffer, options: DecodeSafetyOptions): Promise<
     await writeTempExclusive(inputPath, buffer);
 
     // ImageMagick needs the OpenEXR delegate which is often missing on macOS
+    let magickFailure: unknown;
     try {
       const cmd = await findMagickCmd(options);
       await execFileAsync(
@@ -731,16 +781,22 @@ async function decodeExr(buffer: Buffer, options: DecodeSafetyOptions): Promise<
         commandOptions(options, 120_000),
       );
       return await readFile(outputPath);
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
       // ImageMagick failed, try ffmpeg
+      magickFailure = error;
     }
 
-    await execFileAsync(
-      "ffmpeg",
-      ["-y", "-i", inputPath, "-pix_fmt", "rgba", "-update", "1", outputPath],
-      commandOptions(options, 120_000),
-    );
+    try {
+      await execFileAsync(
+        resolveFfmpeg() ?? "ffmpeg",
+        ["-y", "-i", inputPath, "-pix_fmt", "rgba", "-update", "1", outputPath],
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([magickFailure, error]);
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -805,20 +861,27 @@ async function decodeJxl(buffer: Buffer, options: DecodeSafetyOptions): Promise<
 
     // Try djxl first (from libjxl-tools) — works even when ImageMagick
     // lacks a JXL delegate (common on Ubuntu stock packages).
+    let djxlFailure: unknown;
     try {
       await execFileAsync("djxl", [inputPath, outputPath], commandOptions(options, 120_000));
       return await readFile(outputPath);
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
       // djxl not available, fall back to ImageMagick
+      djxlFailure = error;
     }
 
-    const cmd = await findMagickCmd(options);
-    await execFileAsync(
-      cmd,
-      magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
-      commandOptions(options, 120_000),
-    );
+    try {
+      const cmd = await findMagickCmd(options);
+      await execFileAsync(
+        cmd,
+        magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([djxlFailure, error]);
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
@@ -834,22 +897,29 @@ async function decodeJp2(buffer: Buffer, options: DecodeSafetyOptions): Promise<
   const outputPath = join(tmpdir(), `jp2-out-${id}.png`);
   try {
     await writeTempExclusive(inputPath, buffer);
+    let opjFailure: unknown;
     try {
       await execFileAsync("opj_decompress", ["-i", inputPath, "-o", outputPath], {
         timeout: 60_000,
         signal: options.signal,
       });
       return await readFile(outputPath);
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
       // opj_decompress not available, fall back to ImageMagick
+      opjFailure = error;
     }
-    const cmd = await findMagickCmd(options);
-    await execFileAsync(
-      cmd,
-      magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
-      commandOptions(options, 120_000),
-    );
+    try {
+      const cmd = await findMagickCmd(options);
+      await execFileAsync(
+        cmd,
+        magickArgs(cmd, [inputPath, `png:${outputPath}`], options),
+        commandOptions(options, 120_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      throw chainFailure([opjFailure, error]);
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});

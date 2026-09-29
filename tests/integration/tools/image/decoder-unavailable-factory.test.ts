@@ -9,7 +9,7 @@
  * The missing binary is simulated as a misconfigured host sees it: PATH points
  * at an empty directory, so every decoder spawn fails with ENOENT.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -127,5 +127,34 @@ describe("Factory image input: decoder availability (#1428)", () => {
     });
 
     expect(res.statusCode).toBe(422);
+  });
+
+  it("reports an ImageMagick without the JXL delegate, and no djxl, as 503 (#1429)", async () => {
+    // The only decoder on PATH is an ImageMagick that runs but has no JXL
+    // delegate, the stock-Ubuntu situation the issue describes.
+    const shimDir = mkdtempSync(join(tmpdir(), "factory-jxl-shims-"));
+    try {
+      writeFileSync(
+        join(shimDir, "magick"),
+        `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "Version: ImageMagick 7"; exit 0; fi
+echo "magick: no decode delegate for this image format" >&2
+exit 1
+`,
+      );
+      chmodSync(join(shimDir, "magick"), 0o755);
+      process.env.PATH = shimDir;
+
+      const res = await resizeRequest({
+        filename: "photo.jxl",
+        contentType: "image/jxl",
+        content: readFixture(fixtures.image.formats("jxl")),
+      });
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
+    } finally {
+      rmSync(shimDir, { recursive: true, force: true });
+    }
   });
 });
