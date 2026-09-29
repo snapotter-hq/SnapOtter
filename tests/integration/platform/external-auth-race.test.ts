@@ -236,10 +236,12 @@ describe("external auth auto-create races", () => {
     // The resolver's insert and the SCIM Users POST use an unqualified
     // onConflictDoNothing and read every refused insert as "someone else
     // holds this username or this identity". That is only honest while the
-    // unique surface is the primary key (a fresh UUID), the username, and
-    // the (auth_provider, external_id) identity index. If this fails, a new
-    // unique constraint joined the table: give both guards an explicit story
-    // for it before widening this list.
+    // unique surface is the primary key (a fresh UUID), the username, the
+    // (auth_provider, external_id) identity index, and the SCIM externalId
+    // index (#1510). The resolver leaves scim_external_id NULL, so that one
+    // can't fire there; on the SCIM POST it is the identity the 409 names.
+    // If this fails, a new unique constraint joined the table: give both
+    // guards an explicit story for it before widening this list.
     const res = await db.execute(
       sql`SELECT indexname FROM pg_indexes WHERE tablename = 'users' AND indexdef ILIKE '%UNIQUE%' ORDER BY indexname`,
     );
@@ -247,6 +249,7 @@ describe("external auth auto-create races", () => {
     expect(names).toEqual([
       "users_auth_provider_external_id_unique",
       "users_pkey",
+      "users_scim_external_id_unique",
       "users_username_unique",
     ]);
   });
