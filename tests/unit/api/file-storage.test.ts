@@ -377,6 +377,51 @@ describe("storage not writable (EACCES)", () => {
     }
   });
 
+  // #1455: a delete that can't happen must not look like one that did.
+  it.skipIf(isRoot)(
+    "deleteStoredFile throws a SafeError when the file can't be removed",
+    async () => {
+      const { saveFile, deleteStoredFile } = await importModule();
+      const name = await saveFile(Buffer.from("keep"), "stuck.png");
+      try {
+        await chmod(testDir, 0o555);
+        const err = (await deleteStoredFile(name).then(
+          () => null,
+          (e: unknown) => e,
+        )) as StorageError | null;
+        expect(err).toBeInstanceOf(Error);
+        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.isSafeMessage).toBe(true);
+        expect(err?.kind).toBe("operational");
+        expect(err?.code).toBe("EACCES");
+        expect(err?.statusCode).toBe(503);
+      } finally {
+        await chmod(testDir, 0o755).catch(() => {});
+      }
+      expect(existsSync(join(testDir, name)), "the file is still there").toBe(true);
+    },
+  );
+
+  it.skipIf(isRoot)(
+    "deleteThumbnail throws a SafeError when the thumbnail can't be removed",
+    async () => {
+      const { saveThumbnail, deleteThumbnail } = await importModule();
+      await saveThumbnail("stuck.png", Buffer.from("t"));
+      const thumbDir = join(testDir, ".thumbs");
+      try {
+        await chmod(thumbDir, 0o555);
+        const err = (await deleteThumbnail("stuck.png").then(
+          () => null,
+          (e: unknown) => e,
+        )) as StorageError | null;
+        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.statusCode).toBe(503);
+      } finally {
+        await chmod(thumbDir, 0o755).catch(() => {});
+      }
+    },
+  );
+
   it.skipIf(isRoot)(
     "saveThumbnail throws a SafeError when the directory is read-only",
     async () => {

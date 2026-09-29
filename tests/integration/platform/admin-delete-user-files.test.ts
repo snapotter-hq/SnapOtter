@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -127,3 +127,53 @@ describe("library delete removes cached previews (#1320, #1407)", () => {
     expect(existsSync(getStoredFilePath(file.storedName))).toBe(false);
   });
 });
+
+// Root ignores directory permissions, so storage can't be made undeletable there.
+describe.skipIf(process.getuid?.() === 0)(
+  "a storage delete that fails stops the delete (#1455)",
+  () => {
+    async function withReadOnlyStorage<T>(fn: () => Promise<T>): Promise<T> {
+      await chmod(env.FILES_STORAGE_PATH, 0o555);
+      try {
+        return await fn();
+      } finally {
+        await chmod(env.FILES_STORAGE_PATH, 0o755);
+      }
+    }
+
+    it("the library delete answers 503 and keeps the row", async () => {
+      const { token } = await createUserAndLogin(testApp.app, "stuck-lib-1455");
+      const file = await uploadAs(token);
+
+      const res = await withReadOnlyStorage(() =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: "/api/v1/files",
+          headers: { authorization: `Bearer ${token}` },
+          payload: { ids: [file.id] },
+        }),
+      );
+      expect(res.statusCode, res.body).toBe(503);
+      // The message is pinned in file-storage.test.ts; this harness has no app error handler.
+      const rows = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, file.id));
+      expect(rows, "the row still points at the file, so a retry can finish").toHaveLength(1);
+      expect(existsSync(getStoredFilePath(file.storedName))).toBe(true);
+    });
+
+    it("the admin user delete answers 503 and keeps the user", async () => {
+      const { token, userId } = await createUserAndLogin(testApp.app, "stuck-admin-1455");
+      await uploadAs(token);
+
+      const res = await withReadOnlyStorage(() =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/auth/users/${userId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        }),
+      );
+      expect(res.statusCode, res.body).toBe(503);
+      const users = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+      expect(users).toHaveLength(1);
+    });
+  },
+);

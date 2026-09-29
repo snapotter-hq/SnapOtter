@@ -125,6 +125,13 @@ export async function getObjectStream(storedName: string): Promise<Readable> {
   return requireObjectBody(response, key) as Readable;
 }
 
+/**
+ * S3's DeleteObject succeeds for a key that isn't there, so a failure here is a
+ * real one (AccessDenied, expired credentials, a missing bucket, the network)
+ * and must reach the caller rather than orphan the object (#1455). Some
+ * S3-compatible stores do answer a missing key with NoSuchKey or a 404; that is
+ * the one "already gone" case let through.
+ */
 export async function deleteObject(storedName: string): Promise<void> {
   try {
     await getClient().send(
@@ -133,8 +140,8 @@ export async function deleteObject(storedName: string): Promise<void> {
         Key: fileKey(storedName),
       }),
     );
-  } catch {
-    // Object already gone or doesn't exist
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
   }
 }
 
@@ -172,8 +179,8 @@ export async function deleteThumbnail(storedName: string): Promise<void> {
         Key: thumbKey(storedName),
       }),
     );
-  } catch {
-    // Thumbnail may not exist
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
   }
 }
 

@@ -214,10 +214,30 @@ export async function deleteStoredFile(storedName: string): Promise<void> {
     await s3.deleteObject(storedName);
     return;
   }
+  await unlinkStored(join(env.FILES_STORAGE_PATH, storedName));
+}
+
+/**
+ * Remove a stored file or thumbnail. "Already gone" is fine; anything else
+ * reaches the caller. Swallowing every error let a delete that failed on
+ * permissions look like one that worked, and the caller then dropped the DB
+ * row, orphaning the file for good (#1455). A permissions or read-only fault
+ * becomes the same 503 the save path raises.
+ */
+async function unlinkStored(path: string): Promise<void> {
   try {
-    await unlink(join(env.FILES_STORAGE_PATH, storedName));
-  } catch {
-    // File already gone
+    await unlink(path);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return;
+    if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+      throw new SafeError("Storage directory is not writable", {
+        kind: "operational",
+        code,
+        statusCode: 503,
+      });
+    }
+    throw e;
   }
 }
 
@@ -287,9 +307,5 @@ export async function deleteThumbnail(storedName: string): Promise<void> {
     await s3.deleteThumbnail(storedName);
     return;
   }
-  try {
-    await unlink(thumbPath(storedName));
-  } catch {
-    // Thumbnail may not exist
-  }
+  await unlinkStored(thumbPath(storedName));
 }
