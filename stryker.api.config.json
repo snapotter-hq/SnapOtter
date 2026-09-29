@@ -53,7 +53,7 @@
     "/docs",
     "/.local-wiki",
     "/.worktrees",
-    "/.tmp",
+    ".tmp",
     "/.claude",
     "/.venv",
     "/.codex",
