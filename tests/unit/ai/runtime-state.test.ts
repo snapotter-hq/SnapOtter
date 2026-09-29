@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -877,15 +878,20 @@ describe("getOcrRuntimeCapability", () => {
 
 describe("invalid runtime diagnostics (#1433)", () => {
   const linuxX64 = { platform: "linux", arch: "x64" } as const;
+  type Fixture = ReturnType<typeof createRuntimeFixture>;
 
   function warnings(warn: ReturnType<typeof vi.spyOn>): string[] {
     return warn.mock.calls.map((call) => String(call[0]));
   }
 
+  function quietWarn() {
+    return vi.spyOn(console, "warn").mockImplementation(() => {});
+  }
+
   it("logs which check rejected the runtime, once, without putting it on the capability", () => {
     const fixture = createRuntimeFixture();
     writeFileSync(fixture.smallModelPath, "wrong", "utf-8");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = quietWarn();
     const options = { aiDataDir: fixture.aiDataDir, ...linuxX64 };
 
     // Per-request reads stay quiet; only the capability check reports.
@@ -901,9 +907,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
       providers: [],
     });
     expect(warnings(warn)).toEqual([
-      expect.stringMatching(
-        /^\[ocr-runtime\] .*v3 is invalid: model file runtimes\/ocr\/linux-amd64-cpu-py312\/generation-test\/models\/small\.onnx failed its digest check$/,
-      ),
+      `[ocr-runtime] Accurate OCR runtime at ${join(fixture.aiDataDir, "v3")} is unavailable: model file runtimes/ocr/linux-amd64-cpu-py312/generation-test/models/small.onnx failed its digest check`,
     ]);
 
     // The capability is polled; the same failure must not flood the log.
@@ -912,108 +916,226 @@ describe("invalid runtime diagnostics (#1433)", () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it("logs a different failure on the same runtime right away", () => {
+    const fixture = createRuntimeFixture();
+    const options = { aiDataDir: fixture.aiDataDir, ...linuxX64 };
+    const warn = quietWarn();
+
+    writeFileSync(fixture.smallModelPath, "broken", "utf-8");
+    getOcrRuntimeCapability(options);
+    // Integrity files are checked before models, so restore the model first.
+    writeFileSync(fixture.smallModelPath, "small", "utf-8");
+    writeFileSync(fixture.adapterPath, "# evil adapter\n", "utf-8");
+    getOcrRuntimeCapability(options);
+
+    expect(warnings(warn)).toEqual([
+      expect.stringMatching(/small\.onnx is the wrong size$/),
+      expect.stringMatching(/ocr_runtime\.py doesn't match its size or digest$/),
+    ]);
+  });
+
   it("logs again after the runtime recovers and then fails", () => {
     const fixture = createRuntimeFixture();
     const options = { aiDataDir: fixture.aiDataDir, ...linuxX64 };
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = quietWarn();
 
-    writeFileSync(fixture.smallModelPath, "wrong", "utf-8");
+    // A different length from "small", so the size check catches it without
+    // depending on the digest cache seeing a same-size rewrite.
+    writeFileSync(fixture.smallModelPath, "broken", "utf-8");
     getOcrRuntimeCapability(options);
     writeFileSync(fixture.smallModelPath, "small", "utf-8");
     expect(getOcrRuntimeCapability(options).available).toBe(true);
-    writeFileSync(fixture.smallModelPath, "wrong", "utf-8");
+    writeFileSync(fixture.smallModelPath, "broken", "utf-8");
     getOcrRuntimeCapability(options);
 
     expect(warn).toHaveBeenCalledTimes(2);
   });
 
-  it("names the failing check for each kind of corruption", () => {
-    const cases: Array<
-      [string, (fixture: ReturnType<typeof createRuntimeFixture>) => void, RegExp]
-    > = [
-      [
-        "missing signed index",
-        (fixture) => unlinkSync(fixture.signedIndexPath),
-        /signed index indexes\/.* is missing, outside indexes\/, or behind a symlink$/,
-      ],
-      [
-        "tampered signed index",
-        (fixture) => {
-          const index = JSON.parse(readFileSync(fixture.signedIndexPath, "utf-8"));
-          index.artifacts[0].files.at(-1).sha256 = "f".repeat(64);
-          writeFileSync(fixture.signedIndexPath, canonicalJson(index), "utf-8");
-        },
-        /signed index indexes\/.* doesn't match its pinned size or digest$/,
-      ],
-      [
-        "resized model",
-        (fixture) => writeFileSync(fixture.mediumModelPath, "changed", "utf-8"),
-        /model file .*medium\.onnx is missing, outside models\/, or the wrong size$/,
-      ],
-      [
-        "corrupt execution code",
-        (fixture) => writeFileSync(fixture.adapterPath, "# evil adapter\n", "utf-8"),
-        /runtime file .*ocr_runtime\.py is missing or failed its digest check$/,
-      ],
-      [
-        "corrupt site-packages file",
-        (fixture) => writeFileSync(fixture.sitePackagePath, "rapidocr-v2\n", "utf-8"),
-        /runtime payload tree doesn't match the signed file list$/,
-      ],
-      [
-        "malformed descriptor field",
-        (fixture) =>
-          mutateDescriptor(fixture.descriptorPath, (descriptor) => {
-            descriptor.artifact.arch = null;
-          }),
-        /active descriptor has a missing or malformed field$/,
-      ],
-      [
-        "descriptor that drifted from its signed artifact",
-        (fixture) =>
-          mutateDescriptor(fixture.descriptorPath, (descriptor) => {
-            descriptor.artifact.version = "9.9.9";
-          }),
-        /active descriptor doesn't match its signed artifact$/,
-      ],
-      [
-        "missing python",
-        (fixture) => unlinkSync(fixture.pythonPath),
-        /runtime python or entrypoint is missing or outside its generation$/,
-      ],
-      [
-        "empty descriptor",
-        (fixture) => writeFileSync(fixture.descriptorPath, "", "utf-8"),
-        /the active descriptor is empty, too large, or not a plain file$/,
-      ],
-      [
-        "descriptor that no longer matches its activation marker",
-        (fixture) =>
-          writeFileSync(
-            fixture.descriptorPath,
-            `${readFileSync(fixture.descriptorPath, "utf-8")} `,
-            "utf-8",
-          ),
-        /activation marker doesn't match the active descriptor$/,
-      ],
-    ];
+  it("stays quiet for missing, incompatible, and unsupported-host runtimes", () => {
+    const warn = quietWarn();
+    const empty = mkdtempSync(join(tmpdir(), "snapotter-runtime-state-empty-"));
+    temporaryDirectories.push(empty);
+    const fixture = createRuntimeFixture();
 
-    for (const [label, corrupt, expected] of cases) {
-      const fixture = createRuntimeFixture();
-      corrupt(fixture);
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      expect(
-        getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64 }),
-        label,
-      ).toMatchObject({ status: "invalid", reason: "descriptor-invalid" });
-      expect(warnings(warn), label).toEqual([expect.stringMatching(expected)]);
-      warn.mockRestore();
-    }
+    expect(getOcrRuntimeCapability({ aiDataDir: empty, ...linuxX64 })).toMatchObject({
+      reason: "descriptor-missing",
+    });
+    expect(
+      getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, platform: "linux", arch: "arm64" }),
+    ).toMatchObject({ reason: "artifact-incompatible" });
+    expect(
+      getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, platform: "darwin", arch: "arm64" }),
+    ).toMatchObject({ reason: "unsupported-host" });
+    expect(warn).not.toHaveBeenCalled();
   });
 
-  it("keeps the message of an error thrown while reading the runtime", () => {
+  it("stays quiet while an install waits to commit its activation", () => {
     const fixture = createRuntimeFixture();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mutateActivationState(fixture.activationPath, (state) => {
+      state.status = "pending";
+    });
+    const warn = quietWarn();
+    const options = { aiDataDir: fixture.aiDataDir, ...linuxX64 };
+
+    expect(getOcrRuntimeCapability(options)).toMatchObject({ reason: "descriptor-invalid" });
+    expect(readPendingOcrRuntimeForHandoff(options)).not.toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, (fixture: Fixture) => void, RegExp]>([
+    [
+      "missing signed index",
+      (fixture) => unlinkSync(fixture.signedIndexPath),
+      /signed index indexes\/.* is missing, outside indexes\/, or behind a symlink$/,
+    ],
+    [
+      "tampered signed index",
+      (fixture) => {
+        const index = JSON.parse(readFileSync(fixture.signedIndexPath, "utf-8"));
+        index.artifacts[0].files.at(-1).sha256 = "f".repeat(64);
+        writeFileSync(fixture.signedIndexPath, canonicalJson(index), "utf-8");
+      },
+      /signed index indexes\/.* doesn't match its pinned size or digest$/,
+    ],
+    [
+      "resized model",
+      (fixture) => writeFileSync(fixture.mediumModelPath, "changed", "utf-8"),
+      /model file .*medium\.onnx is the wrong size$/,
+    ],
+    [
+      "corrupt execution code",
+      (fixture) => writeFileSync(fixture.adapterPath, "# evil adapter\n", "utf-8"),
+      /runtime file .*ocr_runtime\.py doesn't match its size or digest$/,
+    ],
+    [
+      "corrupt site-packages file",
+      (fixture) => writeFileSync(fixture.sitePackagePath, "rapidocr-v2\n", "utf-8"),
+      /runtime payload file venv\/lib\/python3\.12\/site-packages\/rapidocr\/__init__\.py doesn't match its signed size, digest, or mode$/,
+    ],
+    [
+      "payload file with the wrong mode",
+      (fixture) => chmodSync(fixture.sitePackagePath, 0o664),
+      /runtime payload file .*__init__\.py doesn't match its signed size, digest, or mode$/,
+    ],
+    [
+      "unsigned file in the payload",
+      (fixture) => writeFileSync(join(fixture.runtimeRoot, "extra.txt"), "x", "utf-8"),
+      /runtime payload file extra\.txt isn't in the signed file list$/,
+    ],
+    [
+      "missing python",
+      (fixture) => unlinkSync(fixture.pythonPath),
+      /runtime python runtimes\/ocr\/.*\/venv\/bin\/python is missing, not a plain file, or outside its generation$/,
+    ],
+    [
+      "malformed descriptor field",
+      (fixture) =>
+        mutateDescriptor(fixture.descriptorPath, (descriptor) => {
+          descriptor.artifact.arch = null;
+        }),
+      /active descriptor has a missing or malformed field$/,
+    ],
+    [
+      "hand-edited health status",
+      (fixture) =>
+        mutateDescriptor(fixture.descriptorPath, (descriptor) => {
+          descriptor.health.status = "degraded";
+        }),
+      /active descriptor health status is degraded, not healthy$/,
+    ],
+    [
+      "missing descriptor section",
+      (fixture) =>
+        mutateDescriptor(fixture.descriptorPath, (descriptor) => {
+          Reflect.deleteProperty(descriptor, "health");
+        }),
+      /active descriptor is missing a section or has one that isn't an object$/,
+    ],
+    [
+      "descriptor that drifted from its signed artifact",
+      (fixture) =>
+        mutateDescriptor(fixture.descriptorPath, (descriptor) => {
+          descriptor.artifact.version = "9.9.9";
+        }),
+      /active descriptor doesn't match its signed artifact$/,
+    ],
+    [
+      "empty descriptor",
+      (fixture) => writeFileSync(fixture.descriptorPath, "", "utf-8"),
+      /active descriptor active\/ocr\.json is empty, too large, hard-linked, or not a plain file$/,
+    ],
+    [
+      "symlinked active directory",
+      (fixture) => {
+        const activeDir = join(fixture.aiDataDir, "v3", "active");
+        const externalActiveDir = join(fixture.aiDataDir, "external-active");
+        const descriptorJson = readFileSync(fixture.descriptorPath, "utf-8");
+        rmSync(activeDir, { recursive: true });
+        mkdirSync(externalActiveDir);
+        writeFileSync(join(externalActiveDir, "ocr.json"), descriptorJson, "utf-8");
+        symlinkSync(externalActiveDir, activeDir, "dir");
+      },
+      /active descriptor path active\/ocr\.json runs through a symlink$/,
+    ],
+    [
+      "symlinked v3 root",
+      (fixture) => {
+        const v3Root = join(fixture.aiDataDir, "v3");
+        renameSync(v3Root, join(fixture.aiDataDir, "v3-real"));
+        symlinkSync(join(fixture.aiDataDir, "v3-real"), v3Root, "dir");
+      },
+      /v3 root is a symlink or not a directory$/,
+    ],
+    [
+      "missing activation marker",
+      (fixture) => unlinkSync(fixture.activationPath),
+      /activation marker rollback\/ocr\.json is missing$/,
+    ],
+    [
+      "descriptor that no longer matches its activation marker",
+      (fixture) =>
+        writeFileSync(
+          fixture.descriptorPath,
+          `${readFileSync(fixture.descriptorPath, "utf-8")} `,
+          "utf-8",
+        ),
+      /activation marker rollback\/ocr\.json vouches for a different descriptor than active\/ocr\.json$/,
+    ],
+  ])("names the failing check for a %s", (_label, corrupt, expected) => {
+    const fixture = createRuntimeFixture();
+    corrupt(fixture);
+    const warn = quietWarn();
+
+    expect(getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64 })).toMatchObject({
+      status: "invalid",
+      reason: "descriptor-invalid",
+    });
+    expect(warnings(warn)).toEqual([expect.stringMatching(expected)]);
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    "reports a permission error as itself, not as a missing file",
+    () => {
+      const fixture = createRuntimeFixture();
+      const indexesDir = join(fixture.aiDataDir, "v3", "indexes");
+      const warn = quietWarn();
+      chmodSync(indexesDir, 0o000);
+      try {
+        expect(
+          getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64 }),
+        ).toMatchObject({ status: "invalid", reason: "descriptor-invalid" });
+      } finally {
+        chmodSync(indexesDir, 0o755);
+      }
+      expect(warnings(warn)).toEqual([
+        expect.stringMatching(/active runtime could not be read: EACCES: permission denied/),
+      ]);
+    },
+  );
+
+  it("keeps the message and cause of an error thrown while reading the runtime", () => {
+    const fixture = createRuntimeFixture();
+    const warn = quietWarn();
 
     expect(
       getOcrRuntimeCapability({
@@ -1024,7 +1146,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
     ).toMatchObject({ status: "invalid", reason: "descriptor-invalid" });
     expect(warnings(warn)).toEqual([
       expect.stringMatching(
-        /active runtime could not be read: Unable to read the OCR runtime trust store at .*no-such-trust-store\.json$/,
+        /active runtime could not be read: Unable to read the OCR runtime trust store at .*no-such-trust-store\.json: ENOENT: no such file or directory/,
       ),
     ]);
   });
@@ -1032,7 +1154,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
   it("carries the verifier's reason when the signed index isn't trusted", () => {
     const fixture = createRuntimeFixture();
     const otherKey = generateKeyPairSync("ed25519");
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = quietWarn();
 
     expect(
       getOcrRuntimeCapability({
