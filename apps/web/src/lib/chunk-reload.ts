@@ -51,9 +51,11 @@ const abortedByLeaving = new WeakSet<object>();
 
 /**
  * True for a chunk error this handler left unhandled because the page was
- * being left: the browser aborted the import, nothing crashed. Released
- * builds reported these as Firefox and Safari "crashes", never Chrome's
- * (Chrome doesn't abort), in bursts as several imports died at once (#1480).
+ * being left. Usually the browser aborted the import and nothing crashed:
+ * released builds sent these to Sentry with Firefox's and Safari's wording,
+ * never Chrome's (Chrome doesn't abort), in bursts as several imports died
+ * at once (#1480). It can't prove an abort, though, so reportRenderError
+ * delays the report rather than dropping it.
  */
 export function isAbortedByLeaving(error: unknown): boolean {
   return typeof error === "object" && error !== null && abortedByLeaving.has(error);

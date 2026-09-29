@@ -53,7 +53,7 @@ describe("a lazy page aborted while leaving", () => {
     document.body.innerHTML = "";
   });
 
-  it("reaches the boundary as the same error, so it is not reported", async () => {
+  it("reaches the boundary as the same error, so it is not reported straight away", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const uninstall = installChunkReloadHandler(vi.fn());
     window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
