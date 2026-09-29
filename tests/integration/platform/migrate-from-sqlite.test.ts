@@ -120,6 +120,9 @@ describe("migrate-from-sqlite", () => {
     const [user] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u1'`)).rows;
     expect(user.username).toBe("alice");
     expect(user.must_change_password).toBe(false); // 0 became boolean false
+    // 1.x's column default was the team *name* "Default"; no team of that name
+    // came over, so it maps to the Default team's seeded id (#1474).
+    expect(user.team).toBe("default-team-00000000");
     expect(new Date(user.created_at as string).getTime()).toBe(1750000000 * 1000); // seconds became timestamptz
     const [pipeline] = (await db.execute(sql`SELECT * FROM pipelines WHERE id = 'p1'`)).rows;
     expect((pipeline.steps as Array<{ toolId: string }>)[0].toolId).toBe("compress"); // text JSON became jsonb
@@ -480,6 +483,18 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
     expect(result.tables.jobs).toBe(4);
     expect(result.tables.audit_log).toBe(4);
     expect(result.tables.user_files).toBe(4);
+  });
+
+  it("maps 1.x team names to team ids (#1474)", async () => {
+    // 1.x stored the team's name in users.team; 2.x looks teams up by id.
+    const { rows } = await db.execute(
+      sql`SELECT id, team FROM users WHERE id IN ('u-admin', 'u-editor', 'u-oidc') ORDER BY id`,
+    );
+    expect(rows).toEqual([
+      { id: "u-admin", team: "tm-1" },
+      { id: "u-editor", team: "tm-2" },
+      { id: "u-oidc", team: "tm-1" },
+    ]);
   });
 
   it("boolean conversions: 0 -> false, 1 -> true", async () => {
@@ -891,6 +906,11 @@ describe("migrate-from-sqlite (real 1.17.2 schema)", () => {
     const [u] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u-admin'`)).rows;
     expect(u.username).toBe("admin");
     expect(u).not.toHaveProperty("analytics_enabled");
+  });
+
+  it("maps the 1.x admin's team name to the Default team's id (#1474)", async () => {
+    const [u] = (await db.execute(sql`SELECT team FROM users WHERE id = 'u-admin'`)).rows;
+    expect(u.team).toBe("default-team-00000000");
   });
 
   it("maps the out-of-enum job status 'error' to 'failed'", async () => {
