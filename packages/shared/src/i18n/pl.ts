@@ -2843,6 +2843,7 @@ export const pl: TranslationKeys = {
       bgBlack: "Czarne",
       bgNone: "Brak",
       bgCustom: "Niestandardowe",
+      collageFailed: "Nie udało się utworzyć kolażu",
     },
     stitch: {
       format: "Format",

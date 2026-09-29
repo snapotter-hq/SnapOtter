@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { de } from "@snapotter/shared/i18n/de.js";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -100,5 +102,31 @@ describe("editor menu bar i18n (#923)", () => {
       de.editor.menu.layer.flattenImage,
     );
     expect(screen.queryByText("Flatten Image")).not.toBeInTheDocument();
+  });
+
+  it("defines an item id for every menu-item test id the e2e suites select", () => {
+    const repo = path.resolve(__dirname, "../../..");
+    const menuSource = readFileSync(
+      path.join(repo, "apps/web/src/components/editor/editor-menu-bar.tsx"),
+      "utf8",
+    );
+    const ids = new Set([...menuSource.matchAll(/\bid: "([a-z0-9-]+)"/g)].map((m) => m[1]));
+    const selected = new Set<string>();
+    const scan = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) scan(full);
+        else if (entry.name.endsWith(".ts")) {
+          for (const m of readFileSync(full, "utf8").matchAll(/menu-item-([a-z0-9-]+)/g)) {
+            selected.add(m[1]);
+          }
+        }
+      }
+    };
+    scan(path.join(repo, "tests/e2e-editor"));
+    scan(path.join(repo, "tests/e2e"));
+
+    expect(selected.size).toBeGreaterThan(0);
+    expect([...selected].filter((id) => !ids.has(id))).toEqual([]);
   });
 });

@@ -2844,6 +2844,7 @@ export const uk: TranslationKeys = {
       bgBlack: "Чорний",
       bgNone: "Немає",
       bgCustom: "Власний",
+      collageFailed: "Не вдалося створити колаж",
     },
     stitch: {
       format: "Формат",

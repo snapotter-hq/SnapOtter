@@ -2836,6 +2836,7 @@ export const id: TranslationKeys = {
       bgBlack: "Hitam",
       bgNone: "Tidak ada",
       bgCustom: "Kustom",
+      collageFailed: "Kolase gagal dibuat",
     },
     stitch: {
       format: "Format",

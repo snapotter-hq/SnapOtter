@@ -2645,6 +2645,7 @@ export const hi: TranslationKeys = {
       bgBlack: "काला",
       bgNone: "कोई नहीं",
       bgCustom: "कस्टम",
+      collageFailed: "कोलाज नहीं बन सका",
     },
     stitch: {
       format: "फॉर्मेट",

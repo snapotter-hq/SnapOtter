@@ -1922,8 +1922,8 @@ export const en = {
       submitBatch: "Erase All ({count})",
       progressLabel: "Erasing object",
       stall:
-        "Processing timed out with no progress. The result may have saved to your files -- otherwise, try again.",
-      stallBatch: "Processing timed out. The result may have saved -- check your files.",
+        "Processing timed out with no progress. The result may have saved to your files; otherwise, try again.",
+      stallBatch: "Processing timed out. The result may have saved; check your files.",
       timeoutOverloaded: "Request timed out - the server may be overloaded. Try again.",
       erasingProgress: "Erasing {current}/{total}",
     },
@@ -2780,6 +2780,7 @@ export const en = {
       bgBlack: "Black",
       bgNone: "None",
       bgCustom: "Custom",
+      collageFailed: "Collage failed",
     },
     stitch: {
       submitCount: "Stitch {count} images",

@@ -127,19 +127,21 @@ export function CollageSettings() {
             try {
               resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
             } catch {
-              reject(new Error("Invalid response"));
+              reject(new Error(t.errors.invalidResponse));
             }
           } else {
             try {
               const body = JSON.parse(xhr.responseText);
-              reject(new Error(body.error || `Failed: ${xhr.status}`));
+              reject(
+                new Error(body.error || format(t.errors.failedWithStatus, { status: xhr.status })),
+              );
             } catch {
-              reject(new Error(`Failed: ${xhr.status}`));
+              reject(new Error(format(t.errors.failedWithStatus, { status: xhr.status })));
             }
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.onerror = () => reject(new Error(t.errors.network));
         xhr.send(formData);
 
         store.setProgress(5);
@@ -149,7 +151,7 @@ export function CollageSettings() {
       if (elapsed < 800) await new Promise((r) => setTimeout(r, 800 - elapsed));
       store.setResult(result.downloadUrl, result.processedSize, result.originalSize, result.jobId);
     } catch (err) {
-      store.setError(err instanceof Error ? err.message : "Collage failed");
+      store.setError(err instanceof Error ? err.message : t.toolSettings.collage.collageFailed);
     }
   }, [
     hasImages,
@@ -165,6 +167,7 @@ export function CollageSettings() {
     aspectRatio,
     outputFormat,
     quality,
+    t,
   ]);
 
   // Group templates by image count, prioritizing current count

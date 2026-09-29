@@ -2772,6 +2772,7 @@ export const ko: TranslationKeys = {
       bgBlack: "검은색",
       bgNone: "없음",
       bgCustom: "맞춤",
+      collageFailed: "콜라주를 만들지 못했습니다",
     },
     stitch: {
       format: "포맷",

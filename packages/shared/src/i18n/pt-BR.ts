@@ -2844,6 +2844,7 @@ export const ptBR: TranslationKeys = {
       bgBlack: "Preto",
       bgNone: "Nenhum",
       bgCustom: "Personalizado",
+      collageFailed: "Falha ao criar a collage",
     },
     stitch: {
       format: "Formato",

@@ -2843,6 +2843,7 @@ export const tr: TranslationKeys = {
       bgBlack: "Siyah",
       bgNone: "Yok",
       bgCustom: "Özel",
+      collageFailed: "Kolaj oluşturulamadı",
     },
     stitch: {
       format: "Biçim",

@@ -2851,6 +2851,7 @@ export const nl: TranslationKeys = {
       bgBlack: "Zwart",
       bgNone: "Geen",
       bgCustom: "Aangepast",
+      collageFailed: "Collage maken mislukt",
     },
     stitch: {
       format: "Formaat",

@@ -17,12 +17,15 @@ import ts from "typescript";
  * render site: any literal assigned to a copy-named property (PROP_NAMES) in an
  * object literal counts, because a label array is read back through property
  * accesses, lookups and child components that no file-local analysis can
- * follow. So does a literal handed to an error/message state setter or to
- * confirm()/alert(), which reaches the screen through state or a native dialog.
+ * follow. So does a literal handed to an error/message state setter (bare or
+ * as a member, `store.setError(...)`) or to confirm()/alert(), which reaches
+ * the screen through state or a native dialog.
  *
  * Known limits: a literal that travels through two locals before rendering,
- * object keys used as display text (`Object.keys(PRESETS)`), and strings built
- * in .ts files are still invisible here. Those have to be caught by review.
+ * object keys used as display text (`Object.keys(PRESETS)`), a message thrown
+ * or rejected as `new Error("...")` and shown later via `err.message`, and
+ * strings built in .ts files are still invisible here. Those have to be caught
+ * by review.
  */
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -44,6 +47,7 @@ const PROP_NAMES = new Set([
 ]);
 
 /** State setters and native dialogs whose string argument reaches the screen. */
+const STATE_SETTER_SINK = /^set\w*(Error|Message)$/;
 const MESSAGE_SINK = /^(set\w*(Error|Message)|confirm|alert)$/;
 
 // A property value shaped like an identifier ("crosshair", "move-tool") is a
@@ -186,13 +190,31 @@ function bindingDefault(
   return owner.initializer ? [owner.initializer] : [];
 }
 
-/** Right-hand sides of every `name = ...` assignment under `scope`. */
+/** Does this function-like node declare its own `name` (parameter or local)? */
+function redeclares(fn: ts.SignatureDeclaration, name: string): boolean {
+  if (fn.parameters.some((parameter) => findBinding(parameter.name, name))) return true;
+  let found = false;
+  const visit = (node: ts.Node) => {
+    if (found || (node !== fn && ts.isFunctionLike(node))) return;
+    if (ts.isVariableDeclaration(node) && findBinding(node.name, name)) found = true;
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(fn, visit);
+  return found;
+}
+
+/**
+ * Right-hand sides of every `name = ...` / `name += ...` assignment under
+ * `scope`, skipping nested functions that declare their own `name`.
+ */
 function assignmentsTo(scope: ts.Node, name: string): ts.Expression[] {
   const found: ts.Expression[] = [];
   const visit = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && redeclares(node, name)) return;
     if (
       ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      (node.operatorToken.kind === ts.SyntaxKind.EqualsToken ||
+        node.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken) &&
       ts.isIdentifier(node.left) &&
       node.left.text === name
     ) {
@@ -281,14 +303,17 @@ function isMessageSinkArgument(node: ts.Node): boolean {
     return false;
   }
   const callee = call.expression;
-  const name = ts.isIdentifier(callee)
-    ? callee.text
-    : ts.isPropertyAccessExpression(callee) &&
-        ts.isIdentifier(callee.expression) &&
-        callee.expression.text === "window"
-      ? callee.name.text
-      : null;
-  return !!name && MESSAGE_SINK.test(name);
+  if (ts.isIdentifier(callee)) return MESSAGE_SINK.test(callee.text);
+  if (!ts.isPropertyAccessExpression(callee)) return false;
+  // store.setError(...) and useFileStore.getState().setError(...) count;
+  // confirm()/alert() only as the window globals, not someone's dialog API.
+  const name = callee.name.text;
+  if (STATE_SETTER_SINK.test(name)) return true;
+  return (
+    ts.isIdentifier(callee.expression) &&
+    callee.expression.text === "window" &&
+    MESSAGE_SINK.test(name)
+  );
 }
 
 function literalText(node: ts.Node): string | null {

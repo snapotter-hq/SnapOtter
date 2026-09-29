@@ -2834,6 +2834,7 @@ export const vi: TranslationKeys = {
       bgBlack: "Đen",
       bgNone: "Không",
       bgCustom: "Tùy chỉnh",
+      collageFailed: "Không thể tạo ảnh ghép",
     },
     stitch: {
       format: "Định dạng",

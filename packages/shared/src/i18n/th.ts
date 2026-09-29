@@ -2797,6 +2797,7 @@ export const th: TranslationKeys = {
       bgBlack: "ดำ",
       bgNone: "ไม่มี",
       bgCustom: "กำหนดเอง",
+      collageFailed: "สร้างคอลลาจไม่สำเร็จ",
     },
     stitch: {
       format: "รูปแบบ",

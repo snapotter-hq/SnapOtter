@@ -2796,6 +2796,7 @@ export const ja: TranslationKeys = {
       bgBlack: "黒",
       bgNone: "なし",
       bgCustom: "カスタム",
+      collageFailed: "コラージュの作成に失敗しました",
     },
     stitch: {
       format: "フォーマット",

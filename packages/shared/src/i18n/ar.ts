@@ -2815,6 +2815,7 @@ export const ar: TranslationKeys = {
       bgBlack: "أسود",
       bgNone: "بدون",
       bgCustom: "مخصص",
+      collageFailed: "فشل إنشاء الصورة المجمّعة",
     },
     stitch: {
       format: "الصيغة",

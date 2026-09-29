@@ -26,6 +26,7 @@ afterEach(() => {
 });
 
 const texts = (dir: string | string[]) => scanToolUiLiterals(dir).map((h) => h.text);
+const kinds = (dir: string) => scanToolUiLiterals(dir).map((h) => [h.kind, h.text]);
 
 describe("scanToolUiLiterals", () => {
   it("reports JSX text, user-facing attributes and rendered expressions", () => {
@@ -191,7 +192,10 @@ describe("scanToolUiLiterals", () => {
         <span>{SAMPLE_SIZES.find((s) => s.value === size)?.label}</span>
       );`,
     });
-    expect(texts(dir).sort()).toEqual(["3x3 Average", "Point (1x1)"]);
+    expect(kinds(dir)).toEqual([
+      ["PROP", "Point (1x1)"],
+      ["PROP", "3x3 Average"],
+    ]);
   });
 
   it("reports every user-facing property name, whether or not this file renders it (#922)", () => {
@@ -236,7 +240,18 @@ describe("scanToolUiLiterals", () => {
     expect(texts(dir)).toEqual([]);
   });
 
-  it("reports a destructured local whose source object holds the literal (#922)", () => {
+  it("reports a destructuring default that renders (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `const cfg: { heading?: string } = {};
+      export const A = () => {
+        const { heading = "Fallback heading" } = cfg;
+        return <h2>{heading}</h2>;
+      };`,
+    });
+    expect(kinds(dir)).toEqual([["LOCAL", "Fallback heading"]]);
+  });
+
+  it("reports the source object of a destructured copy property through PROP (#922)", () => {
     const dir = fixture({
       "a.tsx": `const config = { title: "Export settings" };
       export const A = () => {
@@ -244,7 +259,7 @@ describe("scanToolUiLiterals", () => {
         return <h2>{title}</h2>;
       };`,
     });
-    expect(texts(dir)).toEqual(["Export settings"]);
+    expect(kinds(dir)).toEqual([["PROP", "Export settings"]]);
   });
 
   it("reports a parameter default that renders (#922)", () => {
@@ -278,6 +293,33 @@ describe("scanToolUiLiterals", () => {
       };`,
     });
     expect(texts(dir).sort()).toEqual(["File not found", "File too large", "Too big"]);
+  });
+
+  it("follows += onto a rendered let (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = ({ n }: { n: number }) => {
+        let msg = "Start here";
+        if (n) msg += " and more words";
+        return <p>{msg}</p>;
+      };`,
+    });
+    expect(texts(dir).sort()).toEqual(["Start here", "and more words"]);
+  });
+
+  it("ignores assignments to a same-named let in a nested function (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = () => {
+        let msg = "Outer copy shown";
+        const helper = () => {
+          let msg = "";
+          msg = "Inner only copy";
+          return msg.length;
+        };
+        helper();
+        return <p>{msg}</p>;
+      };`,
+    });
+    expect(texts(dir)).toEqual(["Outer copy shown"]);
   });
 
   it("does not report assignments to a let that never renders (#922)", () => {
@@ -314,12 +356,30 @@ describe("scanToolUiLiterals", () => {
     );
   });
 
+  it("reports literals handed to a member error setter (#922)", () => {
+    const dir = fixture({
+      "a.tsx": `export const A = () => {
+        store.setError("Collage failed");
+        useFileStore.getState().setError(\`Upload failed: \${"x"}\`);
+        return null;
+      };`,
+    });
+    expect(kinds(dir)).toEqual([
+      ["SINK", "Collage failed"],
+      ["SINK", "Upload failed:"],
+    ]);
+  });
+
   it("does not report literals handed to other setters (#922)", () => {
     const dir = fixture({
       "a.tsx": `export const A = () => {
         setPreset("Custom Preset");
         setMode("Grid Mode");
         setError(null);
+        setErrorCount("Not A Message");
+        setMessages("Not A Message Either");
+        store.setPreset("Custom Preset");
+        dialog.confirm("Their Own Dialog");
         return null;
       };`,
     });

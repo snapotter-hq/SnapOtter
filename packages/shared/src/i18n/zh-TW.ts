@@ -2578,6 +2578,7 @@ export const zhTW: TranslationKeys = {
       bgBlack: "黑色",
       bgNone: "無",
       bgCustom: "自訂",
+      collageFailed: "拼貼畫建立失敗",
     },
     stitch: {
       format: "格式",

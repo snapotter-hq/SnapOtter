@@ -20,10 +20,12 @@ vi.stubGlobal("localStorage", {
   clear: () => storage.clear(),
 });
 
+import { NewDocumentDialog } from "@/components/editor/common/new-document-dialog";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { CropOptions } from "@/components/editor/options/crop-options";
 import { EyedropperOptions } from "@/components/editor/options/eyedropper-options";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { useEditorStore } from "@/stores/editor-store";
 
 function renderDe(ui: React.ReactNode) {
   localStorage.setItem("snapotter-locale", "de");
@@ -35,6 +37,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  useEditorStore.setState({ cropState: null });
   cleanup();
   vi.clearAllMocks();
 });
@@ -67,5 +70,44 @@ describe("data-structure label sweep (#922)", () => {
     expect(free).toHaveValue("free");
     expect(screen.getByRole("option", { name: "16:9" })).toHaveValue("16:9");
     expect(screen.queryByRole("option", { name: "Free" })).not.toBeInTheDocument();
+  });
+
+  it("applies a ratio by id and clears it again on Free (#922)", async () => {
+    useEditorStore.setState({
+      cropState: { x: 0, y: 0, width: 400, height: 400, aspectRatio: null },
+    });
+    renderDe(<CropOptions />);
+
+    const select = await screen.findByRole("combobox");
+    fireEvent.change(select, { target: { value: "16:9" } });
+    const ratioed = useEditorStore.getState().cropState;
+    expect(ratioed?.aspectRatio).toBe("16:9");
+    expect(ratioed?.width).toBe(400);
+    expect(ratioed?.height).toBeCloseTo(225);
+
+    fireEvent.change(select, { target: { value: "free" } });
+    expect(useEditorStore.getState().cropState?.aspectRatio).toBeNull();
+  });
+
+  it("keeps new-document presets working on ids, with Custom translated (#922)", async () => {
+    renderDe(<NewDocumentDialog open onClose={() => {}} />);
+
+    const preset = (await screen.findByLabelText(
+      de.editor.ui.newDocument.preset,
+    )) as HTMLSelectElement;
+    const width = screen.getByLabelText(de.editor.ui.widthPx) as HTMLInputElement;
+    const height = screen.getByLabelText(de.editor.ui.heightPx) as HTMLInputElement;
+    expect(preset.value).toBe("hd");
+    expect(width.value).toBe("1920");
+
+    fireEvent.change(preset, { target: { value: "4k" } });
+    expect(preset.value).toBe("4k");
+    expect(width.value).toBe("3840");
+    expect(height.value).toBe("2160");
+
+    fireEvent.change(width, { target: { value: "1000" } });
+    expect(preset.value).toBe("custom");
+    expect(preset.selectedOptions[0]).toHaveTextContent(de.editor.ui.newDocument.presetCustom);
+    expect(screen.queryByRole("option", { name: "Custom" })).not.toBeInTheDocument();
   });
 });
