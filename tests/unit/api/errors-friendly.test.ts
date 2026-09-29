@@ -121,4 +121,21 @@ describe("stripInternalPaths", () => {
   it("leaves messages with no path untouched", () => {
     expect(stripInternalPaths("Region exceeds image bounds")).toBe("Region exceeds image bounds");
   });
+
+  it("strips paths under the host's temp dir, wherever TMPDIR points (#1430)", () => {
+    // macOS puts it under /var/folders, and a job runner may point it anywhere;
+    // decoder errors carry temp paths built from os.tmpdir().
+    const original = process.env.TMPDIR;
+    process.env.TMPDIR = "/Users/runner/jobs/42/tmp";
+    try {
+      expect(
+        stripInternalPaths(
+          "Command failed: heif-convert /Users/runner/jobs/42/tmp/heic-in-7-abc.heic /Users/runner/jobs/42/tmp/heic-out-7-abc.png",
+        ),
+      ).toBe("Command failed: heif-convert [internal] [internal]");
+    } finally {
+      if (original === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = original;
+    }
+  });
 });

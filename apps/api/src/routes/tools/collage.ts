@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -481,7 +481,7 @@ export function registerCollage(app: FastifyInstance) {
           if (isDecoderUnavailable(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }
@@ -498,7 +498,7 @@ export function registerCollage(app: FastifyInstance) {
             if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
         }

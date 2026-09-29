@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import type { ZodIssue } from "zod";
 
 export function formatZodErrors(issues: ZodIssue[]): string {
@@ -8,13 +9,23 @@ export function formatZodErrors(issues: ZodIssue[]): string {
 
 /**
  * Strip internal filesystem paths from error messages to avoid
- * leaking server directory structure to API consumers.
+ * leaking server directory structure to API consumers. That includes
+ * anything under the host's temp dir, which on macOS or a job runner sits
+ * outside the roots above; decoder errors carry temp paths (#1430).
  */
 export function stripInternalPaths(message: string): string {
-  return message.replace(
+  const tempRoot = tmpdir().replace(/[/\\]+$/, "");
+  const withoutTemp = tempRoot
+    ? message.replace(new RegExp(`${escapeRegExp(tempRoot)}[^\\s'")}]*`, "g"), "[internal]")
+    : message;
+  return withoutTemp.replace(
     /\/(?:tmp|data|app|opt|home|workspace)\b[^\s'")}]*|[A-Za-z]:\\[^\s'")}]*/g,
     "[internal]",
   );
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // Matching control characters is the entire point of these patterns (we strip

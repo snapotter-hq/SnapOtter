@@ -12,6 +12,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import type { DeepEnhanceSkipReason } from "../../lib/batch-file-notes.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { reportError } from "../../lib/error-report.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import {
@@ -255,7 +256,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
           }
           return reply.status(422).send({
             error: "Failed to decode HEIC file",
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }
@@ -275,7 +276,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
           }
           return reply.status(422).send({
             error: `Failed to decode ${validation.format} file`,
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { prepareZXingModule, readBarcodes } from "zxing-wasm/reader";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { reportError } from "../../lib/error-report.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -175,7 +175,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
             if (isDecoderUnavailable(err)) throw err;
             return reply.status(422).send({
               error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
         }
@@ -190,7 +190,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
               if (isDecoderUnavailable(decodeErr)) throw decodeErr;
               return reply.status(422).send({
                 error: `Failed to decode ${validation.format.toUpperCase()} file`,
-                details: err instanceof Error ? err.message : String(err),
+                details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
               });
             }
           }

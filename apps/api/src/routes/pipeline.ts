@@ -22,7 +22,7 @@ import { type Pool, queueName, type ToolJobData } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
-import { formatZodErrors } from "../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
@@ -415,7 +415,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         return reply.status(422).send({
                           error:
                             "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-                          details: err instanceof Error ? err.message : String(err),
+                          details: stripInternalPaths(
+                            err instanceof Error ? err.message : String(err),
+                          ),
                         });
                       }
                     }
@@ -435,7 +437,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         if (isDecoderUnavailable(err)) throw err;
                         return reply.status(422).send({
                           error: `Failed to decode ${validation.format} file`,
-                          details: err instanceof Error ? err.message : String(err),
+                          details: stripInternalPaths(
+                            err instanceof Error ? err.message : String(err),
+                          ),
                         });
                       }
                     }

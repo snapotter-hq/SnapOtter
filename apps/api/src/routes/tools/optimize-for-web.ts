@@ -5,7 +5,7 @@ import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -124,7 +124,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
           }
           return reply.status(422).send({
             error: "Failed to decode HEIC file",
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }
@@ -144,7 +144,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
           }
           return reply.status(422).send({
             error: `Failed to decode ${validation.format} file`,
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       }
