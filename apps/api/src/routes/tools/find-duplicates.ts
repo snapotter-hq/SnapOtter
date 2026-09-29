@@ -7,6 +7,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
@@ -80,8 +81,14 @@ async function extractFileInfo(file: FileData): Promise<FileInfo> {
       .jpeg({ quality: 70 })
       .toBuffer();
     thumbnail = `data:image/jpeg;base64,${thumbBuffer.toString("base64")}`;
-  } catch {
-    // Non-fatal: some formats may fail thumbnail generation
+  } catch (err) {
+    // Non-fatal: the UI shows the entry without a preview. Info rather than
+    // debug, since it fires once per file and only on failure, and the default
+    // LOG_LEVEL would hide a debug line.
+    logger.info(
+      { err, filename: file.filename, format },
+      "find-duplicates: thumbnail failed, returning null",
+    );
   }
 
   return {
@@ -218,7 +225,14 @@ export function registerFindDuplicates(app: FastifyInstance) {
           const info = await extractFileInfo(file);
           info.hash = await computeDHash128(file.buffer);
           fileInfos.push(info);
-        } catch {
+        } catch (err) {
+          // This is where a buffer Sharp can't decode gets rejected. When
+          // autoOrient warned just before, this is the follow-up line its own
+          // comment points at, so carry the Sharp error.
+          logger.warn(
+            { err, filename: file.filename },
+            "find-duplicates: skipping file, hash failed",
+          );
           skippedFiles.push({ filename: file.filename, reason: "Failed to compute image hash" });
         }
       }
