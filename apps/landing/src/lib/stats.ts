@@ -15,7 +15,7 @@
 // 176,180. A scheduled rebuild cannot refresh a number no build ever reads.
 const GHCR_PACKAGE_URL =
   "https://github.com/users/snapotter-hq/packages/container/package/snapotter";
-const GHCR_FALLBACK = 176_000; // live 2026-09-12: 176,180
+const GHCR_FALLBACK = 218_000; // live 2026-09-29: 218,100
 
 // Fallbacks for when an upstream fetch fails. These are a safety net, not a
 // source of truth: a successful build overwrites them with live values, and the
@@ -23,13 +23,13 @@ const GHCR_FALLBACK = 176_000; // live 2026-09-12: 176,180
 // "+", a stale constant understates rather than overstates, so a degraded build
 // is never a false claim, just a quieter one.
 //
-// REFRESHED 2026-09-12 against the live APIs. They had drifted badly once
+// REFRESHED 2026-09-29 (pulls) against the live APIs. They had drifted badly once
 // before (104K against a real 232K, understating pulls by ~55%), because a
 // failed fetch degraded silently and nothing ever surfaced the gap. `warnStale`
 // below now puts it in the build log. Re-check these whenever you touch this
 // file.
 const STAR_FALLBACK = 2_630; // live 2026-09-12: 2,636
-const DOCKER_FALLBACK = 486_000; // live 2026-09-12: 486,567
+const DOCKER_FALLBACK = 580_000; // live 2026-09-29: 580,677
 
 const GITHUB_REPO = "snapotter-hq/SnapOtter";
 const DOCKERHUB_REPO = "snapotter/snapotter";
