@@ -188,7 +188,7 @@ docker compose -f docker-compose.dev.yml up -d
 export DATA_DIR=/tmp/so-test-data && mkdir -p "$DATA_DIR"
 ```
 
-Each Vitest fork gets its own Postgres DB clone + workspace + isolated `BULLMQ_PREFIX`
+Each Vitest fork gets its own Postgres DB clone + workspace + library-file folder + isolated `BULLMQ_PREFIX`
 via `tests/setup/per-fork-env.ts` (testcontainers for Postgres). 30s test timeouts.
 
 ### E2E Projects

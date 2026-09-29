@@ -17,9 +17,9 @@ const FORK_DIR = /^SnapOtter-test-(\d+)_[0-9a-f]{8}$/;
 
 /**
  * A sweep only removes directories created at least this long ago (the top
- * directory's mtime is set when its entries, `workspace/` and `files/`, are
- * made). A pid
- * means something only inside its own namespace, so a run in a container
+ * directory's mtime moves each time an entry is added: `workspace/` at setup,
+ * `files/` and others on first use, which only makes a live one look younger).
+ * A pid means something only inside its own namespace, so a run in a container
  * sharing this temp dir can look dead from here; no worker, which lives for a
  * single test file, runs this long.
  */
