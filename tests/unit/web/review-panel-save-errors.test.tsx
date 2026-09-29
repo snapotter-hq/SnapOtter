@@ -407,10 +407,17 @@ describe("ReviewPanel Save to Files failure reasons (#1350)", () => {
     [
       "the API's upload limit",
       () =>
-        new Response(JSON.stringify({ error: "request file too large" }), {
-          status: 413,
-          headers: JSON_HEADERS,
-        }),
+        new Response(
+          JSON.stringify({
+            error: "request file too large",
+            details: "request file too large",
+            code: "FST_REQ_FILE_TOO_LARGE",
+          }),
+          {
+            status: 413,
+            headers: JSON_HEADERS,
+          },
+        ),
     ],
     [
       "a proxy's HTML page",

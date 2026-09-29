@@ -178,7 +178,7 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
     ]);
     expect(res.statusCode).toBe(413);
     // Not a quota answer: the panel tells these apart by the code (#1350).
-    expect(res.json().code).toBeUndefined();
+    expect(res.json().code).not.toBe("STORAGE_QUOTA_EXCEEDED");
     await expectNothingSaved(before, 1);
   });
 
