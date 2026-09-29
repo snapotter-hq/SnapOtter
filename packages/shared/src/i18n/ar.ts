@@ -5483,6 +5483,7 @@ export const ar: TranslationKeys = {
     failedWithStatus: "فشل: {status}",
     processingFailedWithStatus: "فشلت المعالجة: {status}",
     processingFailedNoDetail: "فشلت المعالجة",
+    jobTrackingFailed: "حدث خطأ أثناء متابعة هذه المهمة. حاول مرة أخرى.",
     requestTimedOut: "انتهت مهلة الطلب",
     requestFailedWithStatus: "فشل الطلب: {status}",
   },

@@ -5540,6 +5540,7 @@ export const tr: TranslationKeys = {
     failedWithStatus: "Başarısız: {status}",
     processingFailedWithStatus: "İşlem başarısız oldu: {status}",
     processingFailedNoDetail: "İşlem başarısız oldu",
+    jobTrackingFailed: "Bu iş takip edilirken bir sorun oluştu. Tekrar deneyin.",
     requestTimedOut: "İstek zaman aşımına uğradı",
     requestFailedWithStatus: "İstek başarısız oldu: {status}",
   },

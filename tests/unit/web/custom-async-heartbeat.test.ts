@@ -87,9 +87,9 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     ).toThrow("boom");
 
     expect(onFailed).toHaveBeenCalledOnce();
-    expect(onFailed).toHaveBeenCalledWith(
-      "Something went wrong while tracking this job. Try again.",
-    );
+    // A reason, not text: this function has no locale, so the component
+    // translates it (#1593).
+    expect(onFailed).toHaveBeenCalledWith({ reason: "trackingFailed" });
     expect(FakeEventSource.instances[0].readyState).toBe(2);
     vi.advanceTimersByTime(10 * 60_000);
     expect(onStall).not.toHaveBeenCalled();
@@ -111,12 +111,37 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
         data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
       }),
     ).toThrow("onFailed broke");
-    expect(onFailed).toHaveBeenNthCalledWith(1, "server said no");
-    expect(onFailed).toHaveBeenNthCalledWith(
-      2,
-      "Something went wrong while tracking this job. Try again.",
-    );
+    expect(onFailed).toHaveBeenNthCalledWith(1, { message: "server said no" });
+    expect(onFailed).toHaveBeenNthCalledWith(2, { reason: "trackingFailed" });
     expect(FakeEventSource.instances[0].readyState).toBe(2);
+  });
+
+  it("passes the server's own error through as the failure message", () => {
+    const onFailed = vi.fn();
+    subscribe("job-failed", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "failed",
+        error: "Signature box is off the page",
+      }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ message: "Signature box is off the page" });
+  });
+
+  // #1593: this used to hand onFailed the English "Processing failed", which
+  // the component showed as-is in every locale.
+  it("reports a failed frame with no error text as a reason, not English", () => {
+    const onFailed = vi.fn();
+    subscribe("job-failed-bare", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "failed" }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
   });
 
   it("ignores a malformed frame and keeps waiting", () => {

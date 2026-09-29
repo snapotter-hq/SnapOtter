@@ -5551,6 +5551,7 @@ export const nl: TranslationKeys = {
     failedWithStatus: "Mislukt: {status}",
     processingFailedWithStatus: "Verwerking mislukt: {status}",
     processingFailedNoDetail: "Verwerking mislukt",
+    jobTrackingFailed: "Er ging iets mis bij het volgen van deze taak. Probeer het opnieuw.",
     requestTimedOut: "Time-out van verzoek",
     requestFailedWithStatus: "Verzoek mislukt: {status}",
   },

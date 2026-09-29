@@ -5564,6 +5564,7 @@ export const fr: TranslationKeys = {
     failedWithStatus: "Échec : {status}",
     processingFailedWithStatus: "Échec du traitement : {status}",
     processingFailedNoDetail: "Échec du traitement",
+    jobTrackingFailed: "Un problème est survenu lors du suivi de cette tâche. Réessayez.",
     requestTimedOut: "Délai d'attente dépassé",
     requestFailedWithStatus: "Échec de la requête : {status}",
   },

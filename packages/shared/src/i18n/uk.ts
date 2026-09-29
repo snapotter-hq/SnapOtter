@@ -5540,6 +5540,7 @@ export const uk: TranslationKeys = {
     failedWithStatus: "Помилка: {status}",
     processingFailedWithStatus: "Обробка не вдалася: {status}",
     processingFailedNoDetail: "Обробка не вдалася",
+    jobTrackingFailed: "Під час відстеження цього завдання сталася помилка. Спробуйте ще раз.",
     requestTimedOut: "Час очікування вичерпано",
     requestFailedWithStatus: "Помилка запиту: {status}",
   },

@@ -5478,6 +5478,7 @@ export const ja: TranslationKeys = {
     failedWithStatus: "失敗しました：{status}",
     processingFailedWithStatus: "処理に失敗しました：{status}",
     processingFailedNoDetail: "処理に失敗しました",
+    jobTrackingFailed: "このジョブの追跡中に問題が発生しました。もう一度お試しください。",
     requestTimedOut: "リクエストがタイムアウトしました",
     requestFailedWithStatus: "リクエストに失敗しました：{status}",
   },

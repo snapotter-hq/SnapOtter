@@ -5544,6 +5544,7 @@ export const ptBR: TranslationKeys = {
     failedWithStatus: "Falha: {status}",
     processingFailedWithStatus: "Falha no processamento: {status}",
     processingFailedNoDetail: "Falha no processamento",
+    jobTrackingFailed: "Algo deu errado ao acompanhar esta tarefa. Tente novamente.",
     requestTimedOut: "A requisição expirou",
     requestFailedWithStatus: "Falha na requisição: {status}",
   },

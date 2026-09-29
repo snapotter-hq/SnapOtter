@@ -5543,6 +5543,7 @@ export const es: TranslationKeys = {
     failedWithStatus: "Error: {status}",
     processingFailedWithStatus: "Error en el procesamiento: {status}",
     processingFailedNoDetail: "Error en el procesamiento",
+    jobTrackingFailed: "Algo salió mal al seguir esta tarea. Vuelve a intentarlo.",
     requestTimedOut: "La solicitud agotó el tiempo de espera",
     requestFailedWithStatus: "Error en la solicitud: {status}",
   },

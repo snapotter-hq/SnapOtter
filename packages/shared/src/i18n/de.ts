@@ -5570,6 +5570,8 @@ export const de: TranslationKeys = {
     failedWithStatus: "Fehlgeschlagen: {status}",
     processingFailedWithStatus: "Verarbeitung fehlgeschlagen: {status}",
     processingFailedNoDetail: "Verarbeitung fehlgeschlagen",
+    jobTrackingFailed:
+      "Beim Verfolgen dieses Auftrags ist ein Fehler aufgetreten. Versuchen Sie es erneut.",
     requestTimedOut: "Zeitüberschreitung der Anfrage",
     requestFailedWithStatus: "Anfrage fehlgeschlagen: {status}",
   },

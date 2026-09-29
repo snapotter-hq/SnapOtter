@@ -5312,6 +5312,7 @@ export const hi: TranslationKeys = {
     failedWithStatus: "विफल: {status}",
     processingFailedWithStatus: "प्रोसेसिंग विफल: {status}",
     processingFailedNoDetail: "प्रोसेसिंग विफल",
+    jobTrackingFailed: "इस जॉब को ट्रैक करते समय कुछ गलत हो गया। फिर से प्रयास करें।",
     requestTimedOut: "अनुरोध का समय समाप्त हो गया",
     requestFailedWithStatus: "अनुरोध विफल: {status}",
   },

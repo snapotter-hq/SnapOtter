@@ -5451,6 +5451,7 @@ export const th: TranslationKeys = {
     failedWithStatus: "ล้มเหลว: {status}",
     processingFailedWithStatus: "ประมวลผลล้มเหลว: {status}",
     processingFailedNoDetail: "ประมวลผลล้มเหลว",
+    jobTrackingFailed: "เกิดข้อผิดพลาดขณะติดตามงานนี้ ลองอีกครั้ง",
     requestTimedOut: "คำขอหมดเวลา",
     requestFailedWithStatus: "คำขอล้มเหลว: {status}",
   },

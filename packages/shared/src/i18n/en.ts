@@ -5457,6 +5457,7 @@ export const en = {
     failedWithStatus: "Failed: {status}",
     processingFailedWithStatus: "Processing failed: {status}",
     processingFailedNoDetail: "Processing failed",
+    jobTrackingFailed: "Something went wrong while tracking this job. Try again.",
     requestTimedOut: "Request timed out",
     requestFailedWithStatus: "Request failed: {status}",
   },

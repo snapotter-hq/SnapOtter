@@ -5546,6 +5546,7 @@ export const pl: TranslationKeys = {
     failedWithStatus: "Niepowodzenie: {status}",
     processingFailedWithStatus: "Przetwarzanie nie powiodło się: {status}",
     processingFailedNoDetail: "Przetwarzanie nie powiodło się",
+    jobTrackingFailed: "Coś poszło nie tak podczas śledzenia tego zadania. Spróbuj ponownie.",
     requestTimedOut: "Upłynął limit czasu żądania",
     requestFailedWithStatus: "Żądanie nie powiodło się: {status}",
   },

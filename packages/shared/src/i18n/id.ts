@@ -5529,6 +5529,7 @@ export const id: TranslationKeys = {
     failedWithStatus: "Gagal: {status}",
     processingFailedWithStatus: "Pemrosesan gagal: {status}",
     processingFailedNoDetail: "Pemrosesan gagal",
+    jobTrackingFailed: "Terjadi kesalahan saat melacak pekerjaan ini. Coba lagi.",
     requestTimedOut: "Permintaan habis waktu",
     requestFailedWithStatus: "Permintaan gagal: {status}",
   },

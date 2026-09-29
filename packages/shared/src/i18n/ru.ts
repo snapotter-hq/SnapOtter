@@ -5541,6 +5541,7 @@ export const ru: TranslationKeys = {
     failedWithStatus: "Ошибка: {status}",
     processingFailedWithStatus: "Ошибка обработки: {status}",
     processingFailedNoDetail: "Ошибка обработки",
+    jobTrackingFailed: "Что-то пошло не так при отслеживании этой задачи. Попробуйте снова.",
     requestTimedOut: "Время ожидания истекло",
     requestFailedWithStatus: "Ошибка запроса: {status}",
   },

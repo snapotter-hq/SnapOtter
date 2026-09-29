@@ -5548,6 +5548,8 @@ export const it: TranslationKeys = {
     failedWithStatus: "Non riuscito: {status}",
     processingFailedWithStatus: "Elaborazione non riuscita: {status}",
     processingFailedNoDetail: "Elaborazione non riuscita",
+    jobTrackingFailed:
+      "Si è verificato un problema durante il monitoraggio di questa operazione. Riprova.",
     requestTimedOut: "Richiesta scaduta",
     requestFailedWithStatus: "Richiesta non riuscita: {status}",
   },

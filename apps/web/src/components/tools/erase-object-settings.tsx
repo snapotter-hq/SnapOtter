@@ -8,7 +8,7 @@ import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
-import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import { type JobFailure, jobFailureMessage, type ProgressFrame } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
@@ -35,7 +35,7 @@ const SSE_STALL_TIMEOUT_MS = 5 * 60_000;
 interface ProgressHandlers {
   onProgress?: (percent: number) => void;
   onComplete: (result: Record<string, unknown>) => void;
-  onFailed: (error: string) => void;
+  onFailed: (failure: JobFailure) => void;
   onStall: () => void;
 }
 
@@ -116,7 +116,9 @@ export function subscribeEraseObjectJobProgress(
         }
         if (data.phase === "failed") {
           cleanup();
-          handlers.onFailed(typeof data.error === "string" ? data.error : "Processing failed");
+          handlers.onFailed(
+            typeof data.error === "string" ? { message: data.error } : { reason: "noDetail" },
+          );
           return;
         }
         if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
@@ -125,7 +127,7 @@ export function subscribeEraseObjectJobProgress(
         // with it, so nothing else would ever settle the run.
         cleanup();
         try {
-          handlers.onFailed(FRAME_HANDLING_FAILED);
+          handlers.onFailed({ reason: "trackingFailed" });
         } catch {
           // onFailed may be what threw; the original error is rethrown below.
         }
@@ -227,7 +229,7 @@ export function EraseObjectSettings({
           applyResult(r);
           resolve();
         },
-        onFailed: (err) => reject(new Error(err)),
+        onFailed: (failure) => reject(new Error(jobFailureMessage(failure, t.errors))),
         onStall: () => reject(new Error(t.toolSettings["erase-object"].stallBatch)),
       });
 
@@ -354,9 +356,9 @@ export function EraseObjectSettings({
         applyResult(r);
         finishUi();
       },
-      onFailed: (err) => {
+      onFailed: (failure) => {
         progressCleanupRef.current = null;
-        setError(err);
+        setError(jobFailureMessage(failure, t.errors));
         finishUi();
       },
       onStall: () => {

@@ -15,3 +15,19 @@ export interface ProgressFrame {
  * that fails to parse is the only kind a handler may ignore.
  */
 export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this job. Try again.";
+
+/**
+ * How a job-progress subscriber reports a failed run. Subscribers that live
+ * outside a component have no locale, so when there's no server text they hand
+ * over a reason and the component translates it with jobFailureMessage (#1593).
+ */
+export type JobFailure = { message: string } | { reason: "noDetail" | "trackingFailed" };
+
+/** The text to show for a JobFailure, in the caller's locale. */
+export function jobFailureMessage(
+  failure: JobFailure,
+  errors: { processingFailedNoDetail: string; jobTrackingFailed: string },
+): string {
+  if ("message" in failure) return failure.message;
+  return failure.reason === "noDetail" ? errors.processingFailedNoDetail : errors.jobTrackingFailed;
+}

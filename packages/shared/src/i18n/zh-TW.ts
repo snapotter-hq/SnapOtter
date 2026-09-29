@@ -5228,6 +5228,7 @@ export const zhTW: TranslationKeys = {
     failedWithStatus: "失敗：{status}",
     processingFailedWithStatus: "處理失敗：{status}",
     processingFailedNoDetail: "處理失敗",
+    jobTrackingFailed: "追蹤此工作時發生錯誤。請再試一次。",
     requestTimedOut: "要求逾時",
     requestFailedWithStatus: "要求失敗：{status}",
   },
