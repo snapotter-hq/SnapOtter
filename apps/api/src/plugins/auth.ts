@@ -196,7 +196,7 @@ export function createSessionToken(): string {
 export async function ensureDefaultTeam(): Promise<void> {
   await db
     .insert(schema.teams)
-    .values({ id: "default-team-00000000", name: "Default" })
+    .values({ id: schema.DEFAULT_TEAM_ID, name: "Default" })
     .onConflictDoNothing();
 }
 

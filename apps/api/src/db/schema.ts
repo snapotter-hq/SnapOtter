@@ -21,6 +21,9 @@ export const jobStatus = pgEnum("job_status", [
   "canceled",
 ]);
 
+/** The id ensureDefaultTeam() seeds the "Default" team with (1.x used the same one). */
+export const DEFAULT_TEAM_ID = "default-team-00000000";
+
 export const users = pgTable(
   "users",
   {
@@ -28,7 +31,9 @@ export const users = pgTable(
     username: text("username").notNull().unique(),
     passwordHash: text("password_hash"),
     role: text("role").notNull().default("user"),
-    team: text("team").notNull().default("Default"),
+    // A teams.id, never a name (#1474): every lookup matches on the id, and
+    // renaming a team must not orphan its members.
+    team: text("team").notNull().default(DEFAULT_TEAM_ID),
     mustChangePassword: boolean("must_change_password").notNull().default(true),
     authProvider: text("auth_provider").notNull().default("local"),
     externalId: text("external_id"),
