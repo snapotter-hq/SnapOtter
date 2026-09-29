@@ -1,5 +1,6 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -697,28 +698,76 @@ test("the canonical E2E command exactly covers every release browser and device 
 
 test("pnpm test:e2e runs every lane even when an earlier one fails (#1390)", async () => {
   const { runPlan } = (await import(pathToFileURL(e2eRunnerPath).href)) as {
-    runPlan: (plan: string[][], runCommand: (args: string[]) => number | null) => number;
+    runPlan: (plan: string[][], runCommand: (args: string[]) => number | string) => number;
   };
   const plan = [
     ["test", "--project=chromium"],
     ["test", "--project=chromium-serial", "--workers=1"],
     ["test", "--project=chromium-visual"],
   ];
-  const statuses = [1, 0, 2];
-  const ran: string[][] = [];
+  const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  try {
+    const outcomes = [1, 0, 2];
+    const ran: string[][] = [];
 
-  // On a Mac the standard lane is red for known reasons (#912), and stopping
-  // there hid every chromium-serial and chromium-visual failure behind it.
-  const status = runPlan(plan, (args) => {
-    ran.push(args);
-    return statuses[ran.length - 1] ?? 0;
-  });
+    // On a Mac the standard lane is red for known reasons (#912), and stopping
+    // there hid every chromium-serial and chromium-visual failure behind it.
+    const status = runPlan(plan, (args) => {
+      ran.push(args);
+      return outcomes[ran.length - 1] ?? 0;
+    });
 
-  expect(ran).toEqual(plan);
-  expect(status).toBe(1);
-  expect(runPlan(plan, () => 0)).toBe(0);
-  // A lane killed by a signal reports a null status; that is a failure too.
-  expect(runPlan(plan, () => null)).toBe(1);
+    expect(ran).toEqual(plan);
+    expect(status).toBe(1);
+    const summary = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(summary).toContain("playwright test --project=chromium (exit 1)");
+    expect(summary).toContain("playwright test --project=chromium-visual (exit 2)");
+    expect(summary).not.toContain("chromium-serial");
+
+    stderr.mockClear();
+    expect(runPlan(plan, () => 0)).toBe(0);
+    expect(stderr).not.toHaveBeenCalled();
+
+    // A lane killed by a signal has no exit code; it still fails the run.
+    const killed = ["SIGKILL", 0, 0];
+    let lane = 0;
+    expect(runPlan(plan, () => killed[lane++] ?? 0)).toBe(1);
+    expect(stderr.mock.calls.map(([chunk]) => String(chunk)).join("")).toContain(
+      "(killed by SIGKILL)",
+    );
+  } finally {
+    stderr.mockRestore();
+  }
+});
+
+test("pnpm test:e2e reaches every lane through the real entry point (#1390)", () => {
+  // Drives main() itself, so the old stop-at-first-failure loop can't come
+  // back there while runPlan stays correct and unused. A stub pnpm on PATH
+  // records each lane and fails the first one.
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "run-main-e2e-"));
+  try {
+    const logFile = path.join(binDir, "lanes.log");
+    fs.writeFileSync(
+      path.join(binDir, "pnpm"),
+      `#!/bin/sh\necho "$*" >> "${logFile}"\ncase "$*" in *--project=chromium-serial*|*visual*) exit 0 ;; esac\nexit 3\n`,
+      { mode: 0o755 },
+    );
+    const run = spawnSync(process.execPath, [e2eRunnerPath], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}` },
+    });
+
+    const lanes = fs.readFileSync(logFile, "utf8").trim().split("\n");
+    expect(lanes).toHaveLength(3);
+    expect(lanes[0]).toContain("exec playwright test --project=chromium ");
+    expect(lanes[1]).toContain("--project=chromium-serial");
+    expect(lanes[2]).toContain("--project=chromium-visual");
+    expect(run.status).toBe(3);
+    expect(run.stderr).toContain("Failed e2e lanes:");
+  } finally {
+    fs.rmSync(binDir, { recursive: true, force: true });
+  }
 });
 
 test("Vitest excludes every Playwright spec directory", () => {

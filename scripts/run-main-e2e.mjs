@@ -54,18 +54,21 @@ export function buildMainE2ePlan(platform = process.platform, coreOnly = false) 
   return plan;
 }
 
-// Runs every lane, even after one fails, and returns the first failing status
-// (0 when all pass). Stopping at the first red lane hid everything after it:
-// on a Mac the standard lane is always red for known reasons (#912), so a
-// local run never reached chromium-serial or chromium-visual (#1390).
+// Runs every lane, even after one fails, and returns the first failing exit
+// code (0 when all pass). runCommand returns the lane's exit code, or the
+// signal name when the lane was killed. Stopping at the first red lane hid
+// everything after it: on a Mac the standard lane is always red for known
+// reasons (#912), so a local run never reached chromium-serial or
+// chromium-visual (#1390).
 export function runPlan(plan, runCommand) {
   let firstFailure = 0;
   const failed = [];
   for (const args of plan) {
-    const status = runCommand(args);
-    if (status === 0) continue;
-    failed.push(`playwright ${args.join(" ")} (exit ${status ?? "signal"})`);
-    if (firstFailure === 0) firstFailure = status ?? 1;
+    const outcome = runCommand(args);
+    if (outcome === 0) continue;
+    const exited = typeof outcome === "number";
+    failed.push(`playwright ${args.join(" ")} (${exited ? "exit" : "killed by"} ${outcome})`);
+    if (firstFailure === 0) firstFailure = exited ? outcome : 1;
   }
   if (failed.length > 0) {
     process.stderr.write(`\nFailed e2e lanes:\n${failed.map((lane) => `  ${lane}\n`).join("")}`);
@@ -94,7 +97,7 @@ function main() {
       stdio: "inherit",
     });
     if (result.error) throw result.error;
-    return result.status;
+    return result.status ?? result.signal;
   });
   process.exit(status);
 }
