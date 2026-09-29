@@ -357,16 +357,19 @@ export function registerBarcodeRead(app: FastifyInstance) {
           // work while memory is short (#1469).
           const reload = !(err instanceof RangeError);
           // The size tells memory pressure (retry works) from an image too
-          // big for this server (it never will).
+          // big for this server (it never will). It's set once the image is
+          // decoded, so without it the failure came earlier: decoding the
+          // upload itself (HEIC, #1533), not zxing.
+          const stage = imageSize ? "barcode decoder" : "image decode";
           request.log.error(
-            { err, toolId: "barcode-read", imageSize, reload },
-            "Barcode decoder failed",
+            { err, toolId: "barcode-read", stage, imageSize, reload },
+            `Barcode read failed in the ${stage}`,
           );
           void reportError(err, { source: "http", toolId: "barcode-read", statusCode: 503 });
           if (reload) initZXingReader();
           return reply.status(503).send({
             error: "Barcode reading failed on this server.",
-            details: "The barcode decoder ran out of resources or failed. Try again.",
+            details: "The server ran out of resources reading this image. Try again.",
             code: "ENGINE_UNAVAILABLE",
           });
         }
