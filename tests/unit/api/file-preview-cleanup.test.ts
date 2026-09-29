@@ -66,6 +66,14 @@ describe("deletePreview (#1320)", () => {
     expect(existsSync(join(previewDir, "other-file.mp4"))).toBe(true);
   });
 
+  it("rejects when a preview can't be removed (#1455)", async () => {
+    const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
+    // A non-empty directory where the preview should be: rm without recursive fails.
+    await mkdir(join(previewDir, "stuck-file.pdf"));
+    await writeFile(join(previewDir, "stuck-file.pdf", "x"), "x");
+    await expect(deletePreview("stuck-file")).rejects.toThrow();
+  });
+
   it("is idempotent when preview files do not exist", async () => {
     const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
     await expect(deletePreview("nonexistent-file-id")).resolves.toBeUndefined();

@@ -231,10 +231,12 @@ async function unlinkStored(path: string): Promise<void> {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return;
     if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+      // The path and errno stay on `cause` for the logs; the message is shown to users.
       throw new SafeError("Storage directory is not writable", {
         kind: "operational",
         code,
         statusCode: 503,
+        cause: e,
       });
     }
     throw e;

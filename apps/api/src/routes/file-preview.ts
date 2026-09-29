@@ -98,11 +98,11 @@ export function ensurePreviewDir(): Promise<void> {
  * Remove cached preview files for a deleted user file (.mp4, .mp3, .pdf).
  */
 export async function deletePreview(fileId: string): Promise<void> {
+  // `force` already ignores a missing preview, so anything that still throws is
+  // a real failure. It reaches the caller, which fails the delete before any
+  // row goes, the same as a stored file that can't be removed (#1455).
   for (const ext of [".mp4", ".mp3", ".pdf"]) {
-    const path = previewPath(fileId, ext);
-    await rm(path, { force: true }).catch((err) => {
-      logger.warn({ err, fileId, path }, "Could not remove cached preview");
-    });
+    await rm(previewPath(fileId, ext), { force: true });
   }
 }
 
