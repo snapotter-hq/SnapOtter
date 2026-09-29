@@ -345,8 +345,9 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
   });
 
   it("answers 400 when the body stops while a file is being read, keeping nothing", async () => {
-    // Here the handler is already waiting on the second file when the body
-    // ends, so the part fails under the reader (readFilePart).
+    // Streamed, so the body ends after the handler has moved on to the
+    // second file: whether busboy fails that part before or while it's read,
+    // the handler must refuse it rather than save half a file.
     const before = await libraryState([adminId]);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
