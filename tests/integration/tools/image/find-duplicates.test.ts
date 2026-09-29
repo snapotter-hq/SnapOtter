@@ -7,6 +7,7 @@
 
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { UNDECODABLE_IMAGE_MESSAGE } from "../../../../apps/api/src/lib/image-error.js";
 import { logger } from "../../../../apps/api/src/lib/logger.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -1404,9 +1405,13 @@ describe("Find Duplicates", () => {
       { name: "file", filename: "sideways.jpg", contentType: "image/jpeg", content: broken },
     ]);
 
-    // The skip has to leave a server-side trace with the Sharp error, so the
-    // autoOrient warn that fires just before it has a follow-up line (#1475).
+    // A corrupt upload is expected input (#1492): the user gets the
+    // classifier's message, the server gets an info line with the filename
+    // (the classifier logs the probe result itself), and nothing at warn or
+    // error, so the autoOrient warn just before stays the only warn.
     const warnSpy = vi.spyOn(logger, "warn");
+    const infoSpy = vi.spyOn(logger, "info");
+    const errorSpy = vi.spyOn(logger, "error");
     try {
       const res = await app.inject({
         method: "POST",
@@ -1419,22 +1424,33 @@ describe("Find Duplicates", () => {
       const result = JSON.parse(res.body);
       expect(result.totalImages).toBe(2);
       expect(result.skippedFiles).toEqual([
-        { filename: "sideways.jpg", reason: "Failed to compute image hash" },
+        { filename: "sideways.jpg", reason: UNDECODABLE_IMAGE_MESSAGE },
       ]);
       expect(result.duplicateGroups).toHaveLength(1);
 
-      const skipLines = warnSpy.mock.calls.filter(
-        (call) => typeof call[1] === "string" && call[1].startsWith("find-duplicates:"),
+      const isOurs = (call: unknown[]) =>
+        typeof call[1] === "string" && call[1].startsWith("find-duplicates:");
+      // the same file also gets the thumbnail info line (its JPEG re-encode
+      // fails too), so pin the skip line by its message
+      const skipLines = infoSpy.mock.calls.filter(
+        (call) => call[1] === "find-duplicates: skipping undecodable file",
       );
       expect(skipLines).toHaveLength(1);
-      expect(skipLines[0][0]).toMatchObject({ filename: "sideways.jpg", err: expect.any(Error) });
-      expect(skipLines[0][1]).toBe("find-duplicates: skipping file, hash failed");
-      // and it pairs with the autoOrient warn for the same file
+      expect(skipLines[0][0]).toMatchObject({
+        filename: "sideways.jpg",
+        err: expect.any(Error),
+        reason: UNDECODABLE_IMAGE_MESSAGE,
+      });
+      expect(warnSpy.mock.calls.filter(isOurs)).toHaveLength(0);
+      expect(errorSpy.mock.calls.filter(isOurs)).toHaveLength(0);
+      // the autoOrient warn for the same file is still there
       expect(warnSpy.mock.calls.some((call) => String(call[1]).startsWith("autoOrient:"))).toBe(
         true,
       );
     } finally {
       warnSpy.mockRestore();
+      infoSpy.mockRestore();
+      errorSpy.mockRestore();
     }
   });
 
@@ -1456,7 +1472,7 @@ describe("Find Duplicates", () => {
     const result = JSON.parse(res.body);
     expect(result.error).toContain("At least 2");
     expect(result.skippedFiles).toEqual([
-      { filename: "sideways.jpg", reason: "Failed to compute image hash" },
+      { filename: "sideways.jpg", reason: UNDECODABLE_IMAGE_MESSAGE },
     ]);
   });
 

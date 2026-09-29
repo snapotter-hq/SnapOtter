@@ -1,7 +1,9 @@
+import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { reportError, safeFormatTag } from "../../lib/error-report.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
@@ -11,6 +13,7 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -255,14 +258,30 @@ export function registerFindDuplicates(app: FastifyInstance) {
           info.hash = await computeDHash128(file.buffer);
           fileInfos.push(info);
         } catch (err) {
-          // This is where a buffer Sharp can't decode gets rejected. When
-          // autoOrient warned just before, this is the follow-up line its own
-          // comment points at, so carry the Sharp error.
-          logger.warn(
-            { err, filename: file.filename },
-            "find-duplicates: skipping file, hash failed",
-          );
-          skippedFiles.push({ filename: file.filename, reason: "Failed to compute image hash" });
+          // This is where a buffer Sharp can't decode gets rejected. The probe
+          // in asInputErrorIfUndecodable tells a corrupt upload (expected: the
+          // user is told, info line, no Sentry) from a hash failure on an image
+          // Sharp can decode (a real fault: error line and a report). It logs
+          // the probe result itself; the line here adds the filename.
+          const classified = await asInputErrorIfUndecodable(file.buffer, err);
+          if (isToolInputError(classified)) {
+            logger.info(
+              { err, filename: file.filename, reason: classified.message },
+              "find-duplicates: skipping undecodable file",
+            );
+            skippedFiles.push({ filename: file.filename, reason: classified.message });
+          } else {
+            logger.error(
+              { err, filename: file.filename },
+              "find-duplicates: hash failed on a decodable image",
+            );
+            void reportError(err, {
+              source: "http",
+              toolId: "find-duplicates",
+              inputFormat: safeFormatTag(file.filename),
+            });
+            skippedFiles.push({ filename: file.filename, reason: "Failed to compute image hash" });
+          }
         }
       }
 

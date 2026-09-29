@@ -3,6 +3,8 @@
  * sanitize failure that skips a file has to leave a server-side warn with the
  * underlying error, and a missing decoder is the operator's problem, so it
  * answers 503 ENGINE_UNAVAILABLE for the request instead of a per-file skip.
+ * The hash-step catch (#1492) tells a corrupt upload from a real fault; the
+ * fault case here stubs the classifier to say "not input".
  *
  * The decoder failures are injected through the real modules' exports, so the
  * cases don't depend on which decoders a host has installed.
@@ -14,7 +16,34 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 const decoderMocks = vi.hoisted(() => ({
   heic: null as Error | null,
   cli: null as Error | null,
+  // When set, the hash-step classifier says "not input" so the route's
+  // real-fault branch runs against a buffer it would otherwise call corrupt.
+  hashIsNotInput: false,
+  reportError: vi.fn(),
 }));
+
+vi.mock("../../../../apps/api/src/lib/image-error.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../../apps/api/src/lib/image-error.js")>();
+  return {
+    ...actual,
+    asInputErrorIfUndecodable: async (
+      ...args: Parameters<typeof actual.asInputErrorIfUndecodable>
+    ) => {
+      if (decoderMocks.hashIsNotInput) {
+        const err = args[1];
+        return err instanceof Error ? err : new Error(String(err));
+      }
+      return actual.asInputErrorIfUndecodable(...args);
+    },
+  };
+});
+
+vi.mock("../../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../../apps/api/src/lib/error-report.js")>();
+  return { ...actual, reportError: decoderMocks.reportError };
+});
 
 vi.mock("../../../../apps/api/src/lib/heic-converter.js", async (importOriginal) => {
   const actual =
@@ -83,7 +112,26 @@ afterAll(async () => {
 afterEach(() => {
   decoderMocks.heic = null;
   decoderMocks.cli = null;
+  decoderMocks.hashIsNotInput = false;
+  decoderMocks.reportError.mockClear();
 });
+
+/** An orientation-6 JPEG cut in half: validation passes, every decode fails. */
+async function truncatedJpeg(): Promise<Buffer> {
+  const width = 64;
+  const height = 64;
+  const raw = Buffer.alloc(width * height * 3);
+  let seed = 4242;
+  for (let i = 0; i < raw.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    raw[i] = (seed >> 16) & 0xff;
+  }
+  const full = await sharp(raw, { raw: { width, height, channels: 3 } })
+    .withMetadata({ orientation: 6 })
+    .jpeg()
+    .toBuffer();
+  return full.subarray(0, Math.floor(full.length / 2));
+}
 
 async function post(files: Array<{ filename: string; contentType: string; content: Buffer }>) {
   const { body, contentType } = createMultipartPayload(files.map((f) => ({ name: "file", ...f })));
@@ -211,6 +259,40 @@ describe("find-duplicates skip paths (#1493)", () => {
       expect(findDuplicatesWarns(warnSpy)).toHaveLength(0);
     } finally {
       warnSpy.mockRestore();
+    }
+  });
+
+  it("treats a hash failure the classifier does not call input as a fault: error line, report, generic reason (#1492)", async () => {
+    decoderMocks.hashIsNotInput = true;
+    const broken = await truncatedJpeg();
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      const res = await post(
+        withGoodPair({ filename: "odd.jpg", contentType: "image/jpeg", content: broken }),
+      );
+
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.skippedFiles).toEqual([
+        { filename: "odd.jpg", reason: "Failed to compute image hash" },
+      ]);
+
+      const lines = errorSpy.mock.calls.filter(
+        (call) => typeof call[1] === "string" && String(call[1]).startsWith("find-duplicates:"),
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0][0]).toMatchObject({ filename: "odd.jpg", err: expect.any(Error) });
+      expect(lines[0][1]).toBe("find-duplicates: hash failed on a decodable image");
+      expect(decoderMocks.reportError).toHaveBeenCalledTimes(1);
+      // the reported error is the one that was logged
+      expect(decoderMocks.reportError.mock.calls[0][0]).toBe(lines[0][0].err);
+      expect(decoderMocks.reportError.mock.calls[0][1]).toMatchObject({
+        source: "http",
+        toolId: "find-duplicates",
+        inputFormat: "jpg",
+      });
+    } finally {
+      errorSpy.mockRestore();
     }
   });
 
