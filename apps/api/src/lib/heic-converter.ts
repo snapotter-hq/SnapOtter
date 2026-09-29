@@ -166,10 +166,15 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
     options.signal?.throwIfAborted();
 
     // Single-image HEIF: exact filename. Multi-image: -1 suffix on first image.
+    // Only a missing file means "look for the suffixed one"; any other read
+    // failure (V8 unable to allocate the buffer, EIO) is the real error, and
+    // falling back would replace it with an ENOENT for a file that never
+    // existed (#1533).
     let decoded: Buffer;
     try {
       decoded = await readFile(outputPath);
-    } catch {
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
       decoded = await readFile(suffixedPath);
     }
     if (options.maxPixels !== undefined || options.maxDimension !== undefined) {

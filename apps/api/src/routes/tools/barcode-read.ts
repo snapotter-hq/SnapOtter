@@ -219,7 +219,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
           try {
             fileBuffer = await decodeHeic(fileBuffer);
           } catch (err) {
-            if (isDecoderUnavailable(err)) throw err;
+            // A server fault (no decoder, no memory for its output) is not a
+            // bad file: the outer catch answers those as 503 (#1533).
+            if (isDecoderUnavailable(err) || isDecoderFault(err)) throw err;
             return reply.status(422).send({
               error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
