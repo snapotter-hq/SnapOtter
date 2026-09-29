@@ -1,3 +1,4 @@
+import type { FeedbackErrorCategory } from "@snapotter/shared";
 import {
   ANALYTICS_EVENTS,
   detectModalityFromMime,
@@ -67,6 +68,13 @@ export interface FileEntry {
    */
   claimed: boolean;
   error: string | null;
+  /**
+   * The feedback category of `error`, when the code that set it knew the
+   * cause. The message may be translated, so it can't be classified from the
+   * text (#1596). Any patch that sets `error` without a category clears it, so
+   * a re-run can't inherit the last failure's category.
+   */
+  errorCategory?: FeedbackErrorCategory | null;
   serverFileId?: string;
   modality: Modality;
   previewKind: PreviewKind;
@@ -400,7 +408,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!entries[index]) return;
     // Enforces the claim invariant; see the `claimed` field on FileEntry.
     const claimReset = "processedUrl" in patch ? { claimed: false } : null;
-    entries[index] = { ...entries[index], ...patch, ...claimReset };
+    // Same shape for the error's category; see `errorCategory` on FileEntry.
+    const categoryReset =
+      "error" in patch && !("errorCategory" in patch) ? { errorCategory: null } : null;
+    entries[index] = { ...entries[index], ...patch, ...claimReset, ...categoryReset };
     const idx = get().selectedIndex;
     set({ entries, files: deriveFiles(entries), ...deriveSelected(entries, idx) });
   },

@@ -169,6 +169,8 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: en.errors.fileTooLarge,
+      // The message is translated, so feedback reads the cause from here (#1596).
+      errorCategory: "upload_error",
     });
     expect(useFileStore.getState().error).toBe(en.errors.fileTooLarge);
 
@@ -187,6 +189,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Processing failed: 500",
+      errorCategory: null,
     });
     expect(useFileStore.getState().processing).toBe(false);
 

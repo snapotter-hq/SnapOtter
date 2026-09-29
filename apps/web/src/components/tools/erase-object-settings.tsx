@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
+import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
 import {
   frameFailure,
@@ -233,7 +234,8 @@ export function EraseObjectSettings({
           resolve();
         },
         onFailed: (failure) => reject(new Error(jobFailureMessage(failure, t.errors))),
-        onStall: () => reject(new Error(t.toolSettings["erase-object"].stallBatch)),
+        onStall: () =>
+          reject(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -280,7 +282,7 @@ export function EraseObjectSettings({
       };
       xhr.ontimeout = () => {
         stopProgress();
-        reject(new Error(t.errors.requestTimedOut));
+        reject(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
       };
       xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
       for (const [key, value] of formatHeaders()) {
@@ -503,6 +505,7 @@ export function EraseObjectSettings({
         useFileStore.getState().updateEntry(index, {
           status: "failed",
           error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+          errorCategory: feedbackCategoryOf(err),
         });
       }
     }

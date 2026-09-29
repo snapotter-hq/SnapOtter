@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { en } from "@snapotter/shared/i18n/en.js";
 import { act, renderHook } from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -560,6 +561,30 @@ describe("useToolProcessor batch cancel (#767)", () => {
       expect(useFileStore.getState().processing).toBe(false);
     });
     expect(useFileStore.getState().error).toBe("All files failed processing");
+
+    hook.unmount();
+  });
+});
+
+// #1341 made a batch 413 read in the user's language. That text can't be
+// classified for feedback, so the entry also stores the cause (#1596).
+describe("useToolProcessor batch 413", () => {
+  it("fails every file with the translated too-large text and an upload_error category", async () => {
+    const hook = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 413;
+      xhrs[0].response = new Blob(["<html>413 Request Entity Too Large</html>"]);
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries.every((e) => e.status === "failed")).toBe(true);
+    });
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry).toMatchObject({ error: en.errors.fileTooLarge, errorCategory: "upload_error" });
+    }
 
     hook.unmount();
   });

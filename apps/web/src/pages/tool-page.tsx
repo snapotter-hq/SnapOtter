@@ -352,7 +352,10 @@ export function ToolPage() {
   const [imageWrapperStyle, setImageWrapperStyle] = useState<React.CSSProperties | null>(null);
   const [imageWrapperChildren, setImageWrapperChildren] = useState<React.ReactNode>(null);
   const [bgPreview, setBgPreview] = useState<BgPreviewState | null>(null);
-  const failedFeedbackCategory = classifyFeedbackError(currentEntry?.error);
+  const failedFeedbackCategory = classifyFeedbackError(
+    currentEntry?.error,
+    currentEntry?.errorCategory,
+  );
 
   const [cropCrop, setCropCrop] = useState<Crop>({
     unit: "%",
