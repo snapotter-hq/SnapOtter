@@ -280,45 +280,48 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
 
   it("a 503 raised inside the worker keeps its code and details on the job row", async () => {
     const errorSpy = vi.spyOn(logger, "error");
-    // The route's pre-validation passes; qpdf breaks before the worker runs.
-    mocks.pdfPassesLeft = 1;
-    const res = await post("/api/v1/tools/pdf/ocr-pdf", [
-      { name: "file", filename: "scan.pdf", contentType: "application/pdf", content: PDF },
-      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
-    ]);
-    expect(res.statusCode).toBe(202);
-    const { jobId } = res.json() as { jobId: string };
+    try {
+      // The route's pre-validation passes; qpdf breaks before the worker runs.
+      mocks.pdfPassesLeft = 1;
+      const res = await post("/api/v1/tools/pdf/ocr-pdf", [
+        { name: "file", filename: "scan.pdf", contentType: "application/pdf", content: PDF },
+        { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+      ]);
+      expect(res.statusCode).toBe(202);
+      const { jobId } = res.json() as { jobId: string };
 
-    let row: typeof schema.jobs.$inferSelect | undefined;
-    for (let i = 0; i < 150; i++) {
-      [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-      if (row?.status === "failed") break;
-      await new Promise((r) => setTimeout(r, 200));
+      let row: typeof schema.jobs.$inferSelect | undefined;
+      for (let i = 0; i < 150; i++) {
+        [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        if (row?.status === "failed") break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        details: expect.stringContaining("QPDF_PATH"),
+      });
+
+      // The worker logs it as a fault instead of skipping it as bad input (#1330, #1407).
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId, toolId: "ocr-pdf" }),
+        "tool job failed",
+      );
+
+      // A client reconnecting after the failure replays the same code and hint.
+      const replay = await app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${jobId}/progress`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+      expect(frame).toMatchObject({
+        phase: "failed",
+        code: "ENGINE_UNAVAILABLE",
+        details: expect.stringContaining("QPDF_PATH"),
+      });
+    } finally {
+      errorSpy.mockRestore();
     }
-    expect(row?.status).toBe("failed");
-    expect(row?.error).toMatchObject({
-      code: "ENGINE_UNAVAILABLE",
-      details: expect.stringContaining("QPDF_PATH"),
-    });
-
-    // The worker logs it as a fault instead of skipping it as bad input (#1330, #1407).
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ jobId, toolId: "ocr-pdf" }),
-      "tool job failed",
-    );
-    errorSpy.mockRestore();
-
-    // A client reconnecting after the failure replays the same code and hint.
-    const replay = await app.inject({
-      method: "GET",
-      url: `/api/v1/jobs/${jobId}/progress`,
-      headers: { authorization: `Bearer ${token}` },
-    });
-    const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
-    expect(frame).toMatchObject({
-      phase: "failed",
-      code: "ENGINE_UNAVAILABLE",
-      details: expect.stringContaining("QPDF_PATH"),
-    });
   });
 });

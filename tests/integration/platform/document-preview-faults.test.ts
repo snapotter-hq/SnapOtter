@@ -131,10 +131,17 @@ describe("document preview failure classification (#1404)", () => {
 
   it("gives concurrent cold requests their own conversion and caches a complete PDF (#1319)", async () => {
     const outDirs: string[] = [];
+    // Neither conversion finishes until both have started, so the second
+    // request can't find the first one's result already cached. Capped so a
+    // regression fails instead of hanging.
+    let releaseBoth = () => {};
+    const bothStarted = new Promise<void>((r) => {
+      releaseBoth = r;
+    });
     mocks.convert.mockImplementation(async (_input: string, outDir: string) => {
       outDirs.push(outDir);
-      // Hold both conversions open at once, then write a whole file per request.
-      await new Promise((r) => setTimeout(r, 300));
+      if (outDirs.length === 2) releaseBoth();
+      await Promise.race([bothStarted, new Promise((r) => setTimeout(r, 5_000))]);
       await writeFile(join(outDir, "input.pdf"), `%PDF complete ${basename(outDir)}`);
     });
     const { id } = await uploadDocx();
