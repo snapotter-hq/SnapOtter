@@ -776,7 +776,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         loginMethod: session.idToken ? "oidc" : user.authProvider === "saml" ? "saml" : "local",
         email: user.email ?? null,
         hasLocalPassword: !!user.passwordHash,
-        hasOidcLink: !!user.externalId,
+        // external_id also holds SAML NameIDs, so the provider decides (#1606).
+        hasOidcLink: user.authProvider === "oidc" && !!user.externalId,
         totpEnabled: user.totpEnabled,
       },
       expiresAt: session.expiresAt.toISOString(),
@@ -886,7 +887,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         authProvider: u.authProvider ?? "local",
         email: u.email ?? null,
         hasLocalPassword: !!u.passwordHash,
-        hasOidcLink: !!u.externalId,
+        hasOidcLink: u.authProvider === "oidc" && !!u.externalId,
         createdAt: u.createdAt.toISOString(),
       })),
       maxUsers: env.MAX_USERS,
