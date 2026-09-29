@@ -85,6 +85,17 @@ export function getInstallScriptPath(): string {
   return join(PROJECT_ROOT, "packages/ai/python/install_feature.py");
 }
 
+// Startup recovery retries a failed sweep every few seconds, so each stuck
+// path is warned about once per errno rather than on every attempt (#1565).
+const importSweepWarnings = new Map<string, string>();
+
+function warnImportSweepFailure(key: string, message: string, error: unknown): void {
+  const code = (error as NodeJS.ErrnoException).code ?? "unknown";
+  if (importSweepWarnings.get(key) === code) return;
+  importSweepWarnings.set(key, code);
+  console.warn(`${message} (${code}):`, error);
+}
+
 /**
  * Remove upload/extraction staging only while this process owns install.flock.
  * New v2 uploads are always lock-owned. Pre-v2 upload directories are age
@@ -97,14 +108,15 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
   try {
     entries = readdirSync(AI_DIR, { withFileTypes: true });
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") return true;
-    console.warn(
-      `[feature-status] Cannot list ${AI_DIR} to sweep interrupted import staging (${code ?? "unknown"}):`,
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    warnImportSweepFailure(
+      AI_DIR,
+      `[feature-status] Cannot list ${AI_DIR} to sweep interrupted import staging`,
       error,
     );
     return false;
   }
+  importSweepWarnings.delete(AI_DIR);
 
   let complete = true;
   for (const entry of entries) {
@@ -124,12 +136,13 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
       if (info.isSymbolicLink()) unlinkSync(path);
       else rmSync(path, { recursive: true, force: true });
       console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
+      importSweepWarnings.delete(path);
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== "ENOENT") {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         complete = false;
-        console.warn(
-          `[feature-status] Cannot remove orphaned ${entry.name}/ (${code ?? "unknown"}):`,
+        warnImportSweepFailure(
+          path,
+          `[feature-status] Cannot remove orphaned ${entry.name}/`,
           error,
         );
       }

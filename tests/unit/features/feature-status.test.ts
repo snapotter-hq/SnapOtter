@@ -1464,6 +1464,16 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
       const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
       expect(logged).toContain(".offline-import-v2-logged-failure");
       expect(logged).toContain("EPERM");
+      expect(existsSync(offlineUpload)).toBe(true);
+
+      // Startup recovery retries every few seconds; the same stuck entry and
+      // errno must not be warned about again on each attempt.
+      const warnsForEntry = () =>
+        warn.mock.calls.filter((call) =>
+          String(call[0]).includes(".offline-import-v2-logged-failure"),
+        ).length;
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      expect(warnsForEntry()).toBe(1);
     } finally {
       warn.mockRestore();
       fsFaults.denyRecursiveRemovePath = null;
