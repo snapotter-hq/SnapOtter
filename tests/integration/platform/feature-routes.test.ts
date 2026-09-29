@@ -117,6 +117,7 @@ const hoisted = vi.hoisted(() => {
     runOcrRuntimeMaintenanceMock: vi.fn(async (_action: string) => ({ removed: [] })),
     purgeOcrRuntimeDownloadsMock: vi.fn(async () => {}),
     cleanupInterruptedMock: vi.fn(() => true),
+    reportErrorMock: vi.fn(async () => {}),
   };
 });
 
@@ -166,6 +167,11 @@ vi.mock("../../../apps/api/src/lib/ocr-runtime-install.js", async (importOrigina
 vi.mock("../../../apps/api/src/lib/feature-status.js", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, cleanupInterruptedFeatureImports: hoisted.cleanupInterruptedMock };
+});
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, reportError: hoisted.reportErrorMock };
 });
 
 // ── Temp DATA_DIR + crafted manifest before importing feature-status ──
@@ -743,12 +749,22 @@ describe("feature bundle route contracts", () => {
 
   it("returns 500 when interrupted import staging cannot be cleaned up", async () => {
     hoisted.cleanupInterruptedMock.mockReturnValueOnce(false);
+    hoisted.reportErrorMock.mockClear();
 
     const res = await postImport([{ name: "index", content: Buffer.from("index") }]);
 
     expect(res.statusCode).toBe(500);
     expect(JSON.parse(res.body).error).toBe(
       "Interrupted offline import staging could not be cleaned up safely",
+    );
+    // A server-side 500 is reported like the route's other 500s (#1565).
+    expect(hoisted.reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "OfflineImportRecoveryError" }),
+      expect.objectContaining({
+        source: "http",
+        route: "/api/v1/admin/features/import",
+        statusCode: 500,
+      }),
     );
     // The lease taken before the failed sweep must not leak.
     await waitForLeaseFree();

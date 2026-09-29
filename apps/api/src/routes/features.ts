@@ -1396,10 +1396,6 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           reply.status(507);
           return { error: errorMessage };
         }
-        if (err instanceof OfflineImportRecoveryError) {
-          reply.status(500);
-          return { error: err.message };
-        }
         // multipartParts() marks a request the client broke (no boundary, a
         // body that ends mid-part, a part over the size limit) with 400/413
         // (#1473), so answer it as the client's rather than a 500 (#1539).
@@ -1410,9 +1406,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           return failure.body;
         }
         // Only explicit import/input validation failures are client errors.
-        // Installer, dispatcher handoff, commit, and rollback failures are
-        // server-side faults and must remain retryable/observable as 5xx, so
-        // log and report them before answering.
+        // Staging recovery, installer, dispatcher handoff, commit, and
+        // rollback failures are server-side faults and must remain
+        // retryable/observable as 5xx, so log and report them before
+        // answering.
         request.log.error({ err }, "Offline feature import failed");
         void reportError(err, {
           source: "http",

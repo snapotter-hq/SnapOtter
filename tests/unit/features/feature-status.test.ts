@@ -28,6 +28,7 @@ const ocrRuntime = vi.hoisted(() => ({
 const fsFaults = vi.hoisted(() => ({
   denyOwnerOnlyMutationPath: null as string | null,
   denyRecursiveRemovePath: null as string | null,
+  denyReaddirPath: null as string | null,
   existsSequencePath: null as string | null,
   existsSequence: [] as boolean[],
   forceNonDocker: false,
@@ -116,6 +117,10 @@ vi.mock("node:fs", async (importOriginal) => {
       if (args[0] === fsFaults.denyRecursiveRemovePath) throw permissionError();
       return actual.rmSync(...args);
     },
+    readdirSync: ((...args: Parameters<typeof actual.readdirSync>) => {
+      if (args[0] === fsFaults.denyReaddirPath) throw permissionError();
+      return actual.readdirSync(...args);
+    }) as typeof actual.readdirSync,
   };
 });
 
@@ -1447,6 +1452,36 @@ describe("Crash recovery - recoverInterruptedInstalls", () => {
     fsFaults.denyRecursiveRemovePath = null;
     expect(mod.recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(offlineUpload)).toBe(false);
+  });
+
+  it("logs the entry and errno when orphaned import staging can't be removed (#1565)", () => {
+    const offlineUpload = join(aiDir, ".offline-import-v2-logged-failure");
+    mkdirSync(offlineUpload, { recursive: true });
+    fsFaults.denyRecursiveRemovePath = offlineUpload;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+      expect(logged).toContain(".offline-import-v2-logged-failure");
+      expect(logged).toContain("EPERM");
+    } finally {
+      warn.mockRestore();
+      fsFaults.denyRecursiveRemovePath = null;
+    }
+  });
+
+  it("logs the errno when the AI directory can't be listed for import staging (#1565)", () => {
+    fsFaults.denyReaddirPath = aiDir;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(mod.recoverInterruptedInstalls()).toBe(false);
+      const logged = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+      expect(logged).toContain("interrupted import staging");
+      expect(logged).toContain("EPERM");
+    } finally {
+      warn.mockRestore();
+      fsFaults.denyReaddirPath = null;
+    }
   });
 
   it("does NOT delete non-staging directories", () => {

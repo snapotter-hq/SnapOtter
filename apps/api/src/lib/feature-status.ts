@@ -97,7 +97,12 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
   try {
     entries = readdirSync(AI_DIR, { withFileTypes: true });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return true;
+    console.warn(
+      `[feature-status] Cannot list ${AI_DIR} to sweep interrupted import staging (${code ?? "unknown"}):`,
+      error,
+    );
     return false;
   }
 
@@ -120,7 +125,14 @@ export function cleanupInterruptedFeatureImports(nowMs = Date.now()): boolean {
       else rmSync(path, { recursive: true, force: true });
       console.info(`[feature-status] Deleted orphaned ${entry.name}/`);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") complete = false;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        complete = false;
+        console.warn(
+          `[feature-status] Cannot remove orphaned ${entry.name}/ (${code ?? "unknown"}):`,
+          error,
+        );
+      }
     }
   }
   return complete;
