@@ -4565,6 +4565,7 @@ export const pl: TranslationKeys = {
       passwordPolicyHeading: "Polityka haseł",
       securitySettingsSaved: "Ustawienia zabezpieczeń zapisane",
       securitySettingsFailed: "Nie udało się zapisać ustawień zabezpieczeń",
+      adminSettingsLoadFailed: "Nie udało się wczytać ustawień zabezpieczeń.",
     },
     people: {
       heading: "Użytkownicy",
@@ -4608,6 +4609,7 @@ export const pl: TranslationKeys = {
       tableHeaderTeam: "Zespół",
       noSearchResults: "Brak członków pasujących do wyszukiwania.",
       noUsersFound: "Nie znaleziono użytkowników.",
+      loadFailed: "Nie udało się wczytać użytkowników.",
       authBadgeLocalOidc: "Lokalny + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Zmień rolę / zespół",
@@ -4641,6 +4643,7 @@ export const pl: TranslationKeys = {
       tableHeaderTeamName: "Nazwa zespołu",
       tableHeaderMembers: "Członkowie",
       emptyState: "Nie znaleziono zespołów.",
+      loadFailed: "Nie udało się wczytać zespołów.",
       renameSaveButton: "Zapisz",
       renameCancelButton: "Anuluj",
       renameAction: "Zmień nazwę",
@@ -4681,6 +4684,7 @@ export const pl: TranslationKeys = {
       deleteSuccess: 'Rola "{name}" usunięta',
       deleteFailed: "Nie udało się usunąć roli",
       emptyState: "Nie znaleziono ról.",
+      loadFailed: "Nie udało się wczytać ról.",
       builtInBadge: "Wbudowana",
       userCountBadge: "{count} użytkownik(ów)",
       editRoleTitle: "Edytuj rolę",
@@ -4700,6 +4704,7 @@ export const pl: TranslationKeys = {
       heading: "Dziennik audytu",
       allActionsFilter: "Wszystkie akcje",
       emptyState: "Brak wpisów w dzienniku audytu.",
+      loadFailed: "Nie udało się wczytać dziennika audytu.",
       tableHeaderTime: "Czas",
       tableHeaderUser: "Użytkownik",
       tableHeaderAction: "Akcja",
@@ -4762,6 +4767,7 @@ export const pl: TranslationKeys = {
       deleteConfirm:
         "Usunąć ten klucz API? Wszystkie integracje korzystające z niego przestaną działać.",
       emptyState: "Brak kluczy API. Wygeneruj jeden, aby rozpocząć.",
+      loadFailed: "Nie udało się wczytać kluczy API.",
     },
     tools: {
       heading: "Narzędzia",

@@ -4556,6 +4556,7 @@ export const id: TranslationKeys = {
       passwordPolicyHeading: "Kebijakan Kata Sandi",
       securitySettingsSaved: "Pengaturan keamanan tersimpan",
       securitySettingsFailed: "Gagal menyimpan pengaturan keamanan",
+      adminSettingsLoadFailed: "Gagal memuat pengaturan keamanan.",
     },
     people: {
       heading: "Anggota",
@@ -4598,6 +4599,7 @@ export const id: TranslationKeys = {
       tableHeaderTeam: "Tim",
       noSearchResults: "Tidak ada anggota yang cocok dengan pencarian Anda.",
       noUsersFound: "Tidak ada pengguna ditemukan.",
+      loadFailed: "Gagal memuat pengguna.",
       authBadgeLocalOidc: "Lokal + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Edit Peran / Tim",
@@ -4631,6 +4633,7 @@ export const id: TranslationKeys = {
       tableHeaderTeamName: "Nama Tim",
       tableHeaderMembers: "Anggota",
       emptyState: "Tidak ada tim ditemukan.",
+      loadFailed: "Gagal memuat tim.",
       renameSaveButton: "Simpan",
       renameCancelButton: "Batal",
       renameAction: "Ganti Nama",
@@ -4670,6 +4673,7 @@ export const id: TranslationKeys = {
       deleteSuccess: 'Peran "{name}" dihapus',
       deleteFailed: "Gagal menghapus peran",
       emptyState: "Tidak ada peran ditemukan.",
+      loadFailed: "Gagal memuat peran.",
       builtInBadge: "Bawaan",
       userCountBadge: "{count} pengguna",
       editRoleTitle: "Edit peran",
@@ -4689,6 +4693,7 @@ export const id: TranslationKeys = {
       heading: "Log Audit",
       allActionsFilter: "Semua tindakan",
       emptyState: "Tidak ada entri log audit.",
+      loadFailed: "Gagal memuat log audit.",
       tableHeaderTime: "Waktu",
       tableHeaderUser: "Pengguna",
       tableHeaderAction: "Tindakan",
@@ -4751,6 +4756,7 @@ export const id: TranslationKeys = {
       deleteConfirm:
         "Hapus kunci API ini? Semua integrasi yang menggunakannya akan berhenti berfungsi.",
       emptyState: "Belum ada kunci API. Buat satu untuk memulai.",
+      loadFailed: "Gagal memuat kunci API.",
     },
     tools: {
       heading: "Alat",

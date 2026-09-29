@@ -4563,6 +4563,7 @@ export const ru: TranslationKeys = {
       passwordPolicyHeading: "Политика паролей",
       securitySettingsSaved: "Настройки безопасности сохранены",
       securitySettingsFailed: "Не удалось сохранить настройки безопасности",
+      adminSettingsLoadFailed: "Не удалось загрузить настройки безопасности.",
     },
     people: {
       heading: "Пользователи",
@@ -4605,6 +4606,7 @@ export const ru: TranslationKeys = {
       tableHeaderTeam: "Команда",
       noSearchResults: "Участники не найдены.",
       noUsersFound: "Пользователи не найдены.",
+      loadFailed: "Не удалось загрузить пользователей.",
       authBadgeLocalOidc: "Локальный + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Изменить роль / команду",
@@ -4638,6 +4640,7 @@ export const ru: TranslationKeys = {
       tableHeaderTeamName: "Название команды",
       tableHeaderMembers: "Участники",
       emptyState: "Команды не найдены.",
+      loadFailed: "Не удалось загрузить команды.",
       renameSaveButton: "Сохранить",
       renameCancelButton: "Отмена",
       renameAction: "Переименовать",
@@ -4677,6 +4680,7 @@ export const ru: TranslationKeys = {
       deleteSuccess: 'Роль "{name}" удалена',
       deleteFailed: "Не удалось удалить роль",
       emptyState: "Роли не найдены.",
+      loadFailed: "Не удалось загрузить роли.",
       builtInBadge: "Встроенная",
       userCountBadge: "{count} пользователь(ей)",
       editRoleTitle: "Редактировать роль",
@@ -4696,6 +4700,7 @@ export const ru: TranslationKeys = {
       heading: "Журнал аудита",
       allActionsFilter: "Все действия",
       emptyState: "Записей в журнале аудита нет.",
+      loadFailed: "Не удалось загрузить журнал аудита.",
       tableHeaderTime: "Время",
       tableHeaderUser: "Пользователь",
       tableHeaderAction: "Действие",
@@ -4758,6 +4763,7 @@ export const ru: TranslationKeys = {
       deleteConfirm:
         "Удалить этот API-ключ? Все интеграции, использующие его, перестанут работать.",
       emptyState: "API-ключей пока нет. Сгенерируйте один для начала.",
+      loadFailed: "Не удалось загрузить API-ключи.",
     },
     tools: {
       heading: "Инструменты",

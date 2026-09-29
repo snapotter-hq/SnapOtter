@@ -4584,6 +4584,7 @@ export const fr: TranslationKeys = {
       passwordPolicyHeading: "Politique de mots de passe",
       securitySettingsSaved: "Paramètres de sécurité enregistrés",
       securitySettingsFailed: "Échec de l'enregistrement des paramètres de sécurité",
+      adminSettingsLoadFailed: "Impossible de charger les paramètres de sécurité.",
     },
     people: {
       heading: "Personnes",
@@ -4626,6 +4627,7 @@ export const fr: TranslationKeys = {
       tableHeaderTeam: "Équipe",
       noSearchResults: "Aucun membre ne correspond à votre recherche.",
       noUsersFound: "Aucun utilisateur trouvé.",
+      loadFailed: "Impossible de charger les utilisateurs.",
       authBadgeLocalOidc: "Local + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Modifier le rôle / l'équipe",
@@ -4660,6 +4662,7 @@ export const fr: TranslationKeys = {
       tableHeaderTeamName: "Nom de l'équipe",
       tableHeaderMembers: "Membres",
       emptyState: "Aucune équipe trouvée.",
+      loadFailed: "Impossible de charger les équipes.",
       renameSaveButton: "Enregistrer",
       renameCancelButton: "Annuler",
       renameAction: "Renommer",
@@ -4700,6 +4703,7 @@ export const fr: TranslationKeys = {
       deleteSuccess: 'Rôle "{name}" supprimé',
       deleteFailed: "Échec de la suppression du rôle",
       emptyState: "Aucun rôle trouvé.",
+      loadFailed: "Impossible de charger les rôles.",
       builtInBadge: "Prédéfini",
       userCountBadge: "{count} utilisateur(s)",
       editRoleTitle: "Modifier le rôle",
@@ -4719,6 +4723,7 @@ export const fr: TranslationKeys = {
       heading: "Journal d'audit",
       allActionsFilter: "Toutes les actions",
       emptyState: "Aucune entrée dans le journal d'audit.",
+      loadFailed: "Impossible de charger le journal d'audit.",
       tableHeaderTime: "Heure",
       tableHeaderUser: "Utilisateur",
       tableHeaderAction: "Action",
@@ -4781,6 +4786,7 @@ export const fr: TranslationKeys = {
       deleteConfirm:
         "Supprimer cette clé API ? Les intégrations qui l'utilisent cesseront de fonctionner.",
       emptyState: "Aucune clé API pour le moment. Générez-en une pour commencer.",
+      loadFailed: "Impossible de charger les clés API.",
     },
     tools: {
       heading: "Outils",

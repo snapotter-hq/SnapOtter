@@ -4574,6 +4574,7 @@ export const it: TranslationKeys = {
       passwordPolicyHeading: "Policy password",
       securitySettingsSaved: "Impostazioni di sicurezza salvate",
       securitySettingsFailed: "Impossibile salvare le impostazioni di sicurezza",
+      adminSettingsLoadFailed: "Impossibile caricare le impostazioni di sicurezza.",
     },
     people: {
       heading: "Persone",
@@ -4617,6 +4618,7 @@ export const it: TranslationKeys = {
       tableHeaderTeam: "Team",
       noSearchResults: "Nessun membro corrisponde alla ricerca.",
       noUsersFound: "Nessun utente trovato.",
+      loadFailed: "Impossibile caricare gli utenti.",
       authBadgeLocalOidc: "Locale + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Modifica ruolo / team",
@@ -4650,6 +4652,7 @@ export const it: TranslationKeys = {
       tableHeaderTeamName: "Nome del team",
       tableHeaderMembers: "Membri",
       emptyState: "Nessun team trovato.",
+      loadFailed: "Impossibile caricare i team.",
       renameSaveButton: "Salva",
       renameCancelButton: "Annulla",
       renameAction: "Rinomina",
@@ -4689,6 +4692,7 @@ export const it: TranslationKeys = {
       deleteSuccess: 'Ruolo "{name}" eliminato',
       deleteFailed: "Eliminazione del ruolo non riuscita",
       emptyState: "Nessun ruolo trovato.",
+      loadFailed: "Impossibile caricare i ruoli.",
       builtInBadge: "Predefinito",
       userCountBadge: "{count} utente/i",
       editRoleTitle: "Modifica ruolo",
@@ -4708,6 +4712,7 @@ export const it: TranslationKeys = {
       heading: "Registro di audit",
       allActionsFilter: "Tutte le azioni",
       emptyState: "Nessuna voce nel registro di audit.",
+      loadFailed: "Impossibile caricare il registro di audit.",
       tableHeaderTime: "Ora",
       tableHeaderUser: "Utente",
       tableHeaderAction: "Azione",
@@ -4770,6 +4775,7 @@ export const it: TranslationKeys = {
       deleteConfirm:
         "Eliminare questa chiave API? Le integrazioni che la utilizzano smetteranno di funzionare.",
       emptyState: "Nessuna chiave API ancora. Generane una per iniziare.",
+      loadFailed: "Impossibile caricare le chiavi API.",
     },
     tools: {
       heading: "Strumenti",

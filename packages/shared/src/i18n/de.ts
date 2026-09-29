@@ -4581,6 +4581,7 @@ export const de: TranslationKeys = {
       passwordPolicyHeading: "Passwortrichtlinie",
       securitySettingsSaved: "Sicherheitseinstellungen gespeichert",
       securitySettingsFailed: "Sicherheitseinstellungen konnten nicht gespeichert werden",
+      adminSettingsLoadFailed: "Sicherheitseinstellungen konnten nicht geladen werden.",
     },
     people: {
       heading: "Personen",
@@ -4624,6 +4625,7 @@ export const de: TranslationKeys = {
       tableHeaderTeam: "Team",
       noSearchResults: "Keine Mitglieder entsprechen Ihrer Suche.",
       noUsersFound: "Keine Benutzer gefunden.",
+      loadFailed: "Benutzer konnten nicht geladen werden.",
       authBadgeLocalOidc: "Lokal + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Rolle / Team bearbeiten",
@@ -4658,6 +4660,7 @@ export const de: TranslationKeys = {
       tableHeaderTeamName: "Teamname",
       tableHeaderMembers: "Mitglieder",
       emptyState: "Keine Teams gefunden.",
+      loadFailed: "Teams konnten nicht geladen werden.",
       renameSaveButton: "Speichern",
       renameCancelButton: "Abbrechen",
       renameAction: "Umbenennen",
@@ -4698,6 +4701,7 @@ export const de: TranslationKeys = {
       deleteSuccess: 'Rolle "{name}" gelöscht',
       deleteFailed: "Rolle konnte nicht gelöscht werden",
       emptyState: "Keine Rollen gefunden.",
+      loadFailed: "Rollen konnten nicht geladen werden.",
       builtInBadge: "Integriert",
       userCountBadge: "{count} Benutzer",
       editRoleTitle: "Rolle bearbeiten",
@@ -4717,6 +4721,7 @@ export const de: TranslationKeys = {
       heading: "Audit-Protokoll",
       allActionsFilter: "Alle Aktionen",
       emptyState: "Keine Audit-Protokolleinträge.",
+      loadFailed: "Das Audit-Protokoll konnte nicht geladen werden.",
       tableHeaderTime: "Zeit",
       tableHeaderUser: "Benutzer",
       tableHeaderAction: "Aktion",
@@ -4779,6 +4784,7 @@ export const de: TranslationKeys = {
       deleteConfirm:
         "Diesen API-Schlüssel löschen? Alle Integrationen, die ihn nutzen, werden nicht mehr funktionieren.",
       emptyState: "Noch keine API-Schlüssel. Generieren Sie einen, um zu beginnen.",
+      loadFailed: "API-Schlüssel konnten nicht geladen werden.",
     },
     tools: {
       heading: "Werkzeuge",

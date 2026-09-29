@@ -4565,6 +4565,7 @@ export const tr: TranslationKeys = {
       passwordPolicyHeading: "Parola Politikası",
       securitySettingsSaved: "Güvenlik ayarları kaydedildi",
       securitySettingsFailed: "Güvenlik ayarları kaydedilemedi",
+      adminSettingsLoadFailed: "Güvenlik ayarları yüklenemedi.",
     },
     people: {
       heading: "Kişiler",
@@ -4608,6 +4609,7 @@ export const tr: TranslationKeys = {
       tableHeaderTeam: "Takım",
       noSearchResults: "Aramanızla eşleşen üye bulunamadı.",
       noUsersFound: "Kullanıcı bulunamadı.",
+      loadFailed: "Kullanıcılar yüklenemedi.",
       authBadgeLocalOidc: "Yerel + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Rol / Takım Düzenle",
@@ -4641,6 +4643,7 @@ export const tr: TranslationKeys = {
       tableHeaderTeamName: "Takım Adı",
       tableHeaderMembers: "Üyeler",
       emptyState: "Takım bulunamadı.",
+      loadFailed: "Takımlar yüklenemedi.",
       renameSaveButton: "Kaydet",
       renameCancelButton: "İptal",
       renameAction: "Yeniden Adlandır",
@@ -4680,6 +4683,7 @@ export const tr: TranslationKeys = {
       deleteSuccess: '"{name}" rolü silindi',
       deleteFailed: "Rol silinemedi",
       emptyState: "Rol bulunamadı.",
+      loadFailed: "Roller yüklenemedi.",
       builtInBadge: "Yerleşik",
       userCountBadge: "{count} kullanıcı",
       editRoleTitle: "Rolü düzenle",
@@ -4699,6 +4703,7 @@ export const tr: TranslationKeys = {
       heading: "Denetim Günlüğü",
       allActionsFilter: "Tüm işlemler",
       emptyState: "Denetim günlüğü kaydı yok.",
+      loadFailed: "Denetim günlüğü yüklenemedi.",
       tableHeaderTime: "Zaman",
       tableHeaderUser: "Kullanıcı",
       tableHeaderAction: "İşlem",
@@ -4761,6 +4766,7 @@ export const tr: TranslationKeys = {
       deleteConfirm:
         "Bu API anahtarı silinsin mi? Bunu kullanan tüm entegrasyonlar çalışmayı durduracak.",
       emptyState: "Henüz API anahtarı yok. Başlamak için bir tane oluşturun.",
+      loadFailed: "API anahtarları yüklenemedi.",
     },
     tools: {
       heading: "Araçlar",

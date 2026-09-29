@@ -4560,6 +4560,7 @@ export const es: TranslationKeys = {
       passwordPolicyHeading: "Política de contraseñas",
       securitySettingsSaved: "Configuración de seguridad guardada",
       securitySettingsFailed: "Error al guardar la configuración de seguridad",
+      adminSettingsLoadFailed: "No se pudo cargar la configuración de seguridad.",
     },
     people: {
       heading: "Personas",
@@ -4602,6 +4603,7 @@ export const es: TranslationKeys = {
       tableHeaderTeam: "Equipo",
       noSearchResults: "Ningún miembro coincide con tu búsqueda.",
       noUsersFound: "No se encontraron usuarios.",
+      loadFailed: "No se pudieron cargar los usuarios.",
       authBadgeLocalOidc: "Local + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Editar rol / equipo",
@@ -4635,6 +4637,7 @@ export const es: TranslationKeys = {
       tableHeaderTeamName: "Nombre del equipo",
       tableHeaderMembers: "Miembros",
       emptyState: "No se encontraron equipos.",
+      loadFailed: "No se pudieron cargar los equipos.",
       renameSaveButton: "Guardar",
       renameCancelButton: "Cancelar",
       renameAction: "Renombrar",
@@ -4675,6 +4678,7 @@ export const es: TranslationKeys = {
       deleteSuccess: 'Rol "{name}" eliminado',
       deleteFailed: "Error al eliminar el rol",
       emptyState: "No se encontraron roles.",
+      loadFailed: "No se pudieron cargar los roles.",
       builtInBadge: "Predeterminado",
       userCountBadge: "{count} usuario(s)",
       editRoleTitle: "Editar rol",
@@ -4694,6 +4698,7 @@ export const es: TranslationKeys = {
       heading: "Registro de auditoría",
       allActionsFilter: "Todas las acciones",
       emptyState: "No hay entradas en el registro de auditoría.",
+      loadFailed: "No se pudo cargar el registro de auditoría.",
       tableHeaderTime: "Hora",
       tableHeaderUser: "Usuario",
       tableHeaderAction: "Acción",
@@ -4756,6 +4761,7 @@ export const es: TranslationKeys = {
       deleteConfirm:
         "¿Eliminar esta clave API? Las integraciones que la usen dejarán de funcionar.",
       emptyState: "Aún no hay claves API. Genera una para comenzar.",
+      loadFailed: "No se pudieron cargar las claves API.",
     },
     tools: {
       heading: "Herramientas",

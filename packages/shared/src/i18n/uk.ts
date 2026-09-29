@@ -4562,6 +4562,7 @@ export const uk: TranslationKeys = {
       passwordPolicyHeading: "Політика паролів",
       securitySettingsSaved: "Налаштування безпеки збережено",
       securitySettingsFailed: "Не вдалося зберегти налаштування безпеки",
+      adminSettingsLoadFailed: "Не вдалося завантажити налаштування безпеки.",
     },
     people: {
       heading: "Користувачі",
@@ -4604,6 +4605,7 @@ export const uk: TranslationKeys = {
       tableHeaderTeam: "Команда",
       noSearchResults: "Учасників не знайдено.",
       noUsersFound: "Користувачів не знайдено.",
+      loadFailed: "Не вдалося завантажити користувачів.",
       authBadgeLocalOidc: "Локальний + OIDC",
       authBadgeOidc: "OIDC",
       editRoleTeamAction: "Змінити роль / команду",
@@ -4637,6 +4639,7 @@ export const uk: TranslationKeys = {
       tableHeaderTeamName: "Назва команди",
       tableHeaderMembers: "Учасники",
       emptyState: "Команд не знайдено.",
+      loadFailed: "Не вдалося завантажити команди.",
       renameSaveButton: "Зберегти",
       renameCancelButton: "Скасувати",
       renameAction: "Перейменувати",
@@ -4676,6 +4679,7 @@ export const uk: TranslationKeys = {
       deleteSuccess: 'Роль "{name}" видалено',
       deleteFailed: "Не вдалося видалити роль",
       emptyState: "Ролей не знайдено.",
+      loadFailed: "Не вдалося завантажити ролі.",
       builtInBadge: "Вбудована",
       userCountBadge: "{count} користувач(ів)",
       editRoleTitle: "Редагувати роль",
@@ -4695,6 +4699,7 @@ export const uk: TranslationKeys = {
       heading: "Журнал аудиту",
       allActionsFilter: "Усі дії",
       emptyState: "Записів у журналі аудиту немає.",
+      loadFailed: "Не вдалося завантажити журнал аудиту.",
       tableHeaderTime: "Час",
       tableHeaderUser: "Користувач",
       tableHeaderAction: "Дія",
@@ -4757,6 +4762,7 @@ export const uk: TranslationKeys = {
       deleteConfirm:
         "Видалити цей API-ключ? Усі інтеграції, що його використовують, перестануть працювати.",
       emptyState: "API-ключів поки немає. Згенеруйте один для початку.",
+      loadFailed: "Не вдалося завантажити API-ключі.",
     },
     tools: {
       heading: "Інструменти",

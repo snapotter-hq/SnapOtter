@@ -1090,16 +1090,23 @@ export function AdminSecuritySettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  const loadSettings = useCallback(() => {
+    setLoading(true);
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
         setSettings(data.settings);
         originalSettingsRef.current = data.settings;
+        setLoadFailed(false);
       })
-      .catch(() => {})
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const updateSetting = useCallback((key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -1130,6 +1137,16 @@ export function AdminSecuritySettings() {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // A form full of defaults would misstate the live policy (MFA off, no
+  // session limits), so a failed load shows only the failure (#1447).
+  if (loadFailed) {
+    return (
+      <div className="border-t border-border pt-6">
+        <LoadFailed message={t.settings.security.adminSettingsLoadFailed} onRetry={loadSettings} />
       </div>
     );
   }
@@ -1394,7 +1411,7 @@ function generatePassword(): string {
   return chars.join("");
 }
 
-function PeopleSection() {
+export function PeopleSection() {
   const { t } = useTranslation();
   const isMobile = useMobile();
   const [users, setUsers] = useState<UserEntry[]>([]);
@@ -1421,6 +1438,7 @@ function PeopleSection() {
   );
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [availableRoles, setAvailableRoles] = useState<RoleEntry[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadTeams = useCallback(async () => {
     try {
@@ -1436,8 +1454,10 @@ function PeopleSection() {
       const data = await apiGet<{ users: UserEntry[]; maxUsers: number }>("/auth/users");
       setUsers(data.users);
       setMaxUsers(data.maxUsers);
+      setLoadFailed(false);
     } catch {
       setUsers([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -1934,7 +1954,15 @@ function PeopleSection() {
         )}
 
         {/* Table rows */}
-        {filteredUsers.length === 0 ? (
+        {loadFailed ? (
+          <LoadFailed
+            message={t.settings.people.loadFailed}
+            onRetry={() => {
+              setLoading(true);
+              loadUsers();
+            }}
+          />
+        ) : filteredUsers.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground rounded-b-lg">
             {search ? t.settings.people.noSearchResults : t.settings.people.noUsersFound}
           </div>
@@ -2107,14 +2135,17 @@ export function ApiKeysSection() {
   const [scopedPerms, setScopedPerms] = useState<string[]>([]);
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const { permissions } = useAuth();
 
   const loadKeys = useCallback(async () => {
     try {
       const data = await apiGet<{ apiKeys: ApiKeyEntry[] }>("/v1/api-keys");
       setKeys(data.apiKeys);
+      setLoadFailed(false);
     } catch {
       setKeys([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -2347,8 +2378,17 @@ export function ApiKeysSection() {
         </div>
       )}
 
-      {keys.length === 0 && !newKey && (
-        <p className="text-sm text-muted-foreground">{t.settings.apiKeys.emptyState}</p>
+      {loadFailed ? (
+        <LoadFailed
+          message={t.settings.apiKeys.loadFailed}
+          onRetry={() => {
+            setLoading(true);
+            loadKeys();
+          }}
+        />
+      ) : (
+        keys.length === 0 &&
+        !newKey && <p className="text-sm text-muted-foreground">{t.settings.apiKeys.emptyState}</p>
       )}
     </div>
   );
@@ -2356,7 +2396,7 @@ export function ApiKeysSection() {
 
 /* ────────────────────── Teams ────────────────────── */
 
-function TeamsSection() {
+export function TeamsSection() {
   const { t } = useTranslation();
   const isMobile = useMobile();
   const [teams, setTeams] = useState<TeamEntry[]>([]);
@@ -2374,13 +2414,16 @@ function TeamsSection() {
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const loadTeams = useCallback(async () => {
     try {
       const data = await apiGet<{ teams: TeamEntry[] }>("/v1/teams");
       setTeams(data.teams);
+      setLoadFailed(false);
     } catch {
       setTeams([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -2581,7 +2624,15 @@ function TeamsSection() {
           </div>
         )}
 
-        {teams.length === 0 ? (
+        {loadFailed ? (
+          <LoadFailed
+            message={t.settings.teams.loadFailed}
+            onRetry={() => {
+              setLoading(true);
+              loadTeams();
+            }}
+          />
+        ) : teams.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground rounded-b-lg">
             {t.settings.teams.emptyState}
           </div>
@@ -2801,7 +2852,7 @@ const PERMISSION_GROUPS = [
   },
 ];
 
-function RolesSection() {
+export function RolesSection() {
   const { t } = useTranslation();
   const [roles, setRoles] = useState<RoleEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2817,12 +2868,16 @@ function RolesSection() {
     null,
   );
 
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const loadRoles = useCallback(async () => {
     try {
       const data = await apiGet<{ roles: RoleEntry[] }>("/v1/roles");
       setRoles(data.roles);
+      setLoadFailed(false);
     } catch {
       setRoles([]);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -3098,7 +3153,15 @@ function RolesSection() {
 
       {/* Role cards */}
       <div className="space-y-3">
-        {roles.length === 0 ? (
+        {loadFailed ? (
+          <LoadFailed
+            message={t.settings.roles.loadFailed}
+            onRetry={() => {
+              setLoading(true);
+              loadRoles();
+            }}
+          />
+        ) : roles.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             {t.settings.roles.emptyState}
           </p>
@@ -3232,7 +3295,7 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function AuditLogSection() {
+export function AuditLogSection() {
   const { t } = useTranslation();
   const isMobile = useMobile();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -3241,6 +3304,7 @@ function AuditLogSection() {
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const limit = 25;
 
   const fetchEntries = useCallback(async () => {
@@ -3253,9 +3317,11 @@ function AuditLogSection() {
       );
       setEntries(data.entries);
       setTotal(data.total);
+      setLoadFailed(false);
     } catch {
       setEntries([]);
       setTotal(0);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -3294,6 +3360,8 @@ function AuditLogSection() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
+      ) : loadFailed ? (
+        <LoadFailed message={t.settings.auditLog.loadFailed} onRetry={fetchEntries} />
       ) : entries.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
           {t.settings.auditLog.emptyState}
@@ -3682,6 +3750,27 @@ function AboutSection() {
 }
 
 /* ────────────────────── Shared ────────────────────── */
+
+/**
+ * Stands in for a list or form whose data failed to load, so an empty list
+ * only ever means "there are none" (#1447): "No API keys" after a 500 reads
+ * as a fact, and an admin may go and create them again.
+ */
+function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div role="alert" className="px-4 py-8 text-center space-y-3">
+      <p className="text-sm text-destructive">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-muted transition-colors"
+      >
+        {t.common.retry}
+      </button>
+    </div>
+  );
+}
 
 function SettingRow({
   label,
