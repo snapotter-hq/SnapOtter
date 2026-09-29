@@ -135,6 +135,9 @@ const ALERT_FLOORS: Record<string, string | Record<string, string>> = {
   qs: "6.16.0",
   // GHSA-fxqj-rqcc-2cmp: incomplete fix of GHSA-6g55-p6wh-862q.
   postcss: "8.5.23",
+  // GHSA-73wf-gq98-2v4g: prototype write via an untrusted stats file, and
+  // GHSA-c83g-rgw3-j3cx: unbounded query cache growth.
+  browserslist: "4.28.7",
 };
 
 function floorFor(floors: string | Record<string, string>, version: Version): string | undefined {
@@ -178,6 +181,7 @@ describe("Dependabot alert floors (issue #835)", () => {
       ["override fast-uri", overrides["fast-uri"], "4.1.3"],
       ["override qs", overrides.qs, "6.16.0"],
       ["override postcss", overrides.postcss, "8.5.23"],
+      ["override browserslist", overrides.browserslist, "4.28.7"],
       ["override dompurify", overrides.dompurify, "3.4.13"],
       ["override undici@6", overrides["undici@6"], "6.28.0"],
       ["override undici@7", overrides["undici@7"], "7.29.0"],
