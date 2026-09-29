@@ -56,8 +56,8 @@ export interface InputHandler {
       signal?: AbortSignal;
       /**
        * Request-scoped logger for warn lines the handler emits while
-       * normalizing (autoOrient's rotate failures). Defaults to the process
-       * logger, which has no request binding (#1417).
+       * normalizing (autoOrient's rotate failures, the qpdf timeout skip).
+       * Defaults to the process logger, which has no request binding (#1417).
        */
       log?: FastifyBaseLogger;
     },

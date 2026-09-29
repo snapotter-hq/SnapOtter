@@ -235,6 +235,7 @@ export function registerOcrPdf(app: FastifyInstance) {
           await validatePdfPath(validationPath, {
             rejectPasswordProtected: true,
             signal: ingressAbort.signal,
+            log: request.log,
           });
         });
       } catch (err) {

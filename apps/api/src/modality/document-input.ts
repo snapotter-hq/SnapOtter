@@ -8,8 +8,10 @@ import {
   qpdfPageCount,
   qpdfRequiresPassword,
 } from "@snapotter/doc-engine";
+import type { FastifyBaseLogger } from "fastify";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
+import { logger } from "../lib/logger.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 const ZIP_MAGIC = Buffer.from("PK");
@@ -42,6 +44,12 @@ export interface PdfPathValidationOptions {
   lenient?: boolean;
   rejectPasswordProtected?: boolean;
   signal?: AbortSignal;
+  /**
+   * Request-scoped logger for the one warn this validator emits (a qpdf
+   * structural check that timed out and was skipped). Defaults to the process
+   * logger (#1547).
+   */
+  log?: Pick<FastifyBaseLogger, "warn">;
 }
 
 /** Validate a PDF in place so large callers never need a Node.js Buffer. */
@@ -109,11 +117,16 @@ export async function validatePdfPath(
     // structure. Tradeoff: a file crafted to stall qpdf passes this gate,
     // but every downstream engine (qpdf, ghostscript, LibreOffice, ...)
     // runs under its own timeout and fails loudly on a broken file.
+    // A failed stat leaves bytes out rather than logging 0, which would read
+    // as an empty PDF (an empty file is rejected before qpdf ever runs).
     const size = await stat(filePath)
-      .then((s) => s.size)
-      .catch(() => 0);
-    console.warn(
-      `[document-input] ${(err as Error).message} for ${filePath} (${size} bytes); skipping structural validation`,
+      .then((s): number | undefined => s.size)
+      .catch(() => undefined);
+    // Goes through pino so the line reaches the log file and carries the
+    // request binding when the caller has one (#1547).
+    (opts.log ?? logger).warn(
+      { err, filePath, bytes: size },
+      "document-input: qpdf structural check timed out, skipping it",
     );
   }
   opts.signal?.throwIfAborted();
@@ -158,6 +171,7 @@ export class DocumentInputHandler implements InputHandler {
       lenient?: boolean;
       rejectPasswordProtected?: boolean;
       signal?: AbortSignal;
+      log?: FastifyBaseLogger;
     },
   ): Promise<PreparedInput> {
     if (raw.length === 0) throw new InputValidationError("Empty file");

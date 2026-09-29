@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { FastifyBaseLogger } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 
@@ -20,6 +21,7 @@ vi.mock("@snapotter/doc-engine", async (importOriginal) => ({
 }));
 
 import { QpdfTimeoutError } from "@snapotter/doc-engine";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import {
   DocumentInputHandler,
   validatePdfPath,
@@ -125,20 +127,79 @@ describe("path-backed PDF validation", () => {
     expect(qpdf.pageCount).not.toHaveBeenCalled();
   });
 
-  it("treats a qpdf check timeout as inconclusive rather than damage", async () => {
+  it("treats a qpdf check timeout as inconclusive and warns through the given logger (#1547)", async () => {
     const inputPath = join(scratchDir, "big-but-healthy.pdf");
     writeFileSync(inputPath, "%PDF-path-backed");
     qpdf.requiresPassword.mockResolvedValueOnce(false);
     qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const log = { warn: vi.fn() };
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      await expect(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true, log }),
+      ).resolves.toBeUndefined();
+      expect(log.warn).toHaveBeenCalledOnce();
+      expect(log.warn.mock.calls[0][0]).toMatchObject({
+        err: expect.objectContaining({ message: "qpdf timed out after 30s" }),
+        filePath: inputPath,
+        bytes: 16,
+      });
+      expect(log.warn.mock.calls[0][1]).toBe(
+        "document-input: qpdf structural check timed out, skipping it",
+      );
+      // nothing bypasses pino any more
+      expect(consoleWarn).not.toHaveBeenCalled();
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it("forwards the request logger from prepare into the qpdf-timeout warn (#1547)", async () => {
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+    const warn = vi.fn();
+    const log = { warn } as unknown as FastifyBaseLogger;
+    const processWarn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    try {
+      await expect(
+        new DocumentInputHandler().prepare(Buffer.from("%PDF-path-backed"), "big.pdf", {
+          scratchDir,
+          rejectPasswordProtected: true,
+          log,
+        }),
+      ).resolves.toMatchObject({ filename: "big.pdf" });
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0][0]).toMatchObject({
+        bytes: 16,
+        filePath: expect.stringMatching(/qpdf-.*input\.pdf$/),
+      });
+      // it went to the caller's logger, not the process one
+      expect(processWarn).not.toHaveBeenCalled();
+    } finally {
+      processWarn.mockRestore();
+    }
+  });
+
+  it("falls back to the process logger for the timeout warn when no request logger is given", async () => {
+    const inputPath = join(scratchDir, "big-but-healthy-2.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+    // mockImplementation keeps the call from building the real transport
+    const processWarn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     try {
       await expect(
         validatePdfPath(inputPath, { rejectPasswordProtected: true }),
       ).resolves.toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining("timed out"));
+      expect(processWarn).toHaveBeenCalledOnce();
+      expect(processWarn.mock.calls[0][1]).toBe(
+        "document-input: qpdf structural check timed out, skipping it",
+      );
     } finally {
-      warn.mockRestore();
+      processWarn.mockRestore();
     }
   });
 
@@ -148,17 +209,17 @@ describe("path-backed PDF validation", () => {
     qpdf.requiresPassword.mockResolvedValueOnce(false);
     qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
     qpdf.pageCount.mockResolvedValueOnce(11);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const log = { warn: vi.fn() };
     const originalMaxPages = env.MAX_PDF_PAGES;
     env.MAX_PDF_PAGES = 10;
 
     try {
-      await expect(validatePdfPath(inputPath, { rejectPasswordProtected: true })).rejects.toThrow(
-        /11 pages.*maximum of 10/i,
-      );
+      await expect(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true, log }),
+      ).rejects.toThrow(/11 pages.*maximum of 10/i);
+      expect(log.warn).toHaveBeenCalledOnce();
     } finally {
       env.MAX_PDF_PAGES = originalMaxPages;
-      warn.mockRestore();
     }
   });
 

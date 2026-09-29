@@ -146,7 +146,7 @@ describe("OCR PDF path-backed processing", () => {
 
     const request = {
       headers: {},
-      log: { error: vi.fn() },
+      log: { error: vi.fn(), warn: vi.fn() },
       raw: {
         aborted: false,
         once: vi.fn(),
@@ -202,6 +202,8 @@ describe("OCR PDF path-backed processing", () => {
     expect(mocks.validatePdfPath).toHaveBeenCalledWith(validationPath, {
       rejectPasswordProtected: true,
       signal: expect.any(AbortSignal),
+      // the route's own request logger, so a qpdf-timeout warn carries reqId (#1547)
+      log: request.log,
     });
     expect(mocks.getObjectBuffer).not.toHaveBeenCalled();
     expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
