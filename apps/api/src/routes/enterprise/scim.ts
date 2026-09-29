@@ -50,7 +50,9 @@ function scimActiveValue(value: unknown): boolean {
 // A blank externalId means no external identity. Stored as "", it takes the
 // (auth_provider, external_id) index slot that NULL leaves free, so the next
 // blank one collides (issue #1008). Non-blank values are kept verbatim so the
-// externalId filter still matches exactly what the IdP sent.
+// externalId filter still matches exactly what the IdP sent. This does no type
+// checking: SCIM bodies have no schema yet, so a non-string passes through as
+// it did before.
 function scimExternalId(value: unknown): string | null {
   if (typeof value === "string" && value.trim() === "") return null;
   return (value as string | null | undefined) ?? null;

@@ -990,6 +990,21 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       }
     });
 
+    it("stores a padded non-blank externalId verbatim so the eq filter still finds it", async () => {
+      const externalId = ` ${uniqueName("scim-pad-ext")} `;
+      const { id } = await createScimUser({ userName: uniqueName("scim-pad"), externalId });
+
+      expect((await userRow(id))?.externalId).toBe(externalId);
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        query: { filter: `externalId eq "${externalId}"` },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).Resources.map((r: { id: string }) => r.id)).toEqual([id]);
+    });
+
     it("creates a disabled user when active is false and falls back to the first email", async () => {
       const username = uniqueName("scim-create-inactive");
       const res = await crudApp.app.inject({
@@ -1360,6 +1375,25 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       }
     });
 
+    it("leaves the stored externalId alone when PUT omits it", async () => {
+      const externalId = uniqueName("scim-put-keep-ext");
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-put-keep"),
+        externalId,
+      });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: { userName, active: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).externalId).toBe(externalId);
+      expect((await userRow(id))?.externalId).toBe(externalId);
+    });
+
     it("deactivation revokes sessions, stores a restorable role, and stays canonical", async () => {
       const { id, userName } = await createScimUser({
         userName: uniqueName("scim-put-deactivate"),
@@ -1495,8 +1529,8 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
 
     it("clears externalId to NULL when a PATCH replace sends a blank one, by path or value object", async () => {
-      // Issue #1008: both replace shapes wrote "" verbatim, so the second
-      // user to get one collided with the first on the identity index.
+      // Issue #1008: both replace shapes wrote a blank externalId verbatim,
+      // where it held a slot on the identity index like a real value.
       const a = await createScimUser({
         userName: uniqueName("scim-patch-blank-a"),
         externalId: uniqueName("ext"),
