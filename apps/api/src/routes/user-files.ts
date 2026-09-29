@@ -90,6 +90,21 @@ function extToMime(ext: string): string {
 }
 
 /**
+ * The MIME type to store for an upload that didn't validate as an image.
+ *
+ * Only the route's own image check can vouch for an image type, so a client
+ * claiming image/* for bytes that failed it gets application/octet-stream
+ * (#1349). Anything else keeps the client's type: video, audio, PDF and Office
+ * uploads have no sniff here, and their previews branch on that type.
+ */
+function unverifiedUploadMime(clientMime: string | undefined): string {
+  if (!clientMime || clientMime.toLowerCase().startsWith("image/")) {
+    return "application/octet-stream";
+  }
+  return clientMime;
+}
+
+/**
  * The width/height to store for a validated image, or null if they weren't
  * actually measured.
  *
@@ -269,8 +284,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /api/v1/files/upload
    *
-   * Multipart form with one or more image file parts.
-   * Validates each (magic bytes + dimensions), stores to disk, creates DB record.
+   * Multipart form with one or more file parts. Each is checked as an image
+   * (magic bytes + dimensions); one that passes is stored with its sniffed
+   * type, one that doesn't is still kept, under a type from
+   * unverifiedUploadMime(). Stores to disk, creates DB record.
    */
   app.post(
     "/api/v1/files/upload",
@@ -365,7 +382,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           const safeName = sanitizeFilename(part.filename ?? "upload");
           const mimeType = isValidImage
             ? formatToMime(validation.format)
-            : part.mimetype || "application/octet-stream";
+            : unverifiedUploadMime(part.mimetype);
           const dimensions = measuredDimensions(isValidImage ? validation : null);
 
           const storedName = await saveFile(safeBuffer, safeName);
