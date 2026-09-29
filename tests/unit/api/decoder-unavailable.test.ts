@@ -202,8 +202,8 @@ describe("decodeToSharpCompat without a decoder binary", () => {
   it("ends the RAW fallback chain in DecoderUnavailableError when no RAW decoder exists", async () => {
     hideDecoderBinaries();
 
-    // dcraw_emu and both exiftool attempts fail to spawn and fall through;
-    // the ImageMagick probe is the last word.
+    // Every tier fails to spawn; dcraw_emu, the image's RAW decoder, is the
+    // one the 503 names (#1429).
     const err = await decodeToSharpCompat(
       readFixture(fixtures.image.formats("dng")),
       "raw",
@@ -211,7 +211,7 @@ describe("decodeToSharpCompat without a decoder binary", () => {
     ).catch((e) => e);
 
     expect(err).toBeInstanceOf(DecoderUnavailableError);
-    expect(err.message).toMatch(/No ImageMagick found/);
+    expect(err.cause?.syscall).toBe("spawn dcraw_emu");
   });
 
   it("rejects with DecoderUnavailableError when a direct decoder cannot be spawned", async () => {

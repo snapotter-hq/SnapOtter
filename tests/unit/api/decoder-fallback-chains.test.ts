@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
+  asDecoderUnavailable,
   DecoderUnavailableError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -22,19 +23,30 @@ import { decodeHeic } from "../../../apps/api/src/lib/heic-converter.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 const ORIGINAL_PATH = process.env.PATH;
+const ORIGINAL_FFMPEG_PATH = process.env.FFMPEG_PATH;
 const binDirs: string[] = [];
 
-afterEach(() => {
+function restoreEnv() {
   process.env.PATH = ORIGINAL_PATH;
-});
+  if (ORIGINAL_FFMPEG_PATH === undefined) delete process.env.FFMPEG_PATH;
+  else process.env.FFMPEG_PATH = ORIGINAL_FFMPEG_PATH;
+}
+
+afterEach(restoreEnv);
 
 afterAll(() => {
-  process.env.PATH = ORIGINAL_PATH;
+  restoreEnv();
   for (const dir of binDirs) rmSync(dir, { recursive: true, force: true });
 });
 
-/** A PATH holding only the given shim scripts (each a POSIX sh body). */
+/**
+ * A PATH holding only the given shim scripts (each a POSIX sh body). `which`
+ * isn't on it either, so resolveFfmpeg() finds nothing and EXR's fallback
+ * spawns a bare `ffmpeg` that isn't there. FFMPEG_PATH is cleared so a
+ * developer's own setting can't hand EXR a real ffmpeg.
+ */
 function useShims(shims: Record<string, string>) {
+  delete process.env.FFMPEG_PATH;
   const dir = mkdtempSync(join(tmpdir(), "decoder-shims-"));
   binDirs.push(dir);
   for (const [name, body] of Object.entries(shims)) {
@@ -176,5 +188,159 @@ describe("fallback chains keep the first real verdict (#1429)", () => {
     );
 
     expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.message).toMatch(/no support for this format/);
+  });
+
+  it("JXL: with djxl missing, the 503 names djxl rather than ImageMagick's delegate", async () => {
+    useShims({ magick: magickNoDelegate });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("jxl")), "jxl").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.cause?.syscall).toBe("spawn djxl");
+  });
+
+  it("a primary that exits 0 without writing output is no verdict", async () => {
+    useShims({ djxl: "exit 0", magick: magickNoDelegate });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("jxl")), "jxl").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+  });
+
+  it("RAW: a dcraw_emu that can't start decides it, whatever ImageMagick's delegate says", async () => {
+    // ImageMagick 6 without ufraw fails like this, which no pattern can tell
+    // from a bad file.
+    useShims({
+      exiftool: "exit 0",
+      magick: `${MAGICK_VERSION}
+echo "convert: delegate failed \\\`'ufraw-batch' --silent' @ error/delegate.c/InvokeDelegate/1911." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "dng",
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.cause?.syscall).toBe("spawn dcraw_emu");
+  });
+
+  it("RAW: dcraw_emu exiting 0 with an empty TIFF is no verdict", async () => {
+    useShims({
+      dcraw_emu: ': > "$5.tiff"\nexit 0',
+      exiftool: "exit 0",
+      magick: magickNoDelegate,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "dng",
+    ).catch((e) => e);
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+  });
+
+  it("a successful fallback after a rejected primary still decodes", async () => {
+    const png = join(process.cwd(), "tests/fixtures/image/valid/test-200x150.png");
+    useShims({
+      djxl: 'echo "Error: failed to decode" >&2\nexit 1',
+      magick: `${MAGICK_VERSION}
+for a; do last=$a; done
+/bin/cp "${png}" "\${last#png:}"`,
+    });
+
+    const out = await decodeToSharpCompat(readFixture(fixtures.image.formats("jxl")), "jxl");
+
+    expect(out.subarray(1, 4).toString("ascii")).toBe("PNG");
+  });
+
+  it("a cancelled chain stays an abort, not the primary's rejection", async () => {
+    useShims({
+      djxl: 'echo "Error: failed to decode" >&2\nexit 1',
+      magick: `${MAGICK_VERSION}\n/bin/sleep 5`,
+    });
+    const controller = new AbortController();
+    const pending = decodeToSharpCompat(
+      readFixture(fixtures.image.formats("jxl")),
+      "jxl",
+      undefined,
+      { signal: controller.signal },
+    ).catch((e) => e);
+    setTimeout(() => controller.abort(), 300);
+
+    const err = await pending;
+
+    expect(err.name).toBe("AbortError");
+  });
+});
+
+describe("filenames can't steer the classification (#1429)", () => {
+  it("a RAW extension carrying a missing-support phrase keeps dcraw_emu's verdict", async () => {
+    // Real dcraw_emu and ImageMagick echo the input path, which is built from
+    // the upload's extension.
+    useShims({
+      dcraw_emu: 'echo "Cannot open $5: Unsupported file format or not RAW file" >&2\nexit 2',
+      exiftool: "exit 0",
+      magick: `${MAGICK_VERSION}
+for a; do last=$a; done
+echo "magick: unable to open image \\\`$last'" >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "no decode delegate for this image format",
+    ).catch((e) => e);
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toMatch(/Unsupported file format/);
+  });
+});
+
+describe("asDecoderUnavailable classification (#1429)", () => {
+  const execError = (stderr: string, code: unknown = 1) =>
+    Object.assign(new Error(`Command failed: x\n${stderr}`), { stderr, code });
+
+  it.each([
+    "magick: no decode delegate for this image format `x.jxl'",
+    "convert: delegate library support not built-in (OpenEXR)",
+    "Could not decode image: No decoding plugin installed for this compression format",
+    "Could not decode image: Unsupported feature: Unsupported codec",
+    "Support for this compression format has not been built in",
+    "MAGICK: NO DECODE DELEGATE FOR THIS IMAGE FORMAT",
+  ])("reads %j as missing support", (stderr) => {
+    const converted = asDecoderUnavailable(execError(stderr));
+    expect(converted).toBeInstanceOf(DecoderUnavailableError);
+    expect((converted as Error).message).toMatch(/no support for this format/);
+  });
+
+  it("reads exit 127 as a decoder that could not start", () => {
+    const converted = asDecoderUnavailable(execError("", 127));
+    expect(converted).toBeInstanceOf(DecoderUnavailableError);
+    expect((converted as Error).message).toMatch(/could not be started/);
+  });
+
+  it.each([
+    ["a real rejection", execError("magick: improper image header `x'")],
+    [
+      "a phrase only in the command line",
+      Object.assign(
+        new Error("Command failed: magick no decode delegate for this image format.dng"),
+        { stderr: "", code: 1 },
+      ),
+    ],
+    ["an ENOENT code string with no spawn", Object.assign(new Error("gone"), { code: "ENOENT" })],
+    ["a non-127 exit", execError("", 2)],
+  ])("leaves %s alone", (_label, err) => {
+    expect(asDecoderUnavailable(err)).toBe(err);
   });
 });

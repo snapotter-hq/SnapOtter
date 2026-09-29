@@ -162,7 +162,9 @@ exit 1
 
       expect(res.statusCode, res.body).toBe(503);
       expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
-      expect(res.json().error).toMatch(/no support for this format/);
+      // djxl is the JXL decoder and it's missing, so the 503 names it rather
+      // than ImageMagick's delegate.
+      expect(res.json().error).toMatch(/could not be started/);
     } finally {
       rmSync(shimDir, { recursive: true, force: true });
     }

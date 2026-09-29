@@ -45,9 +45,9 @@ export function isDecoderUnavailable(err: unknown): boolean {
  * something they already have.
  */
 export function noDecoderFound(message: string, probeFailures: unknown[]): Error {
-  const notInstalled = probeFailures.every(isBinarySpawnFailure);
+  const notInstalled = probeFailures.every(cannotStart);
   if (notInstalled) return new DecoderUnavailableError(message, probeFailures.at(-1));
-  return new Error(message, { cause: probeFailures.find((err) => !isBinarySpawnFailure(err)) });
+  return new Error(message, { cause: probeFailures.find((err) => !cannotStart(err)) });
 }
 
 /**
@@ -58,7 +58,7 @@ export function noDecoderFound(message: string, probeFailures: unknown[]): Error
  */
 export function asDecoderUnavailable(err: unknown): unknown {
   if (err instanceof DecoderUnavailableError) return err;
-  if (isBinarySpawnFailure(err)) {
+  if (cannotStart(err)) {
     return new DecoderUnavailableError(
       "An image decoder on this server could not be started. Check that the container's decoder binaries are installed and executable.",
       err,
@@ -66,7 +66,7 @@ export function asDecoderUnavailable(err: unknown): unknown {
   }
   if (lacksFormatSupport(err)) {
     return new DecoderUnavailableError(
-      "An image decoder on this server has no support for this format. Install the missing ImageMagick delegate or libheif decoder plugin.",
+      "An image decoder on this server has no support for this format. Check the container's decoder packages (ImageMagick delegates, libheif plugins).",
       err,
     );
   }
@@ -74,35 +74,49 @@ export function asDecoderUnavailable(err: unknown): unknown {
 }
 
 /**
+ * The binary never ran: a failed spawn, or exit 127, which from a shell-less
+ * execFile means its shared libraries wouldn't load (#1429).
+ */
+function cannotStart(err: unknown): boolean {
+  return isBinarySpawnFailure(err) || (err as { code?: unknown } | null)?.code === 127;
+}
+
+/**
  * The decoder ran but can't handle the format at all, so it never judged the
- * file: ImageMagick without the delegate, libheif without its HEVC plugin, or
- * a binary whose shared libraries won't load (exit 127, execFile uses no
- * shell) (#1429).
+ * file: ImageMagick without the delegate, or libheif without its HEVC plugin
+ * (newer and 1.15-1.17 wording, and a build without plugin loading). Only
+ * stderr is read: the command line in the error message carries a temp path
+ * derived from the upload (#1429).
  */
 const MISSING_SUPPORT =
-  /no decode delegate for this image format|delegate library support not built-in|No decoding plugin installed|No decoder for this image format/i;
+  /no decode delegate for this image format|delegate library support not built-in|No decoding plugin installed|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
 
 function lacksFormatSupport(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const { code, stderr } = err as Error & { code?: unknown; stderr?: unknown };
-  if (code === 127) return true;
-  return MISSING_SUPPORT.test(`${err.message}\n${stderr ?? ""}`);
+  const stderr = (err as { stderr?: unknown } | null)?.stderr;
+  return stderr !== undefined && MISSING_SUPPORT.test(String(stderr));
+}
+
+/** Killed or timed out, or exited 0 without writing its output: no verdict either way. */
+function inconclusive(err: unknown): boolean {
+  const e = err as { killed?: unknown; signal?: unknown; code?: unknown; syscall?: unknown } | null;
+  if (e?.killed === true || (typeof e?.signal === "string" && e.signal !== "")) return true;
+  return e?.code === "ENOENT" && e.syscall === "open";
+}
+
+function unavailable(err: unknown): boolean {
+  return err instanceof DecoderUnavailableError || cannotStart(err) || lacksFormatSupport(err);
 }
 
 /**
  * The error a failed fallback chain surfaces: the first decoder that actually
  * judged the file, so a real rejection keeps its 422 even when a later
- * fallback can't read the format at all. With no verdict, the last failure,
- * which asDecoderUnavailable then classifies (#1429).
+ * fallback can't read the format at all. With no verdict, the first decoder
+ * that was unavailable (the chain's own decoder, named in the cause), which
+ * asDecoderUnavailable then turns into a 503 (#1429).
  */
 function chainFailure(failures: unknown[]): unknown {
-  const verdict = failures.find(
-    (err) =>
-      !(err instanceof DecoderUnavailableError) &&
-      !isBinarySpawnFailure(err) &&
-      !lacksFormatSupport(err),
-  );
-  return verdict ?? failures.at(-1);
+  const verdict = failures.find((err) => !unavailable(err) && !inconclusive(err));
+  return verdict ?? failures.find(unavailable) ?? failures[0];
 }
 
 export interface DecodeSafetyOptions {
@@ -608,7 +622,10 @@ async function decodeRaw(
   const id = randomUUID();
   // Use the original extension so LibRaw / ExifTool / ImageMagick can identify
   // the RAW variant.
-  const suffix = ext ? `.${ext.replace(/^\./, "")}` : ".dng";
+  // The extension comes from the upload's filename; keep it alphanumeric so it
+  // can't smuggle text into the decoders' command lines and stderr (#1429).
+  const safeExt = ext?.replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".dng";
   const inputPath = join(tmpdir(), `raw-in-${id}${suffix}`);
   const outputPath = join(tmpdir(), `raw-out-${id}.png`);
   // dcraw_emu APPENDS the output extension to the full input path
@@ -696,6 +713,10 @@ async function decodeRaw(
       );
     } catch (error) {
       options.signal?.throwIfAborted();
+      // dcraw_emu is the image's RAW decoder. ImageMagick's RAW path hands off
+      // to ufraw or darktable, which fail with messages no pattern can tell
+      // from a bad file, so a dcraw_emu that can't start decides it (#1429).
+      if (cannotStart(dcrawFailure)) throw dcrawFailure;
       throw chainFailure([dcrawFailure, error].filter((err) => err !== undefined));
     }
     return await readFile(outputPath);
