@@ -72,13 +72,20 @@ export function failedRead(results: readonly { isValid: boolean; error: string }
  *   instantiate error this way) or it trapped mid-read, after which the
  *   instance can't be trusted (#1402);
  * - no room in its heap for the image, which zxing throws as a plain Error;
- * - no room mid-read (DecoderOutOfMemory, from failedRead) (#1425).
+ * - no room mid-read (DecoderOutOfMemory, from failedRead) (#1425);
+ * - no room in Node for zxing's grayscale copy of the image, made in JS
+ *   before the wasm call: V8's "Array buffer allocation failed" (#1469).
+ *
+ * sharp running out of memory earlier in the route isn't here because it
+ * can't be: libvips crashes the process (a segfault under `ulimit -v`, an
+ * OOM kill under a cgroup limit) rather than throwing.
  */
 function isDecoderFault(err: unknown): boolean {
   return (
     err instanceof WebAssembly.RuntimeError ||
     err instanceof DecoderOutOfMemory ||
-    (err instanceof Error && /^Failed to allocate \d+ bytes in WASM memory/.test(err.message))
+    (err instanceof Error && /^Failed to allocate \d+ bytes in WASM memory/.test(err.message)) ||
+    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
   );
 }
 

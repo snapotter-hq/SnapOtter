@@ -1228,6 +1228,32 @@ describe("Barcode Read server-side failures", () => {
     expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
   });
 
+  it("answers 503 when Node can't allocate the decoder's copy of the image", async () => {
+    // Before handing the image to wasm, zxing copies it into a one-byte
+    // grayscale Uint8Array in JS. Under memory pressure V8 throws
+    // "Array buffer allocation failed" there; before #1469 that was a 422.
+    // Fail exactly that allocation (400x400 = 160000 bytes) and nothing else.
+    const RealUint8Array = globalThis.Uint8Array;
+    globalThis.Uint8Array = new Proxy(RealUint8Array, {
+      construct(target, args, newTarget) {
+        if (args[0] === 400 * 400) throw new RangeError("Array buffer allocation failed");
+        return Reflect.construct(target, args, newTarget);
+      },
+    });
+    let res: Awaited<ReturnType<typeof readQr>>;
+    try {
+      res = await readQr();
+    } finally {
+      globalThis.Uint8Array = RealUint8Array;
+    }
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body).code).toBe("ENGINE_UNAVAILABLE");
+
+    const next = await readQr();
+    expect(next.statusCode).toBe(200);
+    expect(JSON.parse(next.body).barcodes[0]?.text).toBe(QR_TEXT);
+  });
+
   // chmod means nothing to root, and S3 storage never touches WORKSPACE_PATH.
   it.skipIf(process.getuid?.() === 0 || process.env.STORAGE_MODE === "s3")(
     "answers 500, not 422, when the result can't be stored",
