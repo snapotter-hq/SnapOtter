@@ -4392,6 +4392,7 @@ export const ko: TranslationKeys = {
       saveButton: "설정 저장",
       saveSuccess: "설정이 저장되었습니다.",
       saveFailed: "설정 저장에 실패했습니다.",
+      loadFailed: "시스템 설정을 불러오지 못했습니다.",
       limitsAndResources: "제한 및 리소스",
       maxFileSize: "최대 파일 크기",
       maxBatchSize: "최대 배치 크기",

@@ -4438,6 +4438,7 @@ export const ar: TranslationKeys = {
       saveButton: "حفظ الإعدادات",
       saveSuccess: "تم حفظ الإعدادات.",
       saveFailed: "فشل حفظ الإعدادات.",
+      loadFailed: "تعذّر تحميل إعدادات النظام.",
       limitsAndResources: "الحدود والموارد",
       maxFileSize: "حجم الملف الأقصى",
       maxBatchSize: "حجم الدفعة الأقصى",

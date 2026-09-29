@@ -4479,6 +4479,7 @@ export const nl: TranslationKeys = {
       saveButton: "Instellingen opslaan",
       saveSuccess: "Instellingen opgeslagen.",
       saveFailed: "Instellingen opslaan mislukt.",
+      loadFailed: "Systeeminstellingen laden mislukt.",
       limitsAndResources: "Limieten & Bronnen",
       maxFileSize: "Max bestandsgrootte",
       maxBatchSize: "Max batchgrootte",

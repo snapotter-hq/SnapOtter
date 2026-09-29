@@ -4457,6 +4457,7 @@ export const vi: TranslationKeys = {
       saveButton: "Lưu cài đặt",
       saveSuccess: "Đã lưu cài đặt.",
       saveFailed: "Lưu cài đặt thất bại.",
+      loadFailed: "Không thể tải cài đặt hệ thống.",
       limitsAndResources: "Giới hạn & Tài nguyên",
       maxFileSize: "Dung lượng tệp tối đa",
       maxBatchSize: "Kích thước lô tối đa",

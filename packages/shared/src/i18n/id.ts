@@ -4461,6 +4461,7 @@ export const id: TranslationKeys = {
       saveButton: "Simpan Pengaturan",
       saveSuccess: "Pengaturan disimpan.",
       saveFailed: "Gagal menyimpan pengaturan.",
+      loadFailed: "Gagal memuat pengaturan sistem.",
       limitsAndResources: "Batasan & Sumber Daya",
       maxFileSize: "Ukuran File Maks",
       maxBatchSize: "Ukuran Batch Maks",

@@ -4415,6 +4415,7 @@ export const ja: TranslationKeys = {
       saveButton: "設定を保存",
       saveSuccess: "設定を保存しました。",
       saveFailed: "設定の保存に失敗しました。",
+      loadFailed: "システム設定を読み込めませんでした。",
       limitsAndResources: "制限とリソース",
       maxFileSize: "最大ファイルサイズ",
       maxBatchSize: "最大バッチサイズ",

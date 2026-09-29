@@ -4468,6 +4468,7 @@ export const tr: TranslationKeys = {
       saveButton: "Ayarları Kaydet",
       saveSuccess: "Ayarlar kaydedildi.",
       saveFailed: "Ayarlar kaydedilemedi.",
+      loadFailed: "Sistem ayarları yüklenemedi.",
       limitsAndResources: "Limitler ve Kaynaklar",
       maxFileSize: "Maksimum Dosya Boyutu",
       maxBatchSize: "Maksimum Toplu İşlem Boyutu",

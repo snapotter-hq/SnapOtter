@@ -4403,6 +4403,7 @@ export const en = {
       saveButton: "Save Settings",
       saveSuccess: "Settings saved.",
       saveFailed: "Failed to save settings.",
+      loadFailed: "Couldn't load the system settings.",
       limitsAndResources: "Limits & Resources",
       maxFileSize: "Max File Size",
       maxBatchSize: "Max Batch Size",

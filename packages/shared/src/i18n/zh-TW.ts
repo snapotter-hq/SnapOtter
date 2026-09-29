@@ -4195,6 +4195,7 @@ export const zhTW: TranslationKeys = {
       saveButton: "儲存設定",
       saveSuccess: "設定已儲存。",
       saveFailed: "儲存設定失敗。",
+      loadFailed: "無法載入系統設定。",
       limitsAndResources: "限制與資源",
       maxFileSize: "最大檔案大小",
       maxBatchSize: "最大批次處理數",

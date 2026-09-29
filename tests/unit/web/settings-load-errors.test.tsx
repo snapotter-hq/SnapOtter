@@ -1,21 +1,24 @@
 // @vitest-environment jsdom
 
 /**
- * A settings list that fails to load says so, with a Retry, instead of
- * rendering its empty state (#1447). "No API keys" after a 500 reads as
- * "there are none", and an admin may go and create them again.
+ * A settings list or form that fails to load says so, with a Retry, instead
+ * of rendering its empty state or a form of defaults (#1447). "No API keys"
+ * after a 500 reads as "there are none", and an admin may go and create them
+ * again; a System tab of invented defaults reads as the live configuration.
  */
 
 import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const apiGet = vi.hoisted(() => vi.fn());
+const apiPost = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, apiGet };
+  return { ...actual, apiGet, apiPost };
 });
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -33,12 +36,14 @@ import {
   AuditLogSection,
   PeopleSection,
   RolesSection,
+  SystemSection,
   TeamsSection,
 } from "@/components/settings/settings-dialog";
 
 afterEach(() => {
   cleanup();
   apiGet.mockReset();
+  apiPost.mockReset();
 });
 
 /** Resolve every GET from `data` by path prefix; reject the ones listed in `failing`. */
@@ -52,6 +57,8 @@ function serve(data: Record<string, unknown>, failing: string[]) {
     return data[hit];
   });
 }
+
+const s = en.settings;
 
 const team = {
   id: "t1",
@@ -76,6 +83,14 @@ const user = {
   team: "Default",
   createdAt: "2026-01-01T00:00:00Z",
 };
+const apiKey = {
+  id: 1,
+  name: "ci key",
+  prefix: "si_abc",
+  createdAt: "2026-01-01T00:00:00Z",
+  permissions: null,
+  expiresAt: null,
+};
 const auditEntry = {
   id: "a1",
   actorId: "u1",
@@ -94,8 +109,10 @@ interface Case {
   element: () => ReactElement;
   endpoint: string;
   data: Record<string, unknown>;
+  /** The same endpoints answering with nothing in the list. */
+  empty: Record<string, unknown>;
   failedText: string;
-  emptyText: RegExp;
+  emptyText: string;
   loadedText: string;
 }
 
@@ -109,30 +126,23 @@ const cases: Case[] = [
       "/v1/teams": { teams: [team] },
       "/v1/roles": { roles: [role] },
     },
-    failedText: "Couldn't load users.",
-    emptyText: /No users found/,
+    empty: {
+      "/auth/users": { users: [], maxUsers: 0 },
+      "/v1/teams": { teams: [] },
+      "/v1/roles": { roles: [] },
+    },
+    failedText: s.people.loadFailed,
+    emptyText: s.people.noUsersFound,
     loadedText: "ada",
   },
   {
     name: "API keys",
     element: () => <ApiKeysSection />,
     endpoint: "/v1/api-keys",
-    data: {
-      "/v1/api-keys": {
-        apiKeys: [
-          {
-            id: 1,
-            name: "ci key",
-            prefix: "si_abc",
-            createdAt: "2026-01-01T00:00:00Z",
-            permissions: null,
-            expiresAt: null,
-          },
-        ],
-      },
-    },
-    failedText: "Couldn't load your API keys.",
-    emptyText: /No API keys yet/,
+    data: { "/v1/api-keys": { apiKeys: [apiKey] } },
+    empty: { "/v1/api-keys": { apiKeys: [] } },
+    failedText: s.apiKeys.loadFailed,
+    emptyText: s.apiKeys.emptyState,
     loadedText: "ci key",
   },
   {
@@ -140,8 +150,9 @@ const cases: Case[] = [
     element: () => <TeamsSection />,
     endpoint: "/v1/teams",
     data: { "/v1/teams": { teams: [team] } },
-    failedText: "Couldn't load teams.",
-    emptyText: /No teams found/,
+    empty: { "/v1/teams": { teams: [] } },
+    failedText: s.teams.loadFailed,
+    emptyText: s.teams.emptyState,
     loadedText: "Design",
   },
   {
@@ -149,8 +160,9 @@ const cases: Case[] = [
     element: () => <RolesSection />,
     endpoint: "/v1/roles",
     data: { "/v1/roles": { roles: [role] } },
-    failedText: "Couldn't load roles.",
-    emptyText: /No roles found/,
+    empty: { "/v1/roles": { roles: [] } },
+    failedText: s.roles.loadFailed,
+    emptyText: s.roles.emptyState,
     loadedText: "Reads the audit log",
   },
   {
@@ -158,8 +170,9 @@ const cases: Case[] = [
     element: () => <AuditLogSection />,
     endpoint: "/v1/audit-log",
     data: { "/v1/audit-log": { entries: [auditEntry], total: 1 } },
-    failedText: "Couldn't load the audit log.",
-    emptyText: /No audit log entries/,
+    empty: { "/v1/audit-log": { entries: [], total: 0 } },
+    failedText: s.auditLog.loadFailed,
+    emptyText: s.auditLog.emptyState,
     loadedText: "ada",
   },
 ];
@@ -178,7 +191,7 @@ describe("a settings list that fails to load (#1447)", () => {
   it.each(cases)("$name loads on Retry once the server answers", async (c) => {
     serve(c.data, [c.endpoint]);
     render(c.element());
-    const retry = await screen.findByRole("button", { name: "Retry" });
+    const retry = await screen.findByRole("button", { name: en.common.retry });
 
     serve(c.data, []);
     fireEvent.click(retry);
@@ -187,46 +200,128 @@ describe("a settings list that fails to load (#1447)", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it.each(cases)(
+    "$name that loads with nothing in it shows its empty state, no alert",
+    async (c) => {
+      serve(c.empty, []);
+
+      render(c.element());
+
+      expect(await screen.findByText(c.emptyText)).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
+});
+
+describe("People (#1447)", () => {
+  it("shows no user count when the list didn't load", async () => {
+    serve(cases[0].data, ["/auth/users"]);
+
+    render(<PeopleSection />);
+    await screen.findByRole("alert");
+
+    // A failed load leaves the list empty; its count must not read as "0 users".
+    expect(screen.queryByText(s.people.userCountPlural.replace("{count}", "0"))).toBeNull();
+  });
+
   it("still shows the users when only the team and role pickers fail to load", async () => {
     // Those fetches need teams:manage and audit:read, which a users:manage
     // admin may not have; the pickers fall back to Default and the built-in
     // roles, and the user list must not be hidden behind their 403.
-    serve(
-      {
-        "/auth/users": { users: [user], maxUsers: 0 },
-        "/v1/teams": { teams: [] },
-        "/v1/roles": { roles: [] },
-      },
-      ["/v1/teams", "/v1/roles"],
-    );
+    serve(cases[0].data, ["/v1/teams", "/v1/roles"]);
 
     render(<PeopleSection />);
 
     expect(await screen.findByText("ada")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
-});
 
-describe("admin security settings that fail to load (#1447)", () => {
-  it("shows the failure and a Retry instead of a form full of defaults", async () => {
-    serve({ "/v1/settings": { settings: {} } }, ["/v1/settings"]);
+  it("reloads the pickers too on Retry", async () => {
+    serve(cases[0].data, ["/auth/users", "/v1/teams", "/v1/roles"]);
+    render(<PeopleSection />);
+    const retry = await screen.findByRole("button", { name: en.common.retry });
 
-    render(<AdminSecuritySettings />);
+    serve(cases[0].data, []);
+    fireEvent.click(retry);
+    await screen.findByText("ada");
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Couldn't load the security settings.");
-    expect(screen.queryByRole("button", { name: /save/i })).toBeNull();
+    const paths = apiGet.mock.calls.map(([path]) => path as string);
+    for (const endpoint of ["/auth/users", "/v1/teams", "/v1/roles"]) {
+      expect(paths.filter((p) => p.startsWith(endpoint)).length, endpoint).toBe(2);
+    }
   });
 
-  it("loads the form on Retry once the server answers", async () => {
+  it("edits a user with their current role and team selected when the pickers fell back", async () => {
+    // With the fallback lists, "uploader" and "Design" aren't options; a
+    // select whose value isn't an option shows the first one, so the admin
+    // would read "User" and "Default" and a change to those would save nothing.
+    serve(
+      {
+        "/auth/users": { users: [{ ...user, role: "uploader", team: "Design" }], maxUsers: 0 },
+      },
+      ["/v1/teams", "/v1/roles"],
+    );
+    render(<PeopleSection />);
+    fireEvent.click(await screen.findByRole("button", { name: en.common.actions }));
+    fireEvent.click(screen.getByText(s.people.editRoleTeamAction));
+
+    expect(screen.getByDisplayValue("uploader")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Design")).toBeInTheDocument();
+  });
+});
+
+describe("API keys (#1447)", () => {
+  it("keeps a new key's one-time secret on screen when the list reload after it fails", async () => {
+    // The secret is shown exactly once. Hiding it behind the load failure
+    // would leave a working key nobody holds.
+    serve({ "/v1/api-keys": { apiKeys: [] } }, []);
+    apiPost.mockResolvedValue({ key: "si_secret_123" });
+    render(<ApiKeysSection />);
+    const generate = await screen.findByRole("button", { name: s.apiKeys.generateButton });
+
+    serve({}, ["/v1/api-keys"]);
+    fireEvent.click(generate);
+
+    expect(await screen.findByText("si_secret_123")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(s.apiKeys.loadFailed);
+  });
+});
+
+describe("settings forms that fail to load (#1447)", () => {
+  const forms = [
+    {
+      name: "admin security",
+      element: () => <AdminSecuritySettings />,
+      failedText: s.security.adminSettingsLoadFailed,
+      save: /save/i,
+    },
+    {
+      name: "system",
+      element: () => <SystemSection />,
+      failedText: s.system.loadFailed,
+      save: s.system.saveButton,
+    },
+  ];
+
+  it.each(forms)("$name shows the failure and a Retry instead of a form of defaults", async (f) => {
     serve({ "/v1/settings": { settings: {} } }, ["/v1/settings"]);
-    render(<AdminSecuritySettings />);
+
+    render(f.element());
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(f.failedText);
+    expect(screen.queryByRole("button", { name: f.save })).toBeNull();
+  });
+
+  it.each(forms)("$name loads the form on Retry once the server answers", async (f) => {
+    serve({ "/v1/settings": { settings: {} } }, ["/v1/settings"]);
+    render(f.element());
     await screen.findByRole("alert");
 
     serve({ "/v1/settings": { settings: {} } }, []);
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: en.common.retry }));
 
-    expect(await screen.findByRole("button", { name: /save/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: f.save })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

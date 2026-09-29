@@ -4266,6 +4266,7 @@ export const hi: TranslationKeys = {
       saveButton: "सेटिंग्स सहेजें",
       saveSuccess: "सेटिंग्स सहेजी गईं।",
       saveFailed: "सेटिंग्स सहेजने में विफल।",
+      loadFailed: "सिस्टम सेटिंग्स लोड नहीं हो सकीं।",
       limitsAndResources: "सीमाएं और संसाधन",
       maxFileSize: "अधिकतम फाइल साइज़",
       maxBatchSize: "अधिकतम बैच साइज़",

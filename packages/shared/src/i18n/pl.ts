@@ -4467,6 +4467,7 @@ export const pl: TranslationKeys = {
       saveButton: "Zapisz ustawienia",
       saveSuccess: "Ustawienia zapisane.",
       saveFailed: "Nie udało się zapisać ustawień.",
+      loadFailed: "Nie udało się wczytać ustawień systemowych.",
       limitsAndResources: "Limity i zasoby",
       maxFileSize: "Maks. rozmiar pliku",
       maxBatchSize: "Maks. rozmiar partii",

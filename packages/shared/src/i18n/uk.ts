@@ -4466,6 +4466,7 @@ export const uk: TranslationKeys = {
       saveButton: "Зберегти налаштування",
       saveSuccess: "Налаштування збережено.",
       saveFailed: "Не вдалося зберегти налаштування.",
+      loadFailed: "Не вдалося завантажити системні налаштування.",
       limitsAndResources: "Обмеження та ресурси",
       maxFileSize: "Макс. розмір файлу",
       maxBatchSize: "Макс. розмір пакета",

@@ -4484,6 +4484,7 @@ export const de: TranslationKeys = {
       saveButton: "Einstellungen speichern",
       saveSuccess: "Einstellungen gespeichert.",
       saveFailed: "Einstellungen konnten nicht gespeichert werden.",
+      loadFailed: "Systemeinstellungen konnten nicht geladen werden.",
       limitsAndResources: "Limits & Ressourcen",
       maxFileSize: "Maximale Dateigröße",
       maxBatchSize: "Maximale Stapelgröße",

@@ -4416,6 +4416,7 @@ export const th: TranslationKeys = {
       saveButton: "บันทึกการตั้งค่า",
       saveSuccess: "บันทึกการตั้งค่าแล้ว",
       saveFailed: "บันทึกการตั้งค่าล้มเหลว",
+      loadFailed: "โหลดการตั้งค่าระบบไม่สำเร็จ",
       limitsAndResources: "ข้อจำกัดและทรัพยากร",
       maxFileSize: "ขนาดไฟล์สูงสุด",
       maxBatchSize: "ขนาดชุดสูงสุด",

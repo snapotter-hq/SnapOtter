@@ -4475,6 +4475,7 @@ export const it: TranslationKeys = {
       saveButton: "Salva impostazioni",
       saveSuccess: "Impostazioni salvate.",
       saveFailed: "Salvataggio delle impostazioni non riuscito.",
+      loadFailed: "Impossibile caricare le impostazioni di sistema.",
       limitsAndResources: "Limiti e risorse",
       maxFileSize: "Dimensione massima file",
       maxBatchSize: "Dimensione massima batch",

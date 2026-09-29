@@ -4470,6 +4470,7 @@ export const ptBR: TranslationKeys = {
       saveButton: "Salvar configurações",
       saveSuccess: "Configurações salvas.",
       saveFailed: "Falha ao salvar as configurações.",
+      loadFailed: "Não foi possível carregar as configurações do sistema.",
       limitsAndResources: "Limites e recursos",
       maxFileSize: "Tamanho máximo de arquivo",
       maxBatchSize: "Tamanho máximo de lote",

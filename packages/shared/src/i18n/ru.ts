@@ -4467,6 +4467,7 @@ export const ru: TranslationKeys = {
       saveButton: "Сохранить настройки",
       saveSuccess: "Настройки сохранены.",
       saveFailed: "Не удалось сохранить настройки.",
+      loadFailed: "Не удалось загрузить системные настройки.",
       limitsAndResources: "Ограничения и ресурсы",
       maxFileSize: "Макс. размер файла",
       maxBatchSize: "Макс. размер пакета",

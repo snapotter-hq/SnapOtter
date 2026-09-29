@@ -533,7 +533,7 @@ function GeneralSection() {
 
 /* ────────────────────── System ────────────────────── */
 
-function SystemSection() {
+export function SystemSection() {
   const { t } = useTranslation();
   const { role, hasPermission } = useAuth();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
@@ -548,26 +548,23 @@ function SystemSection() {
   const [installFeedbackOpen, setInstallFeedbackOpen] = useState(false);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
+  const loadSettings = useCallback(() => {
+    setLoading(true);
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
         setSettings(data.settings);
         originalSettingsRef.current = data.settings;
+        setLoadFailed(false);
       })
-      .catch(() => {
-        // Fallback defaults if endpoint not ready
-        const fallback = {
-          fileUploadLimitMb: "100",
-          defaultTheme: "system",
-          defaultLocale: "en",
-          loginAttemptLimit: "5",
-        };
-        setSettings(fallback);
-        originalSettingsRef.current = fallback;
-      })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const updateSetting = useCallback((key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -626,6 +623,12 @@ function SystemSection() {
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  // Invented defaults read as the live configuration: a 90-day audit
+  // retention would show as 0, "keep forever" (#1447).
+  if (loadFailed) {
+    return <LoadFailed message={t.settings.system.loadFailed} onRetry={loadSettings} />;
   }
 
   const installFeedbackVisible = shouldShowInstallFeedbackCard({
@@ -1415,7 +1418,7 @@ export function PeopleSection() {
   const { t } = useTranslation();
   const isMobile = useMobile();
   const [users, setUsers] = useState<UserEntry[]>([]);
-  const [maxUsers, setMaxUsers] = useState(5);
+  const [maxUsers, setMaxUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1463,13 +1466,28 @@ export function PeopleSection() {
     }
   }, []);
 
-  useEffect(() => {
+  // The team and role lists only feed the pickers, which fall back to Default
+  // and the built-in roles: those endpoints need teams:manage and audit:read,
+  // which a users:manage admin may not have, so their failure isn't the
+  // section's (#1447).
+  const loadRoles = useCallback(async () => {
+    try {
+      const data = await apiGet<{ roles: RoleEntry[] }>("/v1/roles");
+      setAvailableRoles(data.roles);
+    } catch {
+      setAvailableRoles([]);
+    }
+  }, []);
+
+  const loadAll = useCallback(() => {
     loadUsers();
     loadTeams();
-    apiGet<{ roles: RoleEntry[] }>("/v1/roles")
-      .then((data) => setAvailableRoles(data.roles))
-      .catch(() => setAvailableRoles([]));
-  }, [loadUsers, loadTeams]);
+    loadRoles();
+  }, [loadUsers, loadTeams, loadRoles]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1604,6 +1622,17 @@ export function PeopleSection() {
     [resetPasswordUser, resetPassword, t.settings.people.resetSuccess],
   );
 
+  // A picker whose list fell back (built-in roles, Default) may not hold the
+  // user's current role or team, and a select whose value isn't an option
+  // shows the first one: the admin would read the wrong value, and "changing"
+  // to it would save nothing yet report success. Always offer the current one.
+  const editRoleListed =
+    availableRoles.length > 0
+      ? availableRoles.some((r) => r.name === editRole)
+      : ["user", "editor", "admin"].includes(editRole);
+  const editTeamListed =
+    teams.length > 0 ? teams.some((tm) => tm.name === editTeam) : editTeam === "Default";
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1620,16 +1649,18 @@ export function PeopleSection() {
         <p className="text-sm text-muted-foreground mt-1">{t.settings.people.description}</p>
       </div>
 
-      {/* User count */}
-      <p className="text-sm text-muted-foreground">
-        {maxUsers > 0
-          ? `${users.length} / ${maxUsers} ${plural(maxUsers, format(t.settings.people.userCount, { count: "" }), format(t.settings.people.userCountPlural, { count: "" })).trim()}`
-          : plural(
-              users.length,
-              format(t.settings.people.userCount, { count: users.length }),
-              format(t.settings.people.userCountPlural, { count: users.length }),
-            )}
-      </p>
+      {/* User count: none when the list didn't load, rather than a made-up 0 */}
+      {!loadFailed && (
+        <p className="text-sm text-muted-foreground">
+          {maxUsers > 0
+            ? `${users.length} / ${maxUsers} ${plural(maxUsers, format(t.settings.people.userCount, { count: "" }), format(t.settings.people.userCountPlural, { count: "" })).trim()}`
+            : plural(
+                users.length,
+                format(t.settings.people.userCount, { count: users.length }),
+                format(t.settings.people.userCountPlural, { count: users.length }),
+              )}
+        </p>
+      )}
 
       {/* Action message */}
       {actionMsg && (
@@ -1854,6 +1885,7 @@ export function PeopleSection() {
               onChange={(e) => setEditRole(e.target.value)}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
             >
+              {!editRoleListed && <option value={editRole}>{editRole}</option>}
               {availableRoles.length > 0 ? (
                 availableRoles.map((r) => (
                   <option key={r.name} value={r.name}>
@@ -1874,6 +1906,7 @@ export function PeopleSection() {
               onChange={(e) => setEditTeam(e.target.value)}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-40"
             >
+              {!editTeamListed && <option value={editTeam}>{editTeam}</option>}
               {teams.map((tm) => (
                 <option key={tm.id} value={tm.name}>
                   {tm.name}
@@ -1959,7 +1992,7 @@ export function PeopleSection() {
             message={t.settings.people.loadFailed}
             onRetry={() => {
               setLoading(true);
-              loadUsers();
+              loadAll();
             }}
           />
         ) : filteredUsers.length === 0 ? (

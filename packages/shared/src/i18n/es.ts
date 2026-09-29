@@ -4461,6 +4461,7 @@ export const es: TranslationKeys = {
       saveButton: "Guardar configuración",
       saveSuccess: "Configuración guardada.",
       saveFailed: "Error al guardar la configuración.",
+      loadFailed: "No se pudo cargar la configuración del sistema.",
       limitsAndResources: "Límites y recursos",
       maxFileSize: "Tamaño máximo de archivo",
       maxBatchSize: "Tamaño máximo de lote",

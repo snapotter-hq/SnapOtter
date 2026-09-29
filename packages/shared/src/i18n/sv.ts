@@ -4460,6 +4460,7 @@ export const sv: TranslationKeys = {
       saveButton: "Spara inställningar",
       saveSuccess: "Inställningar sparade.",
       saveFailed: "Kunde inte spara inställningar.",
+      loadFailed: "Kunde inte läsa in systeminställningar.",
       limitsAndResources: "Gränser & Resurser",
       maxFileSize: "Max filstorlek",
       maxBatchSize: "Max batchstorlek",

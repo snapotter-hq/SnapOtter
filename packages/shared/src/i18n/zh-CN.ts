@@ -4196,6 +4196,7 @@ export const zhCN: TranslationKeys = {
       saveButton: "保存设置",
       saveSuccess: "设置已保存。",
       saveFailed: "保存设置失败。",
+      loadFailed: "无法加载系统设置。",
       limitsAndResources: "限制与资源",
       maxFileSize: "最大文件大小",
       maxBatchSize: "最大批量大小",
