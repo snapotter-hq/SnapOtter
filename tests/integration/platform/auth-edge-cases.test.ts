@@ -1163,6 +1163,65 @@ describe("Admin user-management guards", () => {
     expect(res.statusCode).toBe(401);
     expect(JSON.parse(res.body).code).toBe("INVALID_PASSWORD");
   });
+
+  // The client can't read the password policy (a user who must change their
+  // password can't reach /v1/settings), so a weak password names the rule it
+  // broke and the client words it in the UI language (#1446).
+  it.each([
+    ["Short1A", { rule: "minLength", minLength: 8 }],
+    ["alllower1", { rule: "uppercase" }],
+    ["ALLUPPER1", { rule: "lowercase" }],
+    ["NoDigitsHere", { rule: "digit" }],
+  ])("change-password to %s names the broken rule", async (newPassword, expected) => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { currentPassword: password, newPassword },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", ...expected });
+  });
+
+  it("change-password names the special-character rule when the policy requires one", async () => {
+    await db
+      .insert(schema.settings)
+      .values({ key: "passwordRequireSpecial", value: "true" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+    try {
+      const { username, password } = await createUser();
+      const token = await loginAs(username, password);
+
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/change-password",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { currentPassword: password, newPassword: "NoSpecial9" },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule: "special" });
+    } finally {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireSpecial"));
+    }
+  });
+
+  it("register names the broken password rule too", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: uid(), password: "Short1A" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      rule: "minLength",
+      minLength: 8,
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
