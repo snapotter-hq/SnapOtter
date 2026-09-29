@@ -21,6 +21,7 @@ import { auditFromRequest } from "../lib/audit.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import {
+  deleteStoredFile,
   getCachedThumbnail,
   isStorageServiceFault,
   readStoredFile,
@@ -278,7 +279,22 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(statusCode).send({ error: (err as Error).message });
       }
 
-      const created: ReturnType<typeof serializeFile>[] = [];
+      // All-or-nothing (#1342): every part is validated, quota-checked against
+      // the whole batch, and written to storage first. Only once every part
+      // has made it are the rows inserted and the quota charged, in one
+      // transaction. Any failure on the way deletes what was staged, so an
+      // error response always means nothing was saved.
+      const staged: { storedName: string; values: typeof schema.userFiles.$inferInsert }[] = [];
+      let stagedBytes = 0;
+      const discardStaged = async () => {
+        await Promise.all(
+          staged.map(({ storedName }) =>
+            deleteStoredFile(storedName).catch((err) =>
+              request.log.warn({ err, storedName }, "Failed to discard a staged upload"),
+            ),
+          ),
+        );
+      };
 
       const parts = request.parts();
 
@@ -286,108 +302,131 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       // library shows it under "Tools Used". Sent before the file part(s).
       let sourceToolId: string | null = null;
 
-      for await (const part of parts) {
-        if (part.type === "field" && part.fieldname === "toolId") {
-          const value = typeof part.value === "string" ? part.value : "";
-          if (/^[a-z0-9-]{1,40}$/.test(value)) sourceToolId = value;
-          continue;
-        }
-        if (part.type !== "file") continue;
-
-        // Consume the stream into a buffer
-        const chunks: Buffer[] = [];
-        for await (const chunk of part.file) {
-          chunks.push(chunk);
-        }
-        const buffer = Buffer.concat(chunks);
-
-        if (buffer.length === 0) continue;
-
-        // Try image validation; non-image files skip validation and use MIME from extension
-        const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
-        const isValidImage = validation?.valid === true;
-
-        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
-        // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
-        // an external entity, say) makes Sharp fail validation, and gating the
-        // sanitizer on a successful decode would store the payload untouched.
-        // Throwing out of the multipart loop gets rewritten to a generic 400 by
-        // the stream teardown, so handle it here like the quota check below:
-        // return the sanitizer's reason for a size/element-cap rejection, and
-        // report + 500 for anything unexpected rather than storing the file.
-        let safeBuffer: Buffer = buffer;
-        if (isSvgBuffer(buffer)) {
-          try {
-            safeBuffer = sanitizeSvg(buffer);
-          } catch (err) {
-            if ((err as { statusCode?: number }).statusCode === 400) {
-              return reply.status(400).send({ error: (err as Error).message });
-            }
-            request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
-            void reportError(err, {
-              source: "http",
-              route: "/api/v1/files/upload",
-              method: "POST",
-              statusCode: 500,
-            });
-            return reply.status(500).send({ error: "Internal server error" });
+      try {
+        for await (const part of parts) {
+          if (part.type === "field" && part.fieldname === "toolId") {
+            const value = typeof part.value === "string" ? part.value : "";
+            if (/^[a-z0-9-]{1,40}$/.test(value)) sourceToolId = value;
+            continue;
           }
-        }
+          if (part.type !== "file") continue;
 
-        // Re-check quota with actual file size before persisting
-        try {
-          await checkStorageQuota(userId, safeBuffer.length);
-        } catch (err) {
-          const statusCode = (err as Error & { statusCode?: number }).statusCode ?? 413;
-          return reply.status(statusCode).send({ error: (err as Error).message });
-        }
+          // Consume the stream into a buffer
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file) {
+            chunks.push(chunk);
+          }
+          const buffer = Buffer.concat(chunks);
 
-        const safeName = sanitizeFilename(part.filename ?? "upload");
-        const mimeType = isValidImage
-          ? formatToMime(validation.format)
-          : part.mimetype || "application/octet-stream";
-        const dimensions = measuredDimensions(isValidImage ? validation : null);
+          if (buffer.length === 0) continue;
 
-        // Persist to disk
-        const storedName = await saveFile(safeBuffer, safeName);
+          // Try image validation; non-image files skip validation and use MIME from extension
+          const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
+          const isValidImage = validation?.valid === true;
 
-        // Create DB record
-        const id = randomUUID();
-        const fileSize = safeBuffer.length;
-        try {
-          await db.insert(schema.userFiles).values({
-            id,
-            userId,
-            originalName: safeName,
+          // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
+          // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
+          // an external entity, say) makes Sharp fail validation, and gating the
+          // sanitizer on a successful decode would store the payload untouched.
+          // Throwing out of the multipart loop gets rewritten to a generic 400 by
+          // the stream teardown, so handle it here like the quota check below:
+          // return the sanitizer's reason for a size/element-cap rejection, and
+          // report + 500 for anything unexpected rather than storing the file.
+          let safeBuffer: Buffer = buffer;
+          if (isSvgBuffer(buffer)) {
+            try {
+              safeBuffer = sanitizeSvg(buffer);
+            } catch (err) {
+              if ((err as { statusCode?: number }).statusCode === 400) {
+                await discardStaged();
+                return reply.status(400).send({ error: (err as Error).message });
+              }
+              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+              void reportError(err, {
+                source: "http",
+                route: "/api/v1/files/upload",
+                method: "POST",
+                statusCode: 500,
+              });
+              await discardStaged();
+              return reply.status(500).send({ error: "Internal server error" });
+            }
+          }
+
+          // Quota is checked against the whole batch so far, not this file alone:
+          // nothing is charged until the commit below.
+          try {
+            await checkStorageQuota(userId, stagedBytes + safeBuffer.length);
+          } catch (err) {
+            await discardStaged();
+            const statusCode = (err as Error & { statusCode?: number }).statusCode ?? 413;
+            return reply.status(statusCode).send({ error: (err as Error).message });
+          }
+
+          const safeName = sanitizeFilename(part.filename ?? "upload");
+          const mimeType = isValidImage
+            ? formatToMime(validation.format)
+            : part.mimetype || "application/octet-stream";
+          const dimensions = measuredDimensions(isValidImage ? validation : null);
+
+          const storedName = await saveFile(safeBuffer, safeName);
+          stagedBytes += safeBuffer.length;
+          staged.push({
             storedName,
-            mimeType,
-            size: fileSize,
-            width: dimensions.width,
-            height: dimensions.height,
-            version: 1,
-            parentId: null,
-            toolChain: sourceToolId ? [sourceToolId] : null,
+            values: {
+              id: randomUUID(),
+              userId,
+              originalName: safeName,
+              storedName,
+              mimeType,
+              size: safeBuffer.length,
+              width: dimensions.width,
+              height: dimensions.height,
+              version: 1,
+              parentId: null,
+              toolChain: sourceToolId ? [sourceToolId] : null,
+            },
           });
-        } catch {
-          return reply.status(409).send({ error: "Failed to save file record" });
         }
-
-        // Increment the user's pre-computed storage counter
-        if (userId) {
-          await db
-            .update(schema.users)
-            .set({ storageUsed: sql`${schema.users.storageUsed} + ${fileSize}` })
-            .where(eq(schema.users.id, userId));
-        }
-
-        const [row] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
-
-        if (row) created.push(serializeFile(row));
+      } catch (err) {
+        // A part that failed mid-read (over the upload limit, a dropped
+        // connection) or a storage write that threw: undo the batch, then let
+        // the error handler answer with the error's own status (413 for the
+        // size limit, #1280).
+        await discardStaged();
+        throw err;
       }
 
-      if (created.length === 0) {
+      if (staged.length === 0) {
         return reply.status(400).send({ error: "No valid files uploaded" });
       }
+
+      let rows: (typeof schema.userFiles.$inferSelect)[];
+      try {
+        rows = await db.transaction(async (tx) => {
+          const inserted = await tx
+            .insert(schema.userFiles)
+            .values(staged.map((s) => s.values))
+            .returning();
+          if (userId) {
+            await tx
+              .update(schema.users)
+              .set({ storageUsed: sql`${schema.users.storageUsed} + ${stagedBytes}` })
+              .where(eq(schema.users.id, userId));
+          }
+          return inserted;
+        });
+      } catch (err) {
+        request.log.error({ err }, "Library upload commit failed; discarding the batch");
+        await discardStaged();
+        return reply.status(409).send({ error: "Failed to save file record" });
+      }
+      // Keep the response in upload order; RETURNING doesn't promise one.
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const created = staged
+        .map((s) => byId.get(s.values.id as string))
+        .filter((r): r is typeof schema.userFiles.$inferSelect => r !== undefined)
+        .map(serializeFile);
 
       await auditFromRequest(request)("FILE_UPLOADED", {
         userId,
