@@ -44,6 +44,25 @@ export function initZXingReader(): void {
 // Hand zxing-wasm the packaged binary so it never fetches it from jsdelivr (#1385).
 initZXingReader();
 
+/** zxing ran out of heap mid-read, which it reports as a result (#1425). */
+class DecoderOutOfMemory extends Error {}
+
+/**
+ * The decoder failing on this server's side rather than on the image:
+ * - a WebAssembly RuntimeError: it couldn't instantiate (the glue wraps every
+ *   instantiate error this way) or it trapped mid-read, after which the
+ *   instance can't be trusted (#1402);
+ * - no room in its heap for the image, which zxing throws as a plain Error;
+ * - no room mid-read (DecoderOutOfMemory) (#1425).
+ */
+function isDecoderFault(err: unknown): boolean {
+  return (
+    err instanceof WebAssembly.RuntimeError ||
+    err instanceof DecoderOutOfMemory ||
+    (err instanceof Error && /^Failed to allocate \d+ bytes in WASM memory/.test(err.message))
+  );
+}
+
 const settingsSchema = z.object({
   tryHarder: z.boolean().default(true),
 });
@@ -165,6 +184,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
+      let storing = false;
       try {
         const tryHarder = settings.tryHarder;
 
@@ -232,6 +252,10 @@ export function registerBarcodeRead(app: FastifyInstance) {
           tryHarder,
           maxNumberOfSymbols: 255,
         });
+        // zxing reports running out of heap mid-read as a result, not a throw;
+        // filtering it out as an invalid read turned it into "no barcodes".
+        const outOfMemory = results.find((r) => r.error.includes("bad_alloc"));
+        if (outOfMemory) throw new DecoderOutOfMemory(outOfMemory.error);
 
         const validResults = results.filter((r) => r.isValid);
 
@@ -264,6 +288,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
         }
 
         // --- Generate annotated image ---
+        // Nothing past here depends on the upload being readable: a failure is
+        // storage or memory on this server, for the global error handler.
+        storing = true;
         const jobId = randomUUID();
 
         // Save original input
@@ -291,15 +318,12 @@ export function registerBarcodeRead(app: FastifyInstance) {
           previewUrl: downloadUrl,
         });
       } catch (err) {
-        if (isDecoderUnavailable(err)) throw err;
-        // A WebAssembly RuntimeError is the decoder itself failing: it couldn't
-        // instantiate (the glue wraps every instantiate error this way), or it
-        // trapped mid-decode, after which the instance can't be trusted.
-        // Either way it's a server fault, not a bad image. zxing-wasm caches a
-        // failed instantiation for good, so hand it the binary again: new
-        // overrides drop the cached instance and the next request starts a
-        // fresh one (#1402).
-        if (err instanceof WebAssembly.RuntimeError) {
+        if (isDecoderUnavailable(err) || storing) throw err;
+        // The decoder itself failing is a server fault, not a bad image
+        // (isDecoderFault). zxing-wasm caches a failed instantiation for good,
+        // so hand it the binary again: new overrides drop the cached instance
+        // and the next request starts a fresh one with a fresh heap (#1402).
+        if (isDecoderFault(err)) {
           request.log.error(
             { err, toolId: "barcode-read" },
             "Barcode decoder failed; reloading it for the next request",
@@ -315,7 +339,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
         request.log.error({ err, toolId: "barcode-read" }, "Barcode read failed");
         return reply.status(422).send({
           error: "Barcode reading failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },
