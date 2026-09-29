@@ -27,6 +27,17 @@ const HOUR_MS = 3600_000;
 const LIMITS: Record<Exclude<ErrorClass, "expected">, number> = { operational: 1, bug: 10 };
 const OPERATIONAL_CODES = new Set(["ENOSPC", "EACCES", "EROFS", "EMFILE", "ENFILE"]);
 
+/**
+ * True for a node errno that means the host's environment is broken (disk
+ * full, permission denied, read-only fs, out of descriptors), which
+ * classifyError reports as operational. Wrappers that would otherwise recast
+ * an error as a bug check this first, so the errno keeps its class (#1450).
+ */
+export function isOperationalErrno(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && OPERATIONAL_CODES.has(code);
+}
+
 export interface ReportContext {
   source: "http" | "worker" | "cron" | "boot";
   toolId?: string;
@@ -98,7 +109,7 @@ export function classifyError(err: unknown, source?: ReportContext["source"]): E
   if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
-  if (e?.code && OPERATIONAL_CODES.has(e.code)) return "operational";
+  if (isOperationalErrno(err)) return "operational";
   if (
     e?.name === "ReplyError" &&
     typeof e.message === "string" &&

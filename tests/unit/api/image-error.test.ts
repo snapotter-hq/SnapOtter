@@ -6,6 +6,7 @@ import {
 } from "@snapotter/shared";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import {
   asInputErrorIfUndecodable,
   PIXEL_LIMIT_IMAGE_MESSAGE,
@@ -80,6 +81,48 @@ describe("withImageEncodeContext", () => {
       },
     );
     await expect(wrapped(input, settings, "in.png")).rejects.toBe(inputErr);
+  });
+});
+
+// #1450: a full disk or a permission error during an encode is the host's
+// environment, not our code. Wrapped as a bug-kind SafeError it reported up to
+// 10 bug events an hour instead of one operational warning.
+describe("withImageEncodeContext and environmental errnos (#1450)", () => {
+  const failingWith = (err: Error) =>
+    withImageEncodeContext(
+      "Image conversion failed",
+      (s: Settings) => s.format,
+      async () => {
+        throw err;
+      },
+    );
+
+  it.each(["ENOSPC", "EACCES", "EROFS", "EMFILE", "ENFILE"])(
+    "rethrows a %s untouched so it classifies as operational",
+    async (code) => {
+      const err = Object.assign(new Error(`${code}: write '/tmp/snapotter-psd/in.psd'`), {
+        code,
+        syscall: "write",
+      });
+
+      const thrown = await failingWith(err)(input, settings, "in.png").catch((e: unknown) => e);
+
+      expect(thrown).toBe(err);
+      expect(classifyError(thrown, "worker")).toBe("operational");
+    },
+  );
+
+  it("still wraps a missing binary (ENOENT) and a plain failure as bugs", async () => {
+    // A missing file or binary can be our own wrong path, so ENOENT stays out
+    // of the operational set, the same line error-report.ts draws.
+    for (const err of [
+      Object.assign(new Error("spawn magick ENOENT"), { code: "ENOENT", syscall: "spawn magick" }),
+      new Error(""),
+    ]) {
+      const thrown = await failingWith(err)(input, settings, "in.png").catch((e: unknown) => e);
+      expect(isSafeMessageError(thrown)).toBe(true);
+      expect(classifyError(thrown, "worker")).toBe("bug");
+    }
   });
 });
 

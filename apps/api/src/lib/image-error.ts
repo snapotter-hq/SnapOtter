@@ -2,6 +2,7 @@ import { isSafeMessageError, isToolInputError, SafeError, ToolInputError } from 
 import sharp from "sharp";
 import { isPixelSafetyError } from "../modality/image-input.js";
 import type { LegacyToolProcessResult, ToolProcessCtx } from "../routes/tool-factory.js";
+import { isOperationalErrno } from "./error-report.js";
 import { logger } from "./logger.js";
 
 /** Short single-line messages so friendlyError() passes them to the client verbatim. */
@@ -26,8 +27,10 @@ type ImageProcess<T> = (
  * value (see `rebuildErrorValue`), so a bare Sharp failure is undiagnosable.
  * Re-throwing as a SafeError makes the title survive while the original error is
  * kept as `cause`, preserving its stack and exact location. Errors we already
- * author (SafeError) or that flag bad user input (ToolInputError) pass through
- * untouched so their class is not masked.
+ * author (SafeError), that flag bad user input (ToolInputError), or that are
+ * an environmental errno (a full disk or a permission error while writing a
+ * temp file or running an encoder, #1450) pass through untouched so their
+ * class is not masked; an errno already gets a code-and-syscall title.
  */
 export function withImageEncodeContext<T>(
   message: string,
@@ -38,7 +41,7 @@ export function withImageEncodeContext<T>(
     try {
       return await process(inputBuffer, settings, filename, ctx);
     } catch (err) {
-      if (isSafeMessageError(err) || isToolInputError(err)) throw err;
+      if (isSafeMessageError(err) || isToolInputError(err) || isOperationalErrno(err)) throw err;
       throw new SafeError(message, {
         kind: "bug",
         code: codeOf(settings),
