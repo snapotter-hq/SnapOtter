@@ -8,7 +8,12 @@ import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
-import { type JobFailure, jobFailureMessage, type ProgressFrame } from "@/lib/progress-frames";
+import {
+  frameFailure,
+  type JobFailure,
+  jobFailureMessage,
+  type ProgressFrame,
+} from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
@@ -116,9 +121,7 @@ export function subscribeEraseObjectJobProgress(
         }
         if (data.phase === "failed") {
           cleanup();
-          handlers.onFailed(
-            typeof data.error === "string" ? { message: data.error } : { reason: "noDetail" },
-          );
+          handlers.onFailed(frameFailure(data.error));
           return;
         }
         if (typeof data.percent === "number") handlers.onProgress?.(data.percent);

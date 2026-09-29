@@ -144,6 +144,18 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
   });
 
+  it("treats a blank server error as no detail instead of showing nothing", () => {
+    // The worker publishes error: "" when a handler throws an Error with no text.
+    const onFailed = vi.fn();
+    subscribe("job-failed-blank", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "failed", error: "  " }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
+  });
+
   it("ignores a malformed frame and keeps waiting", () => {
     const onComplete = vi.fn();
     const onFailed = vi.fn();

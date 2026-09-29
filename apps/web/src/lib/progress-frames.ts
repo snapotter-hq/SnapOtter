@@ -23,6 +23,15 @@ export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this j
  */
 export type JobFailure = { message: string } | { reason: "noDetail" | "trackingFailed" };
 
+/**
+ * The JobFailure for a failed progress frame's `error`. A blank or missing
+ * error has nothing to show, so it's `noDetail` rather than an empty message:
+ * the worker publishes `error: ""` when a handler throws an Error with no text.
+ */
+export function frameFailure(error: unknown): JobFailure {
+  return typeof error === "string" && error.trim() ? { message: error } : { reason: "noDetail" };
+}
+
 /** The text to show for a JobFailure, in the caller's locale. */
 export function jobFailureMessage(
   failure: JobFailure,

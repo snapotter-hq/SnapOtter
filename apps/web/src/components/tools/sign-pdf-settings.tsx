@@ -7,7 +7,12 @@ import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { type JobFailure, jobFailureMessage, type ProgressFrame } from "@/lib/progress-frames";
+import {
+  frameFailure,
+  type JobFailure,
+  jobFailureMessage,
+  type ProgressFrame,
+} from "@/lib/progress-frames";
 import {
   addSignature,
   deleteSignature,
@@ -102,9 +107,7 @@ export function subscribeSignPdfJobProgress(
         }
         if (data.phase === "failed") {
           cleanup();
-          handlers.onFailed(
-            typeof data.error === "string" ? { message: data.error } : { reason: "noDetail" },
-          );
+          handlers.onFailed(frameFailure(data.error));
           return;
         }
         if (typeof data.percent === "number") handlers.onProgress?.(data.percent);

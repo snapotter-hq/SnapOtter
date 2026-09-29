@@ -5517,7 +5517,7 @@ export const vi: TranslationKeys = {
     failedWithStatus: "Thất bại: {status}",
     processingFailedWithStatus: "Xử lý thất bại: {status}",
     processingFailedNoDetail: "Xử lý thất bại",
-    jobTrackingFailed: "Đã xảy ra lỗi khi theo dõi tác vụ này. Hãy thử lại.",
+    jobTrackingFailed: "Đã xảy ra lỗi khi theo dõi tác vụ này. Vui lòng thử lại.",
     requestTimedOut: "Yêu cầu đã hết thời gian",
     requestFailedWithStatus: "Yêu cầu thất bại: {status}",
   },

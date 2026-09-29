@@ -5527,7 +5527,7 @@ export const sv: TranslationKeys = {
     failedWithStatus: "Misslyckades: {status}",
     processingFailedWithStatus: "Bearbetningen misslyckades: {status}",
     processingFailedNoDetail: "Bearbetningen misslyckades",
-    jobTrackingFailed: "Något gick fel när jobbet följdes upp. Försök igen.",
+    jobTrackingFailed: "Något gick fel vid spårningen av jobbet. Försök igen.",
     requestTimedOut: "Tidsgränsen för begäran överskreds",
     requestFailedWithStatus: "Begäran misslyckades: {status}",
   },
