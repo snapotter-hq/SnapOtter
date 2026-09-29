@@ -2,14 +2,14 @@
  * users.team holds a team id (#1474). Register, SSO, and SCIM all write the id,
  * and every lookup (the storage quota, MFA policy, job enqueue) matches on
  * teams.id. The column default used to be the team *name* "Default", so the
- * bootstrap admin, the anonymous user, and 1.x imports carried a value no
- * teams.id matches, and team settings silently skipped them.
+ * bootstrap admin and the anonymous user carried a value no teams.id matches,
+ * and team settings silently skipped them. Migration 0009 itself is covered by
+ * users-team-id-migration.test.ts.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { ensureAnonymousUser } from "../../../apps/api/src/plugins/auth.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -19,7 +19,6 @@ import {
 } from "../test-server.js";
 
 const PNG = readFixture(fixtures.image.base.png200);
-const MIGRATION = join(__dirname, "../../../apps/api/drizzle/0009_users_team_id.sql");
 
 let testApp: TestApp;
 let adminToken: string;
@@ -37,23 +36,26 @@ afterEach(async () => {
   await db.update(schema.teams).set({ storageQuota: null });
 });
 
-async function adminRow() {
-  const [admin] = await db
-    .select({ id: schema.users.id, team: schema.users.team })
+async function teamOf(username: string) {
+  const [user] = await db
+    .select({ team: schema.users.team })
     .from(schema.users)
-    .where(eq(schema.users.username, "admin"));
-  return admin;
+    .where(eq(schema.users.username, username));
+  return user?.team;
 }
 
 describe("users.team holds a team id (#1474)", () => {
-  it("gives the bootstrap admin a team that resolves by id", async () => {
-    const { team } = await adminRow();
-    const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, team));
+  it("gives the bootstrap admin the seeded Default team's id", async () => {
+    expect(await teamOf("admin")).toBe(schema.DEFAULT_TEAM_ID);
+    const [row] = await db
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.id, schema.DEFAULT_TEAM_ID));
     expect(row?.name).toBe("Default");
   });
 
   it("applies the team storage quota to the bootstrap admin", async () => {
-    const { team } = await adminRow();
+    const team = schema.DEFAULT_TEAM_ID;
     const [{ total }] = await db
       .select({ total: sql<number>`coalesce(sum(${schema.users.storageUsed}), 0)` })
       .from(schema.users)
@@ -79,75 +81,45 @@ describe("users.team holds a team id (#1474)", () => {
   });
 });
 
-describe("migration 0009 rewrites team names to team ids (#1474)", () => {
-  // The data statements only: the ALTER COLUMN needs a privileged role, and
-  // the per-fork database already has it applied.
-  const dataStatements = readFileSync(MIGRATION, "utf8")
-    .split("--> statement-breakpoint")
-    .map((s) => s.replace(/^\s*--.*$/gm, "").trim())
-    .filter((s) => /^UPDATE\b/i.test(s));
+describe("the bootstrap users join whichever team is the Default team (#1474)", () => {
+  // ensureDefaultTeam() skips its seed when another team already holds the
+  // name, so the column default alone could name a team that doesn't exist.
+  const STAFF = "Staff1474";
+  const OTHER_DEFAULT = "t1474-default";
 
-  const ids = {
-    byName: "u1474-by-name",
-    defaultName: "u1474-default-name",
-    alreadyId: "u1474-already-id",
-    unknown: "u1474-unknown",
-  };
+  async function freshAnonymous() {
+    await db.delete(schema.users).where(eq(schema.users.id, "anonymous"));
+    await ensureAnonymousUser();
+    return teamOf("anonymous");
+  }
 
+  // The seeded team, renamed.
   beforeAll(async () => {
     await db
-      .insert(schema.teams)
-      .values({ id: "t1474-eng", name: "Engineering1474" })
-      .onConflictDoNothing();
-    const base = { passwordHash: null, role: "user", mustChangePassword: false };
-    await db
-      .insert(schema.users)
-      .values([
-        { ...base, id: ids.byName, username: ids.byName, team: "Engineering1474" },
-        { ...base, id: ids.defaultName, username: ids.defaultName, team: "Default" },
-        { ...base, id: ids.alreadyId, username: ids.alreadyId, team: "t1474-eng" },
-        { ...base, id: ids.unknown, username: ids.unknown, team: "NoSuchTeam1474" },
-      ])
-      .onConflictDoNothing();
-    for (const statement of dataStatements) await db.execute(sql.raw(statement));
+      .update(schema.teams)
+      .set({ name: STAFF })
+      .where(eq(schema.teams.id, schema.DEFAULT_TEAM_ID));
   });
 
   afterAll(async () => {
-    await db.delete(schema.users).where(sql`${schema.users.id} LIKE 'u1474-%'`);
-    await db.delete(schema.teams).where(eq(schema.teams.id, "t1474-eng"));
+    await db.delete(schema.users).where(eq(schema.users.id, "anonymous"));
+    await db.delete(schema.teams).where(eq(schema.teams.id, OTHER_DEFAULT));
+    await db
+      .update(schema.teams)
+      .set({ name: "Default" })
+      .where(eq(schema.teams.id, schema.DEFAULT_TEAM_ID));
   });
 
-  async function teamOf(id: string) {
-    const [row] = await db
-      .select({ team: schema.users.team })
-      .from(schema.users)
-      .where(eq(schema.users.id, id));
-    return row.team;
-  }
-
-  it("has data statements to run", () => {
-    expect(dataStatements.length).toBeGreaterThan(0);
+  it("uses the team named Default when it isn't the seeded one", async () => {
+    await db.insert(schema.teams).values({ id: OTHER_DEFAULT, name: "Default" });
+    try {
+      expect(await freshAnonymous()).toBe(OTHER_DEFAULT);
+    } finally {
+      await db.delete(schema.teams).where(eq(schema.teams.id, OTHER_DEFAULT));
+    }
   });
 
-  it("maps a team name to that team's id", async () => {
-    expect(await teamOf(ids.byName)).toBe("t1474-eng");
-  });
-
-  it("maps the old 'Default' column default to the Default team's id", async () => {
-    // Whatever id this database gave the team named Default: it's the seeded
-    // one on a normal install, but another test file may have created it first.
-    const [defaultTeam] = await db
-      .select({ id: schema.teams.id })
-      .from(schema.teams)
-      .where(eq(schema.teams.name, "Default"));
-    expect(await teamOf(ids.defaultName)).toBe(defaultTeam.id);
-  });
-
-  it("leaves a value that's already an id alone", async () => {
-    expect(await teamOf(ids.alreadyId)).toBe("t1474-eng");
-  });
-
-  it("leaves a value that matches no team alone", async () => {
-    expect(await teamOf(ids.unknown)).toBe("NoSuchTeam1474");
+  it("falls back to the seeded team when no team is named Default", async () => {
+    expect(await freshAnonymous()).toBe(schema.DEFAULT_TEAM_ID);
   });
 });

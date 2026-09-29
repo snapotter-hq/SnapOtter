@@ -249,7 +249,7 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
       "sso-user",
       null,
       "user",
-      "Default",
+      "tm-3",
       0,
       "oidc",
       "ext-id-123",
@@ -486,14 +486,16 @@ describe("migrate-from-sqlite (representative 1.x database)", () => {
   });
 
   it("maps 1.x team names to team ids (#1474)", async () => {
-    // 1.x stored the team's name in users.team; 2.x looks teams up by id.
+    // 2.x looks teams up by id. 1.x wrote ids too, except where a row kept
+    // the column default 'Default', a name: any name maps to its team's id,
+    // and a value that's already an id stays.
     const { rows } = await db.execute(
       sql`SELECT id, team FROM users WHERE id IN ('u-admin', 'u-editor', 'u-oidc') ORDER BY id`,
     );
     expect(rows).toEqual([
       { id: "u-admin", team: "tm-1" },
       { id: "u-editor", team: "tm-2" },
-      { id: "u-oidc", team: "tm-1" },
+      { id: "u-oidc", team: "tm-3" },
     ]);
   });
 

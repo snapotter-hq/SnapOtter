@@ -71,7 +71,6 @@ const SMALL_SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></
 let testApp: TestApp;
 let adminToken: string;
 let adminId: string;
-let adminTeam: string;
 /** Rows and blobs the success cases keep, removed in afterAll. */
 const keptIds: string[] = [];
 const keptBlobs: string[] = [];
@@ -80,11 +79,10 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
   const [admin] = await db
-    .select({ id: schema.users.id, team: schema.users.team })
+    .select({ id: schema.users.id })
     .from(schema.users)
     .where(eq(schema.users.username, "admin"));
   adminId = admin.id;
-  adminTeam = admin.team;
 }, 30_000);
 
 afterAll(async () => {
@@ -102,10 +100,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.restoreAllMocks();
-  await db
-    .update(schema.users)
-    .set({ storageQuota: null, team: adminTeam })
-    .where(eq(schema.users.id, adminId));
+  await db.update(schema.users).set({ storageQuota: null }).where(eq(schema.users.id, adminId));
   await db.update(schema.teams).set({ storageQuota: null });
 });
 
