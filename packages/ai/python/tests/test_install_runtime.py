@@ -207,6 +207,10 @@ class InstallRuntimeTests(unittest.TestCase):
         return self._active_path().read_bytes()
 
     def _install(self, **kwargs):
+        # Without this the installer probes the real host's cgroup memory, and a
+        # host where that isn't readable (bare WSL2, for one) fails every install
+        # at preflight. Tests of the probe itself call it directly (#1563).
+        kwargs.setdefault("effective_memory_bytes", 64 * 1024 * 1024 * 1024)
         artifact = self.fixture.artifact()
         return install_runtime.install_runtime(
             ai_data_dir=self.fixture.ai_data_dir,
