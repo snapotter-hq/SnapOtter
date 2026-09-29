@@ -87,6 +87,9 @@ describe("BASE_PATH configuration", () => {
     "with %s enabled",
     (provider) => {
       const configure = (basePath: string, externalUrl: string) => {
+        // Pin both flags off first so each arm runs alone, whatever the shell exports.
+        vi.stubEnv("OIDC_ENABLED", "false");
+        vi.stubEnv("SAML_ENABLED", "false");
         enableSso[provider]();
         vi.stubEnv("EXTERNAL_URL", externalUrl);
         vi.stubEnv("BASE_PATH", basePath);
@@ -119,6 +122,8 @@ describe("BASE_PATH configuration", () => {
   );
 
   it("leaves EXTERNAL_URL unchecked against BASE_PATH when no SSO provider is on", () => {
+    vi.stubEnv("OIDC_ENABLED", "false");
+    vi.stubEnv("SAML_ENABLED", "false");
     vi.stubEnv("BASE_PATH", "/snapotter");
     vi.stubEnv("EXTERNAL_URL", "https://example.com");
     expect(() => loadEnv()).not.toThrow();
