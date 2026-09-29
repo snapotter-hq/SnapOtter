@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,15 +13,28 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   env: config,
 }));
 
-// Passthrough fs mock: only statfs is overridable, to simulate a full disk.
-const diskState = vi.hoisted(() => ({ lowDisk: false }));
+// Passthrough fs mock. statfs can report a full disk; writeFile can fail
+// halfway through (the disk filling after the free-space check passed); unlink
+// can fail with EBUSY.
+const diskState = vi.hoisted(() => ({ lowDisk: false, failWriteMidway: false, failUnlink: false }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const errno = (code: string) => Object.assign(new Error(`${code}: simulated`), { code });
   return {
     ...actual,
     statfs: (path: string) =>
       diskState.lowDisk ? Promise.resolve({ bfree: 0, bsize: 4096 }) : actual.statfs(path),
+    writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
+      const [path, data] = args;
+      if (diskState.failWriteMidway && Buffer.isBuffer(data)) {
+        await actual.writeFile(path, data.subarray(0, Math.floor(data.length / 2)));
+        throw errno("ENOSPC");
+      }
+      return actual.writeFile(...args);
+    },
+    unlink: (path: Parameters<typeof actual.unlink>[0]) =>
+      diskState.failUnlink ? Promise.reject(errno("EBUSY")) : actual.unlink(path),
   };
 });
 
@@ -36,6 +49,9 @@ beforeEach(async () => {
 
 afterEach(async () => {
   diskState.lowDisk = false;
+  diskState.failWriteMidway = false;
+  diskState.failUnlink = false;
+  vi.restoreAllMocks();
   await rm(testDir, { recursive: true, force: true });
 });
 
@@ -459,5 +475,51 @@ describe("disk space floor", () => {
     expect(err?.kind).toBe("operational");
     expect(err?.code).toBe("ENOSPC");
     expect(err?.statusCode).toBe(507);
+  });
+});
+
+// #1472: a write that fails partway leaves a partial file whose name never
+// reaches the caller, so only saveFile can remove it.
+describe("saveFile after a failed write", () => {
+  /** Files in the storage root, ignoring the thumbnail folder. */
+  async function storedFiles(): Promise<string[]> {
+    return (await readdir(testDir)).filter((name) => name !== ".thumbs");
+  }
+
+  it("removes the partly written file and rethrows the write error", async () => {
+    const { saveFile } = await importModule();
+    diskState.failWriteMidway = true;
+
+    const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("ENOSPC");
+    expect(await storedFiles()).toEqual([]);
+  });
+
+  it("logs the file it couldn't remove, and still throws the write error", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const { saveFile } = await importModule();
+    diskState.failWriteMidway = true;
+    diskState.failUnlink = true;
+
+    const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("ENOSPC");
+    const [leftover, ...rest] = await storedFiles();
+    expect(rest).toEqual([]);
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storedName: leftover,
+        err: expect.objectContaining({ code: "EBUSY" }),
+      }),
+      expect.any(String),
+    );
   });
 });

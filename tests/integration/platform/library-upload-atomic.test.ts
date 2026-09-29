@@ -20,7 +20,15 @@ const hooks = vi.hoisted(() => ({
   failSaveOnCall: 0,
   /** When set, sanitizeSvg throws a non-400 error (the handler's 500 branch). */
   svgUnexpectedError: false,
+  /** When set, deleting a blob this request wrote fails (a stuck discard). */
+  failDelete: false,
+  reportError: vi.fn(),
 }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return { ...actual, reportError: hooks.reportError };
+});
 
 vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
@@ -33,6 +41,12 @@ vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
       const storedName = await actual.saveFile(buffer, originalName);
       hooks.savedNames.push(storedName);
       return storedName;
+    },
+    deleteStoredFile: async (storedName: string) => {
+      if (hooks.failDelete && hooks.savedNames.includes(storedName)) {
+        throw Object.assign(new Error("simulated EBUSY on delete"), { code: "EBUSY" });
+      }
+      return actual.deleteStoredFile(storedName);
     },
   };
 });
@@ -96,6 +110,8 @@ beforeEach(() => {
   hooks.savedNames.length = 0;
   hooks.failSaveOnCall = 0;
   hooks.svgUnexpectedError = false;
+  hooks.failDelete = false;
+  hooks.reportError.mockReset();
 });
 
 afterEach(async () => {
@@ -271,5 +287,32 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
     });
     expect(hooks.savedNames).toHaveLength(2);
     expect(await survivingBlobs()).toEqual(hooks.savedNames);
+  });
+});
+
+// #1472: once the request has failed, nothing points at a staged blob. A
+// discard that can't delete it is a storage leak, so it has to be reported,
+// not left to a warning.
+describe("a staged blob that can't be discarded", () => {
+  it("is reported, and the client still gets the original refusal", async () => {
+    const before = await dbState();
+    hooks.failDelete = true;
+
+    const res = await upload([
+      png("ok.png"),
+      { name: "big.bin", content: OVER_LIMIT, type: "application/octet-stream" },
+    ]);
+
+    expect(res.statusCode).toBe(413);
+    expect(await dbState()).toEqual(before);
+    const [stuck] = hooks.savedNames;
+    expect(await survivingBlobs()).toEqual([stuck]);
+    expect(hooks.reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "EBUSY" }),
+      expect.objectContaining({ source: "http", route: "/api/v1/files/upload", method: "POST" }),
+    );
+
+    hooks.failDelete = false;
+    await deleteStoredFile(stuck);
   });
 });

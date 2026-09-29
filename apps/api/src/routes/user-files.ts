@@ -306,12 +306,21 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       // error response always means nothing was saved.
       const staged: { storedName: string; values: typeof schema.userFiles.$inferInsert }[] = [];
       let stagedBytes = 0;
+      // The request has already failed and no row points at a staged blob, so
+      // one this can't delete is orphaned for good: report it, don't just warn
+      // (#1472). The client still gets the refusal that caused the discard.
       const discardStaged = async () => {
         await Promise.all(
           staged.map(({ storedName }) =>
-            deleteStoredFile(storedName).catch((err) =>
-              request.log.warn({ err, storedName }, "Failed to discard a staged upload"),
-            ),
+            deleteStoredFile(storedName).catch((err) => {
+              request.log.error({ err, storedName }, "Failed to discard a staged upload");
+              void reportError(err, {
+                source: "http",
+                route: "/api/v1/files/upload",
+                method: "POST",
+                subsystem: "library-storage",
+              });
+            }),
           ),
         );
       };

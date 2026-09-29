@@ -5,6 +5,7 @@ import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
 import { CAMERA_RAW_INPUTS, SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
+import { logger } from "./logger.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
 
@@ -144,6 +145,22 @@ export async function ensureStorageDir(): Promise<void> {
   storageReady = true;
 }
 
+/**
+ * Delete what a failed write left behind. A write that fails partway (the disk
+ * filling after the free-space check, an I/O error) leaves a partial file, and
+ * its name never reaches the caller, so nothing else could ever remove it
+ * (#1472). If this delete fails too, the file is orphaned: say so, with its
+ * name, and let the caller see the write error that caused it.
+ */
+async function removePartialWrite(path: string, storedName: string): Promise<void> {
+  try {
+    await unlink(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    logger.error({ err, storedName }, "Could not remove a partly written library file");
+  }
+}
+
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
   const storedName = generateStoredName(originalName);
   if (isS3Enabled()) {
@@ -153,9 +170,11 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
   }
   await ensureStorageDir();
   await assertDiskSpace(env.FILES_STORAGE_PATH);
+  const path = join(env.FILES_STORAGE_PATH, storedName);
   try {
-    await writeFile(join(env.FILES_STORAGE_PATH, storedName), buffer);
+    await writeFile(path, buffer);
   } catch (e) {
+    await removePartialWrite(path, storedName);
     if (e instanceof Error && (e as NodeJS.ErrnoException).code === "EACCES") {
       throw new SafeError("Storage directory is not writable", {
         kind: "operational",
