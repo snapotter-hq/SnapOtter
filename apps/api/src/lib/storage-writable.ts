@@ -37,16 +37,30 @@ function currentIds(): { uid: string; gid: string } {
 }
 
 /**
- * Actionable error text for a storage directory the process cannot write to.
- * Names the directory and the running uid/gid, then lists the supported fixes
- * for the common "container runs under a foreign/non-root UID" deployments
- * (TrueNAS, Kubernetes runAsUser, OpenShift, bind mounts).
+ * Actionable error text for a directory the process cannot write to. Names the
+ * directory and the running uid/gid, then lists the supported fixes for the
+ * common "container runs under a foreign/non-root UID" deployments (TrueNAS,
+ * Kubernetes runAsUser, OpenShift, bind mounts). `role` picks the opener:
+ * storage directories block uploads, the log directory blocks the rotating
+ * log file the process opens at boot (#1487).
  */
-export function storagePermissionMessage(dir: string): string {
+export function storagePermissionMessage(
+  dir: string,
+  role: "storage" | "logs" = "storage",
+): string {
   const { uid, gid } = currentIds();
+  const opener =
+    role === "logs"
+      ? [
+          `Log directory "${dir}" is not writable by the current user (uid=${uid} gid=${gid}).`,
+          "SnapOtter writes its rotating log file there and cannot start until this is fixed. Common fixes:",
+        ]
+      : [
+          `Storage directory "${dir}" is not writable by the current user (uid=${uid} gid=${gid}).`,
+          "SnapOtter cannot upload, process, or store files until this is fixed. Common fixes:",
+        ];
   return [
-    `Storage directory "${dir}" is not writable by the current user (uid=${uid} gid=${gid}).`,
-    "SnapOtter cannot upload, process, or store files until this is fixed. Common fixes:",
+    ...opener,
     `  - Host volume owned by another user: on the host run "chown -R ${uid}:${gid} <host-path>"` +
       " (or set the container user to match the volume's owner).",
     "  - Running as a non-root user (TrueNAS, Kubernetes runAsUser, OpenShift): run the container" +
@@ -57,13 +71,20 @@ export function storagePermissionMessage(dir: string): string {
 }
 
 /**
- * Verifies the local storage directories (WORKSPACE_PATH for processing,
- * FILES_STORAGE_PATH for the saved library) are writable, throwing an Error
- * with actionable remediation if not. No-op in S3 storage mode. Called at boot
- * so a permissions misconfiguration fails fast with a clear message instead of
- * surfacing as a cryptic EACCES on the first file operation.
+ * Verifies the local directories the process writes to are writable, throwing
+ * an Error with actionable remediation if not. Called at boot so a permissions
+ * misconfiguration fails fast with a clear message instead of surfacing as a
+ * cryptic EACCES on the first file operation.
+ *
+ * LOG_DIR is probed in every storage mode: logs stay local even when objects
+ * live in S3, and pino-roll's own mkdir failure would otherwise arrive as an
+ * unhandled 'error' event from the transport worker with no env var named
+ * (#1487). WORKSPACE_PATH and FILES_STORAGE_PATH are skipped in S3 mode.
  */
 export async function assertStorageWritable(): Promise<void> {
+  if (!(await isDirWritable(env.LOG_DIR))) {
+    throw new Error(storagePermissionMessage(env.LOG_DIR, "logs"));
+  }
   if (env.STORAGE_MODE === "s3") return;
   for (const dir of [env.WORKSPACE_PATH, env.FILES_STORAGE_PATH]) {
     if (!(await isDirWritable(dir))) {

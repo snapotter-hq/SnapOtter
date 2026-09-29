@@ -180,15 +180,21 @@ try {
 }
 console.log("Redis connected");
 
-// Verify the local storage directories are writable before serving. A non-root
-// container launched against a volume it cannot write (TrueNAS, Kubernetes
-// runAsUser / OpenShift, or a bind mount owned by another user) would otherwise
-// boot "healthy" and fail with a cryptic EACCES on the first file operation.
+// Verify the local storage and log directories are writable before serving. A
+// non-root container launched against a volume it cannot write (TrueNAS,
+// Kubernetes runAsUser / OpenShift, or a bind mount owned by another user)
+// would otherwise boot "healthy" and fail with a cryptic EACCES on the first
+// file operation, or die on an unhandled transport error from the log writer.
 try {
   await assertStorageWritable();
-  console.log("Storage directories writable");
+  console.log("Storage and log directories writable");
 } catch (err) {
+  // A permission failure carries its own remediation text. Anything else the
+  // probe rethrows (EEXIST when the path is a file, ENOTDIR, ENOENT for an
+  // empty LOG_DIR) is a raw errno, so print the error too, as the other FATAL
+  // blocks above do.
   console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
   process.exit(1);
 }
 

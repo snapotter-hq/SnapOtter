@@ -396,7 +396,7 @@ environment:
 
 ### Storage permissions {#storage-permissions}
 
-SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error.
+SnapOtter writes to two locations at runtime: `/data` (user files, logs, AI models and the Python venv) and `/tmp/workspace` (temporary processing scratch). Both must be writable by the user the container runs as. If either is not, the container **fails fast at startup** with a message naming the directory, the running UID/GID, and how to fix it — instead of booting "healthy" and then failing on the first upload with a cryptic error. The log directory (`LOG_DIR`, `/data/logs` in the image) is checked the same way, in every storage mode, since logs stay local even when files live in S3.
 
 How permissions are handled depends on how the container is launched:
 

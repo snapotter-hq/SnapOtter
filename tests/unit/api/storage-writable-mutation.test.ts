@@ -11,6 +11,7 @@ const mockEnv = vi.hoisted(() => ({
   STORAGE_MODE: "local",
   WORKSPACE_PATH: "",
   FILES_STORAGE_PATH: "",
+  LOG_DIR: "",
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({ env: mockEnv }));
@@ -39,41 +40,41 @@ describe("storagePermissionMessage pins every line of the remediation text", () 
     expect(m).toContain('Storage directory "/data/workspace" is not writable by the current user');
   });
 
-  it("includes the SnapOtter-cannot-upload summary line (line 49)", () => {
-    // Kills the L49 quasi -> "" mutant; this exact phrase lives only on that line.
+  it("includes the SnapOtter-cannot-upload summary line", () => {
+    // Kills the quasi -> "" mutant; this exact phrase lives only on that line.
     expect(msg()).toContain("SnapOtter cannot upload, process, or store files until this is fixed");
   });
 
-  it("includes the chown host-volume remediation (line 50)", () => {
+  it("includes the chown host-volume remediation", () => {
     expect(msg()).toContain("Host volume owned by another user");
     expect(msg()).toContain("chown -R");
   });
 
-  it("includes the container-user hint continuation (line 51)", () => {
-    // Kills the L51 quasi -> "" mutant.
+  it("includes the container-user hint continuation", () => {
+    // Kills the quasi -> "" mutant.
     expect(msg()).toContain("or set the container user to match the volume's owner");
   });
 
-  it("includes the non-root runtime remediation header (line 52)", () => {
-    // Kills the L52 quasi -> "" mutant.
+  it("includes the non-root runtime remediation header", () => {
+    // Kills the quasi -> "" mutant.
     expect(msg()).toContain(
       "Running as a non-root user (TrueNAS, Kubernetes runAsUser, OpenShift)",
     );
   });
 
-  it("includes the PUID/PGID and supplementary-group guidance (lines 53-54)", () => {
-    // Kills the L54 quasi -> "" mutant (the fsGroup phrase lives only there).
+  it("includes the PUID/PGID and supplementary-group guidance", () => {
+    // Kills the quasi -> "" mutant (the fsGroup phrase lives only there).
     const m = msg();
     expect(m).toContain("set PUID/PGID to match the volume");
     expect(m).toContain("supplementary group 0 (Kubernetes fsGroup: 0)");
   });
 
-  it("includes the deployment docs link (line 55)", () => {
+  it("includes the deployment docs link", () => {
     expect(msg()).toContain("https://docs.snapotter.com/guide/deployment#storage-permissions");
   });
 
-  it("joins the lines with newlines, not an empty separator (line 56)", () => {
-    // The message is an array joined by "\n". Kills the L56 `"\n"` -> `""`
+  it("joins the lines with newlines, not an empty separator", () => {
+    // The message is an array joined by "\n". Kills the `"\n"` -> `""`
     // separator mutant: with "" the six lines would concatenate into one line.
     const m = msg();
     expect(m).toContain("\n");
@@ -95,6 +96,30 @@ describe("storagePermissionMessage pins every line of the remediation text", () 
   });
 });
 
+describe("storagePermissionMessage pins the logs-role opener (#1487)", () => {
+  const m = storagePermissionMessage("/data/logs", "logs");
+
+  it("opens with the log-directory line and the running uid/gid", () => {
+    expect(m).toMatch(
+      /^Log directory "\/data\/logs" is not writable by the current user \(uid=\S+ gid=\S+\)\.\n/,
+    );
+  });
+
+  it("says what the log directory blocks instead of the upload wording", () => {
+    expect(m).toContain(
+      "SnapOtter writes its rotating log file there and cannot start until this is fixed. Common fixes:\n  - Host volume",
+    );
+    expect(m).not.toContain("cannot upload");
+  });
+
+  it("keeps the shared remediation block and the five-line shape", () => {
+    expect(m).toContain("chown -R");
+    expect(m).toContain("PUID/PGID");
+    expect(m).toContain("https://docs.snapotter.com/guide/deployment#storage-permissions");
+    expect(m.split("\n").length).toBe(5);
+  });
+});
+
 describe("isDirWritable returns a real writability verdict", () => {
   it("returns exactly true for a freshly created writable directory", async () => {
     const dir = join(root, "ok");
@@ -110,17 +135,19 @@ describe("isDirWritable returns a real writability verdict", () => {
 });
 
 describe("assertStorageWritable wiring", () => {
-  it("resolves to undefined when both configured paths are writable", async () => {
+  it("resolves to undefined when the configured paths and LOG_DIR are writable", async () => {
     mockEnv.STORAGE_MODE = "local";
     mockEnv.WORKSPACE_PATH = join(root, "assert-ws");
     mockEnv.FILES_STORAGE_PATH = join(root, "assert-files");
+    mockEnv.LOG_DIR = join(root, "assert-logs");
     await expect(assertStorageWritable()).resolves.toBeUndefined();
   });
 
-  it("is a no-op in s3 mode even with unwritable paths configured", async () => {
+  it("resolves in s3 mode with unwritable storage paths and a writable LOG_DIR", async () => {
     mockEnv.STORAGE_MODE = "s3";
     mockEnv.WORKSPACE_PATH = "/definitely/not/writable/xyz";
     mockEnv.FILES_STORAGE_PATH = "/definitely/not/writable/xyz";
+    mockEnv.LOG_DIR = join(root, "assert-logs-s3");
     await expect(assertStorageWritable()).resolves.toBeUndefined();
   });
 });
