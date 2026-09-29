@@ -274,6 +274,11 @@ function cgroupProcessPath(mount: CgroupMount, membership: string): string | nul
     : null;
 }
 
+/** A value read from /proc or cgroupfs, quoted and capped for an error message. */
+function quoted(value: string | undefined): string {
+  return JSON.stringify((value ?? "").slice(0, 64));
+}
+
 function resolveMembershipMemoryLimits(
   readTextFile: (path: string) => string,
   failClosed: boolean,
@@ -281,14 +286,26 @@ function resolveMembershipMemoryLimits(
 ): bigint[] | null {
   const membershipLines = membershipRaw.split("\n").filter(Boolean);
   if (failClosed && membershipLines.length === 0) {
-    throw new Error("unable to read the process cgroup memory capacity");
+    throw new Error(
+      "unable to resolve the process cgroup memory capacity: /proc/self/cgroup is empty",
+    );
   }
   const parsedMemberships = membershipLines.map((line) => /^([^:]*):([^:]*):(.*)$/.exec(line));
-  if (parsedMemberships.some((fields) => fields !== null && hasParentPathSegment(fields[3]))) {
-    throw new Error("unable to read the process cgroup memory capacity");
+  const escaping = parsedMemberships.find(
+    (fields) => fields !== null && hasParentPathSegment(fields[3]),
+  );
+  if (escaping) {
+    throw new Error(
+      `unable to resolve the process cgroup memory capacity: cgroup membership ${quoted(escaping[3])} is outside the cgroup namespace`,
+    );
   }
-  if (failClosed && parsedMemberships.some((fields) => !validLinuxMembership(fields))) {
-    throw new Error("unable to read the process cgroup memory capacity");
+  const unrecognised = failClosed
+    ? parsedMemberships.findIndex((fields) => !validLinuxMembership(fields))
+    : -1;
+  if (unrecognised !== -1) {
+    throw new Error(
+      `unable to resolve the process cgroup memory capacity: unrecognised /proc/self/cgroup line ${quoted(membershipLines[unrecognised])}`,
+    );
   }
   const allMemberships = parsedMemberships
     .filter(
@@ -311,8 +328,10 @@ function resolveMembershipMemoryLimits(
   let mountInfoRaw: string;
   try {
     mountInfoRaw = readTextFile("/proc/self/mountinfo");
-  } catch {
-    throw new Error("unable to resolve the process cgroup memory capacity");
+  } catch (error) {
+    throw new Error("unable to read the process cgroup memory capacity from /proc/self/mountinfo", {
+      cause: error,
+    });
   }
 
   const visibleMounts = parseVisibleMounts(mountInfoRaw);
@@ -335,7 +354,10 @@ function resolveMembershipMemoryLimits(
       });
     }
     if (selected.length === 0) {
-      throw new Error("unable to resolve the process cgroup memory capacity");
+      const mountKind = membership.kind === "cgroup2" ? "cgroup2" : "cgroup v1";
+      throw new Error(
+        `unable to resolve the process cgroup memory capacity: no ${mountKind} memory mount in /proc/self/mountinfo covers ${quoted(membership.path)}`,
+      );
     }
     return selected;
   });
@@ -366,7 +388,7 @@ function resolveMembershipMemoryLimits(
             readTextFile(controllersPath);
           } catch (controllersError) {
             throw new Error(
-              `unable to read the process cgroup memory capacity from ${controllersPath}`,
+              `unable to read the process cgroup memory capacity from ${controllersPath} (memory.max is absent)`,
               { cause: controllersError },
             );
           }
@@ -380,7 +402,7 @@ function resolveMembershipMemoryLimits(
         const normalized = raw.trim();
         if (normalized !== "max" && !/^[0-9]+$/.test(normalized)) {
           throw new Error(
-            `malformed cgroup memory capacity in ${limitPath}: ${JSON.stringify(normalized.slice(0, 64))}`,
+            `malformed cgroup memory capacity in ${limitPath}: ${quoted(normalized)}`,
           );
         }
         const limit = parseCgroupLimit(raw, true);
@@ -422,8 +444,13 @@ function membershipMemoryLimits(
       let failedMembershipRaw: string;
       try {
         failedMembershipRaw = readTextFile("/proc/self/cgroup");
-      } catch {
-        throw new Error("unable to read the process cgroup memory capacity");
+      } catch (rereadError) {
+        // Keep what went wrong first; the failed re-read is only why it's final.
+        const first = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `unable to read the process cgroup memory capacity from /proc/self/cgroup (re-read after: ${first})`,
+          { cause: rereadError },
+        );
       }
       if (failedMembershipRaw === membershipRaw) throw error;
       continue;
@@ -431,8 +458,10 @@ function membershipMemoryLimits(
     let confirmedMembershipRaw: string;
     try {
       confirmedMembershipRaw = readTextFile("/proc/self/cgroup");
-    } catch {
-      throw new Error("unable to read the process cgroup memory capacity");
+    } catch (error) {
+      throw new Error("unable to read the process cgroup memory capacity from /proc/self/cgroup", {
+        cause: error,
+      });
     }
     if (confirmedMembershipRaw === membershipRaw) return limits;
   }

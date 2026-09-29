@@ -1037,22 +1037,27 @@ describe("OCR runtime memory compatibility", () => {
   });
 });
 
-describe("memory-capacity errors say what couldn't be read (#1501)", () => {
+describe("memory-capacity errors say what went wrong (#1501)", () => {
   const cgroup2Mount =
     "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw";
+  const denied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
 
-  function thrownBy(files: Map<string, string>, failures: Map<string, Error>): unknown {
+  function reader(files: Map<string, string>, failures = new Map<string, Error>()) {
+    return (path: string) => {
+      const failure = failures.get(path);
+      if (failure) throw failure;
+      const value = files.get(path);
+      if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+      return value;
+    };
+  }
+
+  function thrownBy(readTextFile: (path: string) => string): unknown {
     try {
       getOcrRuntimeEffectiveMemoryBytes({
         hostPlatform: "linux",
         physicalMemoryBytes: 8 * GiB,
-        readTextFile: (path) => {
-          const failure = failures.get(path);
-          if (failure) throw failure;
-          const value = files.get(path);
-          if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
-          return value;
-        },
+        readTextFile,
       });
     } catch (error) {
       return error;
@@ -1060,16 +1065,16 @@ describe("memory-capacity errors say what couldn't be read (#1501)", () => {
     throw new Error("expected the memory capacity read to fail");
   }
 
-  const membership = new Map([
-    ["/proc/self/cgroup", "0::/job\n"],
-    ["/proc/self/mountinfo", cgroup2Mount],
-  ]);
+  function membership(cgroup = "0::/job\n") {
+    return new Map([
+      ["/proc/self/cgroup", cgroup],
+      ["/proc/self/mountinfo", cgroup2Mount],
+    ]);
+  }
 
   it("names the limit file it couldn't read and keeps the cause", () => {
-    const denied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
-
     expect(
-      thrownBy(membership, new Map([["/sys/fs/cgroup/job/memory.max", denied]])),
+      thrownBy(reader(membership(), new Map([["/sys/fs/cgroup/job/memory.max", denied]]))),
     ).toMatchObject({
       message:
         "unable to read the process cgroup memory capacity from /sys/fs/cgroup/job/memory.max",
@@ -1077,23 +1082,89 @@ describe("memory-capacity errors say what couldn't be read (#1501)", () => {
     });
   });
 
-  it("names the controllers file it couldn't read when memory.max is absent", () => {
-    const denied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
-
+  it("names the controllers file it couldn't read, and why it read it", () => {
     expect(
-      thrownBy(membership, new Map([["/sys/fs/cgroup/job/cgroup.controllers", denied]])),
+      thrownBy(reader(membership(), new Map([["/sys/fs/cgroup/job/cgroup.controllers", denied]]))),
     ).toMatchObject({
       message:
-        "unable to read the process cgroup memory capacity from /sys/fs/cgroup/job/cgroup.controllers",
+        "unable to read the process cgroup memory capacity from /sys/fs/cgroup/job/cgroup.controllers (memory.max is absent)",
       cause: denied,
     });
   });
 
-  it("quotes a malformed limit and says where it came from", () => {
-    const files = new Map([...membership, ["/sys/fs/cgroup/job/memory.max", "12 GiB\n"]]);
+  it("names /proc/self/cgroup and /proc/self/mountinfo when they can't be read", () => {
+    expect(thrownBy(reader(new Map(), new Map([["/proc/self/cgroup", denied]])))).toMatchObject({
+      message: "unable to read the process cgroup memory capacity from /proc/self/cgroup",
+      cause: denied,
+    });
+    expect(
+      thrownBy(
+        reader(
+          new Map([["/proc/self/cgroup", "0::/job\n"]]),
+          new Map([["/proc/self/mountinfo", denied]]),
+        ),
+      ),
+    ).toMatchObject({
+      message: "unable to read the process cgroup memory capacity from /proc/self/mountinfo",
+      cause: denied,
+    });
+  });
 
-    expect(thrownBy(files, new Map())).toMatchObject({
-      message: 'malformed cgroup memory capacity in /sys/fs/cgroup/job/memory.max: "12 GiB"',
+  it("keeps the first failure when re-reading /proc/self/cgroup fails too", () => {
+    const exhausted = Object.assign(new Error("EMFILE: too many open files"), { code: "EMFILE" });
+    const files = new Map([...membership(), ["/sys/fs/cgroup/job/memory.max", "12 GiB\n"]]);
+    let cgroupReads = 0;
+
+    const error = thrownBy((path) => {
+      if (path === "/proc/self/cgroup" && ++cgroupReads > 1) throw exhausted;
+      return reader(files)(path);
+    });
+
+    expect(error).toMatchObject({
+      message:
+        'unable to read the process cgroup memory capacity from /proc/self/cgroup (re-read after: malformed cgroup memory capacity in /sys/fs/cgroup/job/memory.max: "12 GiB")',
+      cause: exhausted,
+    });
+  });
+
+  it("quotes a malformed limit, capped, and says where it came from", () => {
+    const files = new Map([...membership(), ["/sys/fs/cgroup/job/memory.max", "x".repeat(200)]]);
+
+    expect(thrownBy(reader(files))).toMatchObject({
+      message: `malformed cgroup memory capacity in /sys/fs/cgroup/job/memory.max: "${"x".repeat(64)}"`,
+    });
+  });
+
+  it.each([
+    ["an empty /proc/self/cgroup", "", "/proc/self/cgroup is empty"],
+    [
+      "a membership outside the cgroup namespace",
+      "0::/../job\n",
+      'cgroup membership "/../job" is outside the cgroup namespace',
+    ],
+    [
+      "an unrecognised membership line",
+      "garbage\n",
+      'unrecognised /proc/self/cgroup line "garbage"',
+    ],
+  ])(
+    "says what was wrong with %s rather than that it couldn't be read",
+    (_label, cgroup, detail) => {
+      expect(thrownBy(reader(membership(cgroup)))).toMatchObject({
+        message: `unable to resolve the process cgroup memory capacity: ${detail}`,
+      });
+    },
+  );
+
+  it("says when no cgroup mount covers the process's membership", () => {
+    const files = new Map([
+      ["/proc/self/cgroup", "0::/job\n"],
+      ["/proc/self/mountinfo", "22 1 0:5 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw"],
+    ]);
+
+    expect(thrownBy(reader(files))).toMatchObject({
+      message:
+        'unable to resolve the process cgroup memory capacity: no cgroup2 memory mount in /proc/self/mountinfo covers "/job"',
     });
   });
 });

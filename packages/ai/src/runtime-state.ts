@@ -858,6 +858,16 @@ function validateSignedArtifact(
   return manifest;
 }
 
+/**
+ * A descriptor value for a log detail. String() throws on a crafted object
+ * like {"toString": 1}; JSON.stringify can't, for anything JSON.parse built.
+ */
+function describeValue(value: unknown): string {
+  return typeof value === "string" || typeof value === "number"
+    ? String(value)
+    : String(JSON.stringify(value));
+}
+
 function parseOcrDescriptor(
   value: unknown,
   v3Root: string,
@@ -911,7 +921,7 @@ function parseOcrDescriptor(
   ) {
     return invalidDescriptor("active descriptor has a missing or malformed field");
   }
-  // Every mismatch, not just the first, so one log line says all of it (#1501).
+  // Collect every mismatch so one log line names all of them (#1501).
   const mismatches: string[] = [];
   if (artifact.target !== target || artifact.arch !== expectedArch) {
     mismatches.push(
@@ -923,13 +933,13 @@ function parseOcrDescriptor(
   }
   if (compatibility.protocolVersion !== OCR_RUNTIME_PROTOCOL_VERSION) {
     mismatches.push(
-      `runtime speaks OCR protocol ${String(compatibility.protocolVersion)}, but this SnapOtter speaks ${OCR_RUNTIME_PROTOCOL_VERSION}`,
+      `runtime speaks OCR protocol ${describeValue(compatibility.protocolVersion)}, but this SnapOtter speaks ${OCR_RUNTIME_PROTOCOL_VERSION}`,
     );
   }
   if (compatibility.snapotterVersion !== APP_VERSION) {
     // The common one: a SnapOtter upgrade leaves the installed runtime behind.
     mismatches.push(
-      `runtime was built for SnapOtter ${String(compatibility.snapotterVersion)}, but this is ${APP_VERSION}; reinstall Accurate OCR`,
+      `runtime was built for SnapOtter ${describeValue(compatibility.snapotterVersion)}, but this is ${APP_VERSION}; reinstall Accurate OCR`,
     );
   }
   if (mismatches.length > 0) return incompatibleArtifact(mismatches.join("; "));
@@ -1201,8 +1211,10 @@ export function readPendingOcrRuntimeForHandoff(
 
 // The capability is polled by feature status and read on every OCR request, so
 // an unusable runtime is logged once per distinct failure, not on every read.
-// Any read with nothing to report clears it, so a recurrence logs again.
-let lastReportedInvalidRuntime: string | null = null;
+// Any read with nothing to report clears it, so a recurrence logs again. One
+// slot per v3 root, so callers that resolve different roots don't keep
+// displacing each other's line.
+const lastReportedUnavailableRuntime = new Map<string, string>();
 
 // A missing runtime or an unsupported host is the normal state of a dev
 // checkout or a Fast-OCR-only install, so those stay quiet. Insufficient
@@ -1215,26 +1227,28 @@ const LOGGED_UNAVAILABLE_REASONS: ReadonlySet<OcrRuntimeUnavailableReason> = new
 
 const MAX_LOGGED_DETAIL_CHARS = 500;
 
-function reportInvalidRuntime(options: RuntimeStateOptions, result: ActiveRuntimeResult): void {
+function reportUnavailableRuntime(options: RuntimeStateOptions, result: ActiveRuntimeResult): void {
+  const v3Root = join(resolveAiDataDir(options), "v3");
   if (result.descriptor || !LOGGED_UNAVAILABLE_REASONS.has(result.reason)) {
-    lastReportedInvalidRuntime = null;
+    lastReportedUnavailableRuntime.delete(v3Root);
     return;
   }
-  // Details can quote values read from the data volume, so control characters
-  // and line breaks are flattened and the length is capped: a crafted value
-  // can't forge log lines or flood the log.
+  // Details can quote values read from the data volume, so control and
+  // format characters (line breaks, bidi overrides, zero-width marks) are
+  // flattened and the length is capped: a crafted value can't forge, reorder,
+  // or flood log lines.
   const detail = (result.detail ?? "no detail recorded")
-    .replace(/[\p{Cc}\s]+/gu, " ")
+    .replace(/[\p{Cc}\p{Cf}\s]+/gu, " ")
     .slice(0, MAX_LOGGED_DETAIL_CHARS);
-  const message = `[ocr-runtime] Accurate OCR runtime at ${join(resolveAiDataDir(options), "v3")} is unavailable: ${detail}`;
-  if (message === lastReportedInvalidRuntime) return;
-  lastReportedInvalidRuntime = message;
+  const message = `[ocr-runtime] Accurate OCR runtime at ${v3Root} is unavailable: ${detail}`;
+  if (lastReportedUnavailableRuntime.get(v3Root) === message) return;
+  lastReportedUnavailableRuntime.set(v3Root, message);
   aiLog.warn(message);
 }
 
 export function getOcrRuntimeCapability(options: RuntimeStateOptions = {}): OcrRuntimeCapability {
   const result = inspectActiveRuntime("ocr", options);
-  reportInvalidRuntime(options, result);
+  reportUnavailableRuntime(options, result);
   if (!result.descriptor) {
     return {
       available: false,

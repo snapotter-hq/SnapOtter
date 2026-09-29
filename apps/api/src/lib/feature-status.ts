@@ -1361,6 +1361,16 @@ export function verifyBundleModels(bundleId: string): string | null {
 // per distinct error, and again only after a read has worked in between (#1501).
 let lastLoggedOcrMemoryFailure: string | null = null;
 
+/** An error's message and its causes' messages, as one string to compare. */
+function causeChain(error: unknown): string {
+  const messages: string[] = [];
+  for (let e: unknown = error, depth = 0; e !== undefined && depth < 5; depth++) {
+    messages.push(e instanceof Error ? e.message : String(e));
+    e = e instanceof Error ? e.cause : undefined;
+  }
+  return messages.join(": ");
+}
+
 export function getFeatureStates(): FeatureBundleState[] {
   const installed = readInstalled();
   const lock = getInstallingBundle();
@@ -1387,8 +1397,12 @@ export function getFeatureStates(): FeatureBundleState[] {
     } catch (error) {
       ocrMemoryCapacityUnknown = true;
       // The UI only says the limit couldn't be determined; the log says why.
-      const failure = error instanceof Error ? error.message : String(error);
-      if (failure !== lastLoggedOcrMemoryFailure) {
+      // Only for a missing runtime, the one case where this read decides what
+      // the UI shows: an installed runtime's own check has already logged it.
+      const failure = causeChain(error);
+      const runtimeMissing =
+        !ocrCapability.available && ocrCapability.reason === "descriptor-missing";
+      if (runtimeMissing && failure !== lastLoggedOcrMemoryFailure) {
         lastLoggedOcrMemoryFailure = failure;
         logger.warn(
           { err: error },
