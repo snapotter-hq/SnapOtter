@@ -10,7 +10,7 @@
  * calling runSystemJob); anything else is a bug.
  */
 import type { Job } from "bullmq";
-import { and, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
@@ -18,6 +18,7 @@ import { getMaxAgeMs } from "../lib/cleanup.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
 import { runAuditArchive } from "./audit-archive.js";
+import { reconcilableJobRows } from "./job-reconciliation.js";
 import { getQueue } from "./queues.js";
 import { runSiemForward } from "./siem-forward.js";
 
@@ -250,7 +251,6 @@ export function owningJobIds(dirJobId: string): string[] {
   return [...ids];
 }
 
-const IN_FLIGHT_STATUSES = ["queued", "processing"] as const;
 const FINISHED_STATUSES = ["completed", "failed", "canceled"] as const;
 
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
@@ -360,23 +360,16 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
 
   // Age alone would delete the input of a job still waiting behind a backed-up
   // queue, so an expired dir survives while any job that owns it is in flight
-  // (#1412). Only rows job-reconciliation settles count (same criteria as its
-  // candidate query, which covers gdpr-export's system rows since #1441): a
-  // stranded one goes terminal within a minute, so a stuck row cannot pin a
-  // dir forever. Selected by status, not by an id list, so a huge backlog of
-  // expired dirs cannot overflow the bind-parameter limit.
+  // (#1412). Only rows job-reconciliation settles count, through its own
+  // predicate: a stranded one goes terminal within a minute, so a stuck row
+  // cannot pin a dir forever. Selected by status, not by an id list, so a huge
+  // backlog of expired dirs cannot overflow the bind-parameter limit.
   const inFlightIds = new Set<string>();
   if (expiredDirs.length > 0) {
     const rows = await db
       .select({ id: schema.jobs.id })
       .from(schema.jobs)
-      .where(
-        and(
-          inArray(schema.jobs.status, [...IN_FLIGHT_STATUSES]),
-          isNotNull(schema.jobs.toolId),
-          ne(schema.jobs.toolId, ""),
-        ),
-      );
+      .where(reconcilableJobRows());
     for (const r of rows) inFlightIds.add(r.id);
   }
 

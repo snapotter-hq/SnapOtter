@@ -32,7 +32,7 @@
  *      cannot double-resolve, and a genuinely canceled job is never
  *      resurrected.
  */
-import { and, eq, inArray, isNotNull, lt, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, ne, type SQL } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { logger } from "../lib/logger.js";
 import { getObjectSize, listObjects, type ObjectInfo } from "../lib/object-storage.js";
@@ -41,6 +41,24 @@ import { POOLS, type Pool } from "./types.js";
 
 /** DB statuses a reconciler may resolve. Terminal rows are never touched. */
 const NON_TERMINAL = ["queued", "processing"] as const;
+
+/**
+ * The rows this reconciler settles, before the grace window: non-terminal and
+ * actually enqueued. A row with no tool_id is an SSE-progress placeholder that
+ * was never enqueued; those are reconciled at startup by their own narrow path
+ * in apps/api/src/index.ts, and the two sets are deliberately disjoint.
+ *
+ * The storage TTL sweep uses this same predicate to decide which in-flight
+ * jobs keep their files (#1412), so a row can only hold a dir while something
+ * is guaranteed to settle it. Change it here, never in a copy.
+ */
+export function reconcilableJobRows(): SQL | undefined {
+  return and(
+    inArray(schema.jobs.status, NON_TERMINAL),
+    isNotNull(schema.jobs.toolId),
+    ne(schema.jobs.toolId, ""),
+  );
+}
 
 /**
  * BullMQ states in which the job will still be executed, or is executing.
@@ -247,17 +265,7 @@ export async function reconcileStrandedJobs(
       inputRefs: schema.jobs.inputRefs,
     })
     .from(schema.jobs)
-    .where(
-      and(
-        inArray(schema.jobs.status, NON_TERMINAL),
-        // A row with no tool_id is an SSE-progress placeholder that was never
-        // enqueued. Those are reconciled at startup by their own narrow path in
-        // apps/api/src/index.ts; the two sets are deliberately disjoint.
-        isNotNull(schema.jobs.toolId),
-        ne(schema.jobs.toolId, ""),
-        lt(schema.jobs.createdAt, new Date(Date.now() - graceMs)),
-      ),
-    )
+    .where(and(reconcilableJobRows(), lt(schema.jobs.createdAt, new Date(Date.now() - graceMs))))
     .orderBy(schema.jobs.createdAt)
     .limit(limit);
 

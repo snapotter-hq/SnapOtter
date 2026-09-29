@@ -152,6 +152,20 @@ describe("GDPR export route authority", () => {
 
     expect(res.statusCode).toBe(202);
     expect(queueAddMock).toHaveBeenCalledTimes(1);
+    // Stranded-job reconciliation finds a live export by looking up the row id
+    // as the BullMQ job id (#1441), so the enqueue must pass it as jobId.
+    // Without that, any export running past the grace window would be failed
+    // mid-run.
+    const { jobId } = res.json() as { jobId: string };
+    expect(queueAddMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ jobId }),
+      expect.objectContaining({ jobId }),
+    );
+    const rowValues = insertMock.mock.results[0].value.values;
+    expect(rowValues).toHaveBeenCalledWith(
+      expect.objectContaining({ id: jobId, type: "system", toolId: "gdpr-export" }),
+    );
   });
 
   it("still 404s an unknown target before consulting role authority", async () => {

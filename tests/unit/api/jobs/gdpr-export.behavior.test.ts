@@ -4,6 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const selectMock = vi.hoisted(() => vi.fn());
 const readStoredFileMock = vi.hoisted(() => vi.fn());
 const putObjectMock = vi.hoisted(() => vi.fn());
+/** Every archive written through putObjectStream, drained to a buffer. */
+const written = vi.hoisted(() => [] as Array<{ key: string; body: Buffer }>);
+const putObjectStreamMock = vi.hoisted(() =>
+  vi.fn(async (key: string, source: AsyncIterable<Buffer>) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of source) chunks.push(chunk);
+    const body = Buffer.concat(chunks);
+    written.push({ key, body });
+    return body.length;
+  }),
+);
 
 /**
  * Stands in for a Drizzle query builder, including its projection behavior: when
@@ -35,6 +46,8 @@ async function loadGdprExport() {
   selectMock.mockReset();
   readStoredFileMock.mockReset();
   putObjectMock.mockReset();
+  putObjectStreamMock.mockClear();
+  written.length = 0;
 
   vi.doMock("drizzle-orm", () => ({
     eq: vi.fn(() => "eq"),
@@ -77,6 +90,7 @@ async function loadGdprExport() {
 
   vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
     putObject: putObjectMock,
+    putObjectStream: putObjectStreamMock,
   }));
 
   return import("../../../../apps/api/src/jobs/gdpr-export.js");
@@ -123,6 +137,29 @@ describe("GDPR export job behavior", () => {
     );
 
     expect(putObjectMock).not.toHaveBeenCalled();
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+  });
+
+  // #1441: stranded-job reconciliation adopts a non-empty file in
+  // outputs/<jobId>/ as the finished export. putObject on the local backend
+  // writes straight to the final path, so a write that dies partway (ENOSPC,
+  // a kill) would leave a truncated archive there to be served as complete.
+  // putObjectStream stages under .snapotter-staging/ and renames, and the
+  // reconciler never lists that subdirectory.
+  it("writes the archive through the staged, atomic stream write", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]));
+
+    await gdprExportJob("user-1", "export-atomic");
+
+    expect(putObjectMock, "the direct, non-atomic write must not be used").not.toHaveBeenCalled();
+    expect(putObjectStreamMock).toHaveBeenCalledTimes(1);
+    expect(putObjectStreamMock.mock.calls[0][0]).toBe("outputs/export-atomic/gdpr-export.zip");
+    expect(new AdmZip(written[0].body).getEntry("profile.json")).not.toBeNull();
   });
 
   it("writes a ZIP without passwordHash and skips missing library file contents", async () => {
@@ -186,8 +223,8 @@ describe("GDPR export job behavior", () => {
       outputRef: "outputs/export-job/gdpr-export.zip",
     });
 
-    expect(putObjectMock).toHaveBeenCalledTimes(1);
-    const [outputRef, zipBuffer] = putObjectMock.mock.calls[0];
+    expect(written).toHaveLength(1);
+    const { key: outputRef, body: zipBuffer } = written[0];
     expect(outputRef).toBe("outputs/export-job/gdpr-export.zip");
 
     const zip = new AdmZip(zipBuffer);
@@ -262,9 +299,8 @@ describe("GDPR export job behavior", () => {
       outputRef: "outputs/export-null/gdpr-export.zip",
     });
 
-    expect(putObjectMock).toHaveBeenCalledTimes(1);
-    const zipBuffer = putObjectMock.mock.calls[0][1];
-    const zip = new AdmZip(zipBuffer);
+    expect(written).toHaveLength(1);
+    const zip = new AdmZip(written[0].body);
 
     const files = JSON.parse(zip.readAsText("files.json"));
     const jobs = JSON.parse(zip.readAsText("jobs.json"));
@@ -304,10 +340,9 @@ describe("GDPR export job behavior", () => {
 
     // With no files, the library-copy loop never runs, so readStoredFile is untouched.
     expect(readStoredFileMock).not.toHaveBeenCalled();
-    expect(putObjectMock).toHaveBeenCalledTimes(1);
+    expect(written).toHaveLength(1);
 
-    const zipBuffer = putObjectMock.mock.calls[0][1];
-    const zip = new AdmZip(zipBuffer);
+    const zip = new AdmZip(written[0].body);
     expect(JSON.parse(zip.readAsText("files.json"))).toEqual([]);
     expect(JSON.parse(zip.readAsText("jobs.json"))).toEqual([]);
     expect(JSON.parse(zip.readAsText("audit-log.json"))).toEqual([]);

@@ -21,7 +21,7 @@
 
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
@@ -29,6 +29,7 @@ import {
   UNRECOVERABLE_STRANDED_JOB_ERROR,
 } from "../../../apps/api/src/jobs/job-reconciliation.js";
 import { getQueue } from "../../../apps/api/src/jobs/queues.js";
+import { SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
 import { deletePrefix, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
@@ -241,8 +242,8 @@ describe("stranded-job reconciliation", () => {
   // as the BullMQ jobId), and nothing else settles one whose export throws, so
   // a failed export said "queued" forever.
   describe("GDPR export rows (#1441)", () => {
-    const gdpr = (status: "queued" | "processing" = "queued") =>
-      seedJob({ status, type: "system", toolId: "gdpr-export", pool: "system" });
+    const gdpr = () =>
+      seedJob({ status: "queued", type: "system", toolId: "gdpr-export", pool: "system" });
 
     it("fails a GDPR export whose job is gone and produced nothing", async () => {
       const id = await gdpr();
@@ -269,10 +270,37 @@ describe("stranded-job reconciliation", () => {
       expect(row.outputRefs).toEqual([`outputs/${id}/gdpr-export.zip`]);
     });
 
+    // The #1441 path end to end: the export really throws on the system worker
+    // the test app runs, BullMQ keeps the job in its failed set (removeOnFail is
+    // by age), and nothing but the reconciler ever makes the row terminal.
+    it("fails a GDPR export that threw and sits in BullMQ's failed set", async () => {
+      const id = await gdpr();
+      const queue = getQueue("system");
+      // No users row for this id, so gdprExportJob throws "User ... not found".
+      const job = await queue.add(
+        SYSTEM_JOBS.gdprExport,
+        { userId: randomUUID(), jobId: id } as never,
+        { jobId: id, attempts: 1 },
+      );
+      try {
+        await vi.waitFor(async () => expect(await job.getState()).toBe("failed"), {
+          timeout: 20_000,
+          interval: 200,
+        });
+        expect((await readJob(id)).status, "precondition: nothing else settles it").toBe("queued");
+
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("failed");
+        expect((await readJob(id)).status).toBe("failed");
+      } finally {
+        await queue.remove(id).catch(() => {});
+      }
+    });
+
     it("leaves a GDPR export alone while its job is still queued on the system pool", async () => {
       const id = await gdpr();
       const queue = getQueue("system");
-      await queue.add("system:gdpr-export", { jobId: id } as never, {
+      await queue.add(SYSTEM_JOBS.gdprExport, { jobId: id } as never, {
         jobId: id,
         delay: 10 * 60_000,
       });
