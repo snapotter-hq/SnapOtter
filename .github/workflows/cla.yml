@@ -10,9 +10,16 @@ permissions: {}
 
 jobs:
   cla:
+    # Comments are matched loosely on purpose: contains() ignores case, so
+    # "Recheck", "recheck\r\n", or the sign phrase with a trailing period or
+    # a greeting in front all get through. The action does the real check.
     if: |
-      (github.event_name == 'pull_request_target') ||
-      (github.event_name == 'issue_comment' && github.event.comment.body == 'recheck')
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       github.event.comment.user.type != 'Bot' &&
+       (contains(github.event.comment.body, 'recheck') ||
+        contains(github.event.comment.body, 'hereby sign the CLA')))
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -33,16 +40,16 @@ jobs:
           branch: "cla-signatures"
           allowlist: "snapotter-hq,dependabot[bot],renovate[bot],github-actions[bot],snapotter-bot"
           custom-notsigned-prcomment: |
-            Thank you for your contribution! Before we can merge this PR, you need to sign our [Contributor License Agreement](https://github.com/snapotter-hq/snapotter/blob/main/CLA.md).
+            Thanks for the PR! Before we can merge it, we need you to sign our [Contributor License Agreement](https://github.com/snapotter-hq/snapotter/blob/main/CLA.md). You keep ownership of your code and grant SnapOtter a license to use it, including under our commercial license ([plain-language summary](https://github.com/snapotter-hq/snapotter/blob/main/CLA.md#plain-language-summary)).
 
-            **What the CLA does:** You keep ownership of your code. You grant SnapOtter a license to use your contribution under any license (including our commercial license). [Read the plain-language summary](https://github.com/snapotter-hq/snapotter/blob/main/CLA.md#plain-language-summary).
-
-            **How to sign:** Comment on this PR with the following text:
+            To sign, reply to this PR with:
 
             > I have read the CLA Document and I hereby sign the CLA
 
-            You only need to do this once. It applies to all future contributions.
-          custom-pr-sign-comment: "I have read the CLA Document and I hereby sign the CLA"
+            Case and a trailing period don't matter. You only sign once, and it covers future PRs too. If the check doesn't turn green, comment `recheck`.
+          # No custom-pr-sign-comment: with it set the action demands an exact,
+          # whole-comment match. Its built-in pattern accepts the same phrase with
+          # any case, extra spaces, and text around it on the same line.
           custom-allsigned-prcomment: "All contributors have signed the CLA. Thank you!"
           lock-pullrequest-aftermerge: false
           use-dco-flag: false
