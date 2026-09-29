@@ -721,12 +721,12 @@ describe("readActiveRuntime", () => {
 
   it.each([
     ["002", 0o002],
+    // What docker/entrypoint.sh sets for the app in the container.
+    ["007", 0o007],
     ["077", 0o077],
-    ["022", 0o022],
   ])("builds a valid fixture whatever the process umask is (umask %s, #1481)", (_label, umask) => {
     // The payload check compares each file's mode with the signed one, so a
-    // fixture written under a group-writable umask used to fail on hosts
-    // that run one.
+    // fixture written under any umask but 022 used to fail.
     const previous = process.umask(umask);
     let fixture: ReturnType<typeof createRuntimeFixture>;
     try {
