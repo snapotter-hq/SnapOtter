@@ -580,6 +580,12 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       "commit write failed",
     ]);
     expect(rollbackError.message).toBe("runtime state unavailable");
+    expect(hoisted.logErrorWithCausesMock.mock.results[0]?.type).toBe("return");
+
+    // The UI still gets the top-level message, and only that.
+    const detail = await getFeatureDetail("ocr");
+    expect(detail?.status).toBe("error");
+    expect(detail?.error).toBe("OCR runtime handoff failed and activation rollback also failed");
   });
 
   it("logs an OCR install that finished but could not report itself complete (#1504)", async () => {
@@ -587,18 +593,67 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
 
     const res = await postInstall("ocr");
     expect(res.statusCode).toBe(202);
+    const { jobId } = JSON.parse(res.body);
     await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
 
+    // One line: the branch returns rather than falling into the failure path.
+    expect(hoisted.logErrorWithCausesMock).toHaveBeenCalledTimes(1);
     const [, fields, message] = hoisted.logErrorWithCausesMock.mock.calls[0];
     expect(message).toBe(
-      "[ocr-runtime] OCR runtime installed, but reporting the install as complete failed",
+      "[ocr-runtime] OCR runtime installed, but finishing the install job failed",
     );
+    expect(fields).toMatchObject({ bundleId: "ocr", jobId });
     expect((fields.err as Error).message).toBe("progress store unavailable");
+    expect(
+      hoisted.runOcrRuntimeMaintenanceMock.mock.calls.filter(([action]) => action === "commit"),
+    ).toHaveLength(1);
+    const detail = await getFeatureDetail("ocr");
+    expect(detail?.status).not.toBe("error");
+    expect(detail?.error).toBeNull();
     // The install itself went through: nothing was rolled back.
     expect(hoisted.runOcrRuntimeMaintenanceMock).not.toHaveBeenCalledWith(
       "rollback",
       expect.anything(),
     );
+  });
+
+  it("logs, rather than throws, when recording a failed OCR install fails too (#1504)", async () => {
+    // Nothing awaits the install, so a rejection here used to go unhandled,
+    // which ends the process when no unhandledRejection handler is installed.
+    hoisted.handoffOcrDispatcherMock.mockRejectedValueOnce(new Error("candidate readiness failed"));
+    hoisted.failProgressPhase.value = "failed";
+
+    const res = await postInstall("ocr");
+    expect(res.statusCode).toBe(202);
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length >= 2);
+
+    const calls = hoisted.logErrorWithCausesMock.mock.calls;
+    expect(calls.map(([, , message]) => message)).toEqual([
+      "[ocr-runtime] OCR install failed",
+      "[ocr-runtime] Recording the failed OCR install failed",
+    ]);
+    expect((calls[1][1].err as Error).message).toBe("progress store unavailable");
+  });
+
+  it("keeps the failed probe in the cause when the restored dispatcher can't be recovered (#1504)", async () => {
+    hoisted.handoffOcrDispatcherMock.mockRejectedValueOnce(new Error("candidate readiness failed"));
+    hoisted.probeOcrDispatcherMock.mockRejectedValueOnce(
+      new Error("no ready published dispatcher"),
+    );
+    hoisted.rotateOcrDispatcherMock.mockRejectedValueOnce(new Error("rotation spawn failed"));
+
+    const res = await postInstall("ocr");
+    expect(res.statusCode).toBe(202);
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
+
+    const err = hoisted.logErrorWithCausesMock.mock.calls[0][1].err as Error;
+    expect(err.message).toMatch(/dispatcher could not be recovered/);
+    // Why the restored dispatcher was judged unhealthy, not just that rotating it failed.
+    expect(((err.cause as AggregateError).errors as Error[]).map((e) => e.message)).toEqual([
+      "candidate readiness failed",
+      "no ready published dispatcher",
+      "rotation spawn failed",
+    ]);
   });
 
   it("returns 500 when the offline OCR installer fails after validation", async () => {
@@ -671,7 +726,9 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     const response = await postOcrImport();
 
     expect(response.statusCode).toBe(500);
-    expect(JSON.parse(response.body).error).toMatch(/handoff failed.*rollback also failed/i);
+    expect(JSON.parse(response.body).error).toBe(
+      "OCR runtime handoff failed and activation rollback also failed",
+    );
     expect(
       hoisted.runOcrRuntimeMaintenanceMock.mock.calls.filter(([action]) => action === "commit"),
     ).toHaveLength(2);

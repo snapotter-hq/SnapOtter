@@ -162,13 +162,13 @@ async function handoffInstalledOcrRuntime(
     if (typeof rollback.restoredGeneration === "string") {
       try {
         await probeOcrDispatcher(runtimeOptions);
-      } catch {
+      } catch (probeError) {
         try {
           await rotateOcrDispatcher(runtimeOptions);
         } catch (recoveryError) {
           throw new Error(
             "OCR runtime handoff failed; the prior descriptor was restored but its local dispatcher could not be recovered",
-            { cause: new AggregateError([activationError, recoveryError]) },
+            { cause: new AggregateError([activationError, probeError, recoveryError]) },
           );
         }
       }
@@ -260,11 +260,11 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
     } catch (error) {
       if (!finalize()) {
         // Only the success path finalizes first, so the runtime is installed
-        // and active; what failed is telling the job it's done.
+        // and active; what failed is the bookkeeping after it.
         logErrorWithCauses(
           logger,
           { err: error, bundleId, jobId },
-          "[ocr-runtime] OCR runtime installed, but reporting the install as complete failed",
+          "[ocr-runtime] OCR runtime installed, but finishing the install job failed",
         );
         return;
       }
@@ -277,12 +277,22 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
       );
       const errorMessage = error instanceof Error ? error.message : String(error);
       setInstallProgress(bundleId, null, errorMessage);
-      await updateSingleFileProgress({
-        jobId,
-        phase: "failed",
-        percent: 0,
-        error: errorMessage,
-      });
+      try {
+        await updateSingleFileProgress({
+          jobId,
+          phase: "failed",
+          percent: 0,
+          error: errorMessage,
+        });
+      } catch (recordError) {
+        // Nothing awaits this block, so a rejection escaping it would be
+        // unhandled, and that ends the process when no handler is installed.
+        logErrorWithCauses(
+          logger,
+          { err: recordError, bundleId, jobId },
+          "[ocr-runtime] Recording the failed OCR install failed",
+        );
+      }
     } finally {
       pump();
     }

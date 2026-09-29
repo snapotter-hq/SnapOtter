@@ -46,6 +46,20 @@ describe("logger module load (#1418)", () => {
     expect(() => logger.info("first call")).toThrow(/LOG_DIR or LOG_LEVEL.*#1418/);
   });
 
+  it("passes child options through, so a child can swap the err serializer (#1504)", async () => {
+    // logErrorWithCauses relies on this to keep AggregateError causes.
+    stubConfig(fullEnv());
+    const { logger } = await import(LOGGER_PATH);
+    const pino = (await import("pino")).default;
+
+    const child = logger.child({}, { serializers: { err: pino.stdSerializers.errWithCause } });
+
+    const serializers = (child as unknown as Record<symbol, Record<string, unknown>>)[
+      pino.symbols.serializersSym
+    ];
+    expect(serializers.err).toBe(pino.stdSerializers.errWithCause);
+  });
+
   it("builds a working pino logger on first use that Fastify accepts as loggerInstance", async () => {
     stubConfig(fullEnv());
     const { logger } = await import(LOGGER_PATH);

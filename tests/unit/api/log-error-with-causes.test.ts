@@ -65,6 +65,30 @@ describe("logErrorWithCauses (#1504)", () => {
     expect(err?.cause?.aggregateErrors).toHaveLength(2);
   });
 
+  it("falls back to the default serializer when the cause chain can't be walked", () => {
+    // errWithCause tags every error it visits, so a frozen one in the chain
+    // throws, and an AggregateError that lists itself recurses until the
+    // stack runs out. Either would otherwise take the caller's catch with it.
+    const frozenCause = new Error("top", { cause: Object.freeze(new Error("frozen cause")) });
+    const selfListing = new AggregateError([], "lists itself");
+    selfListing.errors.push(selfListing);
+    const selfListingCause = new Error("top", { cause: selfListing });
+
+    for (const err of [frozenCause, selfListingCause]) {
+      const { log, lines } = capturingLogger();
+
+      expect(() => logErrorWithCauses(log, { err, bundleId: "ocr" }, "failed")).not.toThrow();
+
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({
+        msg: "failed",
+        bundleId: "ocr",
+        err: { message: expect.stringMatching(/^top/) },
+        causeChainError: expect.any(String),
+      });
+    }
+  });
+
   it("leaves the logger it was given alone", () => {
     const { log, lines } = capturingLogger();
 
