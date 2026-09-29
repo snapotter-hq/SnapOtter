@@ -327,7 +327,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
                   source: "http",
                   route: "/api/v1/files/upload",
                   method: "POST",
-                  subsystem: "library-storage",
+                  subsystem: "upload-storage",
                 },
               );
             }),

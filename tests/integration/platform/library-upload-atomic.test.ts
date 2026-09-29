@@ -319,7 +319,7 @@ describe("a staged blob that can't be discarded", () => {
           source: "http",
           route: "/api/v1/files/upload",
           method: "POST",
-          subsystem: "library-storage",
+          subsystem: "upload-storage",
         }),
       );
     } finally {
