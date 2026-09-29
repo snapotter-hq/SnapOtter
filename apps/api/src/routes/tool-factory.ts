@@ -437,6 +437,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           try {
             const prepared = await handlerForPosition(i).prepare(fileBuffer, fname, {
               scratchDir,
+              // reqId comes with request.log; jobId and toolId make a
+              // normalization warn joinable to the job row, and filename says
+              // which of a multi-input upload it was (#1417).
+              log: request.log.child({ jobId, toolId: config.toolId, filename: fname }),
               lenient: config.skipStructuralValidation,
               // Reject encrypted PDFs up front only for PDF-only tools (qpdf
               // page ops etc.). Scoped to acceptedInputs === [".pdf"] so the

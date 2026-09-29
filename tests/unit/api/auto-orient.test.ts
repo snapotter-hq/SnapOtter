@@ -163,6 +163,24 @@ describe("autoOrient", () => {
     expect(loggerMock.warn.mock.calls[0][0]).toMatchObject({ err: expect.any(Error), bytes: 0 });
   });
 
+  it("routes its warn lines through the logger it is given (#1417)", async () => {
+    const full = await createDetailedJpegWithOrientation(6);
+    const truncated = full.subarray(0, Math.floor(full.length / 2));
+    const requestLog = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
+
+    const result = await autoOrient(truncated, requestLog);
+
+    expect(result.equals(truncated)).toBe(true);
+    expect(requestLog.warn).toHaveBeenCalledOnce();
+    expect(requestLog.warn.mock.calls[0][0]).toMatchObject({ orientation: 6, format: "jpeg" });
+
+    // the metadata-failure warn takes the same route
+    await autoOrient(Buffer.alloc(0), requestLog);
+    expect(requestLog.warn).toHaveBeenCalledTimes(2);
+    expect(requestLog.warn.mock.calls[1][0]).toMatchObject({ bytes: 0 });
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
   it("logs and passes the image through when the rotation fails", async () => {
     const full = await createDetailedJpegWithOrientation(6);
     const truncated = full.subarray(0, Math.floor(full.length / 2));

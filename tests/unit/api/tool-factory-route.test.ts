@@ -73,6 +73,8 @@ vi.mock("../../../apps/api/src/lib/analytics.js", () => ({
   trackEvent: vi.fn(),
 }));
 
+const childLog = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
+
 vi.mock("../../../apps/api/src/lib/auto-orient.js", () => ({
   autoOrient: vi.fn((buf: Buffer) => Promise.resolve(buf)),
 }));
@@ -143,6 +145,7 @@ vi.mock("sharp", () => ({
 
 import { apiToolPath } from "@snapotter/shared";
 import { enqueueToolJob, waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
+import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import {
   getFirstMissingBundleForTool,
   isToolInstalled,
@@ -289,7 +292,14 @@ function createMockRequest(opts: {
       },
     }),
     headers: {},
-    log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+    log: {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      // request.log.child({ jobId, toolId }) is what the factory hands the
+      // input handler (#1417); tests read the bindings off this spy.
+      child: vi.fn(() => childLog),
+    },
   };
 }
 
@@ -527,6 +537,29 @@ describe("createToolRoute", () => {
       );
     });
 
+    it("hands the input handler a request child logger bound to the job and tool (#1417)", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+      });
+
+      await handler(req, reply);
+
+      expect(req.log.child).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: expect.any(String), toolId: id, filename: "test.png" }),
+      );
+      // the bound jobId is the one the caller gets back, so the line joins to the job
+      const bound = vi.mocked(req.log.child).mock.calls[0][0] as { jobId: string };
+      expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ jobId: bound.jobId }));
+      expect(enqueueToolJob).toHaveBeenCalledWith(expect.objectContaining({ jobId: bound.jobId }));
+      expect(vi.mocked(autoOrient)).toHaveBeenCalledWith(expect.any(Buffer), childLog);
+    });
+
     it("returns 200 success envelope when waitForJob resolves", async () => {
       const app = createMockApp();
       const id = "resize";
@@ -731,7 +764,14 @@ describe("createToolRoute", () => {
             };
           },
         }),
-        log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+        log: {
+          warn: vi.fn(),
+          error: vi.fn(),
+          info: vi.fn(),
+          // request.log.child({ jobId, toolId }) is what the factory hands the
+          // input handler (#1417); tests read the bindings off this spy.
+          child: vi.fn(() => childLog),
+        },
       };
 
       await handler(req, reply);

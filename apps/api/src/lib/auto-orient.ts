@@ -1,3 +1,4 @@
+import type { FastifyBaseLogger } from "fastify";
 import sharp, { type Metadata } from "sharp";
 import { logger } from "./logger.js";
 import { resolveOutputFormat } from "./output-format.js";
@@ -15,8 +16,16 @@ import { resolveOutputFormat } from "./output-format.js";
  * Returns the original buffer unchanged if no rotation is needed. Also passes
  * the buffer through, with a warn log, when its metadata can't be read or the
  * rotation itself fails, so a sideways result is traceable.
+ *
+ * Pass the request logger (or a child carrying jobId and toolId) where one is
+ * in scope, so those warn lines can be joined to the upload that produced a
+ * sideways result (#1417). Without it they go to the process logger, which
+ * carries only trace ids, and only when OpenTelemetry is active.
  */
-export async function autoOrient(buffer: Buffer): Promise<Buffer> {
+export async function autoOrient(
+  buffer: Buffer,
+  log: Pick<FastifyBaseLogger, "warn"> = logger,
+): Promise<Buffer> {
   let meta: Metadata;
   try {
     meta = await sharp(buffer).metadata();
@@ -26,7 +35,7 @@ export async function autoOrient(buffer: Buffer): Promise<Buffer> {
     // handles or a transient failure on a valid file. Passing it through is
     // right in both cases (the tool's own decode is the arbiter), but the
     // second would otherwise be a silent sideways result.
-    logger.warn(
+    log.warn(
       { err, bytes: buffer.length },
       "autoOrient: could not read image metadata, passing image through unrotated",
     );
@@ -44,7 +53,7 @@ export async function autoOrient(buffer: Buffer): Promise<Buffer> {
   } catch (err) {
     // The tool's own decode of the same buffer is expected to reject it. A warn
     // here with no failed-job line after it points at an encode-side bug.
-    logger.warn(
+    log.warn(
       { err, orientation: meta.orientation, format: meta.format, bytes: buffer.length },
       "autoOrient: rotation failed, passing image through unrotated",
     );

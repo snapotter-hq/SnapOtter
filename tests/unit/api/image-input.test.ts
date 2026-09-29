@@ -188,6 +188,26 @@ describe("ImageInputHandler resource bounds", () => {
   });
 });
 
+describe("ImageInputHandler request logger (#1417)", () => {
+  it("hands opts.log to autoOrient so its warn lines carry the request binding", async () => {
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "jpeg",
+      width: 10,
+      height: 10,
+    });
+    const log = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
+
+    const result = await new ImageInputHandler().prepare(RAW, "scan.jpg", {
+      scratchDir: "/tmp/ocr",
+      log: log as never,
+    });
+
+    expect(mocks.autoOrient).toHaveBeenCalledWith(RAW, log);
+    expect(result).toEqual({ buffer: ORIENTED, filename: "scan.jpg" });
+  });
+});
+
 describe("ImageInputHandler decoder availability (#1428)", () => {
   const missingHeif = () => new DecoderUnavailableError("No HEIF decoder found.");
   const missingMagick = () => new DecoderUnavailableError("No ImageMagick found.");

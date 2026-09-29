@@ -1,3 +1,4 @@
+import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../lib/auto-orient.js";
 import { stripInternalPaths } from "../lib/errors.js";
@@ -26,6 +27,7 @@ export class ImageInputHandler implements InputHandler {
       maxDimension?: number;
       maxPixels?: number;
       signal?: AbortSignal;
+      log?: FastifyBaseLogger;
     },
   ): Promise<PreparedInput> {
     let fileBuffer = raw;
@@ -173,7 +175,7 @@ export class ImageInputHandler implements InputHandler {
     // the EXIF orientation tag so the worker sees upright pixels.
     if (!isSvg) {
       opts.signal?.throwIfAborted();
-      fileBuffer = await autoOrient(fileBuffer);
+      fileBuffer = await autoOrient(fileBuffer, opts.log);
       opts.signal?.throwIfAborted();
     }
 
