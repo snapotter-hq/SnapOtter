@@ -4570,6 +4570,7 @@ export const pl: TranslationKeys = {
         "Uwierzytelnianie dwuskładnikowe zmieniono w innym oknie. Odśwież stronę i spróbuj ponownie.",
       twoFactorUnreadable:
         "Serwer nie może odczytać ustawień uwierzytelniania dwuskładnikowego. Skontaktuj się z administratorem.",
+      ssoNeedsProvider: "Aby wymusić SSO, najpierw skonfiguruj dostawcę OIDC lub SAML.",
     },
     people: {
       heading: "Użytkownicy",
@@ -4629,6 +4630,8 @@ export const pl: TranslationKeys = {
       usernameTaken: "Ta nazwa użytkownika jest już zajęta",
       lastAdmin: "Zawsze musi być co najmniej jeden administrator",
       cannotDeleteSelf: "Nie można usunąć własnego konta",
+      usernameInvalid:
+        "Nazwa użytkownika musi mieć od 3 do 50 znaków i może zawierać tylko a-z, A-Z, 0-9, kropki, łączniki i podkreślenia",
     },
     teams: {
       heading: "Zespoły",
@@ -4707,6 +4710,9 @@ export const pl: TranslationKeys = {
         teams: "Zespoły",
         system: "System",
       },
+      nameInvalid:
+        "Nazwa roli musi mieć od 2 do 30 znaków i może zawierać tylko a-z, 0-9, łączniki i podkreślenia",
+      permissionsRequired: "Wybierz co najmniej jedno uprawnienie",
     },
     auditLog: {
       heading: "Dziennik audytu",
@@ -4850,6 +4856,8 @@ export const pl: TranslationKeys = {
       resetFailed: "Resetowanie nie powiodło się: {error}",
       resetVenvKept:
         "Współdzielone środowisko Python pozostało nietknięte: ta instalacja nie zawiera dołączonej bazy, z której można je odtworzyć. Modele, pamięć podręczna pobierania i wpisy instalacji zostały wyczyszczone. Odtwórz to środowisko samodzielnie, jeśli problemem jest nieaktualny pakiet w środku.",
+      importBusy: "Trwa już inna instalacja lub import. Spróbuj ponownie po ich zakończeniu.",
+      importNoSpace: "Na serwerze brakuje miejsca na dysku na ten pakiet.",
     },
     about: {
       heading: "Informacje",
@@ -5215,8 +5223,11 @@ export const pl: TranslationKeys = {
     passwordNeedsDigit: "Hasło musi zawierać cyfrę.",
     passwordNeedsSpecial: "Hasło musi zawierać znak specjalny.",
     tooManyRequests: "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
-    escalationDenied: "Nie możesz nadać roli ani uprawnień wykraczających poza własne.",
+    escalationDenied: "To wymaga szerszego dostępu, niż ma twoja rola.",
     featureNotLicensed: "Wymaga to licencji enterprise.",
+    sessionEnded: "Twoja sesja wygasła. Zaloguj się ponownie.",
+    forbidden: "Nie masz uprawnień, aby to zrobić.",
+    invalidSetting: "Nieprawidłowa wartość: {setting}.",
   },
   sidebar: {
     sponsor: "Wesprzyj nas",

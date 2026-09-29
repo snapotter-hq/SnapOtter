@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { Permission } from "@snapotter/shared";
+import {
+  normalizeRoleName,
+  type Permission,
+  ROLE_NAME_MAX_LENGTH,
+  ROLE_NAME_MIN_LENGTH,
+  ROLE_NAME_PATTERN,
+} from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -35,14 +41,14 @@ const ALL_PERMISSIONS: Permission[] = [
 
 const roleNameField = z
   .string()
-  .transform((v) => v.trim().toLowerCase())
+  .transform(normalizeRoleName)
   .pipe(
     z
       .string()
-      .min(2, "Role name must be 2-30 characters")
-      .max(30, "Role name must be 2-30 characters")
+      .min(ROLE_NAME_MIN_LENGTH, "Role name must be 2-30 characters")
+      .max(ROLE_NAME_MAX_LENGTH, "Role name must be 2-30 characters")
       .regex(
-        /^[a-z0-9_-]+$/,
+        ROLE_NAME_PATTERN,
         "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
       ),
   );

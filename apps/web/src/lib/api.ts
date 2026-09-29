@@ -1,3 +1,4 @@
+import type { TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
 import { useConnectionStore } from "@/stores/connection-store";
@@ -93,15 +94,31 @@ export class ApiError extends Error {
 
 /**
  * Translated copy for a failed request: the message `byCode` gives the
- * error's code, else `fallback`. Never the server's English text (#1445).
+ * error's code, then the refusals any request can meet (an ended session,
+ * a missing permission, a rate limit), else `fallback`. Never the server's
+ * English text (#1445).
  */
 export function apiErrorMessage(
+  t: TranslationKeys,
   err: unknown,
   byCode: Partial<Record<string, string>>,
   fallback: string,
 ): string {
-  const code = err instanceof ApiError ? err.code : undefined;
-  return (code !== undefined && byCode[code]) || fallback;
+  if (err instanceof ApiError) {
+    const byAnyCode: Partial<Record<string, string>> = {
+      AUTH_REQUIRED: t.errors.sessionEnded,
+      FORBIDDEN: t.errors.forbidden,
+      ...byCode,
+    };
+    const mapped = err.code !== undefined ? byAnyCode[err.code] : undefined;
+    if (mapped) return mapped;
+    // A rate limiter's 429 carries no code.
+    if (err.status === 429) return t.errors.tooManyRequests;
+  }
+  // The screen shows only the translated fallback, so keep the server's
+  // reason where someone debugging can find it.
+  console.warn("Request failed:", err);
+  return fallback;
 }
 
 async function throwWithMessage(res: Response): Promise<never> {

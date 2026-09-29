@@ -19,6 +19,7 @@ function mfaErrorMessage(
   // A plain rate-limit 429 carries no code.
   if (err instanceof ApiError && err.status === 429) return t.auth.mfaThrottledUnknownWait;
   return apiErrorMessage(
+    t,
     err,
     {
       INVALID_CODE: t.auth.mfaInvalidCode,

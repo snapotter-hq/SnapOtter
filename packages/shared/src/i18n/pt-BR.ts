@@ -4570,9 +4570,10 @@ export const ptBR: TranslationKeys = {
       securitySettingsFailed: "Falha ao salvar configurações de segurança",
       adminSettingsLoadFailed: "Não foi possível carregar as configurações de segurança.",
       twoFactorStateChanged:
-        "A autenticação em dois fatores foi alterada em outra janela. Recarregue e tente novamente.",
+        "A autenticação de dois fatores foi alterada em outra janela. Recarregue e tente novamente.",
       twoFactorUnreadable:
-        "O servidor não consegue ler suas configurações de autenticação em dois fatores. Fale com um administrador.",
+        "O servidor não consegue ler suas configurações de autenticação de dois fatores. Fale com um administrador.",
+      ssoNeedsProvider: "Para a imposição de SSO, configure primeiro um provedor OIDC ou SAML.",
     },
     people: {
       heading: "Pessoas",
@@ -4630,6 +4631,8 @@ export const ptBR: TranslationKeys = {
       usernameTaken: "Esse nome de usuário já está em uso",
       lastAdmin: "Sempre deve haver pelo menos um administrador",
       cannotDeleteSelf: "Não é possível excluir sua própria conta",
+      usernameInvalid:
+        "O nome de usuário deve ter de 3 a 50 caracteres e usar apenas a-z, A-Z, 0-9, pontos, hifens e sublinhados",
     },
     teams: {
       heading: "Equipes",
@@ -4708,6 +4711,9 @@ export const ptBR: TranslationKeys = {
         teams: "Equipes",
         system: "Sistema",
       },
+      nameInvalid:
+        "O nome da função deve ter de 2 a 30 caracteres e usar apenas a-z, 0-9, hifens e sublinhados",
+      permissionsRequired: "Escolha pelo menos uma permissão",
     },
     auditLog: {
       heading: "Registro de auditoria",
@@ -4850,6 +4856,9 @@ export const ptBR: TranslationKeys = {
       resetFailed: "Falha ao redefinir: {error}",
       resetVenvKept:
         "O ambiente Python compartilhado foi mantido: esta instalação não tem uma base incluída para reconstruí-lo. Os modelos, o cache de download e os registros de instalação foram apagados. Recrie esse ambiente você mesmo se o problema for um pacote desatualizado nele.",
+      importBusy:
+        "Outra instalação ou importação já está em andamento. Tente novamente quando terminar.",
+      importNoSpace: "O servidor não tem espaço em disco suficiente para este pacote.",
     },
     about: {
       heading: "Sobre",
@@ -5214,8 +5223,11 @@ export const ptBR: TranslationKeys = {
     passwordNeedsDigit: "A senha deve conter um número.",
     passwordNeedsSpecial: "A senha deve conter um caractere especial.",
     tooManyRequests: "Muitas tentativas. Aguarde um minuto e tente novamente.",
-    escalationDenied: "Você não pode conceder uma função ou permissões acima das suas.",
+    escalationDenied: "Isso exige mais acesso do que sua função tem.",
     featureNotLicensed: "Isso requer uma licença empresarial.",
+    sessionEnded: "Sua sessão terminou. Entre novamente.",
+    forbidden: "Você não tem permissão para fazer isso.",
+    invalidSetting: "Valor inválido para {setting}.",
   },
   sidebar: {
     sponsor: "Apoie-nos",

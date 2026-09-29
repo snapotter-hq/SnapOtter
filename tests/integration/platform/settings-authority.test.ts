@@ -239,6 +239,8 @@ describe("generic settings authority", () => {
 
     expect.soft(res.statusCode, res.body).toBe(400);
     expect.soft(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    // Named so the client can say which field is wrong in its own language (#1445).
+    expect.soft(JSON.parse(res.body).setting).toBe("loginAttemptLimit");
     expect(await readSetting("loginAttemptLimit")).toBe("5");
   });
 
@@ -350,6 +352,7 @@ describe("generic settings authority", () => {
 
     expect.soft(res.statusCode, res.body).toBe(400);
     expect.soft(JSON.parse(res.body).code).toBe("UNKNOWN_SETTING");
+    expect.soft(JSON.parse(res.body).setting).toBe(unknownKey);
     expect(await readSetting(unknownKey)).toBeUndefined();
   });
 

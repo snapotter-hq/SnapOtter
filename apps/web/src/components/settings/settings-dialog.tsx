@@ -1,4 +1,14 @@
-import { APP_VERSION, CATEGORIES, SUPPORTED_LOCALES, TOOLS } from "@snapotter/shared";
+import {
+  APP_VERSION,
+  CATEGORIES,
+  isValidRoleName,
+  isValidUsername,
+  normalizeRoleName,
+  SUPPORTED_LOCALES,
+  TEAM_NAME_MAX_LENGTH,
+  TOOLS,
+  type TranslationKeys,
+} from "@snapotter/shared";
 import {
   BarChart3,
   Check,
@@ -1082,6 +1092,22 @@ export function SecuritySection() {
   );
 }
 
+/** What the Security tab calls each setting it saves, to name one the server refused. */
+function securitySettingLabel(t: TranslationKeys, key: string): string | undefined {
+  const labels: Partial<Record<string, string>> = {
+    sessionIdleTimeoutMinutes: t.settings.security.sessionIdleTimeout,
+    maxSessionsPerUser: t.settings.security.maxSessionsPerUser,
+    mfaPolicy: t.settings.security.mfaPolicy,
+    ssoEnforcement: t.settings.security.ssoEnforcement,
+    ssoBreakGlassUsername: t.settings.security.ssoBreakGlassUsername,
+    passwordMinLength: t.settings.security.passwordMinLength,
+    passwordRequireUppercase: t.settings.security.passwordRequireUppercase,
+    passwordRequireDigit: t.settings.security.passwordRequireNumber,
+    passwordRequireSpecial: t.settings.security.passwordRequireSpecial,
+  };
+  return labels[key];
+}
+
 export function AdminSecuritySettings() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -1125,13 +1151,23 @@ export function AdminSecuritySettings() {
       originalSettingsRef.current = { ...settings };
       setSaveMsg({ type: "success", text: t.settings.security.securitySettingsSaved });
     } catch (err) {
+      // A refused value comes back with the setting's key: name its row.
+      const refused =
+        err instanceof ApiError && typeof err.body.setting === "string"
+          ? securitySettingLabel(t, err.body.setting)
+          : undefined;
       setSaveMsg({
         type: "error",
         text: apiErrorMessage(
+          t,
           err,
           {
             FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
             ESCALATION_DENIED: t.errors.escalationDenied,
+            DEPENDENCY_VALIDATION_FAILED: t.settings.security.ssoNeedsProvider,
+            ...(refused && {
+              VALIDATION_ERROR: format(t.errors.invalidSetting, { setting: refused }),
+            }),
           },
           t.settings.security.securitySettingsFailed,
         ),
@@ -1513,6 +1549,11 @@ export function PeopleSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       setAddError(null);
+      // The server's refusal names no rule, so check here and say which (#1445).
+      if (!isValidUsername(newUsername)) {
+        setAddError(t.settings.people.usernameInvalid);
+        return;
+      }
       setAdding(true);
       try {
         await apiPost("/auth/register", {
@@ -1534,6 +1575,7 @@ export function PeopleSection() {
         setAddError(
           (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
             apiErrorMessage(
+              t,
               err,
               {
                 USER_LIMIT_REACHED: format(t.settings.people.userLimitReached, { max: maxUsers }),
@@ -1565,6 +1607,7 @@ export function PeopleSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
             {
               SELF_DELETE: t.settings.people.cannotDeleteSelf,
@@ -1596,6 +1639,7 @@ export function PeopleSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
             {
               SELF_DEMOTE: t.settings.people.cannotRemoveOwnAdmin,
@@ -1628,6 +1672,7 @@ export function PeopleSection() {
           text:
             (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
             apiErrorMessage(
+              t,
               err,
               { ESCALATION_DENIED: t.errors.escalationDenied },
               t.settings.people.resetFailed,
@@ -2506,8 +2551,13 @@ export function TeamsSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
-            { CONFLICT: t.settings.teams.duplicateName },
+            {
+              CONFLICT: t.settings.teams.duplicateName,
+              // Blank names never leave the form, so length is the only rule left.
+              VALIDATION_ERROR: t.settings.teams.nameTooLong,
+            },
             t.settings.teams.createFailed,
           ),
         });
@@ -2532,8 +2582,12 @@ export function TeamsSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
-            { CONFLICT: t.settings.teams.duplicateName },
+            {
+              CONFLICT: t.settings.teams.duplicateName,
+              VALIDATION_ERROR: t.settings.teams.nameTooLong,
+            },
             t.settings.teams.renameFailed,
           ),
         });
@@ -2548,7 +2602,7 @@ export function TeamsSection() {
       if (!confirm(format(t.settings.teams.deleteConfirm, { name }))) return;
       try {
         await apiDelete(`/v1/teams/${id}`);
-        setActionMsg({ type: "success", text: `Team "${name}" deleted` });
+        setActionMsg({ type: "success", text: format(t.settings.teams.deleteSuccess, { name }) });
         await loadTeams();
       } catch (err) {
         // Both refusals (the Default team, a team with members) are 400s with
@@ -2556,6 +2610,7 @@ export function TeamsSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
             { VALIDATION_ERROR: t.settings.teams.cannotDeleteDefault },
             t.settings.teams.deleteFailed,
@@ -2597,7 +2652,7 @@ export function TeamsSection() {
       } catch (err) {
         setActionMsg({
           type: "error",
-          text: apiErrorMessage(err, {}, t.settings.teams.quotaSaveFailed),
+          text: apiErrorMessage(t, err, {}, t.settings.teams.quotaSaveFailed),
         });
       } finally {
         setSavingQuota(false);
@@ -2659,6 +2714,7 @@ export function TeamsSection() {
               onChange={(e) => setNewTeamName(e.target.value)}
               placeholder={t.settings.teams.teamNamePlaceholder}
               required
+              maxLength={TEAM_NAME_MAX_LENGTH}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground flex-1"
             />
             <button
@@ -2718,6 +2774,7 @@ export function TeamsSection() {
                         type="text"
                         value={editingTeamName}
                         onChange={(e) => setEditingTeamName(e.target.value)}
+                        maxLength={TEAM_NAME_MAX_LENGTH}
                         className="px-2 py-1 rounded border border-border bg-background text-sm text-foreground w-40"
                         ref={(el) => el?.focus()}
                         onKeyDown={(e) => {
@@ -2959,9 +3016,20 @@ export function RolesSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newName.trim()) return;
+      // The server's refusals for these name no rule, so check here (#1445).
+      const invalid = !isValidRoleName(newName)
+        ? t.settings.roles.nameInvalid
+        : newPermissions.length === 0
+          ? t.settings.roles.permissionsRequired
+          : null;
+      if (invalid) {
+        setActionMsg({ type: "error", text: invalid });
+        setTimeout(() => setActionMsg(null), 3000);
+        return;
+      }
       try {
         await apiPost("/v1/roles", {
-          name: newName.trim().toLowerCase(),
+          name: normalizeRoleName(newName),
           description: newDescription.trim(),
           permissions: newPermissions,
         });
@@ -2975,6 +3043,7 @@ export function RolesSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
             {
               CONFLICT: t.settings.roles.duplicateRoleError,
@@ -2993,9 +3062,14 @@ export function RolesSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRole) return;
+      if (!isValidRoleName(editName)) {
+        setActionMsg({ type: "error", text: t.settings.roles.nameInvalid });
+        setTimeout(() => setActionMsg(null), 3000);
+        return;
+      }
       try {
         await apiPut(`/v1/roles/${editingRole.id}`, {
-          name: editName.trim().toLowerCase(),
+          name: normalizeRoleName(editName),
           description: editDescription.trim(),
           permissions: editPermissions,
         });
@@ -3006,6 +3080,7 @@ export function RolesSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
             {
               CONFLICT: t.settings.roles.duplicateRoleError,
@@ -3038,6 +3113,7 @@ export function RolesSection() {
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
+            t,
             err,
             { ESCALATION_DENIED: t.errors.escalationDenied },
             t.settings.roles.deleteFailed,
@@ -3113,6 +3189,7 @@ export function RolesSection() {
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               placeholder={t.settings.roles.descriptionPlaceholder}
+              maxLength={500}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
             />
           </div>
@@ -3185,6 +3262,7 @@ export function RolesSection() {
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               placeholder={t.settings.roles.descriptionPlaceholder}
+              maxLength={500}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
             />
           </div>

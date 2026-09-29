@@ -1,6 +1,12 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { ANALYTICS_EVENTS, type PasswordRule } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  type PasswordRule,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from "@snapotter/shared";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -136,10 +142,10 @@ function weakPasswordBody({ message, rule, minLength }: PasswordRuleFailure) {
 }
 
 function validateUsername(username: string): string | null {
-  if (username.length < 3 || username.length > 50) {
+  if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
     return "Username must be between 3 and 50 characters";
   }
-  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+  if (!USERNAME_PATTERN.test(username)) {
     return "Username can only contain letters, numbers, dots, hyphens, and underscores";
   }
   return null;

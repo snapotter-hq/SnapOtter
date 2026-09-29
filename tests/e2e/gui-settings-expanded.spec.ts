@@ -801,6 +801,12 @@ test.describe("Settings Roles Tab - Extended custom role management", () => {
       // Try to create same role via GUI
       await page.getByRole("button", { name: /create custom role/i }).click();
       await page.getByPlaceholder("Role name").fill(roleName);
+      // A role needs a permission, or the form stops before the name is checked.
+      await page
+        .locator("label")
+        .filter({ hasText: "tools:use" })
+        .locator("input[type='checkbox']")
+        .check();
       await page.getByRole("button", { name: /^create$/i }).click();
 
       // Should show duplicate error

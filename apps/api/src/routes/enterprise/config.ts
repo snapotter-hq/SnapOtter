@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  normalizeRoleName,
+  ROLE_NAME_MAX_LENGTH,
+  ROLE_NAME_MIN_LENGTH,
+  ROLE_NAME_PATTERN,
+} from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -18,14 +24,14 @@ const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
 const roleNameField = z
   .string()
-  .transform((value) => value.trim().toLowerCase())
+  .transform(normalizeRoleName)
   .pipe(
     z
       .string()
-      .min(2, "Role name must be 2-30 characters")
-      .max(30, "Role name must be 2-30 characters")
+      .min(ROLE_NAME_MIN_LENGTH, "Role name must be 2-30 characters")
+      .max(ROLE_NAME_MAX_LENGTH, "Role name must be 2-30 characters")
       .regex(
-        /^[a-z0-9_-]+$/,
+        ROLE_NAME_PATTERN,
         "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
       ),
   );

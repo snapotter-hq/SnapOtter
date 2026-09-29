@@ -4570,6 +4570,8 @@ export const tr: TranslationKeys = {
         "İki faktörlü kimlik doğrulama başka bir pencerede değiştirildi. Sayfayı yenileyip tekrar deneyin.",
       twoFactorUnreadable:
         "Sunucu iki faktörlü kimlik doğrulama ayarlarınızı okuyamıyor. Bir yöneticiye başvurun.",
+      ssoNeedsProvider:
+        "SSO zorunluluğu için önce bir OIDC veya SAML sağlayıcısı yapılandırılmalıdır.",
     },
     people: {
       heading: "Kişiler",
@@ -4629,6 +4631,8 @@ export const tr: TranslationKeys = {
       usernameTaken: "Bu kullanıcı adı zaten alınmış",
       lastAdmin: "Her zaman en az bir yönetici olmalıdır",
       cannotDeleteSelf: "Kendi hesabınızı silemezsiniz",
+      usernameInvalid:
+        "Kullanıcı adı 3 ile 50 karakter arasında olmalı ve yalnızca a-z, A-Z, 0-9, nokta, kısa çizgi ve alt çizgi içermelidir",
     },
     teams: {
       heading: "Takımlar",
@@ -4706,6 +4710,9 @@ export const tr: TranslationKeys = {
         teams: "Takımlar",
         system: "Sistem",
       },
+      nameInvalid:
+        "Rol adı 2 ile 30 karakter arasında olmalı ve yalnızca a-z, 0-9, kısa çizgi ve alt çizgi içermelidir",
+      permissionsRequired: "En az bir izin seçin",
     },
     auditLog: {
       heading: "Denetim Günlüğü",
@@ -4847,6 +4854,8 @@ export const tr: TranslationKeys = {
       resetFailed: "Sıfırlama başarısız oldu: {error}",
       resetVenvKept:
         "Paylaşılan Python ortamı olduğu gibi bırakıldı: bu kurulumda ortamı yeniden oluşturacak paketlenmiş bir temel yok. Modeller, indirme önbelleği ve kurulum kayıtları temizlendi. Sorun ortamdaki eski bir paketse, o ortamı kendiniz yeniden oluşturun.",
+      importBusy: "Başka bir kurulum veya içe aktarma zaten sürüyor. Bittiğinde tekrar deneyin.",
+      importNoSpace: "Sunucuda bu paket için yeterli disk alanı yok.",
     },
     about: {
       heading: "Hakkında",
@@ -5211,8 +5220,11 @@ export const tr: TranslationKeys = {
     passwordNeedsDigit: "Parola bir rakam içermelidir.",
     passwordNeedsSpecial: "Parola bir özel karakter içermelidir.",
     tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
-    escalationDenied: "Kendi yetkilerinizin ötesinde bir rol veya izin veremezsiniz.",
+    escalationDenied: "Bu işlem, rolünüzün sahip olduğundan daha fazla erişim gerektirir.",
     featureNotLicensed: "Bunun için kurumsal lisans gerekir.",
+    sessionEnded: "Oturumunuz sona erdi. Yeniden oturum açın.",
+    forbidden: "Bunu yapma izniniz yok.",
+    invalidSetting: "{setting} için geçersiz değer.",
   },
   sidebar: {
     sponsor: "Bize destek olun",

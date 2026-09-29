@@ -135,6 +135,27 @@ describe("offline AI bundle import", () => {
     expect(indexInput.files).toHaveLength(1);
     expect(archiveInput.files).toHaveLength(1);
   });
+
+  it.each([
+    [409, en.settings.aiFeatures.importBusy],
+    [507, en.settings.aiFeatures.importNoSpace],
+  ])("words a %s by its status, not the server's English (#1445)", async (status, expected) => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status,
+      json: async () => ({ error: "SERVER-TEXT" }),
+    });
+    renderSection();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Legacy AI bundle" }));
+    fireEvent.change(screen.getByLabelText("Legacy bundle archive (.tar.gz)"), {
+      target: { files: [new File(["legacy"], "legacy-bundle.tar.gz")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(expected);
+    expect(screen.queryByText(/SERVER-TEXT/)).toBeNull();
+  });
 });
 
 describe("AI environment reset", () => {

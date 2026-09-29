@@ -4510,9 +4510,11 @@ export const ja: TranslationKeys = {
       securitySettingsFailed: "セキュリティ設定の保存に失敗しました",
       adminSettingsLoadFailed: "セキュリティ設定を読み込めませんでした。",
       twoFactorStateChanged:
-        "二要素認証が別のウィンドウで変更されました。再読み込みしてもう一度お試しください。",
+        "2 要素認証が別のウィンドウで変更されました。再読み込みしてもう一度お試しください。",
       twoFactorUnreadable:
-        "サーバーで二要素認証の設定を読み取れません。管理者に問い合わせてください。",
+        "サーバーで 2 要素認証の設定を読み取れません。管理者に問い合わせてください。",
+      ssoNeedsProvider:
+        "SSO を強制するには、先に OIDC または SAML プロバイダーを設定してください。",
     },
     people: {
       heading: "メンバー",
@@ -4571,6 +4573,8 @@ export const ja: TranslationKeys = {
       usernameTaken: "このユーザー名は既に使われています",
       lastAdmin: "管理者は常に1人以上必要です",
       cannotDeleteSelf: "自分のアカウントは削除できません",
+      usernameInvalid:
+        "ユーザー名は 3〜50 文字で、a-z、A-Z、0-9、ドット、ハイフン、アンダースコアのみ使用できます",
     },
     teams: {
       heading: "チーム",
@@ -4646,6 +4650,8 @@ export const ja: TranslationKeys = {
         teams: "チーム",
         system: "システム",
       },
+      nameInvalid: "ロール名は 2〜30 文字で、a-z、0-9、ハイフン、アンダースコアのみ使用できます",
+      permissionsRequired: "権限を 1 つ以上選択してください",
     },
     auditLog: {
       heading: "監査ログ",
@@ -4784,6 +4790,10 @@ export const ja: TranslationKeys = {
       resetFailed: "リセットに失敗しました: {error}",
       resetVenvKept:
         "共有のPython環境はそのまま残しました。このインストールには、環境を作り直すための同梱のベースがありません。モデル、ダウンロードキャッシュ、インストール記録は削除済みです。環境内の古いパッケージが原因の場合は、その環境をご自身で作り直してください。",
+      importBusy:
+        "別のインストールまたはインポートが実行中です。完了してからもう一度お試しください。",
+      importNoSpace:
+        "サーバーのディスク容量が不足しているため、このバンドルをインポートできません。",
     },
     about: {
       heading: "SnapOtterについて",
@@ -5148,8 +5158,11 @@ export const ja: TranslationKeys = {
     passwordNeedsDigit: "パスワードには数字を含める必要があります。",
     passwordNeedsSpecial: "パスワードには特殊文字を含める必要があります。",
     tooManyRequests: "試行回数が多すぎます。1分待ってからもう一度お試しください。",
-    escalationDenied: "自分の権限を超えるロールや権限は付与できません。",
+    escalationDenied: "この操作には、あなたのロールを超える権限が必要です。",
     featureNotLicensed: "エンタープライズライセンスが必要です。",
+    sessionEnded: "セッションが終了しました。もう一度サインインしてください。",
+    forbidden: "この操作を行う権限がありません。",
+    invalidSetting: "{setting} の値が無効です。",
   },
   sidebar: {
     sponsor: "支援する",

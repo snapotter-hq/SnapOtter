@@ -4579,6 +4579,7 @@ export const it: TranslationKeys = {
         "L'autenticazione a due fattori è cambiata in un'altra finestra. Ricarica e riprova.",
       twoFactorUnreadable:
         "Il server non riesce a leggere le tue impostazioni di autenticazione a due fattori. Rivolgiti a un amministratore.",
+      ssoNeedsProvider: "Per l'applicazione SSO devi prima configurare un provider OIDC o SAML.",
     },
     people: {
       heading: "Persone",
@@ -4638,6 +4639,8 @@ export const it: TranslationKeys = {
       usernameTaken: "Questo nome utente è già in uso",
       lastAdmin: "Deve esserci sempre almeno un amministratore",
       cannotDeleteSelf: "Non è possibile eliminare il proprio account",
+      usernameInvalid:
+        "Il nome utente deve avere da 3 a 50 caratteri e usare solo a-z, A-Z, 0-9, punti, trattini e trattini bassi",
     },
     teams: {
       heading: "Team",
@@ -4715,6 +4718,9 @@ export const it: TranslationKeys = {
         teams: "Team",
         system: "Sistema",
       },
+      nameInvalid:
+        "Il nome del ruolo deve avere da 2 a 30 caratteri e usare solo a-z, 0-9, trattini e trattini bassi",
+      permissionsRequired: "Scegli almeno un permesso",
     },
     auditLog: {
       heading: "Registro di audit",
@@ -4857,6 +4863,9 @@ export const it: TranslationKeys = {
       resetFailed: "Ripristino non riuscito: {error}",
       resetVenvKept:
         "L'ambiente Python condiviso è stato lasciato invariato: questa installazione non ha una base inclusa da cui ricostruirlo. Modelli, cache dei download e registri di installazione sono stati cancellati. Ricrea tu stesso quell'ambiente se il problema è un pacchetto obsoleto al suo interno.",
+      importBusy:
+        "È già in corso un'altra installazione o importazione. Riprova quando sarà terminata.",
+      importNoSpace: "Il server non ha abbastanza spazio su disco per questo bundle.",
     },
     about: {
       heading: "Informazioni",
@@ -5220,8 +5229,11 @@ export const it: TranslationKeys = {
     passwordNeedsDigit: "La password deve contenere un numero.",
     passwordNeedsSpecial: "La password deve contenere un carattere speciale.",
     tooManyRequests: "Troppi tentativi. Attendi un minuto e riprova.",
-    escalationDenied: "Non puoi assegnare un ruolo o permessi superiori ai tuoi.",
+    escalationDenied: "Serve un accesso superiore a quello del tuo ruolo.",
     featureNotLicensed: "Serve una licenza enterprise.",
+    sessionEnded: "La sessione è scaduta. Accedi di nuovo.",
+    forbidden: "Non hai il permesso di farlo.",
+    invalidSetting: "Valore non valido per {setting}.",
   },
   sidebar: {
     sponsor: "Sostienici",

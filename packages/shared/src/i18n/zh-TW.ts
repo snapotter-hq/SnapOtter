@@ -4286,8 +4286,9 @@ export const zhTW: TranslationKeys = {
       securitySettingsSaved: "安全設定已儲存",
       securitySettingsFailed: "儲存安全設定失敗",
       adminSettingsLoadFailed: "無法載入安全設定。",
-      twoFactorStateChanged: "雙重驗證已在另一個視窗中變更。請重新載入後再試一次。",
-      twoFactorUnreadable: "伺服器無法讀取你的雙重驗證設定。請聯絡管理員。",
+      twoFactorStateChanged: "兩步驟驗證已在另一個視窗中變更。請重新載入後再試一次。",
+      twoFactorUnreadable: "伺服器無法讀取您的兩步驟驗證設定。請聯絡管理員。",
+      ssoNeedsProvider: "若要啟用 SSO 強制執行，請先設定 OIDC 或 SAML 提供者。",
     },
     people: {
       heading: "成員",
@@ -4345,6 +4346,7 @@ export const zhTW: TranslationKeys = {
       usernameTaken: "此使用者名稱已被使用",
       lastAdmin: "必須始終保留至少一位管理員",
       cannotDeleteSelf: "無法刪除自己的帳戶",
+      usernameInvalid: "使用者名稱須為 3 到 50 個字元，只能包含 a-z、A-Z、0-9、句點、連字號和底線",
     },
     teams: {
       heading: "團隊",
@@ -4420,6 +4422,8 @@ export const zhTW: TranslationKeys = {
         teams: "團隊",
         system: "系統",
       },
+      nameInvalid: "角色名稱須為 2 到 30 個字元，只能包含 a-z、0-9、連字號和底線",
+      permissionsRequired: "請至少選擇一項權限",
     },
     auditLog: {
       heading: "稽核記錄",
@@ -4555,6 +4559,8 @@ export const zhTW: TranslationKeys = {
       resetFailed: "重設失敗：{error}",
       resetVenvKept:
         "共用的 Python 環境已原樣保留：此安裝沒有可用於重建它的內建基礎套件。模型、下載快取與安裝記錄已清除。若問題出在其中某個過時的套件，請你自行重建該環境。",
+      importBusy: "另一個安裝或匯入正在進行中。請在完成後再試一次。",
+      importNoSpace: "伺服器磁碟空間不足，無法匯入此套件。",
     },
     about: {
       heading: "關於",
@@ -4907,8 +4913,11 @@ export const zhTW: TranslationKeys = {
     passwordNeedsDigit: "密碼必須包含一個數字。",
     passwordNeedsSpecial: "密碼必須包含一個特殊字元。",
     tooManyRequests: "嘗試次數過多。請等待一分鐘後再試一次。",
-    escalationDenied: "無法授予超出自身權限的角色或權限。",
+    escalationDenied: "此操作需要超出您角色的權限。",
     featureNotLicensed: "這需要企業版授權。",
+    sessionEnded: "您的工作階段已結束。請重新登入。",
+    forbidden: "您沒有執行此操作的權限。",
+    invalidSetting: "{setting} 的值無效。",
   },
   sidebar: {
     sponsor: "支持我們",

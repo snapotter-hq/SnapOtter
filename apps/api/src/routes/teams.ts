@@ -8,6 +8,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { TEAM_NAME_MAX_LENGTH } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -23,7 +24,7 @@ const teamBodySchema = z.object({
       z
         .string()
         .min(1, "Team name is required")
-        .max(50, "Team name must be 50 characters or fewer"),
+        .max(TEAM_NAME_MAX_LENGTH, "Team name must be 50 characters or fewer"),
     ),
   storageQuota: z.number().int().positive().nullable().optional(),
   retentionHours: z.number().int().positive().nullable().optional(),

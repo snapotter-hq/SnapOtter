@@ -4,7 +4,8 @@
  * stays the server's text for callers that haven't moved over.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { en } from "@snapotter/shared";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiErrorMessage, apiPost } from "@/lib/api";
 
 afterEach(() => {
@@ -46,14 +47,50 @@ describe("ApiError (#1445)", () => {
       body: {},
     });
   });
+});
 
-  it("apiErrorMessage picks by code and falls back otherwise", () => {
-    const conflict = new ApiError("English", 409, "CONFLICT", {});
-    expect(apiErrorMessage(conflict, { CONFLICT: "taken" }, "fallback")).toBe("taken");
-    expect(apiErrorMessage(conflict, {}, "fallback")).toBe("fallback");
-    expect(apiErrorMessage(new ApiError("English", 500, undefined, {}), {}, "fallback")).toBe(
-      "fallback",
+describe("apiErrorMessage (#1445)", () => {
+  const err = (status: number, code?: string) => new ApiError("English", status, code, {});
+
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("picks the screen's message for the code", () => {
+    expect(apiErrorMessage(en, err(409, "CONFLICT"), { CONFLICT: "taken" }, "fallback")).toBe(
+      "taken",
     );
-    expect(apiErrorMessage(new Error("plain"), { CONFLICT: "taken" }, "fallback")).toBe("fallback");
+  });
+
+  it("answers the refusals any request can meet", () => {
+    expect(apiErrorMessage(en, err(401, "AUTH_REQUIRED"), {}, "fallback")).toBe(
+      en.errors.sessionEnded,
+    );
+    expect(apiErrorMessage(en, err(403, "FORBIDDEN"), {}, "fallback")).toBe(en.errors.forbidden);
+    expect(apiErrorMessage(en, err(429), {}, "fallback")).toBe(en.errors.tooManyRequests);
+  });
+
+  it("lets a screen word those refusals its own way", () => {
+    expect(apiErrorMessage(en, err(403, "FORBIDDEN"), { FORBIDDEN: "mine" }, "fallback")).toBe(
+      "mine",
+    );
+  });
+
+  it.each([
+    ["an unmapped code", err(409, "CONFLICT")],
+    ["no code", err(500)],
+    ["a plain Error", new Error("plain")],
+  ])("falls back for %s and logs the reason", (_case, error) => {
+    expect(apiErrorMessage(en, error, {}, "fallback")).toBe("fallback");
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), error);
+  });
+
+  it("logs nothing when it has a message", () => {
+    apiErrorMessage(en, err(409, "CONFLICT"), { CONFLICT: "taken" }, "fallback");
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });

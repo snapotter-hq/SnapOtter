@@ -4589,6 +4589,8 @@ export const fr: TranslationKeys = {
         "L'authentification à deux facteurs a été modifiée dans une autre fenêtre. Rechargez la page et réessayez.",
       twoFactorUnreadable:
         "Le serveur ne parvient pas à lire vos paramètres d'authentification à deux facteurs. Contactez un administrateur.",
+      ssoNeedsProvider:
+        "Pour l'application du SSO, configurez d'abord un fournisseur OIDC ou SAML.",
     },
     people: {
       heading: "Personnes",
@@ -4647,6 +4649,8 @@ export const fr: TranslationKeys = {
       usernameTaken: "Ce nom d'utilisateur est déjà pris",
       lastAdmin: "Il doit toujours y avoir au moins un administrateur",
       cannotDeleteSelf: "Vous ne pouvez pas supprimer votre propre compte",
+      usernameInvalid:
+        "Le nom d'utilisateur doit compter de 3 à 50 caractères et n'utiliser que a-z, A-Z, 0-9, points, tirets et traits de soulignement",
     },
     teams: {
       heading: "Équipes",
@@ -4726,6 +4730,9 @@ export const fr: TranslationKeys = {
         teams: "Équipes",
         system: "Système",
       },
+      nameInvalid:
+        "Le nom du rôle doit compter de 2 à 30 caractères et n'utiliser que a-z, 0-9, tirets et traits de soulignement",
+      permissionsRequired: "Choisissez au moins une permission",
     },
     auditLog: {
       heading: "Journal d'audit",
@@ -4867,6 +4874,9 @@ export const fr: TranslationKeys = {
       resetFailed: "Échec de la réinitialisation : {error}",
       resetVenvKept:
         "L'environnement Python partagé a été conservé : cette installation ne dispose d'aucune base fournie permettant de le reconstruire. Les modèles, le cache de téléchargement et les enregistrements d'installation ont été effacés. Recréez cet environnement vous-même si un paquet obsolète qu'il contient est à l'origine du problème.",
+      importBusy:
+        "Une autre installation ou importation est déjà en cours. Réessayez une fois qu'elle sera terminée.",
+      importNoSpace: "Le serveur n'a pas assez d'espace disque pour ce bundle.",
     },
     about: {
       heading: "À propos",
@@ -5234,9 +5244,11 @@ export const fr: TranslationKeys = {
     passwordNeedsDigit: "Le mot de passe doit contenir un chiffre.",
     passwordNeedsSpecial: "Le mot de passe doit contenir un caractère spécial.",
     tooManyRequests: "Trop de tentatives. Patientez une minute puis réessayez.",
-    escalationDenied:
-      "Vous ne pouvez pas attribuer un rôle ou des autorisations au-delà des vôtres.",
+    escalationDenied: "Cette action demande plus de droits que n'en a votre rôle.",
     featureNotLicensed: "Cette fonction nécessite une licence entreprise.",
+    sessionEnded: "Votre session a expiré. Reconnectez-vous.",
+    forbidden: "Vous n'avez pas l'autorisation de faire cela.",
+    invalidSetting: "Valeur non valide pour {setting}.",
   },
   sidebar: {
     sponsor: "Soutenez-nous",

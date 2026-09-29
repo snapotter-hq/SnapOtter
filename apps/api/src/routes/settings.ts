@@ -121,6 +121,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({
           error: prepared.error,
           code: prepared.code,
+          // Which setting, so a client can name it in its own language (#1445).
+          setting: requestedKey,
           ...(prepared.details ? { details: prepared.details } : {}),
         });
       }

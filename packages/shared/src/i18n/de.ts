@@ -4586,6 +4586,8 @@ export const de: TranslationKeys = {
         "Die Zwei-Faktor-Authentifizierung wurde in einem anderen Fenster geändert. Laden Sie neu und versuchen Sie es erneut.",
       twoFactorUnreadable:
         "Ihre Zwei-Faktor-Einstellungen können auf dem Server nicht gelesen werden. Wenden Sie sich an einen Administrator.",
+      ssoNeedsProvider:
+        "Für die SSO-Erzwingung muss zuerst ein OIDC- oder SAML-Anbieter eingerichtet sein.",
     },
     people: {
       heading: "Personen",
@@ -4645,6 +4647,8 @@ export const de: TranslationKeys = {
       usernameTaken: "Dieser Benutzername ist bereits vergeben",
       lastAdmin: "Es muss immer mindestens einen Administrator geben",
       cannotDeleteSelf: "Sie können Ihr eigenes Konto nicht löschen",
+      usernameInvalid:
+        "Der Benutzername muss 3 bis 50 Zeichen lang sein und darf nur a-z, A-Z, 0-9, Punkte, Bindestriche und Unterstriche enthalten",
     },
     teams: {
       heading: "Teams",
@@ -4724,6 +4728,9 @@ export const de: TranslationKeys = {
         teams: "Teams",
         system: "System",
       },
+      nameInvalid:
+        "Der Rollenname muss 2 bis 30 Zeichen lang sein und darf nur a-z, 0-9, Bindestriche und Unterstriche enthalten",
+      permissionsRequired: "Wählen Sie mindestens eine Berechtigung aus",
     },
     auditLog: {
       heading: "Audit-Protokoll",
@@ -4868,6 +4875,9 @@ export const de: TranslationKeys = {
       resetFailed: "Zurücksetzen fehlgeschlagen: {error}",
       resetVenvKept:
         "Die gemeinsame Python-Umgebung wurde beibehalten: Diese Installation hat keine mitgelieferte Basis, aus der sie neu aufgebaut werden könnte. Modelle, der Download-Cache und die Installationseinträge wurden gelöscht. Erstellen Sie diese Umgebung selbst neu, wenn ein veraltetes Paket darin das Problem ist.",
+      importBusy:
+        "Eine andere Installation oder ein anderer Import läuft bereits. Versuchen Sie es erneut, sobald dieser Vorgang abgeschlossen ist.",
+      importNoSpace: "Auf dem Server ist nicht genug Speicherplatz für dieses Paket frei.",
     },
     about: {
       heading: "Info",
@@ -5237,9 +5247,11 @@ export const de: TranslationKeys = {
     passwordNeedsDigit: "Das Passwort muss eine Zahl enthalten.",
     passwordNeedsSpecial: "Das Passwort muss ein Sonderzeichen enthalten.",
     tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
-    escalationDenied:
-      "Sie können keine Rolle oder Berechtigungen vergeben, die über Ihre eigenen hinausgehen.",
+    escalationDenied: "Dafür reichen die Rechte Ihrer Rolle nicht aus.",
     featureNotLicensed: "Dafür ist eine Enterprise-Lizenz erforderlich.",
+    sessionEnded: "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+    forbidden: "Dazu fehlt Ihnen die Berechtigung.",
+    invalidSetting: "Ungültiger Wert für {setting}.",
   },
   sidebar: {
     sponsor: "Uns unterstützen",

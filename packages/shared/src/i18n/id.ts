@@ -4561,6 +4561,8 @@ export const id: TranslationKeys = {
         "Autentikasi dua faktor diubah di jendela lain. Muat ulang lalu coba lagi.",
       twoFactorUnreadable:
         "Server tidak dapat membaca pengaturan autentikasi dua faktor Anda. Hubungi administrator.",
+      ssoNeedsProvider:
+        "Penerapan SSO memerlukan penyedia OIDC atau SAML yang sudah dikonfigurasi.",
     },
     people: {
       heading: "Anggota",
@@ -4619,6 +4621,8 @@ export const id: TranslationKeys = {
       usernameTaken: "Nama pengguna itu sudah dipakai",
       lastAdmin: "Harus selalu ada setidaknya satu admin",
       cannotDeleteSelf: "Tidak dapat menghapus akun Anda sendiri",
+      usernameInvalid:
+        "Nama pengguna harus 3 sampai 50 karakter dan hanya boleh berisi a-z, A-Z, 0-9, titik, tanda hubung, dan garis bawah",
     },
     teams: {
       heading: "Tim",
@@ -4696,6 +4700,9 @@ export const id: TranslationKeys = {
         teams: "Tim",
         system: "Sistem",
       },
+      nameInvalid:
+        "Nama peran harus 2 sampai 30 karakter dan hanya boleh berisi a-z, 0-9, tanda hubung, dan garis bawah",
+      permissionsRequired: "Pilih setidaknya satu izin",
     },
     auditLog: {
       heading: "Log Audit",
@@ -4838,6 +4845,8 @@ export const id: TranslationKeys = {
       resetFailed: "Reset gagal: {error}",
       resetVenvKept:
         "Lingkungan Python bersama dibiarkan apa adanya: instalasi ini tidak memiliki basis bawaan untuk membangunnya kembali. Model, cache unduhan, dan catatan instalasi sudah dihapus. Buat ulang lingkungan tersebut sendiri jika paket usang di dalamnya adalah penyebab masalahnya.",
+      importBusy: "Instalasi atau impor lain sedang berjalan. Coba lagi setelah selesai.",
+      importNoSpace: "Ruang disk server tidak cukup untuk bundel ini.",
     },
     about: {
       heading: "Tentang",
@@ -5201,8 +5210,11 @@ export const id: TranslationKeys = {
     passwordNeedsDigit: "Kata sandi harus mengandung angka.",
     passwordNeedsSpecial: "Kata sandi harus mengandung karakter khusus.",
     tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
-    escalationDenied: "Anda tidak dapat memberikan peran atau izin melebihi milik Anda sendiri.",
+    escalationDenied: "Tindakan itu memerlukan akses lebih dari yang dimiliki peran Anda.",
     featureNotLicensed: "Ini memerlukan lisensi enterprise.",
+    sessionEnded: "Sesi Anda telah berakhir. Masuk lagi.",
+    forbidden: "Anda tidak memiliki izin untuk melakukan itu.",
+    invalidSetting: "Nilai tidak valid untuk {setting}.",
   },
   sidebar: {
     sponsor: "Dukung kami",

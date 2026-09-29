@@ -151,8 +151,8 @@ test.describe("GUI Settings - Security Tab", () => {
     await openSettings(page);
     await page.getByRole("button", { name: /security/i }).click();
 
-    // Too short fails the client-side length check (minimum 8) before any
-    // request is sent, so no password is changed.
+    // Too short fails the server's password policy (minimum 8), which is
+    // checked before anything changes, so no password is changed.
     await page.getByPlaceholder("Current Password").fill("admin");
     await page.getByPlaceholder("New Password").first().fill("ab");
     await page.getByPlaceholder("Confirm New Password").fill("ab");
