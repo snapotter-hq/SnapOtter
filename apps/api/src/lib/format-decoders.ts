@@ -17,7 +17,9 @@ const execFileAsync = promisify(execFile);
  * operator's container, not the caller's file, so it carries the same 503
  * ENGINE_UNAVAILABLE the media and document input handlers use instead of the
  * plain Error a corrupt upload produces (#795). As a SafeError with a status,
- * the global error handler logs it, reports it, and shows its message.
+ * the global error handler logs it, reports it, and shows its message. The
+ * HEIF decode also uses it when the server runs out of memory mid-decode, for
+ * the same reason (#1577).
  */
 export class DecoderUnavailableError extends SafeError {
   constructor(message: string, cause?: unknown) {
