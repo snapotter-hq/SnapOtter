@@ -1036,3 +1036,64 @@ describe("OCR runtime memory compatibility", () => {
     expect(() => assertOcrRuntimeMemory(4 * GiB, { effectiveMemoryBytes: 4 * GiB })).not.toThrow();
   });
 });
+
+describe("memory-capacity errors say what couldn't be read (#1501)", () => {
+  const cgroup2Mount =
+    "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw";
+
+  function thrownBy(files: Map<string, string>, failures: Map<string, Error>): unknown {
+    try {
+      getOcrRuntimeEffectiveMemoryBytes({
+        hostPlatform: "linux",
+        physicalMemoryBytes: 8 * GiB,
+        readTextFile: (path) => {
+          const failure = failures.get(path);
+          if (failure) throw failure;
+          const value = files.get(path);
+          if (value === undefined) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+          return value;
+        },
+      });
+    } catch (error) {
+      return error;
+    }
+    throw new Error("expected the memory capacity read to fail");
+  }
+
+  const membership = new Map([
+    ["/proc/self/cgroup", "0::/job\n"],
+    ["/proc/self/mountinfo", cgroup2Mount],
+  ]);
+
+  it("names the limit file it couldn't read and keeps the cause", () => {
+    const denied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+
+    expect(
+      thrownBy(membership, new Map([["/sys/fs/cgroup/job/memory.max", denied]])),
+    ).toMatchObject({
+      message:
+        "unable to read the process cgroup memory capacity from /sys/fs/cgroup/job/memory.max",
+      cause: denied,
+    });
+  });
+
+  it("names the controllers file it couldn't read when memory.max is absent", () => {
+    const denied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+
+    expect(
+      thrownBy(membership, new Map([["/sys/fs/cgroup/job/cgroup.controllers", denied]])),
+    ).toMatchObject({
+      message:
+        "unable to read the process cgroup memory capacity from /sys/fs/cgroup/job/cgroup.controllers",
+      cause: denied,
+    });
+  });
+
+  it("quotes a malformed limit and says where it came from", () => {
+    const files = new Map([...membership, ["/sys/fs/cgroup/job/memory.max", "12 GiB\n"]]);
+
+    expect(thrownBy(files, new Map())).toMatchObject({
+      message: 'malformed cgroup memory capacity in /sys/fs/cgroup/job/memory.max: "12 GiB"',
+    });
+  });
+});

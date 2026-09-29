@@ -364,17 +364,24 @@ function resolveMembershipMemoryLimits(
           }
           try {
             readTextFile(controllersPath);
-          } catch {
-            throw new Error("unable to read the process cgroup memory capacity");
+          } catch (controllersError) {
+            throw new Error(
+              `unable to read the process cgroup memory capacity from ${controllersPath}`,
+              { cause: controllersError },
+            );
           }
         } else {
-          throw new Error("unable to read the process cgroup memory capacity");
+          throw new Error(`unable to read the process cgroup memory capacity from ${limitPath}`, {
+            cause: error,
+          });
         }
       }
       if (raw !== undefined) {
         const normalized = raw.trim();
         if (normalized !== "max" && !/^[0-9]+$/.test(normalized)) {
-          throw new Error("malformed cgroup memory capacity");
+          throw new Error(
+            `malformed cgroup memory capacity in ${limitPath}: ${JSON.stringify(normalized.slice(0, 64))}`,
+          );
         }
         const limit = parseCgroupLimit(raw, true);
         if (limit !== null) limits.push(limit);
@@ -396,9 +403,14 @@ function membershipMemoryLimits(
     let membershipRaw: string;
     try {
       membershipRaw = readTextFile("/proc/self/cgroup");
-    } catch {
+    } catch (error) {
       if (failClosed || attempt > 0) {
-        throw new Error("unable to read the process cgroup memory capacity");
+        throw new Error(
+          "unable to read the process cgroup memory capacity from /proc/self/cgroup",
+          {
+            cause: error,
+          },
+        );
       }
       return null;
     }

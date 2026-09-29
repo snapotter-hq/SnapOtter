@@ -1003,7 +1003,88 @@ describe("invalid runtime diagnostics (#1433)", () => {
     expect(consoleWarn).not.toHaveBeenCalled();
   });
 
-  it("stays quiet for missing, incompatible, and unsupported-host runtimes", () => {
+  it.each<[string, (descriptor: MutableDescriptor) => void, string]>([
+    [
+      "an older SnapOtter",
+      (descriptor) => {
+        descriptor.compatibility.snapotterVersion = "0.0.1";
+      },
+      `runtime was built for SnapOtter 0.0.1, but this is ${APP_VERSION}; reinstall Accurate OCR`,
+    ],
+    [
+      "another protocol",
+      (descriptor) => {
+        descriptor.compatibility.protocolVersion = 99;
+      },
+      "runtime speaks OCR protocol 99, but this SnapOtter speaks 1",
+    ],
+    [
+      "another platform",
+      (descriptor) => {
+        descriptor.artifact.platform = "windows";
+      },
+      "runtime was built for windows, not linux",
+    ],
+  ])(
+    "logs which compatibility check rejected the runtime: %s (#1501)",
+    (_label, mutate, detail) => {
+      const fixture = createRuntimeFixture();
+      mutateDescriptor(fixture.descriptorPath, mutate);
+      const warn = quietWarn();
+      const options = { aiDataDir: fixture.aiDataDir, ...linuxX64 };
+
+      expect(getOcrRuntimeCapability(options)).toMatchObject({ reason: "artifact-incompatible" });
+      // Polled like any other capability read: one line, not one per poll.
+      getOcrRuntimeCapability(options);
+      expect(warnings(warn)).toEqual([
+        `[ocr-runtime] Accurate OCR runtime at ${join(fixture.aiDataDir, "v3")} is unavailable: ${detail}`,
+      ]);
+    },
+  );
+
+  it("names the target it was built for when the host needs another (#1501)", () => {
+    const fixture = createRuntimeFixture();
+    const warn = quietWarn();
+
+    expect(
+      getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, platform: "linux", arch: "arm64" }),
+    ).toMatchObject({ reason: "artifact-incompatible" });
+    expect(warnings(warn)).toEqual([
+      expect.stringMatching(
+        /is unavailable: runtime was built for linux-amd64-cpu-py312 \(amd64\), but this host needs linux-arm64-cpu-py311 \(arm64\)$/,
+      ),
+    ]);
+  });
+
+  it("logs why the container's memory limit couldn't be read (#1501)", () => {
+    const fixture = createRuntimeFixture();
+    const procFiles = new Map([
+      ["/proc/self/cgroup", "0::/docker/deadbeef\n"],
+      [
+        "/proc/self/mountinfo",
+        "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw\n",
+      ],
+    ]);
+    const warn = quietWarn();
+    const options = {
+      aiDataDir: fixture.aiDataDir,
+      ...linuxX64,
+      physicalMemoryBytes: 8 * 1024 ** 3,
+      readTextFile: (path: string) => {
+        const value = procFiles.get(path);
+        if (value === undefined) throw new Error("denied");
+        return value;
+      },
+    };
+
+    expect(getOcrRuntimeCapability(options)).toMatchObject({ reason: "memory-capacity-unknown" });
+    getOcrRuntimeCapability(options);
+    expect(warnings(warn)).toEqual([
+      `[ocr-runtime] Accurate OCR runtime at ${join(fixture.aiDataDir, "v3")} is unavailable: this container's memory limit couldn't be read: unable to read the process cgroup memory capacity from /sys/fs/cgroup/docker/deadbeef/memory.max: denied`,
+    ]);
+  });
+
+  it("stays quiet for missing and unsupported-host runtimes", () => {
     const warn = quietWarn();
     const empty = mkdtempSync(join(tmpdir(), "snapotter-runtime-state-empty-"));
     temporaryDirectories.push(empty);
@@ -1012,9 +1093,6 @@ describe("invalid runtime diagnostics (#1433)", () => {
     expect(getOcrRuntimeCapability({ aiDataDir: empty, ...linuxX64 })).toMatchObject({
       reason: "descriptor-missing",
     });
-    expect(
-      getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, platform: "linux", arch: "arm64" }),
-    ).toMatchObject({ reason: "artifact-incompatible" });
     expect(
       getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, platform: "darwin", arch: "arm64" }),
     ).toMatchObject({ reason: "unsupported-host" });

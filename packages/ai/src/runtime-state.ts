@@ -162,11 +162,9 @@ function invalidDescriptor(detail: string): DescriptorValidationFailure {
   return { descriptor: null, status: "invalid", reason: "descriptor-invalid", detail };
 }
 
-const INCOMPATIBLE_ARTIFACT: DescriptorValidationFailure = {
-  descriptor: null,
-  status: "incompatible",
-  reason: "artifact-incompatible",
-};
+function incompatibleArtifact(detail: string): DescriptorValidationFailure {
+  return { descriptor: null, status: "incompatible", reason: "artifact-incompatible", detail };
+}
 
 const INSUFFICIENT_MEMORY: DescriptorValidationFailure = {
   descriptor: null,
@@ -174,11 +172,9 @@ const INSUFFICIENT_MEMORY: DescriptorValidationFailure = {
   reason: "insufficient-memory",
 };
 
-const UNKNOWN_MEMORY_CAPACITY: DescriptorValidationFailure = {
-  descriptor: null,
-  status: "incompatible",
-  reason: "memory-capacity-unknown",
-};
+function unknownMemoryCapacity(detail: string): DescriptorValidationFailure {
+  return { descriptor: null, status: "incompatible", reason: "memory-capacity-unknown", detail };
+}
 
 const MISSING_DESCRIPTOR: ActiveRuntimeFailure = {
   descriptor: null,
@@ -915,15 +911,28 @@ function parseOcrDescriptor(
   ) {
     return invalidDescriptor("active descriptor has a missing or malformed field");
   }
-  if (
-    artifact.target !== target ||
-    artifact.platform !== "linux" ||
-    artifact.arch !== expectedArch ||
-    compatibility.protocolVersion !== OCR_RUNTIME_PROTOCOL_VERSION ||
-    compatibility.snapotterVersion !== APP_VERSION
-  ) {
-    return INCOMPATIBLE_ARTIFACT;
+  // Every mismatch, not just the first, so one log line says all of it (#1501).
+  const mismatches: string[] = [];
+  if (artifact.target !== target || artifact.arch !== expectedArch) {
+    mismatches.push(
+      `runtime was built for ${artifact.target} (${artifact.arch}), but this host needs ${target} (${expectedArch})`,
+    );
   }
+  if (artifact.platform !== "linux") {
+    mismatches.push(`runtime was built for ${artifact.platform}, not linux`);
+  }
+  if (compatibility.protocolVersion !== OCR_RUNTIME_PROTOCOL_VERSION) {
+    mismatches.push(
+      `runtime speaks OCR protocol ${String(compatibility.protocolVersion)}, but this SnapOtter speaks ${OCR_RUNTIME_PROTOCOL_VERSION}`,
+    );
+  }
+  if (compatibility.snapotterVersion !== APP_VERSION) {
+    // The common one: a SnapOtter upgrade leaves the installed runtime behind.
+    mismatches.push(
+      `runtime was built for SnapOtter ${String(compatibility.snapotterVersion)}, but this is ${APP_VERSION}; reinstall Accurate OCR`,
+    );
+  }
+  if (mismatches.length > 0) return incompatibleArtifact(mismatches.join("; "));
 
   const signedIndexPath = resolveSignedIndex(v3Root, artifact.signedIndex);
   if (!signedIndexPath) {
@@ -944,8 +953,10 @@ function parseOcrDescriptor(
       if (!hasOcrRuntimeMemory(verified.minimumMemoryBytes, memoryOptions)) {
         return INSUFFICIENT_MEMORY;
       }
-    } catch {
-      return UNKNOWN_MEMORY_CAPACITY;
+    } catch (error) {
+      return unknownMemoryCapacity(
+        `this container's memory limit couldn't be read: ${errorMessage(error)}`,
+      );
     }
     signedArtifact = verified.artifact;
   } catch (error) {
@@ -1189,14 +1200,23 @@ export function readPendingOcrRuntimeForHandoff(
 }
 
 // The capability is polled by feature status and read on every OCR request, so
-// an invalid runtime is logged once per distinct failure, not on every read.
-// Any read that isn't descriptor-invalid clears it, so a recurrence logs again.
+// an unusable runtime is logged once per distinct failure, not on every read.
+// Any read with nothing to report clears it, so a recurrence logs again.
 let lastReportedInvalidRuntime: string | null = null;
+
+// A missing runtime or an unsupported host is the normal state of a dev
+// checkout or a Fast-OCR-only install, so those stay quiet. Insufficient
+// memory is already spelled out, with both sizes, in feature status.
+const LOGGED_UNAVAILABLE_REASONS: ReadonlySet<OcrRuntimeUnavailableReason> = new Set([
+  "descriptor-invalid",
+  "artifact-incompatible",
+  "memory-capacity-unknown",
+]);
 
 const MAX_LOGGED_DETAIL_CHARS = 500;
 
 function reportInvalidRuntime(options: RuntimeStateOptions, result: ActiveRuntimeResult): void {
-  if (result.descriptor || result.reason !== "descriptor-invalid") {
+  if (result.descriptor || !LOGGED_UNAVAILABLE_REASONS.has(result.reason)) {
     lastReportedInvalidRuntime = null;
     return;
   }

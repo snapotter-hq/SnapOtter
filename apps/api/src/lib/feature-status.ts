@@ -41,6 +41,7 @@ import {
 } from "@snapotter/shared";
 import * as tar from "tar";
 import { getQueuedBundleIds } from "./feature-install-queue.js";
+import { logger } from "./logger.js";
 
 // ── Paths ───────────────────────────────────────────────────────────────
 
@@ -1356,6 +1357,10 @@ export function verifyBundleModels(bundleId: string): string | null {
   return null;
 }
 
+// Feature states are polled, so a memory read that keeps failing is logged once
+// per distinct error, and again only after a read has worked in between (#1501).
+let lastLoggedOcrMemoryFailure: string | null = null;
+
 export function getFeatureStates(): FeatureBundleState[] {
   const installed = readInstalled();
   const lock = getInstallingBundle();
@@ -1378,8 +1383,18 @@ export function getFeatureStates(): FeatureBundleState[] {
   if (selectedOcrTarget) {
     try {
       effectiveOcrMemoryBytes = getOcrRuntimeEffectiveMemoryBytes();
-    } catch {
+      lastLoggedOcrMemoryFailure = null;
+    } catch (error) {
       ocrMemoryCapacityUnknown = true;
+      // The UI only says the limit couldn't be determined; the log says why.
+      const failure = error instanceof Error ? error.message : String(error);
+      if (failure !== lastLoggedOcrMemoryFailure) {
+        lastLoggedOcrMemoryFailure = failure;
+        logger.warn(
+          { err: error },
+          "[ocr-runtime] Accurate OCR can't be offered: this container's memory limit couldn't be read",
+        );
+      }
     }
   }
   const ocrMemoryCompatible =
