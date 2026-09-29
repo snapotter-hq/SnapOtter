@@ -25,11 +25,15 @@ test.describe("Chunk reload", () => {
       route.fulfill({ status: 404, contentType: "text/plain", body: "Not found" }),
     );
     const navigations = countNavigations(page);
+    const reloaded = page.waitForEvent("load");
 
     await page.getByRole("link", { name: "Automate" }).click();
+    await reloaded;
 
     // The chunk is still missing after the reload, so the loop guard hands
     // the second failure to the error boundary instead of reloading again.
+    // Asserted on the reloaded page: the handler runs before the boundary
+    // renders, so a second reload would already be counted by now.
     await expect(page.getByRole("heading", { name: "Something went wrong" })).toBeVisible();
     expect(navigations()).toBe(1);
     await expect(page).toHaveURL("/automate");

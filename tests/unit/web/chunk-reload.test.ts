@@ -129,19 +129,31 @@ describe("installChunkReloadHandler", () => {
     it("reloads again after the page comes back from the back/forward cache", () => {
       startLeaving();
       vi.advanceTimersByTime(500);
-      window.dispatchEvent(new Event("pageshow"));
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
       fireChunkError();
 
       expect(reload).toHaveBeenCalledTimes(1);
     });
 
-    it("stops listening for beforeunload once uninstalled", () => {
-      uninstall();
+    it("keeps leaving through a pageshow that is not a back/forward restore", () => {
+      // A slow first load can still fire load/pageshow while being left.
       startLeaving();
-      uninstall = installChunkReloadHandler(reload);
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
       fireChunkError();
 
-      expect(reload).toHaveBeenCalledTimes(1);
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it("removes every listener it added once uninstalled", () => {
+      const remove = vi.spyOn(window, "removeEventListener");
+      uninstall();
+
+      const removed = remove.mock.calls.map(([type]) => type);
+      expect(removed).toEqual(
+        expect.arrayContaining(["beforeunload", "pageshow", "vite:preloadError"]),
+      );
+      remove.mockRestore();
+      uninstall = installChunkReloadHandler(reload);
     });
   });
 });

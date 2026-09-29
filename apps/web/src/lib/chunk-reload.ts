@@ -53,8 +53,8 @@ export function installChunkReloadHandler(
     leavingAt = Date.now();
   };
   // A page restored from the back/forward cache is no longer being left.
-  const onPageShow = () => {
-    leavingAt = Number.NEGATIVE_INFINITY;
+  const onPageShow = (event: PageTransitionEvent) => {
+    if (event.persisted) leavingAt = Number.NEGATIVE_INFINITY;
   };
   const onPreloadError = (event: Event) => {
     // Unhandled on purpose: if the leave is cancelled after all, the error
