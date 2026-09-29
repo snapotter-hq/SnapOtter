@@ -1316,6 +1316,31 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(rows).toHaveLength(1);
     });
 
+    it("rejects an externalId another user holds with a uniqueness 409 naming externalId", async () => {
+      // Issue #1006: the identity index turns this into a 23505, which used
+      // to come back as "userName already taken".
+      const externalId = uniqueName("scim-put-ext-taken");
+      await createScimUser({ userName: uniqueName("scim-put-ext-holder"), externalId });
+      const victim = await createScimUser({ userName: uniqueName("scim-put-ext-victim") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${victim.id}`,
+        headers: authHeaders(),
+        payload: { userName: victim.userName, externalId, active: true },
+      });
+
+      expect(res.statusCode, res.body).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 409,
+        scimType: "uniqueness",
+        detail: "externalId already assigned to another user",
+      });
+      const row = await userRow(victim.id);
+      expect(row?.externalId).toBeNull();
+    });
+
     it("replaces userName, externalId, and primary email", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-put-src") });
       const renamed = uniqueName("scim-put-renamed");
@@ -1511,6 +1536,39 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const rows = await db.select().from(schema.users).where(eq(schema.users.username, target));
       expect(rows).toHaveLength(1);
     });
+
+    it.each([
+      ["a path replace", (value: string) => ({ op: "replace", path: "externalId", value })],
+      ["a valueless replace", (value: string) => ({ op: "replace", value: { externalId: value } })],
+    ])(
+      "rejects an externalId another user holds via %s with a uniqueness 409",
+      async (_label, op) => {
+        // Issue #1006: same identity-index 23505 as the PUT case.
+        const externalId = uniqueName("scim-patch-ext-taken");
+        await createScimUser({ userName: uniqueName("scim-patch-ext-holder"), externalId });
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-ext-victim") });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [op(externalId)],
+          },
+        });
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 409,
+          scimType: "uniqueness",
+          detail: "externalId already assigned to another user",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.externalId).toBeNull();
+      },
+    );
 
     it("adds an externalId with a mixed-case op name", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-patch-ext") });
