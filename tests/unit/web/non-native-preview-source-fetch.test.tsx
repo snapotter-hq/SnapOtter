@@ -104,6 +104,27 @@ describe("NonNativePreview source fetch (#1286)", () => {
     expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
   });
 
+  // Only the source fetch's 404 means the result is gone. The preview
+  // endpoint's own 404 is a different fault and keeps Retry.
+  it("keeps the generic failure and Retry on a 404 from the preview request", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        Promise.resolve(
+          input === SOURCE_URL
+            ? new Response(new Blob(["mkv"]), { status: 200 })
+            : new Response("{}", { status: 404 }),
+        ),
+      ),
+    );
+
+    await generate();
+
+    expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
+    expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
+    expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
+  });
+
   it("forgets an expired source when it is handed a different file", async () => {
     stubFetch(() =>
       Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),

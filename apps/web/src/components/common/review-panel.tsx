@@ -72,15 +72,18 @@ type SaveFailure = "expired" | "quota" | "tooLarge" | "generic";
 async function uploadFailure(res: Response): Promise<SaveFailure> {
   if (res.status !== 413) return "generic";
   // Both the quota and the upload size limit answer 413; only the quota
-  // carries this code. A reverse proxy's 413 is an HTML page, and any body
-  // that can't be read as JSON means the size limit too.
+  // carries this code. A reverse proxy's 413 is an HTML page: the size limit.
+  if (!res.headers.get("content-type")?.includes("application/json")) return "tooLarge";
   try {
     const body: unknown = await res.json();
-    if ((body as { code?: unknown } | null)?.code === "STORAGE_QUOTA_EXCEEDED") return "quota";
+    return (body as { code?: unknown } | null)?.code === "STORAGE_QUOTA_EXCEEDED"
+      ? "quota"
+      : "tooLarge";
   } catch {
-    // Not JSON: not our quota answer.
+    // Our JSON answer, cut off before it could be read: it may have been the
+    // quota, so don't claim a reason, and leave the retry open.
+    return "generic";
   }
-  return "tooLarge";
 }
 
 interface ReviewPanelProps {
@@ -138,12 +141,16 @@ export function ReviewPanel({
   // button and invite a duplicate save.
   const errorResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => clearTimeout(errorResetRef.current ?? undefined), []);
-  // A failure with a reason stays up, so it has to go when the panel moves to
-  // another result (the thumbnail strip, or a re-run); it was about the old one.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resets on a result change, which downloadUrl is
+  // The panel isn't remounted when it moves to another result (the thumbnail
+  // strip, or a re-run). A failure with a reason stays up, and a save still in
+  // flight would otherwise land its outcome on the new result, so both are
+  // about the old one: clear them, and let a late save finish without
+  // touching this panel's state.
+  const shownUrlRef = useRef(downloadUrl);
   useEffect(() => {
+    shownUrlRef.current = downloadUrl;
     clearTimeout(errorResetRef.current ?? undefined);
-    setSaveStatus((status) => (status === "error" ? "idle" : status));
+    setSaveStatus((status) => (status === "error" || status === "saving" ? "idle" : status));
   }, [downloadUrl]);
 
   const handleSaveToFiles = useCallback(async () => {
@@ -151,6 +158,7 @@ export function ReviewPanel({
     // selection while the upload is in flight, and the claim must land on the
     // entry that was actually saved.
     const claimIndex = useFileStore.getState().selectedIndex;
+    const stillShown = () => shownUrlRef.current === downloadUrl;
     clearTimeout(errorResetRef.current ?? undefined);
     setSaveStatus("saving");
     let failure: SaveFailure = "generic";
@@ -185,7 +193,7 @@ export function ReviewPanel({
           statusCode: uploadRes.status,
         });
       }
-      setSaveStatus("saved");
+      if (stillShown()) setSaveStatus("saved");
       useFileStore.getState().markClaimed(claimIndex);
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
@@ -206,6 +214,7 @@ export function ReviewPanel({
           { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
         );
       }
+      if (!stillShown()) return;
       setSaveFailure(failure);
       setSaveStatus("error");
       // A reason stays on screen: it tells the user what to do, and the

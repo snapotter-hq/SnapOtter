@@ -328,6 +328,21 @@ function saveButtonNamed(name: string): HTMLButtonElement {
   return screen.getByRole("button", { name }) as HTMLButtonElement;
 }
 
+const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
+
+/** The API's answer when the library is over quota. */
+const quotaResponse = () =>
+  new Response(
+    JSON.stringify({
+      error: "Storage quota exceeded. Used 10.0MB of 10.0MB",
+      code: "STORAGE_QUOTA_EXCEEDED",
+    }),
+    { status: 413, headers: JSON_HEADERS },
+  );
+
+const failedResult = (status: number) => () =>
+  Promise.resolve({ ok: false, status, blob: () => Promise.resolve(new Blob()) });
+
 // #1350: every failure said "An error occurred" for three seconds and handed
 // the same button back, even when the server had said why and a retry
 // couldn't help.
@@ -362,17 +377,7 @@ describe("ReviewPanel Save to Files failure reasons (#1350)", () => {
     let uploads = 0;
     const fetchMock = stubFetch(okResult, () => {
       uploads += 1;
-      return Promise.resolve(
-        uploads === 1
-          ? new Response(
-              JSON.stringify({
-                error: "Storage quota exceeded. Used 10.0MB of 10.0MB",
-                code: "STORAGE_QUOTA_EXCEEDED",
-              }),
-              { status: 413 },
-            )
-          : new Response("{}", { status: 201 }),
-      );
+      return Promise.resolve(uploads === 1 ? quotaResponse() : new Response("{}", { status: 201 }));
     });
 
     renderPanel();
@@ -401,15 +406,19 @@ describe("ReviewPanel Save to Files failure reasons (#1350)", () => {
   it.each([
     [
       "the API's upload limit",
-      () => new Response(JSON.stringify({ error: "request file too large" }), { status: 413 }),
+      () =>
+        new Response(JSON.stringify({ error: "request file too large" }), {
+          status: 413,
+          headers: JSON_HEADERS,
+        }),
     ],
     [
       "a proxy's HTML page",
-      () => new Response("<html>413 Request Entity Too Large</html>", { status: 413 }),
-    ],
-    [
-      "a body that can't be read",
-      () => ({ ok: false, status: 413, json: () => Promise.reject(new Error("aborted")) }),
+      () =>
+        new Response("<html>413 Request Entity Too Large</html>", {
+          status: 413,
+          headers: { "content-type": "text/html" },
+        }),
     ],
   ])("says the file is too large on %s, and offers no retry", async (_label, response) => {
     vi.useFakeTimers();
@@ -452,5 +461,116 @@ describe("ReviewPanel Save to Files failure reasons (#1350)", () => {
 
     expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
     expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+  });
+
+  // Our own JSON 413, cut off mid-read, might have been the quota answer, so
+  // it gets no reason and the button comes back.
+  it("keeps the generic, retryable message when a JSON 413 can't be read", async () => {
+    vi.useFakeTimers();
+    stubFetch(okResult, () =>
+      Promise.resolve({
+        ok: false,
+        status: 413,
+        headers: new Headers(JSON_HEADERS),
+        json: () => Promise.reject(new TypeError("network error")),
+      }),
+    );
+
+    renderPanel();
+    await clickSave();
+
+    expect(screen.getByText(en.common.error)).toBeTruthy();
+    expect(screen.queryByText(en.errors.fileTooLarge)).toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+  });
+
+  // The panel isn't remounted per result. A save that finishes after the user
+  // moved on is about the result they left, and must not land on this one.
+  it.each([
+    ["an expired result", failedResult(404), () => Promise.resolve({ ok: true, status: 201 })],
+    ["a full library", okResult, () => Promise.resolve(quotaResponse())],
+    ["a success", okResult, () => Promise.resolve({ ok: true, status: 201 })],
+  ])(
+    "leaves the new result's button alone when the old save ends in %s",
+    async (_label, result, upload) => {
+      let finishResult: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        finishResult = resolve;
+      });
+      stubFetch(() => gate.then(result), upload);
+
+      const view = renderPanel();
+      await clickSave();
+      expect(screen.getByText(en.common.saving)).toBeTruthy();
+
+      view.rerender(panel("resize", "/api/v1/download/job-2/b-resized.png"));
+      expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+
+      await act(async () => {
+        finishResult();
+      });
+
+      expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+      expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
+      expect(screen.queryByText(en.toolPage.libraryFull)).toBeNull();
+      expect(screen.queryByText(en.toolPage.savedToFiles)).toBeNull();
+    },
+  );
+
+  it("drops a sticky reason when the next attempt fails generically", async () => {
+    vi.useFakeTimers();
+    let results = 0;
+    stubFetch(
+      () => {
+        results += 1;
+        return results === 1 ? okResult() : failedResult(500)();
+      },
+      () => Promise.resolve(quotaResponse()),
+    );
+
+    renderPanel();
+    await clickSave();
+    fireEvent.click(saveButtonNamed(en.toolPage.libraryFull));
+    await act(async () => {});
+
+    expect(screen.getByText(en.common.error)).toBeTruthy();
+    expect(screen.queryByText(en.toolPage.libraryFull)).toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+  });
+
+  it("keeps a sticky reason when an earlier generic error's timer runs out", async () => {
+    vi.useFakeTimers();
+    let results = 0;
+    stubFetch(
+      () => {
+        results += 1;
+        return results === 1 ? failedResult(500)() : okResult();
+      },
+      () => Promise.resolve(quotaResponse()),
+    );
+
+    renderPanel();
+    await clickSave();
+    expect(screen.getByText(en.common.error)).toBeTruthy();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    fireEvent.click(saveButtonNamed(en.common.error));
+    await act(async () => {});
+    expect(screen.getByText(en.toolPage.libraryFull)).toBeTruthy();
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.getByText(en.toolPage.libraryFull)).toBeTruthy();
   });
 });

@@ -333,3 +333,31 @@ describe("a staged blob that can't be discarded", () => {
     }
   });
 });
+
+// The web app tells a full library from an oversized file by this code
+// (#1350). The per-part and commit-time checks are covered above and in
+// library-upload-quota.test.ts; this is the up-front one.
+describe("library upload quota answers", () => {
+  it("tags the up-front check's 413 when the user is already over quota", async () => {
+    const start = await dbState();
+    // An admin lowered the quota below what's stored. 0 means unlimited, so
+    // make sure there is something stored to be over.
+    const used = start.storageUsed + 2;
+    await db
+      .update(schema.users)
+      .set({ storageUsed: used, storageQuota: used - 1 })
+      .where(eq(schema.users.id, adminId));
+    try {
+      const before = await dbState();
+      const res = await upload([png()]);
+      expect(res.statusCode).toBe(413);
+      expect(res.json().code).toBe("STORAGE_QUOTA_EXCEEDED");
+      await expectNothingSaved(before, 0);
+    } finally {
+      await db
+        .update(schema.users)
+        .set({ storageUsed: start.storageUsed })
+        .where(eq(schema.users.id, adminId));
+    }
+  });
+});
