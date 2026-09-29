@@ -529,6 +529,28 @@ class InstallRuntimeTests(unittest.TestCase):
         generation_root = v3_root / "runtimes" / FAMILY / TARGET / "1.0.0-abc123"
         self.assertEqual(stat.S_IMODE(generation_root.stat().st_mode), 0o755)
 
+    def _assert_install_keeps_signed_modes_under_umask(self, umask: int) -> None:
+        # The installer must give every extracted file its signed mode itself.
+        # Under the default 022 an inherited mode happens to match, so only a
+        # tighter umask catches a regression here (#1563).
+        previous = os.umask(umask)
+        try:
+            result = self._install()
+        finally:
+            os.umask(previous)
+
+        for relative_path, (_contents, mode) in self.fixture.files.items():
+            with self.subTest(path=relative_path):
+                info = (result.generation_root / relative_path).lstat()
+                self.assertEqual(stat.S_IMODE(info.st_mode), mode)
+
+    def test_install_keeps_signed_modes_under_the_container_umask(self) -> None:
+        # docker/entrypoint.sh runs the app under umask 0007.
+        self._assert_install_keeps_signed_modes_under_umask(0o007)
+
+    def test_install_keeps_signed_modes_under_an_owner_only_umask(self) -> None:
+        self._assert_install_keeps_signed_modes_under_umask(0o077)
+
     def test_target_preflight_fails_before_creating_v3_state(self) -> None:
         artifact = self.fixture.artifact()
         artifact["target"] = "linux-arm64-cpu-py311"
