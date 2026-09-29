@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noTemplateCurlyInString: These contract assertions intentionally match GitHub and shell interpolation syntax as literal text.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,6 +8,17 @@ import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
+
+/**
+ * The release workflow's shell steps call `jq`, which GitHub's runners ship
+ * with and a dev machine or fleet host may not: without it the step exits 2 and
+ * the harness reads that as the workflow's own verdict (#1456). A harness that
+ * needs jq runs wherever it's installed, and always in CI, where a missing jq
+ * should fail loudly rather than skip.
+ */
+const itWithJq = it.skipIf(
+  spawnSync("jq", ["--version"]).status !== 0 && process.env.CI !== "true",
+);
 const bundlesWorkflowPath = path.resolve(root, ".github/workflows/ai-bundles.yml");
 const ciWorkflowPath = path.resolve(root, ".github/workflows/ci.yml");
 const releaseWorkflowPath = path.resolve(root, ".github/workflows/release.yml");
@@ -1045,7 +1056,7 @@ describe("OCR v3 bundle release workflow", () => {
     expect(dockerJob).not.toContain("repair-${VERSION}");
   });
 
-  it("revalidates exact release provenance before tag or checkpoint digest reuse", () => {
+  itWithJq("revalidates exact release provenance before tag or checkpoint digest reuse", () => {
     // Drives a bash harness (temp scripts, a fake docker CLI, .docker.log
     // fixtures) that the slimmed Docker Container E2E image can't reproduce;
     // validated in PR CI instead. `/.dockerenv` marks a container runtime.

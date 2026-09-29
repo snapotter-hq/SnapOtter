@@ -76,6 +76,9 @@ apps/videos
 remotion/
 /demo
 pentest-results/
+# Test scratch: fleet jobs point TMPDIR here, so per-fork test workspaces
+# and Playwright's transform cache land in it (#1456)
+.tmp/
 # Stryker mutation testing
 .stryker-tmp/
 .stryker-tmp-api/
