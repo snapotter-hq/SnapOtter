@@ -963,6 +963,33 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(rows.map((r) => r.id)).toEqual([first.id]);
     });
 
+    it("stores a blank externalId as NULL so blank creates don't collide on the identity index", async () => {
+      // Issue #1008: "" is not NULL, so the (auth_provider, external_id)
+      // index from #969 treated every blank externalId as one shared identity
+      // and refused the second create with a 409.
+      const ids: string[] = [];
+      for (const externalId of ["", "   "]) {
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName: uniqueName("scim-blank-ext"), externalId },
+        });
+        expect(res.statusCode, res.body).toBe(201);
+        const body = JSON.parse(res.body);
+        expect(body).not.toHaveProperty("externalId");
+        ids.push(body.id);
+      }
+      // A third blank create after the whitespace one still has to succeed.
+      ids.push(
+        (await createScimUser({ userName: uniqueName("scim-blank-ext"), externalId: "" })).id,
+      );
+
+      for (const id of ids) {
+        expect((await userRow(id))?.externalId).toBeNull();
+      }
+    });
+
     it("creates a disabled user when active is false and falls back to the first email", async () => {
       const username = uniqueName("scim-create-inactive");
       const res = await crudApp.app.inject({
@@ -1305,6 +1332,34 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.email).toBe("put-primary@example.com");
     });
 
+    it("clears externalId to NULL when PUT sends a blank one, for more than one user", async () => {
+      // Issue #1008: a stored "" held the identity index, so the second user
+      // to receive a blank externalId collided with the first.
+      const a = await createScimUser({
+        userName: uniqueName("scim-put-blank-a"),
+        externalId: uniqueName("ext"),
+      });
+      const b = await createScimUser({
+        userName: uniqueName("scim-put-blank-b"),
+        externalId: uniqueName("ext"),
+      });
+
+      for (const [user, externalId] of [
+        [a, ""],
+        [b, ""],
+      ] as const) {
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${user.id}`,
+          headers: authHeaders(),
+          payload: { userName: user.userName, externalId, active: true },
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body)).not.toHaveProperty("externalId");
+        expect((await userRow(user.id))?.externalId).toBeNull();
+      }
+    });
+
     it("deactivation revokes sessions, stores a restorable role, and stays canonical", async () => {
       const { id, userName } = await createScimUser({
         userName: uniqueName("scim-put-deactivate"),
@@ -1437,6 +1492,39 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(JSON.parse(res.body).externalId).toBe("patched-ext");
       const row = await userRow(id);
       expect(row?.externalId).toBe("patched-ext");
+    });
+
+    it("clears externalId to NULL when a PATCH replace sends a blank one, by path or value object", async () => {
+      // Issue #1008: both replace shapes wrote "" verbatim, so the second
+      // user to get one collided with the first on the identity index.
+      const a = await createScimUser({
+        userName: uniqueName("scim-patch-blank-a"),
+        externalId: uniqueName("ext"),
+      });
+      const b = await createScimUser({
+        userName: uniqueName("scim-patch-blank-b"),
+        externalId: uniqueName("ext"),
+      });
+
+      const byPath = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${a.id}`,
+        headers: authHeaders(),
+        payload: { Operations: [{ op: "replace", path: "externalId", value: "" }] },
+      });
+      expect(byPath.statusCode, byPath.body).toBe(200);
+      expect(JSON.parse(byPath.body)).not.toHaveProperty("externalId");
+      expect((await userRow(a.id))?.externalId).toBeNull();
+
+      const byValue = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${b.id}`,
+        headers: authHeaders(),
+        payload: { Operations: [{ op: "replace", value: { externalId: " " } }] },
+      });
+      expect(byValue.statusCode, byValue.body).toBe(200);
+      expect(JSON.parse(byValue.body)).not.toHaveProperty("externalId");
+      expect((await userRow(b.id))?.externalId).toBeNull();
     });
 
     it("updates email via the emails array and the work-email value path", async () => {
