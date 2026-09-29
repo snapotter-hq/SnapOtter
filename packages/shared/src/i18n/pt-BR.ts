@@ -4957,6 +4957,7 @@ export const ptBR: TranslationKeys = {
     changeButton: "Alterar senha",
     sidebarTitle: "Quase lá",
     sidebarDescription: "Defina uma senha forte para proteger sua conta e você estará pronto.",
+    sessionEnded: "Sua sessão terminou. Entre novamente para alterar sua senha.",
   },
   automate: {
     title: "Automatizar",

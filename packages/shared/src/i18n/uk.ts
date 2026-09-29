@@ -4949,6 +4949,7 @@ export const uk: TranslationKeys = {
     sidebarTitle: "Майже готово",
     sidebarDescription:
       "Встановіть надійний пароль для захисту Вашого облікового запису, і можна починати.",
+    sessionEnded: "Сеанс завершено. Увійдіть знову, щоб змінити пароль.",
   },
   automate: {
     title: "Автоматизація",
@@ -5193,7 +5194,7 @@ export const uk: TranslationKeys = {
       "Для «{tool}» потрібна функція «{feature}». Увімкніть її в Налаштування → AI-функції.",
     featureNotInstalled:
       "Функцію «{feature}» не встановлено. Увімкніть її в Налаштування → AI-функції.",
-    passwordTooShort: "Пароль має містити щонайменше {minLength} символів.",
+    passwordTooShort: "Пароль закороткий (мінімум: {minLength}).",
     passwordNeedsUppercase: "Пароль має містити велику літеру.",
     passwordNeedsLowercase: "Пароль має містити малу літеру.",
     passwordNeedsDigit: "Пароль має містити цифру.",

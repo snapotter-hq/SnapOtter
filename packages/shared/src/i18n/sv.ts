@@ -4942,6 +4942,7 @@ export const sv: TranslationKeys = {
     changeButton: "Byt lösenord",
     sidebarTitle: "Nästan klar",
     sidebarDescription: "Välj ett starkt lösenord för att säkra ditt konto, sedan är du igång.",
+    sessionEnded: "Din session har avslutats. Logga in igen för att byta lösenord.",
   },
   automate: {
     title: "Automatisera",

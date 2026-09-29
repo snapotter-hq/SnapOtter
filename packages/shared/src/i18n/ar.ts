@@ -4907,6 +4907,7 @@ export const ar: TranslationKeys = {
     changeButton: "تغيير كلمة المرور",
     sidebarTitle: "أوشكت على الانتهاء",
     sidebarDescription: "عيّن كلمة مرور قوية لتأمين حسابك، وستكون جاهزًا للانطلاق.",
+    sessionEnded: "انتهت جلستك. سجّل الدخول مرة أخرى لتغيير كلمة المرور.",
   },
   automate: {
     title: "أتمتة",
@@ -5147,7 +5148,7 @@ export const ar: TranslationKeys = {
     featureNotInstalledForTool:
       'تتطلب أداة {tool} ميزة "{feature}". فعّلها من الإعدادات ← ميزات AI.',
     featureNotInstalled: 'ميزة "{feature}" غير مثبتة. فعّلها من الإعدادات ← ميزات AI.',
-    passwordTooShort: "يجب أن تتكون كلمة المرور من {minLength} أحرف على الأقل.",
+    passwordTooShort: "يجب ألا يقل عدد أحرف كلمة المرور عن {minLength}.",
     passwordNeedsUppercase: "يجب أن تحتوي كلمة المرور على حرف كبير.",
     passwordNeedsLowercase: "يجب أن تحتوي كلمة المرور على حرف صغير.",
     passwordNeedsDigit: "يجب أن تحتوي كلمة المرور على رقم.",

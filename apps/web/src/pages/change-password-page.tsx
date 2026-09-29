@@ -1,7 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { passwordErrorMessage } from "@/lib/password-errors";
 
@@ -74,6 +74,7 @@ export function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
 
@@ -103,7 +104,19 @@ export function ChangePasswordPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(passwordErrorMessage(t, res.status, data, t.changePassword.failedError));
+        // A 401 that isn't a wrong current password means the session is
+        // gone (expired, idle, or ended by an admin's password reset).
+        // Retrying here can't work, so point back to sign-in.
+        if (res.status === 401 && data.code !== "INVALID_PASSWORD") {
+          clearToken();
+          setSessionEnded(true);
+          return;
+        }
+        const message = passwordErrorMessage(t, res.status, data);
+        if (!message) {
+          console.warn("Password change failed", { status: res.status, code: data.code });
+        }
+        setError(message ?? t.changePassword.failedError);
         return;
       }
 
@@ -214,7 +227,19 @@ export function ChangePasswordPage() {
                 minLength={8}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {sessionEnded && (
+              <p role="alert" className="text-sm text-destructive">
+                {t.changePassword.sessionEnded}{" "}
+                <a href={appUrl("/login")} className="underline">
+                  {t.auth.loginButton}
+                </a>
+              </p>
+            )}
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
               disabled={loading || !currentPassword || !newPassword || !confirmPassword}

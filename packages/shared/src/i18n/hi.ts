@@ -4733,6 +4733,7 @@ export const hi: TranslationKeys = {
     changeButton: "पासवर्ड बदलें",
     sidebarTitle: "लगभग हो गया",
     sidebarDescription: "अपने अकाउंट को सुरक्षित करने के लिए एक मजबूत पासवर्ड सेट करें, फिर आप तैयार हैं।",
+    sessionEnded: "आपका सत्र समाप्त हो गया है। पासवर्ड बदलने के लिए फिर से साइन इन करें।",
   },
   automate: {
     title: "ऑटोमेट",

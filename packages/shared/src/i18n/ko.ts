@@ -4863,6 +4863,7 @@ export const ko: TranslationKeys = {
     changeButton: "비밀번호 변경",
     sidebarTitle: "거의 다 됐어요",
     sidebarDescription: "강력한 비밀번호를 설정하여 계정을 보호하면 바로 시작할 수 있습니다.",
+    sessionEnded: "세션이 종료되었습니다. 비밀번호를 변경하려면 다시 로그인하세요.",
   },
   automate: {
     title: "자동화",

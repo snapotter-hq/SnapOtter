@@ -76,14 +76,23 @@ describe("change-password errors are translated (#1446)", () => {
     expect(screen.queryByText("Current password is incorrect")).toBeNull();
   });
 
-  it("doesn't blame the current password when the session has expired", async () => {
-    // Also a 401, but from requireAuth: the password may be right.
+  it("sends the user back to sign in when the session has ended", async () => {
+    // Also a 401, but from requireAuth (expired, idle, or every session
+    // dropped by an admin's reset): the password may be right, and retrying
+    // here can never work.
+    storage.set("snapotter-token", "stale");
     answer(401, { error: "Authentication required", code: "AUTH_REQUIRED" });
 
     await submit();
 
-    expect(await screen.findByText(de.changePassword.failedError)).toBeVisible();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(de.changePassword.sessionEnded);
+    expect(screen.getByRole("link", { name: de.auth.loginButton })).toHaveAttribute(
+      "href",
+      "/login",
+    );
     expect(screen.queryByText(de.settings.security.currentPasswordIncorrect)).toBeNull();
+    expect(storage.has("snapotter-token")).toBe(false);
   });
 
   it("says an SSO account's password is managed by the identity provider", async () => {

@@ -4976,6 +4976,7 @@ export const fr: TranslationKeys = {
     sidebarTitle: "Presque fini",
     sidebarDescription:
       "Définissez un mot de passe fort pour sécuriser votre compte, puis vous serez prêt.",
+    sessionEnded: "Votre session a expiré. Reconnectez-vous pour changer votre mot de passe.",
   },
   automate: {
     title: "Automatiser",

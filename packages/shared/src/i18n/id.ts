@@ -4944,6 +4944,7 @@ export const id: TranslationKeys = {
     sidebarTitle: "Hampir selesai",
     sidebarDescription:
       "Atur kata sandi yang kuat untuk mengamankan akun Anda, lalu Anda siap memulai.",
+    sessionEnded: "Sesi Anda telah berakhir. Masuk lagi untuk mengubah kata sandi.",
   },
   automate: {
     title: "Otomasi",

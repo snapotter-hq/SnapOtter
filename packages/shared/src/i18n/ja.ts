@@ -4889,6 +4889,8 @@ export const ja: TranslationKeys = {
     changeButton: "パスワード変更",
     sidebarTitle: "あと少しです",
     sidebarDescription: "強力なパスワードを設定してアカウントを保護すれば、準備完了です。",
+    sessionEnded:
+      "セッションが終了しました。パスワードを変更するには、もう一度サインインしてください。",
   },
   automate: {
     title: "自動化",

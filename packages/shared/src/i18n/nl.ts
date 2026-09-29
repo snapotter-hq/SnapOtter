@@ -4963,6 +4963,7 @@ export const nl: TranslationKeys = {
     sidebarTitle: "Bijna klaar",
     sidebarDescription:
       "Stel een sterk wachtwoord in om je account te beveiligen, dan ben je er klaar voor.",
+    sessionEnded: "Je sessie is verlopen. Log opnieuw in om je wachtwoord te wijzigen.",
   },
   automate: {
     title: "Automatiseren",

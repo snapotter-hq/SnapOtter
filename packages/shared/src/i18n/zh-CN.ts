@@ -4657,6 +4657,7 @@ export const zhCN: TranslationKeys = {
     changeButton: "修改密码",
     sidebarTitle: "快要完成了",
     sidebarDescription: "设置一个强密码来保护您的账号，然后就可以开始使用了。",
+    sessionEnded: "你的会话已结束。请重新登录以更改密码。",
   },
   automate: {
     title: "自动化",

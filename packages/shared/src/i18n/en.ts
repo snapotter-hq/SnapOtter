@@ -4878,6 +4878,7 @@ export const en = {
     changeButton: "Change password",
     sidebarTitle: "Hello from the otter side!",
     sidebarDescription: "Set a strong password to secure your account, then you're good to go.",
+    sessionEnded: "Your session has ended. Sign in again to change your password.",
   },
   automate: {
     title: "Automate",

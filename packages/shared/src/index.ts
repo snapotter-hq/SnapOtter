@@ -15,6 +15,7 @@ export * from "./features.js";
 export * from "./i18n/index.js";
 export * from "./library-save.js";
 export * from "./modality.js";
+export * from "./password-policy.js";
 export * from "./permissions.js";
 export * from "./pipeline-templates.js";
 export * from "./search/format-aliases.js";

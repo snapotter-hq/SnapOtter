@@ -4933,6 +4933,7 @@ export const vi: TranslationKeys = {
     changeButton: "Đổi mật khẩu",
     sidebarTitle: "Sắp xong rồi",
     sidebarDescription: "Đặt mật khẩu mạnh để bảo mật tài khoản, sau đó bạn có thể sử dụng ngay.",
+    sessionEnded: "Phiên của bạn đã kết thúc. Hãy đăng nhập lại để đổi mật khẩu.",
   },
   automate: {
     title: "Tự động hóa",

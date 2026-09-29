@@ -4657,6 +4657,7 @@ export const zhTW: TranslationKeys = {
     changeButton: "變更密碼",
     sidebarTitle: "就差一步",
     sidebarDescription: "設定一組強密碼來保護您的帳戶，然後就可以開始使用了。",
+    sessionEnded: "你的工作階段已結束。請重新登入以變更密碼。",
   },
   automate: {
     title: "自動化",

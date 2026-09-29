@@ -4953,6 +4953,7 @@ export const es: TranslationKeys = {
     changeButton: "Cambiar contraseña",
     sidebarTitle: "Ya casi",
     sidebarDescription: "Establece una contraseña segura para proteger tu cuenta y estarás listo.",
+    sessionEnded: "Tu sesión ha terminado. Vuelve a iniciar sesión para cambiar tu contraseña.",
   },
   automate: {
     title: "Automatizar",

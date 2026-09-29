@@ -4953,6 +4953,7 @@ export const tr: TranslationKeys = {
     sidebarTitle: "Neredeyse tamam",
     sidebarDescription:
       "Hesabınızı güvence altına almak için güçlü bir parola belirleyin, ardından hazırsınız.",
+    sessionEnded: "Oturumunuz sona erdi. Parolanızı değiştirmek için yeniden giriş yapın.",
   },
   automate: {
     title: "Otomatikleştir",

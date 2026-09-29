@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, type PasswordRule } from "@snapotter/shared";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -94,7 +94,7 @@ export function computeKeyPrefix(rawKey: string): string {
  */
 interface PasswordRuleFailure {
   message: string;
-  rule: "minLength" | "uppercase" | "lowercase" | "digit" | "special";
+  rule: PasswordRule;
   minLength?: number;
 }
 

@@ -4963,6 +4963,7 @@ export const it: TranslationKeys = {
     sidebarTitle: "Ci siamo quasi",
     sidebarDescription:
       "Imposta una password sicura per proteggere il tuo account, poi sarai pronto.",
+    sessionEnded: "La sessione è scaduta. Accedi di nuovo per cambiare la password.",
   },
   automate: {
     title: "Automatizza",

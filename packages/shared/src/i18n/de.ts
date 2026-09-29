@@ -4976,6 +4976,8 @@ export const de: TranslationKeys = {
     sidebarTitle: "Fast geschafft",
     sidebarDescription:
       "Legen Sie ein sicheres Passwort fest, um Ihr Konto zu schützen. Dann kann es losgehen.",
+    sessionEnded:
+      "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an, um Ihr Passwort zu ändern.",
   },
   automate: {
     title: "Automatisieren",
