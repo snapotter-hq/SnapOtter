@@ -140,6 +140,15 @@ function serializeFile(row: typeof schema.userFiles.$inferSelect) {
 }
 
 /**
+ * Answers a quota refusal from quotaRefusal(). The upload size limit answers
+ * 413 too, so the code is what tells the web app's Save to Files to say the
+ * library is full rather than that the file is too large (#1350).
+ */
+function sendOverQuota(reply: FastifyReply, message: string) {
+  return reply.status(413).send({ error: message, code: "STORAGE_QUOTA_EXCEEDED" });
+}
+
+/**
  * Why storing `additionalBytes` more would put the user, or their team, over
  * quota: the message for a 413, or null when it fits. Uses the pre-computed
  * storageUsed counters. A database fault throws rather than reading as "over
@@ -298,7 +307,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
       // Refuse an account already over quota before reading the body.
       const overQuota = await quotaRefusal(db, userId, 0);
-      if (overQuota) return reply.status(413).send({ error: overQuota });
+      if (overQuota) return sendOverQuota(reply, overQuota);
 
       // All-or-nothing (#1342): every part is validated, quota-checked against
       // the whole batch, and written to storage first. Only once every part
@@ -393,7 +402,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           const batchOverQuota = await quotaRefusal(db, userId, stagedBytes + safeBuffer.length);
           if (batchOverQuota) {
             await discardStaged();
-            return reply.status(413).send({ error: batchOverQuota });
+            return sendOverQuota(reply, batchOverQuota);
           }
 
           const safeName = sanitizeFilename(part.filename ?? "upload");
@@ -466,7 +475,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       }
       if ("overQuota" in committed) {
         await discardStaged();
-        return reply.status(413).send({ error: committed.overQuota });
+        return sendOverQuota(reply, committed.overQuota);
       }
       // Keep the response in upload order; RETURNING doesn't promise one.
       const byId = new Map(committed.rows.map((r) => [r.id, r]));
@@ -871,7 +880,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     // Enforce per-user storage quota before saving results
     const overQuota = await quotaRefusal(db, userId, 0);
-    if (overQuota) return reply.status(413).send({ error: overQuota });
+    if (overQuota) return sendOverQuota(reply, overQuota);
 
     let fileBuffer: Buffer | null = null;
     let filename = "result";
@@ -940,7 +949,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     // Re-check quota with actual file size before persisting
     const resultOverQuota = await quotaRefusal(db, userId, safeResultBuffer.length);
-    if (resultOverQuota) return reply.status(413).send({ error: resultOverQuota });
+    if (resultOverQuota) return sendOverQuota(reply, resultOverQuota);
 
     // Persist to disk
     const storedName = await saveFile(safeResultBuffer, resultName);

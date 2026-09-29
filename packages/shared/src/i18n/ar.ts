@@ -4078,6 +4078,8 @@ export const ar: TranslationKeys = {
     importFromFiles: "استيراد من الملفات",
     saveToFiles: "حفظ في الملفات",
     savedToFiles: "تم الحفظ في الملفات",
+    resultExpired: "انتهت صلاحية هذه النتيجة. شغّل الأداة مرة أخرى.",
+    libraryFull: "مساحة تخزين ملفاتك ممتلئة. احذف بعض الملفات ثم حاول مرة أخرى.",
     librarySaveTitle: "هذا الملف من ملفاتك",
     librarySaveAsNew: "حفظ النتيجة كملف جديد",
     librarySaveAsNewHint: "يُبقي الملف الأصلي في ملفاتك",

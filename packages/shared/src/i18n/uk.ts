@@ -4114,6 +4114,8 @@ export const uk: TranslationKeys = {
     importFromFiles: "Імпортувати з файлів",
     saveToFiles: "Зберегти у файли",
     savedToFiles: "Збережено у файли",
+    resultExpired: "Термін дії цього результату минув. Запустіть інструмент ще раз.",
+    libraryFull: "Сховище ваших файлів заповнене. Видаліть кілька файлів і спробуйте ще раз.",
     librarySaveTitle: "Цей файл із ваших файлів",
     librarySaveAsNew: "Зберегти результат як новий файл",
     librarySaveAsNewHint: "Оригінал залишиться у ваших файлах",

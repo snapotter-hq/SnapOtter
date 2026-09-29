@@ -35,6 +35,8 @@ export function NonNativePreview({
   const [missingEncoder, setMissingEncoder] = useState<string | null>(null);
   // Set when the upload is over the server's size limit (#1280).
   const [tooLarge, setTooLarge] = useState(false);
+  // Set when the result to preview is gone from the server (#1350).
+  const [sourceExpired, setSourceExpired] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -56,6 +58,7 @@ export function NonNativePreview({
     setState("idle");
     setMissingEncoder(null);
     setTooLarge(false);
+    setSourceExpired(false);
     setPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
@@ -85,6 +88,7 @@ export function NonNativePreview({
     const controller = new AbortController();
     abortRef.current = controller;
     let encoder: string | null = null;
+    let expired = false;
 
     try {
       let fileToUpload = file;
@@ -95,6 +99,9 @@ export function NonNativePreview({
         // statusCode on purpose: a status here is about fetching the source,
         // not about the preview request, and must not be read as one.
         if (!res.ok) {
+          // Only a processed result is fetched here (an input comes in as
+          // `file`), so a 404 or 410 means the result expired (#1350).
+          expired = res.status === 404 || res.status === 410;
           throw new SafeError(`Media preview could not fetch its source (HTTP ${res.status})`, {
             code: `preview-source-http-${res.status}`,
           });
@@ -140,6 +147,7 @@ export function NonNativePreview({
         const status = err instanceof SafeError ? err.statusCode : undefined;
         setMissingEncoder(encoder);
         setTooLarge(status === 413);
+        setSourceExpired(expired);
         setState("error");
         // A 413 (over the upload limit) or 422 (ffmpeg couldn't decode it, or
         // lacks the encoder) is about the file, and the panel says so.
@@ -230,18 +238,21 @@ export function NonNativePreview({
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
           <p className="font-medium text-foreground mb-1">
-            {tooLarge
-              ? t.errors.fileTooLarge
-              : missingEncoder
-                ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
-                : t.toolPage.previewFailed}
+            {sourceExpired
+              ? t.toolPage.resultExpired
+              : tooLarge
+                ? t.errors.fileTooLarge
+                : missingEncoder
+                  ? format(t.toolPage.previewEncoderMissing, { encoder: missingEncoder })
+                  : t.toolPage.previewFailed}
           </p>
           <p className="text-sm text-muted-foreground mb-3">
             {filename}
             {fileSize != null && <> &middot; {formatFileSize(fileSize)}</>}
           </p>
-          {/* The same file will hit the same limit, so a retry can't help. */}
-          {!tooLarge && (
+          {/* The same file hits the same limit, and a gone result stays gone,
+              so a retry can't help either. */}
+          {!tooLarge && !sourceExpired && (
             <button
               type="button"
               onClick={generatePreview}

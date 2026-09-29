@@ -3838,6 +3838,8 @@ export const zhCN: TranslationKeys = {
     importFromFiles: "从文件库导入",
     saveToFiles: "保存到文件库",
     savedToFiles: "已保存到文件库",
+    resultExpired: "此结果已过期。请重新运行该工具。",
+    libraryFull: "您的文件存储空间已满。请删除部分文件后重试。",
     librarySaveTitle: "此文件来自文件库",
     librarySaveAsNew: "将结果保存为新文件",
     librarySaveAsNewHint: "原文件保留在文件库中",

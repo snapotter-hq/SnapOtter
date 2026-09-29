@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,11 +48,12 @@ function previewCalls(fetchMock: ReturnType<typeof stubFetch>) {
 }
 
 async function generate() {
-  render(
+  const view = render(
     <NonNativePreview src={SOURCE_URL} filename="clip.mkv" fileSize={null} modality="video" />,
   );
   fireEvent.click(screen.getByRole("button", { name: /generate preview/i }));
   await act(async () => {});
+  return view;
 }
 
 // #1286: a failed source fetch used to send the error body off to be
@@ -70,7 +72,57 @@ describe("NonNativePreview source fetch (#1286)", () => {
 
     expect(fetchMock.mock.calls.filter(([url]) => url === SOURCE_URL)).toHaveLength(1);
     expect(previewCalls(fetchMock)).toHaveLength(0);
-    expect(screen.getByText("Preview generation failed")).toBeTruthy();
+    expect(screen.getByText(en.toolPage.resultExpired)).toBeTruthy();
+  });
+
+  // #1350: the preview never ran, so "Preview generation failed" was wrong,
+  // and Retry would only fetch the same missing result again.
+  it.each([404, 410])(
+    "says the result has expired on a %i source fetch, and offers no retry",
+    async (status) => {
+      stubFetch(() =>
+        Promise.resolve({ ok: false, status, blob: () => Promise.resolve(new Blob()) }),
+      );
+
+      await generate();
+
+      expect(screen.getByText(en.toolPage.resultExpired)).toBeTruthy();
+      expect(screen.queryByText(en.toolPage.previewFailed)).toBeNull();
+      expect(screen.queryByRole("button", { name: en.common.retry })).toBeNull();
+    },
+  );
+
+  it("keeps the generic failure and Retry when the source fetch fails another way", async () => {
+    stubFetch(() =>
+      Promise.resolve({ ok: false, status: 502, blob: () => Promise.resolve(new Blob()) }),
+    );
+
+    await generate();
+
+    expect(screen.getByText(en.toolPage.previewFailed)).toBeTruthy();
+    expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
+    expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
+  });
+
+  it("forgets an expired source when it is handed a different file", async () => {
+    stubFetch(() =>
+      Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
+    );
+
+    const view = await generate();
+    expect(screen.getByText(en.toolPage.resultExpired)).toBeTruthy();
+
+    view.rerender(
+      <NonNativePreview
+        src="/api/v1/download/job-2/other.mkv"
+        filename="other.mkv"
+        fileSize={null}
+        modality="video"
+      />,
+    );
+
+    expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
+    expect(screen.getByRole("button", { name: en.toolPage.generatePreview })).toBeTruthy();
   });
 
   it("still sends a source that fetched fine", async () => {

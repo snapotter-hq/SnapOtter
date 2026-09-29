@@ -4056,6 +4056,8 @@ export const th: TranslationKeys = {
     importFromFiles: "นำเข้าจากไฟล์",
     saveToFiles: "บันทึกไปยังไฟล์",
     savedToFiles: "บันทึกไปยังไฟล์แล้ว",
+    resultExpired: "ผลลัพธ์นี้หมดอายุแล้ว กรุณาเรียกใช้เครื่องมืออีกครั้ง",
+    libraryFull: "พื้นที่จัดเก็บไฟล์ของคุณเต็มแล้ว ลบไฟล์บางส่วนแล้วลองอีกครั้ง",
     librarySaveTitle: "ไฟล์นี้มาจากไฟล์ของคุณ",
     librarySaveAsNew: "บันทึกผลลัพธ์เป็นไฟล์ใหม่",
     librarySaveAsNewHint: "เก็บไฟล์ต้นฉบับไว้ในไฟล์ของคุณ",

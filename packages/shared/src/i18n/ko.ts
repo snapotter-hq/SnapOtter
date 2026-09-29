@@ -4038,6 +4038,8 @@ export const ko: TranslationKeys = {
     importFromFiles: "파일에서 가져오기",
     saveToFiles: "파일에 저장",
     savedToFiles: "파일에 저장됨",
+    resultExpired: "이 결과는 만료되었습니다. 도구를 다시 실행하세요.",
+    libraryFull: "파일 저장 공간이 가득 찼습니다. 일부 파일을 삭제한 후 다시 시도하세요.",
     librarySaveTitle: "이 파일은 내 파일에서 가져왔습니다",
     librarySaveAsNew: "결과를 새 파일로 저장",
     librarySaveAsNewHint: "원본은 내 파일에 유지됩니다",

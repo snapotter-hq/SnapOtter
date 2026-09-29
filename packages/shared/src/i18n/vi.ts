@@ -4103,6 +4103,8 @@ export const vi: TranslationKeys = {
     importFromFiles: "Nhập từ Tệp",
     saveToFiles: "Lưu vào Tệp",
     savedToFiles: "Đã lưu vào Tệp",
+    resultExpired: "Kết quả này đã hết hạn. Hãy chạy lại công cụ.",
+    libraryFull: "Bộ nhớ tệp của bạn đã đầy. Xóa bớt một số tệp rồi thử lại.",
     librarySaveTitle: "Tệp này lấy từ Tệp của bạn",
     librarySaveAsNew: "Lưu kết quả thành tệp mới",
     librarySaveAsNewHint: "Giữ nguyên tệp gốc trong Tệp của bạn",

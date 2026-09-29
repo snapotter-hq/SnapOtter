@@ -4044,6 +4044,8 @@ export const en = {
     importFromFiles: "Import from Files",
     saveToFiles: "Save to Files",
     savedToFiles: "Saved to Files",
+    resultExpired: "This result has expired. Run the tool again.",
+    libraryFull: "Your file storage is full. Delete some files, then try again.",
     librarySaveTitle: "This file is from your Files",
     librarySaveAsNew: "Save result as a new file",
     librarySaveAsNewHint: "Keeps the original in your Files",

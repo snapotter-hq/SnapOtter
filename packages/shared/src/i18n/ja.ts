@@ -4060,6 +4060,9 @@ export const ja: TranslationKeys = {
     importFromFiles: "ファイルからインポート",
     saveToFiles: "ファイルに保存",
     savedToFiles: "ファイルに保存しました",
+    resultExpired: "この結果は有効期限が切れています。ツールをもう一度実行してください。",
+    libraryFull:
+      "ファイルの保存容量がいっぱいです。いくつかのファイルを削除してから、もう一度お試しください。",
     librarySaveTitle: "このファイルはマイファイルから読み込まれています",
     librarySaveAsNew: "結果を新しいファイルとして保存",
     librarySaveAsNewHint: "元のファイルはマイファイルに残ります",

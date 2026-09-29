@@ -4114,6 +4114,9 @@ export const ptBR: TranslationKeys = {
     importFromFiles: "Importar de Arquivos",
     saveToFiles: "Salvar em Arquivos",
     savedToFiles: "Salvo em Arquivos",
+    resultExpired: "Este resultado expirou. Execute a ferramenta novamente.",
+    libraryFull:
+      "Seu armazenamento de arquivos está cheio. Exclua alguns arquivos e tente novamente.",
     librarySaveTitle: "Este arquivo vem dos seus Arquivos",
     librarySaveAsNew: "Salvar o resultado como um novo arquivo",
     librarySaveAsNewHint: "Mantém o original nos seus Arquivos",

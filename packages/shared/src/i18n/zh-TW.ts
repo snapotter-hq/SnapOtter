@@ -3837,6 +3837,8 @@ export const zhTW: TranslationKeys = {
     importFromFiles: "從檔案庫匯入",
     saveToFiles: "儲存至檔案庫",
     savedToFiles: "已儲存至檔案庫",
+    resultExpired: "此結果已過期。請重新執行該工具。",
+    libraryFull: "您的檔案儲存空間已滿。請刪除部分檔案後再試一次。",
     librarySaveTitle: "此檔案來自檔案庫",
     librarySaveAsNew: "將結果儲存為新檔案",
     librarySaveAsNewHint: "原始檔案保留在檔案庫中",

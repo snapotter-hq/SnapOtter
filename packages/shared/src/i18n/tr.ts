@@ -4112,6 +4112,8 @@ export const tr: TranslationKeys = {
     importFromFiles: "Dosyalardan İçe Aktar",
     saveToFiles: "Dosyalara Kaydet",
     savedToFiles: "Dosyalara Kaydedildi",
+    resultExpired: "Bu sonucun süresi doldu. Aracı yeniden çalıştırın.",
+    libraryFull: "Dosya depolama alanınız dolu. Birkaç dosyayı silip yeniden deneyin.",
     librarySaveTitle: "Bu dosya Dosyalarınızdan geliyor",
     librarySaveAsNew: "Sonucu yeni dosya olarak kaydet",
     librarySaveAsNewHint: "Orijinal, Dosyalarınızda kalır",

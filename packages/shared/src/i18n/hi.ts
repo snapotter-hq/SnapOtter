@@ -3908,6 +3908,8 @@ export const hi: TranslationKeys = {
     importFromFiles: "फ़ाइल्स से आयात करें",
     saveToFiles: "फ़ाइल्स में सहेजें",
     savedToFiles: "फ़ाइल्स में सहेजा गया",
+    resultExpired: "यह परिणाम समाप्त हो चुका है। टूल को फिर से चलाएं।",
+    libraryFull: "आपकी फ़ाइल स्टोरेज भर गई है। कुछ फ़ाइलें हटाएं, फिर दोबारा कोशिश करें।",
     librarySaveTitle: "यह फ़ाइल आपकी फ़ाइल्स से है",
     librarySaveAsNew: "परिणाम को नई फ़ाइल के रूप में सहेजें",
     librarySaveAsNewHint: "मूल फ़ाइल आपकी फ़ाइल्स में बनी रहती है",

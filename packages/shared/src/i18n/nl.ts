@@ -4123,6 +4123,8 @@ export const nl: TranslationKeys = {
     importFromFiles: "Importeren uit Bestanden",
     saveToFiles: "Opslaan in Bestanden",
     savedToFiles: "Opgeslagen in Bestanden",
+    resultExpired: "Dit resultaat is verlopen. Voer de tool opnieuw uit.",
+    libraryFull: "Je bestandsopslag is vol. Verwijder een paar bestanden en probeer het opnieuw.",
     librarySaveTitle: "Dit bestand komt uit je Bestanden",
     librarySaveAsNew: "Resultaat opslaan als nieuw bestand",
     librarySaveAsNewHint: "Het origineel blijft in je Bestanden",

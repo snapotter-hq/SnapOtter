@@ -4128,6 +4128,8 @@ export const fr: TranslationKeys = {
     importFromFiles: "Importer depuis Fichiers",
     saveToFiles: "Enregistrer dans Fichiers",
     savedToFiles: "Enregistré dans Fichiers",
+    resultExpired: "Ce résultat a expiré. Relancez l'outil.",
+    libraryFull: "Votre espace de stockage est plein. Supprimez quelques fichiers, puis réessayez.",
     librarySaveTitle: "Ce fichier provient de vos Fichiers",
     librarySaveAsNew: "Enregistrer le résultat comme nouveau fichier",
     librarySaveAsNewHint: "Conserve l'original dans vos Fichiers",

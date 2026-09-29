@@ -177,6 +177,8 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
       { name: "big.bin", content: OVER_LIMIT, type: "application/octet-stream" },
     ]);
     expect(res.statusCode).toBe(413);
+    // Not a quota answer: the panel tells these apart by the code (#1350).
+    expect(res.json().code).toBeUndefined();
     await expectNothingSaved(before, 1);
   });
 
@@ -190,6 +192,7 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
 
     const res = await upload([png(), jpg()]);
     expect(res.statusCode).toBe(413);
+    expect(res.json().code).toBe("STORAGE_QUOTA_EXCEEDED");
     await expectNothingSaved(before, 1);
   });
 
@@ -212,6 +215,7 @@ describe("multi-file library upload is all-or-nothing (#1342)", () => {
 
     const res = await upload([png(), jpg()]);
     expect(res.statusCode).toBe(413);
+    expect(res.json().code).toBe("STORAGE_QUOTA_EXCEEDED");
     await expectNothingSaved(before, 1);
   });
 

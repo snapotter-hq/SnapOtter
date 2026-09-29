@@ -4106,6 +4106,8 @@ export const id: TranslationKeys = {
     importFromFiles: "Impor dari File",
     saveToFiles: "Simpan ke File",
     savedToFiles: "Tersimpan ke File",
+    resultExpired: "Hasil ini sudah kedaluwarsa. Jalankan alat lagi.",
+    libraryFull: "Penyimpanan file Anda penuh. Hapus beberapa file, lalu coba lagi.",
     librarySaveTitle: "File ini berasal dari File Anda",
     librarySaveAsNew: "Simpan hasil sebagai file baru",
     librarySaveAsNewHint: "File asli tetap tersimpan di File Anda",

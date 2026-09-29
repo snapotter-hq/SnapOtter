@@ -4105,6 +4105,8 @@ export const sv: TranslationKeys = {
     importFromFiles: "Importera från Filer",
     saveToFiles: "Spara till Filer",
     savedToFiles: "Sparad till Filer",
+    resultExpired: "Resultatet har gått ut. Kör verktyget igen.",
+    libraryFull: "Din fillagring är full. Ta bort några filer och försök igen.",
     librarySaveTitle: "Den här filen kommer från dina Filer",
     librarySaveAsNew: "Spara resultatet som en ny fil",
     librarySaveAsNewHint: "Originalet finns kvar i dina Filer",

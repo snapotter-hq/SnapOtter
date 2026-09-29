@@ -4114,6 +4114,8 @@ export const ru: TranslationKeys = {
     importFromFiles: "Импорт из Файлов",
     saveToFiles: "Сохранить в Файлы",
     savedToFiles: "Сохранено в Файлы",
+    resultExpired: "Срок действия этого результата истёк. Запустите инструмент снова.",
+    libraryFull: "Хранилище ваших файлов заполнено. Удалите несколько файлов и повторите попытку.",
     librarySaveTitle: "Этот файл из ваших файлов",
     librarySaveAsNew: "Сохранить результат как новый файл",
     librarySaveAsNewHint: "Оригинал останется в ваших файлах",
