@@ -200,8 +200,9 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
     // carries a conflict guard and the loser recovers below. The guard is
     // unqualified on purpose: it has to cover both the username constraint
     // and the (auth_provider, external_id) index that refuses a second
-    // account for one identity (issue #969). The only other constraint on
-    // the table is the primary key, on a fresh UUID.
+    // account for one identity (issue #969). The other constraints can't
+    // fire here: the primary key is a fresh UUID, and scim_external_id
+    // (issue #1510) is left NULL.
     const MAX_USERNAME_RACE_RETRIES = 3;
     for (let attempt = 0; attempt < MAX_USERNAME_RACE_RETRIES; attempt++) {
       const uniqueUsername = await findUniqueUsername(username);

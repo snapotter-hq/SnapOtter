@@ -117,6 +117,10 @@ describe("migration: SCIM externalId gets its own column (#1510)", () => {
       ["oidc_user", "oidc", "shared-id"],
       ["saml_user", "saml", "name-id"],
       ["scim_no_id", "scim", null],
+      // #1008's rule: a blank id is no id. A padded one moves verbatim so the
+      // eq filter still matches what the IdP sent.
+      ["scim_blank", "scim", "   "],
+      ["scim_padded", "scim", " padded-id "],
       ["local_user", "local", null],
     ]);
 
@@ -127,6 +131,8 @@ describe("migration: SCIM externalId gets its own column (#1510)", () => {
       oidc_user: { external: "shared-id", scim: null },
       saml_user: { external: "name-id", scim: null },
       scim_no_id: { external: null, scim: null },
+      scim_blank: { external: null, scim: null },
+      scim_padded: { external: null, scim: " padded-id " },
       local_user: { external: null, scim: null },
     });
   });

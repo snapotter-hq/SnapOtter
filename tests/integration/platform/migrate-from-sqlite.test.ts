@@ -965,6 +965,23 @@ describe("migrate-from-sqlite (SCIM identities, #1510)", () => {
     expect(incoming?.external_id).toBeNull();
     expect(run.warnings.find((w) => w.includes("u-scim-incoming"))).toContain("idp-held");
   });
+
+  it("keeps a SCIM id with a target account an OIDC link took over", async () => {
+    await truncateMigratedTables();
+    await migrateFromSqlite(heldPath, { force: false });
+    // What an OIDC auto-link does to the row: the SCIM id stays, the provider
+    // and sign-in identity change.
+    await db.execute(
+      sql`UPDATE users SET auth_provider = 'oidc', external_id = 'oidc-sub' WHERE id = 'u-scim-held'`,
+    );
+
+    const run = await importCapturingWarnings(incomingPath, { force: true });
+    expect(run.error).toBeNull();
+
+    const rows = (await db.execute(sql`SELECT * FROM users ORDER BY id`)).rows;
+    expect(rows.find((u) => u.id === "u-scim-held")?.scim_external_id).toBe("idp-held");
+    expect(rows.find((u) => u.id === "u-scim-incoming")?.scim_external_id).toBeNull();
+  });
 });
 
 describe("migrate-from-sqlite (real 1.17.2 schema)", () => {

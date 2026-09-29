@@ -938,7 +938,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
 
     it("refuses a second create carrying an already-provisioned externalId with the SCIM 409 envelope", async () => {
-      // Issue #969: only the (auth_provider, external_id) index stops an IdP
+      // Issues #969 and #1510: only the SCIM externalId index stops an IdP
       // retry under a fresh userName from minting a second account for one
       // identity. The insert guard is unqualified so that refusal lands as
       // the pre-check's 409 rather than a 500.
@@ -967,9 +967,9 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
 
     it("stores a blank externalId as NULL so blank creates don't collide on the identity index", async () => {
-      // Issue #1008: "" is not NULL, so the (auth_provider, external_id)
-      // index from #969 treated every blank externalId as one shared identity
-      // and refused the second create with a 409.
+      // Issue #1008: "" is not NULL, so the externalId unique index treated
+      // every blank externalId as one shared identity and refused the second
+      // create with a 409.
       const ids: string[] = [];
       for (const externalId of ["", "   "]) {
         const res = await crudApp.app.inject({
@@ -1324,8 +1324,8 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
 
     it("rejects an externalId another user holds with a uniqueness 409 naming externalId", async () => {
-      // Issue #1006: the identity index turns this into a 23505, which used
-      // to come back as "userName already taken".
+      // Issue #1006: the externalId unique index turns this into a 23505,
+      // which used to come back as "userName already taken".
       const externalId = uniqueName("scim-put-ext-taken");
       await createScimUser({ userName: uniqueName("scim-put-ext-holder"), externalId });
       const victim = await createScimUser({ userName: uniqueName("scim-put-ext-victim") });
@@ -2087,6 +2087,41 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
       expect(deactivate.statusCode, deactivate.body).toBe(200);
       expect((await userRow(scimUser.id))?.role).toBe("disabled:user");
+
+      // The link used to free the id, so an IdP retrying the create under a
+      // fresh userName minted a second account for the same person.
+      const again = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: { userName: uniqueName("scim-linked-again"), externalId: scimId },
+      });
+      expect(again.statusCode, again.body).toBe(409);
+      const holders = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.scimExternalId, scimId));
+      expect(holders.map((u) => u.id)).toEqual([scimUser.id]);
+    });
+
+    it("a SCIM PATCH removing externalId leaves an OIDC user's sign-in subject alone", async () => {
+      const sub = uniqueName("oidc-sub-remove");
+      const oidcUser = await insertOidcUser(sub);
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${oidcUser.id}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "remove", path: "externalId" }],
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      const row = await userRow(oidcUser.id);
+      expect(row?.externalId).toBe(sub);
+      expect(row?.scimExternalId).toBeNull();
     });
   });
 

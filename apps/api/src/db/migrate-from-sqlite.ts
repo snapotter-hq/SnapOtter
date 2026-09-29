@@ -246,7 +246,7 @@ export function detachTwinIdentities(
 /**
  * One operator-facing line per detached row. It has to name the row that kept
  * the identity, because unpicking this afterwards means hand-written SQL against
- * external_id: there is no UI for it.
+ * external_id (scim_external_id for a SCIM identity): there is no UI for it.
  */
 export function detachedIdentityWarning(d: DetachedIdentity): string {
   const who = `user "${d.username}" (id ${d.id})`;
@@ -296,12 +296,15 @@ async function mapUserTeamNamesToIds(tx: { execute: typeof db.execute }): Promis
 
 /**
  * 1.x kept SCIM's externalId in external_id; it lives in scim_external_id since
- * #1510. Mirrors migration 0010 for the rows this import brings. Twins were
- * already detached above, so the moved values are distinct.
+ * #1510. Mirrors migration 0010 for the rows this import brings, blank-to-NULL
+ * rule included. Twins were already detached above, so the moved values are
+ * distinct.
  */
 async function moveScimExternalIds(tx: { execute: typeof db.execute }): Promise<void> {
   await tx.execute(sql`
-    UPDATE users SET scim_external_id = external_id, external_id = NULL
+    UPDATE users
+    SET scim_external_id = CASE WHEN btrim(external_id) = '' THEN NULL ELSE external_id END,
+        external_id = NULL
     WHERE auth_provider = 'scim' AND external_id IS NOT NULL`);
 }
 
@@ -336,7 +339,7 @@ export async function migrateFromSqlite(
       const existing = await tx.execute(sql`SELECT count(*)::int AS n FROM users`);
       if ((existing.rows[0].n as number) > 0 && !opts.force) {
         throw new TargetNonEmptyError(
-          "Target Postgres database is non-empty; refusing to migrate. Re-run with --force to attempt inserting 1.x rows into the existing database. This will FAIL and roll back if any primary key or unique value (username, team name, role name) collides with existing data. The one exception is the (auth_provider, external_id) identity index: a 1.x user whose external identity already belongs to an account here is imported without that link instead of colliding.",
+          "Target Postgres database is non-empty; refusing to migrate. Re-run with --force to attempt inserting 1.x rows into the existing database. This will FAIL and roll back if any primary key or unique value (username, team name, role name) collides with existing data. The one exception is an external identity, the (auth_provider, external_id) index or a SCIM externalId: a 1.x user whose external identity already belongs to an account here is imported without that link instead of colliding.",
         );
       }
 

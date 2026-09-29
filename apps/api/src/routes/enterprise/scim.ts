@@ -675,7 +675,11 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         {
           userId: id,
           username: updated.username,
-          changes: Object.keys(updates).filter((k) => k !== "updatedAt"),
+          // Named as SCIM attributes, as PATCH logs its paths, so audit
+          // searches for externalId changes keep working after #1510.
+          changes: Object.keys(updates)
+            .filter((k) => k !== "updatedAt")
+            .map((k) => (k === "scimExternalId" ? "externalId" : k)),
         },
         request.ip,
         request.id,
