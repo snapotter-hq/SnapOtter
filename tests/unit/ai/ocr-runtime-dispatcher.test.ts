@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { PassThrough, Writable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ActiveRuntimeDescriptor } from "../../../packages/ai/src/runtime-state.js";
 
 const mockSpawn = vi.hoisted(() => vi.fn());
@@ -237,6 +237,11 @@ async function publishRuntime(child: MockChild, dataDir: string): Promise<void> 
   expect(parsedRequests(child)[requestIndex]).toMatchObject({ script: "smoke", args: [] });
   respondLine(child, requestIndex, readinessResult());
   await rotation;
+}
+
+// A real, blocking delay that fake timers can't shorten.
+function burnRealTime(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function leaseFiles(aiDataDir: string, generation = "generation-a"): string[] {
@@ -788,9 +793,21 @@ describe("runOcrRuntime", () => {
 
   it("terminates a request that exceeds its timeout", async () => {
     vi.useFakeTimers();
+    // The dispatcher measures its budget with node:perf_hooks' performance,
+    // which fake timers leave alone (they replace globalThis.performance, a
+    // different object). Pin it, so real time spent before the timer is armed
+    // can't use up the 100ms and time the request out before any kill (#1551).
+    const now = vi.spyOn(performance, "now").mockReturnValue(0);
+    onTestFinished(() => now.mockRestore());
     const child = createMockChild();
     mockSpawn.mockReturnValue(child.process);
     await publishRuntime(child, aiDataDir);
+    // Stand in for a loaded host: the runtime read right after the request
+    // sets its deadline takes 150ms of real time (#1551).
+    mockReadActiveRuntime.mockImplementationOnce(() => {
+      burnRealTime(150);
+      return descriptor();
+    });
     const promise = runOcrRuntime("ocr", [], { aiDataDir, timeoutMs: 100 });
     let settled = false;
     const rejection = expect(
@@ -817,6 +834,7 @@ describe("runOcrRuntime", () => {
   it("uses one monotonic timeout across generation readiness and wall-clock jumps", async () => {
     vi.useFakeTimers();
     const monotonicNow = vi.spyOn(performance, "now").mockReturnValue(0);
+    onTestFinished(() => monotonicNow.mockRestore());
     vi.setSystemTime(new Date("2026-07-13T00:00:00.000Z"));
     let activeDescriptor = descriptor("generation-a");
     mockReadActiveRuntime.mockImplementation(() => activeDescriptor);
