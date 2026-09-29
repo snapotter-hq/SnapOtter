@@ -414,12 +414,6 @@ function descriptorReferences(
   }
 }
 
-// The installer writes a pending marker, swaps in the new descriptor, and
-// commits after the dispatcher handoff. Reads in that window see this, which is
-// normal during an install and only a fault if it never commits.
-const PENDING_COMMIT_DETAIL =
-  "activation marker is still pending commit (an install is running or was interrupted)";
-
 /** Says why the activation marker doesn't vouch for the active descriptor, or null if it does. */
 function activationStateMismatch(
   v3Root: string,
@@ -434,10 +428,12 @@ function activationStateMismatch(
     if (!isSymlinkFreePath(v3Root, markerPath)) return `${marker} runs through a symlink`;
     rawMarker = readBoundedStateFile(markerPath, ACTIVATION_STATE_MAX_BYTES);
   } catch (error) {
-    if (isMissingPathError(error)) return `${marker} is missing`;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return `${marker} is missing`;
     return `${marker} could not be read: ${errorMessage(error)}`;
   }
-  if (!rawMarker) return `${marker} is empty, too large, hard-linked, or not a plain file`;
+  if (!rawMarker) {
+    return `${marker} is empty, too large, hard-linked, not a plain file, or changed while being read`;
+  }
 
   try {
     const parsed: unknown = JSON.parse(rawMarker.toString("utf8"));
@@ -453,10 +449,14 @@ function activationStateMismatch(
     ) {
       return `${marker} is not a canonical ${family} marker`;
     }
+    // Checked before the descriptor hash: the installer writes the pending
+    // marker before it swaps the descriptor, so an install in flight can look
+    // like either. It is logged like any other cause, once per install, and a
+    // stuck one stays in the log instead of going quiet.
     if (parsed.status !== requiredStatus) {
       return parsed.status === "pending"
-        ? PENDING_COMMIT_DETAIL
-        : `${marker} status is ${String(parsed.status)}, expected ${requiredStatus}`;
+        ? `${marker} is still pending commit (an install is running or was interrupted)`
+        : `${marker} status is ${JSON.stringify(parsed.status)}, expected ${requiredStatus}`;
     }
 
     const active: unknown = JSON.parse(rawDescriptor.toString("utf8"));
@@ -471,9 +471,10 @@ function activationStateMismatch(
 
     const previousMalformed = `${marker} has a malformed previous-descriptor record`;
     if (parsed.previousDescriptorB64 === null) {
-      return parsed.previousGeneration === null && parsed.previousIndexPath === null
-        ? null
-        : previousMalformed;
+      if (parsed.previousGeneration !== null || parsed.previousIndexPath !== null) {
+        return previousMalformed;
+      }
+      return null;
     }
     if (typeof parsed.previousDescriptorB64 !== "string") return previousMalformed;
     const previous = Buffer.from(parsed.previousDescriptorB64, "base64");
@@ -484,11 +485,14 @@ function activationStateMismatch(
       return previousMalformed;
     }
     const references = descriptorReferences(previous, family);
-    return references !== null &&
-      parsed.previousGeneration === references.generation &&
-      parsed.previousIndexPath === references.indexPath
-      ? null
-      : previousMalformed;
+    if (
+      references === null ||
+      parsed.previousGeneration !== references.generation ||
+      parsed.previousIndexPath !== references.indexPath
+    ) {
+      return previousMalformed;
+    }
+    return null;
   } catch (error) {
     return `${marker} or the active descriptor isn't valid JSON: ${errorMessage(error)}`;
   }
@@ -908,12 +912,7 @@ function parseOcrDescriptor(
     !isIsoTimestamp(health.checkedAt) ||
     (health.detail !== undefined && typeof health.detail !== "string")
   ) {
-    // The installer only ever writes "healthy", so another status means a hand edit.
-    return invalidDescriptor(
-      health.status === "healthy"
-        ? "active descriptor has a missing or malformed field"
-        : `active descriptor health status is ${String(health.status)}, not healthy`,
-    );
+    return invalidDescriptor("active descriptor has a missing or malformed field");
   }
   if (
     artifact.target !== target ||
@@ -934,7 +933,7 @@ function parseOcrDescriptor(
   const rawIndex = readPinnedIndex(signedIndexPath, artifact.signedIndex);
   if (!rawIndex) {
     return invalidDescriptor(
-      `signed index ${artifact.signedIndex.path} doesn't match its pinned size or digest`,
+      `signed index ${artifact.signedIndex.path} is hard-linked or doesn't match its pinned size or digest`,
     );
   }
   let signedArtifact: Record<string, unknown>;
@@ -959,13 +958,13 @@ function parseOcrDescriptor(
   const pythonPath = resolveRuntimeFile(v3Root, target, value.generation, runtime.pythonPath);
   if (!pythonPath) {
     return invalidDescriptor(
-      `runtime python ${String(runtime.pythonPath)} is missing, not a plain file, or outside its generation`,
+      `runtime python ${String(runtime.pythonPath)} is missing, behind a symlink, or not a plain file`,
     );
   }
   const entrypoint = resolveRuntimeFile(v3Root, target, value.generation, runtime.entrypoint);
   if (!entrypoint) {
     return invalidDescriptor(
-      `runtime entrypoint ${String(runtime.entrypoint)} is missing, not a plain file, or outside its generation`,
+      `runtime entrypoint ${String(runtime.entrypoint)} is missing, behind a symlink, or not a plain file`,
     );
   }
   if (
@@ -977,17 +976,23 @@ function parseOcrDescriptor(
   for (const file of Object.values(runtime.integrityFiles)) {
     const integrityPath = resolveRuntimeFile(v3Root, target, value.generation, file.path);
     if (!integrityPath) {
-      return invalidDescriptor(`runtime file ${file.path} is missing or not a plain file`);
+      return invalidDescriptor(
+        `runtime file ${file.path} is missing, behind a symlink, or not a plain file`,
+      );
     }
     if (!verifyRuntimeFileDigest(integrityPath, file.size, file.sha256)) {
-      return invalidDescriptor(`runtime file ${file.path} doesn't match its size or digest`);
+      return invalidDescriptor(
+        `runtime file ${file.path} is hard-linked or doesn't match its size or digest`,
+      );
     }
   }
   const modelRoot = resolve(v3Root, "runtimes", "ocr", target, value.generation, "models");
   for (const file of Object.values(artifact.modelFiles)) {
     const modelPath = resolveRuntimeFile(v3Root, target, value.generation, file.path);
     if (!modelPath) {
-      return invalidDescriptor(`model file ${file.path} is missing or not a plain file`);
+      return invalidDescriptor(
+        `model file ${file.path} is missing, behind a symlink, or not a plain file`,
+      );
     }
     if (!isContainedPath(modelRoot, modelPath)) {
       return invalidDescriptor(`model file ${file.path} is outside models/`);
@@ -996,7 +1001,7 @@ function parseOcrDescriptor(
       return invalidDescriptor(`model file ${file.path} is the wrong size`);
     }
     if (!verifyRuntimeFileDigest(modelPath, file.size, file.sha256)) {
-      return invalidDescriptor(`model file ${file.path} failed its digest check`);
+      return invalidDescriptor(`model file ${file.path} is hard-linked or failed its digest check`);
     }
   }
   const generationRoot = resolve(v3Root, "runtimes", "ocr", target, value.generation);
@@ -1074,7 +1079,7 @@ function inspectActiveRuntime(
     const rawDescriptor = readBoundedStateFile(descriptorPath, ACTIVE_DESCRIPTOR_MAX_BYTES);
     if (!rawDescriptor) {
       return invalidDescriptor(
-        `active descriptor active/${family}.json is empty, too large, hard-linked, or not a plain file`,
+        `active descriptor active/${family}.json is empty, too large, hard-linked, not a plain file, or changed while being read`,
       );
     }
     const activationMismatch = activationStateMismatch(
@@ -1105,12 +1110,14 @@ function inspectActiveRuntime(
   }
 }
 
-/** An error's message plus each wrapped cause's, so "Unable to read X" says why. */
-function errorMessage(error: unknown): string {
+/**
+ * An error's message plus its wrapped causes', so "Unable to read X" says why.
+ * Bounded, because this runs inside the capability read and must never throw.
+ */
+function errorMessage(error: unknown, depth = 0): string {
   if (!(error instanceof Error)) return String(error);
-  return error.cause === undefined
-    ? error.message
-    : `${error.message}: ${errorMessage(error.cause)}`;
+  if (error.cause === undefined || depth >= 4) return error.message;
+  return `${error.message}: ${errorMessage(error.cause, depth + 1)}`;
 }
 
 export interface OcrRuntimeActivationIdentity {
@@ -1185,18 +1192,19 @@ export function readPendingOcrRuntimeForHandoff(
 // Any read that isn't descriptor-invalid clears it, so a recurrence logs again.
 let lastReportedInvalidRuntime: string | null = null;
 
+const MAX_LOGGED_DETAIL_CHARS = 500;
+
 function reportInvalidRuntime(options: RuntimeStateOptions, result: ActiveRuntimeResult): void {
-  if (
-    result.descriptor ||
-    result.reason !== "descriptor-invalid" ||
-    result.detail === PENDING_COMMIT_DETAIL
-  ) {
+  if (result.descriptor || result.reason !== "descriptor-invalid") {
     lastReportedInvalidRuntime = null;
     return;
   }
-  // Details can quote index contents, so whitespace is collapsed to keep a
-  // crafted value on one log line.
-  const detail = (result.detail ?? "no detail recorded").replace(/\s+/g, " ");
+  // Details can quote values read from the data volume, so control characters
+  // and line breaks are flattened and the length is capped: a crafted value
+  // can't forge log lines or flood the log.
+  const detail = (result.detail ?? "no detail recorded")
+    .replace(/[\p{Cc}\s]+/gu, " ")
+    .slice(0, MAX_LOGGED_DETAIL_CHARS);
   const message = `[ocr-runtime] Accurate OCR runtime at ${join(resolveAiDataDir(options), "v3")} is unavailable: ${detail}`;
   if (message === lastReportedInvalidRuntime) return;
   lastReportedInvalidRuntime = message;

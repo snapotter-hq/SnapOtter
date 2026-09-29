@@ -1,6 +1,7 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   chmodSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -14,6 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { APP_VERSION } from "@snapotter/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { OcrRuntimeTrustKey } from "../../../packages/ai/src/runtime-index.js";
 import {
   getOcrRuntimeCapability,
   readActiveRuntime,
@@ -907,7 +909,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
       providers: [],
     });
     expect(warnings(warn)).toEqual([
-      `[ocr-runtime] Accurate OCR runtime at ${join(fixture.aiDataDir, "v3")} is unavailable: model file runtimes/ocr/linux-amd64-cpu-py312/generation-test/models/small.onnx failed its digest check`,
+      `[ocr-runtime] Accurate OCR runtime at ${join(fixture.aiDataDir, "v3")} is unavailable: model file runtimes/ocr/linux-amd64-cpu-py312/generation-test/models/small.onnx is hard-linked or failed its digest check`,
     ]);
 
     // The capability is polled; the same failure must not flood the log.
@@ -923,14 +925,14 @@ describe("invalid runtime diagnostics (#1433)", () => {
 
     writeFileSync(fixture.smallModelPath, "broken", "utf-8");
     getOcrRuntimeCapability(options);
-    // Integrity files are checked before models, so restore the model first.
+    // Put the model back so only one thing is wrong at a time.
     writeFileSync(fixture.smallModelPath, "small", "utf-8");
     writeFileSync(fixture.adapterPath, "# evil adapter\n", "utf-8");
     getOcrRuntimeCapability(options);
 
     expect(warnings(warn)).toEqual([
       expect.stringMatching(/small\.onnx is the wrong size$/),
-      expect.stringMatching(/ocr_runtime\.py doesn't match its size or digest$/),
+      expect.stringMatching(/ocr_runtime\.py is hard-linked or doesn't match its size or digest$/),
     ]);
   });
 
@@ -969,17 +971,32 @@ describe("invalid runtime diagnostics (#1433)", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("stays quiet while an install waits to commit its activation", () => {
+  it.each([
+    ["after the descriptor swap", (_state: Record<string, unknown>) => {}],
+    [
+      // The installer writes the pending marker for the new descriptor before
+      // it swaps the descriptor in.
+      "before the descriptor swap",
+      (state: Record<string, unknown>) => {
+        state.activatedDescriptorSha256 = "e".repeat(64);
+      },
+    ],
+  ])("words a pending activation as an install in flight, %s", (_label, adjust) => {
     const fixture = createRuntimeFixture();
     mutateActivationState(fixture.activationPath, (state) => {
       state.status = "pending";
+      adjust(state);
     });
     const warn = quietWarn();
     const options = { aiDataDir: fixture.aiDataDir, ...linuxX64 };
 
     expect(getOcrRuntimeCapability(options)).toMatchObject({ reason: "descriptor-invalid" });
-    expect(readPendingOcrRuntimeForHandoff(options)).not.toBeNull();
-    expect(warn).not.toHaveBeenCalled();
+    getOcrRuntimeCapability(options);
+    expect(warnings(warn)).toEqual([
+      expect.stringMatching(
+        /is unavailable: activation marker rollback\/ocr\.json is still pending commit \(an install is running or was interrupted\)$/,
+      ),
+    ]);
   });
 
   it.each<[string, (fixture: Fixture) => void, RegExp]>([
@@ -995,7 +1012,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
         index.artifacts[0].files.at(-1).sha256 = "f".repeat(64);
         writeFileSync(fixture.signedIndexPath, canonicalJson(index), "utf-8");
       },
-      /signed index indexes\/.* doesn't match its pinned size or digest$/,
+      /signed index indexes\/.* is hard-linked or doesn't match its pinned size or digest$/,
     ],
     [
       "resized model",
@@ -1003,9 +1020,19 @@ describe("invalid runtime diagnostics (#1433)", () => {
       /model file .*medium\.onnx is the wrong size$/,
     ],
     [
+      "hard-linked model",
+      (fixture) => linkSync(fixture.smallModelPath, join(fixture.aiDataDir, "small-copy.onnx")),
+      /model file .*small\.onnx is hard-linked or failed its digest check$/,
+    ],
+    [
       "corrupt execution code",
       (fixture) => writeFileSync(fixture.adapterPath, "# evil adapter\n", "utf-8"),
-      /runtime file .*ocr_runtime\.py doesn't match its size or digest$/,
+      /runtime file .*ocr_runtime\.py is hard-linked or doesn't match its size or digest$/,
+    ],
+    [
+      "hard-linked python",
+      (fixture) => linkSync(fixture.pythonPath, join(fixture.aiDataDir, "python-copy")),
+      /runtime file .*venv\/bin\/python is hard-linked or doesn't match its size or digest$/,
     ],
     [
       "corrupt site-packages file",
@@ -1025,7 +1052,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
     [
       "missing python",
       (fixture) => unlinkSync(fixture.pythonPath),
-      /runtime python runtimes\/ocr\/.*\/venv\/bin\/python is missing, not a plain file, or outside its generation$/,
+      /runtime python runtimes\/ocr\/.*\/venv\/bin\/python is missing, behind a symlink, or not a plain file$/,
     ],
     [
       "malformed descriptor field",
@@ -1034,14 +1061,6 @@ describe("invalid runtime diagnostics (#1433)", () => {
           descriptor.artifact.arch = null;
         }),
       /active descriptor has a missing or malformed field$/,
-    ],
-    [
-      "hand-edited health status",
-      (fixture) =>
-        mutateDescriptor(fixture.descriptorPath, (descriptor) => {
-          descriptor.health.status = "degraded";
-        }),
-      /active descriptor health status is degraded, not healthy$/,
     ],
     [
       "missing descriptor section",
@@ -1062,7 +1081,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
     [
       "empty descriptor",
       (fixture) => writeFileSync(fixture.descriptorPath, "", "utf-8"),
-      /active descriptor active\/ocr\.json is empty, too large, hard-linked, or not a plain file$/,
+      /active descriptor active\/ocr\.json is empty, too large, hard-linked, not a plain file, or changed while being read$/,
     ],
     [
       "symlinked active directory",
@@ -1101,7 +1120,7 @@ describe("invalid runtime diagnostics (#1433)", () => {
         ),
       /activation marker rollback\/ocr\.json vouches for a different descriptor than active\/ocr\.json$/,
     ],
-  ])("names the failing check for a %s", (_label, corrupt, expected) => {
+  ])("names the failing check: %s", (_label, corrupt, expected) => {
     const fixture = createRuntimeFixture();
     corrupt(fixture);
     const warn = quietWarn();
@@ -1111,6 +1130,39 @@ describe("invalid runtime diagnostics (#1433)", () => {
       reason: "descriptor-invalid",
     });
     expect(warnings(warn)).toEqual([expect.stringMatching(expected)]);
+  });
+
+  it("caps a huge value from the data volume to a bounded log line", () => {
+    const fixture = createRuntimeFixture();
+    mutateActivationState(fixture.activationPath, (state) => {
+      state.status = "a".repeat(5_000);
+    });
+    const warn = quietWarn();
+
+    getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64 });
+
+    const [line] = warnings(warn);
+    expect(line).toMatch(/activation marker rollback\/ocr\.json status is "a+$/);
+    expect(line.length).toBeLessThan(700);
+  });
+
+  it("flattens control characters an error message carries into the log", () => {
+    const fixture = createRuntimeFixture();
+    const escapeChar = String.fromCharCode(27);
+    const warn = quietWarn();
+
+    // An error quotes its path raw, unlike the JSON-quoted marker values.
+    getOcrRuntimeCapability({
+      aiDataDir: fixture.aiDataDir,
+      ...linuxX64,
+      trustStorePath: join(fixture.aiDataDir, `trust${escapeChar}[2K\nfake line.json`),
+    });
+
+    const [line] = warnings(warn);
+    expect(line).toMatch(
+      /Unable to read the OCR runtime trust store at .*trust \[2K fake line\.json/,
+    );
+    expect(line).not.toMatch(/\p{Cc}/u);
   });
 
   it.skipIf(process.getuid?.() === 0)(
@@ -1148,6 +1200,25 @@ describe("invalid runtime diagnostics (#1433)", () => {
       expect.stringMatching(
         /active runtime could not be read: Unable to read the OCR runtime trust store at .*no-such-trust-store\.json: ENOENT: no such file or directory/,
       ),
+    ]);
+  });
+
+  it("still answers when a thrown error is its own cause", () => {
+    const fixture = createRuntimeFixture();
+    const loop = new Error("loop");
+    loop.cause = loop;
+    const trustKeys = {
+      find() {
+        throw loop;
+      },
+    } as unknown as readonly OcrRuntimeTrustKey[];
+    const warn = quietWarn();
+
+    expect(
+      getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64, trustKeys }),
+    ).toMatchObject({ status: "invalid", reason: "descriptor-invalid" });
+    expect(warnings(warn)).toEqual([
+      expect.stringMatching(/signed index failed verification: loop: loop: loop/),
     ]);
   });
 
