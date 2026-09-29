@@ -51,7 +51,13 @@ function compareCodePoints(left: string, right: string): number {
 // Built for plain JSON values (what JSON.parse returns). As with
 // JSON.stringify, undefined and function values drop out of objects and
 // become null in arrays, array holes included; toJSON is never called.
+// Numbers must be safe integers: Python writes floats as 1.0 or 1e-07 and
+// keeps big integers exact, neither of which JS can reproduce after
+// JSON.parse, so the signer refuses them too (#1415).
 function stringifySorted(value: unknown): string | undefined {
+  if (typeof value === "number" && !Number.isSafeInteger(value)) {
+    throw new TypeError(`canonical runtime JSON only allows safe integers, got ${value}`);
+  }
   if (Array.isArray(value)) {
     return `[${Array.from(value, (item) => stringifySorted(item) ?? "null").join(",")}]`;
   }

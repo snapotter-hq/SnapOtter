@@ -898,6 +898,29 @@ jobs:
                       )
           # OCR_MEASURED_ESTIMATE_CONTRACT_END
 
+          # OCR_CANONICAL_NUMBER_CONTRACT_BEGIN
+          MAX_CANONICAL_INTEGER = 2**53 - 1
+
+          # The JS verifier (canonicalRuntimeJson) re-serializes the parsed index
+          # and can only reproduce integers within +/-(2**53 - 1): JSON.parse turns
+          # 1.0 into 1 and rounds bigger integers. A float or big integer here would
+          # sign an index that no install accepts (#1415).
+          def require_canonical_numbers(value, path="index"):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      require_canonical_numbers(item, f"{path}.{key}")
+              elif isinstance(value, list):
+                  for position, item in enumerate(value):
+                      require_canonical_numbers(item, f"{path}[{position}]")
+              elif isinstance(value, float) or (
+                  type(value) is int and abs(value) > MAX_CANONICAL_INTEGER
+              ):
+                  raise SystemExit(
+                      f"OCR runtime index value {path} must be an integer within "
+                      f"+/-(2**53 - 1), got {value!r}"
+                  )
+          # OCR_CANONICAL_NUMBER_CONTRACT_END
+
           manifest_path = Path("docker/feature-manifest.json")
           try:
               manifest = json.loads(manifest_path.read_bytes())
@@ -1118,6 +1141,7 @@ jobs:
               "schemaVersion": 1,
               "version": os.environ["VERSION"],
           }
+          require_canonical_numbers(index)
           (output / "ocr-runtime-index.unsigned.json").write_bytes(canonical(index))
           PY
 

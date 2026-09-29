@@ -727,6 +727,44 @@ describe("OCR v3 bundle release workflow", () => {
     expect(publishJob).toContain('"files": files');
   });
 
+  it("refuses to sign an index carrying a float or an unsafe integer (#1415)", () => {
+    const workflow = readRequired(bundlesWorkflowPath);
+    const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
+    const beginMarker = "# OCR_CANONICAL_NUMBER_CONTRACT_BEGIN";
+    const endMarker = "# OCR_CANONICAL_NUMBER_CONTRACT_END";
+    const begin = signJob.indexOf(beginMarker);
+    const end = signJob.indexOf(endMarker, begin + beginMarker.length);
+    expect(begin, "canonical-number contract start marker is missing").toBeGreaterThanOrEqual(0);
+    expect(end, "canonical-number contract end marker is missing").toBeGreaterThan(begin);
+    const contract = signJob
+      .slice(begin + beginMarker.length, end)
+      .split("\n")
+      .map((line) => line.replace(/^ {10}/, ""))
+      .join("\n")
+      .trim();
+    const python = `${contract}\n\nimport json\nimport sys\nrequire_canonical_numbers(json.loads(sys.argv[1]))\n`;
+    const check = (indexJson: string) =>
+      execFileSync("python3", ["-c", python, indexJson], { stdio: "pipe" });
+
+    // The contract must run on the index before its canonical bytes are written.
+    const call = signJob.indexOf("require_canonical_numbers(index)");
+    expect(call).toBeGreaterThan(end);
+    expect(call).toBeLessThan(signJob.indexOf('"ocr-runtime-index.unsigned.json").write_bytes'));
+
+    expect(() =>
+      check('{"a":1,"b":[true,null,"x"],"c":{"d":-9007199254740991,"e":9007199254740991}}'),
+    ).not.toThrow();
+    for (const bad of [
+      '{"a":1.0}',
+      '{"a":[1e-07]}',
+      '{"a":{"b":-0.0}}',
+      '{"a":9007199254740992}',
+      '{"a":[{"b":-9007199254740992}]}',
+    ]) {
+      expect(() => check(bad), bad).toThrow(/must be an integer/);
+    }
+  });
+
   it("rejects signed artifacts whose measured sizes drift beyond the release tolerance", () => {
     const workflow = readRequired(bundlesWorkflowPath);
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");

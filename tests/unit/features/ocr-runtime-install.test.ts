@@ -284,6 +284,37 @@ describe("canonicalRuntimeJson integer-like keys (#1411)", () => {
   });
 });
 
+describe("canonicalRuntimeJson numbers (#1415)", () => {
+  // Python's json.dumps writes floats as 1.0, -0.0 and 1e-07 and keeps big
+  // integers exact; JS can't reproduce either after JSON.parse. The canonical
+  // form only allows safe integers, which print the same on both sides.
+  it("writes safe integers exactly as Python does", () => {
+    // Python: {"max":9007199254740991,"min":-9007199254740991,"t":true,"zero":0}
+    expect(
+      canonicalRuntimeJson({
+        zero: 0,
+        t: true,
+        min: -Number.MAX_SAFE_INTEGER,
+        max: Number.MAX_SAFE_INTEGER,
+      }),
+    ).toBe('{"max":9007199254740991,"min":-9007199254740991,"t":true,"zero":0}\n');
+  });
+
+  it("rejects fractions, unsafe integers and non-finite numbers wherever they sit", () => {
+    for (const value of [
+      { a: 1.5 },
+      { a: [1e-7] },
+      { a: { b: Number.MAX_SAFE_INTEGER + 1 } },
+      { a: -(2 ** 60) },
+      JSON.parse('{"a":1e400}') as unknown,
+      [Number.NaN],
+      Number.POSITIVE_INFINITY,
+    ]) {
+      expect(() => canonicalRuntimeJson(value)).toThrow(/safe integer/);
+    }
+  });
+});
+
 describe("remainingInstallerTimeoutMs", () => {
   it("floors a fractional remaining budget to the safe integer the installer requires", () => {
     // The deadline is set at one performance.now() read and the remaining time is
@@ -350,10 +381,31 @@ describe("verifyRuntimeIndex", () => {
   });
 
   it("requires a signed positive safe minimum-memory policy", () => {
-    for (const minimumMemoryBytes of [null, 0, -1, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const minimumMemoryBytes of [null, 0, -1]) {
       const fixture = signedIndex({ minimumMemoryBytes });
       expect(() => verifyRuntimeIndex(fixture.raw, TARGET, [fixture.trustKey], "2.1.0")).toThrow(
         "memory",
+      );
+    }
+    // An unsafe integer can't be canonicalized at all (#1415), so it's
+    // refused before the memory policy is ever read.
+    expect(() => signedIndex({ minimumMemoryBytes: Number.MAX_SAFE_INTEGER + 1 })).toThrow(
+      /safe integer/,
+    );
+  });
+
+  it("names the offending number when a signed index carries a non-integer (#1415)", () => {
+    // Python's signer writes 1000.5 and 1e-07 as floats; JSON.parse turns them
+    // into numbers JS would re-serialize differently, so the verifier must say
+    // why instead of reporting a generic canonical-bytes mismatch.
+    const fixture = signedIndex();
+    for (const replacement of ['"expandedSize":1000.5', '"expandedSize":1e-07']) {
+      const raw = Buffer.from(
+        fixture.raw.toString("utf8").replace('"expandedSize":1000', replacement),
+      );
+      expect(raw.equals(fixture.raw)).toBe(false);
+      expect(() => verifyRuntimeIndex(raw, TARGET, [fixture.trustKey], "2.1.0")).toThrow(
+        /safe integer/,
       );
     }
   });
