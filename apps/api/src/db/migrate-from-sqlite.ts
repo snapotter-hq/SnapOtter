@@ -271,11 +271,12 @@ async function heldIdentities(tx: { execute: typeof db.execute }): Promise<Set<s
 }
 
 /**
- * 1.x stored a team's *name* in users.team; 2.x holds the team's id (#1474).
- * Map every imported name to the id of the team that carries it, then read a
- * leftover "Default" (no team of that name came over) as the default team's
- * seeded id. Mirrors migration 0009, which fixes rows that predate this: the
- * import runs after migrations, so it has to do the same for what it brings.
+ * users.team holds a team's id (#1474). 1.x wrote ids too, except where a row
+ * kept the column default "Default", a team *name*. Map any imported name to
+ * the id of the team that carries it, then read a leftover "Default" (no team
+ * of that name came over) as the default team's seeded id. Mirrors migration
+ * 0009, which fixes rows that predate it: the import runs after migrations, so
+ * it has to do the same for what it brings.
  */
 async function mapUserTeamNamesToIds(tx: { execute: typeof db.execute }): Promise<void> {
   await tx.execute(sql`

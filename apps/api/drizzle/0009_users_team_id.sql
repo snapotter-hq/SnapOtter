@@ -1,11 +1,11 @@
 -- users.team holds a teams.id (#1474). The column default used to be the
--- team *name* 'Default', so the bootstrap admin, the anonymous user, and rows
--- imported from 1.x (which stored names) carried a value no teams.id matches:
--- team quotas, MFA policy and other per-team settings skipped them.
+-- team *name* 'Default' (1.x's was too), so the bootstrap admin, the anonymous
+-- user, and 1.x rows that kept the default carried a value no teams.id
+-- matches: team quotas, MFA policy and other per-team settings skipped them.
 --
 -- First, a value that names a team (and isn't already some team's id) becomes
--- that team's id. The ids are uuids or 'default-team-00000000', so a name and
--- an id can't collide in practice; the NOT EXISTS keeps an id untouched anyway.
+-- that team's id. Ids are generated, so a name that equals another team's id
+-- shouldn't happen; the NOT EXISTS keeps an id untouched if it does.
 UPDATE "users" u
 SET "team" = t."id"
 FROM "teams" t
