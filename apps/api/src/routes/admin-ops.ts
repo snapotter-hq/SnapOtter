@@ -131,15 +131,19 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       sql`SELECT coalesce(sum(size), 0)::text AS bytes, count(*)::int AS files FROM user_files`,
     );
 
-    // Per-team storage breakdown from pre-computed user counters
+    // Per-team storage breakdown from pre-computed user counters. users.team
+    // holds a team id (#1474): label by the team's name, falling back to the
+    // raw value for a user whose team row is gone.
+    const teamName = sql<string>`coalesce(${schema.teams.name}, ${schema.users.team})`;
     const teamStorageRows = await db
       .select({
-        teamName: schema.users.team,
+        teamName,
         totalBytes: sql<string>`coalesce(sum(${schema.users.storageUsed}), 0)::text`,
         userCount: sql<number>`count(*)::int`,
       })
       .from(schema.users)
-      .groupBy(schema.users.team);
+      .leftJoin(schema.teams, eq(schema.teams.id, schema.users.team))
+      .groupBy(teamName);
 
     const jobsPerDay = (jobsPerDayResult.rows as Array<Record<string, unknown>>).map((r) => ({
       day: String(r.day),
