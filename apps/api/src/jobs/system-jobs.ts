@@ -361,9 +361,10 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Age alone would delete the input of a job still waiting behind a backed-up
   // queue, so an expired dir survives while any job that owns it is in flight
   // (#1412). Only rows job-reconciliation settles count (same criteria as its
-  // candidate query): a stranded one goes terminal within a minute, so a stuck
-  // row cannot pin a dir forever. Selected by status, not by an id list, so a
-  // huge backlog of expired dirs cannot overflow the bind-parameter limit.
+  // candidate query, which covers gdpr-export's system rows since #1441): a
+  // stranded one goes terminal within a minute, so a stuck row cannot pin a
+  // dir forever. Selected by status, not by an id list, so a huge backlog of
+  // expired dirs cannot overflow the bind-parameter limit.
   const inFlightIds = new Set<string>();
   if (expiredDirs.length > 0) {
     const rows = await db
@@ -374,7 +375,6 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
           inArray(schema.jobs.status, [...IN_FLIGHT_STATUSES]),
           isNotNull(schema.jobs.toolId),
           ne(schema.jobs.toolId, ""),
-          ne(schema.jobs.type, "system"),
         ),
       );
     for (const r of rows) inFlightIds.add(r.id);

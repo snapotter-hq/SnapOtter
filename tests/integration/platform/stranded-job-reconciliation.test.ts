@@ -226,23 +226,64 @@ describe("stranded-job reconciliation", () => {
     expect((await readJob(id)).status).toBe("queued");
   });
 
-  it("ignores rows whose id is not a BullMQ job id", async () => {
-    // gdpr-export enqueues without a jobId, so BullMQ generates its own and the
-    // queue lookup would wrongly report the row dead while the export runs.
-    const systemJob = await seedJob({
-      status: "processing",
-      type: "system",
-      toolId: "gdpr-export",
-    });
-    // An SSE-progress placeholder was never enqueued at all; the narrow startup
+  it("ignores a progress placeholder, which was never enqueued", async () => {
+    // An SSE-progress placeholder has no BullMQ job at all; the narrow startup
     // sweep in apps/api/src/index.ts owns those rows.
     const placeholder = await seedJob({ status: "processing", toolId: null, pool: null });
 
     const summary = await reconcileStrandedJobs({ graceMs: 0 });
-    expect(summary.outcomes.some((o) => o.jobId === systemJob)).toBe(false);
     expect(summary.outcomes.some((o) => o.jobId === placeholder)).toBe(false);
-    expect((await readJob(systemJob)).status).toBe("processing");
     expect((await readJob(placeholder)).status).toBe("processing");
+  });
+
+  // #1441: gdpr-export rows (type "system") were skipped on the claim that
+  // they enqueue without a jobId. They never did (the route passes the row id
+  // as the BullMQ jobId), and nothing else settles one whose export throws, so
+  // a failed export said "queued" forever.
+  describe("GDPR export rows (#1441)", () => {
+    const gdpr = (status: "queued" | "processing" = "queued") =>
+      seedJob({ status, type: "system", toolId: "gdpr-export", pool: "system" });
+
+    it("fails a GDPR export whose job is gone and produced nothing", async () => {
+      const id = await gdpr();
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("failed");
+
+      const row = await readJob(id);
+      expect(row.status, "a dead GDPR export stayed non-terminal").toBe("failed");
+      expect(row.error?.message).toBe(UNRECOVERABLE_STRANDED_JOB_ERROR);
+    });
+
+    it("completes a GDPR export whose archive was written before the status write was lost", async () => {
+      const id = await gdpr();
+      await seedOutput(id, "gdpr-export.zip", Buffer.from("PK-archive-bytes"));
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("recovered");
+
+      const row = await readJob(id);
+      expect(row.status).toBe("completed");
+      // The same ref the export's own completion records, so the status route
+      // hands out the same download link either way.
+      expect(row.outputRefs).toEqual([`outputs/${id}/gdpr-export.zip`]);
+    });
+
+    it("leaves a GDPR export alone while its job is still queued on the system pool", async () => {
+      const id = await gdpr();
+      const queue = getQueue("system");
+      await queue.add("system:gdpr-export", { jobId: id } as never, {
+        jobId: id,
+        delay: 10 * 60_000,
+      });
+      try {
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("live");
+        expect((await readJob(id)).status).toBe("queued");
+      } finally {
+        await queue.remove(id).catch(() => {});
+      }
+    });
   });
 
   it("skips a zero-byte output rather than calling it a result", async () => {

@@ -670,11 +670,12 @@ describe("storageTtlSweep keeps dirs of in-flight jobs (#1412)", () => {
     expect(deletePrefixMock).toHaveBeenCalledTimes(1);
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/gone");
     // In flight means queued or processing, and only rows job-reconciliation
-    // settles (a tool id, not a system row), so a stuck row cannot pin a dir.
+    // settles (any row with a tool id), so a stuck row cannot pin a dir. Since
+    // #1441 that includes gdpr-export's system rows.
     expect(drizzle.inArray).toHaveBeenCalledWith("jobs.status", ["queued", "processing"]);
     expect(drizzle.isNotNull).toHaveBeenCalledWith("jobs.toolId");
     expect(drizzle.ne).toHaveBeenCalledWith("jobs.toolId", "");
-    expect(drizzle.ne).toHaveBeenCalledWith("jobs.type", "system");
+    expect(drizzle.ne).not.toHaveBeenCalledWith("jobs.type", "system");
     expect(logSpy.mock.calls.map((c) => c[0])).toContain(
       "Storage TTL: kept 3 expired job dirs whose jobs are still in flight",
     );

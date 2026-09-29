@@ -309,20 +309,26 @@ describe("runSystemJob", () => {
       for (const dir of finishedDirs) expect(existsSync(dir)).toBe(false);
     });
 
-    it("does not let a row job-reconciliation never settles pin a stale dir", async () => {
-      // A gdpr-export row (type system) or a progress placeholder (no tool id)
-      // can stay non-terminal forever, so neither counts as in flight.
-      const systemId = `sys-${randomUUID()}`;
+    it("does not let a progress placeholder, which reconciliation never settles, pin a stale dir", async () => {
+      // A placeholder (no tool id) can stay non-terminal until the next boot,
+      // so it does not count as in flight.
       const placeholderId = `ph-${randomUUID()}`;
-      await insertJob(systemId, "system", "queued", { toolId: "gdpr-export" });
       await insertJob(placeholderId, "batch", "processing", { toolId: null });
-      const systemDir = staleDir("outputs", systemId);
       const placeholderChildDir = staleDir("outputs", `${placeholderId}-f0`);
 
       await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
 
-      expect(existsSync(systemDir)).toBe(false);
       expect(existsSync(placeholderChildDir)).toBe(false);
+    });
+
+    it("keeps a queued GDPR export's dir, since reconciliation now settles those rows (#1441)", async () => {
+      const systemId = `sys-${randomUUID()}`;
+      await insertJob(systemId, "system", "queued", { toolId: "gdpr-export" });
+      const systemDir = staleDir("outputs", systemId);
+
+      await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+
+      expect(existsSync(systemDir)).toBe(true);
     });
 
     it("keeps a finished pipeline step's output while its pipeline is still running", async () => {
