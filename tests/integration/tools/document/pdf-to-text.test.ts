@@ -65,6 +65,7 @@ type FontPdfKind =
   | "type0-no-tounicode"
   | "type0-cid-is-unicode"
   | "type0-inline"
+  | "type0-inline-no-tounicode"
   | "simple-unmapped-names";
 
 /** Build a one-page PDF of FONT_TEXT in one of these font shapes:
@@ -77,6 +78,8 @@ type FontPdfKind =
  *    PyMuPDF's CID fallback then yields the right text.
  *  - "type0-inline": the mapped Type0 font dict written inline in the page
  *    resources, which get_fonts reports as xref 0.
+ *  - "type0-inline-no-tounicode": the same inline dict with ToUnicode removed,
+ *    so it extracts as glyph ids like "type0-no-tounicode" (#1566).
  *  - "simple-unmapped-names": base-14 Helvetica re-encoded with glyph names
  *    nothing can map. MuPDF falls back to the character code for simple fonts,
  *    and these codes are ASCII, so the text still extracts correctly.
@@ -95,7 +98,7 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "else:",
     "    p.insert_text((72, 72), text, fontname='rob', fontfile=font, fontsize=12)",
     "for xref, _ext, ftype, *_ in p.get_fonts():",
-    "    if kind in ('type0-no-tounicode', 'type0-cid-is-unicode') and ftype == 'Type0':",
+    "    if kind in ('type0-no-tounicode', 'type0-cid-is-unicode', 'type0-inline-no-tounicode') and ftype == 'Type0':",
     "        d.xref_set_key(xref, 'ToUnicode', 'null')",
     "    if kind == 'type0-cid-is-unicode' and ftype == 'Type0':",
     "        cid_font = int(d.xref_get_key(xref, 'DescendantFonts')[1].strip('[]').split()[0])",
@@ -110,7 +113,7 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "        cids = '<%s>' % ''.join('%04x' % ord(ch) for ch in text)",
     "        drawn = d.xref_stream(content).decode('latin1')",
     "        d.update_stream(content, re.sub(r'<[0-9a-fA-F]+>', cids, drawn, count=1).encode('latin1'))",
-    "    if kind == 'type0-inline' and ftype == 'Type0':",
+    "    if kind in ('type0-inline', 'type0-inline-no-tounicode') and ftype == 'Type0':",
     "        resources = int(d.xref_get_key(p.xref, 'Resources')[1].split()[0])",
     "        d.xref_set_key(resources, 'Font', '<</rob %s>>' % d.xref_object(xref, compressed=True))",
     "    if kind == 'simple-unmapped-names' and ftype == 'Type1':",
@@ -182,6 +185,14 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-cid-is-unicode"), "cid-unicode.pdf");
     expect(res.statusCode).toBe(200);
     expect(await downloadText(res)).toContain(FONT_TEXT);
+  }, 60_000);
+
+  it("tells the user to run OCR when an inline composite font has no ToUnicode map (#1566)", async () => {
+    const res = await runTool(makeFontPdf("type0-inline-no-tounicode"), "inline-glyph-ids.pdf");
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.details).toMatch(/text layer/i);
+    expect(body.details).toMatch(/OCR/);
   }, 60_000);
 
   it("still extracts a composite font whose dict is written inline", async () => {

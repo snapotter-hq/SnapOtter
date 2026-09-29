@@ -145,12 +145,20 @@ interface FakeFont {
   cidToGid?: "absent" | "identity" | "stream";
   /** Defaults to an indirect font; 0 is how get_fonts reports an inline font dict. */
   xref?: number;
+  /** Where an inline (xref 0) font dict lives. "page" is the page's own
+   *  Resources, "inherited" its Pages parent's, "xobject" a Form XObject's
+   *  (get_fonts full=True names it as the referencer), and "missing" means the
+   *  refname resolves to nothing. Defaults to "page". */
+  location?: "page" | "inherited" | "xobject" | "missing";
 }
 
 /** Run draws_unmapped_composite_font against a fake page, so the font rule is
  *  tested without PyMuPDF. The fake doc mirrors the PyMuPDF calls it answers:
- *  get_fonts() rows, xref_get_key() pairs, xref_object() text, xref_is_stream(),
- *  and "bad xref" for an object number out of range, as the real one raises. */
+ *  get_fonts() rows, xref_get_key() pairs (including the key paths PyMuPDF
+ *  resolves through references, such as "Resources/Font/F0/ToUnicode"),
+ *  xref_object() text, xref_is_stream(), and "bad xref" for an object number
+ *  out of range, as the real one raises. A missing key answers ('null', 'null'),
+ *  as it does in PyMuPDF. */
 function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
   const code = [
     "import sys, json",
@@ -161,23 +169,50 @@ function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
     "TO_UNICODE = {'stream': ('xref', '%d 0 R'), 'none': ('null', 'null'),",
     "              'name': ('name', '/Identity-H'), 'dangling': ('xref', '5000 0 R')}",
     "CID_TO_GID = {'absent': '', 'identity': '/CIDToGIDMap/Identity', 'stream': '/CIDToGIDMap %d 0 R'}",
+    "PAGE, PAGES, XOBJECT = 900, 901, 902",
+    "HOLDER = {'page': PAGE, 'inherited': PAGES, 'xobject': XOBJECT, 'missing': PAGE}",
+    "def location(f):",
+    "    return f.get('location', 'page')",
+    "def inline(f):",
+    "    return f.get('xref', 1) == 0",
     "def font_at(xref):",
     "    if not 0 < xref < LENGTH:",
     "        raise ValueError('bad xref')",
     "    return fonts[xref - 1]",
+    "def font_key(i, key):",
+    "    if key == 'ToUnicode':",
+    "        kind, value = TO_UNICODE[fonts[i]['toUnicode']]",
+    "        return (kind, value % (100 + i) if '%d' in value else value)",
+    "    assert key == 'DescendantFonts', key",
+    "    return ('array', '[%d 0 R]' % (200 + i))",
+    "def has_resources(holder):",
+    "    held = [HOLDER[location(f)] for f in fonts if inline(f)]",
+    "    if holder == PAGE:",
+    "        return PAGES not in held or PAGE in held",
+    "    return holder in held",
+    "def tree_key(holder, key):",
+    "    if key == 'Parent':",
+    "        return ('xref', '%d 0 R' % PAGES) if holder == PAGE else ('null', 'null')",
+    "    if key == 'Resources':",
+    "        return ('xref', '950 0 R') if has_resources(holder) else ('null', 'null')",
+    "    prefix = 'Resources/Font/F'",
+    "    assert key.startswith(prefix), key",
+    "    name, _, rest = key[len(prefix):].partition('/')",
+    "    i = int(name)",
+    "    f = fonts[i]",
+    "    if HOLDER[location(f)] != holder or location(f) == 'missing' or not has_resources(holder):",
+    "        return ('null', 'null')",
+    "    return font_key(i, rest) if rest else ('dict', '<</Type/Font/Subtype/Type0>>')",
     "class Doc:",
     "    def xref_length(self):",
     "        return LENGTH",
     "    def xref_is_stream(self, xref):",
     "        return 100 <= xref < 200 or 300 <= xref < 400",
     "    def xref_get_key(self, xref, key):",
+    "        if xref in (PAGE, PAGES, XOBJECT):",
+    "            return tree_key(xref, key)",
     "        font_at(xref)",
-    "        i = xref - 1",
-    "        if key == 'ToUnicode':",
-    "            kind, value = TO_UNICODE[fonts[i]['toUnicode']]",
-    "            return (kind, value % (100 + i) if '%d' in value else value)",
-    "        assert key == 'DescendantFonts', key",
-    "        return ('array', '[%d 0 R]' % (200 + i))",
+    "        return font_key(xref - 1, key)",
     "    def xref_object(self, xref, compressed=False):",
     "        assert 200 <= xref < 300, xref",
     "        i = xref - 200",
@@ -186,9 +221,14 @@ function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
     "        return '<</Type/Font/Subtype/CIDFontType2/BaseFont/ABCDEF+Font%s>>' % entry",
     "class Page:",
     "    parent = Doc()",
-    "    def get_fonts(self):",
-    "        return [(f.get('xref', i + 1), 'ttf', f['type'], 'ABCDEF+Font', 'F%d' % i, '')",
-    "                for i, f in enumerate(fonts)]",
+    "    xref = PAGE",
+    "    def get_fonts(self, full=False):",
+    "        rows = []",
+    "        for i, f in enumerate(fonts):",
+    "            row = (f.get('xref', i + 1), 'ttf', f['type'], 'ABCDEF+Font', 'F%d' % i, '')",
+    "            referencer = XOBJECT if inline(f) and location(f) == 'xobject' else 0",
+    "            rows.append(row + (referencer,) if full else row)",
+    "        return rows",
     "sys.stdout.write(json.dumps(draws_unmapped_composite_font(Page())))",
   ].join("\n");
   const res = spawnSync("python3", ["-c", code, JSON.stringify(fonts)], {
@@ -226,10 +266,43 @@ describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
     );
   });
 
-  it("skips an inline font dict instead of raising on xref 0", () => {
-    // get_fonts reports an inline dict as xref 0 and xref_get_key(0) raises; an
-    // exception here would fail an extraction that succeeds today.
-    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", xref: 0 }])).toBe(false);
+  it("flags an inline Type0 font dict with no ToUnicode map (#1566)", () => {
+    // get_fonts reports an inline dict as xref 0, and xref_get_key(0) raises, so
+    // the dict has to be read through the page's Resources instead.
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", xref: 0 }])).toBe(true);
+  });
+
+  it("does not flag an inline Type0 font dict that carries a ToUnicode map", () => {
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "stream", xref: 0 }])).toBe(false);
+  });
+
+  it("does not flag an inline CID = Unicode font with a CIDToGIDMap stream", () => {
+    expect(
+      drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", cidToGid: "stream", xref: 0 }]),
+    ).toBe(false);
+  });
+
+  it("finds an inline font in Resources inherited from the Pages parent", () => {
+    expect(
+      drawsUnmappedComposite([
+        { type: "Type0", toUnicode: "none", xref: 0, location: "inherited" },
+      ]),
+    ).toBe(true);
+  });
+
+  it("finds an inline font in a Form XObject's Resources through the referencer", () => {
+    expect(
+      drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", xref: 0, location: "xobject" }]),
+    ).toBe(true);
+  });
+
+  it("does not flag an inline font whose dict can't be found, and doesn't raise", () => {
+    // A missing key reads as ('null', 'null'), the same as /ToUnicode null. Without
+    // checking the dict exists first, a failed lookup would look like an unmapped
+    // font.
+    expect(
+      drawsUnmappedComposite([{ type: "Type0", toUnicode: "none", xref: 0, location: "missing" }]),
+    ).toBe(false);
   });
 
   it("does not flag a simple TrueType font with no ToUnicode map", () => {
