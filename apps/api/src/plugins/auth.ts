@@ -887,6 +887,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         authProvider: u.authProvider ?? "local",
         email: u.email ?? null,
         hasLocalPassword: !!u.passwordHash,
+        // Same rule as the session response: external_id alone could be SAML's.
         hasOidcLink: u.authProvider === "oidc" && !!u.externalId,
         createdAt: u.createdAt.toISOString(),
       })),
