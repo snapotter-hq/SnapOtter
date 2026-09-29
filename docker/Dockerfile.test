@@ -107,6 +107,23 @@ RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml 2>/dev/null | head -1)
       done; \
     fi
 
+# PyMuPDF for the fitz-gated suites: pdf-to-text, sign/redact/flatten-pdf, the
+# fitz block of docs-dispatcher, and the fitz tools in the generated format and
+# settings matrices. PR CI shards don't install it, so before #1610 they skipped
+# in every lane; this nightly lane is now the one that runs them (the fuzz and
+# FULL_MATRIX runs live in a host job that still lacks it). Pinned to the
+# production image's version. It lives at /app/.venv, the repo-root venv
+# tests/helpers/python-gate.ts and the sidecar bridge try first, rather than
+# /opt/venv plus PYTHON_VENV_PATH: the API reads /opt/venv as the baked base it
+# reseeds AI venvs from and PYTHON_VENV_PATH as the venv bundle installs write
+# into, and the feature tests must not see either one. It sits above the
+# workspace COPYs so a lockfile change doesn't reinstall it, and
+# docker-compose.test.yml sets REQUIRE_PYTHON_FITZ=1 so a venv the suite can't
+# find fails the run instead of skipping it.
+RUN python3 -m venv /app/.venv && \
+    /app/.venv/bin/pip install --no-cache-dir PyMuPDF==1.27.2.3 && \
+    /app/.venv/bin/python -c "import fitz"
+
 WORKDIR /app
 
 # Copy workspace config first (for layer caching)
@@ -128,18 +145,6 @@ COPY packages/enterprise/package.json packages/enterprise/tsconfig.json ./packag
 
 # Install ALL dependencies (including devDependencies for testing).
 RUN pnpm install --frozen-lockfile
-
-# PyMuPDF for the fitz-gated suites (pdf-to-text, the generated format and fuzz
-# matrices). PR CI shards don't install it, so without this they skip in every
-# lane (#1610). Pinned to the production image's version. It lives at
-# /app/.venv, the repo-root venv tests/helpers/python-gate.ts and the sidecar
-# bridge try first, rather than /opt/venv plus PYTHON_VENV_PATH: the API reads
-# /opt/venv as the baked base it reseeds AI venvs from and PYTHON_VENV_PATH as
-# the venv bundle installs write into, and the feature tests must not see
-# either one.
-RUN python3 -m venv /app/.venv && \
-    /app/.venv/bin/pip install --no-cache-dir PyMuPDF==1.27.2.3 && \
-    /app/.venv/bin/python -c "import fitz"
 
 # Copy source code
 COPY . .
