@@ -152,6 +152,15 @@ class InstallRuntimeTests(unittest.TestCase):
         self.root = Path(self.temporary_directory.name)
         self.fixture = RuntimeFixture(self.root)
         self.host = install_runtime.HostInfo(platform="linux", machine="x86_64")
+        # Installs would otherwise probe the real host's cgroup memory, and a
+        # host where that isn't readable (bare WSL2, for one) fails every one
+        # at preflight. The probe's own tests call the real function (#1563).
+        self._real_effective_memory_bytes = install_runtime._effective_memory_bytes
+        memory_probe = mock.patch.object(
+            install_runtime, "_effective_memory_bytes", return_value=64 * 1024**3
+        )
+        memory_probe.start()
+        self.addCleanup(memory_probe.stop)
 
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
@@ -207,10 +216,6 @@ class InstallRuntimeTests(unittest.TestCase):
         return self._active_path().read_bytes()
 
     def _install(self, **kwargs):
-        # Without this the installer probes the real host's cgroup memory, and a
-        # host where that isn't readable (bare WSL2, for one) fails every install
-        # at preflight. Tests of the probe itself call it directly (#1563).
-        kwargs.setdefault("effective_memory_bytes", 64 * 1024 * 1024 * 1024)
         artifact = self.fixture.artifact()
         return install_runtime.install_runtime(
             ai_data_dir=self.fixture.ai_data_dir,
@@ -626,7 +631,7 @@ class InstallRuntimeTests(unittest.TestCase):
         with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
             Path, "read_text", new=read_from(private_files)
         ):
-            self.assertEqual(install_runtime._effective_memory_bytes(), 6 * gib)
+            self.assertEqual(self._real_effective_memory_bytes(), 6 * gib)
 
         host_files = {
             "/proc/self/cgroup": "0::/system.slice/docker-deadbeef.scope\n",
@@ -643,7 +648,7 @@ class InstallRuntimeTests(unittest.TestCase):
         with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
             Path, "read_text", new=read_from(host_files)
         ):
-            self.assertEqual(install_runtime._effective_memory_bytes(), 5 * gib)
+            self.assertEqual(self._real_effective_memory_bytes(), 5 * gib)
 
     def test_effective_memory_fails_closed_for_unreadable_identified_controller(
         self,
@@ -667,7 +672,7 @@ class InstallRuntimeTests(unittest.TestCase):
             Path, "read_text", new=read_text
         ):
             with self.assertRaisesRegex(install_runtime.PreflightError, "cgroup memory"):
-                install_runtime._effective_memory_bytes()
+                self._real_effective_memory_bytes()
 
     def test_effective_memory_fails_closed_when_mount_metadata_is_unreadable(
         self,
@@ -683,7 +688,7 @@ class InstallRuntimeTests(unittest.TestCase):
             Path, "read_text", new=read_text
         ):
             with self.assertRaisesRegex(install_runtime.PreflightError, "cgroup memory"):
-                install_runtime._effective_memory_bytes()
+                self._real_effective_memory_bytes()
 
     def test_effective_memory_fails_closed_when_linux_membership_is_unavailable(
         self,
@@ -703,7 +708,7 @@ class InstallRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     install_runtime.PreflightError, "cgroup memory"
                 ):
-                    install_runtime._effective_memory_bytes()
+                    self._real_effective_memory_bytes()
 
     def test_model_digests_must_bind_to_files_in_the_exact_manifest(self) -> None:
         artifact = self.fixture.artifact()
