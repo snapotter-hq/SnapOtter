@@ -190,15 +190,15 @@ function isServerFault(err: unknown): boolean {
 /** Log and report a preview failure that is the server's, not the file's. */
 function reportPreviewFault(
   err: unknown,
-  log: FastifyRequest["log"],
+  request: FastifyRequest,
   context: Record<string, unknown>,
   message: string,
 ): void {
-  log.error({ err, ...context }, message);
+  request.log.error({ err, ...context }, message);
   void reportError(err, {
     source: "http",
-    route: "/api/v1/files/:id/preview",
-    method: "GET",
+    route: request.routeOptions?.url ?? undefined,
+    method: request.method,
     statusCode: 500,
   });
 }
@@ -320,7 +320,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           } catch (stageErr) {
             reportPreviewFault(
               stageErr,
-              request.log,
+              request,
               { fileId: id },
               "Document preview staging failed",
             );
@@ -338,7 +338,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           } catch (renameErr) {
             reportPreviewFault(
               renameErr,
-              request.log,
+              request,
               { fileId: id, cachedPath },
               "Document preview cache write failed",
             );
@@ -346,7 +346,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
           }
         } catch (err) {
           if (isServerFault(err)) {
-            reportPreviewFault(err, request.log, { fileId: id }, "Document preview could not run");
+            reportPreviewFault(err, request, { fileId: id }, "Document preview could not run");
             return reply.status(500).send({ error: "Could not generate document preview" });
           }
           request.log.error({ err, fileId: id }, "Document preview generation failed");
@@ -388,7 +388,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       try {
         await access(inputPath);
       } catch (err) {
-        reportPreviewFault(err, request.log, { fileId: id }, "Preview source file missing");
+        reportPreviewFault(err, request, { fileId: id }, "Preview source file missing");
         return reply.status(500).send({ error: "Could not prepare preview" });
       }
       const partialPath = resolveWithinPreviewDir(`${id}.${randomUUID()}.part${previewExt}`);
@@ -440,7 +440,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
         if (isServerFault(err)) {
-          reportPreviewFault(err, request.log, { fileId: id }, "Preview encode could not run");
+          reportPreviewFault(err, request, { fileId: id }, "Preview encode could not run");
           return reply.status(500).send({ error: "Could not generate preview" });
         }
         request.log.error({ err, fileId: id }, "Preview generation failed");
@@ -454,12 +454,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         await rename(partialPath, cachedPath);
       } catch (err) {
         await removePartialPreview(partialPath, request.log);
-        reportPreviewFault(
-          err,
-          request.log,
-          { fileId: id, cachedPath },
-          "Preview cache write failed",
-        );
+        reportPreviewFault(err, request, { fileId: id, cachedPath }, "Preview cache write failed");
         return reply.status(500).send({ error: "Could not store preview" });
       }
 
@@ -617,6 +612,11 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         if (disconnect.clientGone()) {
           request.log.info({ filename }, "On-demand preview stopped: client disconnected");
+        } else if (isServerFault(err)) {
+          // A temp write that failed, a spawn that couldn't start: the server's
+          // fault, not the uploaded file's (#1439).
+          reportPreviewFault(err, request, { filename }, "On-demand preview could not run");
+          return reply.status(500).send({ error: "Could not generate preview" });
         } else {
           request.log.error({ err, filename }, "On-demand preview generation failed");
         }

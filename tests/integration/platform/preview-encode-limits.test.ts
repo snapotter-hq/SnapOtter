@@ -211,4 +211,24 @@ describe("preview encode limits (#1406)", () => {
     await vi.waitFor(() => expect(existsSync(cached)).toBe(true), { timeout: 10_000 });
     expect(readFileSync(cached, "utf8")).toBe("FINISHED-PREVIEW");
   });
+
+  // Kept last: the encoder probe that picks the mp3 encoder is cached per
+  // process by now, so only the encode itself meets the unrunnable binary.
+  it("answers an encode that couldn't start with a 500 (#1439)", async () => {
+    chmodSync(stub, 0o644);
+    try {
+      const payload = wavUpload();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/preview/generate",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": payload.contentType },
+        body: payload.body,
+      });
+      // The spawn failed on the server; nothing was wrong with the upload.
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: "Could not generate preview" });
+    } finally {
+      chmodSync(stub, 0o755);
+    }
+  });
 });
