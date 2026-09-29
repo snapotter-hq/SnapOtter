@@ -11,6 +11,7 @@
  */
 
 import { PassThrough } from "node:stream";
+import { SafeError } from "@snapotter/shared";
 import type { FastifyRequest } from "fastify";
 import { describe, expect, it } from "vitest";
 import {
@@ -399,5 +400,22 @@ describe("multipartFailure (#1341)", () => {
       status: 400,
       body: { error: "Failed to parse multipart request", details: "boom" },
     });
+  });
+
+  // #1421: a storage fault while the upload streams in (the workspace cap,
+  // the disk floor, a full or read-only volume, an S3 outage) is the server's,
+  // not a malformed request. It goes back to the route's caller unchanged, so
+  // the global error handler answers with its status, message and code, and
+  // reports it.
+  it("rethrows a server-side fault instead of calling it a malformed request", () => {
+    const cap = new SafeError("Workspace storage limit reached", {
+      kind: "operational",
+      code: "workspace-cap",
+      statusCode: 503,
+    });
+    expect(() => multipartFailure(cap)).toThrow(cap);
+
+    const other = Object.assign(new Error("storage exploded"), { statusCode: 500 });
+    expect(() => multipartFailure(other)).toThrow(other);
   });
 });

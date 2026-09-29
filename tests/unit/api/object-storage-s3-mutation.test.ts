@@ -159,6 +159,68 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
     expect(s3.putObject).not.toHaveBeenCalled();
   });
 
+  // #1421: an S3 refusal or an unreachable endpoint while an upload streams in
+  // is a storage fault, answered 503 like the local backend's full-disk and
+  // read-only faults. The client's own faults and aborts, and plain bugs,
+  // keep their shape.
+  describe("a failed S3 streaming upload", () => {
+    async function streamFailure(error: unknown): Promise<unknown> {
+      s3.putStream.mockRejectedValueOnce(error);
+      return putObjectStream("uploads/job-s3fault/a.bin", Readable.from([Buffer.from("x")])).then(
+        () => null,
+        (e: unknown) => e,
+      );
+    }
+
+    it.each([
+      [
+        "S3 answering with an error",
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+      ],
+      [
+        "S3 refusing access",
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+      ],
+      [
+        "the endpoint unreachable",
+        Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+      ],
+    ])("answers 503 for %s", async (_case, cause) => {
+      const err = await streamFailure(cause);
+      expect(err).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+      expect(s3.deleteObject).toHaveBeenCalledWith("uploads/job-s3fault/a.bin");
+    });
+
+    it.each([
+      ["a malformed body", Object.assign(new Error("Unexpected end of form"), { statusCode: 400 })],
+      ["an over-limit file", Object.assign(new Error("too large"), { statusCode: 413 })],
+      ["an abort", Object.assign(new Error("The operation was aborted"), { name: "AbortError" })],
+      [
+        // The upload's own client dropping out: ECONNRESET looks like an
+        // unreachable endpoint, but the 400 set upstream says whose it is.
+        "a client abort the SDK wrapped",
+        new Error("Upload failed", {
+          cause: Object.assign(new Error("aborted"), { code: "ECONNRESET", statusCode: 400 }),
+        }),
+      ],
+      ["a bug", new TypeError("Cannot read properties of undefined")],
+    ])("passes %s through unchanged", async (_case, original) => {
+      expect(await streamFailure(original)).toBe(original);
+    });
+  });
+
   it("still validates the key before dispatching to S3 (rejects traversal)", async () => {
     await expect(putObject("uploads/../etc/passwd", Buffer.from("x"))).rejects.toThrow(
       /Invalid object key/,

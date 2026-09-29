@@ -62,7 +62,7 @@ function isS3Enabled(): boolean {
 }
 
 import type { S3StorageModule } from "@snapotter/enterprise";
-import { SafeError } from "@snapotter/shared";
+import { connectivityClass, SafeError } from "@snapotter/shared";
 
 let s3Mod: S3StorageModule | null = null;
 // Concurrent first calls may double-configure; configureS3 is idempotent.
@@ -270,7 +270,7 @@ export async function putObjectStream(
         return written;
       } catch (error) {
         await s3.deleteGenericObject(key).catch(() => {});
-        throw error;
+        throw s3WriteFault(error);
       }
     } finally {
       opts.signal?.removeEventListener("abort", abortSource);
@@ -373,6 +373,37 @@ function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413; limi
   return Object.assign(new Error(`Object exceeds the maximum allowed size (${maxBytes} bytes)`), {
     statusCode: 413 as const,
     limitBytes: maxBytes,
+  });
+}
+
+/** True when the client caused this: a 4xx set upstream, or an abort, anywhere in the cause chain. */
+function isClientSide(error: unknown): boolean {
+  let e: unknown = error;
+  for (let depth = 0; depth < 5 && e instanceof Error; depth++) {
+    const status = (e as { statusCode?: unknown }).statusCode;
+    if (typeof status === "number" && status >= 400 && status < 500) return true;
+    if (e.name === "AbortError") return true;
+    e = e.cause;
+  }
+  return false;
+}
+
+/**
+ * An S3 refusal (the SDK's service errors carry `$metadata`) or an endpoint it
+ * couldn't reach, while an upload streams in: the 503 the local backend's
+ * full-disk and read-only faults already are, so the route answers "storage
+ * unavailable" instead of blaming the request (#1421). The client's own faults
+ * and aborts, and errors of ours, pass through unchanged.
+ */
+function s3WriteFault(error: unknown): unknown {
+  if (isClientSide(error)) return error;
+  const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
+  if (!s3Answered && connectivityClass(error) !== "net-unavailable") return error;
+  return new SafeError("Upload storage is unavailable. Try again shortly", {
+    kind: "operational",
+    code: "storage-unavailable",
+    statusCode: 503,
+    cause: error,
   });
 }
 

@@ -79,6 +79,11 @@ function formatLimit(bytes: number): string {
  * client can tell "too big" from "malformed" (#1341). The limit comes from the
  * error (busboy's and putObjectStream's both carry it), falling back to
  * MAX_UPLOAD_SIZE_MB.
+ *
+ * A server-side fault (a 5xx: the workspace cap, the disk floor, a full or
+ * read-only volume, an S3 outage) is thrown back instead. Those aren't the
+ * client's, and the global error handler answers them with their own status,
+ * message and code, and reports them (#1421).
  */
 export function multipartFailure(
   err: unknown,
@@ -86,6 +91,7 @@ export function multipartFailure(
   | { status: 413; body: { error: string } }
   | { status: 400; body: { error: string; details: string } } {
   const e = err as { statusCode?: unknown; limitBytes?: unknown } | null;
+  if (typeof e?.statusCode === "number" && e.statusCode >= 500) throw err;
   if (e?.statusCode === 413) {
     const limitBytes =
       typeof e.limitBytes === "number" ? e.limitBytes : env.MAX_UPLOAD_SIZE_MB * MIB;
