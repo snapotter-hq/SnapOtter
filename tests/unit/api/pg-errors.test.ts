@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isUniqueViolation } from "../../../apps/api/src/lib/pg-errors.js";
+import {
+  isUniqueViolation,
+  uniqueViolationConstraint,
+} from "../../../apps/api/src/lib/pg-errors.js";
 
 describe("isUniqueViolation", () => {
   it("matches a bare pg error carrying code 23505", () => {
@@ -23,5 +26,25 @@ describe("isUniqueViolation", () => {
     const a: { code: string; cause?: unknown } = { code: "xx" };
     a.cause = a;
     expect(isUniqueViolation(a)).toBe(false);
+  });
+});
+
+describe("uniqueViolationConstraint", () => {
+  it("reads the constraint name off a drizzle-wrapped 23505", () => {
+    const pgErr = Object.assign(new Error("duplicate key"), {
+      code: "23505",
+      constraint: "users_auth_provider_external_id_unique",
+    });
+    const wrapped = new Error("Failed query: update ...", { cause: pgErr });
+    expect(uniqueViolationConstraint(wrapped)).toBe("users_auth_provider_external_id_unique");
+  });
+
+  it("ignores a constraint carried by an error that isn't a unique violation", () => {
+    expect(uniqueViolationConstraint({ code: "23503", constraint: "fk_x" })).toBeUndefined();
+  });
+
+  it("is undefined for a 23505 without a constraint name and for non-errors", () => {
+    expect(uniqueViolationConstraint({ code: "23505" })).toBeUndefined();
+    expect(uniqueViolationConstraint(null)).toBeUndefined();
   });
 });

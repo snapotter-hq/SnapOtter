@@ -6,7 +6,7 @@ import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
-import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { isUniqueViolation, uniqueViolationConstraint } from "../../lib/pg-errors.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
 import { userLimitReached } from "../../lib/user-limit.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
@@ -17,12 +17,23 @@ const SCIM_TOKEN_SUFFIX_PATTERN = /^[0-9a-f]{64}$/;
 
 // ── SCIM Error Format ────────────────────────────────────────────
 
-function scimError(status: number, detail: string) {
+function scimError(status: number, detail: string, scimType?: string) {
   return {
     schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
     detail,
     status,
+    ...(scimType ? { scimType } : {}),
   };
+}
+
+// A user UPDATE can trip either unique index on users: userName, or the
+// (auth_provider, external_id) identity index from issue #969. Name the one
+// that fired (issue #1006) instead of blaming userName for both.
+function userUpdateConflict(err: unknown) {
+  if (uniqueViolationConstraint(err) === "users_auth_provider_external_id_unique") {
+    return scimError(409, "externalId already assigned to another user", "uniqueness");
+  }
+  return scimError(409, "userName already taken");
 }
 
 async function rejectLastActiveAdminDeactivation(
@@ -627,7 +638,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
       } catch (err) {
         if (isUniqueViolation(err)) {
-          return reply.status(409).send(scimError(409, "userName already taken"));
+          return reply.status(409).send(userUpdateConflict(err));
         }
         throw err;
       }
@@ -759,7 +770,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
       } catch (err) {
         if (isUniqueViolation(err)) {
-          return reply.status(409).send(scimError(409, "userName already taken"));
+          return reply.status(409).send(userUpdateConflict(err));
         }
         throw err;
       }
