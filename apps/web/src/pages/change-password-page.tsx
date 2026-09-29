@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { passwordErrorMessage } from "@/lib/password-errors";
 
 /**
  * Trigger the browser's "Save Password" prompt by submitting a real form
@@ -102,7 +103,7 @@ export function ChangePasswordPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || t.changePassword.failedError);
+        setError(passwordErrorMessage(t, res.status, data, t.changePassword.failedError));
         return;
       }
 

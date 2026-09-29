@@ -5184,6 +5184,12 @@ export const sv: TranslationKeys = {
       '{tool} kräver funktionen "{feature}". Aktivera den under Inställningar → AI-funktioner.',
     featureNotInstalled:
       'Funktionen "{feature}" är inte installerad. Aktivera den under Inställningar → AI-funktioner.',
+    passwordTooShort: "Lösenordet måste vara minst {minLength} tecken långt.",
+    passwordNeedsUppercase: "Lösenordet måste innehålla en stor bokstav.",
+    passwordNeedsLowercase: "Lösenordet måste innehålla en liten bokstav.",
+    passwordNeedsDigit: "Lösenordet måste innehålla en siffra.",
+    passwordNeedsSpecial: "Lösenordet måste innehålla ett specialtecken.",
+    tooManyRequests: "För många försök. Vänta en minut och försök igen.",
   },
   sidebar: {
     sponsor: "Stöd oss",

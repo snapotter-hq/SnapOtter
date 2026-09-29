@@ -5195,6 +5195,12 @@ export const ru: TranslationKeys = {
       "Для «{tool}» нужна функция «{feature}». Включите её в Настройки → AI-функции.",
     featureNotInstalled:
       "Функция «{feature}» не установлена. Включите её в Настройки → AI-функции.",
+    passwordTooShort: "Пароль должен содержать не менее {minLength} символов.",
+    passwordNeedsUppercase: "Пароль должен содержать заглавную букву.",
+    passwordNeedsLowercase: "Пароль должен содержать строчную букву.",
+    passwordNeedsDigit: "Пароль должен содержать цифру.",
+    passwordNeedsSpecial: "Пароль должен содержать специальный символ.",
+    tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
   },
   sidebar: {
     sponsor: "Поддержите нас",

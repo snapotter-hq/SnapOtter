@@ -5222,6 +5222,12 @@ export const de: TranslationKeys = {
       "{tool} benötigt die Funktion „{feature}“. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
     featureNotInstalled:
       "Die Funktion „{feature}“ ist nicht installiert. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
+    passwordTooShort: "Das Passwort muss mindestens {minLength} Zeichen lang sein.",
+    passwordNeedsUppercase: "Das Passwort muss einen Großbuchstaben enthalten.",
+    passwordNeedsLowercase: "Das Passwort muss einen Kleinbuchstaben enthalten.",
+    passwordNeedsDigit: "Das Passwort muss eine Zahl enthalten.",
+    passwordNeedsSpecial: "Das Passwort muss ein Sonderzeichen enthalten.",
+    tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
   },
   sidebar: {
     sponsor: "Uns unterstützen",

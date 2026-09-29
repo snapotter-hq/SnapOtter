@@ -5147,6 +5147,12 @@ export const ar: TranslationKeys = {
     featureNotInstalledForTool:
       'تتطلب أداة {tool} ميزة "{feature}". فعّلها من الإعدادات ← ميزات AI.',
     featureNotInstalled: 'ميزة "{feature}" غير مثبتة. فعّلها من الإعدادات ← ميزات AI.',
+    passwordTooShort: "يجب أن تتكون كلمة المرور من {minLength} أحرف على الأقل.",
+    passwordNeedsUppercase: "يجب أن تحتوي كلمة المرور على حرف كبير.",
+    passwordNeedsLowercase: "يجب أن تحتوي كلمة المرور على حرف صغير.",
+    passwordNeedsDigit: "يجب أن تحتوي كلمة المرور على رقم.",
+    passwordNeedsSpecial: "يجب أن تحتوي كلمة المرور على حرف خاص.",
+    tooManyRequests: "محاولات كثيرة جدًا. انتظر دقيقة ثم حاول مرة أخرى.",
   },
   sidebar: {
     sponsor: "ادعمنا",

@@ -5193,6 +5193,12 @@ export const uk: TranslationKeys = {
       "Для «{tool}» потрібна функція «{feature}». Увімкніть її в Налаштування → AI-функції.",
     featureNotInstalled:
       "Функцію «{feature}» не встановлено. Увімкніть її в Налаштування → AI-функції.",
+    passwordTooShort: "Пароль має містити щонайменше {minLength} символів.",
+    passwordNeedsUppercase: "Пароль має містити велику літеру.",
+    passwordNeedsLowercase: "Пароль має містити малу літеру.",
+    passwordNeedsDigit: "Пароль має містити цифру.",
+    passwordNeedsSpecial: "Пароль має містити спеціальний символ.",
+    tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
   },
   sidebar: {
     sponsor: "Підтримайте нас",

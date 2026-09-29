@@ -5118,6 +5118,12 @@ export const th: TranslationKeys = {
     fileTooLarge: "ไฟล์นี้มีขนาดเกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์",
     featureNotInstalledForTool: '{tool} ต้องใช้ฟีเจอร์ "{feature}" เปิดใช้ได้ที่ ตั้งค่า → ฟีเจอร์ AI',
     featureNotInstalled: 'ยังไม่ได้ติดตั้งฟีเจอร์ "{feature}" เปิดใช้ได้ที่ ตั้งค่า → ฟีเจอร์ AI',
+    passwordTooShort: "รหัสผ่านต้องมีอย่างน้อย {minLength} ตัวอักษร",
+    passwordNeedsUppercase: "รหัสผ่านต้องมีตัวอักษรพิมพ์ใหญ่",
+    passwordNeedsLowercase: "รหัสผ่านต้องมีตัวอักษรพิมพ์เล็ก",
+    passwordNeedsDigit: "รหัสผ่านต้องมีตัวเลข",
+    passwordNeedsSpecial: "รหัสผ่านต้องมีอักขระพิเศษ",
+    tooManyRequests: "ลองหลายครั้งเกินไป รอหนึ่งนาทีแล้วลองอีกครั้ง",
   },
   sidebar: {
     sponsor: "สนับสนุนเรา",

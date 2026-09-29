@@ -5105,6 +5105,12 @@ export const ko: TranslationKeys = {
     featureNotInstalledForTool:
       '{tool}에는 "{feature}" 기능이 필요합니다. 설정 → AI 기능에서 활성화하세요.',
     featureNotInstalled: '"{feature}" 기능이 설치되지 않았습니다. 설정 → AI 기능에서 활성화하세요.',
+    passwordTooShort: "비밀번호는 {minLength}자 이상이어야 합니다.",
+    passwordNeedsUppercase: "비밀번호에 대문자를 포함해야 합니다.",
+    passwordNeedsLowercase: "비밀번호에 소문자를 포함해야 합니다.",
+    passwordNeedsDigit: "비밀번호에 숫자를 포함해야 합니다.",
+    passwordNeedsSpecial: "비밀번호에 특수 문자를 포함해야 합니다.",
+    tooManyRequests: "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요.",
   },
   sidebar: {
     sponsor: "후원하기",

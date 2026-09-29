@@ -76,6 +76,16 @@ describe("change-password errors are translated (#1446)", () => {
     expect(screen.queryByText("Current password is incorrect")).toBeNull();
   });
 
+  it("doesn't blame the current password when the session has expired", async () => {
+    // Also a 401, but from requireAuth: the password may be right.
+    answer(401, { error: "Authentication required", code: "AUTH_REQUIRED" });
+
+    await submit();
+
+    expect(await screen.findByText(de.changePassword.failedError)).toBeVisible();
+    expect(screen.queryByText(de.settings.security.currentPasswordIncorrect)).toBeNull();
+  });
+
   it("says an SSO account's password is managed by the identity provider", async () => {
     answer(400, {
       error: "Password changes are managed by your identity provider.",

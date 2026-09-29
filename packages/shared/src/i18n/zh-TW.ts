@@ -4895,6 +4895,12 @@ export const zhTW: TranslationKeys = {
     fileTooLarge: "此檔案超過伺服器的上傳大小限制。",
     featureNotInstalledForTool: "{tool}需要「{feature}」功能。請在 設定 → AI功能 中啟用。",
     featureNotInstalled: "「{feature}」功能未安裝。請在 設定 → AI功能 中啟用。",
+    passwordTooShort: "密碼長度至少需要 {minLength} 個字元。",
+    passwordNeedsUppercase: "密碼必須包含一個大寫字母。",
+    passwordNeedsLowercase: "密碼必須包含一個小寫字母。",
+    passwordNeedsDigit: "密碼必須包含一個數字。",
+    passwordNeedsSpecial: "密碼必須包含一個特殊字元。",
+    tooManyRequests: "嘗試次數過多。請等待一分鐘後再試一次。",
   },
   sidebar: {
     sponsor: "支持我們",

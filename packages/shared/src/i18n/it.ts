@@ -5206,6 +5206,12 @@ export const it: TranslationKeys = {
       '{tool} richiede la funzionalità "{feature}". Attivala in Impostazioni → Funzionalità AI.',
     featureNotInstalled:
       'La funzionalità "{feature}" non è installata. Attivala in Impostazioni → Funzionalità AI.',
+    passwordTooShort: "La password deve contenere almeno {minLength} caratteri.",
+    passwordNeedsUppercase: "La password deve contenere una lettera maiuscola.",
+    passwordNeedsLowercase: "La password deve contenere una lettera minuscola.",
+    passwordNeedsDigit: "La password deve contenere un numero.",
+    passwordNeedsSpecial: "La password deve contenere un carattere speciale.",
+    tooManyRequests: "Troppi tentativi. Attendi un minuto e riprova.",
   },
   sidebar: {
     sponsor: "Sostienici",

@@ -5200,6 +5200,12 @@ export const ptBR: TranslationKeys = {
       '{tool} requer o recurso "{feature}". Ative-o em Configurações → Recursos de AI.',
     featureNotInstalled:
       'O recurso "{feature}" não está instalado. Ative-o em Configurações → Recursos de AI.',
+    passwordTooShort: "A senha deve ter pelo menos {minLength} caracteres.",
+    passwordNeedsUppercase: "A senha deve conter uma letra maiúscula.",
+    passwordNeedsLowercase: "A senha deve conter uma letra minúscula.",
+    passwordNeedsDigit: "A senha deve conter um número.",
+    passwordNeedsSpecial: "A senha deve conter um caractere especial.",
+    tooManyRequests: "Muitas tentativas. Aguarde um minuto e tente novamente.",
   },
   sidebar: {
     sponsor: "Apoie-nos",
