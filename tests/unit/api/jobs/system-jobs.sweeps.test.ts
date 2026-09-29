@@ -454,6 +454,80 @@ describe("storageTtlSweep", () => {
     errSpy.mockRestore();
   });
 
+  // The paths a default install takes (FILE_MAX_AGE_HOURS > 0) must report
+  // deadline failures too, not only the maxAge <= 0 early return.
+  it("adds deleteAfter failures to the global sweep's own count on the final return", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", [{ id: "da", userId: null }]);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+    const old = Date.now() - 7_200_000;
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") =>
+      prefix === "uploads"
+        ? [
+            { key: "uploads/stale", size: 0, mtimeMs: old },
+            { key: "uploads/broken", size: 0, mtimeMs: old },
+          ]
+        : [],
+    );
+    deletePrefixMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "uploads/da" || prefix === "uploads/broken") throw new Error("S3 down");
+    });
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    // Global: 1 removed, 1 failed. Deadline: 1 failed, job not cleaned.
+    expect(result).toEqual({ removed: 1, failed: 2 });
+    errSpy.mockRestore();
+  });
+
+  it("reports deleteAfter failures on the empty-dir early return", async () => {
+    // A permission fault fails the deadline deletes and, on the local
+    // backend, empties the global listing too, so this path is reachable.
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", [{ id: "da", userId: null }]);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+    deletePrefixMock.mockRejectedValue(new Error("EACCES: permission denied"));
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 0, failed: 2 });
+    errSpy.mockRestore();
+  });
+
+  it("caps the logged deleteAfter failures during a store-wide fault", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect(
+      "jobs",
+      Array.from({ length: 15 }, (_, i) => ({ id: `job-${i}`, userId: null })),
+    );
+    getMaxAgeMsMock.mockResolvedValue(0);
+    deletePrefixMock.mockRejectedValue(new Error("S3 down"));
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 0, failed: 30 });
+    const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("30 deleteAfter dir(s) failed to delete");
+    expect(logged.match(/: S3 down/g)).toHaveLength(20);
+    expect(logged).toContain("...and 10 more");
+    errSpy.mockRestore();
+  });
+
   it("still deletes outputs/ when uploads/ fails, and doesn't count the job as cleaned", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -485,7 +559,8 @@ describe("storageTtlSweep", () => {
 
     queueSelect("users", []);
     queueSelect("teams", []);
-    // The deleteAfter select rejects; the outer try/catch must swallow it.
+    // The deleteAfter select rejects; the outer try/catch logs it and the
+    // global sweep still runs.
     queueSelect("jobs", THROW);
     getMaxAgeMsMock.mockResolvedValue(3_600_000);
 
@@ -502,10 +577,11 @@ describe("storageTtlSweep", () => {
     // deleteAfterCleaned stayed 0 (query threw); the global sweep still removed 1.
     expect(result).toEqual({ removed: 1, failed: 0 });
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/after-throw");
-    // The query failure is logged rather than swallowed (#1442).
-    const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
-    expect(logged).toContain("deleteAfter");
-    expect(logged).toContain("select failed");
+    // The query failure is logged rather than swallowed (#1442), with the
+    // error object itself so a wrapped cause (DrizzleQueryError) survives.
+    const call = errSpy.mock.calls.find((c) => String(c[0]).includes("deleteAfter sweep failed"));
+    expect(call, "the failed deadline query was not logged").toBeDefined();
+    expect(call?.[1]).toMatchObject({ message: "select failed" });
     errSpy.mockRestore();
   });
 

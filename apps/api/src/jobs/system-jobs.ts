@@ -252,6 +252,7 @@ export function owningJobIds(dirJobId: string): string[] {
 }
 
 const FINISHED_STATUSES = ["completed", "failed", "canceled"] as const;
+const DELETE_AFTER_ERRORS_LOGGED = 20;
 
 async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   // Build set of user IDs under legal hold (direct or via team) once per sweep
@@ -322,13 +323,17 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     }
   } catch (err) {
     // Best-effort: the global sweep below still runs, but say why the
-    // deadline sweep didn't.
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`Storage TTL: deleteAfter sweep failed: ${message}`);
+    // deadline sweep didn't. The whole error goes to the log, not its message:
+    // drizzle's DrizzleQueryError message is only the SQL, and the reason (a
+    // dropped connection, a missing column) is on its cause.
+    console.error("Storage TTL: deleteAfter sweep failed:", err);
   }
   if (deleteAfterErrors.length > 0) {
+    // Capped: a store-wide fault fails every past-deadline job, every sweep.
+    const shown = deleteAfterErrors.slice(0, DELETE_AFTER_ERRORS_LOGGED);
+    const more = deleteAfterErrors.length - shown.length;
     console.error(
-      `Storage TTL: ${deleteAfterErrors.length} deleteAfter dir(s) failed to delete:\n${deleteAfterErrors.join("\n")}`,
+      `Storage TTL: ${deleteAfterErrors.length} deleteAfter dir(s) failed to delete:\n${shown.join("\n")}${more > 0 ? `\n...and ${more} more` : ""}`,
     );
   }
 
