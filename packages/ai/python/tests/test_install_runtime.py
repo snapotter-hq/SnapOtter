@@ -152,9 +152,10 @@ class InstallRuntimeTests(unittest.TestCase):
         self.root = Path(self.temporary_directory.name)
         self.fixture = RuntimeFixture(self.root)
         self.host = install_runtime.HostInfo(platform="linux", machine="x86_64")
-        # Installs would otherwise probe the real host's cgroup memory, and a
-        # host where that isn't readable (bare WSL2, for one) fails every one
-        # at preflight. The probe's own tests call the real function (#1563).
+        # Installs would otherwise probe the real host's cgroup memory, which
+        # makes the suite depend on the host: without a private cgroup
+        # namespace (GitHub runners, bare WSL2) the probe reaches the cgroup v2
+        # root and fails (#1636). The probe's own tests call the real function.
         self._real_effective_memory_bytes = install_runtime._effective_memory_bytes
         memory_probe = mock.patch.object(
             install_runtime, "_effective_memory_bytes", return_value=64 * 1024**3

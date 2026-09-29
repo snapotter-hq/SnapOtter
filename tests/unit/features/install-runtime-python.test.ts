@@ -22,9 +22,14 @@ function pythonVersion(): [number, number] | null {
 
 const version = pythonVersion();
 const supported = version !== null && (version[0] > 3 || (version[0] === 3 && version[1] >= 11));
+// A local box with an old python3 may skip; CI must not quietly lose the check.
+const required = process.env.CI === "true";
 
-describe.skipIf(!supported)("install_runtime.py unittest suite (#1563)", () => {
-  it("passes every installer test", () => {
+describe.skipIf(!supported && !required)("install_runtime.py unittest suite (#1563)", () => {
+  it("passes every installer test", { timeout: 150_000 }, () => {
+    expect(supported, `CI needs Python 3.11+ for this suite, found ${version?.join(".")}`).toBe(
+      true,
+    );
     const res = spawnSync(
       pythonBin as string,
       ["-m", "unittest", "packages.ai.python.tests.test_install_runtime"],
@@ -35,6 +40,7 @@ describe.skipIf(!supported)("install_runtime.py unittest suite (#1563)", () => {
     const report = `${res.stdout}\n${res.stderr}`.trim().split("\n").slice(-60).join("\n");
     expect(res.error, report).toBeUndefined();
     expect(res.status, report).toBe(0);
-    expect(res.stderr).toMatch(/^Ran \d+ tests? in /m);
+    const ran = Number(/^Ran (\d+) tests? in /m.exec(res.stderr)?.[1] ?? 0);
+    expect(ran, report).toBeGreaterThan(0);
   });
 });
