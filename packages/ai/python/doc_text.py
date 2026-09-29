@@ -82,8 +82,12 @@ def _object_number(doc, text):
     return number if 0 < number < doc.xref_length() else None
 
 
-def _falls_back_to_glyph_ids(doc, xref):
+def _falls_back_to_glyph_ids(doc, xref, prefix=""):
     """True when an unmapped glyph in this Type0 font would come back as its glyph id.
+
+    The font dict is object xref, or, with a prefix such as
+    "Resources/Font/F1/", the dict at that key path under object xref (an
+    inline font, see _inline_font_location).
 
     Needs both halves. No ToUnicode stream: a missing key, a name such as
     /Identity-H, or a reference to nothing all leave MuPDF without a map. And a
@@ -98,10 +102,10 @@ def _falls_back_to_glyph_ids(doc, xref):
     """
     if not 0 < xref < doc.xref_length():
         return False
-    to_unicode = _object_number(doc, doc.xref_get_key(xref, "ToUnicode")[1])
+    to_unicode = _object_number(doc, doc.xref_get_key(xref, prefix + "ToUnicode")[1])
     if to_unicode is not None and doc.xref_is_stream(to_unicode):
         return False
-    descendant = doc.xref_get_key(xref, "DescendantFonts")[1]
+    descendant = doc.xref_get_key(xref, prefix + "DescendantFonts")[1]
     # DescendantFonts is an array holding the CIDFont, sometimes itself behind a
     # reference; follow at most those two hops, then read the CIDFont's text.
     for _hop in range(2):
@@ -110,6 +114,40 @@ def _falls_back_to_glyph_ids(doc, xref):
             break
         descendant = doc.xref_object(number, compressed=True)
     return not _CID_TO_GID_STREAM_RE.search(descendant)
+
+
+# Page tree nodes to climb looking for inherited Resources. Real trees are a
+# handful deep; the cap only stops a Parent loop in a damaged file.
+_MAX_PAGE_TREE_DEPTH = 32
+
+
+def _inline_font_location(page, referencer, refname):
+    """(xref, key prefix) addressing an inline font dict, or None if it can't be found.
+
+    get_fonts reports an inline dict as xref 0, and xref_get_key(0) raises, so
+    the dict is read as a key path instead, which PyMuPDF resolves through any
+    references on the way. It lives in the Resources of whatever uses the font:
+    a Form XObject when get_fonts(full=True) names one as the referencer,
+    otherwise the page, or the nearest Pages ancestor when the page inherits
+    its Resources.
+
+    A missing key reads as ('null', 'null'), the same as /ToUnicode null, so
+    the dict itself has to resolve before any of its keys are trusted.
+    """
+    doc = page.parent
+    holder = referencer or page.xref
+    for _hop in range(_MAX_PAGE_TREE_DEPTH):
+        if not 0 < holder < doc.xref_length():
+            return None
+        if doc.xref_get_key(holder, "Resources")[0] != "null":
+            path = "Resources/Font/" + refname
+            return (holder, path + "/") if doc.xref_get_key(holder, path)[0] == "dict" else None
+        if referencer:
+            return None
+        holder = _object_number(doc, doc.xref_get_key(holder, "Parent")[1])
+        if holder is None:
+            return None
+    return None
 
 
 def draws_unmapped_composite_font(page):
@@ -128,13 +166,16 @@ def draws_unmapped_composite_font(page):
     judges that page on MuPDF's U+FFFD marker, which leaves correctly mapped
     text readable, so the only cost is a second get_text on that page. A font
     dict written inline in the resources has no object number (get_fonts
-    reports xref 0) and is not checked.
+    reports xref 0) and is read through its resources instead (#1566).
     """
     doc = page.parent
-    return any(
-        ftype == "Type0" and _falls_back_to_glyph_ids(doc, xref)
-        for xref, _ext, ftype, *_rest in page.get_fonts()
-    )
+    for xref, _ext, ftype, _name, refname, _encoding, referencer in page.get_fonts(full=True):
+        if ftype != "Type0":
+            continue
+        location = (xref, "") if xref else _inline_font_location(page, referencer, refname)
+        if location and _falls_back_to_glyph_ids(doc, *location):
+            return True
+    return False
 
 
 def main():
