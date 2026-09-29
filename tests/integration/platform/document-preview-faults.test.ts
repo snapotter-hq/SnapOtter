@@ -109,6 +109,31 @@ describe("document preview failure classification (#1404)", () => {
     expect(previewReports()).toHaveLength(0);
   });
 
+  it("answers a conversion that couldn't start with a reported 500 (#1439)", async () => {
+    // What convertDocument rejects with when the spawn itself fails: a Node
+    // SystemError, not anything LibreOffice said about the document.
+    mocks.convert.mockRejectedValueOnce(
+      Object.assign(new Error("spawn soffice EMFILE"), {
+        code: "EMFILE",
+        errno: -24,
+        syscall: "spawn soffice",
+      }),
+    );
+    const { id } = await uploadDocx();
+    const res = await getPreview(id);
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "Could not generate document preview" });
+    expect(previewReports()).toHaveLength(1);
+  });
+
+  it("keeps a LibreOffice timeout as a 422 bad document, unreported (#1439)", async () => {
+    mocks.convert.mockRejectedValueOnce(new Error("LibreOffice timed out after 120s"));
+    const { id } = await uploadDocx();
+    const res = await getPreview(id);
+    expect(res.statusCode).toBe(422);
+    expect(previewReports()).toHaveLength(0);
+  });
+
   it("answers a stored file missing from disk with a reported 500", async () => {
     const { id, storedName } = await uploadDocx();
     await rm(getStoredFilePath(storedName), { force: true });

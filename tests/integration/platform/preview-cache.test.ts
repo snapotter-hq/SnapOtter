@@ -10,8 +10,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { getStoredFilePath } from "../../../apps/api/src/lib/file-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -176,4 +179,28 @@ describe("stored-file preview when the encode succeeds (#1291)", () => {
       delete process.env.PREVIEW_STUB_MODE;
     }
   });
+});
+
+describe("stored-file preview when the stored file is gone (#1439)", () => {
+  it.each([
+    ["audio", "gone.wav", "audio/wav", () => readFixture(fixtures.audio.tiny("wav"))],
+    ["video", "gone.mp4", "video/mp4", () => readFixture(fixtures.video.tiny("mp4"))],
+  ])(
+    "answers a missing %s file with a 500, without running ffmpeg",
+    async (_kind, name, type, content) => {
+      const file = await uploadToLibrary(name, type, content());
+      const [row] = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.id, file.id));
+      rmSync(getStoredFilePath(row?.storedName ?? ""), { force: true });
+      const writesBefore = stubWrites().length;
+
+      const res = await getPreview(file.id);
+      // The server lost the file, which is not something wrong with the upload.
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).error).toBe("Could not prepare preview");
+      expect(stubWrites().length, "ffmpeg never ran").toBe(writesBefore);
+    },
+  );
 });
