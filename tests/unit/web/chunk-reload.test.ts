@@ -9,9 +9,9 @@
  * cannot cause a reload loop.
  *
  * Firefox and Safari also reject in-flight imports when the page starts
- * navigating away, which fires the same event. Reloading then reloads the
- * page being left and cancels the navigation (#912), so the handler only
- * reloads once the server is shown to serve a different build.
+ * navigating away, which fires the same event. Reloading then reloaded the
+ * page being left and cancelled the navigation (#912), so failures that
+ * follow a beforeunload are left alone.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ import {
   CHUNK_RELOAD_GUARD_KEY,
   CHUNK_RELOAD_GUARD_MS,
   installChunkReloadHandler,
-  servedBuildDiffers,
+  LEAVING_WINDOW_MS,
 } from "@/lib/chunk-reload";
 
 function fireChunkError(): Event {
@@ -28,14 +28,12 @@ function fireChunkError(): Event {
   return event;
 }
 
-/** Let the handler's async build check settle. */
-async function settle(): Promise<void> {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
+function startLeaving(): void {
+  window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
 }
 
 describe("installChunkReloadHandler", () => {
   let reload: ReturnType<typeof vi.fn>;
-  let isStale: ReturnType<typeof vi.fn>;
   let uninstall: () => void;
 
   beforeEach(() => {
@@ -43,8 +41,7 @@ describe("installChunkReloadHandler", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-18T12:00:00Z"));
     reload = vi.fn();
-    isStale = vi.fn().mockResolvedValue(true);
-    uninstall = installChunkReloadHandler(reload, isStale);
+    uninstall = installChunkReloadHandler(reload);
   });
 
   afterEach(() => {
@@ -53,75 +50,46 @@ describe("installChunkReloadHandler", () => {
     vi.useRealTimers();
   });
 
-  it("reloads once on a chunk preload error and marks the event handled", async () => {
+  it("reloads once on a chunk preload error and marks the event handled", () => {
     const event = fireChunkError();
+
+    expect(reload).toHaveBeenCalledTimes(1);
     // preventDefault stops Vite from rethrowing the error into the boundary.
     expect(event.defaultPrevented).toBe(true);
-
-    await settle();
-    expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it("does not reload when the server still serves the build this page loaded (#912)", async () => {
-    // A navigation away aborted the import: reloading would cancel it.
-    isStale.mockResolvedValue(false);
-
+  it("does not reload again within the guard window (broken server, not an update)", () => {
     fireChunkError();
-    await settle();
-
-    expect(reload).not.toHaveBeenCalled();
-    // No reload happened, so a later real deploy must still get one.
-    expect(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY)).toBeNull();
-  });
-
-  it("does not reload when the build check itself fails (#912)", async () => {
-    // Firefox aborts the check's own fetch while the page is being left.
-    isStale.mockRejectedValue(new TypeError("NetworkError when attempting to fetch resource."));
-
-    fireChunkError();
-    await settle();
-
-    expect(reload).not.toHaveBeenCalled();
-  });
-
-  it("does not reload again within the guard window (broken server, not an update)", async () => {
-    fireChunkError();
-    await settle();
     vi.advanceTimersByTime(1000);
     const second = fireChunkError();
-    await settle();
 
     expect(reload).toHaveBeenCalledTimes(1);
     // The second failure is left to propagate so the error boundary shows.
     expect(second.defaultPrevented).toBe(false);
   });
 
-  it("reloads again after the guard window has passed (a later, separate update)", async () => {
+  it("reloads again after the guard window has passed (a later, separate update)", () => {
     fireChunkError();
-    await settle();
     vi.advanceTimersByTime(CHUNK_RELOAD_GUARD_MS + 1000);
     fireChunkError();
-    await settle();
 
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
-  it("persists the guard across the reload via sessionStorage", async () => {
+  it("persists the guard across the reload via sessionStorage", () => {
     fireChunkError();
-    await settle();
     expect(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY)).not.toBeNull();
 
     // Simulate the post-reload page: a fresh handler, same sessionStorage.
     uninstall();
     const reloadAfter = vi.fn();
-    uninstall = installChunkReloadHandler(reloadAfter, isStale);
+    uninstall = installChunkReloadHandler(reloadAfter);
     fireChunkError();
-    await settle();
 
     expect(reloadAfter).not.toHaveBeenCalled();
   });
 
-  it("still reloads when sessionStorage is unavailable (Safari private mode)", async () => {
+  it("still reloads when sessionStorage is unavailable (Safari private mode)", () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError");
     });
@@ -130,62 +98,50 @@ describe("installChunkReloadHandler", () => {
     });
 
     fireChunkError();
-    await settle();
     expect(reload).toHaveBeenCalledTimes(1);
 
     setItem.mockRestore();
     getItem.mockRestore();
   });
-});
 
-describe("servedBuildDiffers", () => {
-  const shell = (entry: string) =>
-    `<!doctype html><html><head><base href="/"><script type="module" crossorigin src="${entry}"></script></head><body><div id="root"></div></body></html>`;
+  describe("while the page is being left (#912)", () => {
+    it("does not reload, which would cancel the navigation", () => {
+      startLeaving();
+      vi.advanceTimersByTime(200);
+      const event = fireChunkError();
 
-  function htmlResponse(body: string, status = 200): Response {
-    return new Response(body, { status, headers: { "content-type": "text/html" } });
-  }
+      expect(reload).not.toHaveBeenCalled();
+      // Left unhandled: if the navigation was cancelled after all, the
+      // boundary shows the real chunk error, not an undefined module.
+      expect(event.defaultPrevented).toBe(false);
+      // Nothing reloaded, so a real deploy afterwards still gets its reload.
+      expect(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY)).toBeNull();
+    });
 
-  beforeEach(() => {
-    document.head.innerHTML = `<script type="module" crossorigin src="/assets/index-OLD.js"></script>`;
-  });
+    it("reloads again once the leaving window has passed (the leave was cancelled)", () => {
+      startLeaving();
+      vi.advanceTimersByTime(LEAVING_WINDOW_MS + 1);
+      fireChunkError();
 
-  afterEach(() => {
-    document.head.innerHTML = "";
-  });
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
 
-  it("is true when the served shell boots a different entry (a deploy happened)", async () => {
-    const fetchShell = vi.fn().mockResolvedValue(htmlResponse(shell("/assets/index-NEW.js")));
+    it("reloads again after the page comes back from the back/forward cache", () => {
+      startLeaving();
+      vi.advanceTimersByTime(500);
+      window.dispatchEvent(new Event("pageshow"));
+      fireChunkError();
 
-    await expect(servedBuildDiffers(fetchShell)).resolves.toBe(true);
-    // The shell must bypass the HTTP cache, or a cached copy hides the deploy.
-    expect(fetchShell).toHaveBeenCalledWith("/", { cache: "no-store" });
-  });
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
 
-  it("is false when the served shell boots the same entry", async () => {
-    const fetchShell = vi.fn().mockResolvedValue(htmlResponse(shell("/assets/index-OLD.js")));
+    it("stops listening for beforeunload once uninstalled", () => {
+      uninstall();
+      startLeaving();
+      uninstall = installChunkReloadHandler(reload);
+      fireChunkError();
 
-    await expect(servedBuildDiffers(fetchShell)).resolves.toBe(false);
-  });
-
-  it("is false when the shell request fails with an HTTP error", async () => {
-    const fetchShell = vi.fn().mockResolvedValue(htmlResponse("Bad gateway", 502));
-
-    await expect(servedBuildDiffers(fetchShell)).resolves.toBe(false);
-  });
-
-  it("is false when the response is not the app shell (no entry script)", async () => {
-    // A proxy error page with a 200: reloading would land on it, not the app.
-    const fetchShell = vi
-      .fn()
-      .mockResolvedValue(htmlResponse("<html><body>Maintenance</body></html>"));
-
-    await expect(servedBuildDiffers(fetchShell)).resolves.toBe(false);
-  });
-
-  it("rejects when the shell request itself fails", async () => {
-    const fetchShell = vi.fn().mockRejectedValue(new TypeError("Load failed"));
-
-    await expect(servedBuildDiffers(fetchShell)).rejects.toThrow("Load failed");
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
   });
 });
