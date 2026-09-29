@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { APP_VERSION } from "@snapotter/shared";
+import { aiLog } from "./log.js";
 import {
   canonicalRuntimeJson,
   loadOcrRuntimeTrustKeys,
@@ -1208,7 +1209,7 @@ function reportInvalidRuntime(options: RuntimeStateOptions, result: ActiveRuntim
   const message = `[ocr-runtime] Accurate OCR runtime at ${join(resolveAiDataDir(options), "v3")} is unavailable: ${detail}`;
   if (message === lastReportedInvalidRuntime) return;
   lastReportedInvalidRuntime = message;
-  console.warn(message);
+  aiLog.warn(message);
 }
 
 export function getOcrRuntimeCapability(options: RuntimeStateOptions = {}): OcrRuntimeCapability {

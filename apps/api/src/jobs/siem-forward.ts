@@ -19,6 +19,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { decrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { logger } from "../lib/logger.js";
 import { upsertSetting } from "../lib/settings-helpers.js";
 import { deliverWebhook } from "../lib/webhook-delivery.js";
 import { readSiemConfig } from "../routes/enterprise/siem.js";
@@ -59,7 +60,7 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
   const failureCountStr = await readSettingValue(FAILURES_KEY);
   const failureCount = failureCountStr ? parseInt(failureCountStr, 10) : 0;
   if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
-    console.warn(
+    logger.warn(
       `SIEM forwarding circuit breaker open: ${failureCount} consecutive failures. ` +
         "Reset siem_consecutive_failures to 0 in settings to re-enable.",
     );
@@ -118,7 +119,7 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
 
   // Failure: increment circuit breaker
   await upsertSetting(FAILURES_KEY, String(failureCount + 1));
-  console.error(
+  logger.error(
     `SIEM forwarding failed (attempt ${failureCount + 1}/${CIRCUIT_BREAKER_THRESHOLD}): ${result.error}`,
   );
 }

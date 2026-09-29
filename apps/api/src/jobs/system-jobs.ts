@@ -15,6 +15,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
+import { logger } from "../lib/logger.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
 import { runAuditArchive } from "./audit-archive.js";
@@ -319,20 +320,20 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     }
 
     if (deleteAfterCleaned > 0) {
-      console.log(`Storage TTL: cleaned up ${deleteAfterCleaned} jobs by deleteAfter`);
+      logger.info(`Storage TTL: cleaned up ${deleteAfterCleaned} jobs by deleteAfter`);
     }
   } catch (err) {
     // Best-effort: the global sweep below still runs, but say why the
     // deadline sweep didn't. The whole error goes to the log, not its message:
     // drizzle's DrizzleQueryError message is only the SQL, and the reason (a
     // dropped connection, a missing column) is on its cause.
-    console.error("Storage TTL: deleteAfter sweep failed:", err);
+    logger.error({ err }, "Storage TTL: deleteAfter sweep failed");
   }
   if (deleteAfterErrors.length > 0) {
     // Capped: a store-wide fault fails every past-deadline job, every sweep.
     const shown = deleteAfterErrors.slice(0, DELETE_AFTER_ERRORS_LOGGED);
     const more = deleteAfterErrors.length - shown.length;
-    console.error(
+    logger.error(
       `Storage TTL: ${deleteAfterErrors.length} deleteAfter dir(s) failed to delete:\n${shown.join("\n")}${more > 0 ? `\n...and ${more} more` : ""}`,
     );
   }
@@ -418,13 +419,13 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
     }
   }
   if (errors.length > 0) {
-    console.error(`Storage TTL: ${errors.length} dir(s) failed to delete:\n${errors.join("\n")}`);
+    logger.error(`Storage TTL: ${errors.length} dir(s) failed to delete:\n${errors.join("\n")}`);
   }
   if (removed > 0) {
-    console.log(`Storage TTL: removed ${removed} expired job dirs`);
+    logger.info(`Storage TTL: removed ${removed} expired job dirs`);
   }
   if (kept > 0) {
-    console.log(`Storage TTL: kept ${kept} expired job dirs whose jobs are still in flight`);
+    logger.info(`Storage TTL: kept ${kept} expired job dirs whose jobs are still in flight`);
   }
   return {
     removed: removed + deleteAfterCleaned,

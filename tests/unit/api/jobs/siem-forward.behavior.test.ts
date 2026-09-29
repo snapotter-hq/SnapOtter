@@ -1,5 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The code under test logs through the API's pino logger (#1500); mock it,
+// since config.js is stubbed without LOG_DIR, and read the calls from it.
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+function loggerCalls(level: "info" | "warn" | "error") {
+  loggerMock[level].mockClear();
+  return loggerMock[level];
+}
+
 const readSiemConfigMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const upsertSettingMock = vi.hoisted(() => vi.fn());
@@ -82,6 +96,8 @@ async function loadSiemForward() {
     isFeatureEnabled: isFeatureEnabledMock,
   }));
 
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
+
   return import("../../../../apps/api/src/jobs/siem-forward.js");
 }
 
@@ -104,11 +120,16 @@ describe("SIEM forwarding behavior", () => {
     const { runSiemForward } = await loadSiemForward();
     readSiemConfigMock.mockResolvedValue({ enabled: true, webhookUrl: "https://siem.test" });
     selectMock.mockReturnValueOnce(queryChain([{ value: "5" }], true));
+    const warn = loggerCalls("warn");
 
     await expect(runSiemForward()).resolves.toBeUndefined();
 
     expect(selectMock).toHaveBeenCalledTimes(1);
     expect(deliverWebhookMock).not.toHaveBeenCalled();
+    // Goes through pino, so it reaches LOG_DIR and the support bundle (#1500).
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("SIEM forwarding circuit breaker open: 5 consecutive failures"),
+    );
   });
 
   it("maps audit rows, decrypts auth, advances cursor, and resets failures after success", async () => {
@@ -180,9 +201,11 @@ describe("SIEM forwarding behavior", () => {
         ]),
       );
     deliverWebhookMock.mockResolvedValue({ success: false, error: "downstream 500" });
+    const error = loggerCalls("error");
 
     await expect(runSiemForward()).resolves.toBeUndefined();
 
     expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "5");
+    expect(error).toHaveBeenCalledWith("SIEM forwarding failed (attempt 5/5): downstream 500");
   });
 });

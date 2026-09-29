@@ -23,6 +23,7 @@ import { reconcileStrandedJobs } from "./jobs/job-reconciliation.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
+import { routeAiLogsToPino } from "./lib/ai-log-sink.js";
 import { initAnalytics, shutdownAnalytics, trackEvent } from "./lib/analytics.js";
 import { stripBasePath } from "./lib/base-path.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
@@ -92,6 +93,9 @@ import { teamsRoutes } from "./routes/teams.js";
 import { registerToolRoutes } from "./routes/tools/index.js";
 import { userFileRoutes } from "./routes/user-files.js";
 import { shutdownTracing } from "./tracing.js";
+
+// Before anything can log from packages/ai, so its lines reach LOG_DIR (#1500).
+routeAiLogsToPino();
 
 // Run before anything else, and before the retry loop below: a rejected
 // DATABASE_URL / DATABASE_MIGRATION_URL pair fails the same way on every attempt,

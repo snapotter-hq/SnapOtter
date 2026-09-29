@@ -14,6 +14,20 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The code under test logs through the API's pino logger (#1500); mock it,
+// since config.js is stubbed without LOG_DIR, and read the calls from it.
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+function loggerCalls(level: "info" | "warn" | "error") {
+  loggerMock[level].mockClear();
+  return loggerMock[level];
+}
+
 const getQueueMock = vi.hoisted(() => vi.fn());
 const runSiemForwardMock = vi.hoisted(() => vi.fn());
 const runAuditArchiveMock = vi.hoisted(() => vi.fn());
@@ -187,6 +201,8 @@ async function loadSystemJobs(
   vi.doMock("../../../../apps/api/src/jobs/siem-forward.js", () => ({
     runSiemForward: runSiemForwardMock,
   }));
+
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
   return import("../../../../apps/api/src/jobs/system-jobs.js");
 }
@@ -369,7 +385,7 @@ describe("storageTtlSweep", () => {
 
   it("cleans jobs by deleteAfter, then early-returns when maxAgeMs <= 0", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = loggerCalls("info");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     seedNoLegalHold();
@@ -433,7 +449,7 @@ describe("storageTtlSweep", () => {
   // retention deadline could stop being honored with no trace anywhere.
   it("counts and logs a deleteAfter deletePrefix failure instead of swallowing it", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -458,7 +474,7 @@ describe("storageTtlSweep", () => {
   // deadline failures too, not only the maxAge <= 0 early return.
   it("adds deleteAfter failures to the global sweep's own count on the final return", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -489,7 +505,7 @@ describe("storageTtlSweep", () => {
     // A permission fault fails the deadline deletes and, on the local
     // backend, empties the global listing too, so this path is reachable.
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -506,7 +522,7 @@ describe("storageTtlSweep", () => {
 
   it("caps the logged deleteAfter failures during a store-wide fault", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -530,8 +546,8 @@ describe("storageTtlSweep", () => {
 
   it("still deletes outputs/ when uploads/ fails, and doesn't count the job as cleaned", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
+    const logSpy = loggerCalls("info");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -570,7 +586,7 @@ describe("storageTtlSweep", () => {
       return [];
     });
 
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
 
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
 
@@ -579,15 +595,15 @@ describe("storageTtlSweep", () => {
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/after-throw");
     // The query failure is logged rather than swallowed (#1442), with the
     // error object itself so a wrapped cause (DrizzleQueryError) survives.
-    const call = errSpy.mock.calls.find((c) => String(c[0]).includes("deleteAfter sweep failed"));
+    const call = errSpy.mock.calls.find((c) => String(c[1]).includes("deleteAfter sweep failed"));
     expect(call, "the failed deadline query was not logged").toBeDefined();
-    expect(call?.[1]).toMatchObject({ message: "select failed" });
+    expect(call?.[0]).toMatchObject({ err: { message: "select failed" } });
     errSpy.mockRestore();
   });
 
   it("expires stale local dirs in the global sweep and logs the removal", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = loggerCalls("info");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -618,7 +634,7 @@ describe("storageTtlSweep", () => {
 
   it("records failures and logs them when a global-sweep deletePrefix throws", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -647,7 +663,7 @@ describe("storageTtlSweep", () => {
 
   it("stringifies non-Error rejections from a failed deletePrefix", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
 
     queueSelect("users", []);
@@ -778,7 +794,7 @@ describe("storageTtlSweep keeps dirs of in-flight jobs (#1412)", () => {
       return [{ key: "outputs/pipe-s0", size: 0, mtimeMs: old }];
     });
 
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = loggerCalls("info");
     const drizzle = await import("drizzle-orm");
 
     const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);

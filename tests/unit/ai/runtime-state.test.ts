@@ -15,7 +15,8 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { APP_VERSION } from "@snapotter/shared";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { setAiLogger } from "../../../packages/ai/src/log.js";
 import type { OcrRuntimeTrustKey } from "../../../packages/ai/src/runtime-index.js";
 import {
   getOcrRuntimeCapability,
@@ -982,6 +983,25 @@ describe("invalid runtime diagnostics (#1433)", () => {
     getOcrRuntimeCapability(options);
 
     expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends the warning to the installed log sink, not straight to the console (#1500)", () => {
+    const fixture = createRuntimeFixture();
+    writeFileSync(fixture.smallModelPath, "broken", "utf-8");
+    const consoleWarn = quietWarn();
+    const sinkWarn = vi.fn();
+    setAiLogger({ info: vi.fn(), warn: sinkWarn, error: vi.fn() });
+    onTestFinished(() => setAiLogger(null));
+
+    getOcrRuntimeCapability({ aiDataDir: fixture.aiDataDir, ...linuxX64 });
+
+    expect(sinkWarn).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^\[ocr-runtime\] .* is unavailable: model file .*small\.onnx is the wrong size$/,
+      ),
+      undefined,
+    );
+    expect(consoleWarn).not.toHaveBeenCalled();
   });
 
   it("stays quiet for missing, incompatible, and unsupported-host runtimes", () => {

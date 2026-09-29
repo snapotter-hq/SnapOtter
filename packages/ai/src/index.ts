@@ -28,6 +28,7 @@ export type { FaceLandmarkPoint, FaceLandmarks, FaceLandmarksResult } from "./fa
 export { detectFaceLandmarks } from "./face-landmarks.js";
 export { missingBundleForScript, SCRIPT_BUNDLE_MAP } from "./feature-gate.js";
 export { type InpaintQuality, inpaint } from "./inpainting.js";
+export { type AiLogger, setAiLogger } from "./log.js";
 export { noiseRemoval } from "./noise-removal.js";
 export type {
   OcrExecutionMetadata,

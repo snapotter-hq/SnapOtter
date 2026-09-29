@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 // Mock child_process.spawn before importing the bridge module
 vi.mock("node:child_process", () => ({
@@ -1114,6 +1114,83 @@ describe("bridge - dispatcher lifecycle via runPythonWithProgress", () => {
     expect(pythonLogCalls.length).toBeGreaterThanOrEqual(1);
 
     logSpy.mockRestore();
+  });
+
+  it("sends dispatcher diagnostics to the installed log sink, not the console (#1500)", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerReq.process;
+    });
+
+    // Same module instance the freshly imported bridge uses.
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+    const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    mockDispatcher.stderr.emit(
+      "data",
+      Buffer.from(
+        '{"info": "model cached"}\n{"warning": "low memory"}\n[model] Loading weights...\n',
+      ),
+    );
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    expect(sink.info).toHaveBeenCalledWith("[python] model cached");
+    expect(sink.info).toHaveBeenCalledWith("[python] [model] Loading weights...");
+    expect(sink.warn).toHaveBeenCalledWith("[python] low memory", undefined);
+    expect(consoleLog).not.toHaveBeenCalled();
+    expect(consoleWarn).not.toHaveBeenCalled();
+  });
+
+  it("sends a dispatcher spawn error to the installed log sink (#1500)", async () => {
+    const mockDispatcher = createMockProcess();
+    const mockPerRequest = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDispatcher.process;
+      return mockPerRequest.process;
+    });
+
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    const enoent = new Error("spawn ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    mockDispatcher.emitEvent("error", enoent);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerRequest.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerRequest.emitEvent("close", 0, null);
+    await promise;
+
+    expect(sink.error).toHaveBeenCalledWith(
+      "[bridge] Dispatcher error: spawn ENOENT (code: ENOENT)",
+      undefined,
+    );
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it("dispatcher stderr collects non-JSON non-bracket lines as error output", async () => {

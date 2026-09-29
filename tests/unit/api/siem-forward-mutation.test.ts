@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The code under test logs through the API's pino logger (#1500); mock it,
+// since config.js is stubbed without LOG_DIR.
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 // Mutation-focused coverage for apps/api/src/jobs/siem-forward.ts. The sibling
 // jobs/siem-forward.behavior.test.ts covers the main paths; this file pins the
 // values a mutant would flip: the circuit-breaker >= 5 boundary, the parseInt
@@ -103,6 +112,8 @@ async function loadSiemForward(options: { dataEncryptionKey?: string } = {}) {
   }));
 
   vi.doMock("@snapotter/enterprise", () => ({ isFeatureEnabled: isFeatureEnabledMock }));
+
+  vi.doMock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
   return import("../../../apps/api/src/jobs/siem-forward.js");
 }
