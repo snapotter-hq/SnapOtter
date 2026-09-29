@@ -1,7 +1,18 @@
 import { SafeError } from "@snapotter/shared";
 import Fastify from "fastify";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const reportError = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return { ...actual, reportError };
+});
+
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+
+beforeEach(() => {
+  reportError.mockReset();
+});
 
 async function appThrowing(makeError: () => Error) {
   const app = Fastify({ logger: false });
@@ -92,6 +103,43 @@ describe("registerErrorHandler", () => {
       error: "Malformed JSON in request body",
       details: "Malformed JSON in request body",
     });
+    await app.close();
+  });
+});
+
+// #1421: a storage fault during an upload now reaches this handler instead of
+// being answered as a malformed request. It has to be shown and reported.
+describe("a storage fault reaching the handler", () => {
+  it("shows its message and code, and reports it once with the route's context", async () => {
+    const fault = new SafeError("The server's storage is full.", {
+      kind: "operational",
+      code: "storage-full",
+      statusCode: 503,
+    });
+    const app = await appThrowing(() => fault);
+    const res = await app.inject({ method: "GET", url: "/boom" });
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body)).toEqual({
+      error: "The server's storage is full.",
+      code: "storage-full",
+    });
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError).toHaveBeenCalledWith(
+      fault,
+      expect.objectContaining({ source: "http", method: "GET", statusCode: 503 }),
+    );
+    await app.close();
+  });
+
+  it("doesn't report a client's 4xx", async () => {
+    const app = await appThrowing(() =>
+      Object.assign(new Error("Unexpected end of form"), { statusCode: 400 }),
+    );
+    const res = await app.inject({ method: "GET", url: "/boom" });
+
+    expect(res.statusCode).toBe(400);
+    expect(reportError).not.toHaveBeenCalled();
     await app.close();
   });
 });

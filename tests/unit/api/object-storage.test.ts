@@ -98,10 +98,56 @@ describe("object-storage (local backend)", () => {
     );
 
     await expect(putObjectStream(unavailableKey, source)).rejects.toMatchObject({
-      code: "EDQUOT",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-full",
       statusCode: 503,
+      cause: expect.objectContaining({ code: "EDQUOT" }),
     });
     await expect(objectExists(unavailableKey)).resolves.toBe(false);
+  });
+
+  // #1421: without a status, a tool route answered every failed write as a
+  // malformed request (400), unreported. Each one now says whose it is.
+  describe("a failed streaming write", () => {
+    function failingSource(error: unknown): Readable {
+      return Readable.from(
+        (async function* () {
+          yield Buffer.from("partial");
+          throw error;
+        })(),
+      );
+    }
+
+    it.each([
+      ["a full disk", { code: "ENOSPC", syscall: "write" }, "storage-full"],
+      ["a read-only volume", { code: "EROFS", syscall: "open" }, "storage-not-writable"],
+      ["no permission", { code: "EPERM", syscall: "open" }, "storage-not-writable"],
+      ["another I/O failure", { code: "EIO", syscall: "write" }, "storage-write-failed"],
+    ])("answers %s with a 503 naming it", async (_case, errno, code) => {
+      const cause = Object.assign(new Error(`${errno.code}: simulated`), errno);
+      await expect(putObjectStream(unavailableKey, failingSource(cause))).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code,
+        statusCode: 503,
+        cause,
+      });
+    });
+
+    it("keeps a client's fault as it is", async () => {
+      const clientFault = Object.assign(new Error("Unexpected end of form"), { statusCode: 400 });
+      await expect(putObjectStream(unavailableKey, failingSource(clientFault))).rejects.toBe(
+        clientFault,
+      );
+      expect(clientFault.statusCode).toBe(400);
+    });
+
+    it("makes anything else ours: a 500, not a malformed request", async () => {
+      const bug = new TypeError("Cannot read properties of undefined");
+      await expect(putObjectStream(unavailableKey, failingSource(bug))).rejects.toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
   });
 
   it("rejects a pre-pipeline abort without emitting an unhandled source error", () => {
@@ -192,8 +238,9 @@ describe("object-storage (local backend)", () => {
       );
 
       await expect(putObjectStream(failedKey, source)).rejects.toMatchObject({
-        code: "EDQUOT",
+        code: "storage-full",
         statusCode: 503,
+        cause: expect.objectContaining({ code: "EDQUOT" }),
       });
       await new Promise<void>((resolve) => setImmediate(resolve));
       orphaned = await objectExists(failedKey);
@@ -215,8 +262,9 @@ describe("object-storage (local backend)", () => {
     );
 
     await expect(putObjectStream(destinationKey, source)).rejects.toMatchObject({
-      code: "EDQUOT",
+      code: "storage-full",
       statusCode: 503,
+      cause: expect.objectContaining({ code: "EDQUOT" }),
     });
 
     await expect(getObjectBuffer(destinationKey)).resolves.toEqual(Buffer.from("committed"));
@@ -321,7 +369,10 @@ describe("object-storage (local backend)", () => {
       const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
       await expect(
         isolatedStorage.putObjectStream(destinationKey, Readable.from([Buffer.from("fresh")])),
-      ).rejects.toMatchObject({ code: "EEXIST" });
+      ).rejects.toMatchObject({
+        code: "storage-write-failed",
+        cause: expect.objectContaining({ code: "EEXIST" }),
+      });
       expect(readFileSync(stagingPath).toString()).toBe("owned by another writer");
       await expect(isolatedStorage.getObjectBuffer(destinationKey)).resolves.toEqual(
         Buffer.from("committed"),

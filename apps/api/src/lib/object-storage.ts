@@ -249,14 +249,24 @@ export async function putObjectStream(
     source.destroy(reason);
   };
   let written = 0;
+  // The first failure on the reading side: an over-limit file, the client's
+  // upload breaking off, an abort. S3's multipart upload can replace it with
+  // the error from aborting itself (lib-storage throws that instead), which
+  // would pass a client's 413 off as a storage outage.
+  let sourceError: unknown;
   const counter = async function* (src: AsyncIterable<Buffer>) {
-    for await (const chunk of src) {
-      opts.signal?.throwIfAborted();
-      written += chunk.length;
-      if (opts.maxBytes !== undefined && written > opts.maxBytes) {
-        throw objectSizeLimitError(opts.maxBytes);
+    try {
+      for await (const chunk of src) {
+        opts.signal?.throwIfAborted();
+        written += chunk.length;
+        if (opts.maxBytes !== undefined && written > opts.maxBytes) {
+          throw objectSizeLimitError(opts.maxBytes);
+        }
+        yield chunk;
       }
-      yield chunk;
+    } catch (err) {
+      sourceError ??= err;
+      throw err;
     }
   };
   if (isS3Enabled()) {
@@ -270,7 +280,7 @@ export async function putObjectStream(
         return written;
       } catch (error) {
         await s3.deleteGenericObject(key).catch(() => {});
-        throw s3WriteFault(error);
+        throw sourceError !== undefined ? localWriteFault(sourceError) : s3WriteFault(error);
       }
     } finally {
       opts.signal?.removeEventListener("abort", abortSource);
@@ -301,7 +311,7 @@ export async function putObjectStream(
     } catch (err) {
       if (stagingOwned) await unlink(stagingPath).catch(() => {});
       await rmdir(stagingDir).catch(() => {});
-      throw normalizeOperationalWriteError(err);
+      throw localWriteFault(err);
     }
     return written;
   } finally {
@@ -389,22 +399,76 @@ function isClientSide(error: unknown): boolean {
 }
 
 /**
- * An S3 refusal (the SDK's service errors carry `$metadata`) or an endpoint it
- * couldn't reach, while an upload streams in: the 503 the local backend's
- * full-disk and read-only faults already are, so the route answers "storage
- * unavailable" instead of blaming the request (#1421). The client's own faults
- * and aborts, and errors of ours, pass through unchanged.
+ * The codes a storage fault carries on its 503: the server's storage can't
+ * take the write, whatever the request. Anything that answers a stored
+ * failure by its code (the batch finalize) keeps these 503 (#1421).
+ */
+export const STORAGE_FAULT_CODES: ReadonlySet<string> = new Set([
+  "workspace-cap",
+  "disk-free-floor",
+  "storage-full",
+  "storage-not-writable",
+  "storage-write-failed",
+  "storage-unavailable",
+]);
+
+/** User-facing reasons for a storage fault, one constant per kind. */
+export const STORAGE_FULL_MESSAGE = "The server's storage is full.";
+export const STORAGE_NOT_WRITABLE_MESSAGE =
+  "The server can't write to its storage: it's read-only or not allowed to write there.";
+export const STORAGE_WRITE_FAILED_MESSAGE = "The server couldn't write to its storage.";
+export const STORAGE_UNAVAILABLE_MESSAGE = "The server's storage service is unavailable.";
+
+function storageFault(message: string, code: string, cause: unknown): SafeError {
+  return new SafeError(message, { kind: "operational", code, statusCode: 503, cause });
+}
+
+/** True when the error already says whose it is, or the client caused it. */
+function alreadyClassified(error: unknown): boolean {
+  return isClientSide(error) || typeof (error as { statusCode?: unknown })?.statusCode === "number";
+}
+
+/** Ours: neither the client's nor the storage's, so a 500 the error handler reports. */
+function serverFault(error: unknown): Error {
+  const err = error instanceof Error ? error : new Error(String(error));
+  return Object.assign(err, { statusCode: 500 });
+}
+
+/**
+ * What a failed local write means for the request behind it. Without a
+ * status, the tool routes answered every one of these as a malformed request
+ * (a 400), and nothing was reported (#1421). The client's own faults and
+ * errors that already carry a status (the workspace cap, the disk floor, an
+ * over-limit file) pass through; a storage errno becomes a 503 naming the
+ * condition, with the errno as its cause; anything else is a 500.
+ */
+function localWriteFault(error: unknown): unknown {
+  if (alreadyClassified(error)) return error;
+  const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
+  if (code === "ENOSPC" || code === "EDQUOT") {
+    return storageFault(STORAGE_FULL_MESSAGE, "storage-full", error);
+  }
+  if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+    return storageFault(STORAGE_NOT_WRITABLE_MESSAGE, "storage-not-writable", error);
+  }
+  if (typeof syscall === "string") {
+    return storageFault(STORAGE_WRITE_FAILED_MESSAGE, "storage-write-failed", error);
+  }
+  return serverFault(error);
+}
+
+/**
+ * The S3 counterpart: a refusal (the SDK's service errors carry `$metadata`)
+ * or an endpoint it couldn't reach is a 503 storage fault; the client's own
+ * faults pass through; anything else is ours.
  */
 function s3WriteFault(error: unknown): unknown {
-  if (isClientSide(error)) return error;
+  if (alreadyClassified(error)) return error;
   const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
-  if (!s3Answered && connectivityClass(error) !== "net-unavailable") return error;
-  return new SafeError("Upload storage is unavailable. Try again shortly", {
-    kind: "operational",
-    code: "storage-unavailable",
-    statusCode: 503,
-    cause: error,
-  });
+  if (s3Answered || connectivityClass(error) === "net-unavailable") {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  return serverFault(error);
 }
 
 function normalizeOperationalWriteError(error: unknown): unknown {

@@ -208,6 +208,11 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       ["an over-limit file", Object.assign(new Error("too large"), { statusCode: 413 })],
       ["an abort", Object.assign(new Error("The operation was aborted"), { name: "AbortError" })],
       [
+        // The SDK's retry layer stamps $metadata on whatever passes through it.
+        "an abort the SDK stamped",
+        Object.assign(new Error("Request aborted"), { name: "AbortError", $metadata: {} }),
+      ],
+      [
         // The upload's own client dropping out: ECONNRESET looks like an
         // unreachable endpoint, but the 400 set upstream says whose it is.
         "a client abort the SDK wrapped",
@@ -215,9 +220,42 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
           cause: Object.assign(new Error("aborted"), { code: "ECONNRESET", statusCode: 400 }),
         }),
       ],
-      ["a bug", new TypeError("Cannot read properties of undefined")],
     ])("passes %s through unchanged", async (_case, original) => {
       expect(await streamFailure(original)).toBe(original);
+    });
+
+    it("makes anything else ours: a 500, not a malformed request", async () => {
+      const bug = new TypeError("Cannot read properties of undefined");
+      expect(await streamFailure(bug)).toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
+
+    it("keeps the client's 413 when S3 replaces it with its own abort failure", async () => {
+      // lib-storage aborts the multipart upload when the body fails; if that
+      // abort is refused, it throws the refusal instead of the body's error.
+      s3.putStream.mockImplementationOnce(async (_key: string, source: AsyncIterable<Buffer>) => {
+        try {
+          for await (const _chunk of source) {
+            /* consume */
+          }
+        } catch {
+          throw Object.assign(new Error("Access Denied"), {
+            name: "AccessDenied",
+            $metadata: { httpStatusCode: 403 },
+          });
+        }
+      });
+
+      const err = await putObjectStream(
+        "uploads/job-s3fault/big.bin",
+        Readable.from([Buffer.alloc(4096, 1)]),
+        { maxBytes: 1024 },
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+
+      expect(err).toMatchObject({ statusCode: 413, limitBytes: 1024 });
     });
   });
 

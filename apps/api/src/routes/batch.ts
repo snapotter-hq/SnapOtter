@@ -38,6 +38,7 @@ import {
   deleteObject,
   getObjectStream,
   putObject,
+  STORAGE_FAULT_CODES,
   workspaceHeadroomBytes,
 } from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
@@ -65,10 +66,6 @@ type ParsedFile =
   | ({ kind: "path" } & SpooledMultipartFile);
 
 const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-
-// Storage capacity failures answer 503 wherever they surface, so a client
-// keys on one status and code for "the instance is full" (#1161).
-const CAPACITY_CODES = new Set(["workspace-cap", "disk-free-floor"]);
 
 /**
  * The failure a finalize committed to the parent row before it rethrew, or
@@ -653,7 +650,10 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // row is what the sync client and API consumers must see (#1161).
             const failure = await settledFailure(parentId);
             if (!failure) throw err;
-            const status = failure.code && CAPACITY_CODES.has(failure.code) ? 503 : 500;
+            // Storage faults answer 503 wherever they surface, so a client
+            // keys on one status and code for "the instance can't store
+            // this" (#1161, #1421).
+            const status = failure.code && STORAGE_FAULT_CODES.has(failure.code) ? 503 : 500;
             return reply.status(status).send({
               error: failure.message,
               ...(failure.code ? { code: failure.code } : {}),
