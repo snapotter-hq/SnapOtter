@@ -2,14 +2,14 @@
  * A storage fault partway through a multi-file pdf-to-image run (#1443).
  *
  * The inline batch route publishes `processing` frames to a progress row the
- * client watches over SSE, then rethrows any status-bearing error (a full
- * workspace, an S3 outage) so the global handler can answer with its status.
- * That rethrow skipped the route's terminal frame, so the row stayed
- * `processing` and the SSE stream never ended; only the boot-time placeholder
- * cleanup ever settled it.
+ * client watches over SSE, then rethrows any status-bearing error (today the
+ * local workspace-cap and disk-free-floor SafeErrors) so it is answered with
+ * its own status. That rethrow skipped the route's terminal frame, so the row
+ * stayed `processing` and the SSE stream never ended; only the boot-time
+ * placeholder cleanup ever settled it.
  */
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -19,19 +19,23 @@ import {
   type TestApp,
 } from "../../test-server.js";
 
-/** Object-key prefixes whose putObject fails with a 503, like a full workspace. */
-const storageMock = vi.hoisted(() => ({ poison: new Set<string>() }));
+const faults = vi.hoisted(() => ({
+  /** Object keys (or key prefixes) whose putObject fails with a 503. */
+  poison: new Set<string>(),
+  /** When set, the route's failBatchJob call rejects. */
+  settleFails: false,
+}));
 
 vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../../apps/api/src/lib/object-storage.js")>();
-  const { SafeError: Safe } = await import("@snapotter/shared");
+  const { SafeError } = await import("@snapotter/shared");
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
-      for (const prefix of storageMock.poison) {
+      for (const prefix of faults.poison) {
         if (key.startsWith(prefix)) {
-          throw new Safe("Workspace storage limit reached", {
+          throw new SafeError("Workspace storage limit reached", {
             kind: "operational",
             code: "workspace-cap",
             statusCode: 503,
@@ -39,6 +43,18 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
         }
       }
       return actual.putObject(key, data);
+    },
+  };
+});
+
+vi.mock("../../../../apps/api/src/routes/progress.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../../apps/api/src/routes/progress.js")>();
+  return {
+    ...actual,
+    failBatchJob: async (...args: Parameters<typeof actual.failBatchJob>) => {
+      if (faults.settleFails) throw new Error("settle write failed");
+      return actual.failBatchJob(...args);
     },
   };
 });
@@ -54,45 +70,55 @@ beforeAll(async () => {
   token = await loginAsAdmin(testApp.app);
 }, 30_000);
 
+afterEach(() => {
+  faults.poison.clear();
+  faults.settleFails = false;
+});
+
 afterAll(async () => {
-  storageMock.poison.clear();
   await testApp.cleanup();
 }, 10_000);
+
+function postBatch(clientJobId: string) {
+  const { body, contentType } = createMultipartPayload([
+    { name: "file", filename: "a.pdf", contentType: "application/pdf", content: PDF_3PAGE },
+    { name: "file", filename: "b.pdf", contentType: "application/pdf", content: PDF_2PAGE },
+    { name: "settings", content: JSON.stringify({ dpi: 72 }) },
+    { name: "clientJobId", content: clientJobId },
+  ]);
+  return testApp.app.inject({
+    method: "POST",
+    url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
+    body,
+    headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+  });
+}
 
 async function readRow(id: string) {
   const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
   return row;
 }
 
+async function objectsUnder(prefix: string) {
+  const { listObjects } = await import("../../../../apps/api/src/lib/object-storage.js");
+  return listObjects(prefix);
+}
+
 describe("pdf-to-image batch storage fault (#1443)", () => {
   it("settles the progress row as failed before answering with the fault's status", async () => {
     const clientJobId = "batch-1443-storage-fault";
-    // The second document's output write fails; the first one succeeds.
-    storageMock.poison.add(`outputs/${clientJobId}-f1/`);
+    // The second document's first write fails; the first document succeeds.
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
 
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "a.pdf", contentType: "application/pdf", content: PDF_3PAGE },
-      { name: "file", filename: "b.pdf", contentType: "application/pdf", content: PDF_2PAGE },
-      { name: "settings", content: JSON.stringify({ dpi: 72 }) },
-      { name: "clientJobId", content: clientJobId },
-    ]);
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
-      body,
-      headers: { "content-type": contentType, authorization: `Bearer ${token}` },
-    });
+    const res = await postBatch(clientJobId);
 
-    // The global handler still answers with the fault's own status.
+    // Still answered with the fault's own status and code.
     expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
+    expect(res.json()).toMatchObject({ code: "workspace-cap" });
 
-    // The row a client replays over SSE is terminal, carrying the reason and
-    // the SafeError's code. The persist queue is async, so poll briefly.
-    let row = await readRow(clientJobId);
-    for (let i = 0; i < 50 && row?.status !== "failed"; i++) {
-      await new Promise((r) => setTimeout(r, 50));
-      row = await readRow(clientJobId);
-    }
+    // The settle is awaited before the rethrow, so the row a client replays
+    // over SSE is already terminal when the response arrives.
+    const row = await readRow(clientJobId);
     expect(row?.status, "the progress row was left non-terminal").toBe("failed");
     expect(row?.completedAt).not.toBeNull();
     expect(row?.error).toMatchObject({
@@ -100,10 +126,33 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       code: "workspace-cap",
     });
 
-    // Nothing is sent on a fault, so the first document's rendered pages and
-    // ZIP are only stranded storage; they're removed before the rethrow.
-    const { objectExists } = await import("../../../../apps/api/src/lib/object-storage.js");
-    expect(await objectExists(`outputs/${clientJobId}-f0/page-1.jpg`)).toBe(false);
-    expect(await objectExists(`outputs/${clientJobId}-f0/a-pages.zip`)).toBe(false);
+    // Nothing is sent on a fault, so the first document's rendered output is
+    // only stranded storage; it's removed before the rethrow.
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+  });
+
+  it("also removes the faulting document's own pages when the fault hits after they were written", async () => {
+    const clientJobId = "batch-1443-first-doc-fault";
+    // Pages 1-3 of the first document are written; only its ZIP write fails.
+    faults.poison.add(`outputs/${clientJobId}-f0/a-pages.zip`);
+
+    const res = await postBatch(clientJobId);
+
+    expect(res.statusCode).toBe(503);
+    expect((await readRow(clientJobId))?.status).toBe("failed");
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+  });
+
+  it("keeps the fault's status and still cleans up when settling the row itself fails", async () => {
+    const clientJobId = "batch-1443-settle-fails";
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
+    faults.settleFails = true;
+
+    const res = await postBatch(clientJobId);
+
+    // The settle error is logged, never answered in place of the real fault.
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
+    expect(res.json()).toMatchObject({ code: "workspace-cap" });
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
   });
 });

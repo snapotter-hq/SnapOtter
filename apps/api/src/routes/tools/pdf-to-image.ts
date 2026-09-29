@@ -545,11 +545,18 @@ export function registerPdfToImageRoute(
             );
             // Nothing will be sent, so what this run already rendered (every
             // document up to this one) is only stranded storage with no jobs
-            // row for retention to find.
+            // row for retention to find. On a full workspace this is the space
+            // the next request needs, so a failed delete is said out loud.
             await Promise.all(
-              files
-                .slice(0, i + 1)
-                .map((_, n) => deletePrefix(`outputs/${jobId}-f${n}`).catch(() => {})),
+              files.slice(0, i + 1).map((_, n) => {
+                const prefix = `outputs/${jobId}-f${n}`;
+                return deletePrefix(prefix).catch((cleanupErr) =>
+                  request.log.warn(
+                    { err: cleanupErr, jobId, prefix },
+                    "faulted PDF batch cleanup failed",
+                  ),
+                );
+              }),
             );
             throw err;
           }
