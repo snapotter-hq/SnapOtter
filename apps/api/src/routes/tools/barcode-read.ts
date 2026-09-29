@@ -211,6 +211,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
       }
 
       let storing = false;
+      let imageSize: { width: number; height: number } | undefined;
       try {
         const tryHarder = settings.tryHarder;
 
@@ -265,6 +266,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
           });
         }
 
+        imageSize = { width, height };
         const rawData = await image.ensureAlpha().raw().toBuffer();
 
         // --- Detect barcodes via zxing-wasm ---
@@ -348,15 +350,21 @@ export function registerBarcodeRead(app: FastifyInstance) {
         // so hand it the binary again: new overrides drop the cached instance
         // and the next request starts a fresh one with a fresh heap (#1402).
         if (isDecoderFault(err)) {
+          // Node failing to allocate zxing's grayscale copy happens before the
+          // wasm call, so the decoder is fine; reloading it would only add
+          // work while memory is short (#1469).
+          const reload = !(err instanceof RangeError);
+          // The size tells memory pressure (retry works) from an image too
+          // big for this server (it never will).
           request.log.error(
-            { err, toolId: "barcode-read" },
-            "Barcode decoder failed; reloading it for the next request",
+            { err, toolId: "barcode-read", imageSize, reload },
+            "Barcode decoder failed",
           );
           void reportError(err, { source: "http", toolId: "barcode-read", statusCode: 503 });
-          initZXingReader();
+          if (reload) initZXingReader();
           return reply.status(503).send({
             error: "Barcode reading failed on this server.",
-            details: "The barcode decoder failed and has been reloaded. Try again.",
+            details: "The barcode decoder ran out of resources or failed. Try again.",
             code: "ENGINE_UNAVAILABLE",
           });
         }
