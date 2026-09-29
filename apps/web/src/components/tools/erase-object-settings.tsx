@@ -228,8 +228,7 @@ export function EraseObjectSettings({
           resolve();
         },
         onFailed: (err) => reject(new Error(err)),
-        onStall: () =>
-          reject(new Error("Processing timed out. The result may have saved -- check your files.")),
+        onStall: () => reject(new Error(t.toolSettings["erase-object"].stallBatch)),
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -251,7 +250,7 @@ export function EraseObjectSettings({
             applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
             resolve();
           } catch {
-            reject(new Error("Invalid response"));
+            reject(new Error(t.errors.invalidResponse));
           }
         } else {
           try {
@@ -262,21 +261,21 @@ export function EraseObjectSettings({
                   ? body.error
                   : typeof body.details === "string"
                     ? body.details
-                    : `Failed: ${xhr.status}`,
+                    : format(t.errors.failedWithStatus, { status: xhr.status }),
               ),
             );
           } catch {
-            reject(new Error(`Processing failed: ${xhr.status}`));
+            reject(new Error(format(t.errors.processingFailedWithStatus, { status: xhr.status })));
           }
         }
       };
       xhr.onerror = () => {
         stopProgress();
-        reject(new Error("Network error"));
+        reject(new Error(t.errors.network));
       };
       xhr.ontimeout = () => {
         stopProgress();
-        reject(new Error("Request timed out"));
+        reject(new Error(t.errors.requestTimedOut));
       };
       xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
       for (const [key, value] of formatHeaders()) {
@@ -362,9 +361,7 @@ export function EraseObjectSettings({
       },
       onStall: () => {
         progressCleanupRef.current = null;
-        setError(
-          "Processing timed out with no progress. The result may have saved to your files -- otherwise, try again.",
-        );
+        setError(t.toolSettings["erase-object"].stall);
         finishUi();
       },
     });
@@ -406,7 +403,7 @@ export function EraseObjectSettings({
         try {
           applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
         } catch {
-          setError("Invalid response");
+          setError(t.errors.invalidResponse);
         }
       } else {
         try {
@@ -416,10 +413,10 @@ export function EraseObjectSettings({
               ? body.error
               : typeof body.details === "string"
                 ? body.details
-                : `Failed: ${xhr.status}`,
+                : format(t.errors.failedWithStatus, { status: xhr.status }),
           );
         } catch {
-          setError(`Processing failed: ${xhr.status}`);
+          setError(format(t.errors.processingFailedWithStatus, { status: xhr.status }));
         }
       }
       finishUi();
@@ -427,13 +424,13 @@ export function EraseObjectSettings({
     xhr.onerror = () => {
       stopProgress();
       progressCleanupRef.current = null;
-      setError("Network error");
+      setError(t.errors.network);
       finishUi();
     };
     xhr.ontimeout = () => {
       stopProgress();
       progressCleanupRef.current = null;
-      setError("Request timed out - the server may be overloaded. Try again.");
+      setError(t.toolSettings["erase-object"].timeoutOverloaded);
       finishUi();
     };
     xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
@@ -484,7 +481,12 @@ export function EraseObjectSettings({
 
       setProgressPhase("processing");
       setProgressPercent(basePercent);
-      setProgressStage(`Erasing ${wi + 1}/${work.length}`);
+      setProgressStage(
+        format(t.toolSettings["erase-object"].erasingProgress, {
+          current: wi + 1,
+          total: work.length,
+        }),
+      );
 
       useFileStore.getState().updateEntry(index, { status: "processing", error: null });
 
@@ -495,7 +497,7 @@ export function EraseObjectSettings({
       } catch (err) {
         useFileStore.getState().updateEntry(index, {
           status: "failed",
-          error: err instanceof Error ? err.message : "Processing failed",
+          error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
         });
       }
     }
@@ -606,7 +608,7 @@ export function EraseObjectSettings({
                   : format(t.features.enableButton, {
                       name: bundleName(
                         t,
-                        hqBundle ?? { id: HQ_BUNDLE_ID, name: "High-Quality Inpainting" },
+                        hqBundle ?? { id: HQ_BUNDLE_ID, name: t.featureBundles["inpaint-hq"].name },
                       ),
                     })}
               </button>

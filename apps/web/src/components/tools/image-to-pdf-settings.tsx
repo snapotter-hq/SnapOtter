@@ -224,26 +224,28 @@ export function ImageToPdfSettings() {
           setCompressionResult(result.compression ?? null);
           setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
         } catch {
-          setError("Failed to parse server response");
+          setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
         }
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(body.error || `Failed: ${xhr.status}`);
+          setError(body.error || format(t.errors.failedWithStatus, { status: xhr.status }));
         } catch {
-          setError(`PDF creation failed: ${xhr.status}`);
+          setError(
+            format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, { status: xhr.status }),
+          );
         }
       }
       cleanup();
     };
 
     xhr.onerror = () => {
-      setError("Network error during PDF creation");
+      setError(t.toolSettings["image-to-pdf"].networkErrorCreation);
       cleanup();
     };
 
     xhr.ontimeout = () => {
-      setError("Request timed out - the server may be overloaded");
+      setError(t.toolSettings["image-to-pdf"].requestTimedOut);
       cleanup();
     };
 
@@ -262,6 +264,7 @@ export function ImageToPdfSettings() {
     targetSizeUnit,
     setProcessing,
     setError,
+    t,
   ]);
 
   const hasFiles = files.length > 0;

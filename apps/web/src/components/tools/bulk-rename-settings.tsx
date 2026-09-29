@@ -34,7 +34,7 @@ export function BulkRenameSettings() {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || `Failed: ${res.status}`);
+        throw new Error(text || format(t.errors.failedWithStatus, { status: res.status }));
       }
 
       const blob = await res.blob();
@@ -46,7 +46,7 @@ export function BulkRenameSettings() {
       URL.revokeObjectURL(url);
       setDownloadReady(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Rename failed");
+      setError(err instanceof Error ? err.message : t.toolSettings["bulk-rename"].renameFailed);
     } finally {
       setProcessing(false);
     }

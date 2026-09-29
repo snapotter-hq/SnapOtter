@@ -14,15 +14,15 @@ export function CropOptions() {
   const cropState = useEditorStore((s) => s.cropState);
   const setCropState = useEditorStore((s) => s.setCropState);
   const applyCrop = useEditorStore((s) => s.applyCrop);
-  const [selectedRatio, setSelectedRatio] = useState("Free");
+  const [selectedRatio, setSelectedRatio] = useState("free");
 
   const handleAspectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const label = e.target.value;
-      setSelectedRatio(label);
+      const id = e.target.value;
+      setSelectedRatio(id);
       if (!cropState) return;
 
-      const preset = ASPECT_RATIOS.find((p) => p.label === label);
+      const preset = ASPECT_RATIOS.find((p) => p.id === id);
       if (!preset?.value) {
         setCropState({ ...cropState, aspectRatio: null });
         return;
@@ -35,7 +35,7 @@ export function CropOptions() {
         h = cropState.height;
         w = h * ratio;
       }
-      setCropState({ ...cropState, width: w, height: h, aspectRatio: label });
+      setCropState({ ...cropState, width: w, height: h, aspectRatio: id });
     },
     [cropState, setCropState],
   );
@@ -97,8 +97,8 @@ export function CropOptions() {
           )}
         >
           {ASPECT_RATIOS.map((r) => (
-            <option key={r.label} value={r.label}>
-              {r.label}
+            <option key={r.id} value={r.id}>
+              {r.id === "free" ? t.editor.options.crop.free : r.id}
             </option>
           ))}
         </select>

@@ -35,7 +35,7 @@ export function CompareSettings() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Failed: ${res.status}`);
+        throw new Error(body.error || format(t.errors.failedWithStatus, { status: res.status }));
       }
 
       const result = resolveServerUrls(await res.json());
@@ -45,7 +45,7 @@ export function CompareSettings() {
       // visually compare their two originals. The diff is still downloadable.
       setProcessedUrl(URL.createObjectURL(secondFile));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Comparison failed");
+      setError(err instanceof Error ? err.message : t.toolSettings.compare.comparisonFailed);
     } finally {
       setProcessing(false);
     }

@@ -113,13 +113,14 @@ export function HistoryPanel() {
     const past = temporal.pastStates as Array<{ lastAction?: string }>;
     const future = temporal.futureStates as Array<{ lastAction?: string }>;
 
+    const unknownLabel = t.editor.panels.history.unknown;
     const result: HistoryEntry[] = [];
 
     // Future states (dimmed, above current in reverse order)
     for (let i = future.length - 1; i >= 0; i--) {
       result.push({
         index: -(i + 1),
-        label: (future[i] as { lastAction?: string })?.lastAction || "Unknown",
+        label: (future[i] as { lastAction?: string })?.lastAction || unknownLabel,
       });
     }
 
@@ -133,14 +134,14 @@ export function HistoryPanel() {
     for (let i = past.length - 1; i >= 0; i--) {
       result.push({
         index: past.length - i,
-        label: (past[i] as { lastAction?: string })?.lastAction || "Unknown",
+        label: (past[i] as { lastAction?: string })?.lastAction || unknownLabel,
       });
     }
 
     return result;
     // pastStates and futureStates are intentionally not reactive deps;
     // we read them inside via getState(). lastAction triggers recalculation.
-  }, [lastAction]);
+  }, [lastAction, t]);
 
   const jumpToState = useCallback((entry: HistoryEntry) => {
     const temporal = useEditorStore.temporal.getState();

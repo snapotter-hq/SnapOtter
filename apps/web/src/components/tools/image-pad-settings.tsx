@@ -5,13 +5,14 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
 
+// Ratio labels are locale-invariant; "custom" resolves via i18n.
 const TARGET_OPTIONS = [
   { value: "16:9", label: "16:9" },
   { value: "9:16", label: "9:16" },
   { value: "1:1", label: "1:1" },
   { value: "4:3", label: "4:3" },
   { value: "3:4", label: "3:4" },
-  { value: "custom", label: "Custom" },
+  { value: "custom", label: null },
 ] as const;
 
 /** Mirror of the backend canvasFor helper for preview geometry. */
@@ -182,7 +183,7 @@ export function ImagePadSettings({ onImageStyle, onImageOverlay }: ImagePadSetti
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {opt.label}
+              {opt.value === "custom" ? t.toolSettings["image-pad"].custom : opt.label}
             </button>
           ))}
         </div>

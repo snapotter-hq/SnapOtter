@@ -35,13 +35,13 @@ interface AnalysisData {
   suggestedMode: EnhancementMode;
 }
 
-const MODES: { value: EnhancementMode; label: string; icon: typeof Sparkles }[] = [
-  { value: "auto", label: "Auto", icon: Sparkles },
-  { value: "portrait", label: "Portrait", icon: User },
-  { value: "landscape", label: "Landscape", icon: Mountain },
-  { value: "low-light", label: "Low Light", icon: Moon },
-  { value: "food", label: "Food", icon: UtensilsCrossed },
-  { value: "document", label: "Document", icon: FileText },
+const MODES: { value: EnhancementMode; icon: typeof Sparkles }[] = [
+  { value: "auto", icon: Sparkles },
+  { value: "portrait", icon: User },
+  { value: "landscape", icon: Mountain },
+  { value: "low-light", icon: Moon },
+  { value: "food", icon: UtensilsCrossed },
+  { value: "document", icon: FileText },
 ];
 
 const PRESET_MULTIPLIERS: Record<EnhancementMode, Record<string, number>> = {
@@ -139,6 +139,14 @@ export function ImageEnhancementControls({
   onPreviewFilter,
 }: ImageEnhancementControlsProps) {
   const { t } = useTranslation();
+  const modeLabels: Record<EnhancementMode, string> = {
+    auto: t.toolSettings.imageEnhancement.auto,
+    portrait: t.toolSettings.imageEnhancement.portrait,
+    landscape: t.toolSettings.imageEnhancement.landscape,
+    "low-light": t.toolSettings.imageEnhancement.lowLight,
+    food: t.toolSettings.imageEnhancement.food,
+    document: t.toolSettings.imageEnhancement.document,
+  };
   const { files } = useFileStore();
   const [mode, setMode] = useState<EnhancementMode>("auto");
   const [intensity, setIntensity] = useState(50);
@@ -281,7 +289,7 @@ export function ImageEnhancementControls({
         {t.toolSettings.imageEnhancement.enhancementMode}
       </p>
       <div className="grid grid-cols-3 gap-1">
-        {MODES.map(({ value, label, icon: Icon }) => (
+        {MODES.map(({ value, icon: Icon }) => (
           <button
             key={value}
             type="button"
@@ -293,7 +301,7 @@ export function ImageEnhancementControls({
             }`}
           >
             <Icon className="h-3 w-3" />
-            {label}
+            {modeLabels[value]}
           </button>
         ))}
       </div>

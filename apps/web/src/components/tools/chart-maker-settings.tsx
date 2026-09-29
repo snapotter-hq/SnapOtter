@@ -1,3 +1,4 @@
+import type { TranslationKeys } from "@snapotter/shared";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
@@ -5,17 +6,21 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { useFileStore } from "@/stores/file-store";
 
-const CHART_KINDS = [
-  { value: "bar", label: "Bar" },
-  { value: "line", label: "Line" },
-  { value: "pie", label: "Pie" },
-] as const;
+type ChartKind = "bar" | "line" | "pie";
+
+const CHART_KINDS: readonly ChartKind[] = ["bar", "line", "pie"];
+
+function chartKindLabels(t: TranslationKeys): Record<ChartKind, string> {
+  const s = t.toolSettings["chart-maker"];
+  return { bar: s.kindBar, line: s.kindLine, pie: s.kindPie };
+}
 
 const INPUT_CLASS =
   "w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground";
 
 export function ChartMakerSettings() {
   const { t } = useTranslation();
+  const kindLabels = chartKindLabels(t);
   const { files } = useFileStore();
   const { processFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("chart-maker");
@@ -53,8 +58,8 @@ export function ChartMakerSettings() {
           className={INPUT_CLASS}
         >
           {CHART_KINDS.map((ck) => (
-            <option key={ck.value} value={ck.value}>
-              {ck.label}
+            <option key={ck} value={ck}>
+              {kindLabels[ck]}
             </option>
           ))}
         </select>
@@ -143,8 +148,6 @@ export function ChartMakerSettings() {
   );
 }
 
-type ChartKind = "bar" | "line" | "pie";
-
 export interface ChartMakerControlsProps {
   settings?: Record<string, unknown>;
   onChange?: (settings: Record<string, unknown>) => void;
@@ -153,6 +156,7 @@ export interface ChartMakerControlsProps {
 export function ChartMakerControls({ settings: initial, onChange }: ChartMakerControlsProps) {
   const { t } = useTranslation();
   const s = t.toolSettings["chart-maker"];
+  const kindLabels = chartKindLabels(t);
   const [kind, setKind] = useState<ChartKind>("bar");
   const [title, setTitle] = useState("");
   const [width, setWidth] = useState(960);
@@ -191,8 +195,8 @@ export function ChartMakerControls({ settings: initial, onChange }: ChartMakerCo
           className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
         >
           {CHART_KINDS.map((ck) => (
-            <option key={ck.value} value={ck.value}>
-              {ck.label}
+            <option key={ck} value={ck}>
+              {kindLabels[ck]}
             </option>
           ))}
         </select>

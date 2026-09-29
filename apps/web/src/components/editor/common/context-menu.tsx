@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -24,6 +25,7 @@ interface MenuPosition {
 }
 
 interface MenuItem {
+  id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   shortcut?: string;
@@ -70,6 +72,7 @@ export function ContextMenu({
   onCanvasResize?: () => void;
   onImageResize?: () => void;
 }) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedObjectIds = useEditorStore((s) => s.selectedObjectIds);
@@ -107,7 +110,8 @@ export function ContextMenu({
 
   const objectItems: MenuItem[] = [
     {
-      label: "Cut",
+      id: "cut",
+      label: t.editor.menu.edit.cut,
       icon: Scissors,
       shortcut: "Ctrl+X",
       action: () => {
@@ -116,7 +120,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Copy",
+      id: "copy",
+      label: t.editor.menu.edit.copy,
       icon: Copy,
       shortcut: "Ctrl+C",
       action: () => {
@@ -125,7 +130,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Paste",
+      id: "paste",
+      label: t.editor.menu.edit.paste,
       icon: ClipboardPaste,
       shortcut: "Ctrl+V",
       action: () => {
@@ -135,7 +141,8 @@ export function ContextMenu({
       disabled: !clipboard || clipboard.length === 0,
     },
     {
-      label: "Duplicate",
+      id: "duplicate",
+      label: t.editor.ui.contextMenu.duplicate,
       icon: CopyPlus,
       shortcut: "Ctrl+D",
       action: () => {
@@ -146,7 +153,8 @@ export function ContextMenu({
       dividerAfter: true,
     },
     {
-      label: "Bring to Front",
+      id: "bringToFront",
+      label: t.editor.menu.layer.arrange.bringToFront,
       icon: ArrowUp,
       action: () => {
         for (const id of selectedObjectIds) bringToFront(id);
@@ -154,7 +162,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Bring Forward",
+      id: "bringForward",
+      label: t.editor.menu.layer.arrange.bringForward,
       icon: ArrowUp,
       action: () => {
         for (const id of selectedObjectIds) bringForward(id);
@@ -162,7 +171,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Send Backward",
+      id: "sendBackward",
+      label: t.editor.menu.layer.arrange.sendBackward,
       icon: ArrowDown,
       action: () => {
         for (const id of selectedObjectIds) sendBackward(id);
@@ -170,7 +180,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Send to Back",
+      id: "sendToBack",
+      label: t.editor.menu.layer.arrange.sendToBack,
       icon: ArrowDown,
       action: () => {
         for (const id of selectedObjectIds) sendToBack(id);
@@ -179,7 +190,8 @@ export function ContextMenu({
       dividerAfter: true,
     },
     {
-      label: "Delete",
+      id: "delete",
+      label: t.editor.menu.edit.delete,
       icon: Trash2,
       shortcut: "Del",
       action: () => {
@@ -191,7 +203,8 @@ export function ContextMenu({
 
   const canvasItems: MenuItem[] = [
     {
-      label: "Paste",
+      id: "paste",
+      label: t.editor.menu.edit.paste,
       icon: ClipboardPaste,
       shortcut: "Ctrl+V",
       action: () => {
@@ -201,7 +214,8 @@ export function ContextMenu({
       disabled: !clipboard || clipboard.length === 0,
     },
     {
-      label: "Select All",
+      id: "selectAll",
+      label: t.editor.ui.contextMenu.selectAll,
       icon: MousePointer,
       shortcut: "Ctrl+A",
       action: () => {
@@ -220,7 +234,8 @@ export function ContextMenu({
       dividerAfter: true,
     },
     {
-      label: "Canvas Size...",
+      id: "canvasSize",
+      label: t.editor.menu.image.canvasSize,
       icon: Maximize,
       action: () => {
         onCanvasResize?.();
@@ -228,7 +243,8 @@ export function ContextMenu({
       },
     },
     {
-      label: "Image Size...",
+      id: "imageSize",
+      label: t.editor.menu.image.imageSize,
       icon: ImageIcon,
       action: () => {
         onImageResize?.();
@@ -253,7 +269,7 @@ export function ContextMenu({
       style={{ left: adjustedX, top: adjustedY }}
     >
       {items.map((item) => (
-        <div key={item.label}>
+        <div key={item.id}>
           <button
             type="button"
             onClick={item.action}

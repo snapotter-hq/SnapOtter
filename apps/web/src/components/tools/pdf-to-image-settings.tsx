@@ -25,17 +25,18 @@ const DPI_PRESETS = [
   { value: 600, label: "600" },
 ];
 
-const DPI_LABELS: Record<number, string> = {
-  72: "Screen",
-  150: "Standard",
-  300: "Print",
-  600: "High Quality",
-};
+const DPI_LABEL_KEYS: Record<number, "dpiScreen" | "dpiStandard" | "dpiPrint" | "dpiHighQuality"> =
+  {
+    72: "dpiScreen",
+    150: "dpiStandard",
+    300: "dpiPrint",
+    600: "dpiHighQuality",
+  };
 
 const COLOR_MODE_OPTIONS = [
-  { value: "color", label: "Color" },
-  { value: "grayscale", label: "Grayscale" },
-  { value: "bw", label: "B&W" },
+  { value: "color", labelKey: "colorModeColor" },
+  { value: "grayscale", labelKey: "colorModeGrayscale" },
+  { value: "bw", labelKey: "colorModeBw" },
 ] as const;
 
 const LOSSY_FORMATS = ["jpg", "webp", "avif", "heic", "heif", "jxl"];
@@ -173,7 +174,11 @@ export function PdfToImageSettings() {
             className="w-full mt-1.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           />
         ) : (
-          <p className="text-xs text-muted-foreground mt-1">{DPI_LABELS[store.dpi] ?? ""}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {store.dpi in DPI_LABEL_KEYS
+              ? t.toolSettings["pdf-to-image"][DPI_LABEL_KEYS[store.dpi]]
+              : ""}
+          </p>
         )}
       </div>
 
@@ -194,7 +199,7 @@ export function PdfToImageSettings() {
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {opt.label}
+              {t.toolSettings["pdf-to-image"][opt.labelKey]}
             </button>
           ))}
         </div>

@@ -84,19 +84,23 @@ export function StitchSettings() {
             try {
               resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
             } catch {
-              reject(new Error("Invalid response"));
+              reject(new Error(t.errors.invalidResponse));
             }
           } else {
             try {
               const body = JSON.parse(xhr.responseText);
-              reject(new Error(body.error || `Failed: ${xhr.status}`));
+              reject(
+                new Error(
+                  body.error || formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+                ),
+              );
             } catch {
-              reject(new Error(`Failed: ${xhr.status}`));
+              reject(new Error(formatMessage(t.errors.failedWithStatus, { status: xhr.status })));
             }
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.onerror = () => reject(new Error(t.errors.network));
         xhr.send(formData);
       });
 
@@ -105,7 +109,7 @@ export function StitchSettings() {
       setDownloadUrl(result.downloadUrl);
       setSizes(result.originalSize, result.processedSize);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Stitch failed");
+      setError(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
     } finally {
       setProcessing(false);
     }

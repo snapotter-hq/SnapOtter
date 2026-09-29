@@ -4,10 +4,12 @@ import { format } from "@/lib/format";
 
 const INK_COLORS = ["#13315c", "#1a1814", "#1f6feb"];
 const PEN_WIDTHS = { S: 2, M: 3.5, L: 6 } as const;
+// The typed-signature picker renders each font as a live sample of the user's
+// name, so id is only an identity (React key + selection), never shown.
 const FONTS = [
-  { label: "Signature", css: "'Brush Script MT', 'Segoe Script', cursive" },
-  { label: "Cursive", css: "'Snell Roundhand', 'Apple Chancery', cursive" },
-  { label: "Italic", css: "Georgia, serif" },
+  { id: "signature", css: "'Brush Script MT', 'Segoe Script', cursive" },
+  { id: "cursive", css: "'Snell Roundhand', 'Apple Chancery', cursive" },
+  { id: "italic", css: "Georgia, serif" },
 ];
 
 type Tab = "draw" | "type" | "upload";
@@ -233,10 +235,10 @@ export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
               <div className="mt-3 flex flex-col gap-2">
                 {FONTS.map((f) => (
                   <button
-                    key={f.label}
+                    key={f.id}
                     type="button"
                     onClick={() => setFont(f)}
-                    className={`rounded-lg border px-3 py-2 text-start ${font.label === f.label ? "border-primary bg-primary/10" : "border-border"}`}
+                    className={`rounded-lg border px-3 py-2 text-start ${font.id === f.id ? "border-primary bg-primary/10" : "border-border"}`}
                     style={{ fontFamily: f.css, color }}
                   >
                     {typed || pad.yourName}

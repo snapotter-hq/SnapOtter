@@ -2960,22 +2960,22 @@ export function TeamsSection() {
 /* ────────────────────── Roles ────────────────────── */
 
 const PERMISSION_GROUPS = [
-  { label: "Tools", permissions: ["tools:use"] },
-  { label: "Files", permissions: ["files:own", "files:all"] },
-  { label: "API Keys", permissions: ["apikeys:own", "apikeys:all"] },
-  { label: "Pipelines", permissions: ["pipelines:own", "pipelines:all"] },
-  { label: "Settings", permissions: ["settings:read", "settings:write"] },
-  { label: "Users", permissions: ["users:manage"] },
-  { label: "Teams", permissions: ["teams:manage"] },
+  { id: "tools", permissions: ["tools:use"] },
+  { id: "files", permissions: ["files:own", "files:all"] },
+  { id: "apiKeys", permissions: ["apikeys:own", "apikeys:all"] },
+  { id: "pipelines", permissions: ["pipelines:own", "pipelines:all"] },
+  { id: "settings", permissions: ["settings:read", "settings:write"] },
+  { id: "users", permissions: ["users:manage"] },
+  { id: "teams", permissions: ["teams:manage"] },
   {
-    label: "System",
+    id: "system",
     permissions: ["features:manage", "system:health", "audit:read"],
   },
   {
-    label: "Enterprise Administration",
+    id: "enterpriseAdmin",
     permissions: ["security:manage", "compliance:manage", "webhooks:manage"],
   },
-];
+] as const;
 
 export function RolesSection() {
   const { t } = useTranslation();
@@ -3199,8 +3199,10 @@ export function RolesSection() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {PERMISSION_GROUPS.map((group) => (
-                <div key={group.label} className="space-y-1">
-                  <p className="text-xs font-semibold text-foreground">{group.label}</p>
+                <div key={group.id} className="space-y-1">
+                  <p className="text-xs font-semibold text-foreground">
+                    {t.settings.roles.permGroup[group.id]}
+                  </p>
                   {group.permissions.map((perm) => (
                     <label key={perm} className="flex items-center gap-1.5 text-xs cursor-pointer">
                       <input
@@ -3272,8 +3274,10 @@ export function RolesSection() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {PERMISSION_GROUPS.map((group) => (
-                <div key={group.label} className="space-y-1">
-                  <p className="text-xs font-semibold text-foreground">{group.label}</p>
+                <div key={group.id} className="space-y-1">
+                  <p className="text-xs font-semibold text-foreground">
+                    {t.settings.roles.permGroup[group.id]}
+                  </p>
                   {group.permissions.map((perm) => (
                     <label key={perm} className="flex items-center gap-1.5 text-xs cursor-pointer">
                       <input

@@ -9,8 +9,18 @@ import { useFileStore } from "@/stores/file-store";
 
 // ── Presets ──────────────────────────────────────────────────────────
 
+type BorderPresetId =
+  | "cleanWhite"
+  | "galleryBlack"
+  | "shadow"
+  | "rounded"
+  | "polaroid"
+  | "vintage"
+  | "minimal"
+  | "cinematic";
+
 interface BorderPreset {
-  name: string;
+  id: BorderPresetId;
   borderWidth: number;
   borderColor: string;
   padding: number;
@@ -26,7 +36,7 @@ interface BorderPreset {
 
 const PRESETS: BorderPreset[] = [
   {
-    name: "Clean White",
+    id: "cleanWhite",
     borderWidth: 40,
     borderColor: "#FFFFFF",
     padding: 0,
@@ -40,7 +50,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 40,
   },
   {
-    name: "Gallery Black",
+    id: "galleryBlack",
     borderWidth: 30,
     borderColor: "#1A1A1A",
     padding: 12,
@@ -54,7 +64,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 40,
   },
   {
-    name: "Shadow",
+    id: "shadow",
     borderWidth: 0,
     borderColor: "#FFFFFF",
     padding: 20,
@@ -68,7 +78,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 40,
   },
   {
-    name: "Rounded",
+    id: "rounded",
     borderWidth: 20,
     borderColor: "#FFFFFF",
     padding: 0,
@@ -82,7 +92,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 30,
   },
   {
-    name: "Polaroid",
+    id: "polaroid",
     borderWidth: 0,
     borderColor: "#FFFFFF",
     padding: 40,
@@ -96,7 +106,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 35,
   },
   {
-    name: "Vintage",
+    id: "vintage",
     borderWidth: 12,
     borderColor: "#8B7355",
     padding: 8,
@@ -110,7 +120,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 40,
   },
   {
-    name: "Minimal",
+    id: "minimal",
     borderWidth: 2,
     borderColor: "#D4D4D4",
     padding: 0,
@@ -124,7 +134,7 @@ const PRESETS: BorderPreset[] = [
     shadowOpacity: 40,
   },
   {
-    name: "Cinematic",
+    id: "cinematic",
     borderWidth: 2,
     borderColor: "#333333",
     padding: 30,
@@ -229,7 +239,7 @@ export function BorderControls({
   onImageStyle,
 }: BorderControlsProps) {
   const { t } = useTranslation();
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<BorderPresetId | null>(null);
   const [borderWidth, setBorderWidth] = useState(10);
   const [borderColor, setBorderColor] = useState("#000000");
   const [padding, setPadding] = useState(0);
@@ -303,7 +313,7 @@ export function BorderControls({
   ]);
 
   const applyPreset = (preset: BorderPreset) => {
-    setSelectedPreset(preset.name);
+    setSelectedPreset(preset.id);
     setBorderWidth(preset.borderWidth);
     setBorderColor(preset.borderColor);
     setPadding(preset.padding);
@@ -327,16 +337,16 @@ export function BorderControls({
         <div className="grid grid-cols-4 gap-1">
           {PRESETS.map((preset) => (
             <button
-              key={preset.name}
+              key={preset.id}
               type="button"
               onClick={() => applyPreset(preset)}
               className={`text-[11px] py-1.5 rounded transition-colors ${
-                selectedPreset === preset.name
+                selectedPreset === preset.id
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {preset.name}
+              {t.toolSettings.border.presetNames[preset.id]}
             </button>
           ))}
         </div>

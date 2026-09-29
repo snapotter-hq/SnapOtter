@@ -18,8 +18,18 @@ interface GradientStop {
   position: number;
 }
 
+type PresetId =
+  | "purple-haze"
+  | "flamingo"
+  | "ocean"
+  | "midnight"
+  | "mint"
+  | "sunset"
+  | "clean-white"
+  | "no-background";
+
 interface BeautifyPreset {
-  name: string;
+  id: PresetId;
   backgroundType: string;
   backgroundColor: string;
   gradientStops: GradientStop[];
@@ -34,7 +44,7 @@ interface BeautifyPreset {
 
 const PRESETS: BeautifyPreset[] = [
   {
-    name: "Purple Haze",
+    id: "purple-haze",
     backgroundType: "linear-gradient",
     backgroundColor: "#667eea",
     gradientStops: [
@@ -48,7 +58,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "macos-light",
   },
   {
-    name: "Flamingo",
+    id: "flamingo",
     backgroundType: "linear-gradient",
     backgroundColor: "#f093fb",
     gradientStops: [
@@ -62,7 +72,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "none",
   },
   {
-    name: "Ocean",
+    id: "ocean",
     backgroundType: "linear-gradient",
     backgroundColor: "#4facfe",
     gradientStops: [
@@ -76,7 +86,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "browser-light",
   },
   {
-    name: "Midnight",
+    id: "midnight",
     backgroundType: "linear-gradient",
     backgroundColor: "#0f0c29",
     gradientStops: [
@@ -91,7 +101,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "macos-dark",
   },
   {
-    name: "Mint",
+    id: "mint",
     backgroundType: "linear-gradient",
     backgroundColor: "#43e97b",
     gradientStops: [
@@ -105,7 +115,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "none",
   },
   {
-    name: "Sunset",
+    id: "sunset",
     backgroundType: "linear-gradient",
     backgroundColor: "#fa709a",
     gradientStops: [
@@ -119,7 +129,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "none",
   },
   {
-    name: "Clean White",
+    id: "clean-white",
     backgroundType: "solid",
     backgroundColor: "#f8fafc",
     gradientStops: [
@@ -133,7 +143,7 @@ const PRESETS: BeautifyPreset[] = [
     frame: "macos-light",
   },
   {
-    name: "No Background",
+    id: "no-background",
     backgroundType: "transparent",
     backgroundColor: "#ffffff",
     gradientStops: [
@@ -497,47 +507,39 @@ type SocialChip =
   | "facebook"
   | "producthunt";
 
-const BACKGROUND_TABS: { value: BackgroundTab; label: string }[] = [
-  { value: "linear-gradient", label: "Gradient" },
-  { value: "solid", label: "Solid" },
-  { value: "image", label: "Image" },
-  { value: "transparent", label: "None" },
+type WatermarkPosition = "top-left" | "top-right" | "center" | "bottom-left" | "bottom-right";
+
+// Display labels are built inside BeautifyControls from translations, keyed by these values.
+const BACKGROUND_TABS: BackgroundTab[] = ["linear-gradient", "solid", "image", "transparent"];
+
+const FRAME_TYPES: FrameType[] = [
+  "none",
+  "macos",
+  "windows",
+  "browser",
+  "iphone",
+  "macbook",
+  "ipad",
 ];
 
-const FRAME_TYPES: { value: FrameType; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "macos", label: "macOS" },
-  { value: "windows", label: "Windows" },
-  { value: "browser", label: "Browser" },
-  { value: "iphone", label: "iPhone" },
-  { value: "macbook", label: "MacBook" },
-  { value: "ipad", label: "iPad" },
+const SHADOW_CHIPS: ShadowChip[] = ["none", "subtle", "medium", "dramatic", "custom"];
+
+const SOCIAL_CHIPS: SocialChip[] = [
+  "none",
+  "twitter",
+  "linkedin",
+  "instagram-square",
+  "instagram-story",
+  "facebook",
+  "producthunt",
 ];
 
-const SHADOW_CHIPS: { value: ShadowChip; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "subtle", label: "Subtle" },
-  { value: "medium", label: "Medium" },
-  { value: "dramatic", label: "Dramatic" },
-  { value: "custom", label: "Custom" },
-];
-
-const SOCIAL_CHIPS: { value: SocialChip; label: string }[] = [
-  { value: "none", label: "Original" },
-  { value: "twitter", label: "X/Twitter" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "instagram-square", label: "IG Square" },
-  { value: "instagram-story", label: "IG Story" },
-  { value: "facebook", label: "Facebook" },
-  { value: "producthunt", label: "Product Hunt" },
-];
-
-const WATERMARK_POSITIONS = [
-  { value: "top-left", label: "Top Left" },
-  { value: "top-right", label: "Top Right" },
-  { value: "center", label: "Center" },
-  { value: "bottom-left", label: "Bottom Left" },
-  { value: "bottom-right", label: "Bottom Right" },
+const WATERMARK_POSITIONS: WatermarkPosition[] = [
+  "top-left",
+  "top-right",
+  "center",
+  "bottom-left",
+  "bottom-right",
 ];
 
 // -- Controls ---------------------------------------------------------------
@@ -559,8 +561,56 @@ export function BeautifyControls({
 }: BeautifyControlsProps) {
   const { t } = useTranslation();
   const bt = t.toolSettings.beautify;
+  const presetNames: Record<PresetId, string> = {
+    "purple-haze": bt.presetPurpleHaze,
+    flamingo: bt.presetFlamingo,
+    ocean: bt.presetOcean,
+    midnight: bt.presetMidnight,
+    mint: bt.presetMint,
+    sunset: bt.presetSunset,
+    "clean-white": bt.presetCleanWhite,
+    "no-background": bt.presetNoBackground,
+  };
+  const backgroundTabLabels: Partial<Record<BackgroundTab, string>> = {
+    "linear-gradient": bt.bgGradient,
+    solid: bt.bgSolid,
+    image: bt.bgImage,
+    transparent: bt.none,
+  };
+  const frameTypeLabels: Record<FrameType, string> = {
+    none: bt.none,
+    macos: "macOS",
+    windows: "Windows",
+    browser: bt.frameBrowser,
+    iphone: "iPhone",
+    macbook: "MacBook",
+    ipad: "iPad",
+  };
+  const shadowLabels: Record<ShadowChip, string> = {
+    none: bt.none,
+    subtle: bt.shadowSubtle,
+    medium: bt.shadowMedium,
+    dramatic: bt.shadowDramatic,
+    custom: bt.shadowCustom,
+  };
+  const socialLabels: Record<SocialChip, string> = {
+    none: bt.socialOriginal,
+    twitter: "X/Twitter",
+    linkedin: "LinkedIn",
+    "instagram-square": bt.socialIgSquare,
+    "instagram-story": bt.socialIgStory,
+    facebook: "Facebook",
+    producthunt: "Product Hunt",
+  };
+  const watermarkPositionLabels: Record<WatermarkPosition, string> = {
+    "top-left": bt.positionTopLeft,
+    "top-right": bt.positionTopRight,
+    center: bt.positionCenter,
+    "bottom-left": bt.positionBottomLeft,
+    "bottom-right": bt.positionBottomRight,
+  };
   // State
-  const [selectedPreset, setSelectedPreset] = useState<string | null>("Purple Haze");
+  const [selectedPreset, setSelectedPreset] = useState<PresetId | null>("purple-haze");
   const [backgroundType, setBackgroundType] = useState<BackgroundTab>("linear-gradient");
   const [backgroundColor, setBackgroundColor] = useState("#667eea");
   const [gradientStops, setGradientStops] = useState<GradientStop[]>([
@@ -718,7 +768,7 @@ export function BeautifyControls({
   const clearPreset = () => setSelectedPreset(null);
 
   const applyPreset = (preset: BeautifyPreset) => {
-    setSelectedPreset(preset.name);
+    setSelectedPreset(preset.id);
     const bgTab: BackgroundTab =
       preset.backgroundType === "radial-gradient"
         ? "linear-gradient"
@@ -769,11 +819,11 @@ export function BeautifyControls({
         <div className="grid grid-cols-4 gap-1.5">
           {PRESETS.map((preset) => (
             <button
-              key={preset.name}
+              key={preset.id}
               type="button"
               onClick={() => applyPreset(preset)}
               className={`flex flex-col items-center gap-1 py-1.5 px-1 rounded transition-colors ${
-                selectedPreset === preset.name
+                selectedPreset === preset.id
                   ? "bg-primary/10 ring-1 ring-primary-ink"
                   : "bg-muted hover:bg-muted/80"
               }`}
@@ -783,7 +833,7 @@ export function BeautifyControls({
                 style={{ background: presetGradientCSS(preset) }}
               />
               <span className="text-[10px] text-muted-foreground leading-tight truncate w-full text-center">
-                {preset.name}
+                {presetNames[preset.id]}
               </span>
             </button>
           ))}
@@ -797,25 +847,25 @@ export function BeautifyControls({
           <div className="flex gap-1">
             {BACKGROUND_TABS.map((tab) => (
               <button
-                key={tab.value}
+                key={tab}
                 type="button"
                 onClick={() => {
                   clearPreset();
-                  setBackgroundType(tab.value);
-                  if (tab.value === "linear-gradient" || tab.value === "radial-gradient") {
+                  setBackgroundType(tab);
+                  if (tab === "linear-gradient" || tab === "radial-gradient") {
                     setGradientMode("linear");
                   }
                 }}
                 className={`flex-1 text-[11px] py-1.5 rounded transition-colors ${
                   (backgroundType === "linear-gradient" || backgroundType === "radial-gradient") &&
-                  (tab.value === "linear-gradient" || tab.value === "radial-gradient")
+                  (tab === "linear-gradient" || tab === "radial-gradient")
                     ? "bg-primary text-primary-foreground"
-                    : backgroundType === tab.value
+                    : backgroundType === tab
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab.label}
+                {backgroundTabLabels[tab]}
               </button>
             ))}
           </div>
@@ -975,19 +1025,19 @@ export function BeautifyControls({
           <div className="grid grid-cols-4 gap-1">
             {FRAME_TYPES.map((ft) => (
               <button
-                key={ft.value}
+                key={ft}
                 type="button"
                 onClick={() => {
                   clearPreset();
-                  setFrameType(ft.value);
+                  setFrameType(ft);
                 }}
                 className={`text-[11px] py-1.5 rounded transition-colors ${
-                  frameType === ft.value
+                  frameType === ft
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {ft.label}
+                {frameTypeLabels[ft]}
               </button>
             ))}
           </div>
@@ -1098,19 +1148,19 @@ export function BeautifyControls({
           <div className="flex flex-wrap gap-1">
             {SHADOW_CHIPS.map((chip) => (
               <button
-                key={chip.value}
+                key={chip}
                 type="button"
                 onClick={() => {
                   clearPreset();
-                  setShadowPreset(chip.value);
+                  setShadowPreset(chip);
                 }}
                 className={`text-[11px] px-2.5 py-1 rounded transition-colors ${
-                  shadowPreset === chip.value
+                  shadowPreset === chip
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {chip.label}
+                {shadowLabels[chip]}
               </button>
             ))}
           </div>
@@ -1218,19 +1268,19 @@ export function BeautifyControls({
         <div className="flex flex-wrap gap-1">
           {SOCIAL_CHIPS.map((chip) => (
             <button
-              key={chip.value}
+              key={chip}
               type="button"
               onClick={() => {
                 clearPreset();
-                setSocialPreset(chip.value);
+                setSocialPreset(chip);
               }}
               className={`text-[11px] px-2.5 py-1 rounded transition-colors ${
-                socialPreset === chip.value
+                socialPreset === chip
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {chip.label}
+              {socialLabels[chip]}
             </button>
           ))}
         </div>
@@ -1264,8 +1314,8 @@ export function BeautifyControls({
               className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
             >
               {WATERMARK_POSITIONS.map((pos) => (
-                <option key={pos.value} value={pos.value}>
-                  {pos.label}
+                <option key={pos} value={pos}>
+                  {watermarkPositionLabels[pos]}
                 </option>
               ))}
             </select>
@@ -1351,7 +1401,10 @@ export function BeautifySettings({
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Processing failed: ${res.status}`);
+          throw new Error(
+            body.error ||
+              format(t.toolSettings.beautify.processingFailedStatus, { status: res.status }),
+          );
         }
 
         const result = resolveServerUrls(await res.json());
@@ -1360,7 +1413,9 @@ export function BeautifySettings({
         setManualDownloadUrl(result.downloadUrl);
         setSizes(result.originalSize, result.processedSize);
       } catch (err) {
-        setManualError(err instanceof Error ? err.message : "Processing failed");
+        setManualError(
+          err instanceof Error ? err.message : t.toolSettings.beautify.processingFailed,
+        );
       } finally {
         setManualProcessing(false);
       }

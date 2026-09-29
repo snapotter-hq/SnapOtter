@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { format } from "@/lib/format";
+import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 const SIZE_OPTIONS = [
@@ -142,18 +142,18 @@ export function FaviconSettings() {
         setDownloadUrl(URL.createObjectURL(blob));
         setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
       } else {
-        setError(`Favicon generation failed: ${xhr.status}`);
+        setError(format(t.toolSettings.favicon.generationFailed, { status: xhr.status }));
       }
       cleanup();
     };
 
     xhr.onerror = () => {
-      setError("Network error during favicon generation");
+      setError(t.toolSettings.favicon.networkError);
       cleanup();
     };
 
     xhr.ontimeout = () => {
-      setError("Request timed out - the server may be overloaded");
+      setError(t.toolSettings.favicon.timeout);
       cleanup();
     };
 
@@ -173,6 +173,7 @@ export function FaviconSettings() {
     radius,
     themeColor,
     selectedSizes,
+    t,
   ]);
 
   const hasFiles = files.length > 0;
@@ -365,8 +366,15 @@ export function FaviconSettings() {
           label={t.toolSettings.favicon.progressLabel}
           stage={
             progress.phase === "uploading"
-              ? "Uploading images..."
-              : `Processing ${files.length} image${files.length !== 1 ? "s" : ""}...`
+              ? t.toolSettings.favicon.uploadingImages
+              : format(
+                  plural(
+                    files.length,
+                    t.toolSettings.favicon.processingImagesOne,
+                    t.toolSettings.favicon.processingImagesOther,
+                  ),
+                  { count: files.length },
+                )
           }
           percent={progress.percent}
           elapsed={progress.elapsed}

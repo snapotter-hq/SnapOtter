@@ -8,15 +8,17 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
+// `id` is the React key and the active-preset match; ratio ids double as their
+// own (locale-invariant) display text, only "free" is translated at render.
 const ASPECT_PRESETS = [
-  { label: "Free", value: undefined as number | undefined },
-  { label: "1:1", value: 1 },
-  { label: "4:3", value: 4 / 3 },
-  { label: "3:2", value: 3 / 2 },
-  { label: "16:9", value: 16 / 9 },
-  { label: "2:3", value: 2 / 3 },
-  { label: "4:5", value: 4 / 5 },
-  { label: "9:16", value: 9 / 16 },
+  { id: "free", value: undefined as number | undefined },
+  { id: "1:1", value: 1 },
+  { id: "4:3", value: 4 / 3 },
+  { id: "3:2", value: 3 / 2 },
+  { id: "16:9", value: 16 / 9 },
+  { id: "2:3", value: 2 / 3 },
+  { id: "4:5", value: 4 / 5 },
+  { id: "9:16", value: 9 / 16 },
 ];
 
 export interface CropSettingsProps {
@@ -204,14 +206,14 @@ export function CropSettings({
     if (hasFile && hasSize && !processing) handleProcess();
   };
 
-  // Find which preset label matches the current aspect
-  const activePresetLabel = ASPECT_PRESETS.find((p) => {
+  // Find which preset matches the current aspect
+  const activePresetId = ASPECT_PRESETS.find((p) => {
     if (p.value === undefined && aspect === undefined) return true;
     if (p.value !== undefined && aspect !== undefined) {
       return Math.abs(p.value - aspect) < 0.01;
     }
     return false;
-  })?.label;
+  })?.id;
 
   const canSubmit = hasFile && hasSize && !processing;
 
@@ -233,18 +235,18 @@ export function CropSettings({
           )}
         </div>
         <div className="flex flex-wrap gap-1">
-          {ASPECT_PRESETS.map(({ label, value }) => (
+          {ASPECT_PRESETS.map(({ id, value }) => (
             <button
               type="button"
-              key={label}
+              key={id}
               onClick={() => handleAspectSelect(value)}
               className={`px-2 py-1.5 rounded text-xs transition-colors ${
-                !customMode && activePresetLabel === label
+                !customMode && activePresetId === id
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-primary/20 hover:text-foreground"
               }`}
             >
-              {label}
+              {id === "free" ? t.toolSettings.crop.free : id}
             </button>
           ))}
           <button

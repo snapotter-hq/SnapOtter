@@ -41,7 +41,9 @@ export function ComposeSettings() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Processing failed: ${res.status}`);
+        throw new Error(
+          body.error || format(t.errors.processingFailedWithStatus, { status: res.status }),
+        );
       }
 
       const result = resolveServerUrls(await res.json());
@@ -52,7 +54,7 @@ export function ComposeSettings() {
       setProcessedSize(result.processedSize);
       setSizes(result.originalSize, result.processedSize);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Processing failed");
+      setError(err instanceof Error ? err.message : t.errors.processingFailedNoDetail);
     } finally {
       setProcessing(false);
     }

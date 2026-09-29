@@ -87,14 +87,14 @@ export function FindDuplicatesSettings() {
           const data: DuplicateResult = JSON.parse(xhr.responseText);
           setResults(data);
         } catch {
-          setError("Failed to parse scan results");
+          setError(t.toolSettings["find-duplicates"].parseResultsFailed);
         }
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(body.error || `Failed: ${xhr.status}`);
+          setError(body.error || format(t.errors.failedWithStatus, { status: xhr.status }));
         } catch {
-          setError(`Failed: ${xhr.status}`);
+          setError(format(t.errors.failedWithStatus, { status: xhr.status }));
         }
       }
       setScanning(false);
@@ -102,13 +102,13 @@ export function FindDuplicatesSettings() {
 
     xhr.onerror = () => {
       xhrRef.current = null;
-      setError("Network error during upload. Try with fewer files or check connection.");
+      setError(t.toolSettings["find-duplicates"].networkErrorUpload);
       setScanning(false);
     };
 
     xhr.ontimeout = () => {
       xhrRef.current = null;
-      setError("Request timed out. Try with fewer files.");
+      setError(t.toolSettings["find-duplicates"].requestTimedOut);
       setScanning(false);
     };
 

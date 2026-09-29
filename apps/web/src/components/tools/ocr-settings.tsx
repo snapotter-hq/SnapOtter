@@ -12,16 +12,7 @@ import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
-const LANGUAGES = [
-  { code: "auto", label: "Auto-detect" },
-  { code: "en", label: "English" },
-  { code: "de", label: "German" },
-  { code: "fr", label: "French" },
-  { code: "es", label: "Spanish" },
-  { code: "zh", label: "Chinese" },
-  { code: "ja", label: "Japanese" },
-  { code: "ko", label: "Korean" },
-];
+const LANGUAGE_CODES = ["auto", "en", "de", "fr", "es", "zh", "ja", "ko"] as const;
 
 const ENHANCE_DEFAULTS: Record<OcrQuality, boolean> = {
   fast: false,
@@ -297,11 +288,19 @@ export function OcrSettings() {
           setSavedLibraryFileId(savedFileId);
           useFileStore.getState().setLastSavedLibraryFileId(savedFileId);
         }
-        results.push(total > 1 ? `--- ${file.name} ---\n${text || "(no text detected)"}` : text);
+        results.push(
+          total > 1
+            ? `--- ${file.name} ---\n${text || t.toolSettings.ocr.noTextDetectedInline}`
+            : text,
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`${file.name}: ${msg}`);
-        results.push(total > 1 ? `--- ${file.name} ---\n(error: ${msg})` : "");
+        results.push(
+          total > 1
+            ? `--- ${file.name} ---\n${format(t.toolSettings.ocr.fileErrorInline, { message: msg })}`
+            : "",
+        );
       }
     }
 
@@ -310,7 +309,7 @@ export function OcrSettings() {
     if (errors.length === total) {
       setError(errors.join("; "));
     } else if (errors.length > 0) {
-      setError(`${errors.length} of ${total} files failed`);
+      setError(format(t.toolSettings.ocr.filesFailed, { failed: errors.length, total }));
     }
 
     setText(results.join("\n\n"));
@@ -344,8 +343,10 @@ export function OcrSettings() {
   };
 
   const hasFile = files.length > 0;
-  const langLabel =
-    LANGUAGES.find((l) => l.code === language)?.label ?? t.toolSettings.ocr.autoDetect;
+  const languageLabel = (code: (typeof LANGUAGE_CODES)[number]) =>
+    code === "auto" ? t.toolSettings.ocr.autoDetect : t.commonUi.languageNames[code];
+  const selectedCode = LANGUAGE_CODES.find((code) => code === language);
+  const langLabel = selectedCode ? languageLabel(selectedCode) : t.toolSettings.ocr.autoDetect;
 
   return (
     <div className="space-y-3">
@@ -391,9 +392,9 @@ export function OcrSettings() {
             onChange={(e) => setLanguage(e.target.value)}
             className="w-full mt-1.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
           >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.label}
+            {LANGUAGE_CODES.map((code) => (
+              <option key={code} value={code}>
+                {languageLabel(code)}
               </option>
             ))}
           </select>

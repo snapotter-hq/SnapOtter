@@ -45,7 +45,9 @@ export function WatermarkImageSettings() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Processing failed: ${res.status}`);
+          throw new Error(
+            body.error || format(t.errors.processingFailedWithStatus, { status: res.status }),
+          );
         }
 
         const result = resolveServerUrls(await res.json());
@@ -56,7 +58,7 @@ export function WatermarkImageSettings() {
         setProcessedSize(result.processedSize);
         setSizes(result.originalSize, result.processedSize);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Processing failed");
+        setError(err instanceof Error ? err.message : t.errors.processingFailedNoDetail);
       } finally {
         setProcessing(false);
       }
@@ -80,7 +82,10 @@ export function WatermarkImageSettings() {
 
             if (!res.ok) {
               const body = await res.json().catch(() => ({}));
-              store.updateEntry(i, { status: "failed", error: body.error || "Processing failed" });
+              store.updateEntry(i, {
+                status: "failed",
+                error: body.error || t.errors.processingFailedNoDetail,
+              });
               continue;
             }
 
@@ -96,7 +101,7 @@ export function WatermarkImageSettings() {
           } catch (err) {
             store.updateEntry(i, {
               status: "failed",
-              error: err instanceof Error ? err.message : "Processing failed",
+              error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
             });
           }
         }

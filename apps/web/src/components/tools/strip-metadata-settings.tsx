@@ -197,6 +197,7 @@ export function StripMetadataSettings() {
     : null;
 
   // Auto-fetch metadata for the selected file (with per-file caching)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: t only supplies error fallbacks; a locale switch must not refetch
   useEffect(() => {
     if (!currentFile || !fileKey) {
       setMetadata(null);
@@ -227,14 +228,16 @@ export function StripMetadataSettings() {
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Failed: ${res.status}`);
+          throw new Error(body.error || format(t.errors.failedWithStatus, { status: res.status }));
         }
         const data: MetadataResult = await res.json();
         setMetadata(data);
         if (fileKey) setMetadataCache((prev) => new Map(prev).set(fileKey, data));
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
-        setInspectError(err instanceof Error ? err.message : "Failed to inspect metadata");
+        setInspectError(
+          err instanceof Error ? err.message : t.toolSettings["strip-metadata"].inspectFailed,
+        );
       } finally {
         setInspecting(false);
       }

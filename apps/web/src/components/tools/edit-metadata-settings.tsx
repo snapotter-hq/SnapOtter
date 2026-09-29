@@ -189,6 +189,7 @@ export function EditMetadataSettings() {
     setFieldsToRemove(new Set());
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: t only supplies error fallbacks; a locale switch must not refetch or reset the form
   useEffect(() => {
     if (!currentFile || !fileKey) {
       setForm(EMPTY_FORM);
@@ -221,14 +222,16 @@ export function EditMetadataSettings() {
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Failed: ${res.status}`);
+          throw new Error(body.error || format(t.errors.failedWithStatus, { status: res.status }));
         }
         const data: InspectResult = await res.json();
         setInspectCache((prev) => new Map(prev).set(fileKey, data));
         populateForm(data);
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
-        setInspectError(err instanceof Error ? err.message : "Failed to inspect file");
+        setInspectError(
+          err instanceof Error ? err.message : t.toolSettings["edit-metadata"].inspectFailed,
+        );
         setForm(EMPTY_FORM);
         setInitialForm(EMPTY_FORM);
       } finally {

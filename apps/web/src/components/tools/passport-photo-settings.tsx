@@ -73,15 +73,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Display text comes from the countryCUSTOM / docCUSTOM i18n keys (see
+// passportCountryName / passportDocLabel), so name and label stay empty here.
 const CUSTOM_SPEC: PassportSpec = {
   code: "CUSTOM",
-  name: "Custom",
+  name: "",
   flag: "\u2699\uFE0F",
   region: "americas",
   documents: [
     {
       type: "passport",
-      label: "Custom",
+      label: "",
       width: 35,
       height: 45,
       dpi: 300,
@@ -347,20 +349,26 @@ export function PassportPhotoSettings() {
               ? body.details
               : typeof body.error === "string"
                 ? body.error
-                : `Analysis failed: ${response.status}`
-            : `Analysis failed: ${response.status}`;
+                : format(t.toolSettings["passport-photo"].analysisFailedWithStatus, {
+                    status: response.status,
+                  })
+            : format(t.toolSettings["passport-photo"].analysisFailedWithStatus, {
+                status: response.status,
+              });
           throw new Error(msg);
         }
 
         const result = resolveServerUrls(await response.json());
         setAnalyzeResult(result);
       } catch (err) {
-        setAnalyzeError(err instanceof Error ? err.message : "Face analysis failed");
+        setAnalyzeError(
+          err instanceof Error ? err.message : t.toolSettings["passport-photo"].faceAnalysisFailed,
+        );
       } finally {
         setAnalyzing(false);
       }
     },
-    [setAnalyzing, setAnalyzeResult, setGenerateResult],
+    [setAnalyzing, setAnalyzeResult, setGenerateResult, t],
   );
 
   // Auto-analyze when files change
@@ -416,19 +424,26 @@ export function PassportPhotoSettings() {
             ? errBody.details
             : typeof errBody.error === "string"
               ? errBody.error
-              : `Generation failed: ${response.status}`
-          : `Generation failed: ${response.status}`;
+              : format(t.toolSettings["passport-photo"].generationFailedWithStatus, {
+                  status: response.status,
+                })
+          : format(t.toolSettings["passport-photo"].generationFailedWithStatus, {
+              status: response.status,
+            });
         throw new Error(msg);
       }
 
       const result: GenerateResult = resolveServerUrls(await response.json());
       setGenerateResult(result);
     } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : "Photo generation failed");
+      setGenerateError(
+        err instanceof Error ? err.message : t.toolSettings["passport-photo"].photoGenerationFailed,
+      );
     } finally {
       setGenerating(false);
     }
   }, [
+    t,
     analyzeResult,
     countryCode,
     documentType,

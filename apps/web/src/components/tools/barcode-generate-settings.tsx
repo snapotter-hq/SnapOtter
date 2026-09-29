@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { format } from "@/lib/format";
 
 const BARCODE_TYPES = [
   { value: "code128", label: "Code 128" },
@@ -48,7 +49,9 @@ export function BarcodeGenerateSettings() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Request failed: ${res.status}`);
+        throw new Error(
+          body.error || format(t.errors.requestFailedWithStatus, { status: res.status }),
+        );
       }
 
       const data = resolveServerUrls(await res.json());
@@ -56,11 +59,11 @@ export function BarcodeGenerateSettings() {
         setResultUrl(data.downloadUrl);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate barcode");
+      setError(err instanceof Error ? err.message : ts.generateFailed);
     } finally {
       setGenerating(false);
     }
-  }, [text, type, scale, includeText]);
+  }, [text, type, scale, includeText, t, ts]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

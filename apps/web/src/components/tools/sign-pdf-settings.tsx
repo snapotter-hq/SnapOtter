@@ -253,7 +253,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       return null;
     });
     if (!exported) {
-      setError("Could not read the placed signatures. Try again.");
+      setError(sp.exportFailed);
       endRun();
       return;
     }
@@ -276,7 +276,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       if (landed) return;
       const url = typeof r.downloadUrl === "string" ? r.downloadUrl : null;
       if (!url) {
-        setError("Invalid response");
+        setError(t.errors.invalidResponse);
         return;
       }
       landed = true;
@@ -306,9 +306,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         finish();
       },
       onStall: () => {
-        setError(
-          "Processing timed out. The result may have saved to your files; otherwise, try again.",
-        );
+        setError(sp.stall);
         finish();
       },
     });
@@ -343,7 +341,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         try {
           landResult(resolveServerUrls(JSON.parse(xhr.responseText)));
         } catch {
-          setError("Invalid response");
+          setError(t.errors.invalidResponse);
         }
       } else {
         try {
@@ -353,10 +351,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
               ? b.error
               : typeof b.details === "string"
                 ? b.details
-                : `Failed: ${xhr.status}`,
+                : format(t.errors.failedWithStatus, { status: xhr.status }),
           );
         } catch {
-          setError(`Processing failed: ${xhr.status}`);
+          setError(format(t.errors.processingFailedWithStatus, { status: xhr.status }));
         }
       }
       endRun();
@@ -364,13 +362,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     xhr.onerror = () => {
       stopProgress();
       progressCleanupRef.current = null;
-      setError("Network error");
+      setError(t.errors.network);
       endRun();
     };
     xhr.ontimeout = () => {
       stopProgress();
       progressCleanupRef.current = null;
-      setError("Request timed out. Try again.");
+      setError(sp.timeout);
       endRun();
     };
     xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));

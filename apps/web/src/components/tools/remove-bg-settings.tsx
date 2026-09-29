@@ -41,35 +41,40 @@ const MODEL_MAP: Record<SubjectType, Partial<Record<Quality, BgModel>>> = {
   general: { fast: "u2net", balanced: "birefnet-general-lite", best: "birefnet-general" },
 };
 
-const SUBJECT_OPTIONS: { value: SubjectType; label: string; icon: typeof User }[] = [
-  { value: "people", label: "People", icon: User },
-  { value: "products", label: "Products", icon: Package },
-  { value: "general", label: "General", icon: ImageIcon },
+const SUBJECT_OPTIONS: { value: SubjectType; icon: typeof User }[] = [
+  { value: "people", icon: User },
+  { value: "products", icon: Package },
+  { value: "general", icon: ImageIcon },
 ];
 
-const ALL_QUALITY_OPTIONS: { value: Quality; label: string; peopleOnly?: boolean }[] = [
-  { value: "fast", label: "Fast" },
-  { value: "balanced", label: "HD" },
-  { value: "best", label: "Max" },
-  { value: "ultra", label: "Ultra", peopleOnly: true },
+// labelKey points into t.toolSettings["remove-background"]; the wire value stays `value`.
+const ALL_QUALITY_OPTIONS: {
+  value: Quality;
+  labelKey: "fast" | "hd" | "max" | "ultra";
+  peopleOnly?: boolean;
+}[] = [
+  { value: "fast", labelKey: "fast" },
+  { value: "balanced", labelKey: "hd" },
+  { value: "best", labelKey: "max" },
+  { value: "ultra", labelKey: "ultra", peopleOnly: true },
 ];
 
 const COLOR_PRESETS = [
-  { color: "#FFFFFF", label: "White" },
-  { color: "#000000", label: "Black" },
-  { color: "#FF0000", label: "Red" },
-  { color: "#00FF00", label: "Green" },
-  { color: "#0000FF", label: "Blue" },
-];
+  { color: "#FFFFFF", id: "white" },
+  { color: "#000000", id: "black" },
+  { color: "#FF0000", id: "red" },
+  { color: "#00FF00", id: "green" },
+  { color: "#0000FF", id: "blue" },
+] as const;
 
 const GRADIENT_PRESETS = [
-  { color1: "#667eea", color2: "#764ba2", label: "Purple" },
-  { color1: "#f093fb", color2: "#f5576c", label: "Pink" },
-  { color1: "#4facfe", color2: "#00f2fe", label: "Blue" },
-  { color1: "#43e97b", color2: "#38f9d7", label: "Green" },
-  { color1: "#fa709a", color2: "#fee140", label: "Sunset" },
-  { color1: "#a18cd1", color2: "#fbc2eb", label: "Lavender" },
-];
+  { color1: "#667eea", color2: "#764ba2", id: "purple" },
+  { color1: "#f093fb", color2: "#f5576c", id: "pink" },
+  { color1: "#4facfe", color2: "#00f2fe", id: "blue" },
+  { color1: "#43e97b", color2: "#38f9d7", id: "green" },
+  { color1: "#fa709a", color2: "#fee140", id: "sunset" },
+  { color1: "#a18cd1", color2: "#fbc2eb", id: "lavender" },
+] as const;
 
 // ── Section label ──
 
@@ -243,7 +248,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
               }`}
             >
               <Icon className="h-4 w-4" />
-              {opt.label}
+              {t.toolSettings["remove-background"][opt.value]}
             </button>
           );
         })}
@@ -278,7 +283,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
                 : "border-border text-muted-foreground hover:border-primary/50"
             }`}
           >
-            {opt.label}
+            {t.toolSettings["remove-background"][opt.labelKey]}
           </button>
         ))}
       </div>
@@ -327,7 +332,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
                     bgColor === preset.color ? "border-primary scale-110" : "border-border"
                   }`}
                   style={{ backgroundColor: preset.color }}
-                  title={preset.label}
+                  title={t.toolSettings["remove-background"].colorPresets[preset.id]}
                 />
               ))}
             </div>
@@ -355,7 +360,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             <div className="flex gap-1.5 flex-wrap">
               {GRADIENT_PRESETS.map((preset) => (
                 <button
-                  key={preset.label}
+                  key={preset.id}
                   type="button"
                   onClick={() => {
                     setGradColor1(preset.color1);
@@ -369,7 +374,7 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
                   style={{
                     background: `linear-gradient(180deg, ${preset.color1}, ${preset.color2})`,
                   }}
-                  title={preset.label}
+                  title={t.toolSettings["remove-background"].gradientPresets[preset.id]}
                 />
               ))}
             </div>
@@ -950,7 +955,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       a.click();
       document.body.removeChild(a);
     } catch (err) {
-      setEffectsError(err instanceof Error ? err.message : "Effects processing failed");
+      setEffectsError(
+        err instanceof Error
+          ? err.message
+          : t.toolSettings["remove-background"].effectsProcessingFailed,
+      );
     } finally {
       setApplyingEffects(false);
     }

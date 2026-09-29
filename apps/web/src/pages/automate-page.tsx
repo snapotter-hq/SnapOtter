@@ -373,8 +373,8 @@ export function AutomatePage() {
         });
 
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: "Import failed" }));
-          setImportError(err.error || "Import failed");
+          const err = await res.json().catch(() => ({ error: t.automate.importFailed }));
+          setImportError(err.error || t.automate.importFailed);
           return;
         }
 
@@ -397,6 +397,7 @@ export function AutomatePage() {
     t.automate.newerVersion,
     t.automate.missingName,
     t.automate.couldNotRead,
+    t.automate.importFailed,
   ]);
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+import type { TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -68,6 +69,7 @@ function scanOneFile(
   file: File,
   tryHarder: boolean,
   onUploadProgress: (pct: number) => void,
+  t: TranslationKeys,
 ): Promise<{ filename: string; barcodes: BarcodeResult[]; annotatedUrl: string | null }> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
@@ -86,19 +88,27 @@ function scanOneFile(
         try {
           resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
         } catch {
-          reject(new Error("Invalid response"));
+          reject(new Error(t.errors.invalidResponse));
         }
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          reject(new Error(body.error || `Failed: ${xhr.status}`));
+          reject(
+            new Error(body.error || format(t.errors.failedWithStatus, { status: xhr.status })),
+          );
         } catch {
-          reject(new Error(`Scanning failed: ${xhr.status}`));
+          reject(
+            new Error(
+              format(t.toolSettings["barcode-read"].scanningFailedWithStatus, {
+                status: xhr.status,
+              }),
+            ),
+          );
         }
       }
     };
-    xhr.onerror = () => reject(new Error("Network error"));
-    xhr.ontimeout = () => reject(new Error("Request timed out"));
+    xhr.onerror = () => reject(new Error(t.errors.network));
+    xhr.ontimeout = () => reject(new Error(t.errors.requestTimedOut));
 
     xhr.open("POST", appUrl("/api/v1/tools/image/barcode-read"));
     for (const [key, value] of formatHeaders()) {
@@ -150,12 +160,19 @@ export function BarcodeReadSettings() {
       const fileShare = 100 / total;
 
       try {
-        setProgressStage(`${prefix}Scanning ${file.name}...`);
+        setProgressStage(
+          `${prefix}${format(t.toolSettings["barcode-read"].scanningFile, { name: file.name })}`,
+        );
 
-        const result = await scanOneFile(file, tryHarder, (pct) => {
-          setProgressPhase("uploading");
-          setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
-        });
+        const result = await scanOneFile(
+          file,
+          tryHarder,
+          (pct) => {
+            setProgressPhase("uploading");
+            setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
+          },
+          t,
+        );
 
         setProgressPhase("processing");
         setProgressPercent(fileBase + fileShare);
@@ -187,7 +204,7 @@ export function BarcodeReadSettings() {
     if (errors.length === total) {
       setError(errors.join("; "));
     } else if (errors.length > 0) {
-      setError(`${errors.length} of ${total} files failed`);
+      setError(format(t.toolSettings["barcode-read"].filesFailed, { count: errors.length, total }));
     }
 
     setResults(allResults);

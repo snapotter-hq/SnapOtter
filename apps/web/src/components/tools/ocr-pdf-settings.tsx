@@ -7,16 +7,7 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import { OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
-const LANGUAGE_OPTIONS = [
-  { value: "auto", labelKey: "autoDetect" },
-  { value: "en", label: "English" },
-  { value: "de", label: "German" },
-  { value: "fr", label: "French" },
-  { value: "es", label: "Spanish" },
-  { value: "zh", label: "Chinese" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-] as const;
+const LANGUAGE_CODES = ["en", "de", "fr", "es", "zh", "ja", "ko"] as const;
 
 export function OcrPdfSettings() {
   const { t } = useTranslation();
@@ -89,9 +80,10 @@ export function OcrPdfSettings() {
           onChange={(e) => setLanguage(e.target.value)}
           className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
         >
-          {LANGUAGE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {"labelKey" in opt ? (ts as Record<string, string>)[opt.labelKey] : opt.label}
+          <option value="auto">{ts.autoDetect}</option>
+          {LANGUAGE_CODES.map((code) => (
+            <option key={code} value={code}>
+              {t.commonUi.languageNames[code]}
             </option>
           ))}
         </select>

@@ -26,23 +26,25 @@ import type { EditorLayer, ObjectEffects } from "@/types/editor";
 // ---------------------------------------------------------------------------
 
 const BLEND_MODES = [
-  { value: "source-over", label: "Normal" },
-  { value: "multiply", label: "Multiply" },
-  { value: "screen", label: "Screen" },
-  { value: "overlay", label: "Overlay" },
-  { value: "darken", label: "Darken" },
-  { value: "lighten", label: "Lighten" },
-  { value: "color-dodge", label: "Color Dodge" },
-  { value: "color-burn", label: "Color Burn" },
-  { value: "hard-light", label: "Hard Light" },
-  { value: "soft-light", label: "Soft Light" },
-  { value: "difference", label: "Difference" },
-  { value: "exclusion", label: "Exclusion" },
-  { value: "hue", label: "Hue" },
-  { value: "saturation", label: "Saturation" },
-  { value: "color", label: "Color" },
-  { value: "luminosity", label: "Luminosity" },
+  "source-over",
+  "multiply",
+  "screen",
+  "overlay",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "hard-light",
+  "soft-light",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
 ] as const;
+
+type BlendMode = (typeof BLEND_MODES)[number];
 
 const DEFAULT_DROP_SHADOW: NonNullable<ObjectEffects["dropShadow"]> = {
   enabled: true,
@@ -286,6 +288,24 @@ export function LayersPanel() {
 
 function BlendModeSelect({ value, onChange }: { value: string; onChange: (mode: string) => void }) {
   const { t } = useTranslation();
+  const blendModeLabels: Record<BlendMode, string> = {
+    "source-over": t.editor.panels.layers.blendModes.normal,
+    multiply: t.editor.panels.layers.blendModes.multiply,
+    screen: t.editor.panels.layers.blendModes.screen,
+    overlay: t.editor.panels.layers.blendModes.overlay,
+    darken: t.editor.panels.layers.blendModes.darken,
+    lighten: t.editor.panels.layers.blendModes.lighten,
+    "color-dodge": t.editor.panels.layers.blendModes.colorDodge,
+    "color-burn": t.editor.panels.layers.blendModes.colorBurn,
+    "hard-light": t.editor.panels.layers.blendModes.hardLight,
+    "soft-light": t.editor.panels.layers.blendModes.softLight,
+    difference: t.editor.panels.layers.blendModes.difference,
+    exclusion: t.editor.panels.layers.blendModes.exclusion,
+    hue: t.editor.panels.layers.blendModes.hue,
+    saturation: t.editor.panels.layers.blendModes.saturation,
+    color: t.editor.panels.layers.blendModes.color,
+    luminosity: t.editor.panels.layers.blendModes.luminosity,
+  };
   return (
     <div className="flex items-center gap-2 min-w-0">
       <label htmlFor="blend-mode-select" className="text-[10px] text-muted-foreground shrink-0">
@@ -299,8 +319,8 @@ function BlendModeSelect({ value, onChange }: { value: string; onChange: (mode: 
         data-testid="blend-mode-select"
       >
         {BLEND_MODES.map((mode) => (
-          <option key={mode.value} value={mode.value}>
-            {mode.label}
+          <option key={mode} value={mode}>
+            {blendModeLabels[mode]}
           </option>
         ))}
       </select>
@@ -614,6 +634,7 @@ function LayerContextMenu({
   onFlattenAll,
   onDelete,
 }: LayerContextMenuProps) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Adjust position to stay within viewport
@@ -629,25 +650,29 @@ function LayerContextMenu({
 
   const items = [
     {
-      label: "Duplicate",
+      id: "duplicate",
+      label: t.editor.panels.layers.duplicate,
       icon: Copy,
       action: onDuplicate,
       disabled: false,
     },
     {
-      label: "Merge Down",
+      id: "mergeDown",
+      label: t.editor.menu.layer.mergeDown,
       icon: MergeIcon,
       action: onMergeDown,
       disabled: layerIndex <= 0,
     },
     {
-      label: "Flatten All",
+      id: "flattenAll",
+      label: t.editor.panels.layers.flattenAll,
       icon: Layers,
       action: onFlattenAll,
       disabled: layerCount <= 1,
     },
     {
-      label: "Delete",
+      id: "delete",
+      label: t.editor.menu.edit.delete,
       icon: Trash2,
       action: onDelete,
       disabled: layerCount <= 1,
@@ -663,7 +688,7 @@ function LayerContextMenu({
     >
       {items.map((item) => (
         <button
-          key={item.label}
+          key={item.id}
           type="button"
           disabled={item.disabled}
           onClick={(e) => {
@@ -675,7 +700,7 @@ function LayerContextMenu({
             item.disabled
               ? "text-muted-foreground/40 cursor-not-allowed"
               : "text-foreground hover:bg-muted",
-            item.label === "Delete" && !item.disabled && "text-destructive-ink",
+            item.id === "delete" && !item.disabled && "text-destructive-ink",
           )}
         >
           <item.icon size={14} />

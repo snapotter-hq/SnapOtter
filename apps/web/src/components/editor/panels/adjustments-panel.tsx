@@ -18,121 +18,114 @@ import type { AdjustmentValues } from "@/types/editor";
 
 const ADJUSTMENT_SLIDERS: {
   key: keyof AdjustmentValues;
-  label: string;
   min: number;
   max: number;
 }[] = [
-  { key: "brightness", label: "Brightness", min: -100, max: 100 },
-  { key: "contrast", label: "Contrast", min: -100, max: 100 },
-  { key: "hue", label: "Hue", min: 0, max: 359 },
-  { key: "saturation", label: "Saturation", min: -100, max: 100 },
-  { key: "luminance", label: "Luminance", min: -100, max: 100 },
-  { key: "exposure", label: "Exposure", min: -100, max: 100 },
-  { key: "vibrance", label: "Vibrance", min: -100, max: 100 },
-  { key: "warmth", label: "Warmth", min: -100, max: 100 },
+  { key: "brightness", min: -100, max: 100 },
+  { key: "contrast", min: -100, max: 100 },
+  { key: "hue", min: 0, max: 359 },
+  { key: "saturation", min: -100, max: 100 },
+  { key: "luminance", min: -100, max: 100 },
+  { key: "exposure", min: -100, max: 100 },
+  { key: "vibrance", min: -100, max: 100 },
+  { key: "warmth", min: -100, max: 100 },
 ];
 
-const TOGGLE_FILTERS = ["grayscale", "sepia", "invert", "solarize"];
+type ToggleFilterType = "grayscale" | "sepia" | "invert" | "solarize";
 
-const SLIDER_FILTERS: {
-  type: string;
-  label: string;
-  params: { key: string; label: string; min: number; max: number; step?: number }[];
-}[] = [
-  { type: "blur", label: "Blur", params: [{ key: "radius", label: "Radius", min: 0, max: 40 }] },
-  {
-    type: "sharpen",
-    label: "Sharpen",
-    params: [{ key: "amount", label: "Amount", min: 0, max: 100 }],
-  },
-  {
-    type: "noise",
-    label: "Noise",
-    params: [{ key: "amount", label: "Amount", min: 0, max: 100 }],
-  },
-  {
-    type: "pixelate",
-    label: "Pixelate",
-    params: [{ key: "size", label: "Size", min: 1, max: 50 }],
-  },
-  {
-    type: "emboss",
-    label: "Emboss",
-    params: [{ key: "strength", label: "Strength", min: 0, max: 1, step: 0.01 }],
-  },
-  {
-    type: "posterize",
-    label: "Posterize",
-    params: [{ key: "levels", label: "Levels", min: 2, max: 30 }],
-  },
-  {
-    type: "threshold",
-    label: "Threshold",
-    params: [{ key: "level", label: "Level", min: 0, max: 1, step: 0.01 }],
-  },
+const TOGGLE_FILTERS: ToggleFilterType[] = ["grayscale", "sepia", "invert", "solarize"];
+
+type SliderFilterType =
+  | "blur"
+  | "sharpen"
+  | "noise"
+  | "pixelate"
+  | "emboss"
+  | "posterize"
+  | "threshold"
+  | "kaleidoscope"
+  | "motionBlur"
+  | "radialBlur"
+  | "surfaceBlur";
+
+type FilterParamKey =
+  | "radius"
+  | "amount"
+  | "size"
+  | "strength"
+  | "levels"
+  | "level"
+  | "power"
+  | "angle"
+  | "distance"
+  | "centerX"
+  | "centerY"
+  | "threshold"
+  | "midpoint"
+  | "roundness"
+  | "feather"
+  | "roughness";
+
+interface FilterParam {
+  key: FilterParamKey;
+  min: number;
+  max: number;
+  step?: number;
+}
+
+const SLIDER_FILTERS: { type: SliderFilterType; params: FilterParam[] }[] = [
+  { type: "blur", params: [{ key: "radius", min: 0, max: 40 }] },
+  { type: "sharpen", params: [{ key: "amount", min: 0, max: 100 }] },
+  { type: "noise", params: [{ key: "amount", min: 0, max: 100 }] },
+  { type: "pixelate", params: [{ key: "size", min: 1, max: 50 }] },
+  { type: "emboss", params: [{ key: "strength", min: 0, max: 1, step: 0.01 }] },
+  { type: "posterize", params: [{ key: "levels", min: 2, max: 30 }] },
+  { type: "threshold", params: [{ key: "level", min: 0, max: 1, step: 0.01 }] },
   {
     type: "kaleidoscope",
-    label: "Kaleidoscope",
     params: [
-      { key: "power", label: "Power", min: 2, max: 20 },
-      { key: "angle", label: "Angle", min: 0, max: 360 },
+      { key: "power", min: 2, max: 20 },
+      { key: "angle", min: 0, max: 360 },
     ],
   },
 ];
 
-const BLUR_FILTERS: {
-  type: string;
-  label: string;
-  params: { key: string; label: string; min: number; max: number; step?: number }[];
-}[] = [
+const BLUR_FILTERS: { type: SliderFilterType; params: FilterParam[] }[] = [
   {
     type: "motionBlur",
-    label: "Motion Blur",
     params: [
-      { key: "angle", label: "Angle", min: 0, max: 360 },
-      { key: "distance", label: "Distance", min: 0, max: 100 },
+      { key: "angle", min: 0, max: 360 },
+      { key: "distance", min: 0, max: 100 },
     ],
   },
   {
     type: "radialBlur",
-    label: "Radial Blur",
     params: [
-      { key: "amount", label: "Amount", min: 0, max: 100 },
-      { key: "centerX", label: "Center X", min: 0, max: 1, step: 0.01 },
-      { key: "centerY", label: "Center Y", min: 0, max: 1, step: 0.01 },
+      { key: "amount", min: 0, max: 100 },
+      { key: "centerX", min: 0, max: 1, step: 0.01 },
+      { key: "centerY", min: 0, max: 1, step: 0.01 },
     ],
   },
   {
     type: "surfaceBlur",
-    label: "Surface Blur",
     params: [
-      { key: "radius", label: "Radius", min: 0, max: 40 },
-      { key: "threshold", label: "Threshold", min: 0, max: 255 },
+      { key: "radius", min: 0, max: 40 },
+      { key: "threshold", min: 0, max: 255 },
     ],
   },
 ];
 
-const VIGNETTE_PARAMS: {
-  key: string;
-  label: string;
-  min: number;
-  max: number;
-}[] = [
-  { key: "amount", label: "Amount", min: -100, max: 100 },
-  { key: "midpoint", label: "Midpoint", min: 0, max: 100 },
-  { key: "roundness", label: "Roundness", min: -100, max: 100 },
-  { key: "feather", label: "Feather", min: 0, max: 100 },
+const VIGNETTE_PARAMS: FilterParam[] = [
+  { key: "amount", min: -100, max: 100 },
+  { key: "midpoint", min: 0, max: 100 },
+  { key: "roundness", min: -100, max: 100 },
+  { key: "feather", min: 0, max: 100 },
 ];
 
-const GRAIN_PARAMS: {
-  key: string;
-  label: string;
-  min: number;
-  max: number;
-}[] = [
-  { key: "amount", label: "Amount", min: 0, max: 100 },
-  { key: "size", label: "Size", min: 1, max: 100 },
-  { key: "roughness", label: "Roughness", min: 0, max: 100 },
+const GRAIN_PARAMS: FilterParam[] = [
+  { key: "amount", min: 0, max: 100 },
+  { key: "size", min: 1, max: 100 },
+  { key: "roughness", min: 0, max: 100 },
 ];
 
 type CurveChannel = "rgb" | "red" | "green" | "blue";
@@ -152,57 +145,65 @@ interface LevelsValues {
   outWhite: number;
 }
 
-const CURVE_PRESETS: Record<string, CurvePoint[]> = {
-  Linear: [
+// Keys are stable ids; display text comes from t.editor.panels.adjustments.curvePresets.
+const CURVE_PRESETS = {
+  linear: [
     { x: 0, y: 0 },
     { x: 255, y: 255 },
   ],
-  Darken: [
+  darken: [
     { x: 0, y: 0 },
     { x: 128, y: 96 },
     { x: 255, y: 220 },
   ],
-  Lighten: [
+  lighten: [
     { x: 0, y: 35 },
     { x: 128, y: 160 },
     { x: 255, y: 255 },
   ],
-  "Increase Contrast": [
+  increaseContrast: [
     { x: 0, y: 0 },
     { x: 64, y: 40 },
     { x: 192, y: 215 },
     { x: 255, y: 255 },
   ],
-  "Decrease Contrast": [
+  decreaseContrast: [
     { x: 0, y: 30 },
     { x: 64, y: 74 },
     { x: 192, y: 182 },
     { x: 255, y: 225 },
   ],
-  "Medium Contrast": [
+  mediumContrast: [
     { x: 0, y: 0 },
     { x: 80, y: 55 },
     { x: 176, y: 200 },
     { x: 255, y: 255 },
   ],
-  "Strong Contrast": [
+  strongContrast: [
     { x: 0, y: 0 },
     { x: 64, y: 20 },
     { x: 192, y: 235 },
     { x: 255, y: 255 },
   ],
-  "Cross Process": [
+  crossProcess: [
     { x: 0, y: 12 },
     { x: 48, y: 68 },
     { x: 130, y: 150 },
     { x: 210, y: 230 },
     { x: 255, y: 248 },
   ],
-  Negative: [
+  negative: [
     { x: 0, y: 255 },
     { x: 255, y: 0 },
   ],
-};
+} satisfies Record<string, CurvePoint[]>;
+
+type CurvePresetId = keyof typeof CURVE_PRESETS;
+
+const CURVE_PRESET_IDS = Object.keys(CURVE_PRESETS) as CurvePresetId[];
+
+// "Custom" is not a preset: it marks hand-edited points and stays a stable id.
+type CurvePresetSelection = CurvePresetId | "Custom";
 
 // ---------------------------------------------------------------------------
 // Cubic spline interpolation for curves
@@ -313,6 +314,7 @@ function SectionHeader({ title }: { title: string }) {
 // ---------------------------------------------------------------------------
 
 function AutoAdjustmentsSection() {
+  const { t } = useTranslation();
   const setAdjustment = useEditorStore((s) => s.setAdjustment);
 
   const handleAutoTone = useCallback(() => {
@@ -339,18 +341,19 @@ function AutoAdjustmentsSection() {
     setAdjustment("saturation", 5);
   }, [setAdjustment]);
 
+  const autoButtons = t.editor.panels.adjustments.autoButtons;
   const buttons = [
-    { label: "Auto Tone", onClick: handleAutoTone },
-    { label: "Auto Contrast", onClick: handleAutoContrast },
-    { label: "Auto Color", onClick: handleAutoColor },
-    { label: "Auto Enhance", onClick: handleAutoEnhance },
+    { id: "autoTone", label: autoButtons.autoTone, onClick: handleAutoTone },
+    { id: "autoContrast", label: autoButtons.autoContrast, onClick: handleAutoContrast },
+    { id: "autoColor", label: autoButtons.autoColor, onClick: handleAutoColor },
+    { id: "autoEnhance", label: autoButtons.autoEnhance, onClick: handleAutoEnhance },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-1">
       {buttons.map((btn) => (
         <button
-          key={btn.label}
+          key={btn.id}
           type="button"
           onClick={btn.onClick}
           className={cn(
@@ -371,6 +374,7 @@ function AutoAdjustmentsSection() {
 // ---------------------------------------------------------------------------
 
 function AdjustmentsSlidersSection() {
+  const { t } = useTranslation();
   const adjustments = useEditorStore((s) => s.adjustments);
   const setAdjustment = useEditorStore((s) => s.setAdjustment);
   const handleChange = useCallback(
@@ -382,10 +386,10 @@ function AdjustmentsSlidersSection() {
 
   return (
     <div className="flex flex-col gap-1.5">
-      {ADJUSTMENT_SLIDERS.map(({ key, label, min, max }) => (
+      {ADJUSTMENT_SLIDERS.map(({ key, min, max }) => (
         <SliderRow
           key={key}
-          label={label}
+          label={t.editor.panels.adjustments.sliders[key]}
           value={adjustments[key]}
           min={min}
           max={max}
@@ -603,7 +607,7 @@ function CurvesSection() {
   const [channel, setChannel] = useState<CurveChannel>("rgb");
   const curves = useEditorStore((s) => s.curves);
   const setStoreCurves = useEditorStore((s) => s.setCurves);
-  const [preset, setPreset] = useState("Linear");
+  const [preset, setPreset] = useState<CurvePresetSelection>("linear");
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -769,8 +773,9 @@ function CurvesSection() {
   );
 
   const handlePresetChange = useCallback(
-    (name: string) => {
+    (name: CurvePresetSelection) => {
       setPreset(name);
+      if (name === "Custom") return;
       const presetPoints = CURVE_PRESETS[name];
       if (presetPoints) {
         setStoreCurves(
@@ -797,12 +802,12 @@ function CurvesSection() {
         </select>
         <select
           value={preset}
-          onChange={(e) => handlePresetChange(e.target.value)}
+          onChange={(e) => handlePresetChange(e.target.value as CurvePresetSelection)}
           className="flex-1 px-1.5 py-0.5 text-xs bg-muted border border-border rounded text-foreground"
         >
-          {Object.keys(CURVE_PRESETS).map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {CURVE_PRESET_IDS.map((id) => (
+            <option key={id} value={id}>
+              {t.editor.panels.adjustments.curvePresets[id]}
             </option>
           ))}
           {preset === "Custom" && (
@@ -835,6 +840,7 @@ function CurvesSection() {
 // ---------------------------------------------------------------------------
 
 function ToggleFiltersSection() {
+  const { t } = useTranslation();
   const filters = useEditorStore((s) => s.filters);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
 
@@ -852,7 +858,9 @@ function ToggleFiltersSection() {
               onChange={() => toggleFilter(type)}
               className="accent-primary w-3.5 h-3.5"
             />
-            <span className="text-xs text-foreground capitalize">{type}</span>
+            <span className="text-xs text-foreground">
+              {t.editor.panels.adjustments.filters[type]}
+            </span>
           </label>
         );
       })}
@@ -861,13 +869,14 @@ function ToggleFiltersSection() {
 }
 
 function SliderFiltersSection() {
+  const { t } = useTranslation();
   const filters = useEditorStore((s) => s.filters);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const setFilterParam = useEditorStore((s) => s.setFilterParam);
 
   return (
     <div className="flex flex-col gap-2">
-      {SLIDER_FILTERS.map(({ type, label, params }) => {
+      {SLIDER_FILTERS.map(({ type, params }) => {
         const filter = filters.find((f) => f.type === type);
         if (!filter) return null;
 
@@ -880,13 +889,15 @@ function SliderFiltersSection() {
                 onChange={() => toggleFilter(type)}
                 className="accent-primary w-3.5 h-3.5"
               />
-              <span className="text-xs font-medium text-foreground">{label}</span>
+              <span className="text-xs font-medium text-foreground">
+                {t.editor.panels.adjustments.filters[type]}
+              </span>
             </label>
             {filter.enabled &&
               params.map((p) => (
                 <SliderRow
                   key={p.key}
-                  label={p.label}
+                  label={t.editor.panels.adjustments.params[p.key]}
                   value={filter.params[p.key] ?? p.min}
                   min={p.min}
                   max={p.max}
@@ -902,13 +913,14 @@ function SliderFiltersSection() {
 }
 
 function AdditionalBlursSection() {
+  const { t } = useTranslation();
   const filters = useEditorStore((s) => s.filters);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const setFilterParam = useEditorStore((s) => s.setFilterParam);
 
   return (
     <div className="flex flex-col gap-2">
-      {BLUR_FILTERS.map(({ type, label, params }) => {
+      {BLUR_FILTERS.map(({ type, params }) => {
         const filter = filters.find((f) => f.type === type);
         if (!filter) return null;
 
@@ -921,13 +933,15 @@ function AdditionalBlursSection() {
                 onChange={() => toggleFilter(type)}
                 className="accent-primary w-3.5 h-3.5"
               />
-              <span className="text-xs font-medium text-foreground">{label}</span>
+              <span className="text-xs font-medium text-foreground">
+                {t.editor.panels.adjustments.filters[type]}
+              </span>
             </label>
             {filter.enabled &&
               params.map((p) => (
                 <SliderRow
                   key={p.key}
-                  label={p.label}
+                  label={t.editor.panels.adjustments.params[p.key]}
                   value={filter.params[p.key] ?? p.min}
                   min={p.min}
                   max={p.max}
@@ -968,7 +982,7 @@ function VignetteSection() {
         VIGNETTE_PARAMS.map((p) => (
           <SliderRow
             key={p.key}
-            label={p.label}
+            label={t.editor.panels.adjustments.params[p.key]}
             value={filter.params[p.key] ?? p.min}
             min={p.min}
             max={p.max}
@@ -1005,7 +1019,7 @@ function GrainSection() {
         GRAIN_PARAMS.map((p) => (
           <SliderRow
             key={p.key}
-            label={p.label}
+            label={t.editor.panels.adjustments.params[p.key]}
             value={filter.params[p.key] ?? p.min}
             min={p.min}
             max={p.max}

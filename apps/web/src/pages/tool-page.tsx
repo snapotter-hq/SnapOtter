@@ -448,9 +448,11 @@ export function ToolPage() {
   const toolAcceptDescription = useMemo(
     () =>
       toolAcceptExts && toolAcceptExts.length > 0
-        ? `${toolAcceptExts.map((e) => e.toUpperCase()).join(", ")} files only`
+        ? format(t.toolPage.acceptDescription, {
+            exts: toolAcceptExts.map((e) => e.toUpperCase()).join(", "),
+          })
         : undefined,
-    [toolAcceptExts],
+    [toolAcceptExts, t.toolPage.acceptDescription],
   );
 
   const handleFiles = useCallback(

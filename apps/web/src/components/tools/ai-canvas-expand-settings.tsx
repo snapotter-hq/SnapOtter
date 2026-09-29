@@ -8,11 +8,7 @@ import { useFileStore } from "@/stores/file-store";
 
 type Tier = "fast" | "balanced" | "high";
 
-const TIERS: { id: Tier; label: string; desc: string }[] = [
-  { id: "fast", label: "Fast", desc: "Quick preview, fewer AI passes" },
-  { id: "balanced", label: "Balanced", desc: "Good quality, moderate speed" },
-  { id: "high", label: "High Quality", desc: "Best results, slower" },
-];
+const TIERS: Tier[] = ["fast", "balanced", "high"];
 
 const EXTEND_PRESETS = [
   { label: "16:9", aspect: 16 / 9 },
@@ -28,6 +24,16 @@ export function AiCanvasExpandSettings() {
   const { files } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("ai-canvas-expand");
+  const tierLabels: Record<Tier, string> = {
+    fast: t.toolSettings["ai-canvas-expand"].fast,
+    balanced: t.toolSettings["ai-canvas-expand"].balanced,
+    high: t.toolSettings["ai-canvas-expand"].highQuality,
+  };
+  const tierDescs: Record<Tier, string> = {
+    fast: t.toolSettings["ai-canvas-expand"].fastDesc,
+    balanced: t.toolSettings["ai-canvas-expand"].balancedDesc,
+    high: t.toolSettings["ai-canvas-expand"].highQualityDesc,
+  };
 
   const [extendTop, setExtendTop] = useState(0);
   const [extendRight, setExtendRight] = useState(0);
@@ -104,25 +110,23 @@ export function AiCanvasExpandSettings() {
           {t.toolSettings["ai-canvas-expand"].quality}
         </p>
         <div className="grid grid-cols-3 gap-1">
-          {TIERS.map((t) => (
+          {TIERS.map((tierId) => (
             <button
-              key={t.id}
+              key={tierId}
               type="button"
-              data-testid={`tier-${t.id}`}
-              onClick={() => setTier(t.id)}
+              data-testid={`tier-${tierId}`}
+              onClick={() => setTier(tierId)}
               className={`text-xs py-2 rounded transition-colors ${
-                tier === t.id
+                tier === tierId
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {t.label}
+              {tierLabels[tierId]}
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1">
-          {TIERS.find((t) => t.id === tier)?.desc}
-        </p>
+        <p className="text-[10px] text-muted-foreground mt-1">{tierDescs[tier]}</p>
       </div>
 
       {/* Aspect ratio presets */}

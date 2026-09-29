@@ -8,9 +8,9 @@ import { useFileStore } from "@/stores/file-store";
 
 const QUICK_SCALES = [2, 3, 4, 6, 8];
 const MODEL_OPTIONS = [
-  { value: "lanczos", label: "Fast" },
-  { value: "auto", label: "Balanced" },
-  { value: "realesrgan", label: "Best" },
+  { value: "lanczos", labelKey: "qualityFast" },
+  { value: "auto", labelKey: "qualityBalanced" },
+  { value: "realesrgan", labelKey: "qualityBest" },
 ] as const;
 const OUTPUT_FORMATS = [
   "png",
@@ -114,7 +114,7 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
           {t.toolSettings.upscale.quality}
         </p>
         <div className="flex gap-1">
-          {MODEL_OPTIONS.map(({ value, label }) => (
+          {MODEL_OPTIONS.map(({ value, labelKey }) => (
             <button
               key={value}
               type="button"
@@ -125,7 +125,7 @@ export function UpscaleControls({ settings: initialSettings, onChange }: Upscale
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              {label}
+              {t.toolSettings.upscale[labelKey]}
             </button>
           ))}
         </div>

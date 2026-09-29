@@ -16,15 +16,7 @@ import { cn } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
-const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
-  { value: "free", label: "Free" },
-  { value: "1:1", label: "1:1" },
-  { value: "4:3", label: "4:3" },
-  { value: "3:2", label: "3:2" },
-  { value: "16:9", label: "16:9" },
-  { value: "9:16", label: "9:16" },
-  { value: "4:5", label: "4:5" },
-];
+const ASPECT_RATIOS: AspectRatio[] = ["free", "1:1", "4:3", "3:2", "16:9", "9:16", "4:5"];
 
 const OUTPUT_FORMATS: { value: OutputFormat; label: string }[] = [
   { value: "png", label: "PNG" },
@@ -35,14 +27,20 @@ const OUTPUT_FORMATS: { value: OutputFormat; label: string }[] = [
 ];
 
 const BG_PRESETS = [
-  { id: "white" as const, label: "White", color: "#FFFFFF", border: true },
-  { id: "black" as const, label: "Black", color: "#000000", border: false },
-  { id: "transparent" as const, label: "None", color: "transparent", border: true },
-  { id: "custom" as const, label: "Custom", color: null, border: true },
+  { id: "white" as const, color: "#FFFFFF", border: true },
+  { id: "black" as const, color: "#000000", border: false },
+  { id: "transparent" as const, color: "transparent", border: true },
+  { id: "custom" as const, color: null, border: true },
 ];
 
 export function CollageSettings() {
   const { t } = useTranslation();
+  const bgPresetLabels: Record<(typeof BG_PRESETS)[number]["id"], string> = {
+    white: t.toolSettings.collage.bgWhite,
+    black: t.toolSettings.collage.bgBlack,
+    transparent: t.toolSettings.collage.bgNone,
+    custom: t.toolSettings.collage.bgCustom,
+  };
   const store = useCollageStore();
   const {
     images,
@@ -293,7 +291,7 @@ export function CollageSettings() {
                           ? backgroundColor
                           : (p.color ?? undefined),
                   }}
-                  title={p.label}
+                  title={bgPresetLabels[p.id]}
                 />
               ))}
               {bgPreset === "custom" && (
@@ -321,17 +319,17 @@ export function CollageSettings() {
           <div className="flex flex-wrap gap-1 mt-1">
             {ASPECT_RATIOS.map((ar) => (
               <button
-                key={ar.value}
+                key={ar}
                 type="button"
-                onClick={() => store.setAspectRatio(ar.value)}
+                onClick={() => store.setAspectRatio(ar)}
                 className={cn(
                   "px-2 py-1 text-xs rounded-md transition-colors",
-                  aspectRatio === ar.value
+                  aspectRatio === ar
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80",
                 )}
               >
-                {ar.label}
+                {ar === "free" ? t.toolSettings.collage.ratioFree : ar}
               </button>
             ))}
           </div>
