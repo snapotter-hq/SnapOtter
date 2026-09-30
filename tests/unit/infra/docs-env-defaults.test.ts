@@ -208,15 +208,28 @@ describe("engine overrides", () => {
     expect(ENGINE_VARS.filter((name) => !documented.has(name))).toEqual([]);
   });
 
-  it("the SNAPOTTER_HW_ACCEL row lists every family it accepts", () => {
+  it("the SNAPOTTER_HW_ACCEL row lists exactly the families it accepts", () => {
     const row = configRows.find((r) => r.name === "SNAPOTTER_HW_ACCEL");
     const offered = valueTokens(row?.description ?? "");
+    expect(HW_ACCEL_FAMILIES.length).toBeGreaterThan(0);
     expect(HW_ACCEL_FAMILIES.filter((family) => !offered.includes(family))).toEqual([]);
+    expect(offered.filter((token) => !HW_ACCEL_FAMILIES.includes(token))).toEqual([]);
   });
 
-  it("deployment.md's copy-paste Compose file forwards each one", () => {
+  it("every copy-paste Compose file in deployment.md forwards each one", () => {
     const deployment = readFileSync(path.join(ROOT, "apps/docs/guide/deployment.md"), "utf8");
-    const missing = ENGINE_VARS.filter((name) => !deployment.includes(`- ${name}=\${${name}:-}`));
+    // Checked per file: the CPU example alone would satisfy a whole-page search
+    // while the NVIDIA one, where SNAPOTTER_HW_ACCEL matters, stayed a no-op.
+    const composeFiles = [...deployment.matchAll(/```yaml\n([\s\S]*?)```/g)]
+      .map((m) => m[1])
+      .filter((block) => block.includes("image: snapotter/snapotter"));
+    expect(composeFiles).toHaveLength(2);
+    const missing = composeFiles.flatMap((block, i) =>
+      // Anchored to a live list item, so a commented-out `# - NAME=...` doesn't count.
+      ENGINE_VARS.filter(
+        (name) => !new RegExp(`^\\s+- ${name}=\\$\\{${name}:-\\}`, "m").test(block),
+      ).map((name) => `compose file ${i + 1}: ${name}`),
+    );
     expect(missing).toEqual([]);
   });
 });
