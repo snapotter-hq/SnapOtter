@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
+import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
@@ -425,6 +426,7 @@ export function registerPdfToImageRoute(
       const files: Array<{ buffer: Buffer; filename: string }> = [];
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
 
       try {
         for await (const part of request.parts()) {
@@ -443,19 +445,21 @@ export function registerPdfToImageRoute(
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            // Doubles as an object-key segment and a response header value, so
-            // anything outside the key charset is ignored rather than allowed
-            // to fail every file or to break writeHead after hijack.
-            const raw = part.value as string;
-            if (typeof raw === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           }
         }
       } catch (err) {
         const failure = multipartFailure(err);
         return reply.status(failure.status).send(failure.body);
       }
+
+      // The id is also an object-key segment and a response header value after
+      // hijack; the shared pattern keeps both safe (no CR/LF, no '..').
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
       if (files.length === 0) {
         return reply.status(400).send({ error: "No PDF files provided" });

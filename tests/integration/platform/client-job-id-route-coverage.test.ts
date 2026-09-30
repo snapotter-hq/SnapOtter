@@ -2,7 +2,12 @@
  * Per-route coverage for the clientJobId multipart field (#1329). The value
  * becomes a jobs.id primary key, and a NUL byte in it made Postgres reject the
  * insert, which surfaced as a 500. These are the routes that used to accept any
- * 1-128 character string; the 19 AI routes already require a UUID.
+ * 1-128 character string.
+ *
+ * Every other route that takes the field used to drop a value it didn't like
+ * and carry on under a generated id, so the caller watched an SSE channel
+ * nothing would ever write to. They now share the same rule and the same 400
+ * (#1691).
  *
  * The parse-and-400 gate runs before file validation, so a lone clientJobId
  * field pins each route's field capture and error contract.
@@ -30,6 +35,32 @@ const CLIENT_JOB_ID_ROUTES = [
   { name: "passport-photo analyze", url: `${apiToolPath("passport-photo")}/analyze` },
   { name: "svg-to-raster batch", url: `${apiToolPath("svg-to-raster")}/batch` },
 ];
+
+// Routes that used to drop a clientJobId they didn't like (a UUID-only check
+// on the AI routes and sign-pdf, a looser regex on pdf-to-image batch).
+const FORMERLY_SILENT_ROUTES = [
+  "ai-canvas-expand",
+  "auto-subtitles",
+  "background-replace",
+  "blur-background",
+  "blur-faces",
+  "colorize",
+  "enhance-faces",
+  "erase-object",
+  "noise-removal",
+  "ocr",
+  "ocr-pdf",
+  "red-eye-removal",
+  "remove-background",
+  "remove-gif-background",
+  "restore-photo",
+  "sign-pdf",
+  "transcribe-audio",
+  "transparency-fixer",
+  "upscale",
+]
+  .map((toolId) => ({ name: toolId, url: apiToolPath(toolId) }))
+  .concat([{ name: "pdf-to-image batch", url: `${apiToolPath("pdf-to-image")}/batch` }]);
 
 // Force the bundle gates open so passport-photo (face-detection +
 // background-removal) reaches its multipart parse without AI bundles.
@@ -106,6 +137,33 @@ describe("clientJobId 400 gate", () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toBe(INVALID_CLIENT_JOB_ID_ERROR);
   });
+});
+
+describe("clientJobId 400 gate on the routes that used to drop it (#1691)", () => {
+  for (const route of FORMERLY_SILENT_ROUTES) {
+    it(`${route.name} rejects a malformed clientJobId with 400 instead of ignoring it`, async () => {
+      const res = await postClientJobId(route.url, "my job");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toBe(INVALID_CLIENT_JOB_ID_ERROR);
+    });
+
+    it(`${route.name} rejects a NUL byte with 400`, async () => {
+      const res = await postClientJobId(route.url, "\u0000çãú");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toBe(INVALID_CLIENT_JOB_ID_ERROR);
+    });
+
+    // A non-UUID id the shared rule allows gets past the gate like any other,
+    // and the request stops at the missing file instead.
+    it(`${route.name} accepts a non-UUID clientJobId and moves on to the file check`, async () => {
+      const res = await postClientJobId(route.url, "job_42");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).not.toBe(INVALID_CLIENT_JOB_ID_ERROR);
+    });
+  }
 });
 
 describe("parseClientJobIdField", () => {

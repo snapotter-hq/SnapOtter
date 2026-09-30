@@ -14,7 +14,12 @@ import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { autoSaveToLibrary } from "../../jobs/postprocess.js";
-import { INVALID_SAVE_MODE_ERROR, parseSaveModeField } from "../../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  parseClientJobIdField,
+  parseSaveModeField,
+} from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import {
   applyEffects,
@@ -126,6 +131,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
       let filename = "image";
       let settingsRaw: string | null = null;
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
       let saveModeRaw: string | null = null;
       let inputKey: string | null = null;
@@ -140,10 +146,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           } else if (part.fieldname === "settings") {
             settingsRaw = part.value as string;
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           } else if (part.fieldname === "fileId") {
             fileId = part.value as string;
           } else if (part.fieldname === "saveMode") {
@@ -154,6 +157,12 @@ export function registerRemoveBackground(app: FastifyInstance) {
         const failure = multipartFailure(err);
         return reply.status(failure.status).send(failure.body);
       }
+
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
       // Stamp the client-facing alias before any pre-enqueue work (#892): a
       // cancel landing between parse and enqueueToolJob needs a durable pointer
