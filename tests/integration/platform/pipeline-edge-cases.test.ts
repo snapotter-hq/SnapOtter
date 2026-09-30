@@ -5,9 +5,12 @@
  * single steps, invalid tools, conflicting steps, and multi-step chains.
  */
 
+import { randomUUID } from "node:crypto";
 import { qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -708,6 +711,39 @@ describe("Pipeline batch execution", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers["x-job-id"]).toBe(clientJobId);
+  });
+
+  // A taken id fails the parent insert on the primary key. That is the
+  // client's mistake: 409, and the existing row is left alone (#1689).
+  it("answers 409 for a clientJobId that is already in use", async () => {
+    const clientJobId = `pipeline-batch-1689-${randomUUID()}`;
+    const post = () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "dup.png", contentType: "image/png", content: PNG_200x150 },
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+        },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      return app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+    };
+
+    const first = await post();
+    expect(first.statusCode).toBe(200);
+    const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+
+    const second = await post();
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
+    expect(second.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(after).toEqual(before);
   });
 
   it("pipeline batch with multi-step chain processes correctly", async () => {

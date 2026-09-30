@@ -60,6 +60,7 @@ import {
   spoolMultipartFile,
   storeValidatedOcrPdf,
 } from "../lib/ocr-pdf-ingress.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { InputValidationError } from "../modality/contract.js";
@@ -333,17 +334,26 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           // Insert the parent row BEFORE updateJobProgress, because the
           // progress persist layer does a check-then-insert that races
-          // with our explicit insert below.
-          await db.insert(schema.jobs).values({
-            id: parentId,
-            userId,
-            toolId,
-            pool: "system",
-            type: "batch",
-            status: "queued",
-            inputRefs: [],
-            settings: { flowChildCount: 0 },
-          });
+          // with our explicit insert below. A clientJobId that is already
+          // taken fails on the primary key: that is the client's mistake,
+          // not a server fault, and nothing is staged yet to clean up (#1687).
+          try {
+            await db.insert(schema.jobs).values({
+              id: parentId,
+              userId,
+              toolId,
+              pool: "system",
+              type: "batch",
+              status: "queued",
+              inputRefs: [],
+              settings: { flowChildCount: 0 },
+            });
+          } catch (err) {
+            if (isUniqueViolation(err)) {
+              return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+            }
+            throw err;
+          }
           stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
 
           updateJobProgress({

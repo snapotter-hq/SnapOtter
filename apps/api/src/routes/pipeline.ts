@@ -57,6 +57,7 @@ import {
   spoolMultipartFile,
   storeValidatedOcrPdf,
 } from "../lib/ocr-pdf-ingress.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
@@ -1176,19 +1177,28 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const userId = authUser.id;
 
           // Insert batch-finalize row BEFORE updateJobProgress to avoid
-          // a duplicate-key race with the progress persist layer.
-          await db.insert(schema.jobs).values({
-            id: parentId,
-            userId,
-            toolId: "pipeline-batch",
-            pool: "system",
-            type: "batch",
-            status: "queued",
-            inputRefs: [],
-            // stepCount from the first write (#771): a cancel landing while
-            // files are still validating resolves through this row.
-            settings: { flowChildCount: 0, stepCount: parsedSteps.length },
-          });
+          // a duplicate-key race with the progress persist layer. A
+          // clientJobId that is already taken fails on the primary key: the
+          // client's mistake, answered before anything is staged (#1689).
+          try {
+            await db.insert(schema.jobs).values({
+              id: parentId,
+              userId,
+              toolId: "pipeline-batch",
+              pool: "system",
+              type: "batch",
+              status: "queued",
+              inputRefs: [],
+              // stepCount from the first write (#771): a cancel landing while
+              // files are still validating resolves through this row.
+              settings: { flowChildCount: 0, stepCount: parsedSteps.length },
+            });
+          } catch (err) {
+            if (isUniqueViolation(err)) {
+              return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+            }
+            throw err;
+          }
 
           // Emit initial batch progress
           updateJobProgress({
