@@ -23,11 +23,27 @@ const execFileAsync = promisify(execFile);
  * through answers it that way instead of a 422 blaming libheif (#1577). The
  * message doesn't promise a retry will work: with no pixel limits passed, a
  * very large image can exhaust memory every time.
+ *
+ * Under a memory rlimit or a cgroup that fails malloc rather than killing the
+ * process, heif-dec reports it itself (#1629): libheif's "Allocating <n> bytes
+ * failed", or an abort on std::bad_alloc or on failing to start a decoder
+ * thread. That's stderr as libheif 1.23 printed it under `ulimit -v`. Security
+ * limits share libheif's "Memory allocation error" heading but are the file's
+ * fault, so the match is on the allocation text, not the heading. stderr only:
+ * the message carries a temp path derived from the upload.
  */
+const LIBHEIF_ALLOCATION_FAILED = /\bAllocating \d+ bytes failed\b/;
+const ABORTED_OUT_OF_MEMORY =
+  /instance of 'std::bad_alloc'|instance of 'std::system_error'\s+what\(\):\s+Resource temporarily unavailable/;
+
 function asDecoderOutOfMemory(err: unknown): unknown {
+  const { signal, stderr } = (err ?? {}) as { signal?: unknown; stderr?: unknown };
+  const decoderOutput = typeof stderr === "string" ? stderr : "";
   const outOfMemory =
     (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) ||
-    (err as { signal?: unknown } | null)?.signal === "SIGKILL";
+    signal === "SIGKILL" ||
+    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput) ||
+    (signal === "SIGABRT" && ABORTED_OUT_OF_MEMORY.test(decoderOutput));
   if (!outOfMemory) return err;
   return new DecoderOutOfMemoryError(
     "The HEIF decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
