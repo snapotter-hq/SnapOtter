@@ -14,6 +14,7 @@ import {
 const invalid = (detail: string) => ({ ok: false, detail, scimType: "invalidValue" });
 const syntax = (detail: string) => ({ ok: false, detail, scimType: "invalidSyntax" });
 const noTarget = (detail: string) => ({ ok: false, detail, scimType: "noTarget" });
+const badPath = (detail: string) => ({ ok: false, detail, scimType: "invalidPath" });
 
 describe("scimUserBody", () => {
   it("coerces a whole number in a string attribute, as some IdPs map numeric ids", () => {
@@ -289,6 +290,150 @@ describe("normalizeGroupOps", () => {
     expect(
       normalizeGroupOps([{ op: "replace", path: "displayName", value: { name: "g" } }]),
     ).toEqual(invalid("Operations.0.value must be a string, got object"));
+  });
+
+  it("matches paths case-insensitively, with the schema URN, and keeps a filter's id exact (#1683)", () => {
+    expect(
+      normalizeGroupOps([
+        { op: "Replace", path: "DisplayName", value: "g" },
+        { op: "Add", path: "MEMBERS", value: { value: "u1" } },
+        { op: "remove", path: 'Members[Value EQ "User-2"]' },
+        {
+          op: "replace",
+          path: "urn:ietf:params:scim:schemas:core:2.0:Group:displayName",
+          value: "h",
+        },
+        {
+          op: "remove",
+          path: 'urn:ietf:params:scim:schemas:core:2.0:Group:members[value eq "u3"]',
+        },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "replace", path: "displayName", value: "g" },
+        { op: "Add", path: "members", value: [{ value: "u1" }] },
+        { op: "remove", path: "members", value: [{ value: "User-2" }] },
+        { op: "replace", path: "displayName", value: "h" },
+        { op: "remove", path: "members", value: [{ value: "u3" }] },
+      ],
+    });
+  });
+
+  it("treats add on displayName as a replace, so it renames (#1683)", () => {
+    expect(normalizeGroupOps([{ op: "add", path: "displayName", value: "g" }])).toEqual({
+      ok: true,
+      data: [{ op: "replace", path: "displayName", value: "g" }],
+    });
+  });
+
+  it("refuses a filter or sub-attribute path the route can't apply (#1683)", () => {
+    const refused = (path: string, op = "remove") =>
+      expect(normalizeGroupOps([{ op, path }])).toEqual(
+        badPath(`Operations.0.path ${JSON.stringify(path)} isn't one SnapOtter can apply`),
+      );
+    refused('members[display eq "x"]');
+    refused('members[value ne "x"]');
+    refused('members[value eq "a" or value eq "b"]');
+    refused('members[value eq "x"].display');
+    refused("displayName.value", "replace");
+    // A filter names one member: it can be removed, not added or replaced.
+    refused('members[value eq "x"]', "add");
+    refused('members[value eq "x"]', "replace");
+  });
+
+  it("drops operations on attributes Groups doesn't store", () => {
+    expect(
+      normalizeGroupOps([
+        { op: "replace", path: "externalId", value: "x" },
+        { op: "remove", path: "externalId" },
+        { op: "replace", value: { id: "g1", externalId: "x" } },
+      ]),
+    ).toEqual({ ok: true, data: [] });
+  });
+
+  it("turns a path-less replace into the path ops it stands for, ignoring other keys", () => {
+    // Okta renames a group this way, and sends the group's id alongside.
+    expect(
+      normalizeGroupOps([
+        { op: "replace", value: { id: "g1", DisplayName: "renamed", members: [{ value: "u1" }] } },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "replace", path: "displayName", value: "renamed" },
+        { op: "replace", path: "members", value: [{ value: "u1" }] },
+      ],
+    });
+  });
+
+  it("turns a path-less add into an add of its members and a rename", () => {
+    expect(
+      normalizeGroupOps([
+        { op: "add", value: { displayName: "renamed", members: [{ value: "u1" }] } },
+        { op: "add", value: { members: [] } },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "replace", path: "displayName", value: "renamed" },
+        { op: "add", path: "members", value: [{ value: "u1" }] },
+      ],
+    });
+  });
+
+  it("reads null in a path-less value as unassigned", () => {
+    expect(
+      normalizeGroupOps([{ op: "replace", value: { displayName: null, members: null } }]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "replace", path: "displayName", value: null },
+        { op: "replace", path: "members", value: [] },
+      ],
+    });
+  });
+
+  it("refuses a path-less value that sets one attribute twice", () => {
+    expect(
+      normalizeGroupOps([{ op: "replace", value: { displayName: "a", DisplayName: "b" } }]),
+    ).toEqual(syntax("Operations.0.value sets displayName more than once"));
+  });
+
+  it("keeps a remove's member list, and reads no list or null as every member", () => {
+    // Entra ID removes members with a list instead of a filter path.
+    expect(
+      normalizeGroupOps([
+        { op: "Remove", path: "members", value: [{ value: "u1" }, { value: "u2" }] },
+        { op: "remove", path: "members" },
+        { op: "remove", path: "members", value: null },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "Remove", path: "members", value: [{ value: "u1" }, { value: "u2" }] },
+        { op: "remove", path: "members" },
+        { op: "remove", path: "members" },
+      ],
+    });
+    expect(normalizeGroupOps([{ op: "remove", path: "members", value: [{}] }])).toEqual(
+      invalid("Operations.0.value.0.value is required"),
+    );
+  });
+
+  it("refuses an unknown op, a remove with no path, removing displayName, and a non-object path-less value", () => {
+    expect(normalizeGroupOps([{ op: "update", path: "members" }])).toEqual(
+      syntax("Operations.0.op must be add, remove or replace"),
+    );
+    expect(normalizeGroupOps([{ op: "remove" }])).toEqual(
+      noTarget("Operations.0.path is required for remove"),
+    );
+    expect(normalizeGroupOps([{ op: "remove", path: "displayName" }])).toEqual(
+      invalid("Operations.0: displayName can't be removed"),
+    );
+    expect(normalizeGroupOps([{ op: "replace", value: "renamed" }])).toEqual(
+      invalid("Operations.0.value must be an object, got string"),
+    );
   });
 
   it("lets a null displayName through to the route's own empty-name answer (#988)", () => {

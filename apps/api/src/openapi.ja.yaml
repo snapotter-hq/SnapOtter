@@ -6964,7 +6964,6 @@ paths:
         - System
       summary: ジョブ進捗（SSE）
       description: 長時間実行ジョブを追跡するための Server-Sent Events ストリームです。単一ファイル、バッチ、ハートビートの各フレームを送信し、ジョブの終端イベント直後に閉じます。
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7065,6 +7064,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

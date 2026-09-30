@@ -6997,7 +6997,6 @@ paths:
         - System
       summary: Job प्रगति (SSE)
       description: लंबे समय तक चलने वाले कार्यों को ट्रैक करने के लिए Server-Sent Events स्ट्रीम। यह एकल-फ़ाइल, बैच और हार्टबीट फ़्रेम भेजती है और अंतिम कार्य इवेंट के तुरंत बाद बंद हो जाती है।
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7098,6 +7097,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

@@ -100,7 +100,11 @@ import {
 } from "../lib/ocr-runtime-install.js";
 import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
-import { updateSingleFileProgress } from "./progress.js";
+import {
+  releaseFeatureInstallStream,
+  reserveFeatureInstallStream,
+  updateSingleFileProgress,
+} from "./progress.js";
 
 const venvPath = process.env.PYTHON_VENV_PATH || "/opt/venv";
 const pythonPath = `${venvPath}/bin/python3`;
@@ -762,7 +766,22 @@ function getOcrInstallPreflightError(): { statusCode: 409 | 503; error: string }
   return null;
 }
 
-function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | null {
+/**
+ * Drop an install reservation nothing will use. A failure here leaves a stray
+ * queued row until the startup sweep, which is no reason to fail the request.
+ */
+async function releaseReservedInstall(jobId: string): Promise<void> {
+  try {
+    await releaseFeatureInstallStream(jobId);
+  } catch (err) {
+    logger.warn({ err, jobId }, "could not release an unused feature install reservation");
+  }
+}
+
+async function queueBundleInstallIfNeeded(
+  bundleId: string,
+  userId: string,
+): Promise<EnqueuedBundleInstall | null> {
   if (isFeatureInstalled(bundleId)) {
     if (bundleId === "ocr") return null;
     const modelError = verifyBundleModels(bundleId);
@@ -776,7 +795,21 @@ function queueBundleInstallIfNeeded(bundleId: string): EnqueuedBundleInstall | n
   // that lands behind another install stays queued server-side and starts
   // automatically when the running install finishes.
   const jobId = crypto.randomUUID();
-  const effectiveJobId = enqueue({ bundleId, jobId, mutationEpoch: getAiMutationEpoch() });
+  const mutationEpoch = getAiMutationEpoch();
+  // The progress stream decides who may watch by this row, so it has to exist
+  // before pump() can publish the first frame.
+  await reserveFeatureInstallStream({ jobId, bundleId, userId });
+  let effectiveJobId: string;
+  try {
+    effectiveJobId = enqueue({ bundleId, jobId, mutationEpoch });
+  } catch (err) {
+    await releaseReservedInstall(jobId);
+    throw err;
+  }
+  if (effectiveJobId !== jobId) {
+    // Joined an install that was already queued or running; its own row stands.
+    await releaseReservedInstall(jobId);
+  }
   const pumpError = pump();
   if (pumpError) throw pumpError;
 
@@ -974,7 +1007,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         }
       }
 
-      const result = queueBundleInstallIfNeeded(bundleId);
+      const result = await queueBundleInstallIfNeeded(bundleId, admin.id);
       if (!result) {
         return reply.status(409).send({ error: `Bundle "${bundleId}" is already installed` });
       }
@@ -1012,7 +1045,7 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
           }
         }
 
-        const result = queueBundleInstallIfNeeded(bundleId);
+        const result = await queueBundleInstallIfNeeded(bundleId, admin.id);
         bundles.push(result ?? { bundleId, queued: false, skipped: true });
       }
 

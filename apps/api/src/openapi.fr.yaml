@@ -6999,7 +6999,6 @@ paths:
         - System
       summary: Progression du job (SSE)
       description: Flux Server-Sent Events permettant de suivre les tâches de longue durée. Il envoie des trames de fichier unique, de lot et de pulsation, puis se ferme immédiatement après un événement final de la tâche.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7100,6 +7099,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

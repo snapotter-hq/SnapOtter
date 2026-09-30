@@ -7001,7 +7001,6 @@ paths:
         - System
       summary: Прогресс задачи (SSE)
       description: Поток Server-Sent Events для отслеживания длительных заданий. Он отправляет кадры одиночных файлов, пакетов и heartbeat и закрывается сразу после конечного события задания.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7102,6 +7101,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

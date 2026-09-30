@@ -6963,7 +6963,6 @@ paths:
         - System
       summary: 作业进度（SSE）
       description: 用于跟踪长时间运行作业的 Server-Sent Events 流。它会发送单文件、批处理和 heartbeat 帧，并在作业的最终事件后立即关闭。
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7064,6 +7063,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

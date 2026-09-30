@@ -6886,7 +6886,6 @@ paths:
       description: >
         Server-Sent Events stream for tracking long-running jobs. Sends single-file,
         batch, and heartbeat frames, and closes immediately after a terminal job event.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -6969,6 +6968,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # --- Admin ---------------------------------------------------------------
 

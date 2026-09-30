@@ -128,9 +128,10 @@ function firstMessage(issues: ZodIssue[]): string {
 
 /**
  * RFC 7644 3.12: a malformed request is invalidSyntax, a bad attribute value
- * invalidValue, and a remove with nothing to remove noTarget.
+ * invalidValue, a remove with nothing to remove noTarget, and a path the
+ * server can't apply invalidPath.
  */
-export type ScimErrorType = "invalidSyntax" | "invalidValue" | "noTarget";
+export type ScimErrorType = "invalidSyntax" | "invalidValue" | "noTarget" | "invalidPath";
 
 export type ScimParse<T> =
   | { ok: true; data: T }
@@ -301,33 +302,152 @@ export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
   return { ok: true, data: normalized };
 }
 
+// RFC 7644 3.10 lets a path carry its schema URN.
+const GROUP_SCHEMA_PREFIX = "urn:ietf:params:scim:schemas:core:2.0:group:";
+// Attribute names are case-insensitive; the quoted member id is not.
+const MEMBER_FILTER = /^members\[value\s+eq\s+"([^"]+)"\]$/i;
+
+type GroupPath =
+  | { kind: "members" }
+  | { kind: "displayName" }
+  | { kind: "member"; id: string }
+  | { kind: "unsupported" }
+  | { kind: "ignored" };
+
 /**
- * Check and coerce each Groups PATCH operation's value for the paths the route
- * acts on. Members always come back as a list: a single member object is one
- * member, and null on a replace is none.
+ * What a Groups path targets. A filter or sub-attribute on members or
+ * displayName other than members[value eq "<id>"] names something the route
+ * stores in a form it can't apply. Any other attribute is one SnapOtter
+ * doesn't store, ignored the way the Users route ignores them (#1731).
+ */
+function groupPath(path: string): GroupPath {
+  let trimmed = path.trim();
+  if (trimmed.toLowerCase().startsWith(GROUP_SCHEMA_PREFIX)) {
+    trimmed = trimmed.slice(GROUP_SCHEMA_PREFIX.length);
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower === "members") return { kind: "members" };
+  if (lower === "displayname") return { kind: "displayName" };
+  const filter = trimmed.match(MEMBER_FILTER);
+  if (filter) return { kind: "member", id: filter[1] };
+  return /^(members|displayname)\b/.test(lower) ? { kind: "unsupported" } : { kind: "ignored" };
+}
+
+const groupValueObject = z.record(z.unknown());
+
+/**
+ * Check and coerce each Groups PATCH operation for the route, before any of
+ * them writes (#1683). What comes out is one of two shapes: add, replace or
+ * remove on "members" with a member list, or replace on "displayName". A
+ * remove on "members" without a list removes every member. Getting there:
+ *
+ * - A filter path, members[value eq "<id>"], is a remove of that one member.
+ * - A path-less value object ({displayName, members}, the way Okta renames a
+ *   group) becomes the path ops it stands for.
+ * - add on displayName replaces it (RFC 7644 3.5.2.1).
+ *
+ * An op other than add, remove or replace, a remove with no path, and a path
+ * the route can't apply are refused. Attributes SnapOtter doesn't store are
+ * dropped.
  */
 export function normalizeGroupOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
   const normalized: ScimPatchOp[] = [];
-  for (const [index, op] of ops.entries()) {
-    const opType = op.op.toLowerCase();
-    const at = ["Operations", index, "value"];
-    let value: ScimParse<unknown> = { ok: true, data: op.value };
-    const replacesMembers = opType === "replace" && op.path === "members";
-    if ((opType === "add" && op.path === "members") || replacesMembers) {
-      if (replacesMembers && op.value === null) {
-        value = { ok: true, data: [] };
-      } else {
-        const members = parseWith(membersValue, op.value, "invalidValue", at);
-        value = members.ok
-          ? { ok: true, data: Array.isArray(members.data) ? members.data : [members.data] }
-          : members;
-      }
-    } else if (opType === "replace" && op.path === "displayName") {
-      // Null or blank falls to the route's "displayName cannot be empty" (#988).
-      value = parseWith(scimString.nullish(), op.value, "invalidValue", at);
+  for (const [index, raw] of ops.entries()) {
+    const opType = raw.op.toLowerCase();
+    if (!PATCH_OPS.has(opType)) {
+      return {
+        ok: false,
+        detail: `Operations.${index}.op must be add, remove or replace`,
+        scimType: "invalidSyntax",
+      };
     }
-    if (!value.ok) return value;
-    normalized.push({ ...op, value: value.data });
+    const at = ["Operations", index, "value"];
+
+    if (raw.path === undefined) {
+      // RFC 7644 3.5.2.2: a remove names what it removes.
+      if (opType === "remove") {
+        return {
+          ok: false,
+          detail: `Operations.${index}.path is required for remove`,
+          scimType: "noTarget",
+        };
+      }
+      const object = parseWith(groupValueObject, raw.value, "invalidValue", at);
+      if (!object.ok) return object;
+      const keyed: Record<string, unknown> = {};
+      for (const [key, field] of Object.entries(object.data)) {
+        const lower = key.toLowerCase();
+        const name =
+          lower === "displayname" ? "displayName" : lower === "members" ? "members" : undefined;
+        if (!name) continue;
+        if (name in keyed) {
+          return {
+            ok: false,
+            detail: `${at.join(".")} sets ${name} more than once`,
+            scimType: "invalidSyntax",
+          };
+        }
+        keyed[name] = field;
+      }
+      const body = parseWith(scimGroupBody, keyed, "invalidValue", at);
+      if (!body.ok) return body;
+      if ("displayName" in body.data) {
+        normalized.push({ op: "replace", path: "displayName", value: body.data.displayName });
+      }
+      if ("members" in body.data) {
+        const list = body.data.members ?? [];
+        if (opType === "replace" || list.length > 0) {
+          normalized.push({ op: raw.op, path: "members", value: list });
+        }
+      }
+      continue;
+    }
+
+    const target = groupPath(raw.path);
+    if (target.kind === "ignored") continue;
+    if (target.kind === "unsupported" || (target.kind === "member" && opType !== "remove")) {
+      return {
+        ok: false,
+        detail: `Operations.${index}.path ${JSON.stringify(raw.path)} isn't one SnapOtter can apply`,
+        scimType: "invalidPath",
+      };
+    }
+
+    if (target.kind === "displayName") {
+      if (opType === "remove") {
+        return {
+          ok: false,
+          detail: `Operations.${index}: displayName can't be removed`,
+          scimType: "invalidValue",
+        };
+      }
+      // Null or blank falls to the route's "displayName cannot be empty" (#988).
+      const name = parseWith(scimString.nullish(), raw.value, "invalidValue", at);
+      if (!name.ok) return name;
+      normalized.push({ op: "replace", path: "displayName", value: name.data });
+      continue;
+    }
+
+    if (target.kind === "member") {
+      normalized.push({ op: raw.op, path: "members", value: [{ value: target.id }] });
+      continue;
+    }
+
+    // Null is unassigned (RFC 7643 2.5): none on a replace, all on a remove.
+    if (raw.value === undefined || raw.value === null) {
+      if (opType === "remove") {
+        normalized.push({ op: raw.op, path: "members" });
+        continue;
+      }
+      if (opType === "replace") {
+        normalized.push({ op: raw.op, path: "members", value: [] });
+        continue;
+      }
+    }
+    const members = parseWith(membersValue, raw.value, "invalidValue", at);
+    if (!members.ok) return members;
+    const list = Array.isArray(members.data) ? members.data : [members.data];
+    normalized.push({ op: raw.op, path: "members", value: list });
   }
   return { ok: true, data: normalized };
 }

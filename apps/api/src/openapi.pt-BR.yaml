@@ -6999,7 +6999,6 @@ paths:
         - System
       summary: Progresso do job (SSE)
       description: Stream de Server-Sent Events para acompanhar tarefas de longa duração. Envia frames de arquivo único, lote e heartbeat e fecha imediatamente após um evento terminal da tarefa.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7100,6 +7099,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

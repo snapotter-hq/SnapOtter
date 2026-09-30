@@ -6998,7 +6998,6 @@ paths:
         - System
       summary: 작업 진행 상황(SSE)
       description: 장기 실행 작업을 추적하는 Server-Sent Events 스트림입니다. 단일 파일, 배치 및 하트비트 프레임을 전송하고 작업의 최종 이벤트 직후 닫힙니다.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7099,6 +7098,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck
