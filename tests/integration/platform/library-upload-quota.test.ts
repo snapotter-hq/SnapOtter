@@ -250,6 +250,8 @@ describe("the quota holds under concurrent uploads (#1473)", () => {
     expect(results.map((r) => r.statusCode).sort()).toEqual([201, 413]);
     const refused = results.find((r) => r.statusCode === 413);
     expect(JSON.parse(refused?.body ?? "{}").error).toMatch(/^Storage quota exceeded/);
+    // The web app reads this code to say the library is full (#1350).
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("STORAGE_QUOTA_EXCEEDED");
     expect(await libraryState([adminId])).toEqual({
       rows: before.rows + 1,
       storageUsed: before.storageUsed + PNG.length,
@@ -284,6 +286,8 @@ describe("the quota holds under concurrent uploads (#1473)", () => {
     expect(results.map((r) => r.statusCode).sort()).toEqual([201, 413]);
     const refused = results.find((r) => r.statusCode === 413);
     expect(JSON.parse(refused?.body ?? "{}").error).toMatch(/^Team storage quota exceeded/);
+    // The web app reads this code to say the library is full (#1350).
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("STORAGE_QUOTA_EXCEEDED");
     expect(await libraryState(members)).toEqual({
       rows: before.rows + 1,
       storageUsed: before.storageUsed + PNG.length,
@@ -436,6 +440,7 @@ describe("save-result answers quota refusals and faults the same way (#1473)", (
 
     expect(res.statusCode).toBe(413);
     expect(JSON.parse(res.body).error).toMatch(/^Storage quota exceeded/);
+    expect(JSON.parse(res.body).code).toBe("STORAGE_QUOTA_EXCEEDED");
     expect(hooks.savedNames).toEqual([]);
   });
 
@@ -446,6 +451,7 @@ describe("save-result answers quota refusals and faults the same way (#1473)", (
 
     expect(res.statusCode).toBe(413);
     expect(JSON.parse(res.body).error).toMatch(/^Storage quota exceeded/);
+    expect(JSON.parse(res.body).code).toBe("STORAGE_QUOTA_EXCEEDED");
     expect(hooks.savedNames).toEqual([]);
   });
 });

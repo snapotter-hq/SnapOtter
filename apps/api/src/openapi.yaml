@@ -5694,6 +5694,7 @@ paths:
                 $ref: "#/components/schemas/Error"
               example:
                 error: Storage quota exceeded. Used 1030.0MB of 1024.0MB
+                code: STORAGE_QUOTA_EXCEEDED
 
   /api/v1/files/save-result:
     post:
@@ -5760,6 +5761,7 @@ paths:
                 $ref: "#/components/schemas/Error"
               example:
                 error: Storage quota exceeded. Used 1030.0MB of 1024.0MB
+                code: STORAGE_QUOTA_EXCEEDED
 
   /api/v1/files/{id}:
     get:
