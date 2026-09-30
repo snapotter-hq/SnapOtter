@@ -697,6 +697,26 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               return reply.status(422).send({ error: "Canceled", canceled: true });
             }
           }
+          // Bad input the worker rejected answers with the status it would
+          // have got from preValidate (#1742). The class doesn't survive the
+          // queue, so the row the worker wrote is the authority.
+          const failure = await db
+            .select({ error: schema.jobs.error })
+            .from(schema.jobs)
+            .where(eq(schema.jobs.id, jobId))
+            .then((rows) => rows[0]?.error ?? null)
+            .catch((readErr) => {
+              request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+              return null;
+            });
+          if (typeof failure?.status === "number") {
+            const logLevel = failure.status >= 500 ? "error" : "info";
+            request.log[logLevel]({ err, toolId: config.toolId }, "tool rejected input");
+            const body: Record<string, unknown> = { error: failure.message };
+            if (failure.details !== undefined) body.details = failure.details;
+            if (failure.code) body.code = failure.code;
+            return reply.status(failure.status).send(body);
+          }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.
           request.log.error({ err, toolId: config.toolId }, "tool processing failed");

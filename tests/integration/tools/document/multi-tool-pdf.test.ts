@@ -166,6 +166,19 @@ describe.skipIf(!qpdfAvailable())("multi-tool-pdf (requires qpdf)", () => {
     60_000,
   );
 
+  it("answers 400 with the worker's message when a declared page count is forged", async () => {
+    // The declared count passes preValidate; only the worker's qpdf check
+    // against the real file catches it.
+    const res = await runTool(
+      [{ name: "test-3page.pdf", content: PDF3, pages: 5 }],
+      [{ doc: 0, page: 1 }],
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      error: "Page count does not match document 1",
+    });
+  }, 60_000);
+
   it("rejects a plan referencing more docs than uploads with 400", async () => {
     // pageCounts has 3 entries for a single upload. Indexer-aligned counts
     // are part of the v2 contract, so this must fail cleanly.

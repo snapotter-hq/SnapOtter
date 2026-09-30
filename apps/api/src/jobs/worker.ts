@@ -314,6 +314,19 @@ function validationErrorFields(err: unknown): { code?: string; details?: string 
   };
 }
 
+/**
+ * The HTTP status a rejected input deserves, kept on the failed job row so a
+ * route waiting on the job answers it instead of a generic 422 (#1742). The
+ * error itself doesn't survive the queue, so the row is the only carrier.
+ */
+function inputErrorStatus(err: unknown): { status?: number } {
+  if (err instanceof Error && err.name === "InputValidationError") {
+    const statusCode = (err as { statusCode?: unknown }).statusCode;
+    return { status: typeof statusCode === "number" ? statusCode : 400 };
+  }
+  return isToolInputError(err) ? { status: 400 } : {};
+}
+
 async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
   const { jobId } = data;
@@ -722,7 +735,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             status: isCanceled ? "canceled" : "failed",
             completedAt: new Date(),
             durationMs,
-            error: { message: friendlyError(finalError), ...validationErrorFields(err) },
+            error: {
+              message: friendlyError(finalError),
+              ...validationErrorFields(err),
+              ...(!isCanceled && !isTimeout && inputErrorStatus(err)),
+            },
           })
           .where(eq(schema.jobs.id, jobId))
           .catch((writeErr) => {

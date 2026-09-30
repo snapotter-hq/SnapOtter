@@ -8,11 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
 
+const jobRows = vi.hoisted(() => ({ rows: [] as unknown[] }));
+
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: vi.fn(() => ({
       from: () => ({
-        where: () => ({ get: () => null }),
+        where: () => Object.assign(Promise.resolve(jobRows.rows), { get: () => null }),
         all: () => [],
       }),
     })),
@@ -795,6 +797,48 @@ describe("createToolRoute", () => {
           details: "Sharp exploded",
         }),
       );
+    });
+
+    it("answers the status the worker recorded for rejected input", async () => {
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Start is past the end"));
+      jobRows.rows = [
+        { error: { message: "Start is past the end", code: "OUT_OF_RANGE", status: 400 } },
+      ];
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        jobRows.rows = [];
+      }
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Start is past the end",
+        code: "OUT_OF_RANGE",
+      });
+    });
+
+    it("keeps the 422 when the failed job recorded no status", async () => {
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Sharp exploded"));
+      jobRows.rows = [{ error: { message: "Sharp exploded" } }];
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        jobRows.rows = [];
+      }
+
+      expect(reply.status).toHaveBeenCalledWith(422);
     });
 
     it("uses empty settings when none are provided", async () => {

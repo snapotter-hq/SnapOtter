@@ -132,7 +132,12 @@ export const jobs = pgTable(
     inputRefs: jsonb("input_refs").$type<string[]>(),
     outputRefs: jsonb("output_refs").$type<string[]>(),
     settings: jsonb("settings").$type<Record<string, unknown>>(),
-    error: jsonb("error").$type<{ message: string; details?: unknown }>(),
+    error: jsonb("error").$type<{
+      message: string;
+      details?: unknown;
+      code?: string;
+      status?: number;
+    }>(),
     bytesIn: bigint("bytes_in", { mode: "number" }),
     bytesOut: bigint("bytes_out", { mode: "number" }),
     durationMs: integer("duration_ms"),
