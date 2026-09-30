@@ -23,10 +23,10 @@ export interface ProgressFrame {
 export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this job. Try again.";
 
 /**
- * Parses a sync 2xx tool response: the only step of landing one that may blame
- * the server. It throws unless the body is a JSON object. Callers write the
- * result outside the try around this, so a throw from their own store writes
- * doesn't read as "Invalid response" (#1354, the sync twin of #1287).
+ * Parses a sync 2xx tool response, the step that rejects a malformed body. It
+ * throws unless the body is a JSON object. Callers write the result outside
+ * the try around this, so a throw from their own store writes doesn't read as
+ * "Invalid response" (#1354, the sync twin of #1287).
  */
 export function parseResultBody<T extends object>(text: string): T {
   const body: unknown = JSON.parse(text);

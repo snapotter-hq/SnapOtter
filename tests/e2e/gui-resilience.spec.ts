@@ -982,6 +982,27 @@ test.describe("Server Error Handling", () => {
 
     await page.unroute("**/api/v1/tools/image/resize");
   });
+
+  test("a 200 whose body is not a result fails the run", async ({ loggedInPage: page }) => {
+    // #1354: only the parse may blame the server, and a JSON value that isn't
+    // an object is a bad response too. It used to land as a "completed" entry
+    // with no result behind it.
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify("ok") }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    await expect(
+      page.getByText("Invalid response from server").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Resize" })).toBeEnabled();
+
+    await page.unroute("**/api/v1/tools/image/resize");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -723,8 +723,6 @@ export function useToolProcessor(toolId: string) {
       // Writes a sync 2xx result the way the SSE completion branch does.
       // Any throw from here is ours, not the server's (#1354).
       const landSyncResult = (result: ProcessResult) => {
-        setWarning(result.warning ?? null);
-        setResultPayload(result as unknown as Record<string, unknown>);
         if (result.savedFileId) {
           useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
         }
@@ -743,6 +741,11 @@ export function useToolProcessor(toolId: string) {
         // An auto-saved result is already in the library, so it was never at risk.
         // Must follow the updateEntry above; see the `claimed` invariant in file-store.
         if (result.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
+        // Last: tools that render straight from the payload (histogram, sprite
+        // sheet) must not show a result beside the error a failed write ends
+        // the run with.
+        setWarning(result.warning ?? null);
+        setResultPayload(result as unknown as Record<string, unknown>);
       };
 
       xhr.onload = () => {
@@ -821,13 +824,23 @@ export function useToolProcessor(toolId: string) {
           // The run is over whatever threw. A second throw from the teardown
           // must not replace the root cause, and the entry settle goes last
           // on its own: it's the same store write that may have just thrown.
-          try {
-            setError(FRAME_HANDLING_FAILED);
-            setProcessing(false);
-            setProgress(IDLE_PROGRESS);
-            clearActiveJob();
-          } catch (teardownErr) {
-            console.error("Ending the run after a result handling error failed", teardownErr);
+          // A throw after updateEntry (markClaimed) leaves the entry completed
+          // under the error: the result did land, so failEntry keeps it.
+          // clearActiveJob goes first because it nulls the run's refs before
+          // its own store write, and each write gets its own guard: a store
+          // listener that throws on every write would otherwise stop the
+          // teardown at the first one and leave the cancel handle armed.
+          setProgress(IDLE_PROGRESS);
+          for (const step of [
+            clearActiveJob,
+            () => setError(FRAME_HANDLING_FAILED),
+            () => setProcessing(false),
+          ]) {
+            try {
+              step();
+            } catch (teardownErr) {
+              console.error("Ending the run after a result handling error failed", teardownErr);
+            }
           }
           try {
             failEntry(FRAME_HANDLING_FAILED);

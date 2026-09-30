@@ -286,4 +286,23 @@ test.describe("Automate Page", () => {
     });
     await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
   });
+
+  test("a 200 the client cannot read shows the failure card", async ({ loggedInPage: page }) => {
+    // #1354: an unparseable body is the one sync outcome that still blames
+    // the server, and it has to fail the entry like any other failure.
+    const message = "Invalid response from server";
+    await page.route("**/api/v1/pipeline/execute", (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<html>not json</html>" }),
+    );
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+  });
 });

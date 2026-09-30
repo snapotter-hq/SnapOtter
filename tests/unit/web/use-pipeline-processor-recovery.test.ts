@@ -1256,6 +1256,11 @@ describe("usePipelineProcessor sync result handling errors (#1354)", () => {
         "Ending the run after a result handling error failed",
         expect.objectContaining({ message: "teardown broke" }),
       );
+      // Every teardown step still ran: the run is released for good.
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
     } finally {
       unsubscribe();
       consoleError.mockRestore();

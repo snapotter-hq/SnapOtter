@@ -664,13 +664,21 @@ export function usePipelineProcessor() {
           // The run is over whatever threw. A second throw from the teardown
           // must not replace the root cause; the settle goes last and logs
           // rather than throws.
-          try {
-            setError(FRAME_HANDLING_FAILED);
-            setProcessing(false);
-            setProgress(IDLE_PROGRESS);
-            clearActiveJob();
-          } catch (teardownErr) {
-            console.error("Ending the run after a result handling error failed", teardownErr);
+          // clearActiveJob goes first because it nulls the run's refs before
+          // its own store write, and each write gets its own guard: a store
+          // listener that throws on every write would otherwise stop the
+          // teardown at the first one and leave the cancel handle armed.
+          setProgress(IDLE_PROGRESS);
+          for (const step of [
+            clearActiveJob,
+            () => setError(FRAME_HANDLING_FAILED),
+            () => setProcessing(false),
+          ]) {
+            try {
+              step();
+            } catch (teardownErr) {
+              console.error("Ending the run after a result handling error failed", teardownErr);
+            }
           }
           settleProcessingEntries(FRAME_HANDLING_FAILED);
           throw handlingError.cause;

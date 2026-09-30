@@ -575,7 +575,7 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
   }
 
   it("fails the run with a client-side message when the result write throws", () => {
-    const { unmount } = startRun();
+    const { result, unmount } = startRun();
     vi.spyOn(useFileStore.getState(), "updateEntry")
       .mockImplementationOnce(() => {
         throw new Error("boom");
@@ -583,7 +583,15 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
       .mockImplementation(realUpdateEntry);
 
     // The root cause surfaces instead of disappearing into the catch.
-    expect(() => act(() => respond(200, JSON.stringify(RESULT)))).toThrow("boom");
+    expect(() =>
+      act(() => respond(200, JSON.stringify({ ...RESULT, warning: "scaled down" }))),
+    ).toThrow("boom");
+
+    // Tools that render from the payload must not show a result beside the
+    // error. act() skips its flush when the callback throws, so render first.
+    act(() => {});
+    expect(result.current.resultPayload).toBeNull();
+    expect(result.current.warning).toBeNull();
 
     expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
     expect(useFileStore.getState().entries[0]).toMatchObject({
@@ -657,6 +665,11 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
         "Ending the run after a result handling error failed",
         expect.objectContaining({ message: "teardown broke" }),
       );
+      // Every teardown step still ran: the run is released for good.
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
     } finally {
       unsubscribe();
       consoleError.mockRestore();
@@ -684,9 +697,12 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
   });
 
   it("lands a good result untouched", () => {
-    const { unmount } = startRun();
+    const { result, unmount } = startRun();
 
-    act(() => respond(200, JSON.stringify(RESULT)));
+    act(() => respond(200, JSON.stringify({ ...RESULT, warning: "scaled down" })));
+
+    expect(result.current.resultPayload).toMatchObject({ downloadUrl: RESULT.downloadUrl });
+    expect(result.current.warning).toBe("scaled down");
 
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "completed",
