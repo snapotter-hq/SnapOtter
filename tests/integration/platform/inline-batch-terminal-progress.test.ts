@@ -71,19 +71,25 @@ const ROUTES = [
     name: "pdf-to-image",
     url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
     file: { filename: "a.pdf", contentType: "application/pdf", content: PDF },
+    bad: { filename: "bad.pdf", contentType: "application/pdf", content: Buffer.from("not a pdf") },
     settings: { dpi: 72 },
   },
   {
     name: "svg-to-raster",
     url: "/api/v1/tools/image/svg-to-raster/batch",
     file: { filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+    bad: { filename: "bad.svg", contentType: "image/svg+xml", content: Buffer.from("not an svg") },
     settings: { outputFormat: "png" },
   },
 ] as const;
 
-function postBatch(route: (typeof ROUTES)[number], clientJobId: string) {
+function postBatch(
+  route: (typeof ROUTES)[number],
+  clientJobId: string,
+  file: (typeof ROUTES)[number]["file"] = route.file,
+) {
   const { body, contentType } = createMultipartPayload([
-    { name: "file", ...route.file },
+    { name: "file", ...file },
     { name: "settings", content: JSON.stringify(route.settings) },
     { name: "clientJobId", content: clientJobId },
   ]);
@@ -122,6 +128,24 @@ describe.each(ROUTES)("$name inline batch terminal progress (#1688)", (route) =>
       const res = await postBatch(route, clientJobId);
 
       expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(unhandled).not.toHaveBeenCalled();
+      // Logged, not recovered: the row waits for the boot-time sweep.
+      expect((await readRow(clientJobId))?.status).toBe("processing");
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+
+  it("still answers 422 for an all-failed batch when the terminal write fails", async () => {
+    const clientJobId = `batch-1688-${route.name}-all-failed`;
+    terminal.fails = true;
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      const res = await postBatch(route, clientJobId, route.bad);
+
+      expect(res.statusCode, res.body.slice(0, 300)).toBe(422);
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(unhandled).not.toHaveBeenCalled();
     } finally {
