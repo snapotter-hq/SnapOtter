@@ -1971,7 +1971,17 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(readFileSync(outsidePath)).toEqual(outsideBytes);
   });
 
-  it("cancels and retries a stalled response", async () => {
+  // The stall tests below race a 10ms stall watchdog against the overall
+  // deadline, which starts before any setup. On a loaded runner that setup
+  // alone has taken over 500ms (#1617), long enough for the deadline to win and
+  // turn the expected "stalled" error into "timed out" (#1641). They only care
+  // about the watchdog, so the deadline sits past anything setup can take, and
+  // each test gets a short timeout instead: a watchdog that never fires hangs
+  // into that and fails, as it used to hang into the deadline.
+  const STALL_TEST_DEADLINE_MS = 60_000;
+  const stallTest = { timeout: 5_000 };
+
+  it("cancels and retries a stalled response", stallTest, async () => {
     const fixture = signedIndex();
     const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-stall-retry-"));
     temporaryDirectories.push(directory);
@@ -2000,7 +2010,7 @@ describe("downloadVerifiedRuntimeRelease", () => {
         target: TARGET,
         trustKeys: [fixture.trustKey],
         fetchImpl,
-        timeoutMs: 1_000,
+        timeoutMs: STALL_TEST_DEADLINE_MS,
         stallTimeoutMs: 10,
         retry: {
           maxAttempts: 2,
@@ -2014,34 +2024,38 @@ describe("downloadVerifiedRuntimeRelease", () => {
     expect(canceled).toHaveBeenCalledOnce();
   });
 
-  it("aborts a persistently stalled response instead of holding the install queue forever", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-stall-"));
-    temporaryDirectories.push(directory);
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        new ReadableStream<Uint8Array>({
-          pull() {
-            return new Promise(() => {});
-          },
-        }),
-        { status: 200 },
-      ),
-    );
+  it(
+    "aborts a persistently stalled response instead of holding the install queue forever",
+    stallTest,
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-stall-"));
+      temporaryDirectories.push(directory);
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              return new Promise(() => {});
+            },
+          }),
+          { status: 200 },
+        ),
+      );
 
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        timeoutMs: 1_000,
-        stallTimeoutMs: 10,
-        retry: { maxAttempts: 1 },
-      }),
-    ).rejects.toThrow("stalled");
-  });
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          timeoutMs: STALL_TEST_DEADLINE_MS,
+          stallTimeoutMs: 10,
+          retry: { maxAttempts: 1 },
+        }),
+      ).rejects.toThrow("stalled");
+    },
+  );
 
   it("enforces the overall deadline while a response body is stalled", async () => {
     // This used to bound the wall-clock time of a 10ms deadline, which fired
@@ -2109,37 +2123,41 @@ describe("downloadVerifiedRuntimeRelease", () => {
     }
   }, 5_000);
 
-  it("does not let an unresponsive body cancellation defeat the stall watchdog", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-cancel-watchdog-"));
-    temporaryDirectories.push(directory);
-    const canceled = vi.fn(() => new Promise<void>(() => {}));
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        new ReadableStream<Uint8Array>({
-          pull() {
-            return new Promise(() => {});
-          },
-          cancel: canceled,
-        }),
-        { status: 200 },
-      ),
-    );
+  it(
+    "does not let an unresponsive body cancellation defeat the stall watchdog",
+    stallTest,
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-cancel-watchdog-"));
+      temporaryDirectories.push(directory);
+      const canceled = vi.fn(() => new Promise<void>(() => {}));
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull() {
+              return new Promise(() => {});
+            },
+            cancel: canceled,
+          }),
+          { status: 200 },
+        ),
+      );
 
-    await expect(
-      downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        timeoutMs: 500,
-        stallTimeoutMs: 10,
-        retry: { maxAttempts: 1 },
-      }),
-    ).rejects.toThrow("stalled");
-    expect(canceled).toHaveBeenCalledOnce();
-  });
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          timeoutMs: STALL_TEST_DEADLINE_MS,
+          stallTimeoutMs: 10,
+          retry: { maxAttempts: 1 },
+        }),
+      ).rejects.toThrow("stalled");
+      expect(canceled).toHaveBeenCalledOnce();
+    },
+  );
 
   it("rejects a verified cached archive when hashing crosses the overall deadline", async () => {
     const archiveSize = 128 * 1024 * 1024;
