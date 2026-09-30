@@ -165,6 +165,36 @@ describe("rembg test pins", () => {
     expect(rembgPin(rembgTestPins("requirements").pins)).toBe(declared);
   });
 
+  it("pins the same rembg release everywhere it's installed", () => {
+    // The bundle is what Docker users run and the requirements are what
+    // Dependabot bumps; nothing kept them together, and they drifted to
+    // 2.0.62 vs 2.0.69 (#1336). Compare versions, not specs: the CPU
+    // requirements add the [cpu] extra.
+    const version = (pin: string | undefined) => pin?.split("==")[1];
+    const file = (rel: string) => readFileSync(path.join(root, rel), "utf8");
+    const lines = (rel: string) =>
+      file(rel)
+        .split("\n")
+        .map((line) => line.trim());
+    const manifest = JSON.parse(file("docker/feature-manifest.json"));
+    const seed = /pip_install "(rembg==[^"]+)"/.exec(file("tests/qa/seed-ai-models.sh"))?.[1];
+
+    const versions = {
+      "docker/feature-manifest.json": version(
+        rembgPin(manifest.bundles["background-removal"].packages.common),
+      ),
+      "packages/ai/python/requirements.txt": version(
+        rembgPin(lines("packages/ai/python/requirements.txt")),
+      ),
+      "packages/ai/python/requirements-gpu.txt": version(
+        rembgPin(lines("packages/ai/python/requirements-gpu.txt")),
+      ),
+      "tests/qa/seed-ai-models.sh": version(seed),
+    };
+    for (const [source, v] of Object.entries(versions)) expect(v, source).toBeTruthy();
+    expect(new Set(Object.values(versions)), JSON.stringify(versions)).toHaveProperty("size", 1);
+  });
+
   it.each(["bundle", "requirements"] as const)("pins every %s package exactly", (source) => {
     const { pins, constraints } = rembgTestPins(source);
     expect(pins).toHaveLength(5);
