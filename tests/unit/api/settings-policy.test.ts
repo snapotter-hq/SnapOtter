@@ -36,6 +36,13 @@ describe("settings policy registry", () => {
     { key: "passwordMinLength", input: "7" },
     { key: "disabledTools", input: "not-json" },
     { key: "ssoBreakGlassUsername", input: "invalid username" },
+    // Number("") is 0, and 0 means unlimited or off for these keys (#1695).
+    { key: "maxSessionsPerUser", input: "" },
+    { key: "maxSessionsPerUser", input: "   " },
+    { key: "jobsRetentionDays", input: "" },
+    { key: "sessionIdleTimeoutMinutes", input: "\t" },
+    { key: "fileUploadLimitMb", input: "" },
+    { key: "tempFileMaxAgeHours", input: "  " },
   ])("rejects invalid $key values", ({ key, input }) => {
     const result = prepareSetting(key, input);
 

@@ -62,6 +62,7 @@ beforeAll(async () => {
     ...DEDICATED_OR_SERVER_SETTING_KEYS,
     "defaultTheme",
     "loginAttemptLimit",
+    "maxSessionsPerUser",
     "auditRetentionDays",
     "oidc_client_secret",
     "passwordRequireDigit",
@@ -243,6 +244,27 @@ describe("generic settings authority", () => {
     expect.soft(JSON.parse(res.body).setting).toBe("loginAttemptLimit");
     expect(await readSetting("loginAttemptLimit")).toBe("5");
   });
+
+  // Number("") is 0, and 0 means unlimited sessions, so a blank value used to
+  // lift the limit with a 200 (#1695).
+  it.each(["", "   "])(
+    "rejects a blank maxSessionsPerUser (%j) without clearing the limit",
+    async (blank) => {
+      await upsertSetting("maxSessionsPerUser", "3");
+
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${securityApiKey}` },
+        payload: { maxSessionsPerUser: blank },
+      });
+
+      expect.soft(res.statusCode, res.body).toBe(400);
+      expect.soft(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+      expect.soft(JSON.parse(res.body).setting).toBe("maxSessionsPerUser");
+      expect(await readSetting("maxSessionsPerUser")).toBe("3");
+    },
+  );
 
   it("rejects SSO enforcement without a configured provider atomically", async () => {
     await upsertSetting("defaultTheme", "system");
