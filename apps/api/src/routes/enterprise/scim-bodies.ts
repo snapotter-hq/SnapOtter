@@ -158,14 +158,45 @@ export function parseScimPatch(body: unknown): ScimParse<z.infer<typeof scimPatc
   return parseWith(scimPatchBody, body ?? {}, "invalidSyntax");
 }
 
+const PATCH_OPS = new Set(["add", "remove", "replace"]);
+
+// The paths the Users PATCH route acts on, keyed by their lowercase form.
+// Attribute names are case-insensitive (RFC 7643 2.1), and an exact match
+// used to skip "Active" and answer 200 with the user still active (#1731).
+// Any other path is an attribute SnapOtter keeps no column for (title,
+// name.givenName, phoneNumbers) and is ignored on purpose: IdPs send them on
+// every sync, so refusing them would break provisioning.
+const USER_PATHS = new Map(
+  [
+    "active",
+    "userName",
+    "externalId",
+    "emails",
+    'emails[type eq "work"].value',
+    "name.formatted",
+    "displayName",
+  ].map((path) => [path.toLowerCase(), path]),
+);
+
 /**
  * Check and coerce each Users PATCH operation's value for the paths the route
- * acts on. Emails always come back as a list, or null to clear the address.
+ * acts on, and give each known path its canonical spelling so the route can
+ * match it exactly. Emails always come back as a list, or null to clear the
+ * address. An op other than add, remove or replace is malformed.
  */
 export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
   const normalized: ScimPatchOp[] = [];
-  for (const [index, op] of ops.entries()) {
-    const opType = op.op.toLowerCase();
+  for (const [index, raw] of ops.entries()) {
+    const opType = raw.op.toLowerCase();
+    if (!PATCH_OPS.has(opType)) {
+      return {
+        ok: false,
+        detail: `Operations.${index}.op must be add, remove or replace`,
+        scimType: "invalidSyntax",
+      };
+    }
+    const canonical = raw.path === undefined ? undefined : USER_PATHS.get(raw.path.toLowerCase());
+    const op = canonical === undefined ? raw : { ...raw, path: canonical };
     const at = ["Operations", index, "value"];
     let value: ScimParse<unknown> = { ok: true, data: op.value };
     if (opType === "replace" || opType === "add") {
