@@ -300,9 +300,9 @@ SCIM DELETE is a soft deactivation. Deactivated users still appear in the admin 
 
 ### `externalId` filter misses a user who signs in with OIDC or SAML {#recover-scim-ids-in-oidc-or-saml-users}
 
-Before SCIM's `externalId` got its own column, a SCIM `PUT` or `PATCH` on a user that an OIDC or SAML sign-in had already linked wrote the SCIM id into that user's sign-in identity. The upgrade migration can't tell that value from a real OIDC subject or SAML NameID, so it leaves those users alone. For them, `filter=externalId eq "..."` returns nothing until the IdP sends another update that carries `externalId`.
+Before SCIM's `externalId` got its own column (`users.scim_external_id`), a SCIM `PUT` or `PATCH` on a user that an OIDC or SAML sign-in had already linked wrote the SCIM id into that user's sign-in identity. The upgrade migration can't tell that value from a real OIDC subject or SAML NameID, so it leaves those users alone. For them, `filter=externalId eq "..."` returns nothing until the IdP sends another update that carries `externalId`.
 
-If you'd rather not wait for the IdP, the audit log can vouch for the id. SCIM writes a `SCIM_USER_PROVISIONED` row with the `externalId` it created each user with. Preview the users whose sign-in identity still equals that id:
+If you'd rather not wait for the IdP, the audit log can vouch for the id. SCIM writes a `SCIM_USER_PROVISIONED` row with the `externalId` it created each user with. Once you're on a release that has the `scim_external_id` column, open `psql` against the SnapOtter database (the [account recovery guide](./account-recovery.md#older-images-and-fallbacks) shows how for both setups) and preview the users whose sign-in identity still equals that id:
 
 ```sql
 SELECT u.id, u.username, u.auth_provider, u.external_id AS scim_id
@@ -317,11 +317,14 @@ WHERE u.auth_provider IN ('oidc', 'saml')
       AND a.details->>'externalId' = u.external_id
   )
   AND NOT EXISTS (
-    SELECT 1 FROM users o WHERE o.scim_external_id = u.external_id
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
   );
 ```
 
-If the list looks right, copy the id into the SCIM column:
+If the list looks right, copy the id into the SCIM column. Run it inside `BEGIN;` and check the returned rows before you `COMMIT;`:
 
 ```sql
 UPDATE users u
@@ -336,10 +339,19 @@ WHERE u.auth_provider IN ('oidc', 'saml')
       AND a.details->>'externalId' = u.external_id
   )
   AND NOT EXISTS (
-    SELECT 1 FROM users o WHERE o.scim_external_id = u.external_id
-  );
+    SELECT 1 FROM users o
+    WHERE o.id <> u.id
+      AND (o.scim_external_id = u.external_id
+        OR (o.auth_provider IN ('oidc', 'saml') AND o.external_id = u.external_id))
+  )
+RETURNING u.id, u.username, u.scim_external_id;
 ```
 
-Running it twice is harmless; the second run matches nothing. It leaves `external_id` as it is, because some IdPs (Okta among them) send the same id as both the OIDC `sub` and the SCIM `externalId`, and for them clearing it would break OIDC sign-in. A user whose `external_id` really is the stray SCIM id already fails the OIDC subject match. With `OIDC_AUTO_LINK_USERS` on, their next sign-in relinks by email either way.
+A second run matches nothing. The update leaves `external_id` as it is, because some IdPs (Okta among them) send the same id as both the OIDC `sub` and the SCIM `externalId`, and for them clearing it would break OIDC sign-in. A user whose `external_id` really is the stray SCIM id already fails the subject match. With `OIDC_AUTO_LINK_USERS` (or `SAML_AUTO_LINK_USERS`) on, their next sign-in with a verified email relinks them either way.
 
-The query can't recover a user whose provisioning row audit retention has already pruned, or whose `externalId` the IdP changed after creating them (update rows record which fields changed, not their values). Those users pick the id back up from the IdP's next update.
+Some users stay out of reach and pick the id back up from the IdP's next update:
+
+- users whose sign-in link replaced the SCIM id and who got no SCIM write afterwards, since their `external_id` no longer matches the audit row
+- users whose provisioning row audit retention has already pruned
+- users whose `externalId` the IdP changed after creating them (update rows record which fields changed, not their values)
+- two users holding the same id, which the query skips so the unique index can't abort it; the preview without its last clause lists them, and which one owns the id is your call

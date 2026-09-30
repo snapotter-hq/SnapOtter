@@ -97,11 +97,20 @@ async function identities(
   );
 }
 
-/** The audit row SCIM's create route writes: the user is in details, not target_id. */
-async function provisionedAudit(pool: pg.Pool, userId: string, externalId: string): Promise<void> {
+/**
+ * The audit row SCIM's create route writes: the user is in details, not
+ * target_id. actor_id is NULL for a user that no longer exists, as the
+ * foreign key's ON DELETE SET NULL leaves it.
+ */
+async function provisionedAudit(
+  pool: pg.Pool,
+  userId: string,
+  externalId: string,
+  action = "SCIM_USER_PROVISIONED",
+): Promise<void> {
   await pool.query(
-    "INSERT INTO audit_log (id, actor_id, actor_username, action, details, created_at) VALUES ($1, $2, $2, 'SCIM_USER_PROVISIONED', $3, now())",
-    [randomUUID(), userId, JSON.stringify({ userId, username: userId, externalId })],
+    "INSERT INTO audit_log (id, actor_id, actor_username, action, details, created_at) VALUES ($1, (SELECT id FROM users WHERE id = $2), $2, $3, $4, now())",
+    [randomUUID(), userId, action, JSON.stringify({ userId, username: userId, externalId })],
   );
 }
 
@@ -197,7 +206,7 @@ describe("SCIM guide: recovering SCIM ids from OIDC and SAML users (#1605)", () 
     const pool = await preScimColumnDatabase([
       ["oidc_took_over", "oidc", "scim-e"],
       ["saml_took_over", "saml", "scim-f"],
-      // Its own sub; the SCIM id it was provisioned with is gone from users.
+      // The link replaced its SCIM id with its own sub, and no SCIM write followed.
       ["oidc_relinked", "oidc", "oidc-sub"],
       // Nothing in the audit log to vouch for it (pruned, or never SCIM).
       ["oidc_no_audit", "oidc", "scim-g"],
@@ -205,6 +214,17 @@ describe("SCIM guide: recovering SCIM ids from OIDC and SAML users (#1605)", () 
       ["scim_owner", "scim", "scim-h"],
       ["oidc_shadow", "oidc", "scim-h"],
       ["scim_user", "scim", "scim-i"],
+      // Only someone else's provisioning row carries this value.
+      ["oidc_coincidence", "oidc", "scim-j"],
+      // The IdP already sent a newer id after the upgrade; the stale one mustn't win.
+      ["oidc_resynced", "oidc", "scim-k"],
+      // Blank is no id (#1008), even with an audit row that says the same.
+      ["oidc_blank", "oidc", "  "],
+      // Vouched for only by an update row, which never records values today.
+      ["oidc_decoy", "oidc", "scim-m"],
+      // Two users vouched for one id: copying both would abort on the index.
+      ["oidc_twin", "oidc", "scim-n"],
+      ["saml_twin", "saml", "scim-n"],
     ]);
     await provisionedAudit(pool, "oidc_took_over", "scim-e");
     await provisionedAudit(pool, "saml_took_over", "scim-f");
@@ -212,13 +232,26 @@ describe("SCIM guide: recovering SCIM ids from OIDC and SAML users (#1605)", () 
     await provisionedAudit(pool, "scim_owner", "scim-h");
     await provisionedAudit(pool, "oidc_shadow", "scim-h");
     await provisionedAudit(pool, "scim_user", "scim-i");
+    await provisionedAudit(pool, "deleted_user", "scim-j");
+    await provisionedAudit(pool, "oidc_resynced", "scim-k");
+    await provisionedAudit(pool, "oidc_blank", "  ");
+    await provisionedAudit(pool, "oidc_decoy", "scim-m", "SCIM_USER_UPDATED");
+    await provisionedAudit(pool, "oidc_twin", "scim-n");
+    await provisionedAudit(pool, "saml_twin", "scim-n");
     await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+    await pool.query("UPDATE users SET scim_external_id = 'scim-k-new' WHERE id = 'oidc_resynced'");
 
-    const previewed = await pool.query<{ id: string }>(preview);
-    expect(previewed.rows.map((r) => r.id).sort()).toEqual(["oidc_took_over", "saml_took_over"]);
+    const previewed = await pool.query<{ id: string; scim_id: string }>(preview);
+    expect(previewed.rows.map((r) => [r.id, r.scim_id]).sort()).toEqual([
+      ["oidc_took_over", "scim-e"],
+      ["saml_took_over", "scim-f"],
+    ]);
 
-    const updated = await pool.query(update);
-    expect(updated.rowCount).toBe(2);
+    const updated = await pool.query<{ id: string; scim_external_id: string }>(update);
+    expect(updated.rows.map((r) => [r.id, r.scim_external_id]).sort()).toEqual([
+      ["oidc_took_over", "scim-e"],
+      ["saml_took_over", "scim-f"],
+    ]);
     expect(await identities(pool)).toEqual({
       // external_id stays: Okta and others send the same id as sub and externalId.
       oidc_took_over: { external: "scim-e", scim: "scim-e" },
@@ -228,6 +261,12 @@ describe("SCIM guide: recovering SCIM ids from OIDC and SAML users (#1605)", () 
       scim_owner: { external: null, scim: "scim-h" },
       oidc_shadow: { external: "scim-h", scim: null },
       scim_user: { external: null, scim: "scim-i" },
+      oidc_coincidence: { external: "scim-j", scim: null },
+      oidc_resynced: { external: "scim-k", scim: "scim-k-new" },
+      oidc_blank: { external: "  ", scim: null },
+      oidc_decoy: { external: "scim-m", scim: null },
+      oidc_twin: { external: "scim-n", scim: null },
+      saml_twin: { external: "scim-n", scim: null },
     });
 
     // A second run finds nothing left to do.
