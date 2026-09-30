@@ -301,16 +301,106 @@ export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
   return { ok: true, data: normalized };
 }
 
+// RFC 7644 3.10 lets a path carry its schema URN.
+const GROUP_SCHEMA_PREFIX = "urn:ietf:params:scim:schemas:core:2.0:group:";
+// Attribute names are case-insensitive; the quoted member id is not.
+const MEMBER_FILTER = /^members\[value\s+eq\s+"([^"]+)"\]$/i;
+
 /**
- * Check and coerce each Groups PATCH operation's value for the paths the route
- * acts on. Members always come back as a list: a single member object is one
- * member, and null on a replace is none.
+ * A Groups path spelled the way the route matches it: members, displayName,
+ * or members[value eq "<id>"] with the id as sent. Anything else comes back
+ * trimmed and otherwise untouched (#1683).
+ */
+function canonicalGroupPath(path: string): string {
+  let trimmed = path.trim();
+  if (trimmed.toLowerCase().startsWith(GROUP_SCHEMA_PREFIX)) {
+    trimmed = trimmed.slice(GROUP_SCHEMA_PREFIX.length);
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower === "members") return "members";
+  if (lower === "displayname") return "displayName";
+  const filter = trimmed.match(MEMBER_FILTER);
+  return filter ? `members[value eq "${filter[1]}"]` : trimmed;
+}
+
+const groupValueObject = z.record(z.unknown());
+
+/**
+ * Check and coerce each Groups PATCH operation for the route, before any of
+ * them writes. Paths come back canonical and members always as a list: a
+ * single member object is one member, and null on a replace is none. Two
+ * shapes IdPs send are rewritten into the path ops they stand for (#1683): a
+ * path-less value object ({displayName, members}, the way Okta renames a
+ * group) and a remove carrying a member list (the way Entra ID removes
+ * members). An op other than add, remove or replace is malformed.
  */
 export function normalizeGroupOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
   const normalized: ScimPatchOp[] = [];
-  for (const [index, op] of ops.entries()) {
-    const opType = op.op.toLowerCase();
+  for (const [index, raw] of ops.entries()) {
+    const opType = raw.op.toLowerCase();
+    if (!PATCH_OPS.has(opType)) {
+      return {
+        ok: false,
+        detail: `Operations.${index}.op must be add, remove or replace`,
+        scimType: "invalidSyntax",
+      };
+    }
+    const op = raw.path === undefined ? raw : { ...raw, path: canonicalGroupPath(raw.path) };
     const at = ["Operations", index, "value"];
+
+    if (opType === "remove") {
+      // RFC 7644 3.5.2.2: a remove names what it removes.
+      if (op.path === undefined) {
+        return {
+          ok: false,
+          detail: `Operations.${index}.path is required for remove`,
+          scimType: "noTarget",
+        };
+      }
+      if (op.path === "displayName") {
+        return {
+          ok: false,
+          detail: `Operations.${index}: displayName can't be removed`,
+          scimType: "invalidValue",
+        };
+      }
+      if (op.path === "members" && op.value !== undefined && op.value !== null) {
+        const members = parseWith(membersValue, op.value, "invalidValue", at);
+        if (!members.ok) return members;
+        const list = Array.isArray(members.data) ? members.data : [members.data];
+        for (const member of list) {
+          normalized.push({ op: raw.op, path: `members[value eq "${member.value}"]` });
+        }
+        continue;
+      }
+      normalized.push(op);
+      continue;
+    }
+
+    if (op.path === undefined) {
+      const object = parseWith(groupValueObject, op.value, "invalidValue", at);
+      if (!object.ok) return object;
+      const keyed: Record<string, unknown> = {};
+      for (const [key, field] of Object.entries(object.data)) {
+        const lower = key.toLowerCase();
+        if (lower === "displayname") keyed.displayName = field;
+        else if (lower === "members") keyed.members = field;
+      }
+      const body = parseWith(scimGroupBody, keyed, "invalidValue", at);
+      if (!body.ok) return body;
+      // add on a single-valued attribute replaces it (RFC 7644 3.5.2.1).
+      if ("displayName" in body.data) {
+        normalized.push({ op: "replace", path: "displayName", value: body.data.displayName });
+      }
+      if ("members" in body.data) {
+        const list = body.data.members ?? [];
+        if (opType === "replace" || list.length > 0) {
+          normalized.push({ op: opType, path: "members", value: list });
+        }
+      }
+      continue;
+    }
+
     let value: ScimParse<unknown> = { ok: true, data: op.value };
     const replacesMembers = opType === "replace" && op.path === "members";
     if ((opType === "add" && op.path === "members") || replacesMembers) {

@@ -108,6 +108,36 @@ function isGroupRename(op: ScimPatchOp): boolean {
   return op.op.toLowerCase() === "replace" && op.path === "displayName";
 }
 
+/**
+ * Move each listed user into the team, returning the ids that matched no user.
+ * Those are skipped rather than refused: a member deleted here but still in the
+ * IdP's group would otherwise fail every sync of that group for good (#1683).
+ */
+async function addMembers(
+  executor: Pick<typeof db, "update">,
+  teamId: string,
+  members: ScimMember[],
+): Promise<string[]> {
+  const unknown: string[] = [];
+  for (const member of members) {
+    const added = await executor
+      .update(schema.users)
+      .set({ team: teamId, updatedAt: new Date() })
+      .where(eq(schema.users.id, member.value));
+    if (!added.rowCount) unknown.push(member.value);
+  }
+  return unknown;
+}
+
+/** The response lists the real members; this tells the operator who was skipped. */
+function warnUnknownMembers(log: FastifyBaseLogger, teamId: string, unknown: string[]): void {
+  if (unknown.length === 0) return;
+  log.warn(
+    { teamId, unknownMembers: unknown },
+    "SCIM group named members that match no user; skipped",
+  );
+}
+
 async function rejectLastActiveAdminDeactivation(
   user: { role: string },
   reply: FastifyReply,
@@ -977,12 +1007,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
       // Assign members to the team
       if (members && members.length > 0) {
-        for (const member of members) {
-          await db
-            .update(schema.users)
-            .set({ team: id, updatedAt: new Date() })
-            .where(eq(schema.users.id, member.value));
-        }
+        warnUnknownMembers(request.log, id, await addMembers(db, id, members));
       }
 
       // Fetch actual members
@@ -1141,6 +1166,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
+      const unknownMembers: string[] = [];
+
       // All or nothing. The rename and both membership steps used to write
       // straight to the database, so a failure after the rename left the
       // group renamed and emptied behind a 500 (#1682).
@@ -1166,12 +1193,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
               .where(eq(schema.users.team, id));
 
             // Add new members
-            for (const member of members) {
-              await tx
-                .update(schema.users)
-                .set({ team: id, updatedAt: new Date() })
-                .where(eq(schema.users.id, member.value));
-            }
+            unknownMembers.push(...(await addMembers(tx, id, members)));
           }
         });
       } catch (err) {
@@ -1182,6 +1204,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
+      warnUnknownMembers(request.log, id, unknownMembers);
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       const teamMembers = await db
@@ -1237,6 +1260,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
 
+      const unknownMembers: string[] = [];
+
       // All or nothing. Each operation used to write straight to the database,
       // so member changes from earlier operations stayed committed when a
       // later rename collided, while the IdP read the error as the whole
@@ -1247,13 +1272,17 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             const opType = op.op.toLowerCase();
 
             if (opType === "add" && op.path === "members") {
-              const members = op.value as ScimMember[];
-              for (const member of members) {
-                await tx
-                  .update(schema.users)
-                  .set({ team: id, updatedAt: new Date() })
-                  .where(eq(schema.users.id, member.value));
-              }
+              unknownMembers.push(...(await addMembers(tx, id, op.value as ScimMember[])));
+            } else if (opType === "remove" && op.path === "members") {
+              // No value: remove every member (RFC 7644 3.5.2.2).
+              const [defaultTeam] = await tx
+                .select()
+                .from(schema.teams)
+                .where(eq(schema.teams.name, "Default"));
+              await tx
+                .update(schema.users)
+                .set({ team: defaultTeam?.id ?? "default-team-00000000", updatedAt: new Date() })
+                .where(eq(schema.users.team, id));
             } else if (opType === "remove" && op.path) {
               // Parse path like: members[value eq "userId"]
               const memberMatch = op.path.match(/^members\[value\s+eq\s+"([^"]+)"\]$/i);
@@ -1292,12 +1321,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
                   .where(eq(schema.users.team, id));
 
                 // Add new members
-                for (const member of members) {
-                  await tx
-                    .update(schema.users)
-                    .set({ team: id, updatedAt: new Date() })
-                    .where(eq(schema.users.id, member.value));
-                }
+                unknownMembers.push(...(await addMembers(tx, id, members)));
               }
             }
           }
@@ -1309,6 +1333,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
+      warnUnknownMembers(request.log, id, unknownMembers);
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       const teamMembers = await db
