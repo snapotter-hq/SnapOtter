@@ -41,6 +41,19 @@ function userUpdateConflict(err: unknown, log: FastifyBaseLogger) {
   return scimError(409, "Update conflicts with an existing user", "uniqueness");
 }
 
+// The same for a SCIM group write, which today can only trip the team name
+// indexes. Undefined when the error isn't a unique violation at all, so the
+// caller rethrows it (#1543, #1682).
+function groupWriteConflict(err: unknown, log: FastifyBaseLogger, teamId: string) {
+  const constraint = uniqueViolationConstraint(err);
+  if (constraint === "teams_name_unique" || constraint === "teams_name_lower_unique") {
+    return scimError(409, "Group name already taken", "uniqueness");
+  }
+  if (!isUniqueViolation(err)) return undefined;
+  log.warn({ constraint, teamId }, "SCIM group write hit an unmapped unique constraint");
+  return scimError(409, "Update conflicts with an existing record", "uniqueness");
+}
+
 // Deactivating revokes the user's sessions. Doing that in the same
 // transaction as the UPDATE means a 409 on the UPDATE rolls the revoke back
 // too, instead of leaving an active user logged out (issue #1508).
@@ -1072,12 +1085,18 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
       const body = request.body as Record<string, unknown>;
       const displayName = (body.displayName as string | undefined)?.trim();
-      const members = body.members as Array<{ value: string }> | undefined;
 
       if (body.displayName !== undefined && !displayName) {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
-      if (displayName && displayName !== existing.name) {
+      // Checked before anything writes: iterating an object here used to throw
+      // after the rename and the move-out had already committed (#1682).
+      if (body.members !== undefined && !Array.isArray(body.members)) {
+        return reply.status(400).send(scimError(400, "members must be an array"));
+      }
+      const members = body.members as Array<{ value: string }> | undefined;
+      const renames = displayName !== undefined && displayName !== existing.name;
+      if (renames) {
         // Check for name conflict
         const [conflict] = await db
           .select()
@@ -1086,41 +1105,48 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict && conflict.id !== id) {
           return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
         }
+      }
+
+      // All or nothing. The rename and both membership steps used to write
+      // straight to the database, so a failure after the rename left the
+      // group renamed and emptied behind a 500 (#1682).
+      try {
+        await db.transaction(async (tx) => {
+          if (renames) {
+            await tx.update(schema.teams).set({ name: displayName }).where(eq(schema.teams.id, id));
+          }
+
+          // Replace membership: remove all current members, add new ones
+          if (members !== undefined) {
+            // Find the default team to move removed members to
+            const [defaultTeam] = await tx
+              .select()
+              .from(schema.teams)
+              .where(eq(schema.teams.name, "Default"));
+            const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
+
+            // Move current members out of this team
+            await tx
+              .update(schema.users)
+              .set({ team: fallbackTeamId, updatedAt: new Date() })
+              .where(eq(schema.users.team, id));
+
+            // Add new members
+            for (const member of members) {
+              await tx
+                .update(schema.users)
+                .set({ team: id, updatedAt: new Date() })
+                .where(eq(schema.users.id, member.value));
+            }
+          }
+        });
+      } catch (err) {
         // The pre-check can't close the race: two concurrent renames onto
         // the same displayName both pass it before either UPDATE commits
         // (issue #968), so the loser's 23505 maps to the pre-check's 409.
-        try {
-          await db.update(schema.teams).set({ name: displayName }).where(eq(schema.teams.id, id));
-        } catch (err) {
-          if (isUniqueViolation(err)) {
-            return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
-          }
-          throw err;
-        }
-      }
-
-      // Replace membership: remove all current members, add new ones
-      if (members !== undefined) {
-        // Find the default team to move removed members to
-        const [defaultTeam] = await db
-          .select()
-          .from(schema.teams)
-          .where(eq(schema.teams.name, "Default"));
-        const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
-
-        // Move current members out of this team
-        await db
-          .update(schema.users)
-          .set({ team: fallbackTeamId, updatedAt: new Date() })
-          .where(eq(schema.users.team, id));
-
-        // Add new members
-        for (const member of members) {
-          await db
-            .update(schema.users)
-            .set({ team: id, updatedAt: new Date() })
-            .where(eq(schema.users.id, member.value));
-        }
+        const conflict = groupWriteConflict(err, request.log, id);
+        if (conflict) return reply.status(409).send(conflict);
+        throw err;
       }
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
@@ -1244,23 +1270,9 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         });
       } catch (err) {
         // No conflict pre-check on the rename path, so before issue #968 a
-        // rename onto a taken name surfaced the 23505 as a 500. Today a rename
-        // is the only write here that can trip a unique index; name the one
-        // that fired rather than blame the group name for an index added
-        // later, as userUpdateConflict does for users (#1006).
-        const constraint = uniqueViolationConstraint(err);
-        if (constraint === "teams_name_unique" || constraint === "teams_name_lower_unique") {
-          return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
-        }
-        if (isUniqueViolation(err)) {
-          request.log.warn(
-            { constraint, teamId: id },
-            "SCIM group PATCH hit an unmapped unique constraint",
-          );
-          return reply
-            .status(409)
-            .send(scimError(409, "Update conflicts with an existing record", "uniqueness"));
-        }
+        // rename onto a taken name surfaced the 23505 as a 500.
+        const conflict = groupWriteConflict(err, request.log, id);
+        if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
 
