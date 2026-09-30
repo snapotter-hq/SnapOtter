@@ -12,6 +12,8 @@ describe("settings policy registry", () => {
     { key: "tempFileMaxAgeHours", input: "1.5", expected: "1.5" },
     { key: "startupCleanup", input: true, expected: "true" },
     { key: "jobsRetentionDays", input: 30, expected: "30" },
+    // Surrounding whitespace is still accepted; only an all-blank value is refused (#1695).
+    { key: "maxSessionsPerUser", input: " 30 ", expected: "30" },
     // 0 is a valid override here: it disables the login throttle.
     { key: "loginThrottleMaxFailures", input: 0, expected: "0" },
     { key: "loginThrottleWindowSeconds", input: "900", expected: "900" },
