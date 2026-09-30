@@ -182,6 +182,48 @@ def draws_unmapped_composite_font(page):
     return False
 
 
+# A span needs this many chars MuPDF could map before it's judged, and this
+# share of them equal to their glyph ids. Real fonts line a few glyph ids up
+# with codepoints by coincidence; a whole span doing it is an identity map.
+_MIN_JUDGED_CHARS = 3
+_GLYPH_ID_SHARE = 0.9
+
+
+def _reads_as_glyph_ids(chars):
+    """True when nearly every char of a texttrace span has its glyph id as its Unicode."""
+    mapped = [char for char in chars if char[0] != 0xFFFD]
+    if len(mapped) < _MIN_JUDGED_CHARS:
+        return False
+    return sum(1 for char in mapped if char[0] == char[1]) >= _GLYPH_ID_SHARE * len(mapped)
+
+
+def text_without_glyph_id_spans(trace):
+    """The page's text minus spans that came out as glyph ids, or None if none did.
+
+    A Type0 font whose ToUnicode is the name /Identity-H rather than a stream
+    gets an identity map from MuPDF, so unicode = CID = glyph id and "Hello"
+    reads as ",IPPS" (#1566). MuPDF thinks it has a mapping, so there's no
+    U+FFFD for the #955 verdict to see. page.get_texttrace() pairs each char's
+    Unicode with its glyph id, and in those spans the two are equal, which a
+    real font almost never does across a whole span. Measured on PyMuPDF
+    1.27.2.3: the case-2 span matched on all 45 chars MuPDF could map, while
+    mapped Type0, base-14, CJK, and CID-is-Unicode spans matched on none.
+
+    Judged per span, so a line in another font on the same page still counts.
+    U+FFFD stays out of the ratio: texttrace reports glyph ids below 0x20 that
+    way, and a #955 span is nothing but U+FFFD, which the caller's own verdict
+    already handles. None means no span read as glyph ids.
+    """
+    kept, dropped = [], False
+    for span in trace:
+        chars = span["chars"]
+        if _reads_as_glyph_ids(chars):
+            dropped = True
+            continue
+        kept.extend(chr(char[0]) for char in chars)
+    return "".join(kept) if dropped else None
+
+
 def main():
     args = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
     path, out = args.get("path"), args.get("out")
@@ -217,12 +259,15 @@ def main():
             part = normalize_presentation_forms(page.get_text())
             parts.append(part)
             # The .txt keeps the default extraction either way; only the
-            # readability verdict looks through the glyph ids (#955).
-            judged.append(
-                page.get_text(flags=unmapped_as_fffd)
-                if draws_unmapped_composite_font(page)
-                else part
-            )
+            # readability verdict looks through the glyph ids (#955), and
+            # past spans that came out as glyph ids anyway (#1566).
+            if draws_unmapped_composite_font(page):
+                readable = text_without_glyph_id_spans(page.get_texttrace())
+                judged.append(
+                    readable if readable is not None else page.get_text(flags=unmapped_as_fffd)
+                )
+            else:
+                judged.append(part)
         doc.close()
         text = "\n".join(parts)
         # hasText separates a PDF with a usable text layer from one that has
