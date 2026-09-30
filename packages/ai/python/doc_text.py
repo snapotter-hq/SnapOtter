@@ -221,49 +221,84 @@ def maps_glyph_ids_as_unicode(page):
     return found
 
 
-# A span needs this many chars MuPDF could map before it's judged, and this
-# share of them equal to their glyph ids. Real fonts line a few glyph ids up
-# with codepoints by coincidence; a whole span doing it is an identity map.
+# A font needs this many chars MuPDF could map on the page before it's
+# judged, and this share of them equal to their glyph ids. Real fonts line a
+# few glyph ids up with codepoints by coincidence; a whole font doing it is an
+# identity map.
 _MIN_JUDGED_CHARS = 3
 _GLYPH_ID_SHARE = 0.9
 
 
-def _reads_as_glyph_ids(chars):
-    """True when nearly every char of a texttrace span has its glyph id as its Unicode."""
-    mapped = [char for char in chars if char[0] != 0xFFFD]
-    if len(mapped) < _MIN_JUDGED_CHARS:
-        return False
-    return sum(1 for char in mapped if char[0] == char[1]) >= _GLYPH_ID_SHARE * len(mapped)
-
-
-def text_without_glyph_id_spans(trace):
-    """The page's text minus spans that came out as glyph ids, or None if none did.
+def glyph_id_fonts(trace):
+    """Names of the fonts whose text on this page came out as glyph ids.
 
     A Type0 font whose ToUnicode is the name /Identity-H rather than a stream
     gets an identity map from MuPDF, so unicode = CID = glyph id and "Hello"
     reads as ",IPPS" (#1566). MuPDF thinks it has a mapping, so there's no
     U+FFFD for the #955 verdict to see. page.get_texttrace() pairs each char's
-    Unicode with its glyph id, and in those spans the two are equal, which a
-    real font almost never does across a whole span. Measured on PyMuPDF
-    1.27.2.3: the case-2 span matched on all 45 chars MuPDF could map, while
-    mapped Type0, base-14, CJK, and CID-is-Unicode spans matched on none.
+    Unicode with its glyph id, and for those fonts the two are equal, which a
+    real font almost never does. Measured on PyMuPDF 1.27.2.3: the case-2
+    font matched on all 45 chars MuPDF could map, while mapped Type0, base-14,
+    CJK, and CID-is-Unicode fonts matched on none.
+
+    Tallied per font across the page, not per span, so a two-letter span in a
+    glyph-id font can't pass as readable on its own. Keyed by the span's font
+    name, which is the embedded font's own name: consistent within one page,
+    though it can't be matched to a font dict. U+FFFD stays out of the tally:
+    texttrace reports glyph ids below 0x20 that way, and it reports a #955 or
+    CID-is-Unicode font as nothing but U+FFFD.
 
     Only call it on a page maps_glyph_ids_as_unicode accepts: a Type3 font's
     readable text also has Unicode equal to its glyph ids.
-
-    Judged per span, so a line in another font on the same page still counts.
-    U+FFFD stays out of the ratio: texttrace reports glyph ids below 0x20 that
-    way, and a #955 span is nothing but U+FFFD, which the caller's own verdict
-    already handles. None means no span read as glyph ids.
     """
-    kept, dropped = [], False
+    tally = {}
     for span in trace:
-        chars = span["chars"]
-        if _reads_as_glyph_ids(chars):
-            dropped = True
-            continue
-        kept.extend(chr(char[0]) for char in chars)
-    return "".join(kept) if dropped else None
+        mapped, same = tally.get(span["font"], (0, 0))
+        for char in span["chars"]:
+            if char[0] != 0xFFFD:
+                mapped += 1
+                same += char[0] == char[1]
+        tally[span["font"]] = (mapped, same)
+    return {
+        font
+        for font, (mapped, same) in tally.items()
+        if mapped >= _MIN_JUDGED_CHARS and same >= _GLYPH_ID_SHARE * mapped
+    }
+
+
+def text_outside_fonts(page_dict, fonts):
+    """The text of every span in a get_text("dict") result whose font isn't in fonts.
+
+    The dict uses the default flags, so MuPDF's CID fallback still reads a
+    CID-is-Unicode font correctly; texttrace has no such fallback and would
+    report it as U+FFFD, rejecting a page whose text reads fine today.
+    """
+    return "".join(
+        span["text"]
+        for block in page_dict.get("blocks", [])
+        for line in block.get("lines", [])
+        for span in line.get("spans", [])
+        if span["font"] not in fonts
+    )
+
+
+def _judge_without_glyph_id_fonts(page):
+    """The page's text minus fonts that came out as glyph ids, or None to keep the #955 verdict.
+
+    Only ever feeds the readability verdict, never the .txt, so a failure here
+    falls back to the #955 verdict instead of failing the extraction.
+    """
+    try:
+        if not maps_glyph_ids_as_unicode(page):
+            return None
+        fonts = glyph_id_fonts(page.get_texttrace())
+        return text_outside_fonts(page.get_text("dict"), fonts) if fonts else None
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[doc_text] glyph-id font check skipped on page {page.number}: {exc!r}",
+            file=sys.stderr,
+        )
+        return None
 
 
 def main():
@@ -302,13 +337,9 @@ def main():
             parts.append(part)
             # The .txt keeps the default extraction either way; only the
             # readability verdict looks through the glyph ids (#955), and
-            # past spans that came out as glyph ids anyway (#1566).
+            # past fonts that came out as glyph ids anyway (#1566).
             if draws_unmapped_composite_font(page):
-                readable = (
-                    text_without_glyph_id_spans(page.get_texttrace())
-                    if maps_glyph_ids_as_unicode(page)
-                    else None
-                )
+                readable = _judge_without_glyph_id_fonts(page)
                 judged.append(
                     readable if readable is not None else page.get_text(flags=unmapped_as_fffd)
                 )

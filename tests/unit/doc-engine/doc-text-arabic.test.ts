@@ -406,15 +406,32 @@ describe.skipIf(!hasPython)("doc_text._inline_font_location", () => {
   });
 });
 
-/** A texttrace span as PyMuPDF returns it, reduced to what the helper reads: (unicode, glyph) per char. */
-type FakeSpan = { chars: Array<[number, number]> };
+/** A texttrace span as PyMuPDF returns it, reduced to what the helper reads. */
+type FakeSpan = { font: string; chars: Array<[number, number]> };
 
-const withoutGlyphIdSpans = (trace: FakeSpan[]) =>
-  callHelper<string | null>("text_without_glyph_id_spans", trace as unknown as string);
+/** Call a doc_text helper with JSON arguments and return its JSON result. */
+function callWith<T>(fn: string, ...args: unknown[]): T {
+  const code = [
+    "import sys, json",
+    `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+    `from doc_text import ${fn}`,
+    `result = ${fn}(*json.loads(sys.argv[1]))`,
+    "sys.stdout.write(json.dumps(sorted(result) if isinstance(result, set) else result))",
+  ].join("\n");
+  const res = spawnSync("python3", ["-c", code, JSON.stringify(args)], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+  return JSON.parse(res.stdout) as T;
+}
+
+const glyphIdFonts = (trace: FakeSpan[]) => callWith<string[]>("glyph_id_fonts", trace);
 
 /** Each char of text as a span char whose glyph id is its codepoint plus an offset. */
-function span(text: string, glyphOffset: number): FakeSpan {
+function span(font: string, text: string, glyphOffset: number): FakeSpan {
   return {
+    font,
     chars: [...text].map((ch) => [
       ch.codePointAt(0) as number,
       (ch.codePointAt(0) as number) + glyphOffset,
@@ -426,6 +443,7 @@ function span(text: string, glyphOffset: number): FakeSpan {
 // written as the name /Identity-H, texttrace reports each char's unicode as its
 // glyph id, and glyph ids below 0x20 (Roboto's space is glyph 4) as U+FFFD.
 const IDENTITY: FakeSpan = {
+  font: "Roboto-Black",
   chars: [
     [44, 44],
     [73, 73],
@@ -438,41 +456,49 @@ const IDENTITY: FakeSpan = {
   ],
 };
 
-describe.skipIf(!hasPython)("doc_text.text_without_glyph_id_spans (#1566)", () => {
-  it("answers null when no span reads as glyph ids, so the caller keeps its own verdict", () => {
-    expect(withoutGlyphIdSpans([span("Hello world", -31)])).toBeNull();
-    expect(withoutGlyphIdSpans([])).toBeNull();
+describe.skipIf(!hasPython)("doc_text.glyph_id_fonts (#1566)", () => {
+  it("names a font whose unicode is its glyph id, and no other", () => {
+    expect(glyphIdFonts([IDENTITY, span("Helvetica", "Hi there", -31)])).toEqual(["Roboto-Black"]);
+    expect(glyphIdFonts([span("Helvetica", "Hello world", -31)])).toEqual([]);
+    expect(glyphIdFonts([])).toEqual([]);
   });
 
-  it("drops a span whose unicode is its glyph id and keeps the rest", () => {
-    expect(withoutGlyphIdSpans([IDENTITY, span("Hi there", -31)])).toBe("Hi there");
+  it("tallies across the page, so a short span in a glyph-id font is caught too", () => {
+    const short: FakeSpan = {
+      font: "Roboto-Black",
+      chars: [
+        [44, 44],
+        [73, 73],
+      ],
+    };
+    expect(glyphIdFonts([short, IDENTITY])).toEqual(["Roboto-Black"]);
   });
 
-  it("answers empty text when every span reads as glyph ids", () => {
-    expect(withoutGlyphIdSpans([IDENTITY])).toBe("");
+  it("leaves U+FFFD out, so a #955 or CID-is-Unicode font isn't taken for glyph ids", () => {
+    const unmapped: FakeSpan = {
+      font: "Montserrat-Black",
+      chars: [...Array(8)].map((_, i) => [0xfffd, 40 + i]),
+    };
+    expect(glyphIdFonts([unmapped])).toEqual([]);
   });
 
-  it("leaves U+FFFD out of the judgement, so a #955 span isn't taken for glyph ids", () => {
-    // No ToUnicode at all: texttrace reports every char as U+FFFD.
-    const unmapped: FakeSpan = { chars: [...Array(8)].map((_, i) => [0xfffd, 40 + i]) };
-    expect(withoutGlyphIdSpans([unmapped])).toBeNull();
-  });
-
-  it("doesn't judge a span too short to tell from coincidence", () => {
+  it("doesn't judge a font with too few chars to tell from coincidence", () => {
     expect(
-      withoutGlyphIdSpans([
+      glyphIdFonts([
         {
+          font: "F",
           chars: [
             [44, 44],
             [73, 73],
           ],
         },
       ]),
-    ).toBeNull();
+    ).toEqual([]);
   });
 
-  it("doesn't judge a span where only some chars line up", () => {
+  it("doesn't judge a font where only some chars line up", () => {
     const partly: FakeSpan = {
+      font: "F",
       chars: [
         [44, 44],
         [73, 73],
@@ -482,7 +508,36 @@ describe.skipIf(!hasPython)("doc_text.text_without_glyph_id_spans (#1566)", () =
         [83, 52],
       ],
     };
-    expect(withoutGlyphIdSpans([partly])).toBeNull();
+    expect(glyphIdFonts([partly])).toEqual([]);
+  });
+});
+
+describe.skipIf(!hasPython)("doc_text.text_outside_fonts (#1566)", () => {
+  const dict = {
+    blocks: [
+      {
+        lines: [
+          {
+            spans: [
+              { font: "Roboto-Black", text: ",IPPS" },
+              { font: "Montserrat-Black", text: "Hello" },
+            ],
+          },
+        ],
+      },
+      { type: 1, image: "..." },
+      { lines: [{ spans: [{ font: "Roboto-Black", text: "[SVPH" }] }] },
+    ],
+  };
+
+  it("keeps the text of every span outside the named fonts, skipping image blocks", () => {
+    expect(callWith<string>("text_outside_fonts", dict, ["Roboto-Black"])).toBe("Hello");
+  });
+
+  it("answers empty text when every span is in a named font", () => {
+    expect(callWith<string>("text_outside_fonts", dict, ["Roboto-Black", "Montserrat-Black"])).toBe(
+      "",
+    );
   });
 });
 
@@ -512,9 +567,17 @@ describe("doc_text.main wiring", () => {
   });
 
   it("drops glyph-id spans from a flagged page's verdict (#1566)", () => {
-    expect(main).toMatch(/text_without_glyph_id_spans\(page\.get_texttrace\(\)\)/);
+    expect(main).toMatch(/readable = _judge_without_glyph_id_fonts\(page\)/);
+    const judge = source.slice(
+      source.indexOf("def _judge_without_glyph_id_fonts("),
+      source.indexOf("def main("),
+    );
     // Only on the identity-name shape: a Type3 font's readable text looks the same.
-    expect(main).toMatch(/if maps_glyph_ids_as_unicode\(page\)/);
+    expect(judge).toMatch(/if not maps_glyph_ids_as_unicode\(page\)/);
+    expect(judge).toMatch(/glyph_id_fonts\(page\.get_texttrace\(\)\)/);
+    expect(judge).toMatch(/text_outside_fonts\(page\.get_text\("dict"\), fonts\)/);
+    // Verdict-only, so a failure keeps the #955 verdict rather than failing extraction.
+    expect(judge).toMatch(/except Exception as exc:[\s\S]*return None/);
   });
 
   it("reports the character count of the text it actually wrote", () => {

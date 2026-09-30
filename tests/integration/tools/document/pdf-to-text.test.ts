@@ -68,6 +68,7 @@ type FontPdfKind =
   | "type0-inline-no-tounicode"
   | "type0-identity-name"
   | "type0-identity-name-mixed"
+  | "type0-identity-name-plus-cid-is-unicode"
   | "simple-unmapped-names";
 
 /** Build a one-page PDF of FONT_TEXT in one of these font shapes:
@@ -87,6 +88,9 @@ type FontPdfKind =
  *    as if they were Unicode, with no U+FFFD to catch (#1566 case 2).
  *  - "type0-identity-name-mixed": the same, plus a second line in Helvetica
  *    that reads fine.
+ *  - "type0-identity-name-plus-cid-is-unicode": the same, plus a second line
+ *    in Montserrat in the "type0-cid-is-unicode" shape, which only reads right
+ *    through MuPDF's CID fallback.
  *  - "simple-unmapped-names": base-14 Helvetica re-encoded with glyph names
  *    nothing can map. MuPDF falls back to the character code for simple fonts,
  *    and these codes are ASCII, so the text still extracts correctly.
@@ -106,10 +110,28 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    p.insert_text((72, 72), text, fontname='rob', fontfile=font, fontsize=12)",
     "if kind == 'type0-identity-name-mixed':",
     "    p.insert_text((72, 120), text, fontname='helv', fontsize=12)",
+    "mont = font.replace('Roboto-Black', 'Montserrat-Black')",
+    "if kind == 'type0-identity-name-plus-cid-is-unicode':",
+    "    p.insert_text((72, 120), text, fontname='mont', fontfile=mont, fontsize=12)",
+    "    fonts = {r[4]: r[0] for r in p.get_fonts() if r[2] == 'Type0'}",
+    "    d.xref_set_key(fonts['rob'], 'ToUnicode', '/Identity-H')",
+    "    d.xref_set_key(fonts['mont'], 'ToUnicode', 'null')",
+    "    cid_font = int(d.xref_get_key(fonts['mont'], 'DescendantFonts')[1].strip('[]').split()[0])",
+    "    glyphs = fitz.Font(fontfile=mont); table = bytearray(2 * 0x80)",
+    "    for ch in set(text):",
+    "        gid = glyphs.has_glyph(ord(ch))",
+    "        table[2 * ord(ch)] = gid >> 8; table[2 * ord(ch) + 1] = gid & 0xFF",
+    "    stream = d.get_new_xref(); d.update_object(stream, '<<>>')",
+    "    d.update_stream(stream, bytes(table))",
+    "    d.xref_set_key(cid_font, 'CIDToGIDMap', '%d 0 R' % stream)",
+    "    content = p.get_contents()[-1]",
+    "    cids = '<%s>' % ''.join('%04x' % ord(ch) for ch in text)",
+    "    drawn = d.xref_stream(content).decode('latin1')",
+    "    d.update_stream(content, re.sub(r'<[0-9a-fA-F]+>', cids, drawn, count=1).encode('latin1'))",
     "for xref, _ext, ftype, *_ in p.get_fonts():",
     "    if kind in ('type0-no-tounicode', 'type0-cid-is-unicode', 'type0-inline-no-tounicode') and ftype == 'Type0':",
     "        d.xref_set_key(xref, 'ToUnicode', 'null')",
-    "    if kind.startswith('type0-identity-name') and ftype == 'Type0':",
+    "    if kind in ('type0-identity-name', 'type0-identity-name-mixed') and ftype == 'Type0':",
     "        d.xref_set_key(xref, 'ToUnicode', '/Identity-H')",
     "    if kind == 'type0-cid-is-unicode' and ftype == 'Type0':",
     "        cid_font = int(d.xref_get_key(xref, 'DescendantFonts')[1].strip('[]').split()[0])",
@@ -221,6 +243,18 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
 
   it("still extracts a page whose other text reads fine next to an /Identity-H line", async () => {
     const res = await runTool(makeFontPdf("type0-identity-name-mixed"), "identity-mixed.pdf");
+    expect(res.statusCode).toBe(200);
+    expect(await downloadText(res)).toContain(FONT_TEXT);
+  }, 60_000);
+
+  it("still extracts CID = Unicode text next to an /Identity-H line", async () => {
+    // Pins why the verdict reads the rest of the page with MuPDF's CID
+    // fallback: without it this line judges as U+FFFD and a PDF that reads
+    // fine today would be sent to OCR.
+    const res = await runTool(
+      makeFontPdf("type0-identity-name-plus-cid-is-unicode"),
+      "identity-cid-unicode.pdf",
+    );
     expect(res.statusCode).toBe(200);
     expect(await downloadText(res)).toContain(FONT_TEXT);
   }, 60_000);
