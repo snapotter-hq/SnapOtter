@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
@@ -1274,31 +1274,19 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             if (opType === "add" && op.path === "members") {
               unknownMembers.push(...(await addMembers(tx, id, op.value as ScimMember[])));
             } else if (opType === "remove" && op.path === "members") {
-              // No value: remove every member (RFC 7644 3.5.2.2).
+              // Removed members go to the Default team. A member list removes
+              // those; no list removes every member (RFC 7644 3.5.2.2).
+              const listed = (op.value as ScimMember[] | undefined)?.map((member) => member.value);
+              if (listed?.length === 0) continue;
               const [defaultTeam] = await tx
                 .select()
                 .from(schema.teams)
                 .where(eq(schema.teams.name, "Default"));
+              const inGroup = eq(schema.users.team, id);
               await tx
                 .update(schema.users)
                 .set({ team: defaultTeam?.id ?? "default-team-00000000", updatedAt: new Date() })
-                .where(eq(schema.users.team, id));
-            } else if (opType === "remove" && op.path) {
-              // Parse path like: members[value eq "userId"]
-              const memberMatch = op.path.match(/^members\[value\s+eq\s+"([^"]+)"\]$/i);
-              if (memberMatch) {
-                const userId = memberMatch[1];
-                // Move removed member to default team
-                const [defaultTeam] = await tx
-                  .select()
-                  .from(schema.teams)
-                  .where(eq(schema.teams.name, "Default"));
-                const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
-                await tx
-                  .update(schema.users)
-                  .set({ team: fallbackTeamId, updatedAt: new Date() })
-                  .where(and(eq(schema.users.id, userId), eq(schema.users.team, id)));
-              }
+                .where(listed ? and(inGroup, inArray(schema.users.id, listed)) : inGroup);
             } else if (opType === "replace") {
               if (isGroupRename(op)) {
                 await tx
