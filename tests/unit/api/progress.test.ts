@@ -125,6 +125,61 @@ describe("updateJobProgress", () => {
   });
 });
 
+describe("durable batch terminal progress (#1688)", () => {
+  afterEach(() => {
+    dbMocks.failure = null;
+  });
+
+  it("returns a persistence promise that terminal producers can await", async () => {
+    const persisted = updateJobProgress({
+      jobId: "batch-awaitable",
+      status: "completed",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 0,
+      errors: [],
+    });
+
+    expect(persisted).toBeInstanceOf(Promise);
+    await expect(persisted).resolves.toBeUndefined();
+  });
+
+  it("propagates a durable persistence failure instead of swallowing it", async () => {
+    dbMocks.failure = new Error("database unavailable");
+
+    await expect(
+      updateJobProgress({
+        jobId: "batch-durable-failure",
+        status: "completed",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 0,
+        errors: [],
+      }),
+    ).rejects.toThrow("database unavailable");
+  });
+
+  it("does not leave a nonterminal producer's failure unhandled", async () => {
+    dbMocks.failure = new Error("database unavailable");
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      updateJobProgress({
+        jobId: "batch-nonterminal-failure",
+        status: "processing",
+        totalFiles: 2,
+        completedFiles: 0,
+        failedFiles: 0,
+        errors: [],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+});
+
 describe("updateSingleFileProgress", () => {
   beforeEach(() => {
     dbMocks.failure = null;
