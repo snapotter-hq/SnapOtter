@@ -3537,7 +3537,7 @@ export const zhCN: TranslationKeys = {
       addPage: "添加第 {n} 页",
       dragHint: "拖动可重新排序、旋转或删除页面。添加 PDF 可将其页面引入。",
       reset: "重置计划",
-      emptyPlan: "计划中还没有页面 — 请从上方的文档中添加页面。",
+      emptyPlan: "计划中还没有页面。请从上方的文档中添加页面。",
       docFailed: "无法读取某个文档。",
       pageLabel: "位置 {n}",
       planSummary: "将从 {docs} 个文档组装 {pages} 页。",

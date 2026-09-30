@@ -3798,7 +3798,7 @@ export const vi: TranslationKeys = {
       addPage: "Thêm trang {n}",
       dragHint: "Kéo để sắp xếp lại, xoay hoặc loại bỏ trang. Thêm PDF để lấy các trang của chúng.",
       reset: "Đặt lại kế hoạch",
-      emptyPlan: "Chưa có trang nào trong kế hoạch — hãy thêm trang từ các tài liệu ở trên.",
+      emptyPlan: "Chưa có trang nào trong kế hoạch. Hãy thêm trang từ các tài liệu ở trên.",
       docFailed: "Không thể đọc một tài liệu.",
       pageLabel: "Vị trí {n}",
       planSummary: "Sẽ ghép {pages} trang từ {docs} tài liệu.",

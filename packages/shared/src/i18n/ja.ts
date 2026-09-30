@@ -3756,7 +3756,7 @@ export const ja: TranslationKeys = {
       dragHint:
         "ドラッグで並べ替え・回転・削除ができます。PDF を追加するとそのページを取り込めます。",
       reset: "プランをリセット",
-      emptyPlan: "プランにページがありません — 上のドキュメントからページを追加してください。",
+      emptyPlan: "プランにページがありません。上のドキュメントからページを追加してください。",
       docFailed: "ドキュメントを 1 つ読み込めませんでした。",
       pageLabel: "位置 {n}",
       planSummary: "{docs} 個のドキュメントから {pages} ページを組み立てます。",

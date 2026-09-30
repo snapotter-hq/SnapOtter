@@ -14,7 +14,7 @@ import { createToolRoute } from "../tool-factory.js";
 
 /**
  * PDF Multi-Tool: one route assembles the final document from a page plan
- * built in the editor — reorder, duplicate, delete, rotate, and pull pages
+ * built in the editor: reorder, duplicate, delete, rotate, and pull pages
  * from additional PDFs, all in one submission.
  *
  * Inputs are the uploaded PDFs in document order: the file being edited is
@@ -53,7 +53,10 @@ function validatePlan(settings: z.infer<typeof settingsSchema>, inputCount: numb
     );
   }
   for (const item of settings.items) {
-    if (item.page > (settings.pageCounts[item.doc] ?? 0)) {
+    if (item.doc >= settings.pageCounts.length) {
+      throw new InputValidationError(`Document ${item.doc + 1} was not uploaded`);
+    }
+    if (item.page > settings.pageCounts[item.doc]) {
       throw new InputValidationError(
         `Page ${item.page} does not exist in document ${item.doc + 1}`,
       );
@@ -75,6 +78,7 @@ export function registerMultiToolPdf(app: FastifyInstance) {
     },
     processV2: async (ctx) => {
       const settings = settingsSchema.parse(ctx.settings);
+      // Pipelines, batch runs, and retries call processV2 without preValidate.
       validatePlan(settings, ctx.inputs.length);
 
       // Stage every input once. Sequence-prefixed because two uploads can share

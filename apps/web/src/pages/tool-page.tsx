@@ -403,7 +403,7 @@ export function ToolPage() {
   const isMultiFileTool = toolId ? MULTI_FILE_TOOLS.has(toolId) : false;
   const canReorder = toolId ? REORDERABLE_TOOLS.has(toolId) : false;
   // Canvas editors that manage their own document set hide the generic
-  // file-selection UI (left list/add-more, bottom file strip, pager) — see
+  // file-selection UI (left list/add-more, bottom file strip, pager). See
   // DOC_CANVAS_TOOLS.
   const docCanvas = toolId ? DOC_CANVAS_TOOLS.has(toolId) : false;
   // Every generic multi-file affordance at once.
@@ -819,7 +819,7 @@ export function ToolPage() {
       // extra documents itself, so it is eligible for multi-file selections
       // too. A batch (or previously run) result keeps the read-only viewer.
       const Panel =
-        !hasProcessed && (files.length === 1 || toolId === "multi-tool-pdf")
+        !hasProcessed && (files.length === 1 || docCanvas)
           ? registryEntry?.ResultsPanel
           : undefined;
       return (
@@ -1259,7 +1259,7 @@ export function ToolPage() {
         )}
 
         {/* Batch download — shown right after settings for easy access */}
-        {entries.length > 1 && hasProcessed && batchZipBlob && (
+        {entries.length > 1 && hasProcessed && batchZipBlob && !docCanvas && (
           <button
             type="button"
             onClick={handleDownloadAll}

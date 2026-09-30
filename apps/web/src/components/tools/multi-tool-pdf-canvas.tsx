@@ -81,9 +81,15 @@ function renderDocThumbs(
       const loadingTask = pdfjs.getDocument({ data });
       destroy = () => loadingTask.destroy();
       doc = await loadingTask.promise;
-    } catch {
+    } catch (cause) {
+      if (cancelled) return;
       // Keep the document strip and its remove control available on failure.
-      if (!cancelled) onFail();
+      console.error("multi-tool-pdf: document failed to open", cause);
+      void captureHandledError(
+        new SafeError("Multi-tool document failed to open", { kind: "operational", cause }),
+        { error_class: "operational", tool_id: "multi-tool-pdf" },
+      );
+      onFail();
       return;
     }
     if (cancelled) return;
@@ -289,6 +295,7 @@ function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale:
   // The server rejects plans over the limit, so the add affordances stop at
   // it instead of building an arrangement that can never be submitted.
   const planFull = plan.length >= PDF_MULTI_TOOL_LIMITS.outputPages;
+  const allInPlan = doc.pageCount > 0 && inPlan.size >= doc.pageCount;
 
   // Resolve by stable id at callback time. A React prop/ref can still hold
   // the old index during removal cleanup, when pending thumbs are flushed.
@@ -400,10 +407,10 @@ function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale:
         <button
           type="button"
           onClick={() => appendDoc(index)}
-          disabled={planFull || inPlan.size >= doc.pageCount}
+          disabled={planFull || doc.pageCount === 0 || allInPlan}
           className="text-[10px] text-primary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {inPlan.size >= doc.pageCount ? s.allPages : s.addAll}
+          {allInPlan ? s.allPages : s.addAll}
         </button>
         <span className="text-[10px] text-muted-foreground">
           {inPlan.size}/{doc.pageCount}
@@ -458,7 +465,7 @@ export function MultiToolPdfCanvas() {
   // the page-count render, and until the count lands (setPrimary has run)
   // the plan area shows a loader instead of the grid. The loading branch
   // must NOT early-return here: that would unmount the strips row, where
-  // every document's render lifecycle lives — a classic deadlock.
+  // every document's render lifecycle lives: a classic deadlock.
   const primaryReady = Boolean(primaryDoc && primaryDoc.pageCount > 0);
 
   if (!primary) {
@@ -509,7 +516,7 @@ export function MultiToolPdfCanvas() {
               type="button"
               onClick={zoomIn}
               disabled={zoomIndex === THUMB_ZOOM_LEVELS.length - 1}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted border-l border-border disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted border-s border-border disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label={s.zoomIn}
               data-testid="multi-tool-zoom-in"
             >

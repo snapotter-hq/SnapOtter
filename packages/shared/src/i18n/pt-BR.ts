@@ -3809,7 +3809,7 @@ export const ptBR: TranslationKeys = {
       dragHint:
         "Arraste para reordenar, girar ou remover páginas. Adicione PDFs para puxar as páginas deles.",
       reset: "Redefinir plano",
-      emptyPlan: "Nenhuma página no plano ainda — adicione páginas dos documentos acima.",
+      emptyPlan: "Nenhuma página no plano ainda. Adicione páginas dos documentos acima.",
       docFailed: "Não foi possível ler um documento.",
       pageLabel: "Posição {n}",
       planSummary: "{pages} página(s) de {docs} documento(s) serão montadas.",

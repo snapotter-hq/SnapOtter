@@ -3817,8 +3817,7 @@ export const nl: TranslationKeys = {
       dragHint:
         "Sleep om pagina's te herordenen, draaien of verwijderen. Voeg PDF's toe om pagina's over te nemen.",
       reset: "Plan herstellen",
-      emptyPlan:
-        "Nog geen pagina's in het plan — voeg pagina's toe vanuit de documenten hierboven.",
+      emptyPlan: "Nog geen pagina's in het plan. Voeg pagina's toe vanuit de documenten hierboven.",
       docFailed: "Een document kon niet worden gelezen.",
       pageLabel: "Positie {n}",
       planSummary: "{pages} pagina('s) uit {docs} document(en) worden samengesteld.",

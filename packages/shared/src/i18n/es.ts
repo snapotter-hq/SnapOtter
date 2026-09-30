@@ -3798,7 +3798,7 @@ export const es: TranslationKeys = {
       dragHint:
         "Arrastra para reordenar, rotar o quitar páginas. Añade PDFs para tomar sus páginas.",
       reset: "Restablecer plan",
-      emptyPlan: "Aún no hay páginas en el plan — añade páginas de los documentos de arriba.",
+      emptyPlan: "Aún no hay páginas en el plan. Añade páginas de los documentos de arriba.",
       docFailed: "No se pudo leer un documento.",
       pageLabel: "Posición {n}",
       planSummary: "Se ensamblarán {pages} página(s) de {docs} documento(s).",

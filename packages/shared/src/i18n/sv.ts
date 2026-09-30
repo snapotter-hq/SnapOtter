@@ -3799,7 +3799,7 @@ export const sv: TranslationKeys = {
       dragHint:
         "Dra för att ordna, rotera eller ta bort sidor. Lägg till PDF:er för att hämta deras sidor.",
       reset: "Återställ planen",
-      emptyPlan: "Inga sidor i planen än — lägg till sidor från dokumenten ovan.",
+      emptyPlan: "Inga sidor i planen än. Lägg till sidor från dokumenten ovan.",
       docFailed: "Ett dokument kunde inte läsas.",
       pageLabel: "Position {n}",
       planSummary: "{pages} sida/sidor från {docs} dokument kommer att sammanställas.",

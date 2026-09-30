@@ -3821,7 +3821,7 @@ export const de: TranslationKeys = {
       dragHint:
         "Zum Neuanordnen, Drehen oder Entfernen ziehen. Füge PDFs hinzu, um deren Seiten zu übernehmen.",
       reset: "Plan zurücksetzen",
-      emptyPlan: "Noch keine Seiten im Plan – füge Seiten aus den Dokumenten oben hinzu.",
+      emptyPlan: "Noch keine Seiten im Plan. Füge Seiten aus den Dokumenten oben hinzu.",
       docFailed: "Ein Dokument konnte nicht gelesen werden.",
       pageLabel: "Position {n}",
       planSummary: "{pages} Seite(n) aus {docs} Dokument(en) werden zusammengesetzt.",

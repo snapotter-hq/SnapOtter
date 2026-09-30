@@ -6,12 +6,12 @@ import { create } from "zustand";
  * the output page plan. The canvas (multi-tool-pdf-canvas) writes it and the
  * settings panel (multi-tool-pdf-settings) reads it to build the submission,
  * so the two live in a store rather than passing props across the tool-page
- * layout — same split as the Organize PDF store.
+ * layout, the same split as the Organize PDF store.
  *
  * The plan is tied to the File objects it was built from and outlives the
  * canvas unmount (the result view replaces it), so returning to the editor
  * keeps the arrangement. Plan entries and documents carry stable string ids
- * (a module counter) — dnd drag-ids and React keys stay valid while pages are
+ * (a module counter), so dnd drag-ids and React keys stay valid while pages are
  * moved, duplicated, or removed.
  */
 
@@ -90,7 +90,7 @@ const newId = (kind: "d" | "p"): string => {
 export const THUMB_ZOOM_LEVELS = [0.75, 1, 1.25, 1.5, 2];
 
 /** Doc 0's natural 1..count sequence as the default output plan, capped at
- *  the server's output-page limit — pages beyond it could never be submitted,
+ *  the server's output-page limit. Pages beyond it could never be submitted,
  *  and an uncapped plan would render one drag tile per page (a 10k-page doc
  *  would freeze the editor). */
 const doc0Pages = (d: { pageCount: number }): PlanPage[] =>

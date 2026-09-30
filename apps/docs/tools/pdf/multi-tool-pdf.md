@@ -4,7 +4,7 @@ description: Reorder, rotate, delete, and pull in pages from other PDFs in one e
 
 # PDF Multi-Tool {#multi-tool-pdf}
 
-Assemble a PDF from an explicit page plan: reorder, duplicate, rotate, or delete pages, and pull pages from additional PDFs — all in one request.
+Assemble a PDF from an explicit page plan: reorder, duplicate, rotate, or delete pages, and pull pages from additional PDFs, all in one request.
 
 ## API Endpoint {#api-endpoint}
 

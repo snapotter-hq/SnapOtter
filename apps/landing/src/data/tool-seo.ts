@@ -6990,7 +6990,7 @@ export const TOOL_SEO: Record<string, ToolSeo> = {
     ],
   },
   "multi-tool-pdf": {
-    searchTitle: "PDF Page Editor — Organize and Merge Pages",
+    searchTitle: "PDF Page Editor: Organize and Merge Pages",
     longDescription:
       "Edit PDF pages visually in one place: reorder, rotate, duplicate, or delete pages, and pull in pages from additional PDFs. SnapOtter assembles the result locally on your server for complete privacy.",
     useCases: [

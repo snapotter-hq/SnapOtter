@@ -167,7 +167,7 @@ describe.skipIf(!qpdfAvailable())("multi-tool-pdf (requires qpdf)", () => {
   );
 
   it("rejects a plan referencing more docs than uploads with 400", async () => {
-    // pageCounts has 3 entries for a single upload — indexer-aligned counts
+    // pageCounts has 3 entries for a single upload. Indexer-aligned counts
     // are part of the v2 contract, so this must fail cleanly.
     const parts = [
       {

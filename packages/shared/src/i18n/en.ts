@@ -3740,7 +3740,7 @@ export const en = {
       addPage: "Add page {n}",
       dragHint: "Drag to reorder, rotate, or remove pages. Add PDFs to pull their pages in.",
       reset: "Reset plan",
-      emptyPlan: "No pages in the plan yet — add pages from the documents above.",
+      emptyPlan: "No pages in the plan yet. Add pages from the documents above.",
       docFailed: "A document could not be read.",
       pageLabel: "Position {n}",
       planSummary: "{pages} page(s) from {docs} document(s) will be assembled.",

@@ -199,7 +199,7 @@ export async function qpdfRotatePages(
  * `plan` is the OUTPUT page list, in order: each entry names the staged input
  * `doc` (an index into `inputPaths`) and the 1-based page to take from it. The
  * same input may appear in several consecutive runs, and one run's spec lists
- * its pages in output order — qpdf concatenates the file/range groups of
+ * its pages in output order. qpdf concatenates the file/range groups of
  * `--pages` as given, so interleaving e.g. doc0/doc1/doc0 is preserved.
  *
  * Rotation is NOT part of this call: pages-spec page numbers are plain page
@@ -208,11 +208,11 @@ export async function qpdfRotatePages(
  * using output positions so duplicates can have independent rotations.
  *
  * Trust boundary: both documents and page numbers are structured values from
- * the caller — paths are local scratch files and pages were validated against
- * the real page count — so nothing here interpolates user input into the CLI.
+ * the caller (paths are local scratch files and pages were validated against
+ * the real page count), so nothing here interpolates user input into the CLI.
  */
 export interface PdfPagePlanItem {
-  /** Index into `inputPaths` (not the original upload order — callers stage). */
+  /** Index into `inputPaths` (not the original upload order; callers stage). */
   doc: number;
   /** 1-based page number in that input. */
   page: number;
@@ -234,7 +234,7 @@ export async function qpdfAssemblePages(
     }
   }
 
-  // The old positional grammar (file, range — repeating files with different
+  // The old positional grammar (file, range, repeating files with different
   // ranges) is supported by every qpdf in our support matrix; --file/--range
   // pairs need 11.9+. Ranges are comma-joined plain page numbers; runs longer
   // than the plan item stay consecutive, so runs of an ascending same-doc

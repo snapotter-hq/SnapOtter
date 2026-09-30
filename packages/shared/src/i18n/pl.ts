@@ -3807,7 +3807,7 @@ export const pl: TranslationKeys = {
       dragHint:
         "Przeciągnij, aby zmienić kolejność, obrócić lub usunąć strony. Dodaj PDF-y, aby pobrać ich strony.",
       reset: "Przywróć plan",
-      emptyPlan: "W planszy nie ma jeszcze stron — dodaj strony z dokumentów powyżej.",
+      emptyPlan: "W planie nie ma jeszcze stron. Dodaj strony z dokumentów powyżej.",
       docFailed: "Nie udało się odczytać dokumentu.",
       pageLabel: "Pozycja {n}",
       planSummary: "Zostanie zmontowana(e) {pages} strona/stron z {docs} dokument(ów).",

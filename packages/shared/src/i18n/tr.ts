@@ -3807,7 +3807,7 @@ export const tr: TranslationKeys = {
       dragHint:
         "Yeniden sıralamak, döndürmek veya kaldırmak için sürükleyin. Sayfalarını almak için PDF ekleyin.",
       reset: "Planı sıfırla",
-      emptyPlan: "Planda henüz sayfa yok — yukarıdaki belgelerden sayfa ekleyin.",
+      emptyPlan: "Planda henüz sayfa yok. Yukarıdaki belgelerden sayfa ekleyin.",
       docFailed: "Bir belge okunamadı.",
       pageLabel: "Konum {n}",
       planSummary: "{docs} belgeden {pages} sayfa birleştirilecek.",

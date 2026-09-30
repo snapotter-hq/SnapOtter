@@ -3536,7 +3536,7 @@ export const zhTW: TranslationKeys = {
       addPage: "加入第 {n} 頁",
       dragHint: "拖曳可重新排序、旋轉或移除頁面。新增 PDF 可將其頁面引入。",
       reset: "重設計畫",
-      emptyPlan: "計畫中還沒有頁面 — 請從上方的文件加入頁面。",
+      emptyPlan: "計畫中還沒有頁面。請從上方的文件加入頁面。",
       docFailed: "無法讀取某個文件。",
       pageLabel: "位置 {n}",
       planSummary: "將從 {docs} 個文件組合 {pages} 頁。",

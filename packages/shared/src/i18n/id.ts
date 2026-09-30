@@ -3800,7 +3800,7 @@ export const id: TranslationKeys = {
       dragHint:
         "Seret untuk mengurutkan ulang, memutar, atau menghapus halaman. Tambahkan PDF untuk mengambil halamannya.",
       reset: "Atur ulang rencana",
-      emptyPlan: "Belum ada halaman dalam rencana — tambahkan halaman dari dokumen di atas.",
+      emptyPlan: "Belum ada halaman dalam rencana. Tambahkan halaman dari dokumen di atas.",
       docFailed: "Sebuah dokumen tidak dapat dibaca.",
       pageLabel: "Posisi {n}",
       planSummary: "{pages} halaman dari {docs} dokumen akan dirakit.",

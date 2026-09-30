@@ -20,6 +20,7 @@ vi.mock("@/components/tools/document-view", () => ({
 import { PDF_MULTI_TOOL_LIMITS } from "@snapotter/shared";
 import { MultiToolPdfCanvas } from "@/components/tools/multi-tool-pdf-canvas";
 import { MultiToolPdfSettings } from "@/components/tools/multi-tool-pdf-settings";
+import { captureHandledError } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 import { useMultiToolStore } from "@/stores/multi-tool-store";
 
@@ -106,6 +107,17 @@ describe("PDF multi-tool editor regressions", () => {
     expect(screen.getByTestId("multi-tool-pdf-submit")).toBeEnabled();
   });
 
+  it("does not call a still-loading document fully in the plan", async () => {
+    const view = await seedPrimary();
+    fireEvent.change(view.container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [file("loading.pdf")] },
+    });
+    expect(screen.queryAllByText("All in plan")).toHaveLength(1);
+    const addAll = screen.getAllByText("Add all pages");
+    expect(addAll).toHaveLength(1);
+    expect(addAll[0]).toBeDisabled();
+  });
+
   it("lets users remove an unreadable extra PDF and blocks invalid submission", async () => {
     const view = await seedPrimary();
     fireEvent.change(view.container.querySelector('input[type="file"]') as HTMLInputElement, {
@@ -115,6 +127,17 @@ describe("PDF multi-tool editor regressions", () => {
     expect(screen.getByTestId("multi-tool-pdf-submit")).toBeDisabled();
     fireEvent.click(screen.getByTestId("multi-tool-remove-doc-1"));
     expect(screen.getByTestId("multi-tool-pdf-submit")).toBeEnabled();
+  });
+
+  it("reports and marks a document that fails to open, not just a page that fails to render", async () => {
+    getDocument.mockImplementationOnce(() => ({
+      promise: Promise.reject(new Error("bad xref")),
+      destroy: vi.fn(),
+    }));
+    useFileStore.getState().setFiles([file("broken.pdf")]);
+    editor();
+    await waitFor(() => expect(useMultiToolStore.getState().docs[0]?.failed).toBe(true));
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
   });
 
   it("keeps restart and remove controls available when the primary PDF fails", async () => {

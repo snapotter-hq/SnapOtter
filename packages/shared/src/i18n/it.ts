@@ -3809,7 +3809,7 @@ export const it: TranslationKeys = {
       dragHint:
         "Trascina per riordinare, ruotare o rimuovere pagine. Aggiungi PDF per prenderne le pagine.",
       reset: "Ripristina piano",
-      emptyPlan: "Nessuna pagina nel piano — aggiungi pagine dai documenti sopra.",
+      emptyPlan: "Nessuna pagina nel piano. Aggiungi pagine dai documenti sopra.",
       docFailed: "Impossibile leggere un documento.",
       pageLabel: "Posizione {n}",
       planSummary: "Verranno assemblate {pages} pagina/e da {docs} documento/i.",

@@ -3822,7 +3822,7 @@ export const fr: TranslationKeys = {
         "Faites glisser pour réordonner, faire pivoter ou supprimer des pages. Ajoutez des PDF pour reprendre leurs pages.",
       reset: "Réinitialiser le plan",
       emptyPlan:
-        "Aucune page dans le plan pour l'instant — ajoutez des pages depuis les documents ci-dessus.",
+        "Aucune page dans le plan pour l'instant. Ajoutez des pages depuis les documents ci-dessus.",
       docFailed: "Un document n'a pas pu être lu.",
       pageLabel: "Position {n}",
       planSummary: "{pages} page(s) de {docs} document(s) seront assemblées.",
