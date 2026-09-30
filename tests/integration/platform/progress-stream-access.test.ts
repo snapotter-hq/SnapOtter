@@ -116,6 +116,20 @@ describe("progress stream access", () => {
     expect(res.body).toContain(DOWNLOAD_URL);
   });
 
+  // The web app's EventSource can't set headers; it rides the session cookie.
+  it("accepts the session cookie the web app sends", async () => {
+    const jobId = await seedCompletedJob(owner.userId);
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/v1/jobs/${jobId}/progress`,
+      headers: { cookie: `snapotter-session=${owner.token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain(DOWNLOAD_URL);
+  });
+
   it("answers 404 to a signed-in user who doesn't own the job", async () => {
     const jobId = await seedCompletedJob(owner.userId);
 
