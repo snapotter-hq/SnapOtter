@@ -50,6 +50,9 @@ function findUnanchoredDownloadPaths(source: string): number[] {
 // Files that read result URLs only from useToolProcessor (already resolved) and
 // parse nothing but inspect/analyze responses that carry no URLs.
 const WEB_PARSE_ALLOWLIST = new Set([
+  // Gets downloadUrl as a prop (the store's processedUrl, resolved by
+  // useToolProcessor); parses only a failed library upload's error body (#1350).
+  "apps/web/src/components/common/review-panel.tsx",
   "apps/web/src/components/tools/edit-metadata-settings.tsx",
   "apps/web/src/components/tools/image-enhancement-settings.tsx",
   "apps/web/src/components/tools/strip-metadata-settings.tsx",
