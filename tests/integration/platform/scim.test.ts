@@ -2661,6 +2661,73 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(body.members).toEqual([{ value: member.id, display: member.userName }]);
     });
 
+    describe("a PUT that fails after its rename changes nothing (#1682)", () => {
+      // PUT renamed the group, moved every member to Default, then added the
+      // new ones, each straight to the database. A failure after the rename
+      // left the group renamed and emptied behind a 500.
+      async function putGroup(id: string, payload: Record<string, unknown>) {
+        return crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${id}`,
+          headers: authHeaders(),
+          payload,
+        });
+      }
+
+      async function groupState(id: string, memberIds: string[]) {
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+        const teams = await Promise.all(memberIds.map(async (m) => (await userRow(m))?.team));
+        return { name: row?.name, teams };
+      }
+
+      it("rejects a members value that isn't an array before writing anything", async () => {
+        const member = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-obj") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-put-atomic-obj"),
+          members: [{ value: member.id }],
+        });
+
+        const res = await putGroup(group.id, {
+          displayName: uniqueName("scim-grp-put-atomic-obj-renamed"),
+          members: { value: member.id },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toMatchObject({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "members must be an array",
+        });
+        expect(await groupState(group.id, [member.id])).toEqual({
+          name: group.displayName,
+          teams: [group.id],
+        });
+      });
+
+      it("rolls back the rename and member changes when a later member write fails", async () => {
+        const kept = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-kept") });
+        const incoming = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-in") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-put-atomic-db"),
+          members: [{ value: kept.id }],
+        });
+
+        // Postgres rejects a NUL byte in a text parameter, so the second
+        // member's UPDATE fails after the rename, the move-out, and the first
+        // add have all run.
+        const res = await putGroup(group.id, {
+          displayName: uniqueName("scim-grp-put-atomic-db-renamed"),
+          members: [{ value: incoming.id }, { value: "no\u0000such-user" }],
+        });
+
+        expect(res.statusCode, res.body).toBe(500);
+        expect(await groupState(group.id, [kept.id, incoming.id])).toEqual({
+          name: group.displayName,
+          teams: [group.id, DEFAULT_TEAM_ID],
+        });
+      });
+    });
+
     it("PATCH adds members from an array value and from a single object value", async () => {
       const group = await createScimGroup({ displayName: uniqueName("scim-group-addm") });
       const memberA = await createScimUser({ userName: uniqueName("scim-grp-add-a") });
