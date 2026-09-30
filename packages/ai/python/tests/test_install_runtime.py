@@ -897,12 +897,58 @@ class InstallRuntimeTests(unittest.TestCase):
                     "/proc/self/cgroup": "0::/docker/deadbeef\n",
                     "/proc/self/mountinfo": v2_mount,
                     f"{scope}/memory.max": str(6 * gib),
-                    "/sys/fs/cgroup/cgroup.controllers": "memory\n",
                 },
                 r"^unable to read the process cgroup memory capacity from "
                 r"/sys/fs/cgroup/docker/cgroup.controllers \(memory.max is absent\): "
                 r"No such file or directory$",
                 FileNotFoundError,
+            ),
+            (
+                "limit file not ASCII",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": UnicodeDecodeError(
+                        "ascii", b"\xff", 0, 1, "ordinal not in range(128)"
+                    ),
+                },
+                rf"^unable to read the process cgroup memory capacity from "
+                rf"{scope}/memory.max: 'ascii' codec can't decode byte 0xff",
+                UnicodeDecodeError,
+            ),
+            (
+                "limit path with an embedded NUL",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    # mountinfo octal-escapes the mount point; \000 decodes to NUL.
+                    "/proc/self/mountinfo": (
+                        "29 23 0:26 / /sys/fs/cg\\000roup rw,nosuid,nodev,noexec,relatime "
+                        "- cgroup2 cgroup rw\n"
+                    ),
+                    "/sys/fs/cg\x00roup/docker/deadbeef/memory.max": ValueError(
+                        "embedded null byte"
+                    ),
+                },
+                r"^unable to read the process cgroup memory capacity from "
+                r"/sys/fs/cg\x00roup/docker/deadbeef/memory.max: embedded null byte$",
+                ValueError,
+            ),
+            (
+                "long malformed value is cut to 64 characters",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": "x" * 100,
+                },
+                rf'^malformed cgroup memory capacity in {scope}/memory.max: "{"x" * 64}"$',
+                None,
+            ),
+            (
+                "no cgroup v1 memory mount covers the membership",
+                {"/proc/self/cgroup": "5:memory:/job\n", "/proc/self/mountinfo": v2_mount},
+                r'^unable to resolve the process cgroup memory capacity: no cgroup v1 '
+                r'memory mount in /proc/self/mountinfo covers "/job"$',
+                None,
             ),
             (
                 "cgroup v1 limit file missing",

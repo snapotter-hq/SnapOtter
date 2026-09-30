@@ -399,13 +399,15 @@ def _process_cgroup_memory_limits() -> list[int] | None:
             controllers_path = posixpath.join(current, "cgroup.controllers")
             try:
                 Path(controllers_path).read_text(encoding="ascii")
-            except (OSError, UnicodeError) as controllers_error:
+            except (OSError, ValueError) as controllers_error:
                 raise PreflightError(
                     "unable to read the process cgroup memory capacity from "
                     f"{controllers_path} (memory.max is absent): "
                     f"{_read_reason(controllers_error)}"
                 ) from controllers_error
-        except (OSError, UnicodeError) as error:
+        except (OSError, ValueError) as error:
+            # ValueError also covers an embedded NUL from a decoded mountinfo
+            # path, not only a UnicodeError.
             raise PreflightError(
                 "unable to read the process cgroup memory capacity from "
                 f"{limit_path}: {_read_reason(error)}"
