@@ -1089,12 +1089,15 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       if (body.displayName !== undefined && !displayName) {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
-      // Checked before anything writes: iterating an object here used to throw
-      // after the rename and the move-out had already committed (#1682).
-      if (body.members !== undefined && !Array.isArray(body.members)) {
+      // RFC 7643 2.5 treats null and an empty array as the same state, and PUT
+      // replaces, so null clears the group, as it does on POST. Anything else
+      // that isn't an array is refused before anything writes: iterating it
+      // used to throw after the rename and the move-out had committed (#1682).
+      const rawMembers = body.members === null ? [] : body.members;
+      if (rawMembers !== undefined && !Array.isArray(rawMembers)) {
         return reply.status(400).send(scimError(400, "members must be an array"));
       }
-      const members = body.members as Array<{ value: string }> | undefined;
+      const members = rawMembers as Array<{ value: string }> | undefined;
       const renames = displayName !== undefined && displayName !== existing.name;
       if (renames) {
         // Check for name conflict

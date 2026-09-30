@@ -2704,6 +2704,23 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         });
       });
 
+      it("treats members: null as an empty list and clears the group", async () => {
+        const member = await createScimUser({ userName: uniqueName("scim-grp-put-null-m") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-put-null"),
+          members: [{ value: member.id }],
+        });
+
+        const res = await putGroup(group.id, { members: null });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body).members).toEqual([]);
+        expect(await groupState(group.id, [member.id])).toEqual({
+          name: group.displayName,
+          teams: [DEFAULT_TEAM_ID],
+        });
+      });
+
       it("rolls back the rename and member changes when a later member write fails", async () => {
         const kept = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-kept") });
         const incoming = await createScimUser({ userName: uniqueName("scim-grp-put-atomic-in") });
@@ -2714,7 +2731,8 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
         // Postgres rejects a NUL byte in a text parameter, so the second
         // member's UPDATE fails after the rename, the move-out, and the first
-        // add have all run.
+        // add have all run. This relies on member ids not being checked up
+        // front; if they ever are, fail inside the transaction another way.
         const res = await putGroup(group.id, {
           displayName: uniqueName("scim-grp-put-atomic-db-renamed"),
           members: [{ value: incoming.id }, { value: "no\u0000such-user" }],
