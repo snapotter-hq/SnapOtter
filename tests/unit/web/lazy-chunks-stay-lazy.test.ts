@@ -47,14 +47,12 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** Every module the web source loads through lazy() or lazyWithRetry(), extension-less. */
+/** Every module the web source loads through lazy(), extension-less. */
 function lazyModules(): Set<string> {
   const found = new Set<string>();
   for (const file of sourceFiles(WEB_SRC)) {
     const src = readFileSync(file, "utf8");
-    for (const m of src.matchAll(
-      /\blazy(?:WithRetry)?\(\s*\(\)\s*=>\s*import\(\s*["']([^"']+)["']/g,
-    )) {
+    for (const m of src.matchAll(/\blazy\(\s*\(\)\s*=>\s*import\(\s*["']([^"']+)["']/g)) {
       const spec = m[1];
       const resolved = spec.startsWith("@/")
         ? path.join(WEB_SRC, spec.slice(2))
