@@ -140,12 +140,22 @@ export function usePipelineProcessor() {
   // status guard leaves an already-settled entry and its error alone, and
   // sweeping instead of indexing works after clearActiveJob has nulled
   // activeEntryIndexRef. Batch runs never mark entries "processing".
+  //
+  // Every exit calls this last, after its run-level teardown, and it never
+  // throws: some exits run right after a store write threw (a broken
+  // completion write lands in the same catch as an unparseable body), and a
+  // second throw here must not leave the run stuck at processing with the
+  // cancel button still armed.
   const settleProcessingEntries = useCallback((message: string) => {
-    const { entries, updateEntry } = useFileStore.getState();
-    for (let i = 0; i < entries.length; i++) {
-      if (entries[i]?.status === "processing") {
-        updateEntry(i, { status: "failed", error: message });
+    try {
+      const { entries, updateEntry } = useFileStore.getState();
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i]?.status === "processing") {
+          updateEntry(i, { status: "failed", error: message });
+        }
       }
+    } catch (err) {
+      console.error("Failing the run's entry failed", err);
     }
   }, []);
 
@@ -164,10 +174,10 @@ export function usePipelineProcessor() {
       batchRunRef.current = null;
       const message =
         "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
-      settleProcessingEntries(message);
       setError(message);
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
+      settleProcessingEntries(message);
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
@@ -212,10 +222,10 @@ export function usePipelineProcessor() {
         }
         batchRunRef.current = null;
         clearActiveJob();
-        settleProcessingEntries("Canceled");
         setError("Canceled");
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
+        settleProcessingEntries("Canceled");
       }
     } catch {
       // Cancel request failed; the SSE handler owns cleanup
@@ -250,14 +260,10 @@ export function usePipelineProcessor() {
       setError(FRAME_HANDLING_FAILED);
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
-      // Last and on its own: the store write that threw may throw again, and
-      // the run-level teardown above has to happen regardless. The caller
-      // rethrows the original error; this one is only logged.
-      try {
-        settleProcessingEntries(FRAME_HANDLING_FAILED);
-      } catch (settleErr) {
-        console.error("Failing the run's entry after a frame handling error failed", settleErr);
-      }
+      // Last: the store write that threw may throw again, and the run-level
+      // teardown above has to happen regardless. The sweep logs rather than
+      // throws, and the caller rethrows the original error.
+      settleProcessingEntries(FRAME_HANDLING_FAILED);
     },
     [
       clearStallTimer,
@@ -344,10 +350,12 @@ export function usePipelineProcessor() {
                 // leaving the run in silent limbo.
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
+                const message = "Processing was interrupted. Retry when reconnected.";
                 clearActiveJob();
-                setError("Processing was interrupted. Retry when reconnected.");
+                setError(message);
                 setProcessing(false);
                 setProgress(IDLE_PROGRESS);
+                settleProcessingEntries(message);
               }
               return;
             }
@@ -394,10 +402,10 @@ export function usePipelineProcessor() {
               clearActiveJob();
               batchRunRef.current = null;
               const message = data.error || "Processing failed";
-              settleProcessingEntries(message);
               setError(message);
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
+              settleProcessingEntries(message);
               return;
             }
 
@@ -602,6 +610,7 @@ export function usePipelineProcessor() {
           eventSourceRef.current = null;
         }
 
+        let failure: string | null = null;
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result: ProcessResult = resolveServerUrls(JSON.parse(xhr.responseText));
@@ -615,9 +624,7 @@ export function usePipelineProcessor() {
               ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
             });
           } catch {
-            const message = "Invalid response from server";
-            settleProcessingEntries(message);
-            setError(message);
+            failure = "Invalid response from server";
           }
         } else {
           let message: string;
@@ -639,13 +646,14 @@ export function usePipelineProcessor() {
           } catch {
             message = `Processing failed: ${xhr.status}`;
           }
-          settleProcessingEntries(message);
-          setError(message);
+          failure = message;
         }
 
+        if (failure !== null) setError(failure);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        if (failure !== null) settleProcessingEntries(failure);
       };
 
       xhr.onerror = () => {
@@ -660,11 +668,11 @@ export function usePipelineProcessor() {
           eventSourceRef.current = null;
         }
         const message = "Processing was interrupted. Retry when reconnected.";
-        settleProcessingEntries(message);
         setError(message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        settleProcessingEntries(message);
       };
 
       xhr.ontimeout = () => {
@@ -677,11 +685,11 @@ export function usePipelineProcessor() {
           eventSourceRef.current = null;
         }
         const message = "Request timed out - the server may be overloaded. Try again.";
-        settleProcessingEntries(message);
         setError(message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        settleProcessingEntries(message);
       };
 
       xhr.open("POST", appUrl("/api/v1/pipeline/execute"));

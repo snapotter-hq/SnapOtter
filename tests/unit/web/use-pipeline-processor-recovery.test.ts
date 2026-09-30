@@ -1047,7 +1047,112 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
     }
   });
 
-  it("keeps the first failure when a late failure path fires after the run settled", () => {
+  it("fails the entry when a batch terminal frame reaches a single run", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => {
+      sendBatchFrame({ status: "failed", totalFiles: 1, completedFiles: 1, failedFiles: 1 });
+    });
+
+    expectEntryFailed("Processing was interrupted. Retry when reconnected.");
+    unmount();
+  });
+
+  it("finishes the run when failing the entry throws too", () => {
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startSingleRun();
+    // Both the completion write and the settle after it throw: the run must
+    // still end, with the banner up and the cancel handle disarmed.
+    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 200;
+        xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+        xhrs[0].onload?.();
+      });
+
+      expect(useFileStore.getState().error).toBe("Invalid response from server");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failing the run's entry failed",
+        expect.objectContaining({ message: "store broke" }),
+      );
+    } finally {
+      spy.mockRestore();
+      consoleError.mockRestore();
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      unmount();
+    }
+  });
+
+  it("fails only the run's own entry", () => {
+    const files = ["a.png", "b.png", "c.png"].map(
+      (name) => new File([new ArrayBuffer(16)], name, { type: "image/png" }),
+    );
+    useFileStore.getState().setFiles(files);
+    useFileStore.getState().updateEntry(2, { status: "completed", processedUrl: "blob:done" });
+    useFileStore.getState().setSelectedIndex(1);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(files[1], STEPS);
+    });
+    expect(useFileStore.getState().entries[1].status).toBe("processing");
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "bad settings" });
+      xhrs[0].onload?.();
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].status).toBe("pending");
+    expect(entries[1]).toMatchObject({ status: "failed", error: "error" });
+    expect(entries[2]).toMatchObject({ status: "completed", processedUrl: "blob:done" });
+    unmount();
+  });
+
+  it("clears a failed entry's error when the retry succeeds", () => {
+    const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+    const { result, unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "bad settings" });
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("failed");
+
+    act(() => {
+      result.current.processSingle(file, STEPS);
+    });
+    act(() => {
+      xhrs[1].upload.onload?.();
+      xhrs[1].status = 200;
+      xhrs[1].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[1].onload?.();
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({ status: "completed", error: null });
+    unmount();
+  });
+
+  // Pins the #722 run-identity guard for the new entry write: the aborted
+  // POST's late socket event must not reach the settle at all.
+  it("ignores a late socket event once a failed frame settled the run", () => {
     const { unmount } = startSingleRun();
     act(() => {
       xhrs[0].upload.onload?.();

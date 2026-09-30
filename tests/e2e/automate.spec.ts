@@ -262,9 +262,7 @@ test.describe("Automate Page", () => {
     await expect(page.getByText("Processed").first()).toBeVisible();
   });
 
-  test("a failed pipeline run shows the failure card, not the original", async ({
-    loggedInPage: page,
-  }) => {
+  test("a failed pipeline run shows the failure card", async ({ loggedInPage: page }) => {
     // #1352: the run's entry has to end at "failed", which is what gates the
     // result pane's failure card. The side-panel banner alone used to be the
     // only sign anything went wrong.
