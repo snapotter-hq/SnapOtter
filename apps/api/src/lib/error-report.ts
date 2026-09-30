@@ -142,16 +142,22 @@ export function resetThrottleForTests(): void {
 }
 
 export function errorSignature(err: unknown): string {
-  const e = err as { name?: string; code?: string; stack?: string } | null;
+  const e = err as { name?: string; code?: string; stack?: string; cause?: unknown } | null;
   const name = e?.name ?? "Unknown";
   const code = e?.code ?? "-";
+  // A wrapper built in one place (engineUnavailable) carries the same name,
+  // code, and frame whatever went wrong underneath, so without its cause a
+  // missing decoder and one running out of memory would share one throttle
+  // slot (#1628). Errors with no named cause keep their signature unchanged.
+  const causeName = (e?.cause as { name?: unknown } | null | undefined)?.name;
+  const cause = typeof causeName === "string" ? `:${causeName}` : "";
   let frame = "-";
   if (typeof e?.stack === "string") {
     const line = e.stack.split("\n").find((l) => l.includes("/apps/") || l.includes("/packages/"));
     const m = line?.slice(0, 300).match(/([^/\\\s():]+):(\d+)/);
     if (m) frame = `${m[1]}:${m[2]}`;
   }
-  return `${name}:${code}:${frame}`;
+  return `${name}:${code}:${frame}${cause}`;
 }
 
 /**

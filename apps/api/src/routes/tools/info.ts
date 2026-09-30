@@ -9,6 +9,7 @@ import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -72,9 +73,11 @@ export function registerInfo(app: FastifyInstance) {
         }
         if (sharpDirectFailed) {
           // A guess: the upload wasn't detected as HEIF, so a missing HEIF
-          // decoder says nothing about this server's ability to read it.
+          // decoder says nothing about this server's ability to read it. The
+          // decoder running out of memory does: it was decoding the file, so
+          // that stays the server's 503 (#1628).
           metaBuffer = await decodeHeic(fileBuffer).catch((err: unknown) => {
-            if (!isDecoderUnavailable(err)) throw err;
+            if (!isDecoderUnavailable(err) || err instanceof DecoderOutOfMemoryError) throw err;
             throw new Error("Unrecognized image format", { cause: err });
           });
         }

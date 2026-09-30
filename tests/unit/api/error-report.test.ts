@@ -183,6 +183,22 @@ describe("errorSignature", () => {
     expect(errorSignature(new TypeError("t"))).toMatch(/^TypeError:-:/);
     expect(errorSignature(null)).toBe("Unknown:-:-");
   });
+  it("tells wrappers apart by their cause's name (#1628)", () => {
+    const wrap = (causeName: string) => {
+      const cause = new Error("decoder");
+      cause.name = causeName;
+      const err = Object.assign(new Error("x", { cause }), { code: "ENGINE_UNAVAILABLE" });
+      err.stack =
+        "Error: x\n  at engineUnavailable (/app/apps/api/src/modality/image-input.ts:214:5)";
+      return err;
+    };
+    expect(errorSignature(wrap("DecoderOutOfMemoryError"))).toBe(
+      "Error:ENGINE_UNAVAILABLE:image-input.ts:214:DecoderOutOfMemoryError",
+    );
+    expect(errorSignature(wrap("DecoderUnavailableError"))).not.toBe(
+      errorSignature(wrap("DecoderOutOfMemoryError")),
+    );
+  });
 });
 
 describe("vetSettings", () => {

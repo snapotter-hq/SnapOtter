@@ -138,6 +138,7 @@ describe("decodeHeic when heif-dec is killed", () => {
     failures.kill = { killed: false, code: null, signal: "SIGKILL" };
     const err = await decodeError(readFixture(fixtures.image.formats("heic")));
     expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
     expect((err.cause as { signal?: string }).signal).toBe("SIGKILL");
   });
 

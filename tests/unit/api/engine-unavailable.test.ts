@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 
 const reportError = vi.hoisted(() => vi.fn());
@@ -10,7 +10,7 @@ function engineDown(code = "ENGINE_UNAVAILABLE") {
   return new InputValidationError("engine down", 503, "set FFPROBE_PATH", code);
 }
 
-// The dedupe set is module state, so every case starts from a fresh module.
+// The dedupe map is module state, so every case starts from a fresh module.
 async function freshHelper() {
   vi.resetModules();
   const mod = await import("../../../apps/api/src/lib/engine-unavailable.js");
@@ -22,6 +22,10 @@ beforeEach(() => {
   log.warn.mockReset();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("reportEngineUnavailable (#1403)", () => {
   it("ignores a 4xx, which is the caller's fault", async () => {
     const report = await freshHelper();
@@ -30,7 +34,7 @@ describe("reportEngineUnavailable (#1403)", () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 
-  it("logs and reports a 5xx once per code and tool", async () => {
+  it("logs and reports a 5xx once per code and tool within the window", async () => {
     const report = await freshHelper();
     const err = engineDown();
     report(err, "mute-video", log);
@@ -80,6 +84,27 @@ describe("reportEngineUnavailable (#1403)", () => {
       report(engineDown(), "resize", log);
       expect(reportError).toHaveBeenCalledTimes(2);
       expect(log.warn).toHaveBeenCalledTimes(2);
+    });
+
+    it("opens the next window at exactly ten minutes", async () => {
+      const report = await freshHelper();
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+      report(engineDown(), "resize", log);
+      now.mockReturnValue(1_000_000 + 10 * 60_000 - 1);
+      report(engineDown(), "resize", log);
+      expect(reportError).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(1_000_000 + 10 * 60_000);
+      report(engineDown(), "resize", log);
+      expect(reportError).toHaveBeenCalledTimes(2);
+    });
+
+    it("doesn't stay muted when the clock steps backwards", async () => {
+      const report = await freshHelper();
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+      report(engineDown(), "resize", log);
+      now.mockReturnValue(1_000_000 - 60 * 60_000);
+      report(engineDown(), "resize", log);
+      expect(reportError).toHaveBeenCalledTimes(2);
     });
 
     it("keeps a decoder running out of memory from hiding behind a missing one", async () => {

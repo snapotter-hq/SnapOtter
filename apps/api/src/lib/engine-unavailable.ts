@@ -33,7 +33,10 @@ export function reportEngineUnavailable(
   const key = `${err.code ?? "unknown"}:${cause}:${toolId}`;
   const now = Date.now();
   const last = lastReported.get(key);
-  if (last !== undefined && now - last < REPORT_WINDOW_MS) return;
+  // A clock stepped backwards gives a negative gap; treat it as expired rather
+  // than muting reports for the size of the step.
+  const elapsed = last === undefined ? Number.POSITIVE_INFINITY : now - last;
+  if (elapsed >= 0 && elapsed < REPORT_WINDOW_MS) return;
   lastReported.set(key, now);
   log.warn(
     { code: err.code, cause: cause || undefined, toolId, err },
@@ -44,7 +47,7 @@ export function reportEngineUnavailable(
 
 /**
  * Reply with an input handler's rejection. A 5xx one is also logged and
- * reported, once per tool and window, which suits endpoints the browser fires on its own
+ * reported, once per code, cause and tool per window, which suits endpoints the browser fires on its own
  * (thumbnails, live previews) where a log line per request would bury the
  * signal (#1428).
  */
