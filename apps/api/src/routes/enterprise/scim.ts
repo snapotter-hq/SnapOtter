@@ -1161,79 +1161,94 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
       const operations = body.Operations ?? [];
 
-      for (const op of operations) {
-        const opType = op.op.toLowerCase();
+      // Reject rather than skip an empty rename: a silent no-op leaves the IdP
+      // thinking it applied while the team keeps its old name (#988). Checked
+      // before any operation writes, so nothing is half-applied.
+      const emptyRename = operations.some(
+        (op) =>
+          op.op.toLowerCase() === "replace" &&
+          op.path === "displayName" &&
+          !(op.value as string | undefined)?.trim(),
+      );
+      if (emptyRename) {
+        return reply.status(400).send(scimError(400, "displayName cannot be empty"));
+      }
 
-        if (opType === "add" && op.path === "members") {
-          const members = Array.isArray(op.value)
-            ? (op.value as Array<{ value: string }>)
-            : [op.value as { value: string }];
-          for (const member of members) {
-            await db
-              .update(schema.users)
-              .set({ team: id, updatedAt: new Date() })
-              .where(eq(schema.users.id, member.value));
-          }
-        } else if (opType === "remove" && op.path) {
-          // Parse path like: members[value eq "userId"]
-          const memberMatch = op.path.match(/^members\[value\s+eq\s+"([^"]+)"\]$/i);
-          if (memberMatch) {
-            const userId = memberMatch[1];
-            // Move removed member to default team
-            const [defaultTeam] = await db
-              .select()
-              .from(schema.teams)
-              .where(eq(schema.teams.name, "Default"));
-            const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
-            await db
-              .update(schema.users)
-              .set({ team: fallbackTeamId, updatedAt: new Date() })
-              .where(and(eq(schema.users.id, userId), eq(schema.users.team, id)));
-          }
-        } else if (opType === "replace") {
-          if (op.path === "displayName") {
-            const newName = (op.value as string | undefined)?.trim();
-            if (!newName) {
-              // Reject rather than skip: a silent no-op leaves the IdP thinking
-              // the rename applied while the team keeps its old name (#988).
-              return reply.status(400).send(scimError(400, "displayName cannot be empty"));
-            }
-            // No conflict pre-check on this path, so before issue #968 a
-            // rename onto a taken name surfaced the 23505 as a 500.
-            try {
-              await db.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
-            } catch (err) {
-              if (isUniqueViolation(err)) {
-                return reply
-                  .status(409)
-                  .send(scimError(409, "Group name already taken", "uniqueness"));
+      // All or nothing. Each operation used to write straight to the database,
+      // so member changes from earlier operations stayed committed when a
+      // later rename collided, while the IdP read the error as the whole
+      // request rejected (#1543). The transaction rolls them back instead.
+      try {
+        await db.transaction(async (tx) => {
+          for (const op of operations) {
+            const opType = op.op.toLowerCase();
+
+            if (opType === "add" && op.path === "members") {
+              const members = Array.isArray(op.value)
+                ? (op.value as Array<{ value: string }>)
+                : [op.value as { value: string }];
+              for (const member of members) {
+                await tx
+                  .update(schema.users)
+                  .set({ team: id, updatedAt: new Date() })
+                  .where(eq(schema.users.id, member.value));
               }
-              throw err;
-            }
-          } else if (op.path === "members") {
-            // Full member replacement
-            const members = Array.isArray(op.value) ? (op.value as Array<{ value: string }>) : [];
-            const [defaultTeam] = await db
-              .select()
-              .from(schema.teams)
-              .where(eq(schema.teams.name, "Default"));
-            const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
+            } else if (opType === "remove" && op.path) {
+              // Parse path like: members[value eq "userId"]
+              const memberMatch = op.path.match(/^members\[value\s+eq\s+"([^"]+)"\]$/i);
+              if (memberMatch) {
+                const userId = memberMatch[1];
+                // Move removed member to default team
+                const [defaultTeam] = await tx
+                  .select()
+                  .from(schema.teams)
+                  .where(eq(schema.teams.name, "Default"));
+                const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
+                await tx
+                  .update(schema.users)
+                  .set({ team: fallbackTeamId, updatedAt: new Date() })
+                  .where(and(eq(schema.users.id, userId), eq(schema.users.team, id)));
+              }
+            } else if (opType === "replace") {
+              if (op.path === "displayName") {
+                const newName = (op.value as string).trim();
+                await tx.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
+              } else if (op.path === "members") {
+                // Full member replacement
+                const members = Array.isArray(op.value)
+                  ? (op.value as Array<{ value: string }>)
+                  : [];
+                const [defaultTeam] = await tx
+                  .select()
+                  .from(schema.teams)
+                  .where(eq(schema.teams.name, "Default"));
+                const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
 
-            // Remove all current members
-            await db
-              .update(schema.users)
-              .set({ team: fallbackTeamId, updatedAt: new Date() })
-              .where(eq(schema.users.team, id));
+                // Remove all current members
+                await tx
+                  .update(schema.users)
+                  .set({ team: fallbackTeamId, updatedAt: new Date() })
+                  .where(eq(schema.users.team, id));
 
-            // Add new members
-            for (const member of members) {
-              await db
-                .update(schema.users)
-                .set({ team: id, updatedAt: new Date() })
-                .where(eq(schema.users.id, member.value));
+                // Add new members
+                for (const member of members) {
+                  await tx
+                    .update(schema.users)
+                    .set({ team: id, updatedAt: new Date() })
+                    .where(eq(schema.users.id, member.value));
+                }
+              }
             }
           }
+        });
+      } catch (err) {
+        // No conflict pre-check on the rename path, so before issue #968 a
+        // rename onto a taken name surfaced the 23505 as a 500. A rename is
+        // the only write here that can trip a unique index.
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
         }
+        throw err;
       }
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
