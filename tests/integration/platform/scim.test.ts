@@ -1875,7 +1875,9 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.email).toBeNull();
     });
 
-    it("accepts a PATCH without Operations and changes nothing", async () => {
+    it("refuses a PATCH without Operations and changes nothing", async () => {
+      // RFC 7644 3.5.2 requires at least one operation. This used to answer
+      // 200 having done nothing, which hid a misnamed key (#1511).
       const { id, userName } = await createScimUser({ userName: uniqueName("scim-patch-empty") });
 
       const res = await crudApp.app.inject({
@@ -1885,10 +1887,14 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         payload: {},
       });
 
-      expect(res.statusCode, res.body).toBe(200);
-      const body = JSON.parse(res.body);
-      expect(body.userName).toBe(userName);
-      expect(body.active).toBe(true);
+      expect(res.statusCode, res.body).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        detail: "Operations is required",
+        scimType: "invalidSyntax",
+      });
+      const row = await userRow(id);
+      expect(row?.username).toBe(userName);
+      expect(row?.role).toBe("user");
     });
   });
 
