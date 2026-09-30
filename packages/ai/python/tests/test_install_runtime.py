@@ -729,9 +729,10 @@ class InstallRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(install_runtime.PreflightError, "cgroup memory"):
                     self._real_effective_memory_bytes()
 
-    def test_effective_memory_fails_closed_when_a_non_root_limit_is_missing(
+    def test_effective_memory_fails_closed_when_a_non_root_level_has_neither_file(
         self,
     ) -> None:
+        # Only system.slice is broken: no memory.max and no cgroup.controllers.
         gib = 1024 * 1024 * 1024
         files = {
             "/proc/self/cgroup": "0::/system.slice/docker-deadbeef.scope\n",
@@ -742,6 +743,7 @@ class InstallRuntimeTests(unittest.TestCase):
             "/sys/fs/cgroup/system.slice/docker-deadbeef.scope/memory.max": str(
                 6 * gib
             ),
+            "/sys/fs/cgroup/cgroup.controllers": "cpuset cpu io memory pids\n",
         }
 
         def read_text(path, *args, **kwargs):
