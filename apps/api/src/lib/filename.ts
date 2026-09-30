@@ -129,21 +129,24 @@ export function sanitizeFilename(raw: string): string {
  * Two uploads may share a filename, and clients key results by name
  * (the X-File-Results map), so a collision would drop a result rather than
  * show it. Collisions get a `_1`, `_2`, ... suffix before the extension.
+ *
+ * Names are compared case-insensitively: local storage on macOS (APFS) and on
+ * Docker Desktop bind mounts treats Report.pdf and report.pdf as one file.
  */
 export function createUniqueNamer(): (name: string) => string {
   const used = new Set<string>();
   return (name) => {
-    if (!used.has(name)) {
-      used.add(name);
+    if (!used.has(name.toLowerCase())) {
+      used.add(name.toLowerCase());
       return name;
     }
     const dotIdx = name.lastIndexOf(".");
     const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
     const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
     let counter = 1;
-    while (used.has(`${base}_${counter}${ext}`)) counter++;
+    while (used.has(`${base}_${counter}${ext}`.toLowerCase())) counter++;
     const candidate = `${base}_${counter}${ext}`;
-    used.add(candidate);
+    used.add(candidate.toLowerCase());
     return candidate;
   };
 }

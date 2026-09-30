@@ -106,4 +106,25 @@ describe("Object Eraser HQ (inpaint-hq) feature gate", () => {
     expect(res.statusCode).not.toBe(501);
     expect(res.statusCode).toBe(202);
   });
+
+  it("keeps an image named mask.png separate from the mask part", async () => {
+    setInstalled(["object-eraser-colorize"]);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "mask.png", contentType: "image/png", content: PNG },
+      {
+        name: "mask",
+        filename: "mask.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/erase-object",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^Invalid mask:/);
+  });
 });

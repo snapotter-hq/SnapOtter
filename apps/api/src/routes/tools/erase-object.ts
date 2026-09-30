@@ -15,6 +15,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { createUniqueNamer } from "../../lib/filename.js";
 import {
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -79,16 +80,18 @@ export function registerEraseObject(app: FastifyInstance) {
       let qualityMode = "fast";
       let imageKey: string | null = null;
       let maskKey: string | null = null;
+      // The web client always names the mask part mask.png.
+      const uniqueName = createUniqueNamer();
 
       try {
         const parts = request.parts();
         for await (const part of parts) {
           if (part.type === "file") {
             if (part.fieldname === "mask") {
-              const upload = await receiveUpload(part, jobId);
+              const upload = await receiveUpload(part, jobId, { uniqueName });
               maskKey = upload.key;
             } else {
-              const upload = await receiveUpload(part, jobId);
+              const upload = await receiveUpload(part, jobId, { uniqueName });
               imageKey = upload.key;
               filename = upload.filename;
             }

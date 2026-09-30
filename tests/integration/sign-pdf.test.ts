@@ -159,6 +159,25 @@ describe("sign-pdf", () => {
     expect(body.details || body.error).toMatch(/password-protected|unlock/i);
   });
 
+  it("keeps a signature part named like the PDF separate from the PDF", async () => {
+    const res = await postFields([
+      { name: "file", filename: "doc.pdf", contentType: "application/pdf", content: PDF },
+      {
+        name: "sig0",
+        filename: "doc.pdf",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      {
+        name: "placements",
+        content: JSON.stringify([{ sig: 0, page: 0, x: 0, y: 0, w: 0.25, h: 0.1 }]),
+      },
+    ]);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^Invalid signature image:/);
+  });
+
   it("rejects an invalid signature image before enqueueing work", async () => {
     const res = await postFields([
       { name: "file", filename: "in.pdf", contentType: "application/pdf", content: PDF },

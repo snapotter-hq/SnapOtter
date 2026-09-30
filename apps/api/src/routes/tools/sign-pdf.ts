@@ -17,6 +17,7 @@ import {
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { createUniqueNamer } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer } from "../../lib/object-storage.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
@@ -68,6 +69,7 @@ export function registerSignPdf(app: FastifyInstance) {
     let saveModeRaw: string | null = null;
     let placementsRaw: string | null = null;
     const sigParts: Array<{ index: number; key: string }> = [];
+    const uniqueName = createUniqueNamer();
 
     try {
       for await (const part of request.parts()) {
@@ -78,10 +80,10 @@ export function registerSignPdf(app: FastifyInstance) {
               part.file.resume();
               continue;
             }
-            const upload = await receiveUpload(part, jobId);
+            const upload = await receiveUpload(part, jobId, { uniqueName });
             sigParts.push({ index: Number(m[1]), key: upload.key });
           } else {
-            const upload = await receiveUpload(part, jobId);
+            const upload = await receiveUpload(part, jobId, { uniqueName });
             pdfKey = upload.key;
             filename = upload.filename;
           }
