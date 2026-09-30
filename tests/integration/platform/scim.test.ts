@@ -1771,7 +1771,9 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       ]);
     });
 
-    it("treats name.formatted as a no-op and ignores unknown op types", async () => {
+    it("treats name.formatted as a no-op", async () => {
+      // An unknown op used to be skipped here too. It's refused now, applying
+      // nothing (#1731); see "refuses an op that isn't add, remove or replace".
       const { id, userName } = await createScimUser({ userName: uniqueName("scim-patch-noop") });
 
       const res = await crudApp.app.inject({
@@ -1779,10 +1781,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         url: `/api/v1/scim/v2/Users/${id}`,
         headers: authHeaders(),
         payload: {
-          Operations: [
-            { op: "replace", path: "name.formatted", value: "Display Name" },
-            { op: "bogus", path: "userName", value: "should-not-apply" },
-          ],
+          Operations: [{ op: "replace", path: "name.formatted", value: "Display Name" }],
         },
       });
 
