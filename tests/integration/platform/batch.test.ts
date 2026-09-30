@@ -444,6 +444,37 @@ describe("ClientJobId passthrough", () => {
     expect(res.headers["x-job-id"]).toBeDefined();
     expect((res.headers["x-job-id"] as string).length).toBeGreaterThan(0);
   });
+
+  // The parent insert fails on the primary key when the id is taken. That is
+  // the client's mistake, not a server fault, so it answers 409 and leaves the
+  // existing row alone (#1687).
+  it("answers 409 for a clientJobId that is already in use", async () => {
+    const clientJobId = `batch-1687-${randomUUID()}`;
+    const post = () => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 100 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      return app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+    };
+
+    const first = await post();
+    expect(first.statusCode).toBe(200);
+    const [before] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+
+    const second = await post();
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
+    expect(second.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(after).toEqual(before);
+  });
 });
 
 // ── Error handling ──────────────────────────────────────────────

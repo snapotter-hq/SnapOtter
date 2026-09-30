@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { TOOLS, toolSection } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,8 +52,8 @@ import { useToolResultClaims } from "@/stores/tool-result-claims";
  * click what the user clicks, and ask the guard what it would say next.
  *
  * The split that matters is per-item against whole-result. One tile or one page
- * claims nothing, because the claim is per tool and would answer for every tile
- * or page the user never took (#1123 review). The zip claims, because the zip
+ * claims only itself, so the guard keeps warning until every one of them has
+ * been taken (#1127). The zip claims the whole run at once, because the zip
  * really does contain all of them.
  */
 
@@ -85,8 +85,9 @@ const TILES = [
   { row: 0, col: 1, label: "2", width: 10, height: 10, blobUrl: "blob:tile-2" },
 ];
 
-function base64Result(filename: string) {
+function base64Result(filename: string, entryId: string) {
   return {
+    entryId,
     filename,
     mimeType: "image/png",
     width: 1,
@@ -137,12 +138,24 @@ afterEach(() => {
 describe("split download controls", () => {
   const ROUTE = routeFor("split");
 
-  function renderWithTiles() {
+  function renderWithTiles(fileCount = 1) {
+    useFileStore
+      .getState()
+      .setFiles(
+        Array.from(
+          { length: fileCount },
+          (_, i) => new File(["x"], `photo-${i}.png`, { type: "image/png" }),
+        ),
+      );
     const view = renderPanel(<SplitSettings />);
     // The mount effect clears tiles with the file set, so the run lands after
     // the panel is up, which is the order it happens in the app too.
     act(() => {
-      useSplitStore.setState({ tiles: TILES, zipBlobUrl: "blob:tiles.zip" });
+      useSplitStore.setState({
+        tiles: TILES,
+        runFileCount: fileCount,
+        zipBlobUrl: "blob:tiles.zip",
+      });
     });
     return view;
   }
@@ -152,15 +165,39 @@ describe("split download controls", () => {
 
     fireEvent.click(getByTitle("Download tile 1"));
 
-    expect(useToolResultClaims.getState().claimed.split).toBeUndefined();
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });
 
-  it("keeps warning after every tile is downloaded one at a time", () => {
+  it("goes quiet once every tile is downloaded one at a time", () => {
     const { getByTitle } = renderWithTiles();
 
     fireEvent.click(getByTitle("Download tile 1"));
     fireEvent.click(getByTitle("Download tile 2"));
+
+    expect(workAt(ROUTE)).toBeNull();
+  });
+
+  // The panel previews the first file's tiles only, while the zip carries every
+  // file's. Taking each tile on screen still leaves the other files' tiles
+  // untaken, so the tiles on screen are not the set here.
+  it("keeps warning when every tile on screen is downloaded from a multi-file run", () => {
+    const { getByTitle } = renderWithTiles(2);
+
+    fireEvent.click(getByTitle("Download tile 1"));
+    fireEvent.click(getByTitle("Download tile 2"));
+
+    expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+  });
+
+  it("warns again on a second run after every tile of the first was taken", () => {
+    const { getByTitle } = renderWithTiles();
+    fireEvent.click(getByTitle("Download tile 1"));
+    fireEvent.click(getByTitle("Download tile 2"));
+
+    // Same content, fresh objects: that is what a rerun of the same grid lands.
+    act(() => {
+      useSplitStore.setState({ tiles: TILES.map((t) => ({ ...t })) });
+    });
 
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });
@@ -173,6 +210,66 @@ describe("split download controls", () => {
     expect(workAt(ROUTE)).toBeNull();
   });
 
+  it("goes quiet once the zip of a multi-file run is downloaded", () => {
+    const { getByText } = renderWithTiles(2);
+
+    fireEvent.click(getByText("Download All as ZIP"));
+
+    expect(workAt(ROUTE)).toBeNull();
+  });
+
+  /**
+   * The run itself, not a seeded store: the file count has to be the one the run
+   * split, recorded with its tiles. The file store's live count drifts from it
+   * whenever the file set changes with the panel unmounted (a closed mobile
+   * sheet), because the effect that clears the tiles lives in the panel.
+   */
+  describe("a real run", () => {
+    /**
+     * What the split route answers per file: a zip of photo_r0_c0.png and
+     * photo_r0_c1.png, one byte each, stored. Built once with Python's zipfile;
+     * jszip belongs to apps/web and does not resolve from here.
+     */
+    const TWO_TILE_ZIP =
+      "UEsDBBQAAAAAAPlpPl0b3wWlAQAAAAEAAAAPAAAAcGhvdG9fcjBfYzAucG5nAVBLAwQUAAAAAAD5aT5doY4MPAEAAAABAAAADwAAAHBob3RvX3IwX2MxLnBuZwJQSwECFAMUAAAAAAD5aT5dG98FpQEAAAABAAAADwAAAAAAAAAAAAAAgAEAAAAAcGhvdG9fcjBfYzAucG5nUEsBAhQDFAAAAAAA+Wk+XaGODDwBAAAAAQAAAA8AAAAAAAAAAAAAAIABLgAAAHBob3RvX3IwX2MxLnBuZ1BLBQYAAAAAAgACAHoAAABcAAAAAAA=";
+
+    async function runSplit(fileCount: number) {
+      const bytes = Uint8Array.from(atob(TWO_TILE_ZIP), (c) => c.charCodeAt(0));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ ok: true, blob: async () => new Blob([bytes as BlobPart]) })),
+      );
+      const view = renderWithTiles(fileCount);
+      act(() => {
+        useSplitStore.setState({ tiles: [], zipBlobUrl: null });
+      });
+      fireEvent.click(view.getByTestId("split-submit"));
+      await waitFor(() => expect(useSplitStore.getState().tiles).toHaveLength(2));
+      return view;
+    }
+
+    it("goes quiet once every tile of a one-file run is downloaded", async () => {
+      const { getByTitle } = await runSplit(1);
+
+      fireEvent.click(getByTitle("Download tile 1"));
+      fireEvent.click(getByTitle("Download tile 2"));
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("keeps warning on a two-file run after the file set drops to one behind its back", async () => {
+      const { getByTitle, unmount } = await runSplit(2);
+      fireEvent.click(getByTitle("Download tile 1"));
+      fireEvent.click(getByTitle("Download tile 2"));
+
+      // The mobile sheet closes, and a single pasted file replaces the set.
+      unmount();
+      useFileStore.getState().setFiles([new File(["c"], "c.png", { type: "image/png" })]);
+
+      expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+    });
+  });
+
   // The claim has to be the same key the guard reads, not merely some key.
   // Claiming anything at all would pass the test above if the guard compared
   // presence instead of identity.
@@ -181,7 +278,7 @@ describe("split download controls", () => {
 
     fireEvent.click(getByText("Download All as ZIP"));
 
-    const claim = useToolResultClaims.getState().claimed.split;
+    const [claim] = useToolResultClaims.getState().claimed.split;
     expect(claim).toBeInstanceOf(WeakRef);
     expect((claim as WeakRef<object>).deref()).toBe(useSplitStore.getState().tiles);
   });
@@ -259,7 +356,33 @@ describe("pdf-to-image download controls", () => {
     expect(page).not.toBeNull();
     fireEvent.click(page as Element);
 
-    expect(useToolResultClaims.getState().claimed["pdf-to-image"]).toBeUndefined();
+    expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+  });
+
+  it("goes quiet once every page is downloaded one at a time", () => {
+    seedConverted();
+    const { container } = renderPanel(<PdfToImagePreview />);
+
+    for (const name of ["page-1.png", "page-2.png"]) {
+      const page = container.querySelector(`a[download="${name}"]`);
+      expect(page).not.toBeNull();
+      fireEvent.click(page as Element);
+    }
+
+    expect(workAt(ROUTE)).toBeNull();
+  });
+
+  it("warns again on a second run after every page of the first was taken", () => {
+    seedConverted();
+    const { container } = renderPanel(<PdfToImagePreview />);
+    for (const name of ["page-1.png", "page-2.png"]) {
+      fireEvent.click(container.querySelector(`a[download="${name}"]`) as Element);
+    }
+
+    act(() => {
+      usePdfToImageStore.setState({ results: PDF_PAGES.map((p) => ({ ...p })) });
+    });
+
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });
 
@@ -278,7 +401,7 @@ describe("pdf-to-image download controls", () => {
 
     fireEvent.click(getByTestId("pdf-to-image-download"));
 
-    const claim = useToolResultClaims.getState().claimed["pdf-to-image"];
+    const [claim] = useToolResultClaims.getState().claimed["pdf-to-image"];
     expect((claim as WeakRef<object>).deref()).toBe(usePdfToImageStore.getState().results);
   });
 
@@ -306,28 +429,129 @@ describe("image-to-base64 download controls", () => {
         new File(["a"], "a.png", { type: "image/png" }),
         new File(["b"], "b.png", { type: "image/png" }),
       ]);
-    useBase64Store.setState({ results: [base64Result("a.png"), base64Result("b.png")] });
+    const [a, b] = useFileStore.getState().entries;
+    useBase64Store.setState({
+      results: [base64Result("a.png", a.id), base64Result("b.png", b.id)],
+    });
   }
 
-  // The half that stops the single-result case being widened: with two results,
-  // taking one leaves the other, and the guard has to keep saying so.
+  // Pasted screenshots are all "image.png", so two files sharing a name is
+  // ordinary. Each entry has to show its own text, not the first match (#1701).
+  describe("two files with the same name", () => {
+    function seedSameName() {
+      useFileStore
+        .getState()
+        .setFiles([
+          new File(["a"], "image.png", { type: "image/png" }),
+          new File(["b"], "image.png", { type: "image/png" }),
+        ]);
+      const [first, second] = useFileStore.getState().entries;
+      useBase64Store.setState({
+        results: [
+          { ...base64Result("image.png", first.id), dataUri: "data:image/png;base64,Zmlyc3Q=" },
+          { ...base64Result("image.png", second.id), dataUri: "data:image/png;base64,c2Vjb25k" },
+        ],
+      });
+    }
+
+    it("shows the second file's text when the second entry is selected", () => {
+      seedSameName();
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+      expect(queryByText("data:image/png;base64,Zmlyc3Q=")).not.toBeNull();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+
+      expect(queryByText("data:image/png;base64,c2Vjb25k")).not.toBeNull();
+      expect(queryByText("data:image/png;base64,Zmlyc3Q=")).toBeNull();
+    });
+
+    it("goes quiet once both are saved one at a time", () => {
+      seedSameName();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      fireEvent.click(getByText("Download .txt"));
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      fireEvent.click(getByText("Download .txt"));
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("shows a failure against the entry that failed, not its namesake", () => {
+      useFileStore
+        .getState()
+        .setFiles([
+          new File(["a"], "image.png", { type: "image/png" }),
+          new File(["b"], "image.png", { type: "image/png" }),
+        ]);
+      const [first, second] = useFileStore.getState().entries;
+      useBase64Store.setState({
+        results: [base64Result("image.png", first.id)],
+        errors: [{ entryId: second.id, filename: "image.png", error: "Decode exploded" }],
+      });
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+
+      expect(queryByText("Decode exploded")).toBeNull();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+
+      expect(queryByText("Decode exploded")).not.toBeNull();
+    });
+  });
+
+  // With two results, taking one leaves the other, and the guard has to keep
+  // saying so.
   it("keeps warning after one file's text is saved out of two", () => {
     seedEncoded();
     const { getByText } = renderPanel(<ImageToBase64Results />);
 
     fireEvent.click(getByText("Download .txt"));
 
-    expect(useToolResultClaims.getState().claimed["image-to-base64"]).toBeUndefined();
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });
 
-  // The set rule where the set has one member: this file is everything the
-  // guard is warning about, and the copy-all bar does not render at all in that
-  // state, so the per-file controls are the only way to take the result.
+  it("goes quiet once every file's text is saved one at a time", () => {
+    seedEncoded();
+    const { getByText } = renderPanel(<ImageToBase64Results />);
+
+    fireEvent.click(getByText("Download .txt"));
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    fireEvent.click(getByText("Download .txt"));
+
+    expect(workAt(ROUTE)).toBeNull();
+  });
+
+  it("goes quiet once one file is saved and the other copied", async () => {
+    seedEncoded();
+    const { getByText } = renderPanel(<ImageToBase64Results />);
+
+    fireEvent.click(getByText("Download .txt"));
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    await act(async () => {
+      fireEvent.click(getByText("Copy to Clipboard"));
+    });
+
+    expect(workAt(ROUTE)).toBeNull();
+  });
+
+  // One encoded file is the whole set, and the copy-all bar does not render at
+  // all in that state, so the per-file controls are the only way to take it.
+  // Taking every file one at a time covers it with no special case.
   describe("a run that encoded one file", () => {
     function seedOne() {
       useFileStore.getState().setFiles([new File(["a"], "a.png", { type: "image/png" })]);
-      useBase64Store.setState({ results: [base64Result("a.png")] });
+      useBase64Store.setState({
+        results: [base64Result("a.png", useFileStore.getState().entries[0].id)],
+      });
     }
 
     it("goes quiet once that file's text is saved", () => {
@@ -364,14 +588,14 @@ describe("image-to-base64 download controls", () => {
       expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
     });
 
-    it("claims the results the guard is looking at", () => {
+    it("claims the file the guard is looking at", () => {
       seedOne();
       const { getByText } = renderPanel(<ImageToBase64Results />);
 
       fireEvent.click(getByText("Download .txt"));
 
-      const claim = useToolResultClaims.getState().claimed["image-to-base64"];
-      expect((claim as WeakRef<object>).deref()).toBe(useBase64Store.getState().results);
+      const [claim] = useToolResultClaims.getState().claimed["image-to-base64"];
+      expect((claim as WeakRef<object>).deref()).toBe(useBase64Store.getState().results[0]);
     });
   });
 
@@ -390,8 +614,27 @@ describe("image-to-base64 download controls", () => {
 
     fireEvent.click(getByText("Download All as Text"));
 
-    const claim = useToolResultClaims.getState().claimed["image-to-base64"];
+    const [claim] = useToolResultClaims.getState().claimed["image-to-base64"];
     expect((claim as WeakRef<object>).deref()).toBe(useBase64Store.getState().results);
+  });
+
+  it("warns again on a second run after every file of the first was taken", () => {
+    seedEncoded();
+    const { getByText } = renderPanel(<ImageToBase64Results />);
+    fireEvent.click(getByText("Download .txt"));
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    fireEvent.click(getByText("Download .txt"));
+
+    // Same images encoded again: identical text, fresh objects.
+    act(() => {
+      useBase64Store.setState({
+        results: useBase64Store.getState().results.map((r) => ({ ...r })),
+      });
+    });
+
+    expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });
 
   it("warns again on the results a second run produces", () => {
@@ -399,7 +642,10 @@ describe("image-to-base64 download controls", () => {
     const { getByText } = renderPanel(<ImageToBase64Results />);
     fireEvent.click(getByText("Download All as Text"));
 
-    useBase64Store.setState({ results: [base64Result("a.png"), base64Result("b.png")] });
+    const [a, b] = useFileStore.getState().entries;
+    useBase64Store.setState({
+      results: [base64Result("a.png", a.id), base64Result("b.png", b.id)],
+    });
 
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });

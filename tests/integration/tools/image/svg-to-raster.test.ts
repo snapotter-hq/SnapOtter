@@ -5,12 +5,15 @@
  * that validates SVG input separately from the standard image validation.
  */
 
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../../test-server.js";
@@ -1307,5 +1310,130 @@ describe("svg-to-raster", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toBe("application/zip");
+  });
+});
+
+describe("svg-to-raster batch reserves its job id (#1686)", () => {
+  let owner: { token: string; userId: string };
+
+  beforeAll(async () => {
+    owner = await createUserAndLogin(app, "svgbatchowner");
+  });
+
+  function postBatch(
+    toolId: string,
+    opts: { clientJobId: string; token?: string; settings?: string },
+  ) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+      { name: "settings", content: opts.settings ?? JSON.stringify({}) },
+      { name: "clientJobId", content: opts.clientJobId },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: `/api/v1/tools/image/${toolId}/batch`,
+      headers: { authorization: `Bearer ${opts.token ?? adminToken}`, "content-type": contentType },
+      body,
+    });
+  }
+
+  async function readRow(id: string) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
+    return row;
+  }
+
+  /** The terminal frame is persisted fire and forget, so poll for it. */
+  async function readSettledRow(id: string) {
+    for (let i = 0; i < 100; i++) {
+      const row = await readRow(id);
+      if (row?.status === "completed" || row?.status === "failed") return row;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return readRow(id);
+  }
+
+  it("records the run under the requesting user, with no tool id", async () => {
+    const clientJobId = "svg-batch-1686-owned";
+    const res = await postBatch("svg-to-raster", { clientJobId, token: owner.token });
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+
+    const row = await readSettledRow(clientJobId);
+    expect(row?.userId).toBe(owner.userId);
+    expect(row?.type).toBe("batch");
+    // A tool id would make reconciliation treat this inline run as queued work.
+    expect(row?.toolId).toBeNull();
+    expect(row?.status).toBe("completed");
+  });
+
+  it("answers 409 for a clientJobId that names another user's job, and leaves that job alone", async () => {
+    const victimId = "svg-batch-1686-victim";
+    await db.insert(schema.jobs).values({
+      id: victimId,
+      userId: owner.userId,
+      toolId: "resize",
+      type: "tool",
+      status: "processing",
+      inputRefs: [],
+    });
+    const before = await readRow(victimId);
+
+    const res = await postBatch("svg-to-raster", { clientJobId: victimId });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toMatchObject({ code: "CONFLICT" });
+
+    // Progress writes are fire and forget, so give a stray one time to land
+    // before checking that none did.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(victimId)).toEqual(before);
+  });
+
+  it("answers 409 when a client reuses the id of its own finished run", async () => {
+    const clientJobId = "svg-batch-1686-reused";
+    const first = await postBatch("svg-to-raster", { clientJobId, token: owner.token });
+    expect(first.statusCode, first.body.slice(0, 300)).toBe(200);
+    const settled = await readSettledRow(clientJobId);
+    expect(settled?.status).toBe("completed");
+
+    const second = await postBatch("svg-to-raster", { clientJobId, token: owner.token });
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(clientJobId)).toEqual(settled);
+  });
+
+  // The presets register the same batch handler under their own ids.
+  it("reserves the id on a preset route too", async () => {
+    const victimId = "svg-batch-1686-preset-victim";
+    await db.insert(schema.jobs).values({
+      id: victimId,
+      userId: owner.userId,
+      type: "batch",
+      status: "completed",
+      inputRefs: [],
+    });
+    const before = await readRow(victimId);
+
+    const res = await postBatch("svg-to-png", { clientJobId: victimId });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(victimId)).toEqual(before);
+  });
+
+  // The reservation comes after validation, so a rejected request leaves no
+  // row behind to block the client's corrected retry under the same id.
+  it("leaves no row behind when the settings are rejected", async () => {
+    const clientJobId = "svg-batch-1686-bad-settings";
+    const res = await postBatch("svg-to-raster", {
+      clientJobId,
+      token: owner.token,
+      settings: JSON.stringify({ outputFormat: "bmp" }),
+    });
+    expect(res.statusCode).toBe(400);
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(clientJobId)).toBeUndefined();
   });
 });

@@ -82,6 +82,8 @@ describe("decodeHeic reading its output", () => {
     failures.next = outOfMemory;
     const err = await decodeError(readFixture(fixtures.image.formats("heic")));
     expect(isDecoderUnavailable(err)).toBe(true);
+    // Its own name, so reporting can tell it from a missing decoder (#1628).
+    expect(err.name).toBe("DecoderOutOfMemoryError");
     expect(err.cause).toBe(outOfMemory);
     expect(err.message).not.toMatch(/libheif|install/i);
   });
@@ -136,6 +138,7 @@ describe("decodeHeic when heif-dec is killed", () => {
     failures.kill = { killed: false, code: null, signal: "SIGKILL" };
     const err = await decodeError(readFixture(fixtures.image.formats("heic")));
     expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
     expect((err.cause as { signal?: string }).signal).toBe("SIGKILL");
   });
 

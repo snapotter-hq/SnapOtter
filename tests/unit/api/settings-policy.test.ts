@@ -12,6 +12,8 @@ describe("settings policy registry", () => {
     { key: "tempFileMaxAgeHours", input: "1.5", expected: "1.5" },
     { key: "startupCleanup", input: true, expected: "true" },
     { key: "jobsRetentionDays", input: 30, expected: "30" },
+    // Surrounding whitespace is still accepted; only an all-blank value is refused (#1695).
+    { key: "maxSessionsPerUser", input: " 30 ", expected: "30" },
     // 0 is a valid override here: it disables the login throttle.
     { key: "loginThrottleMaxFailures", input: 0, expected: "0" },
     { key: "loginThrottleWindowSeconds", input: "900", expected: "900" },
@@ -36,6 +38,13 @@ describe("settings policy registry", () => {
     { key: "passwordMinLength", input: "7" },
     { key: "disabledTools", input: "not-json" },
     { key: "ssoBreakGlassUsername", input: "invalid username" },
+    // Number("") is 0, and 0 means unlimited or off for these keys (#1695).
+    { key: "maxSessionsPerUser", input: "" },
+    { key: "maxSessionsPerUser", input: "   " },
+    { key: "jobsRetentionDays", input: "" },
+    { key: "sessionIdleTimeoutMinutes", input: "\t" },
+    { key: "fileUploadLimitMb", input: "" },
+    { key: "tempFileMaxAgeHours", input: "  " },
   ])("rejects invalid $key values", ({ key, input }) => {
     const result = prepareSetting(key, input);
 

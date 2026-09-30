@@ -185,11 +185,12 @@ Unit and integration tests need Postgres + Redis:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
-export DATA_DIR=/tmp/so-test-data && mkdir -p "$DATA_DIR"
 ```
 
-Each Vitest fork gets its own Postgres DB clone + workspace + library-file folder + isolated `BULLMQ_PREFIX`
-via `tests/setup/per-fork-env.ts` (testcontainers for Postgres). 30s test timeouts.
+Each Vitest fork gets its own Postgres DB clone + workspace + library-file folder + data dir + log dir +
+isolated `BULLMQ_PREFIX` via `tests/setup/per-fork-env.ts` (testcontainers for Postgres), so an exported
+`DATA_DIR` is ignored. The exception is `REQUIRE_AI_FEATURES=1`, which keeps your `DATA_DIR` so the
+installed-AI contracts can find the bundles installed there. 30s test timeouts.
 
 ### E2E Projects
 

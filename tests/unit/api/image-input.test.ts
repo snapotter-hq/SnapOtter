@@ -37,6 +37,7 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
     await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
   return {
     DecoderUnavailableError: actual.DecoderUnavailableError,
+    DecoderOutOfMemoryError: actual.DecoderOutOfMemoryError,
     isDecoderUnavailable: actual.isDecoderUnavailable,
     decodeAnyFormat: mocks.decodeAnyFormat,
     decodeToSharpCompat: mocks.decodeToSharpCompat,
@@ -59,7 +60,10 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
   sanitizeSvg: mocks.sanitizeSvg,
 }));
 
-import { DecoderUnavailableError } from "../../../apps/api/src/lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+} from "../../../apps/api/src/lib/format-decoders.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { ImageInputHandler } from "../../../apps/api/src/modality/image-input.js";
 
@@ -236,6 +240,21 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
       message: "No HEIF decoder found.",
+    });
+  });
+
+  it("keeps the decoder's out-of-memory error as the 503's cause (#1628)", async () => {
+    // Reporting tells it from a missing decoder by the cause's name, so the
+    // wrapper has to carry the original through.
+    detected("heif");
+    mocks.decodeHeic.mockRejectedValue(
+      new DecoderOutOfMemoryError("The HEIF decoder ran out of memory."),
+    );
+
+    await expect(prepare("photo.heic")).rejects.toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
     });
   });
 

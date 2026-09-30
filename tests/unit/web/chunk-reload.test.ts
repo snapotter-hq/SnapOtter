@@ -193,4 +193,97 @@ describe("installChunkReloadHandler", () => {
       uninstall = installChunkReloadHandler(reload);
     });
   });
+
+  describe("a leave announced only by the Navigation API (#1479)", () => {
+    // iOS Safari never fires beforeunload, so on iPhone and iPad the handler
+    // used to reload and cancel the navigation. Verified in the iOS 27
+    // Simulator: `navigate` does fire, with a cross-document destination,
+    // before the import is aborted.
+    let navigation: EventTarget;
+
+    function navigate(init: {
+      sameDocument: boolean;
+      downloadRequest?: string | null;
+      url?: string;
+    }): void {
+      const event = Object.assign(new Event("navigate"), {
+        destination: {
+          sameDocument: init.sameDocument,
+          url: init.url ?? "https://snapotter.example/logout",
+        },
+        downloadRequest: init.downloadRequest ?? null,
+      });
+      navigation.dispatchEvent(event);
+    }
+
+    beforeEach(() => {
+      uninstall();
+      navigation = new EventTarget();
+      Object.defineProperty(window, "navigation", { value: navigation, configurable: true });
+      uninstall = installChunkReloadHandler(reload);
+    });
+
+    afterEach(() => {
+      Reflect.deleteProperty(window, "navigation");
+    });
+
+    it("does not reload after a cross-document navigation starts", () => {
+      navigate({ sameDocument: false });
+      vi.advanceTimersByTime(200);
+      const event = fireChunkError();
+
+      expect(reload).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it("still reloads after an in-app (same-document) navigation", () => {
+      // React Router's pushState navigations fire `navigate` too; the page
+      // stays, so a chunk failure there is a real one.
+      navigate({ sameDocument: true });
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reloads after a download, which does not leave the page", () => {
+      navigate({ sameDocument: false, downloadRequest: "result.zip" });
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reloads after a bare <a download>, whose downloadRequest is an empty string", () => {
+      // ResultDownloadLink renders download="" (download={name ?? true}).
+      navigate({ sameDocument: false, downloadRequest: "" });
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reloads after a mailto: link, which hands off to another app", () => {
+      // Chromium fires a cross-document navigate for mailto: while the page
+      // stays put (checked in Chromium 1.61's build; Firefox and WebKit don't).
+      navigate({ sameDocument: false, url: "mailto:contact@snapotter.com" });
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("reloads again once the leaving window has passed", () => {
+      navigate({ sameDocument: false });
+      vi.advanceTimersByTime(LEAVING_WINDOW_MS + 1);
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops listening to the Navigation API once uninstalled", () => {
+      const remove = vi.spyOn(navigation, "removeEventListener");
+      uninstall();
+
+      expect(remove).toHaveBeenCalledWith("navigate", expect.any(Function));
+      remove.mockRestore();
+      uninstall = installChunkReloadHandler(reload);
+    });
+  });
 });

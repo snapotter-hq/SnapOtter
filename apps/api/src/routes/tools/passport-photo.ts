@@ -14,6 +14,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
+import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
@@ -161,6 +162,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
       let fileBuffer: Buffer | null = null;
       let filename = "image";
       let clientJobId: string | null = null;
+      let clientJobIdRaw: string | null = null;
 
       try {
         const parts = request.parts();
@@ -171,16 +173,19 @@ export function registerPassportPhoto(app: FastifyInstance) {
             fileBuffer = Buffer.concat(chunks);
             filename = sanitizeFilename(part.filename ?? "image");
           } else if (part.fieldname === "clientJobId") {
-            const raw = part.value as string;
-            if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-              clientJobId = raw;
-            }
+            clientJobIdRaw = part.value as string;
           }
         }
       } catch (err) {
         const failure = multipartFailure(err);
         return reply.status(failure.status).send(failure.body);
       }
+
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
       if (!fileBuffer || fileBuffer.length === 0) {
         return reply.status(400).send({ error: "No image file provided" });

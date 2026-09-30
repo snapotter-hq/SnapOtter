@@ -153,9 +153,8 @@ class InstallRuntimeTests(unittest.TestCase):
         self.fixture = RuntimeFixture(self.root)
         self.host = install_runtime.HostInfo(platform="linux", machine="x86_64")
         # Installs would otherwise probe the real host's cgroup memory, which
-        # makes the suite depend on the host: without a private cgroup
-        # namespace (GitHub runners, bare WSL2) the probe reaches the cgroup v2
-        # root and fails (#1636). The probe's own tests call the real function.
+        # makes the suite depend on the host's cgroup layout and limits. The
+        # probe's own tests call the real function.
         self._real_effective_memory_bytes = install_runtime._effective_memory_bytes
         memory_probe = mock.patch.object(
             install_runtime, "_effective_memory_bytes", return_value=64 * 1024**3
@@ -644,12 +643,120 @@ class InstallRuntimeTests(unittest.TestCase):
                 6 * gib
             ),
             "/sys/fs/cgroup/system.slice/memory.max": str(5 * gib),
-            "/sys/fs/cgroup/memory.max": "max\n",
+            # The v2 root never has memory.max, only cgroup.controllers.
+            "/sys/fs/cgroup/cgroup.controllers": "cpuset cpu io memory pids\n",
         }
         with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
             Path, "read_text", new=read_from(host_files)
         ):
             self.assertEqual(self._real_effective_memory_bytes(), 5 * gib)
+
+    def test_effective_memory_treats_levels_without_the_memory_controller_as_unlimited(
+        self,
+    ) -> None:
+        # Raspberry Pi OS boots with cgroup_disable=memory: no level has
+        # memory.max, every level still has cgroup.controllers. The API's
+        # probe (packages/ai/src/runtime-resources.ts) reads that as no limit
+        # and so must the installer, or the two disagree (#1672).
+        gib = 1024 * 1024 * 1024
+        scope = "/sys/fs/cgroup/user.slice/user-1000.slice/session-1.scope"
+        files = {
+            "/proc/self/cgroup": "0::/user.slice/user-1000.slice/session-1.scope\n",
+            "/proc/self/mountinfo": (
+                "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+                "- cgroup2 cgroup rw\n"
+            ),
+            f"{scope}/cgroup.controllers": "cpuset cpu io pids\n",
+            "/sys/fs/cgroup/user.slice/user-1000.slice/cgroup.controllers": (
+                "cpuset cpu io pids\n"
+            ),
+            "/sys/fs/cgroup/user.slice/cgroup.controllers": "cpuset cpu io pids\n",
+            "/sys/fs/cgroup/cgroup.controllers": "cpuset cpu io pids\n",
+        }
+
+        def read_text(path, *args, **kwargs):
+            value = files.get(str(path))
+            if value is None:
+                raise FileNotFoundError(path)
+            return value
+
+        with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+            Path, "read_text", new=read_text
+        ):
+            self.assertEqual(self._real_effective_memory_bytes(), 8 * gib)
+
+        # A limit below a level without the controller still applies.
+        files[f"{scope}/memory.max"] = str(3 * gib)
+        with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+            Path, "read_text", new=read_text
+        ):
+            self.assertEqual(self._real_effective_memory_bytes(), 3 * gib)
+
+    def test_effective_memory_fails_closed_when_a_missing_limit_has_no_controllers_file(
+        self,
+    ) -> None:
+        # A missing memory.max only means "no controller here" when the level
+        # itself is readable; otherwise the cgroup is gone or hidden.
+        gib = 1024 * 1024 * 1024
+        cases = {
+            "private namespace root": {
+                "/proc/self/cgroup": "0::/\n",
+                "/proc/self/mountinfo": (
+                    "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+                    "- cgroup2 cgroup rw\n"
+                ),
+            },
+            "cgroup v1 mount point": {
+                "/proc/self/cgroup": "5:memory:/\n",
+                "/proc/self/mountinfo": (
+                    "30 23 0:27 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime "
+                    "- cgroup cgroup rw,memory\n"
+                ),
+                # v1 has no cgroup.controllers fallback: this must not rescue it.
+                "/sys/fs/cgroup/memory/cgroup.controllers": "memory\n",
+            },
+        }
+        for label, files in cases.items():
+            def read_text(path, *args, _files=files, **kwargs):
+                value = _files.get(str(path))
+                if value is None:
+                    raise FileNotFoundError(path)
+                return value
+
+            with self.subTest(label), mock.patch.object(
+                os, "sysconf", side_effect=[8 * gib, 1]
+            ), mock.patch.object(Path, "read_text", new=read_text):
+                with self.assertRaisesRegex(install_runtime.PreflightError, "cgroup memory"):
+                    self._real_effective_memory_bytes()
+
+    def test_effective_memory_fails_closed_when_a_non_root_level_has_neither_file(
+        self,
+    ) -> None:
+        # Only system.slice is broken: no memory.max and no cgroup.controllers.
+        gib = 1024 * 1024 * 1024
+        files = {
+            "/proc/self/cgroup": "0::/system.slice/docker-deadbeef.scope\n",
+            "/proc/self/mountinfo": (
+                "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+                "- cgroup2 cgroup rw\n"
+            ),
+            "/sys/fs/cgroup/system.slice/docker-deadbeef.scope/memory.max": str(
+                6 * gib
+            ),
+            "/sys/fs/cgroup/cgroup.controllers": "cpuset cpu io memory pids\n",
+        }
+
+        def read_text(path, *args, **kwargs):
+            value = files.get(str(path))
+            if value is None:
+                raise FileNotFoundError(path)
+            return value
+
+        with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+            Path, "read_text", new=read_text
+        ):
+            with self.assertRaisesRegex(install_runtime.PreflightError, "cgroup memory"):
+                self._real_effective_memory_bytes()
 
     def test_effective_memory_fails_closed_for_unreadable_identified_controller(
         self,
@@ -710,6 +817,167 @@ class InstallRuntimeTests(unittest.TestCase):
                     install_runtime.PreflightError, "cgroup memory"
                 ):
                     self._real_effective_memory_bytes()
+
+    def test_effective_memory_failures_name_the_file_and_the_reason(self) -> None:
+        # Each refusal says which file and what was wrong with it, worded like
+        # packages/ai/src/runtime-resources.ts, and keeps the OS error as the
+        # cause. The CLI prints only the message, so a read failure carries
+        # the OS reason in it too (#1673).
+        gib = 1024 * 1024 * 1024
+        v2_mount = (
+            "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+            "- cgroup2 cgroup rw\n"
+        )
+        v1_mount = (
+            "30 23 0:27 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime "
+            "- cgroup cgroup rw,memory\n"
+        )
+        scope = "/sys/fs/cgroup/docker/deadbeef"
+        denied = PermissionError(13, "Permission denied")
+        cases = [
+            (
+                "cgroup membership unreadable",
+                {"/proc/self/cgroup": denied},
+                r"^unable to read the process cgroup memory capacity from "
+                r"/proc/self/cgroup: Permission denied$",
+                PermissionError,
+            ),
+            (
+                "cgroup membership empty",
+                {"/proc/self/cgroup": ""},
+                r"^unable to resolve the process cgroup memory capacity: "
+                r"/proc/self/cgroup is empty$",
+                None,
+            ),
+            (
+                "cgroup membership line unrecognised",
+                {"/proc/self/cgroup": "malformed-membership\n"},
+                r'^unable to resolve the process cgroup memory capacity: '
+                r'unrecognised /proc/self/cgroup line "malformed-membership"$',
+                None,
+            ),
+            (
+                "mountinfo unreadable",
+                {"/proc/self/cgroup": "0::/docker/deadbeef\n", "/proc/self/mountinfo": denied},
+                r"^unable to read the process cgroup memory capacity from "
+                r"/proc/self/mountinfo: Permission denied$",
+                PermissionError,
+            ),
+            (
+                "no mount covers the membership",
+                {"/proc/self/cgroup": "0::/docker/deadbeef\n", "/proc/self/mountinfo": v1_mount},
+                r'^unable to resolve the process cgroup memory capacity: no cgroup2 '
+                r'memory mount in /proc/self/mountinfo covers "/docker/deadbeef"$',
+                None,
+            ),
+            (
+                "limit file unreadable",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": denied,
+                },
+                rf"^unable to read the process cgroup memory capacity from "
+                rf"{scope}/memory.max: Permission denied$",
+                PermissionError,
+            ),
+            (
+                "limit file malformed",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": "lots\n",
+                },
+                rf'^malformed cgroup memory capacity in {scope}/memory.max: "lots"$',
+                None,
+            ),
+            (
+                "absent memory.max on a level that isn't readable",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": str(6 * gib),
+                },
+                r"^unable to read the process cgroup memory capacity from "
+                r"/sys/fs/cgroup/docker/cgroup.controllers \(memory.max is absent\): "
+                r"No such file or directory$",
+                FileNotFoundError,
+            ),
+            (
+                "limit file not ASCII",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": UnicodeDecodeError(
+                        "ascii", b"\xff", 0, 1, "ordinal not in range(128)"
+                    ),
+                },
+                rf"^unable to read the process cgroup memory capacity from "
+                rf"{scope}/memory.max: 'ascii' codec can't decode byte 0xff",
+                UnicodeDecodeError,
+            ),
+            (
+                "limit path with an embedded NUL",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    # mountinfo octal-escapes the mount point; \000 decodes to NUL.
+                    "/proc/self/mountinfo": (
+                        "29 23 0:26 / /sys/fs/cg\\000roup rw,nosuid,nodev,noexec,relatime "
+                        "- cgroup2 cgroup rw\n"
+                    ),
+                    "/sys/fs/cg\x00roup/docker/deadbeef/memory.max": ValueError(
+                        "embedded null byte"
+                    ),
+                },
+                r"^unable to read the process cgroup memory capacity from "
+                r"/sys/fs/cg\x00roup/docker/deadbeef/memory.max: embedded null byte$",
+                ValueError,
+            ),
+            (
+                "long malformed value is cut to 64 characters",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": "x" * 100,
+                },
+                rf'^malformed cgroup memory capacity in {scope}/memory.max: "{"x" * 64}"$',
+                None,
+            ),
+            (
+                "no cgroup v1 memory mount covers the membership",
+                {"/proc/self/cgroup": "5:memory:/job\n", "/proc/self/mountinfo": v2_mount},
+                r'^unable to resolve the process cgroup memory capacity: no cgroup v1 '
+                r'memory mount in /proc/self/mountinfo covers "/job"$',
+                None,
+            ),
+            (
+                "cgroup v1 limit file missing",
+                {"/proc/self/cgroup": "5:memory:/\n", "/proc/self/mountinfo": v1_mount},
+                r"^unable to read the process cgroup memory capacity from "
+                r"/sys/fs/cgroup/memory/memory.limit_in_bytes: No such file or directory$",
+                FileNotFoundError,
+            ),
+        ]
+        for label, files, message, cause in cases:
+            def read_text(path, *args, _files=files, **kwargs):
+                value = _files.get(str(path))
+                if value is None:
+                    raise FileNotFoundError(2, "No such file or directory", str(path))
+                if isinstance(value, BaseException):
+                    raise value
+                return value
+
+            with self.subTest(label), mock.patch.object(
+                sys, "platform", "linux"
+            ), mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+                Path, "read_text", new=read_text
+            ):
+                with self.assertRaisesRegex(install_runtime.PreflightError, message) as raised:
+                    self._real_effective_memory_bytes()
+                if cause is None:
+                    self.assertIsNone(raised.exception.__cause__)
+                else:
+                    self.assertIsInstance(raised.exception.__cause__, cause)
 
     def test_model_digests_must_bind_to_files_in_the_exact_manifest(self) -> None:
         artifact = self.fixture.artifact()

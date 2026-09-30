@@ -12,7 +12,9 @@
  * response ZIP holds one per-PDF ZIP per input, in upload order.
  */
 import AdmZip from "adm-zip";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -430,5 +432,116 @@ describe("pdf-to-image endpoints enforce tool access", () => {
       });
       expect(res.statusCode, `${suffix || "/"} -> ${res.body.slice(0, 200)}`).toBe(200);
     }
+  });
+});
+
+/**
+ * The route used the client's clientJobId as its progress row id without
+ * reserving it, and the progress persist updates whatever row has that id. A
+ * request reusing another job's id wrote into that job's row, and since #1443
+ * a storage fault could fail it (#1554).
+ */
+describe("pdf-to-image batch reserves its job id (#1554)", () => {
+  let owner: { token: string; userId: string };
+
+  beforeAll(async () => {
+    owner = await createUserAndLogin(app, "pdfbatchowner");
+  });
+
+  async function readRow(id: string) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, id));
+    return row;
+  }
+
+  /** The terminal frame is persisted fire and forget, so poll for it. */
+  async function readSettledRow(id: string) {
+    for (let i = 0; i < 100; i++) {
+      const row = await readRow(id);
+      if (row?.status === "completed" || row?.status === "failed") return row;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return readRow(id);
+  }
+
+  it("records the run under the requesting user, with no tool id", async () => {
+    const clientJobId = "batch-1554-owned";
+    const res = await postBatch(
+      "pdf-to-jpg",
+      [{ filename: "a.pdf", content: PDF_3PAGE }],
+      { dpi: 72 },
+      { clientJobId, token: owner.token },
+    );
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+
+    const row = await readSettledRow(clientJobId);
+    expect(row?.userId).toBe(owner.userId);
+    expect(row?.type).toBe("batch");
+    // A tool id would make reconciliation treat this inline run as queued work.
+    expect(row?.toolId).toBeNull();
+    expect(row?.status).toBe("completed");
+  });
+
+  it("answers 409 for a clientJobId that names another user's job, and leaves that job alone", async () => {
+    const victimId = "batch-1554-victim";
+    await db.insert(schema.jobs).values({
+      id: victimId,
+      userId: owner.userId,
+      toolId: "resize",
+      type: "tool",
+      status: "processing",
+      inputRefs: [],
+    });
+    const before = await readRow(victimId);
+
+    // Stands in for output the other job already wrote under the shared prefix.
+    const { objectExists, putObject } = await import(
+      "../../../../apps/api/src/lib/object-storage.js"
+    );
+    const victimOutput = `outputs/${victimId}-f0/page-1.jpg`;
+    await putObject(victimOutput, Buffer.from("not ours"));
+
+    const res = await postBatch(
+      "pdf-to-jpg",
+      [
+        { filename: "a.pdf", content: PDF_3PAGE },
+        { filename: "b.pdf", content: PDF_2PAGE },
+      ],
+      { dpi: 72 },
+      { clientJobId: victimId },
+    );
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toMatchObject({ code: "CONFLICT" });
+
+    // Progress writes are fire and forget, so give a stray one time to land
+    // before checking that none did.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(victimId)).toEqual(before);
+    expect(await objectExists(victimOutput)).toBe(true);
+    expect(await objectExists(`outputs/${victimId}-f1/b-pages.zip`)).toBe(false);
+  });
+
+  it("answers 409 when a client reuses the id of its own finished run", async () => {
+    const clientJobId = "batch-1554-reused";
+    const first = await postBatch(
+      "pdf-to-jpg",
+      [{ filename: "a.pdf", content: PDF_3PAGE }],
+      { dpi: 72 },
+      { clientJobId, token: owner.token },
+    );
+    expect(first.statusCode, first.body.slice(0, 300)).toBe(200);
+    const settled = await readSettledRow(clientJobId);
+    expect(settled?.status).toBe("completed");
+
+    const second = await postBatch(
+      "pdf-to-jpg",
+      [{ filename: "b.pdf", content: PDF_2PAGE }],
+      { dpi: 72 },
+      { clientJobId, token: owner.token },
+    );
+    expect(second.statusCode, second.body.slice(0, 300)).toBe(409);
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await readRow(clientJobId)).toEqual(settled);
   });
 });

@@ -1187,29 +1187,4 @@ describe("Logout", () => {
       .where(eq(schema.sessions.id, sessionToken));
     expect(after).toBeUndefined();
   });
-
-  it("logout returns logoutUrl when session has idToken and OIDC discovery is cached", async () => {
-    const { sessionToken } = await createOidcUser();
-
-    // The default createOidcUser sets idToken to "mock-id-token-jwt".
-    // Without a running OIDC provider and cached discovery, the logout
-    // route's try/catch will swallow the error and return no logoutUrl.
-    // We still verify the response shape is correct.
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/logout",
-      cookies: { "snapotter-session": sessionToken },
-    });
-
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
-    expect(body.ok).toBe(true);
-    // logoutUrl is only present when OIDC discovery has been cached with
-    // an end_session_endpoint. In test env without mock provider, it is
-    // absent. We verify it's either undefined or a string URL.
-    if (body.logoutUrl !== undefined) {
-      expect(typeof body.logoutUrl).toBe("string");
-      expect(body.logoutUrl).toContain("id_token_hint=");
-    }
-  });
 });

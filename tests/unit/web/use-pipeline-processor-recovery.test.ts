@@ -835,6 +835,458 @@ describe("usePipelineProcessor handler errors (#1287)", () => {
   });
 });
 
+/**
+ * #1352: a failed single run must fail its entry too. The Automate result pane
+ * gates its failure card on status === "failed" and the thumbnail strip draws
+ * its failed badge off the same status, so an entry left at "processing" hides
+ * the failure everywhere but the side-panel banner.
+ */
+describe("usePipelineProcessor single-run entry settle (#1352)", () => {
+  function expectEntryFailed(message: string) {
+    expect(useFileStore.getState().error).toBe(message);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0]).toMatchObject({ status: "failed", error: message });
+  }
+
+  it("fails the entry on a failed frame", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "Step 2: kaboom" });
+    });
+
+    expectEntryFailed("Step 2: kaboom");
+    unmount();
+  });
+
+  it("falls back to a generic message for a failed frame with no error", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0 });
+    });
+
+    expectEntryFailed("Processing failed");
+    unmount();
+  });
+
+  it("fails the entry on an app error response", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "Step 1 (resize): width must be positive" });
+      xhrs[0].onload?.();
+    });
+
+    // parseApiError is mocked to "error" in this file.
+    expectEntryFailed("error");
+    unmount();
+  });
+
+  it("fails the entry on an error response whose body is not JSON", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 500;
+      xhrs[0].responseText = "<html>Internal Server Error</html>";
+      xhrs[0].onload?.();
+    });
+
+    expectEntryFailed("Processing failed: 500");
+    unmount();
+  });
+
+  it("fails the entry on a canceled error response with the literal Canceled", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "Canceled", canceled: true });
+      xhrs[0].onload?.();
+    });
+
+    expectEntryFailed("Canceled");
+    unmount();
+  });
+
+  it("fails the entry on a 2xx body that does not parse", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = "not json";
+      xhrs[0].onload?.();
+    });
+
+    expectEntryFailed("Invalid response from server");
+    unmount();
+  });
+
+  it("fails the entry when the socket dies mid-upload", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+
+    expectEntryFailed("Processing was interrupted. Retry when reconnected.");
+    unmount();
+  });
+
+  it("fails the entry when the request times out mid-upload", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].ontimeout?.();
+    });
+
+    expectEntryFailed("Request timed out - the server may be overloaded. Try again.");
+    unmount();
+  });
+
+  it("fails the entry when the server never confirms a degraded run", () => {
+    vi.useFakeTimers();
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+
+    act(() => {
+      vi.advanceTimersByTime(30_001);
+    });
+
+    expectEntryFailed(
+      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+    );
+    unmount();
+  });
+
+  it("fails the entry with Canceled when the cancel finds no job server-side", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) })),
+    );
+    const { unmount } = startSingleRun();
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    expectEntryFailed("Canceled");
+    unmount();
+  });
+
+  it("fails the entry when frame handling throws before the result is written", () => {
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    // Only the completion write throws; the settle that follows must land.
+    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+        }),
+      ).toThrow("boom");
+
+      expectEntryFailed("Something went wrong while tracking this job. Try again.");
+    } finally {
+      spy.mockRestore();
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      unmount();
+    }
+  });
+
+  it("keeps a written result when frame handling throws after it", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    // Breaks clearActiveJob's store write, after the completion branch has
+    // already written the result to the entry.
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("listener broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+        }),
+      ).toThrow("listener broke");
+
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "completed",
+        processedUrl: SINGLE_RESULT.downloadUrl,
+      });
+    } finally {
+      unsubscribe();
+      unmount();
+    }
+  });
+
+  it("fails the entry when a batch terminal frame reaches a single run", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => {
+      sendBatchFrame({ status: "failed", totalFiles: 1, completedFiles: 1, failedFiles: 1 });
+    });
+
+    expectEntryFailed("Processing was interrupted. Retry when reconnected.");
+    unmount();
+  });
+
+  it("finishes the run when failing the entry throws too", () => {
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startSingleRun();
+    // Both the completion write and the settle after it throw: the run must
+    // still end, with the banner up and the cancel handle disarmed.
+    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      // The good body parsed, so the store's own throw is what surfaces
+      // (#1354), not a claim that the server sent garbage.
+      expect(() =>
+        act(() => {
+          xhrs[0].upload.onload?.();
+          xhrs[0].status = 200;
+          xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+          xhrs[0].onload?.();
+        }),
+      ).toThrow("store broke");
+
+      expect(useFileStore.getState().error).toBe(
+        "Something went wrong while tracking this job. Try again.",
+      );
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failing the run's entry failed",
+        expect.objectContaining({ message: "store broke" }),
+      );
+    } finally {
+      spy.mockRestore();
+      consoleError.mockRestore();
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      unmount();
+    }
+  });
+
+  it("fails only the run's own entry", () => {
+    const files = ["a.png", "b.png", "c.png"].map(
+      (name) => new File([new ArrayBuffer(16)], name, { type: "image/png" }),
+    );
+    useFileStore.getState().setFiles(files);
+    useFileStore.getState().updateEntry(2, { status: "completed", processedUrl: "blob:done" });
+    useFileStore.getState().setSelectedIndex(1);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(files[1], STEPS);
+    });
+    expect(useFileStore.getState().entries[1].status).toBe("processing");
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "bad settings" });
+      xhrs[0].onload?.();
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].status).toBe("pending");
+    expect(entries[1]).toMatchObject({ status: "failed", error: "error" });
+    expect(entries[2]).toMatchObject({ status: "completed", processedUrl: "blob:done" });
+    unmount();
+  });
+
+  it("clears a failed entry's error when the retry succeeds", () => {
+    const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+    const { result, unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "bad settings" });
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("failed");
+
+    act(() => {
+      result.current.processSingle(file, STEPS);
+    });
+    act(() => {
+      xhrs[1].upload.onload?.();
+      xhrs[1].status = 200;
+      xhrs[1].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[1].onload?.();
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({ status: "completed", error: null });
+    unmount();
+  });
+
+  // Pins the #722 run-identity guard for the new entry write: the aborted
+  // POST's late socket event must not reach the settle at all.
+  it("ignores a late socket event once a failed frame settled the run", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "Step 2: kaboom" });
+    });
+
+    // A late socket event from the aborted POST is ignored by the run guard.
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+
+    expectEntryFailed("Step 2: kaboom");
+    unmount();
+  });
+
+  it("still completes the entry on a successful response", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+      error: null,
+    });
+    unmount();
+  });
+});
+
+/**
+ * #1354: the sync response path parsed the body and wrote the result under
+ * one catch, so a throw from our own store write on a good 200 read as
+ * "Invalid response from server" and vanished. Only an unparseable body
+ * blames the server now; a handling error ends the run with the client-side
+ * message and is rethrown for the console and Sentry.
+ */
+describe("usePipelineProcessor sync result handling errors (#1354)", () => {
+  const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
+  const realUpdateEntry = useFileStore.getState().updateEntry;
+  afterEach(() => {
+    useFileStore.setState({ updateEntry: realUpdateEntry });
+  });
+
+  function respond(status: number, body: string) {
+    xhrs[0].upload.onload?.();
+    xhrs[0].status = status;
+    xhrs[0].responseText = body;
+    xhrs[0].onload?.();
+  }
+
+  it("fails the run with a client-side message when the result write throws", () => {
+    const { unmount } = startSingleRun();
+    vi.spyOn(useFileStore.getState(), "updateEntry")
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockImplementation(realUpdateEntry);
+
+    expect(() => act(() => respond(200, JSON.stringify(SINGLE_RESULT)))).toThrow("boom");
+
+    expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: HANDLER_FAILURE,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    unmount();
+  });
+
+  it("rethrows the root cause when the teardown after it throws too", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startSingleRun();
+    // A store listener that breaks on every write: the result write throws
+    // the root cause, then the teardown's first write throws again.
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+    });
+
+    try {
+      expect(() => act(() => respond(200, JSON.stringify(SINGLE_RESULT)))).toThrow("root cause");
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      // Every teardown step still ran: the run is released for good.
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+      unmount();
+    }
+  });
+
+  it.each([
+    ["an unparseable body", "not json"],
+    ["a JSON null body", "null"],
+    ["a JSON string body", JSON.stringify("ok")],
+  ])("still blames the server for %s", (_label, body) => {
+    const { unmount } = startSingleRun();
+
+    act(() => respond(200, body));
+
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    unmount();
+  });
+});
+
 describe("usePipelineProcessor batch failure message (#1432)", () => {
   it("reads a coded batch failure through parseApiError instead of the first file", async () => {
     const { unmount } = startBatchRun();

@@ -6,7 +6,12 @@ import { copyToClipboard } from "@/lib/utils";
 import type { Base64Result } from "@/stores/base64-store";
 import { useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
-import { base64ResultKey, claimToolResult } from "@/stores/tool-result-claims";
+import {
+  base64FileKey,
+  base64ResultKey,
+  claimToolResult,
+  claimToolResultItem,
+} from "@/stores/tool-result-claims";
 
 // -- Snippet generators -----------------------------------------------------
 
@@ -111,13 +116,10 @@ function CopyButton({
 /**
  * One file's encoded text.
  *
- * These controls claim only when this file is the whole set, which the panel
- * decides and passes down as onTaken. With several files encoded, taking this
- * one leaves the rest untaken and the claim is per tool, so claiming here would
- * answer for text the user never saw. Per-file granularity is the right answer
- * for that case; until then this over-warns rather than going quiet.
+ * Saving or copying it claims this file only. The guard goes quiet once every
+ * file of the run has been taken, which with one file encoded is this one.
  */
-function FileResult({ result, onTaken }: { result: Base64Result; onTaken?: () => void }) {
+function FileResult({ result }: { result: Base64Result }) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>("datauri");
   const tab = TABS.find((t) => t.id === activeTab) ?? TABS[0];
@@ -132,6 +134,11 @@ function FileResult({ result, onTaken }: { result: Base64Result; onTaken?: () =>
     markdown: "Markdown",
   };
 
+  const onTaken = useCallback(
+    () => claimToolResultItem("image-to-base64", base64FileKey(result)),
+    [result],
+  );
+
   const handleDownload = useCallback(() => {
     const blob = new Blob([output], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -140,7 +147,7 @@ function FileResult({ result, onTaken }: { result: Base64Result; onTaken?: () =>
     a.download = `${result.filename}.base64.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    onTaken?.();
+    onTaken();
   }, [output, result.filename, onTaken]);
 
   return (
@@ -226,14 +233,6 @@ export function ImageToBase64Results() {
     claimToolResult("image-to-base64", base64ResultKey(results));
   }, [results]);
 
-  // The same set rule where the set has one member. One encoded file is the
-  // whole set, so taking it takes everything the guard is warning about, and
-  // the copy-all bar is not even rendered in that state: without this the tool
-  // would nag on its most common path. Gated on the results the guard keys on
-  // rather than on the file count, so the two cannot disagree. Not the start of
-  // per-file tracking: with two results, taking one still leaves the other.
-  const singleResultClaim = results.length === 1 ? claimResults : undefined;
-
   // -- Processing state: progress bar --
   if (processing) {
     const pct =
@@ -299,11 +298,10 @@ export function ImageToBase64Results() {
   }
 
   // -- Results ready: find result for the currently selected file --
-  const currentFileName = entries[selectedIndex]?.file.name ?? null;
-  const currentResult = currentFileName
-    ? results.find((r) => r.filename === currentFileName)
-    : null;
-  const currentError = currentFileName ? errors.find((e) => e.filename === currentFileName) : null;
+  // By entry, not name: two pasted screenshots are both "image.png" (#1701).
+  const currentEntryId = entries[selectedIndex]?.id ?? null;
+  const currentResult = currentEntryId ? results.find((r) => r.entryId === currentEntryId) : null;
+  const currentError = currentEntryId ? errors.find((e) => e.entryId === currentEntryId) : null;
 
   const hasMultiple = entries.length > 1;
 
@@ -376,7 +374,7 @@ export function ImageToBase64Results() {
       {/* Current file result */}
       <div className="flex-1 min-h-0">
         {currentResult ? (
-          <FileResult result={currentResult} onTaken={singleResultClaim} />
+          <FileResult result={currentResult} />
         ) : currentError ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">

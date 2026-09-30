@@ -29,6 +29,18 @@ export function forkDirName(pid: number): string {
   return `SnapOtter-test-${pid}_${crypto.randomUUID().slice(0, 8)}`;
 }
 
+/**
+ * The DATA_DIR a worker uses: its own `<forkDir>/data`, so forks don't share
+ * AI bundle state, install markers or a stray 1.x database (#1649). The one
+ * exception is the strict installed-AI lane (REQUIRE_AI_FEATURES=1), which
+ * exists to run against bundles the caller already installed, so it keeps an
+ * exported DATA_DIR.
+ */
+export function forkDataDir(forkDir: string, env: NodeJS.ProcessEnv): string {
+  if (env.REQUIRE_AI_FEATURES === "1" && env.DATA_DIR) return env.DATA_DIR;
+  return path.join(forkDir, "data");
+}
+
 /** The pid a per-fork workspace was made for, or null if `name` isn't one. */
 export function forkDirOwner(name: string): number | null {
   const match = FORK_DIR.exec(name);

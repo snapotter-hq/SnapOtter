@@ -669,10 +669,10 @@ export function SystemSection() {
         label={t.settings.system.fileUploadLimitLabel}
         description={t.settings.system.fileUploadLimitDescription}
       >
-        <input
-          type="number"
-          value={settings.fileUploadLimitMb || "100"}
-          onChange={(e) => updateSetting("fileUploadLimitMb", e.target.value)}
+        <SettingNumberInput
+          value={settings.fileUploadLimitMb}
+          fallback="100"
+          onChange={(v) => updateSetting("fileUploadLimitMb", v)}
           aria-label={t.settings.system.fileUploadLimitLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
@@ -718,10 +718,10 @@ export function SystemSection() {
           label={t.settings.system.loginAttemptLimitLabel}
           description={t.settings.system.loginAttemptLimitDescription}
         >
-          <input
-            type="number"
-            value={settings.loginAttemptLimit || "5"}
-            onChange={(e) => updateSetting("loginAttemptLimit", e.target.value)}
+          <SettingNumberInput
+            value={settings.loginAttemptLimit}
+            fallback="5"
+            onChange={(v) => updateSetting("loginAttemptLimit", v)}
             aria-label={t.settings.system.loginAttemptLimitLabel}
             className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
             min={1}
@@ -739,10 +739,10 @@ export function SystemSection() {
         label={t.settings.fileManagement.maxAge}
         description={t.settings.fileManagement.maxAgeDescription}
       >
-        <input
-          type="number"
-          value={settings.tempFileMaxAgeHours || "24"}
-          onChange={(e) => updateSetting("tempFileMaxAgeHours", e.target.value)}
+        <SettingNumberInput
+          value={settings.tempFileMaxAgeHours}
+          fallback="24"
+          onChange={(v) => updateSetting("tempFileMaxAgeHours", v)}
           aria-label={t.settings.fileManagement.maxAge}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={1}
@@ -827,10 +827,10 @@ export function SystemSection() {
         label={t.settings.dataRetention.jobsRetentionDays}
         description={t.settings.dataRetention.jobsRetentionDaysDesc}
       >
-        <input
-          type="number"
-          value={settings.jobsRetentionDays || "30"}
-          onChange={(e) => updateSetting("jobsRetentionDays", e.target.value)}
+        <SettingNumberInput
+          value={settings.jobsRetentionDays}
+          fallback="30"
+          onChange={(v) => updateSetting("jobsRetentionDays", v)}
           aria-label={t.settings.dataRetention.jobsRetentionDays}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={0}
@@ -841,10 +841,10 @@ export function SystemSection() {
           label={t.settings.dataRetention.auditRetentionDays}
           description={t.settings.dataRetention.auditRetentionDaysDesc}
         >
-          <input
-            type="number"
-            value={settings.auditRetentionDays || "0"}
-            onChange={(e) => updateSetting("auditRetentionDays", e.target.value)}
+          <SettingNumberInput
+            value={settings.auditRetentionDays}
+            fallback="0"
+            onChange={(v) => updateSetting("auditRetentionDays", v)}
             aria-label={t.settings.dataRetention.auditRetentionDays}
             className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
             min={0}
@@ -1209,10 +1209,10 @@ export function AdminSecuritySettings() {
         label={t.settings.security.sessionIdleTimeout}
         description={t.settings.security.sessionIdleTimeoutDesc}
       >
-        <input
-          type="number"
-          value={settings.sessionIdleTimeoutMinutes || "0"}
-          onChange={(e) => updateSetting("sessionIdleTimeoutMinutes", e.target.value)}
+        <SettingNumberInput
+          value={settings.sessionIdleTimeoutMinutes}
+          fallback="0"
+          onChange={(v) => updateSetting("sessionIdleTimeoutMinutes", v)}
           aria-label={t.settings.security.sessionIdleTimeout}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={0}
@@ -1223,10 +1223,10 @@ export function AdminSecuritySettings() {
         label={t.settings.security.maxSessionsPerUser}
         description={t.settings.security.maxSessionsPerUserDesc}
       >
-        <input
-          type="number"
-          value={settings.maxSessionsPerUser || "0"}
-          onChange={(e) => updateSetting("maxSessionsPerUser", e.target.value)}
+        <SettingNumberInput
+          value={settings.maxSessionsPerUser}
+          fallback="0"
+          onChange={(v) => updateSetting("maxSessionsPerUser", v)}
           aria-label={t.settings.security.maxSessionsPerUser}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={0}
@@ -1301,10 +1301,10 @@ export function AdminSecuritySettings() {
         label={t.settings.security.passwordMinLength}
         description={t.settings.security.passwordMinLengthDesc}
       >
-        <input
-          type="number"
-          value={settings.passwordMinLength || "8"}
-          onChange={(e) => updateSetting("passwordMinLength", e.target.value)}
+        <SettingNumberInput
+          value={settings.passwordMinLength}
+          fallback="8"
+          onChange={(v) => updateSetting("passwordMinLength", v)}
           aria-label={t.settings.security.passwordMinLength}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
           min={8}
@@ -3929,6 +3929,41 @@ function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void
         {t.common.retry}
       </button>
     </div>
+  );
+}
+
+/**
+ * Number input for a string-valued setting. The field may be empty while the user
+ * types; if it is left empty, it restores the value it had on focus, so an empty
+ * string (which the API reads as 0) is never saved by accident. See #1186.
+ */
+function SettingNumberInput({
+  value,
+  fallback,
+  onChange,
+  ...props
+}: {
+  value: string | undefined;
+  fallback: string;
+  onChange: (value: string) => void;
+} & Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "type" | "value" | "onChange" | "onFocus" | "onBlur"
+>) {
+  const valueOnFocus = useRef(value ?? fallback);
+  return (
+    <input
+      {...props}
+      type="number"
+      value={value ?? fallback}
+      onFocus={() => {
+        valueOnFocus.current = value ?? fallback;
+      }}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => {
+        if (e.target.value.trim() === "") onChange(valueOnFocus.current);
+      }}
+    />
   );
 }
 

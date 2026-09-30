@@ -1,6 +1,11 @@
 import { create } from "zustand";
 
 export interface Base64Result {
+  /**
+   * The file-store entry this was encoded from. Names repeat (every pasted
+   * screenshot is "image.png"), so this is what ties a result to its file.
+   */
+  entryId: string;
   filename: string;
   mimeType: string;
   width: number;
@@ -13,6 +18,8 @@ export interface Base64Result {
 }
 
 export interface Base64Error {
+  /** The file-store entry that failed. See Base64Result.entryId. */
+  entryId: string;
   filename: string;
   error: string;
 }

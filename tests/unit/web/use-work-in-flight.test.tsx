@@ -34,15 +34,19 @@ import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useSplitStore } from "@/stores/split-store";
 import {
+  base64FileKey,
   base64ResultKey,
   claimToolResult,
+  claimToolResultItem,
   collageResultKey,
   duplicateResultKey,
   htmlToImageResultKey,
   memeResultKey,
   passportPhotoResultKey,
+  pdfToImagePageKey,
   pdfToImageResultKey,
   splitResultKey,
+  splitTileKey,
   useToolResultClaims,
 } from "@/stores/tool-result-claims";
 
@@ -312,6 +316,19 @@ const OWN_STORE_CASES: OwnStoreCase[] = [
 
 /** One tile, for the claim-keeping tests below. */
 const SEED_TILE = { row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: "blob:tile" };
+
+/** One encoded file, for the per-item tests below. */
+const BASE64_SEED = {
+  filename: "a.png",
+  mimeType: "image/png",
+  width: 1,
+  height: 1,
+  originalSize: 10,
+  encodedSize: 14,
+  overheadPercent: 40,
+  base64: "aGk=",
+  dataUri: "data:image/png;base64,aGk=",
+};
 
 /** The route the app really serves this tool at, section included. */
 function routeFor(toolId: string): string {
@@ -730,7 +747,7 @@ describe("tools that keep their results outside the file store", () => {
       useSplitStore.setState({ tiles: [SEED_TILE] });
       claimToolResult("split", splitResultKey(useSplitStore.getState().tiles, null));
 
-      const claim = useToolResultClaims.getState().claimed.split;
+      const [claim] = useToolResultClaims.getState().claimed.split;
       expect(claim).toBeInstanceOf(WeakRef);
       expect((claim as WeakRef<object>).deref()).toBe(useSplitStore.getState().tiles);
     });
@@ -739,7 +756,7 @@ describe("tools that keep their results outside the file store", () => {
       useCollageStore.setState({ phase: "result", resultUrl: "blob:collage" });
       claimToolResult("collage", collageResultKey(useCollageStore.getState().resultUrl));
 
-      expect(useToolResultClaims.getState().claimed.collage).toBe("blob:collage");
+      expect(useToolResultClaims.getState().claimed.collage).toEqual(["blob:collage"]);
     });
 
     // A collected ref cannot be produced on demand (nothing forces a GC), so
@@ -748,10 +765,133 @@ describe("tools that keep their results outside the file store", () => {
     it("warns again when the claimed result has been collected", () => {
       useSplitStore.setState({ tiles: [SEED_TILE] });
       useToolResultClaims.setState({
-        claimed: { split: { deref: () => undefined } as unknown as WeakRef<object> },
+        claimed: { split: [{ deref: () => undefined } as unknown as WeakRef<object>] },
       });
 
       expect(workAt(routeFor("split"))).toEqual({ kind: "unsaved", downloads: [] });
+    });
+
+    // Taking the whole result answers for every item in it, so the item claims
+    // before it have nothing left to say.
+    it("replaces the item claims when the whole result is taken", () => {
+      useSplitStore.setState({ tiles: [SEED_TILE] });
+      claimToolResultItem("split", splitTileKey(SEED_TILE));
+      claimToolResult("split", splitResultKey(useSplitStore.getState().tiles, null));
+
+      const claims = useToolResultClaims.getState().claimed.split;
+      expect(claims).toHaveLength(1);
+      expect((claims[0] as WeakRef<object>).deref()).toBe(useSplitStore.getState().tiles);
+    });
+
+    // An item taken after the whole result joins it rather than displacing it.
+    it("keeps the whole-result claim when an item is taken after it", () => {
+      useSplitStore.setState({ tiles: [SEED_TILE], runFileCount: 2 });
+      claimToolResult("split", splitResultKey(useSplitStore.getState().tiles, null));
+      claimToolResultItem("split", splitTileKey(SEED_TILE));
+
+      expect(useToolResultClaims.getState().claimed.split).toHaveLength(2);
+      expect(workAt(routeFor("split"))).toBeNull();
+    });
+
+    it("keeps one claim per item however many times it is taken", () => {
+      useSplitStore.setState({ tiles: [SEED_TILE] });
+      claimToolResultItem("split", splitTileKey(SEED_TILE));
+      claimToolResultItem("split", splitTileKey(SEED_TILE));
+
+      expect(useToolResultClaims.getState().claimed.split).toHaveLength(1);
+    });
+
+    // A run replaces its items, so item claims from runs gone by would pile up
+    // for the rest of the session. The ones whose item has been collected are
+    // dropped as the next one lands.
+    it("drops item claims whose item has been collected", () => {
+      const dead = { deref: () => undefined } as unknown as WeakRef<object>;
+      useToolResultClaims.setState({ claimed: { split: [dead, dead] } });
+
+      claimToolResultItem("split", splitTileKey(SEED_TILE));
+
+      const claims = useToolResultClaims.getState().claimed.split;
+      expect(claims).toHaveLength(1);
+      expect((claims[0] as WeakRef<object>).deref()).toBe(SEED_TILE);
+    });
+  });
+
+  /**
+   * Taking every item one at a time is taking the result, as long as the items
+   * on screen are the whole result (#1127). Each case seeds a two-item run.
+   */
+  describe("per-item claims", () => {
+    const TILE_A = { row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: "blob:a" };
+    const TILE_B = { row: 0, col: 1, label: "2", width: 10, height: 10, blobUrl: "blob:b" };
+
+    function seedSplit(runFileCount: number) {
+      useSplitStore.setState({
+        tiles: [TILE_A, TILE_B],
+        runFileCount,
+        zipBlobUrl: "blob:tiles.zip",
+      });
+    }
+
+    it("keeps warning while any tile is untaken", () => {
+      seedSplit(1);
+      claimToolResultItem("split", splitTileKey(TILE_A));
+
+      expect(workAt(routeFor("split"))).toEqual({ kind: "unsaved", downloads: [] });
+    });
+
+    it("goes quiet once every tile is taken", () => {
+      seedSplit(1);
+      claimToolResultItem("split", splitTileKey(TILE_A));
+      claimToolResultItem("split", splitTileKey(TILE_B));
+
+      expect(workAt(routeFor("split"))).toBeNull();
+    });
+
+    // The tiles on screen are the first file's; the zip has every file's. The
+    // file store's live count does not enter into it: the run's does.
+    it("keeps warning on a multi-file split with every tile on screen taken", () => {
+      seedSplit(2);
+      useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
+      claimToolResultItem("split", splitTileKey(TILE_A));
+      claimToolResultItem("split", splitTileKey(TILE_B));
+
+      expect(workAt(routeFor("split"))).toEqual({ kind: "unsaved", downloads: [] });
+    });
+
+    it("goes quiet once every page is taken", () => {
+      const pages = [
+        { page: 1, downloadUrl: "/api/v1/download/j/page-1.png", size: 1 },
+        { page: 2, downloadUrl: "/api/v1/download/j/page-2.png", size: 1 },
+      ];
+      usePdfToImageStore.setState({ results: pages, zipUrl: "/api/v1/download/j/pages.zip" });
+      claimToolResultItem("pdf-to-image", pdfToImagePageKey(pages[0]));
+
+      expect(workAt(routeFor("pdf-to-image"))).toEqual({ kind: "unsaved", downloads: [] });
+
+      claimToolResultItem("pdf-to-image", pdfToImagePageKey(pages[1]));
+
+      expect(workAt(routeFor("pdf-to-image"))).toBeNull();
+    });
+
+    // Only the zip landed: there are no pages to take one at a time, and no
+    // number of page claims can stand in for it.
+    it("keeps warning on a zip-only pdf-to-image run", () => {
+      usePdfToImageStore.setState({ results: [], zipUrl: "/api/v1/download/j/pages.zip" });
+
+      expect(workAt(routeFor("pdf-to-image"))).toEqual({ kind: "unsaved", downloads: [] });
+    });
+
+    it("goes quiet once every encoded file is taken", () => {
+      const a = { ...BASE64_SEED, filename: "a.png" };
+      const b = { ...BASE64_SEED, filename: "b.png" };
+      useBase64Store.setState({ results: [a, b] });
+      claimToolResultItem("image-to-base64", base64FileKey(a));
+
+      expect(workAt(routeFor("image-to-base64"))).toEqual({ kind: "unsaved", downloads: [] });
+
+      claimToolResultItem("image-to-base64", base64FileKey(b));
+
+      expect(workAt(routeFor("image-to-base64"))).toBeNull();
     });
   });
 

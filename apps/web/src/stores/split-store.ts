@@ -28,6 +28,13 @@ interface SplitState {
   processing: boolean;
   error: string | null;
   tiles: TileInfo[];
+  /**
+   * How many files the run that produced these tiles split. The tiles are the
+   * first file's only, so with more than one they are not the whole run.
+   * Recorded with the tiles rather than read off the file store later, which
+   * can change while the settings panel (and its clearing effect) is unmounted.
+   */
+  runFileCount: number;
   zipBlobUrl: string | null;
 
   // Actions
@@ -41,7 +48,7 @@ interface SplitState {
   setImageDimensions: (d: { width: number; height: number } | null) => void;
   setProcessing: (p: boolean) => void;
   setError: (e: string | null) => void;
-  setTiles: (tiles: TileInfo[]) => void;
+  setTiles: (tiles: TileInfo[], runFileCount?: number) => void;
   setZipBlobUrl: (url: string | null) => void;
   applyPreset: (cols: number, rows: number) => void;
   reset: () => void;
@@ -64,6 +71,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   processing: false,
   error: null,
   tiles: [],
+  runFileCount: 0,
   zipBlobUrl: null,
 
   setMode: (mode) => set({ mode, tiles: [], zipBlobUrl: null, error: null }),
@@ -79,7 +87,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   setImageDimensions: (imageDimensions) => set({ imageDimensions }),
   setProcessing: (processing) => set({ processing }),
   setError: (error) => set({ error }),
-  setTiles: (tiles) => set({ tiles }),
+  setTiles: (tiles, runFileCount = 0) => set({ tiles, runFileCount }),
   setZipBlobUrl: (url) => {
     const prev = get().zipBlobUrl;
     if (prev) URL.revokeObjectURL(prev);
@@ -97,6 +105,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     }
     set({
       tiles: [],
+      runFileCount: 0,
       zipBlobUrl: null,
       processing: false,
       error: null,

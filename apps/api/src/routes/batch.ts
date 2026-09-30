@@ -19,7 +19,14 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
-import { type Pool, queueName, type ToolJobData, type ToolJobResult } from "../jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  type Pool,
+  parseClientJobIdField,
+  queueName,
+  type ToolJobData,
+  type ToolJobResult,
+} from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
 import { getSecurityHeaders } from "../lib/csp.js";
@@ -53,6 +60,7 @@ import {
   spoolMultipartFile,
   storeValidatedOcrPdf,
 } from "../lib/ocr-pdf-ingress.js";
+import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { InputValidationError } from "../modality/contract.js";
@@ -172,6 +180,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           const files: ParsedFile[] = [];
           let settingsRaw: string | null = null;
           let clientJobId: string | null = null;
+          let clientJobIdRaw: string | null = null;
           const ocrUploadLimits =
             toolId === "ocr" || toolId === "ocr-pdf"
               ? resolveOcrUploadLimits(env.MAX_UPLOAD_SIZE_MB)
@@ -239,10 +248,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               } else if (part.fieldname === "settings") {
                 settingsRaw = part.value as string;
               } else if (part.fieldname === "clientJobId") {
-                const raw = part.value as string;
-                if (typeof raw === "string" && raw.length > 0 && raw.length <= 128) {
-                  clientJobId = raw;
-                }
+                clientJobIdRaw = part.value as string;
               }
             }
           } catch (err) {
@@ -252,6 +258,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               details: err instanceof Error ? err.message : String(err),
             });
           }
+
+          const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+          if (clientJobIdField === null) {
+            return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+          }
+          clientJobId = clientJobIdField ?? null;
 
           if (files.length === 0) {
             return reply.status(400).send({ error: "No files provided" });
@@ -322,17 +334,26 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           // Insert the parent row BEFORE updateJobProgress, because the
           // progress persist layer does a check-then-insert that races
-          // with our explicit insert below.
-          await db.insert(schema.jobs).values({
-            id: parentId,
-            userId,
-            toolId,
-            pool: "system",
-            type: "batch",
-            status: "queued",
-            inputRefs: [],
-            settings: { flowChildCount: 0 },
-          });
+          // with our explicit insert below. A clientJobId that is already
+          // taken fails on the primary key: that is the client's mistake,
+          // not a server fault, and nothing is staged yet to clean up (#1687).
+          try {
+            await db.insert(schema.jobs).values({
+              id: parentId,
+              userId,
+              toolId,
+              pool: "system",
+              type: "batch",
+              status: "queued",
+              inputRefs: [],
+              settings: { flowChildCount: 0 },
+            });
+          } catch (err) {
+            if (isUniqueViolation(err)) {
+              return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+            }
+            throw err;
+          }
           stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
 
           updateJobProgress({

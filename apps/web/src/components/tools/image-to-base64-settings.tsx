@@ -20,7 +20,7 @@ const OUTPUT_FORMATS = [
 export function ImageToBase64Settings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["image-to-base64"];
-  const { files } = useFileStore();
+  const { entries } = useFileStore();
   const { processing, setProcessing, setProgress, addResult, addError, reset } = useBase64Store();
 
   const [outputFormat, setOutputFormat] = useState("original");
@@ -30,7 +30,7 @@ export function ImageToBase64Settings() {
   const [error, setError] = useState<string | null>(null);
 
   const handleProcess = async () => {
-    if (files.length === 0) return;
+    if (entries.length === 0) return;
 
     setProcessing(true);
     setError(null);
@@ -39,9 +39,9 @@ export function ImageToBase64Settings() {
 
     const settings = JSON.stringify({ outputFormat, quality, maxWidth, maxHeight });
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setProgress({ completed: i, total: files.length, currentFile: file.name });
+    for (let i = 0; i < entries.length; i++) {
+      const { id: entryId, file } = entries[i];
+      setProgress({ completed: i, total: entries.length, currentFile: file.name });
 
       try {
         const formData = new FormData();
@@ -56,15 +56,16 @@ export function ImageToBase64Settings() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          addError({ filename: file.name, error: body.error || `Failed: ${res.status}` });
+          addError({ entryId, filename: file.name, error: body.error || `Failed: ${res.status}` });
           continue;
         }
 
         const data = await res.json();
-        for (const r of data.results) addResult(r);
-        for (const e of data.errors) addError(e);
+        for (const r of data.results) addResult({ ...r, entryId });
+        for (const e of data.errors) addError({ ...e, entryId });
       } catch (err) {
         addError({
+          entryId,
           filename: file.name,
           error: err instanceof Error ? err.message : "Failed to convert",
         });
@@ -75,7 +76,7 @@ export function ImageToBase64Settings() {
     setProcessing(false);
   };
 
-  const hasFiles = files.length > 0;
+  const hasFiles = entries.length > 0;
   const showQuality =
     outputFormat === "jpeg" ||
     outputFormat === "webp" ||
@@ -176,8 +177,8 @@ export function ImageToBase64Settings() {
         {processing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {processing
           ? ts.converting
-          : files.length > 1
-            ? format(ts.submitWithCount, { count: files.length })
+          : entries.length > 1
+            ? format(ts.submitWithCount, { count: entries.length })
             : ts.submit}
       </button>
 

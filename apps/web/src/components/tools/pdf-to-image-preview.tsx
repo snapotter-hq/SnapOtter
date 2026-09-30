@@ -2,6 +2,7 @@ import { Check, Download, FileOutput, Loader2 } from "lucide-react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format, plural } from "@/lib/format";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
+import { claimToolResultItem, pdfToImagePageKey } from "@/stores/tool-result-claims";
 
 const PREVIEWABLE_FORMATS = new Set(["png", "jpg", "webp", "gif", "avif"]);
 
@@ -159,15 +160,13 @@ export function PdfToImagePreview() {
                   </div>
                 )}
 
-                {/* Download overlay. Claims nothing: one page out of forty is
-                    not the set, and the claim is per tool, so claiming here
-                    would drop the warning for the thirty-nine pages the user
-                    never took. Per-page granularity is the right answer; until
-                    then the zip button claims and this does not, so someone who
-                    saves every page one at a time still gets asked. */}
+                {/* Download overlay. Claims this page only: the guard goes
+                    quiet once every page has been taken, one at a time or
+                    through the zip. */}
                 <a
                   href={result.downloadUrl}
                   download={`page-${result.page}.${store.format}`}
+                  onClick={() => claimToolResultItem("pdf-to-image", pdfToImagePageKey(result))}
                   className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 pointer-coarse:bg-black/30 transition-colors"
                 >
                   <Download className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity" />

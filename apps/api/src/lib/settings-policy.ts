@@ -18,12 +18,16 @@ const booleanSetting = z
   .union([z.boolean(), z.enum(["true", "false"])])
   .transform((value) => String(value));
 
+// Number("") and Number("   ") are both 0, which means unlimited or off for
+// several of these settings, so a blank string must not reach the transform (#1695).
+const numericString = z.string().trim().min(1, "Must not be empty");
+
 function integerSetting(
   minimum: number,
   maximum = Number.MAX_SAFE_INTEGER,
 ): z.ZodType<string, z.ZodTypeDef, unknown> {
   return z
-    .union([z.number(), z.string()])
+    .union([z.number(), numericString])
     .transform((value) => (typeof value === "number" ? value : Number(value)))
     .refine(Number.isSafeInteger, "Must be an integer")
     .refine((value) => value >= minimum, `Must be at least ${minimum}`)
@@ -33,7 +37,7 @@ function integerSetting(
 
 function finiteNumberSetting(minimumExclusive: number): z.ZodType<string, z.ZodTypeDef, unknown> {
   return z
-    .union([z.number(), z.string()])
+    .union([z.number(), numericString])
     .transform((value) => (typeof value === "number" ? value : Number(value)))
     .refine(Number.isFinite, "Must be a finite number")
     .refine((value) => value > minimumExclusive, `Must be greater than ${minimumExclusive}`)

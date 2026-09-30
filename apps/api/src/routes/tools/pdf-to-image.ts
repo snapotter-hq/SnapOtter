@@ -6,6 +6,7 @@ import * as mupdf from "mupdf";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
+import { db, schema } from "../../db/index.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
@@ -18,6 +19,7 @@ import {
   getObjectStream,
   putObject,
 } from "../../lib/object-storage.js";
+import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
 
@@ -414,7 +416,8 @@ export function registerPdfToImageRoute(
     `${basePath}/batch`,
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
     async (request, reply) => {
-      if (!(await requireToolAccess(request, reply, opts.toolId))) return;
+      const authUser = await requireToolAccess(request, reply, opts.toolId);
+      if (!authUser) return;
 
       // Rasterizing several documents can outrun the default socket timeout.
       request.raw.socket?.setTimeout?.(0);
@@ -485,6 +488,28 @@ export function registerPdfToImageRoute(
       }
 
       const jobId = clientJobId || randomUUID();
+
+      // Reserve the id before the first progress write. The progress persist
+      // updates whatever row already has this id, so a clientJobId naming
+      // another job would write into that job's row, and a fault would fail
+      // it (#1554). The insert makes a collision fail on the primary key.
+      // No toolId: reconciliation treats a non-terminal row with a tool id as
+      // queued work, and this inline run has no queue entry.
+      try {
+        await db.insert(schema.jobs).values({
+          id: jobId,
+          userId: authUser.id,
+          type: "batch",
+          status: "processing",
+          inputRefs: [],
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+        }
+        throw err;
+      }
+
       const results: Array<{ key: string; prefix: string; filename: string } | null> = new Array(
         files.length,
       ).fill(null);
@@ -574,14 +599,20 @@ export function registerPdfToImageRoute(
         }
       }
 
-      updateJobProgress({
+      // Awaited: this route owns the row, and until it is terminal it counts
+      // against the user's concurrent-job limit (#1688). A failed write still
+      // sends the result, but is logged; nothing else will settle the row
+      // before the next restart.
+      await updateJobProgress({
         jobId,
         status: errors.length === files.length ? "failed" : "completed",
         totalFiles: files.length,
         completedFiles: files.length,
         failedFiles: errors.length,
         errors,
-      });
+      }).catch((err) =>
+        request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
+      );
 
       if (errors.length === files.length) {
         // parseApiError on the client reads `error` and `details`, so the

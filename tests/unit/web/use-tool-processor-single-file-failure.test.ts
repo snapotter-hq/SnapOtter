@@ -533,3 +533,185 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     hook.unmount();
   });
 });
+
+/**
+ * #1354: the sync response path used to parse the body and write the result
+ * under one catch, so a throw from our own store writes on a perfectly good
+ * 200 read as "Invalid response from server" and the exception vanished. The
+ * sync twin of #1287's SSE fix: only an unparseable body blames the server; a
+ * handling error ends the run with the client-side message and is rethrown so
+ * it reaches the console and Sentry's global handler.
+ */
+describe("useToolProcessor sync result handling errors (#1354)", () => {
+  const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
+  const RESULT = {
+    jobId: "server-job",
+    downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+    originalSize: 64,
+    processedSize: 32,
+  };
+  // Zustand copies state on every set, so a spy on getState().updateEntry
+  // rides along into later states; put the real actions back explicitly.
+  const realUpdateEntry = useFileStore.getState().updateEntry;
+  const realMarkClaimed = useFileStore.getState().markClaimed;
+  afterEach(() => {
+    useFileStore.setState({ updateEntry: realUpdateEntry, markClaimed: realMarkClaimed });
+  });
+
+  function startRun() {
+    const file = new File([new ArrayBuffer(64)], "clip.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+    return hook;
+  }
+
+  function respond(status: number, body: string) {
+    xhrs[0].status = status;
+    xhrs[0].responseText = body;
+    xhrs[0].onload?.();
+  }
+
+  it("fails the run with a client-side message when the result write throws", () => {
+    const { result, unmount } = startRun();
+    vi.spyOn(useFileStore.getState(), "updateEntry")
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockImplementation(realUpdateEntry);
+
+    // The root cause surfaces instead of disappearing into the catch.
+    expect(() =>
+      act(() => respond(200, JSON.stringify({ ...RESULT, warning: "scaled down" }))),
+    ).toThrow("boom");
+
+    // Tools that render from the payload must not show a result beside the
+    // error. act() skips its flush when the callback throws, so render first.
+    act(() => {});
+    expect(result.current.resultPayload).toBeNull();
+    expect(result.current.warning).toBeNull();
+
+    expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: HANDLER_FAILURE,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+
+    unmount();
+  });
+
+  it("ends the run and rethrows the root cause when every entry write throws", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startRun();
+    vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => act(() => respond(200, JSON.stringify(RESULT)))).toThrow("store broke");
+
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failing the run's entry after a result handling error failed",
+        expect.objectContaining({ message: "store broke" }),
+      );
+    } finally {
+      consoleError.mockRestore();
+      unmount();
+    }
+  });
+
+  it("keeps a written result when a write after it throws", () => {
+    const { unmount } = startRun();
+    vi.spyOn(useFileStore.getState(), "markClaimed").mockImplementation(() => {
+      throw new Error("claim broke");
+    });
+
+    expect(() =>
+      act(() => respond(200, JSON.stringify({ ...RESULT, savedFileId: "file-9" }))),
+    ).toThrow("claim broke");
+
+    // The result reached the entry; the run still ends, and says it went wrong.
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT.downloadUrl,
+    });
+    expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("rethrows the root cause when the teardown after it throws too", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startRun();
+    // A store listener that breaks on every write: the result write throws
+    // the root cause, then the teardown's first write throws again.
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+    });
+
+    try {
+      expect(() => act(() => respond(200, JSON.stringify(RESULT)))).toThrow("root cause");
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      // Every teardown step still ran: the run is released for good.
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+      unmount();
+    }
+  });
+
+  it.each([
+    ["an unparseable body", "<html>not json</html>"],
+    ["a JSON null body", "null"],
+    ["a JSON string body", JSON.stringify("ok")],
+  ])("still blames the server for %s", (_label, body) => {
+    const { unmount } = startRun();
+
+    act(() => respond(200, body));
+
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("lands a good result untouched", () => {
+    const { result, unmount } = startRun();
+
+    act(() => respond(200, JSON.stringify({ ...RESULT, warning: "scaled down" })));
+
+    expect(result.current.resultPayload).toMatchObject({ downloadUrl: RESULT.downloadUrl });
+    expect(result.current.warning).toBe("scaled down");
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT.downloadUrl,
+      processedSize: 32,
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+});

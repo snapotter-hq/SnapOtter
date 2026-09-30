@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  forkDataDir,
   forkDirName,
   forkDirOwner,
   ORPHAN_MIN_AGE_MS,
@@ -215,8 +216,44 @@ describe("this worker's own workspace", () => {
     expect(forkDirOwner(path.basename(path.dirname(workspace)))).toBe(process.pid);
   });
 
+  it("keeps LOG_DIR under the same per-fork directory", () => {
+    const forkRoot = path.dirname(process.env.WORKSPACE_PATH as string);
+    expect(process.env.LOG_DIR).toBe(path.join(forkRoot, "logs"));
+  });
+
+  // The strict AI lane keeps the caller's DATA_DIR on purpose; see forkDataDir.
+  it.skipIf(process.env.REQUIRE_AI_FEATURES === "1")(
+    "keeps DATA_DIR under the same per-fork directory",
+    () => {
+      const forkRoot = path.dirname(process.env.WORKSPACE_PATH as string);
+      expect(process.env.DATA_DIR).toBe(path.join(forkRoot, "data"));
+    },
+  );
+
   it("has its cleanup handlers installed by per-fork-env", () => {
     expect(process.listenerCount("SIGTERM")).toBeGreaterThanOrEqual(1);
     expect(process.listenerCount("exit")).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("forkDataDir", () => {
+  const forkRoot = path.join(os.tmpdir(), "SnapOtter-test-1_0123abcd");
+
+  it("uses the fork's own data dir, even over a DATA_DIR the caller exported", () => {
+    expect(forkDataDir(forkRoot, {})).toBe(path.join(forkRoot, "data"));
+    expect(forkDataDir(forkRoot, { DATA_DIR: "/tmp/shared" })).toBe(path.join(forkRoot, "data"));
+  });
+
+  it("keeps the caller's DATA_DIR in the strict AI lane, where the installed bundles live", () => {
+    expect(forkDataDir(forkRoot, { DATA_DIR: "/srv/ai-data", REQUIRE_AI_FEATURES: "1" })).toBe(
+      "/srv/ai-data",
+    );
+  });
+
+  it("falls back to the fork's dir in the strict lane when no DATA_DIR was given", () => {
+    expect(forkDataDir(forkRoot, { REQUIRE_AI_FEATURES: "1" })).toBe(path.join(forkRoot, "data"));
+    expect(forkDataDir(forkRoot, { DATA_DIR: "", REQUIRE_AI_FEATURES: "1" })).toBe(
+      path.join(forkRoot, "data"),
+    );
   });
 });

@@ -19,6 +19,9 @@
  *     enterprise plugin.
  *   - the resolver's retry-exhaustion throw (#978): caught and turned into a
  *     login failure, while any other resolver throw still surfaces as a 500.
+ *   - RP-initiated logout (auth.ts POST /api/auth/logout): the logoutUrl built
+ *     from the discovery cache the callback warms, including the
+ *     post_logout_redirect_uri under a BASE_PATH prefix (#1355).
  *
  * Like oidc-mfa-callback.test.ts, the cryptographic token exchange is mocked
  * at the `openid-client` boundary (only `authorizationCodeGrant`; discovery,
@@ -82,7 +85,8 @@ const { sanitizeUsername, UsernameRaceExhaustedError } = await import(
   "../../../apps/api/src/lib/external-auth-resolver.js"
 );
 const mfaModule = await import("../../../apps/api/src/plugins/mfa.js");
-const { buildTestApp } = await import("../test-server.js");
+const { getOidcEndSessionEndpoint } = await import("../../../apps/api/src/plugins/oidc.js");
+const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
 
 import type { TestApp } from "../test-server.js";
 
@@ -227,6 +231,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
             subject_types_supported: ["public"],
             id_token_signing_alg_values_supported: ["RS256"],
             code_challenge_methods_supported: ["S256"],
+            end_session_endpoint: `http://localhost:${mockPort}/logout`,
           }),
         );
         return;
@@ -352,6 +357,95 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         spy.mockRestore();
       }
     });
+
+    // The IdP sends the user back to post_logout_redirect_uri after ending its
+    // own session. Under a subpath deployment that has to be the app's login
+    // page at the prefix; a dropped or doubled prefix lands on a 404 or is
+    // rejected by the IdP as an unregistered URI (#1355).
+    it("returns an IdP logoutUrl that redirects back to the login page under the deployment path", async () => {
+      const sub = `sub-logout-${Math.random().toString(36).slice(2, 10)}`;
+      const login = await callbackWithClaims({ sub, preferred_username: sub });
+      expect(login.statusCode).toBe(302);
+      const sessionToken = login.cookies.find((c) => c.name === "snapotter-session")?.value;
+      expect(sessionToken).toBeTruthy();
+      const [before] = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.id, sessionToken ?? ""));
+      expect(before?.idToken).toBe("fake-id-token");
+
+      const res = await oidcApp.app.inject({
+        method: "POST",
+        url: `${basePath}/api/auth/logout`,
+        cookies: { "snapotter-session": sessionToken ?? "" },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.ok).toBe(true);
+      expect(typeof body.logoutUrl).toBe("string");
+      const logoutUrl = new URL(body.logoutUrl);
+      expect(`${logoutUrl.origin}${logoutUrl.pathname}`).toBe(
+        `http://localhost:${mockPort}/logout`,
+      );
+      expect(logoutUrl.searchParams.get("id_token_hint")).toBe("fake-id-token");
+      expect(logoutUrl.searchParams.get("post_logout_redirect_uri")).toBe(
+        `http://localhost:9999${basePath}/login`,
+      );
+      expect(res.cookies.find((c) => c.name === "snapotter-session")).toMatchObject({
+        path: `${basePath}/`,
+        value: "",
+      });
+      const [session] = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.id, sessionToken ?? ""));
+      expect(session).toBeUndefined();
+    });
+  });
+
+  // Both omission cases below log in through the callback first, which warms
+  // the discovery cache with an end_session_endpoint. That leaves exactly one
+  // missing input per test, so each pins its own guard in the logout route.
+  async function oidcSessionWithWarmCache(): Promise<string> {
+    const sub = `sub-warm-${Math.random().toString(36).slice(2, 10)}`;
+    const login = await callbackWithClaims({ sub, preferred_username: sub });
+    expect(login.headers.location).toBe(`${env.BASE_PATH}/`);
+    expect(getOidcEndSessionEndpoint()).toBe(`http://localhost:${mockPort}/logout`);
+    const sessionToken = login.cookies.find((c) => c.name === "snapotter-session")?.value;
+    if (!sessionToken) throw new Error("callback set no snapotter-session cookie");
+    return sessionToken;
+  }
+
+  it("omits logoutUrl for a session with no ID token", async () => {
+    await oidcSessionWithWarmCache();
+    const passwordToken = await loginAsAdmin(oidcApp.app);
+
+    const res = await oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/logout",
+      headers: { authorization: `Bearer ${passwordToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+  });
+
+  it("omits logoutUrl for an ID-token session once OIDC is switched off", async () => {
+    const sessionToken = await oidcSessionWithWarmCache();
+    (env as any).OIDC_ENABLED = false;
+    try {
+      const res = await oidcApp.app.inject({
+        method: "POST",
+        url: "/api/auth/logout",
+        cookies: { "snapotter-session": sessionToken },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true });
+    } finally {
+      (env as any).OIDC_ENABLED = true;
+    }
   });
 
   it("fails with oidc_auth_failed when the token response carries no ID-token claims", async () => {

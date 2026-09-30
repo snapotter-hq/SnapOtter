@@ -1,6 +1,6 @@
 /**
  * Shared types and naming helpers for the BullMQ job system, plus the
- * saveMode multipart-field validation shared by tool-factory and the
+ * saveMode and clientJobId multipart-field validation shared by tool-factory and the
  * hand-written tool routes.
  */
 
@@ -66,6 +66,26 @@ export const INVALID_SAVE_MODE_ERROR = 'Invalid saveMode (expected "new" or "ove
 export function parseSaveModeField(raw: string | null): LibrarySaveMode | undefined | null {
   if (raw === null) return undefined;
   return (LIBRARY_SAVE_MODES as readonly string[]).includes(raw) ? (raw as LibrarySaveMode) : null;
+}
+
+/** Error message for the { error } 400 response when a multipart clientJobId field is malformed. */
+export const INVALID_CLIENT_JOB_ID_ERROR =
+  "Invalid clientJobId (expected 1-128 letters, digits, '_', '-' or '.', starting with a letter or digit, not all digits, no '..')";
+
+// The batch routes also use the id as a BullMQ flow job id (no ':', not an
+// integer) and as an object-key segment (VALID_KEY in lib/object-storage.ts:
+// alphanumeric first character, no '..'), so the pattern is the intersection.
+const CLIENT_JOB_ID_PATTERN = /^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][\w.-]{0,127}$/;
+
+/**
+ * Validate a client-supplied multipart clientJobId field. The value becomes a
+ * jobs.id primary key, so control characters must not get through: Postgres
+ * rejects a NUL byte in a text column, which surfaced as a 500 (#1329).
+ * Returns undefined when the field was absent, null when the value is invalid.
+ */
+export function parseClientJobIdField(raw: string | null): string | undefined | null {
+  if (raw === null) return undefined;
+  return CLIENT_JOB_ID_PATTERN.test(raw) ? raw : null;
 }
 
 /** Result returned by a completed BullMQ job. */

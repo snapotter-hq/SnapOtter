@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import type { SignPlacement } from "@snapotter/shared";
+import { en, type SignPlacement } from "@snapotter/shared";
 import {
   act,
   cleanup,
@@ -428,6 +428,152 @@ describe("sign-pdf settles once when both answers arrive", () => {
 
     expect(useFileStore.getState().processing).toBe(false);
     expect(entry().processedUrl).toBeNull();
+  });
+});
+
+/**
+ * #1354: the sync answer used to parse the body and land the result under one
+ * catch, so a throw from our own store writes on a good 200 read as "Invalid
+ * response" and vanished, with the download link already up beside it. Only
+ * an unparseable body blames the server now; a landing error ends the run with
+ * the client-side message and is rethrown for the console and Sentry.
+ */
+describe("sign-pdf tells its own failures apart from a bad response", () => {
+  const realUpdateEntry = useFileStore.getState().updateEntry;
+  afterEach(() => {
+    useFileStore.setState({ updateEntry: realUpdateEntry });
+  });
+
+  function breakNextEntryWrite() {
+    vi.spyOn(useFileStore.getState(), "updateEntry")
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockImplementation(realUpdateEntry);
+  }
+
+  it("ends the run with the tracking message when landing the result throws", async () => {
+    renderPanel();
+    const xhr = await apply();
+    breakNextEntryWrite();
+
+    expect(() => xhr.respond(200, { downloadUrl: DOWNLOAD_URL })).toThrow("boom");
+    // act() skips its flush when the callback throws; let the render land.
+    await act(async () => {});
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(screen.queryByText(en.errors.invalidResponse)).not.toBeInTheDocument();
+    // No download link beside the error: the result never landed.
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("offers no download link when landing a streamed result throws", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    breakNextEntryWrite();
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: DOWNLOAD_URL },
+          }),
+        });
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("rethrows the root cause when ending the run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await apply();
+    // A store listener that breaks on every write: landing the result throws
+    // the root cause, then endRun's store write throws again.
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respond(200, { downloadUrl: DOWNLOAD_URL })).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  // A fast sign answers twice. Once the streamed answer has failed to land,
+  // the 200 behind it must not land it again or replace the error.
+  it("ignores the sync answer after the streamed one failed to land", async () => {
+    renderPanel();
+    const xhr = await apply();
+    breakNextEntryWrite();
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: DOWNLOAD_URL },
+          }),
+        });
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(entry().processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it.each([
+    ["a JSON null body", null],
+    ["a JSON string body", "ok"],
+    ["a body with no download URL", { jobId: "job-1" }],
+  ])("still says the response was invalid for %s", async (_label, body) => {
+    renderPanel();
+
+    (await apply()).respond(200, body);
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("still says the response was invalid for a body that does not parse", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    act(() => {
+      xhr.status = 200;
+      xhr.responseText = "<html>not json</html>";
+      xhr.onload?.();
+    });
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
   });
 });
 

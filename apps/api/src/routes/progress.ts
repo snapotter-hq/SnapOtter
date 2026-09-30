@@ -246,52 +246,48 @@ function enqueuePersist(jobId: string, fn: () => Promise<void>): Promise<void> {
 }
 
 async function persistJobProgress(progress: JobProgress): Promise<void> {
-  try {
-    const progressJsonb = buildPersistedJobProgress(progress);
-    const isTerminalFrame = progress.status === "completed" || progress.status === "failed";
-    const [existing] = await db
-      .select({ id: schema.jobs.id })
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, progress.jobId));
+  const progressJsonb = buildPersistedJobProgress(progress);
+  const isTerminalFrame = progress.status === "completed" || progress.status === "failed";
+  const [existing] = await db
+    .select({ id: schema.jobs.id })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, progress.jobId));
 
-    if (existing) {
-      await db
-        .update(schema.jobs)
-        .set({
-          status: progress.status,
-          progress: progressJsonb,
-          error:
-            progress.errors.length > 0
-              ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
-              : null,
-          completedAt: isTerminalFrame ? new Date() : null,
-        })
-        // Same resurrect guard as the single-file persist: child outcomes are
-        // published fire and forget, so a late nonterminal frame must not
-        // overwrite the terminal state the finalize already committed.
-        .where(
-          isTerminalFrame
-            ? eq(schema.jobs.id, progress.jobId)
-            : and(
-                eq(schema.jobs.id, progress.jobId),
-                notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
-              ),
-        );
-    } else {
-      await db.insert(schema.jobs).values({
-        id: progress.jobId,
-        type: "batch",
+  if (existing) {
+    await db
+      .update(schema.jobs)
+      .set({
         status: progress.status,
         progress: progressJsonb,
-        inputRefs: [],
         error:
           progress.errors.length > 0
             ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
             : null,
-      });
-    }
-  } catch {
-    // DB persistence is best-effort; don't break real-time SSE
+        completedAt: isTerminalFrame ? new Date() : null,
+      })
+      // Same resurrect guard as the single-file persist: child outcomes are
+      // published fire and forget, so a late nonterminal frame must not
+      // overwrite the terminal state the finalize already committed.
+      .where(
+        isTerminalFrame
+          ? eq(schema.jobs.id, progress.jobId)
+          : and(
+              eq(schema.jobs.id, progress.jobId),
+              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+            ),
+      );
+  } else {
+    await db.insert(schema.jobs).values({
+      id: progress.jobId,
+      type: "batch",
+      status: progress.status,
+      progress: progressJsonb,
+      inputRefs: [],
+      error:
+        progress.errors.length > 0
+          ? { message: `${progress.errors.length} file(s) failed`, details: progress.errors }
+          : null,
+    });
   }
 }
 
@@ -417,11 +413,13 @@ function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress
 // ── Public API (unchanged signatures) ──────────────────────────
 
 /**
- * Create or update progress for a batch job.
+ * Create or update progress for a batch job. Resolves after the durable DB
+ * write settles and rejects if it failed, so a route that owns the row can
+ * await its terminal frame (#1688); nonterminal callers can ignore it.
  */
-export function updateJobProgress(progress: JobProgress): void {
+export function updateJobProgress(progress: JobProgress): Promise<void> {
   const event = { ...progress, type: "batch" } as JobProgress & { type: "batch" };
-  void publish(event);
+  return publish(event);
 }
 
 /** Publish progress and resolve after its best-effort durable DB write settles. */

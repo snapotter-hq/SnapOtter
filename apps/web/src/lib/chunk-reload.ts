@@ -20,11 +20,14 @@
  * beforeunload is the first step of every cross-document navigation. The
  * listener costs Firefox's back/forward cache for these pages; in-app
  * navigation is pushState, so only cross-document history pays for it.
+ * iOS Safari skips beforeunload, so a cross-document `navigate` event from
+ * the Navigation API starts the same window there (#1479).
  */
 
 export const CHUNK_RELOAD_GUARD_KEY = "snapotter-chunk-reload-at";
 export const CHUNK_RELOAD_GUARD_MS = 30_000;
-// How long after beforeunload a chunk failure is blamed on the navigation.
+// How long after beforeunload (or a cross-document `navigate`) a chunk
+// failure is blamed on the navigation.
 // There is no event for a cancelled leave, so this is what ends it.
 export const LEAVING_WINDOW_MS = 10_000;
 
@@ -69,6 +72,24 @@ export function installChunkReloadHandler(
   const onBeforeUnload = () => {
     leavingAt = Date.now();
   };
+  // iOS Safari never fires beforeunload (#1479), but it does fire the
+  // Navigation API's `navigate` before aborting the import. Only a
+  // cross-document destination leaves the page: router pushState is
+  // same-document, and a download keeps the page where it is.
+  const navigation = (window as Window & { navigation?: EventTarget }).navigation;
+  const onNavigate = (event: Event) => {
+    const { destination, downloadRequest } = event as Event & {
+      destination?: { sameDocument?: boolean; url?: string };
+      downloadRequest?: string | null;
+    };
+    if (destination?.sameDocument !== false) return;
+    // downloadRequest is null for a real navigation; a bare <a download> gives "".
+    if (downloadRequest != null) return;
+    // mailto: and other external schemes hand off to another app and the page
+    // stays; Chromium still fires a cross-document navigate for them.
+    if (!/^https?:/i.test(destination.url ?? "")) return;
+    leavingAt = Date.now();
+  };
   // A page restored from the back/forward cache is no longer being left.
   const onPageShow = (event: PageTransitionEvent) => {
     if (event.persisted) leavingAt = Number.NEGATIVE_INFINITY;
@@ -90,9 +111,11 @@ export function installChunkReloadHandler(
   window.addEventListener("beforeunload", onBeforeUnload);
   window.addEventListener("pageshow", onPageShow);
   window.addEventListener("vite:preloadError", onPreloadError);
+  navigation?.addEventListener("navigate", onNavigate);
   return () => {
     window.removeEventListener("beforeunload", onBeforeUnload);
     window.removeEventListener("pageshow", onPageShow);
     window.removeEventListener("vite:preloadError", onPreloadError);
+    navigation?.removeEventListener("navigate", onNavigate);
   };
 }
