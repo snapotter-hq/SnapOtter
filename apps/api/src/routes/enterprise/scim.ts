@@ -11,6 +11,17 @@ import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
 import { userLimitReached } from "../../lib/user-limit.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
 import { hashPassword, verifyPassword } from "../../plugins/auth.js";
+import {
+  normalizeGroupOps,
+  normalizeUserOps,
+  parseScimBody,
+  type ScimEmail,
+  type ScimMember,
+  type ScimPatchOp,
+  scimGroupBody,
+  scimPatchBody,
+  scimUserBody,
+} from "./scim-bodies.js";
 
 const SCIM_TOKEN_PREFIX = "so_scim_v2_";
 const SCIM_TOKEN_SUFFIX_PATTERN = /^[0-9a-f]{64}$/;
@@ -70,8 +81,6 @@ async function updateScimUser(
   });
 }
 
-type ScimPatchOp = { op: string; path?: string; value?: unknown };
-
 /** The trimmed new name a Groups PATCH op renames to, empty when it names none. */
 function groupRenameTarget(op: ScimPatchOp): string {
   return (op.value as string | undefined)?.trim() ?? "";
@@ -106,12 +115,11 @@ function scimActiveValue(value: unknown): boolean {
 // A blank externalId means no external identity. Stored as "", it takes the
 // unique index slot that NULL leaves free, so the next blank one collides
 // (issue #1008). Non-blank values are kept verbatim so the
-// externalId filter still matches exactly what the IdP sent. This does no type
-// checking: SCIM bodies have no schema yet, so a non-string passes through as
-// it did before.
-function scimExternalId(value: unknown): string | null {
-  if (typeof value === "string" && value.trim() === "") return null;
-  return (value as string | null | undefined) ?? null;
+// externalId filter still matches exactly what the IdP sent. The body is parsed
+// first (scim-bodies.ts, #1511), so the value is a string or null by now.
+function scimExternalId(value: string | null | undefined): string | null {
+  if (value?.trim() === "") return null;
+  return value ?? null;
 }
 
 const DISABLED_ROLE_PREFIX = "disabled:";
@@ -430,11 +438,15 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
 
-      const body = request.body as Record<string, unknown>;
-      const userName = body.userName as string | undefined;
+      const parsed = parseScimBody(scimUserBody, request.body);
+      if (!parsed.ok) {
+        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
+      }
+      const body = parsed.data;
+      const userName = body.userName;
       const externalId = scimExternalId(body.externalId);
-      const active = body.active !== false; // default true
-      const emails = body.emails as Array<{ value: string; primary?: boolean }> | undefined;
+      const active = body.active ?? true;
+      const emails = body.emails;
       if (!userName) {
         return reply.status(400).send(scimError(400, "userName is required"));
       }
@@ -635,10 +647,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "User not found"));
       }
 
-      const body = request.body as Record<string, unknown>;
-      const userName = body.userName as string | undefined;
-      const active = body.active !== false;
-      const emails = body.emails as Array<{ value: string; primary?: boolean }> | undefined;
+      const parsed = parseScimBody(scimUserBody, request.body);
+      if (!parsed.ok) {
+        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
+      }
+      const body = parsed.data;
+      const userName = body.userName;
+      const active = body.active ?? true;
+      const emails = body.emails;
 
       if (!active && (await rejectLastActiveAdminDeactivation(existing, reply))) return;
 
@@ -728,16 +744,17 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "User not found"));
       }
 
-      const body = request.body as {
-        schemas?: string[];
-        Operations?: Array<{
-          op: string;
-          path?: string;
-          value?: unknown;
-        }>;
-      };
-
-      const operations = body.Operations ?? [];
+      const parsed = parseScimBody(scimPatchBody, request.body);
+      if (!parsed.ok) {
+        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
+      }
+      // Every value checked before any operation is applied, so a wrong-typed
+      // one refuses the whole patch (#1511).
+      const normalized = normalizeUserOps(parsed.data.Operations ?? []);
+      if (!normalized.ok) {
+        return reply.status(400).send(scimError(400, normalized.detail, "invalidValue"));
+      }
+      const operations = normalized.data;
       const deactivatesUser = operations.some((op) => {
         const opType = op.op.toLowerCase();
         if (opType !== "replace" && opType !== "add") return false;
@@ -776,14 +793,13 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             }
           }
 
+          // normalizeUserOps has checked and coerced these values already.
           if (op.path === "userName") {
             updates.username = op.value as string;
           } else if (op.path === "externalId") {
-            updates.scimExternalId = scimExternalId(op.value);
+            updates.scimExternalId = scimExternalId(op.value as string | null);
           } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
-            const emails = Array.isArray(op.value)
-              ? (op.value as Array<{ value: string; primary?: boolean }>)
-              : [{ value: op.value as string, primary: true }];
+            const emails = op.value as ScimEmail[];
             updates.email = emails.find((e) => e.primary)?.value ?? emails[0]?.value;
           } else if (op.path === "name.formatted" || op.path === "displayName") {
             // name.formatted maps to username display; no separate display name column
@@ -794,10 +810,10 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             const valObj = op.value as Record<string, unknown>;
             if (valObj.userName) updates.username = valObj.userName as string;
             if (valObj.externalId !== undefined) {
-              updates.scimExternalId = scimExternalId(valObj.externalId);
+              updates.scimExternalId = scimExternalId(valObj.externalId as string | null);
             }
             if (valObj.emails) {
-              const emails = valObj.emails as Array<{ value: string; primary?: boolean }>;
+              const emails = valObj.emails as ScimEmail[];
               updates.email = emails.find((e) => e.primary)?.value ?? emails[0]?.value;
             }
           }
@@ -904,9 +920,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       if (!(await scimAuth(request, reply))) return;
       if (!(await requireScimFeature(reply))) return;
 
-      const body = request.body as Record<string, unknown>;
-      const displayName = (body.displayName as string | undefined)?.trim();
-      const members = body.members as Array<{ value: string }> | undefined;
+      const parsed = parseScimBody(scimGroupBody, request.body);
+      if (!parsed.ok) {
+        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
+      }
+      const displayName = parsed.data.displayName?.trim();
+      const members = parsed.data.members ?? undefined;
 
       if (!displayName) {
         return reply.status(400).send(scimError(400, "displayName is required"));
@@ -1083,21 +1102,22 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "Group not found"));
       }
 
-      const body = request.body as Record<string, unknown>;
-      const displayName = (body.displayName as string | undefined)?.trim();
+      const parsed = parseScimBody(scimGroupBody, request.body);
+      if (!parsed.ok) {
+        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
+      }
+      const body = parsed.data;
+      const displayName = body.displayName?.trim();
 
       if (body.displayName !== undefined && !displayName) {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
       // RFC 7643 2.5 treats null and an empty array as the same state, and PUT
       // replaces, so null clears the group, as it does on POST. Anything else
-      // that isn't an array is refused before anything writes: iterating it
-      // used to throw after the rename and the move-out had committed (#1682).
-      const rawMembers = body.members === null ? [] : body.members;
-      if (rawMembers !== undefined && !Array.isArray(rawMembers)) {
-        return reply.status(400).send(scimError(400, "members must be an array"));
-      }
-      const members = rawMembers as Array<{ value: string }> | undefined;
+      // that isn't an array was refused by the schema above, before anything
+      // writes: iterating it used to throw after the rename and the move-out
+      // had committed (#1682).
+      const members = body.members === null ? [] : body.members;
       const renames = displayName !== undefined && displayName !== existing.name;
       if (renames) {
         // Check for name conflict
@@ -1190,9 +1210,17 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "Group not found"));
       }
 
-      const body = request.body as { schemas?: string[]; Operations?: ScimPatchOp[] };
-
-      const operations = body.Operations ?? [];
+      const parsed = parseScimBody(scimPatchBody, request.body);
+      if (!parsed.ok) {
+        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
+      }
+      // Every value checked before any operation writes, with members always
+      // a list (#1511).
+      const normalized = normalizeGroupOps(parsed.data.Operations ?? []);
+      if (!normalized.ok) {
+        return reply.status(400).send(scimError(400, normalized.detail, "invalidValue"));
+      }
+      const operations = normalized.data;
 
       // Reject rather than skip an empty rename: a silent no-op leaves the IdP
       // thinking it applied while the team keeps its old name (#988). Checked
@@ -1212,9 +1240,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             const opType = op.op.toLowerCase();
 
             if (opType === "add" && op.path === "members") {
-              const members = Array.isArray(op.value)
-                ? (op.value as Array<{ value: string }>)
-                : [op.value as { value: string }];
+              const members = op.value as ScimMember[];
               for (const member of members) {
                 await tx
                   .update(schema.users)
@@ -1245,9 +1271,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
                   .where(eq(schema.teams.id, id));
               } else if (op.path === "members") {
                 // Full member replacement
-                const members = Array.isArray(op.value)
-                  ? (op.value as Array<{ value: string }>)
-                  : [];
+                const members = op.value as ScimMember[];
                 const [defaultTeam] = await tx
                   .select()
                   .from(schema.teams)
