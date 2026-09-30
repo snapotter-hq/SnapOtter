@@ -97,6 +97,25 @@ async function identities(
   );
 }
 
+/** The audit row SCIM's create route writes: the user is in details, not target_id. */
+async function provisionedAudit(pool: pg.Pool, userId: string, externalId: string): Promise<void> {
+  await pool.query(
+    "INSERT INTO audit_log (id, actor_id, actor_username, action, details, created_at) VALUES ($1, $2, $2, 'SCIM_USER_PROVISIONED', $3, now())",
+    [randomUUID(), userId, JSON.stringify({ userId, username: userId, externalId })],
+  );
+}
+
+/** The SQL blocks under the SCIM guide's recovery heading, in order. */
+function recoveryQueries(): string[] {
+  const guide = readFileSync(join(process.cwd(), "apps/docs/guide/scim.md"), "utf8");
+  const start = guide.indexOf("{#recover-scim-ids-in-oidc-or-saml-users}");
+  if (start === -1) throw new Error("apps/docs/guide/scim.md lost its SCIM id recovery section");
+  const rest = guide.slice(start);
+  const next = rest.slice(1).search(/\n#{2,3} /);
+  const section = next === -1 ? rest : rest.slice(0, next + 1);
+  return [...section.matchAll(/```sql\n([\s\S]*?)```/g)].map((m) => m[1]);
+}
+
 beforeAll(() => {
   preScimColumnFolder = folderBeforeScimColumn();
 });
@@ -137,6 +156,17 @@ describe("migration: SCIM externalId gets its own column (#1510)", () => {
     });
   });
 
+  it("leaves a SCIM id an older SCIM write put into an OIDC user's external_id where it was (#1605)", async () => {
+    const pool = await preScimColumnDatabase([["oidc_took_over", "oidc", "scim-e"]]);
+    await provisionedAudit(pool, "oidc_took_over", "scim-e");
+
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+
+    expect(await identities(pool)).toEqual({
+      oidc_took_over: { external: "scim-e", scim: null },
+    });
+  });
+
   it("refuses a second user with the same SCIM externalId, whatever its provider", async () => {
     const pool = await preScimColumnDatabase([["scim_user", "scim", "taken-id"]]);
     await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
@@ -152,5 +182,56 @@ describe("migration: SCIM externalId gets its own column (#1510)", () => {
 
     expect(err?.code).toBe("23505");
     expect(err?.constraint).toBe("users_scim_external_id_unique");
+  });
+});
+
+// The migration can't tell a SCIM id an older SCIM write left in an OIDC or
+// SAML user's external_id from that user's own sign-in identity, so the SCIM
+// guide gives operators a query instead (#1605). These run it as published.
+describe("SCIM guide: recovering SCIM ids from OIDC and SAML users (#1605)", () => {
+  it("previews, then copies, only the ids a SCIM provisioning audit row vouches for", async () => {
+    const [preview, update] = recoveryQueries();
+    expect(preview, "the guide's preview SELECT").toMatch(/^SELECT/);
+    expect(update, "the guide's UPDATE").toMatch(/^UPDATE/);
+
+    const pool = await preScimColumnDatabase([
+      ["oidc_took_over", "oidc", "scim-e"],
+      ["saml_took_over", "saml", "scim-f"],
+      // Its own sub; the SCIM id it was provisioned with is gone from users.
+      ["oidc_relinked", "oidc", "oidc-sub"],
+      // Nothing in the audit log to vouch for it (pruned, or never SCIM).
+      ["oidc_no_audit", "oidc", "scim-g"],
+      // Another row already owns this SCIM id, so copying it would trip the index.
+      ["scim_owner", "scim", "scim-h"],
+      ["oidc_shadow", "oidc", "scim-h"],
+      ["scim_user", "scim", "scim-i"],
+    ]);
+    await provisionedAudit(pool, "oidc_took_over", "scim-e");
+    await provisionedAudit(pool, "saml_took_over", "scim-f");
+    await provisionedAudit(pool, "oidc_relinked", "scim-old");
+    await provisionedAudit(pool, "scim_owner", "scim-h");
+    await provisionedAudit(pool, "oidc_shadow", "scim-h");
+    await provisionedAudit(pool, "scim_user", "scim-i");
+    await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS });
+
+    const previewed = await pool.query<{ id: string }>(preview);
+    expect(previewed.rows.map((r) => r.id).sort()).toEqual(["oidc_took_over", "saml_took_over"]);
+
+    const updated = await pool.query(update);
+    expect(updated.rowCount).toBe(2);
+    expect(await identities(pool)).toEqual({
+      // external_id stays: Okta and others send the same id as sub and externalId.
+      oidc_took_over: { external: "scim-e", scim: "scim-e" },
+      saml_took_over: { external: "scim-f", scim: "scim-f" },
+      oidc_relinked: { external: "oidc-sub", scim: null },
+      oidc_no_audit: { external: "scim-g", scim: null },
+      scim_owner: { external: null, scim: "scim-h" },
+      oidc_shadow: { external: "scim-h", scim: null },
+      scim_user: { external: null, scim: "scim-i" },
+    });
+
+    // A second run finds nothing left to do.
+    expect((await pool.query(preview)).rowCount).toBe(0);
+    expect((await pool.query(update)).rowCount).toBe(0);
   });
 });
