@@ -117,7 +117,8 @@ test("mobile bottom nav renders a visible image-editor icon", async ({ page }) =
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  const editorLink = page.getByRole("link", { name: /editor/i });
+  // Exact name: tool cards whose descriptions mention an editor also match /editor/i.
+  const editorLink = page.getByRole("link", { name: "Editor", exact: true });
   await expect(editorLink).toBeVisible();
 
   const icon = editorLink.locator("svg");
