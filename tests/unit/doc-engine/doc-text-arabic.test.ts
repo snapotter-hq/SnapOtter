@@ -159,11 +159,11 @@ interface FakeFont {
  *  xref_object() text, xref_is_stream(), and "bad xref" for an object number
  *  out of range, as the real one raises. A missing key answers ('null', 'null'),
  *  as it does in PyMuPDF. */
-function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
+function onFakePage(fn: string, fonts: FakeFont[]): boolean {
   const code = [
     "import sys, json",
     `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
-    "from doc_text import draws_unmapped_composite_font",
+    `from doc_text import ${fn}`,
     "fonts = json.loads(sys.argv[1])",
     "LENGTH = 1000",
     "TO_UNICODE = {'stream': ('xref', '%d 0 R'), 'none': ('null', 'null'),",
@@ -229,7 +229,7 @@ function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
     "            referencer = XOBJECT if inline(f) and location(f) == 'xobject' else 0",
     "            rows.append(row + (referencer,) if full else row)",
     "        return rows",
-    "sys.stdout.write(json.dumps(draws_unmapped_composite_font(Page())))",
+    `sys.stdout.write(json.dumps(${fn}(Page())))`,
   ].join("\n");
   const res = spawnSync("python3", ["-c", code, JSON.stringify(fonts)], {
     encoding: "utf8",
@@ -238,6 +238,36 @@ function drawsUnmappedComposite(fonts: FakeFont[]): boolean {
   if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
   return JSON.parse(res.stdout) as boolean;
 }
+
+const drawsUnmappedComposite = (fonts: FakeFont[]) =>
+  onFakePage("draws_unmapped_composite_font", fonts);
+const mapsGlyphIdsAsUnicode = (fonts: FakeFont[]) => onFakePage("maps_glyph_ids_as_unicode", fonts);
+
+describe.skipIf(!hasPython)("doc_text.maps_glyph_ids_as_unicode (#1566)", () => {
+  it("accepts a Type0 font whose ToUnicode is the name /Identity-H", () => {
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "name" }])).toBe(true);
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "name", xref: 0 }])).toBe(true);
+  });
+
+  it("ignores the #955 shapes, which MuPDF already reports as U+FFFD", () => {
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "none" }])).toBe(false);
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "dangling" }])).toBe(false);
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "stream" }])).toBe(false);
+  });
+
+  it("ignores an identity name when a CIDToGIDMap stream makes the CID Unicode", () => {
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "name", cidToGid: "stream" }])).toBe(
+      false,
+    );
+  });
+
+  it("stands down when the page also uses a Type3 font, whose readable text looks the same", () => {
+    const identity: FakeFont = { type: "Type0", toUnicode: "name" };
+    const type3: FakeFont = { type: "Type3", toUnicode: "none" };
+    expect(mapsGlyphIdsAsUnicode([identity, type3])).toBe(false);
+    expect(mapsGlyphIdsAsUnicode([type3, identity])).toBe(false);
+  });
+});
 
 describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
   it("flags a Type0 font with no ToUnicode map, the glyph-id fallback case (#955)", () => {
@@ -483,6 +513,8 @@ describe("doc_text.main wiring", () => {
 
   it("drops glyph-id spans from a flagged page's verdict (#1566)", () => {
     expect(main).toMatch(/text_without_glyph_id_spans\(page\.get_texttrace\(\)\)/);
+    // Only on the identity-name shape: a Type3 font's readable text looks the same.
+    expect(main).toMatch(/if maps_glyph_ids_as_unicode\(page\)/);
   });
 
   it("reports the character count of the text it actually wrote", () => {

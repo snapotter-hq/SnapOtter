@@ -105,6 +105,11 @@ def _falls_back_to_glyph_ids(doc, xref, prefix=""):
     to_unicode = _object_number(doc, doc.xref_get_key(xref, prefix + "ToUnicode")[1])
     if to_unicode is not None and doc.xref_is_stream(to_unicode):
         return False
+    return _cid_is_glyph_id(doc, xref, prefix)
+
+
+def _cid_is_glyph_id(doc, xref, prefix=""):
+    """True when this Type0 font's CIDToGIDMap is absent or /Identity."""
     descendant = doc.xref_get_key(xref, prefix + "DescendantFonts")[1]
     # DescendantFonts is an array holding the CIDFont, sometimes itself behind a
     # reference; follow at most those two hops, then read the CIDFont's text.
@@ -182,6 +187,40 @@ def draws_unmapped_composite_font(page):
     return False
 
 
+# ToUnicode written as the name of an identity CMap where a stream belongs.
+_IDENTITY_NAME_RE = re.compile(r"^/Identity-[HV]$")
+
+
+def maps_glyph_ids_as_unicode(page):
+    """True when a Type0 font on the page names an identity CMap as its ToUnicode.
+
+    Some producers write /ToUnicode /Identity-H instead of a stream, and with
+    CID = glyph id MuPDF then reports each glyph id as the character (#1566).
+    That's the only shape text_without_glyph_id_spans is allowed to judge.
+
+    False whenever the page also uses a Type3 font: MuPDF reports a Type3
+    glyph as its character code, which equals the Unicode for ASCII text, so
+    a readable Type3 span looks exactly like glyph ids. Such a page keeps the
+    #955 verdict, which misses the identity-mapped soup but can't reject
+    readable text.
+    """
+    doc = page.parent
+    found = False
+    for xref, _ext, ftype, _name, refname, _encoding, referencer, *_rest in page.get_fonts(
+        full=True
+    ):
+        if ftype == "Type3":
+            return False
+        if ftype != "Type0" or found:
+            continue
+        location = (xref, "") if xref else _inline_font_location(page, referencer, refname)
+        if not location or not 0 < location[0] < doc.xref_length():
+            continue
+        to_unicode = doc.xref_get_key(location[0], location[1] + "ToUnicode")[1]
+        found = bool(_IDENTITY_NAME_RE.match(to_unicode)) and _cid_is_glyph_id(doc, *location)
+    return found
+
+
 # A span needs this many chars MuPDF could map before it's judged, and this
 # share of them equal to their glyph ids. Real fonts line a few glyph ids up
 # with codepoints by coincidence; a whole span doing it is an identity map.
@@ -208,6 +247,9 @@ def text_without_glyph_id_spans(trace):
     real font almost never does across a whole span. Measured on PyMuPDF
     1.27.2.3: the case-2 span matched on all 45 chars MuPDF could map, while
     mapped Type0, base-14, CJK, and CID-is-Unicode spans matched on none.
+
+    Only call it on a page maps_glyph_ids_as_unicode accepts: a Type3 font's
+    readable text also has Unicode equal to its glyph ids.
 
     Judged per span, so a line in another font on the same page still counts.
     U+FFFD stays out of the ratio: texttrace reports glyph ids below 0x20 that
@@ -262,7 +304,11 @@ def main():
             # readability verdict looks through the glyph ids (#955), and
             # past spans that came out as glyph ids anyway (#1566).
             if draws_unmapped_composite_font(page):
-                readable = text_without_glyph_id_spans(page.get_texttrace())
+                readable = (
+                    text_without_glyph_id_spans(page.get_texttrace())
+                    if maps_glyph_ids_as_unicode(page)
+                    else None
+                )
                 judged.append(
                     readable if readable is not None else page.get_text(flags=unmapped_as_fffd)
                 )
