@@ -90,7 +90,8 @@ type FontPdfKind =
  *    that reads fine.
  *  - "type0-identity-name-plus-cid-is-unicode": the same, plus a second line
  *    in Montserrat in the "type0-cid-is-unicode" shape, which only reads right
- *    through MuPDF's CID fallback.
+ *    through MuPDF's CID fallback. Set smaller because Montserrat Black at 12pt
+ *    runs past the page edge.
  *  - "simple-unmapped-names": base-14 Helvetica re-encoded with glyph names
  *    nothing can map. MuPDF falls back to the character code for simple fonts,
  *    and these codes are ASCII, so the text still extracts correctly.
@@ -112,7 +113,7 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    p.insert_text((72, 120), text, fontname='helv', fontsize=12)",
     "mont = font.replace('Roboto-Black', 'Montserrat-Black')",
     "if kind == 'type0-identity-name-plus-cid-is-unicode':",
-    "    p.insert_text((72, 120), text, fontname='mont', fontfile=mont, fontsize=12)",
+    "    p.insert_text((72, 120), text, fontname='mont', fontfile=mont, fontsize=9)",
     "    fonts = {r[4]: r[0] for r in p.get_fonts() if r[2] == 'Type0'}",
     "    d.xref_set_key(fonts['rob'], 'ToUnicode', '/Identity-H')",
     "    d.xref_set_key(fonts['mont'], 'ToUnicode', 'null')",
