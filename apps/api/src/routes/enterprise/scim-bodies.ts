@@ -126,8 +126,11 @@ function firstMessage(issues: ZodIssue[]): string {
   return first?.message ?? "Invalid request body";
 }
 
-/** RFC 7644 3.12: a malformed request is invalidSyntax, a bad attribute value invalidValue. */
-export type ScimErrorType = "invalidSyntax" | "invalidValue";
+/**
+ * RFC 7644 3.12: a malformed request is invalidSyntax, a bad attribute value
+ * invalidValue, and a remove with nothing to remove noTarget.
+ */
+export type ScimErrorType = "invalidSyntax" | "invalidValue" | "noTarget";
 
 export type ScimParse<T> =
   | { ok: true; data: T }
@@ -178,6 +181,45 @@ const USER_PATHS = new Map(
   ].map((path) => [path.toLowerCase(), path]),
 );
 
+// RFC 7644 3.10 lets a path carry its schema URN.
+const USER_SCHEMA_PREFIX = "urn:ietf:params:scim:schemas:core:2.0:user:";
+
+/** The canonical spelling of a known Users path, or undefined for any other. */
+function canonicalUserPath(path: string): string | undefined {
+  let key = path.trim().toLowerCase();
+  if (key.startsWith(USER_SCHEMA_PREFIX)) key = key.slice(USER_SCHEMA_PREFIX.length);
+  return USER_PATHS.get(key);
+}
+
+// The attributes a path-less value object can set, keyed by lowercase name.
+const USER_VALUE_KEYS = new Map(
+  ["userName", "externalId", "active", "emails"].map((key) => [key.toLowerCase(), key]),
+);
+
+/**
+ * A path-less value object with its known keys spelled canonically, so
+ * {"Active": false} deactivates like {"active": false} (#1731). Two spellings
+ * of one attribute are ambiguous, so that's refused rather than guessed.
+ */
+function canonicalValueObject(
+  value: Record<string, unknown>,
+  at: (string | number)[],
+): ScimParse<Record<string, unknown>> {
+  const canonical: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(value)) {
+    const name = USER_VALUE_KEYS.get(key.toLowerCase()) ?? key;
+    if (name in canonical) {
+      return {
+        ok: false,
+        detail: `${at.join(".")} sets ${name} more than once`,
+        scimType: "invalidSyntax",
+      };
+    }
+    canonical[name] = field;
+  }
+  return { ok: true, data: canonical };
+}
+
 /**
  * Check and coerce each Users PATCH operation's value for the paths the route
  * acts on, and give each known path its canonical spelling so the route can
@@ -195,10 +237,29 @@ export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
         scimType: "invalidSyntax",
       };
     }
-    const canonical = raw.path === undefined ? undefined : USER_PATHS.get(raw.path.toLowerCase());
+    const canonical = raw.path === undefined ? undefined : canonicalUserPath(raw.path);
     const op = canonical === undefined ? raw : { ...raw, path: canonical };
     const at = ["Operations", index, "value"];
     let value: ScimParse<unknown> = { ok: true, data: op.value };
+    if (opType === "remove") {
+      // RFC 7644 3.5.2.2: a remove names what it removes.
+      if (op.path === undefined) {
+        return {
+          ok: false,
+          detail: `Operations.${index}.path is required for remove`,
+          scimType: "noTarget",
+        };
+      }
+      // userName is required (RFC 7643 4.1), and dropping a request to unset
+      // active would leave the user as they were while the IdP thinks otherwise.
+      if (op.path === "userName" || op.path === "active") {
+        return {
+          ok: false,
+          detail: `Operations.${index}: ${op.path} can't be removed`,
+          scimType: "invalidValue",
+        };
+      }
+    }
     if (opType === "replace" || opType === "add") {
       if (op.path === "userName") {
         value = parseWith(scimString, op.value, "invalidValue", at);
@@ -220,7 +281,18 @@ export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
           ? { ok: true, data: emails.data === null ? null : emailList(emails.data) }
           : emails;
       } else if (!op.path && typeof op.value === "object" && op.value !== null) {
-        value = parseWith(scimUserBody, op.value, "invalidValue", at);
+        const keyed = canonicalValueObject(op.value as Record<string, unknown>, at);
+        value = keyed.ok ? parseWith(scimUserBody, keyed.data, "invalidValue", at) : keyed;
+        // Null reads as "not sent" on a resource body, but here the route
+        // tests `"active" in value` and would read null as a deactivation.
+        // Refuse it, as the path form does.
+        if (value.ok && (value.data as { active?: unknown }).active === null) {
+          value = {
+            ok: false,
+            detail: `${at.join(".")}.active must be a boolean, got null`,
+            scimType: "invalidValue",
+          };
+        }
       }
     }
     if (!value.ok) return value;

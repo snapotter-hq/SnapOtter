@@ -13,6 +13,7 @@ import {
 
 const invalid = (detail: string) => ({ ok: false, detail, scimType: "invalidValue" });
 const syntax = (detail: string) => ({ ok: false, detail, scimType: "invalidSyntax" });
+const noTarget = (detail: string) => ({ ok: false, detail, scimType: "noTarget" });
 
 describe("scimUserBody", () => {
   it("coerces a whole number in a string attribute, as some IdPs map numeric ids", () => {
@@ -196,6 +197,8 @@ describe("normalizeUserOps", () => {
         { op: "replace", path: "USERNAME", value: "u" },
         { op: "remove", path: "ExternalId" },
         { op: "replace", path: 'Emails[Type eq "work"].Value', value: "a@b.c" },
+        { op: "add", path: "EMAILS", value: "x@y.z" },
+        { op: "replace", path: " urn:ietf:params:scim:schemas:core:2.0:User:active ", value: true },
       ]),
     ).toEqual({
       ok: true,
@@ -208,8 +211,45 @@ describe("normalizeUserOps", () => {
           path: 'emails[type eq "work"].value',
           value: [{ value: "a@b.c", primary: true }],
         },
+        { op: "add", path: "emails", value: [{ value: "x@y.z", primary: true }] },
+        { op: "replace", path: "active", value: true },
       ],
     });
+  });
+
+  it("spells a path-less value object's known keys canonically", () => {
+    expect(
+      normalizeUserOps([
+        { op: "Replace", value: { Active: "False", USERNAME: "u", department: "x" } },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [{ op: "Replace", value: { active: false, userName: "u", department: "x" } }],
+    });
+  });
+
+  it("refuses a value object that sets one attribute under two spellings", () => {
+    expect(normalizeUserOps([{ op: "replace", value: { active: true, Active: false } }])).toEqual(
+      syntax("Operations.0.value sets active more than once"),
+    );
+  });
+
+  it("refuses a value object whose active is null, rather than read it as a deactivation", () => {
+    expect(normalizeUserOps([{ op: "replace", value: { active: null } }])).toEqual(
+      invalid("Operations.0.value.active must be a boolean, got null"),
+    );
+  });
+
+  it("refuses to remove userName or active, and a remove with no path", () => {
+    expect(normalizeUserOps([{ op: "remove", path: "USERNAME" }])).toEqual(
+      invalid("Operations.0: userName can't be removed"),
+    );
+    expect(normalizeUserOps([{ op: "remove", path: "active" }])).toEqual(
+      invalid("Operations.0: active can't be removed"),
+    );
+    expect(normalizeUserOps([{ op: "remove" }])).toEqual(
+      noTarget("Operations.0.path is required for remove"),
+    );
   });
 
   it("refuses an op that isn't add, remove or replace, before anything applies", () => {
@@ -219,7 +259,7 @@ describe("normalizeUserOps", () => {
   });
 
   it("leaves operations on paths the route ignores alone", () => {
-    const ops = [{ op: "replace", path: "name.formatted", value: { any: "thing" } }];
+    const ops = [{ op: "replace", path: "title", value: { any: "thing" } }];
     expect(normalizeUserOps(ops)).toEqual({ ok: true, data: ops });
   });
 });

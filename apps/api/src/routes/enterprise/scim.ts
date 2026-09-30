@@ -816,7 +816,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             updates.email =
               emails === null ? null : (emails.find((e) => e.primary)?.value ?? emails[0]?.value);
           } else if (op.path === "name.formatted" || op.path === "displayName") {
-            // name.formatted maps to username display; no separate display name column
+            // No column holds these, so they're accepted and ignored on purpose.
           }
 
           // Handle valueless replace (bulk value object)
@@ -834,7 +834,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         } else if (opType === "remove") {
           if (op.path === "externalId") {
             updates.scimExternalId = null;
-          } else if (op.path === "emails") {
+          } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
+            // Clearable through the same paths that set it (#1731).
             updates.email = null;
           }
         }
