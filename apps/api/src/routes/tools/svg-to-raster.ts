@@ -6,6 +6,7 @@ import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../../config.js";
+import { db, schema } from "../../db/index.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors } from "../../lib/errors.js";
@@ -14,7 +15,9 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
+import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { requireToolAccess } from "../../permissions.js";
 import { updateJobProgress } from "../progress.js";
 
 const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
@@ -119,6 +122,9 @@ export function registerSvgToRasterRoute(
 
   // --- Batch endpoint (registered first for route priority) ---
   app.post(`${basePath}/batch`, async (request, reply) => {
+    const authUser = await requireToolAccess(request, reply, opts.toolId);
+    if (!authUser) return;
+
     const files: ParsedSvgFile[] = [];
     let settingsRaw: string | null = null;
     let clientJobId: string | null = null;
@@ -199,6 +205,28 @@ export function registerSvgToRasterRoute(
     }
 
     const jobId = clientJobId || randomUUID();
+
+    // Reserve the id before the first progress write. The progress persist
+    // updates whatever row already has this id, so a clientJobId naming
+    // another job would write into that job's row (#1686, as #1554 was for
+    // pdf-to-image). The insert makes a collision fail on the primary key.
+    // No toolId: reconciliation treats a non-terminal row with a tool id as
+    // queued work, and this inline run has no queue entry.
+    try {
+      await db.insert(schema.jobs).values({
+        id: jobId,
+        userId: authUser.id,
+        type: "batch",
+        status: "processing",
+        inputRefs: [],
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        return reply.status(409).send({ error: "Job ID already in use", code: "CONFLICT" });
+      }
+      throw err;
+    }
+
     const queue = new PQueue({ concurrency: resolveConcurrency(env) });
     const results: ({ buffer: Buffer; filename: string } | null)[] = new Array(files.length).fill(
       null,
