@@ -238,4 +238,44 @@ describe("MediaPlayerView fallback across selections (#1709)", () => {
 
     expect(screen.getByRole("button", { name: /generate preview/i })).toBeTruthy();
   });
+
+  // On Automate the player also stays mounted when a result lands, so the
+  // result gets its own chance to play natively.
+  it("tries a result natively after its input fell back", () => {
+    loadTwo();
+    render(
+      <I18nProvider>
+        <MediaPlayerView />
+      </I18nProvider>,
+    );
+    fireEvent.loadedMetadata(screen.getByTestId("media-player-video"));
+    expect(screen.getByRole("button", { name: /generate preview/i })).toBeTruthy();
+
+    act(() => {
+      useFileStore.getState().updateEntry(0, { processedUrl: PROCESSED_URL });
+    });
+
+    const video = screen.getByTestId("media-player-video");
+    expect(video.getAttribute("src")).toBe(PROCESSED_URL);
+
+    // The result can't be decoded either: back to the fallback, for the result.
+    fireEvent.loadedMetadata(video);
+    expect(screen.getByRole("button", { name: /generate preview/i })).toBeTruthy();
+    expect(screen.getByText("output.ogv")).toBeTruthy();
+  });
+
+  it("falls back when the browser rejects the container outright", () => {
+    loadTwo();
+    render(
+      <I18nProvider>
+        <MediaPlayerView />
+      </I18nProvider>,
+    );
+
+    fireEvent.error(screen.getByTestId("media-player-video"));
+
+    expect(screen.queryByTestId("media-player-video")).toBeNull();
+    expect(screen.getByRole("button", { name: /generate preview/i })).toBeTruthy();
+    expect(screen.getByText("theora.ogv")).toBeTruthy();
+  });
 });

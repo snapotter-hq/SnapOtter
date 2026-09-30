@@ -13,9 +13,9 @@ export function MediaPlayerView() {
   const { t } = useTranslation();
   const entry = useFileStore((s) => s.entries[s.selectedIndex]);
   const videoRef = useRef<HTMLVideoElement>(null);
-  // The source that failed to decode, not a bare flag: Automate keeps this
-  // component mounted across selections, so the verdict has to belong to the
-  // file it was made for (#1709).
+  // The source that failed to play, not a bare flag: Automate and the mobile
+  // tool page keep this component mounted across selections and results, so
+  // the verdict has to belong to the source it was made for (#1709).
   const [unplayableSrc, setUnplayableSrc] = useState<string | null>(null);
 
   if (!entry) return null;
@@ -63,6 +63,9 @@ export function MediaPlayerView() {
               setUnplayableSrc(src);
             }
           }}
+          // A container the browser rejects outright never reaches
+          // loadedmetadata; it fires error instead.
+          onError={() => setUnplayableSrc(src)}
         >
           <track kind="captions" />
           {t.tools.mediaPlayer.unsupported}
