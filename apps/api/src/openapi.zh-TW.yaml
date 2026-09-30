@@ -6963,7 +6963,6 @@ paths:
         - System
       summary: 工作進度（SSE）
       description: 用於追蹤長時間執行工作的 Server-Sent Events 串流。它會傳送單一檔案、批次和 heartbeat 框架，並在工作的最終事件後立即關閉。
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7064,6 +7063,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

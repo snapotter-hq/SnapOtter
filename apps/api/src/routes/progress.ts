@@ -885,6 +885,9 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       if (access === "denied") {
         return reply.status(404).send({ error: "Job not found" });
       }
+      // The client may have left during that lookup. Its close event has
+      // already fired, so nothing below would ever clean up after it.
+      if (request.raw.destroyed || reply.raw.destroyed) return;
 
       // Take over the response from Fastify for SSE streaming
       reply.hijack();
@@ -935,6 +938,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       // Frames that arrive before the job row exists wait here until the row
       // shows whose job it is. Heartbeats keep the connection alive meanwhile.
       const held: string[] = [];
+      let heldReceived = 0;
       let checking = false;
       let heldRechecks = 0;
       let heldRecheckTimer: ReturnType<typeof setTimeout> | null = null;
@@ -956,18 +960,28 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       const recheckHeld = async () => {
         if (checking || ended || access !== "missing") return;
         checking = true;
-        const heldBefore = held.length;
+        const receivedBefore = heldReceived;
         try {
           settleAccess(await jobStreamAccess(jobId, user));
-        } catch {
+        } catch (err) {
           // DB unavailable: keep holding and try again below.
+          request.log.warn({ err, jobId }, "progress stream: access check failed");
         } finally {
           checking = false;
         }
         if (ended || access !== "missing" || held.length === 0) return;
-        if (held.length > heldBefore) {
+        if (heldReceived > receivedBefore) {
           void recheckHeld();
-        } else if (!heldRecheckTimer && heldRechecks < HELD_RECHECK_LIMIT) {
+        } else if (heldRechecks >= HELD_RECHECK_LIMIT) {
+          // Still no row to say whose job this is. End the stream rather than
+          // hold its frames behind heartbeats forever; the client reconnects
+          // and the connect-time replay picks up whatever has landed by then.
+          request.log.warn(
+            { jobId, heldFrames: held.length },
+            "progress stream: no job row appeared for held frames",
+          );
+          endStream();
+        } else if (!heldRecheckTimer) {
           heldRechecks++;
           heldRecheckTimer = setTimeout(() => {
             heldRecheckTimer = null;
@@ -984,6 +998,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         }
         if (held.length >= MAX_HELD_FRAMES) held.shift();
         held.push(json);
+        heldReceived++;
         void recheckHeld();
       };
 

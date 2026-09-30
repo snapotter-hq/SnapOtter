@@ -766,6 +766,18 @@ function getOcrInstallPreflightError(): { statusCode: 409 | 503; error: string }
   return null;
 }
 
+/**
+ * Drop an install reservation nothing will use. A failure here leaves a stray
+ * queued row until the startup sweep, which is no reason to fail the request.
+ */
+async function releaseReservedInstall(jobId: string): Promise<void> {
+  try {
+    await releaseFeatureInstallStream(jobId);
+  } catch (err) {
+    logger.warn({ err, jobId }, "could not release an unused feature install reservation");
+  }
+}
+
 async function queueBundleInstallIfNeeded(
   bundleId: string,
   userId: string,
@@ -783,13 +795,20 @@ async function queueBundleInstallIfNeeded(
   // that lands behind another install stays queued server-side and starts
   // automatically when the running install finishes.
   const jobId = crypto.randomUUID();
+  const mutationEpoch = getAiMutationEpoch();
   // The progress stream decides who may watch by this row, so it has to exist
   // before pump() can publish the first frame.
   await reserveFeatureInstallStream({ jobId, bundleId, userId });
-  const effectiveJobId = enqueue({ bundleId, jobId, mutationEpoch: getAiMutationEpoch() });
+  let effectiveJobId: string;
+  try {
+    effectiveJobId = enqueue({ bundleId, jobId, mutationEpoch });
+  } catch (err) {
+    await releaseReservedInstall(jobId);
+    throw err;
+  }
   if (effectiveJobId !== jobId) {
     // Joined an install that was already queued or running; its own row stands.
-    await releaseFeatureInstallStream(jobId);
+    await releaseReservedInstall(jobId);
   }
   const pumpError = pump();
   if (pumpError) throw pumpError;

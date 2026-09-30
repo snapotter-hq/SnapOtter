@@ -6999,7 +6999,6 @@ paths:
         - System
       summary: Avanzamento job (SSE)
       description: Flusso Server-Sent Events per monitorare i lavori a lunga esecuzione. Invia frame per file singolo, batch e heartbeat e si chiude immediatamente dopo un evento terminale del lavoro.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7100,6 +7099,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

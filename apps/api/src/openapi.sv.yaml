@@ -6999,7 +6999,6 @@ paths:
         - System
       summary: Jobbframsteg (SSE)
       description: Server-Sent Events-ström för att följa långvariga jobb. Den skickar ramar för enskilda filer, batcher och heartbeat och stängs omedelbart efter en terminal jobbhändelse.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7100,6 +7099,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck

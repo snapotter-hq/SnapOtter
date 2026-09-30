@@ -6999,7 +6999,6 @@ paths:
         - System
       summary: Progres job (SSE)
       description: Aliran Server-Sent Events untuk melacak pekerjaan yang berjalan lama. Aliran ini mengirim frame file tunggal, batch, dan heartbeat, lalu langsung ditutup setelah peristiwa terminal pekerjaan.
-      security: []
       parameters:
         - name: jobId
           in: path
@@ -7100,6 +7099,18 @@ paths:
                       type:
                         type: string
                         const: heartbeat
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnauthorizedError"
+        "404":
+          description: The job belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/admin/health:
     get:
       operationId: adminHealthCheck
