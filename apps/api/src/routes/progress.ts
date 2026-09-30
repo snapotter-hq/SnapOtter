@@ -16,6 +16,8 @@ import { db, schema } from "../db/index.js";
 import { createRedisSubscriberConnection, sharedRedis } from "../jobs/connection.js";
 import { bullPrefix } from "../jobs/types.js";
 import { getSecurityHeaders } from "../lib/csp.js";
+import { hasEffectivePermission } from "../permissions.js";
+import { type AuthUser, requireAuth } from "../plugins/auth.js";
 
 // ── Exported interfaces (unchanged) ────────────────────────────
 
@@ -777,6 +779,88 @@ function ensureSubscriber(): void {
   });
 }
 
+// ── SSE access ─────────────────────────────────────────────────
+
+type StreamAccess = "allowed" | "denied" | "missing";
+
+/**
+ * Who may watch a job: its owner, or a user with files:all, the same rule
+ * the cancel route applies. The last frame carries the result's download
+ * link, so an ownerless row is files:all only too. "missing" means the row
+ * doesn't exist yet: the web client opens the stream before its upload lands.
+ */
+async function streamAccess(
+  row: { userId: string | null; settings: unknown },
+  user: AuthUser,
+): Promise<Exclude<StreamAccess, "missing">> {
+  if (row.userId && row.userId === user.id) return "allowed";
+  if (await hasEffectivePermission(user, "files:all")) return "allowed";
+  // Installs are shared: a second admin who clicks install joins the running
+  // job, so anyone allowed to manage features may watch it.
+  if (isFeatureInstallRow(row.settings) && (await hasEffectivePermission(user, "features:manage")))
+    return "allowed";
+  return "denied";
+}
+
+async function jobStreamAccess(jobId: string, user: AuthUser): Promise<StreamAccess> {
+  const [row] = await db
+    .select({ userId: schema.jobs.userId, settings: schema.jobs.settings })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.id, jobId));
+  if (!row) return "missing";
+  return streamAccess(row, user);
+}
+
+function isFeatureInstallRow(settings: unknown): boolean {
+  return isRecord(settings) && typeof settings.featureInstall === "string";
+}
+
+/**
+ * Write the jobs row for a feature install before its first progress frame,
+ * so the stream can tell who may watch it. Without it the row only appears
+ * once the first frame is persisted, with no owner and no marker.
+ */
+export async function reserveFeatureInstallStream(args: {
+  jobId: string;
+  bundleId: string;
+  userId: string;
+}): Promise<void> {
+  await db
+    .insert(schema.jobs)
+    .values({
+      id: args.jobId,
+      userId: args.userId,
+      type: "single",
+      status: "queued",
+      inputRefs: [],
+      settings: { featureInstall: args.bundleId },
+    })
+    .onConflictDoNothing();
+}
+
+/** Drop a reserved install row that the install queue didn't use. */
+export async function releaseFeatureInstallStream(jobId: string): Promise<void> {
+  await db
+    .delete(schema.jobs)
+    .where(
+      and(
+        eq(schema.jobs.id, jobId),
+        eq(schema.jobs.status, "queued"),
+        sql`${schema.jobs.settings}->>'featureInstall' IS NOT NULL`,
+      ),
+    );
+}
+
+/** Frames held for a stream whose job row hasn't appeared yet. */
+const MAX_HELD_FRAMES = 200;
+/**
+ * A few publishers announce a frame a moment before the row it belongs to is
+ * written, so a held frame gets re-checked on this timer as well as on the
+ * next frame.
+ */
+const HELD_RECHECK_MS = 500;
+const HELD_RECHECK_LIMIT = 20;
+
 // ── SSE endpoint ───────────────────────────────────────────────
 
 export async function registerProgressRoutes(app: FastifyInstance): Promise<void> {
@@ -787,7 +871,16 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
     "/api/v1/jobs/:jobId/progress",
     { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } },
     async (request: FastifyRequest<{ Params: { jobId: string } }>, reply: FastifyReply) => {
+      // /api/v1/jobs/ is a public prefix, so this route checks for itself.
+      const user = requireAuth(request, reply);
+      if (!user) return;
+
       const { jobId } = request.params;
+
+      let access = await jobStreamAccess(jobId, user);
+      if (access === "denied") {
+        return reply.status(404).send({ error: "Job not found" });
+      }
 
       // Take over the response from Fastify for SSE streaming
       reply.hijack();
@@ -827,7 +920,70 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       // missed forever even though both transport layers behaved correctly.
       let ended = false;
 
+      const endStream = () => {
+        ended = true;
+        clearInterval(keepaliveInterval);
+        if (heldRecheckTimer) clearTimeout(heldRecheckTimer);
+        removeListener();
+        reply.raw.end();
+      };
+
+      // Frames that arrive before the job row exists wait here until the row
+      // shows whose job it is. Heartbeats keep the connection alive meanwhile.
+      const held: string[] = [];
+      let checking = false;
+      let heldRechecks = 0;
+      let heldRecheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const settleAccess = (verdict: StreamAccess) => {
+        if (ended || access !== "missing") return;
+        access = verdict;
+        if (verdict === "allowed") {
+          for (const json of held.splice(0)) {
+            deliver(json);
+            if (ended) return;
+          }
+        } else if (verdict === "denied") {
+          held.length = 0;
+          endStream();
+        }
+      };
+
+      const recheckHeld = async () => {
+        if (checking || ended || access !== "missing") return;
+        checking = true;
+        const heldBefore = held.length;
+        try {
+          settleAccess(await jobStreamAccess(jobId, user));
+        } catch {
+          // DB unavailable: keep holding and try again below.
+        } finally {
+          checking = false;
+        }
+        if (ended || access !== "missing" || held.length === 0) return;
+        if (held.length > heldBefore) {
+          void recheckHeld();
+        } else if (!heldRecheckTimer && heldRechecks < HELD_RECHECK_LIMIT) {
+          heldRechecks++;
+          heldRecheckTimer = setTimeout(() => {
+            heldRecheckTimer = null;
+            void recheckHeld();
+          }, HELD_RECHECK_MS);
+        }
+      };
+
       const callback: FrameCallback = (json: string) => {
+        if (ended) return;
+        if (access === "allowed") {
+          deliver(json);
+          return;
+        }
+        if (held.length >= MAX_HELD_FRAMES) held.shift();
+        held.push(json);
+        void recheckHeld();
+      };
+
+      const deliver = (json: string) => {
         if (ended) return;
         sendFrame(json);
 
@@ -843,12 +999,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
               (parsed.phase === "complete" || parsed.phase === "failed")) ||
             (parsed.type === "batch" &&
               (parsed.status === "completed" || parsed.status === "failed"));
-          if (isTerminal) {
-            ended = true;
-            clearInterval(keepaliveInterval);
-            removeListener();
-            reply.raw.end();
-          }
+          if (isTerminal) endStream();
         } catch {
           // Parse failure; keep streaming
         }
@@ -871,6 +1022,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       request.raw.on("close", () => {
         ended = true;
         clearInterval(keepaliveInterval);
+        if (heldRecheckTimer) clearTimeout(heldRecheckTimer);
         removeListener();
       });
 
@@ -893,6 +1045,13 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       try {
         const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
         if (ended) return;
+        // The row may have appeared since the connect-time check. Its owner
+        // decides whether this stream sees anything, replay included.
+        if (row && access === "missing") {
+          settleAccess(await streamAccess(row, user));
+          if (ended) return;
+        }
+        if (access !== "allowed") return;
         // A live (queued/processing) single-file row replays a nonterminal
         // frame: a reconnecting client must be able to tell "the job exists
         // and is working" apart from "no such job", and heartbeats carry no
