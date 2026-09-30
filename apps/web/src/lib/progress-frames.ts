@@ -31,7 +31,7 @@ export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this j
 export function parseResultBody<T extends object>(text: string): T {
   const body: unknown = JSON.parse(text);
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    throw new SyntaxError("The response body is not a JSON object");
+    throw new Error("The response body is not a JSON object");
   }
   return resolveServerUrls(body as T);
 }

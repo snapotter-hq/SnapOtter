@@ -63,7 +63,7 @@ describe("parseResultBody (#1354)", () => {
     ["a number", "42"],
     ["an array", "[]"],
   ])("throws for %s", (_label, text) => {
-    expect(() => parseResultBody(text)).toThrow(SyntaxError);
+    expect(() => parseResultBody(text)).toThrow();
   });
 
   it("moves result URLs under the deployment prefix", async () => {
