@@ -56,6 +56,44 @@ describe("reportEngineUnavailable (#1403)", () => {
     report(engineDown("OTHER_ENGINE"), "mute-video", log);
     expect(reportError).toHaveBeenCalledTimes(3);
   });
+
+  describe("an intermittent fault (#1628)", () => {
+    // Once per process suited a missing binary and hid every out-of-memory
+    // decode after the first: the same code and tool, but it comes and goes.
+    function withCause(name: string) {
+      const err = engineDown();
+      const cause = new Error("decoder failed");
+      cause.name = name;
+      err.cause = cause;
+      return err;
+    }
+
+    it("reports again once the window has passed, and not before", async () => {
+      const report = await freshHelper();
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+      report(engineDown(), "resize", log);
+      now.mockReturnValue(1_000_000 + 9 * 60_000);
+      report(engineDown(), "resize", log);
+      expect(reportError).toHaveBeenCalledTimes(1);
+
+      now.mockReturnValue(1_000_000 + 11 * 60_000);
+      report(engineDown(), "resize", log);
+      expect(reportError).toHaveBeenCalledTimes(2);
+      expect(log.warn).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps a decoder running out of memory from hiding behind a missing one", async () => {
+      const report = await freshHelper();
+      report(withCause("DecoderUnavailableError"), "resize", log);
+      report(withCause("DecoderOutOfMemoryError"), "resize", log);
+      report(withCause("DecoderOutOfMemoryError"), "resize", log);
+      expect(reportError).toHaveBeenCalledTimes(2);
+      expect(log.warn.mock.calls.map((call) => call[0].cause)).toEqual([
+        "DecoderUnavailableError",
+        "DecoderOutOfMemoryError",
+      ]);
+    });
+  });
 });
 
 describe("sharedServerFault (#1432)", () => {
