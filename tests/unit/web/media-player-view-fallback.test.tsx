@@ -23,6 +23,15 @@ beforeEach(() => {
     createObjectURL: () => "blob:preview",
     revokeObjectURL: () => {},
   });
+  // Some Node versions put a method-less localStorage over jsdom's, and
+  // I18nProvider reads the stored locale on mount.
+  const stored = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => stored.get(k) ?? null,
+    setItem: (k: string, v: string) => void stored.set(k, v),
+    removeItem: (k: string) => void stored.delete(k),
+    clear: () => stored.clear(),
+  });
 });
 
 afterEach(() => {
@@ -166,5 +175,67 @@ describe("MediaPlayerView transcode fallback (#1503)", () => {
     const formData = generateCalls[0][1]?.body as FormData;
     const uploaded = formData.get("file") as File;
     expect(uploaded.name).toBe("input.ogv");
+  });
+});
+
+// Automate keeps one MediaPlayerView across selections (tool-page remounts it
+// per index), so a flag left over from one file must not decide the next (#1709).
+describe("MediaPlayerView fallback across selections (#1709)", () => {
+  function loadTwo() {
+    let n = 0;
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: () => `blob:file-${++n}`,
+      revokeObjectURL: () => {},
+    });
+    useFileStore
+      .getState()
+      .setFiles([
+        new File(["ogv"], "theora.ogv", { type: "video/ogg" }),
+        new File(["mp4"], "h264.mp4", { type: "video/mp4" }),
+      ]);
+  }
+
+  it("plays the next file natively after one fell back", () => {
+    loadTwo();
+    render(
+      <I18nProvider>
+        <MediaPlayerView />
+      </I18nProvider>,
+    );
+
+    fireEvent.loadedMetadata(screen.getByTestId("media-player-video"));
+    expect(screen.getByRole("button", { name: /generate preview/i })).toBeTruthy();
+
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+
+    expect(screen.getByTestId("media-player-video")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /generate preview/i })).toBeNull();
+  });
+
+  it("falls back again on returning to the unplayable file", () => {
+    loadTwo();
+    render(
+      <I18nProvider>
+        <MediaPlayerView />
+      </I18nProvider>,
+    );
+    fireEvent.loadedMetadata(screen.getByTestId("media-player-video"));
+
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    const video = screen.getByTestId("media-player-video");
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    fireEvent.loadedMetadata(video);
+    expect(screen.getByTestId("media-player-video")).toBeTruthy();
+
+    act(() => {
+      useFileStore.getState().setSelectedIndex(0);
+    });
+
+    expect(screen.getByRole("button", { name: /generate preview/i })).toBeTruthy();
   });
 });
