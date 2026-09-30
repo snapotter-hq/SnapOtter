@@ -29,6 +29,19 @@ export class DecoderUnavailableError extends SafeError {
 }
 
 /**
+ * The server ran out of memory mid-decode. Still ENGINE_UNAVAILABLE, so every
+ * route that answers a missing decoder with a 503 answers this one the same
+ * way (#1577), but named apart so reporting doesn't fold an intermittent
+ * fault into a permanent one (#1628).
+ */
+export class DecoderOutOfMemoryError extends DecoderUnavailableError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = "DecoderOutOfMemoryError";
+  }
+}
+
+/**
  * A missing decoder is the server's fault, not the upload's. Routes that
  * answer a decode failure with a 4xx check this first and rethrow, so the
  * global handler answers 503 and logs and reports it (#795, #1428). Marker

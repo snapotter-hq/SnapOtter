@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import {
   asDecoderUnavailable,
-  DecoderUnavailableError,
+  DecoderOutOfMemoryError,
   noDecoderFound,
 } from "./format-decoders.js";
 
@@ -29,7 +29,7 @@ function asDecoderOutOfMemory(err: unknown): unknown {
     (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) ||
     (err as { signal?: unknown } | null)?.signal === "SIGKILL";
   if (!outOfMemory) return err;
-  return new DecoderUnavailableError(
+  return new DecoderOutOfMemoryError(
     "The HEIF decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
     err,
   );

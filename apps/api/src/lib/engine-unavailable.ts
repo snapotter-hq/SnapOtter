@@ -2,15 +2,26 @@ import type { FastifyBaseLogger, FastifyReply } from "fastify";
 import type { InputValidationError } from "../modality/contract.js";
 import { reportError } from "./error-report.js";
 
-const reported = new Set<string>();
+// A broken engine stays broken, but some faults come and go: the HEIF decoder
+// running out of memory is reported as the same ENGINE_UNAVAILABLE (#1577).
+// Once per process hid every repeat of those, so a report lasts a window, and
+// the cause's name is part of the key so one kind can't hide the other (#1628).
+const REPORT_WINDOW_MS = 10 * 60_000;
+const lastReported = new Map<string, number>();
+
+function causeName(err: InputValidationError): string {
+  const name = (err.cause as { name?: unknown } | undefined)?.name;
+  return typeof name === "string" ? name : "";
+}
 
 /**
  * A 5xx InputValidationError (ENGINE_UNAVAILABLE when ffprobe or qpdf can't
  * start) is the operator's container, not the caller's file, and a route that
  * answers it directly never reaches the error handler that logs 5xx. Log and
- * report it here instead, once per code and tool per process, so a broken
- * engine shows up without a line per upload (#1330, #1403). A 4xx is the
- * caller's fault and is ignored.
+ * report it here instead, once per code, cause and tool per ten minutes, so a
+ * broken engine shows up without a line per upload (#1330, #1403) and an
+ * intermittent one shows up each time it recurs (#1628). A 4xx is the caller's
+ * fault and is ignored.
  */
 export function reportEngineUnavailable(
   err: InputValidationError,
@@ -18,16 +29,22 @@ export function reportEngineUnavailable(
   log: Pick<FastifyBaseLogger, "warn">,
 ): void {
   if (err.statusCode < 500) return;
-  const key = `${err.code ?? "unknown"}:${toolId}`;
-  if (reported.has(key)) return;
-  reported.add(key);
-  log.warn({ code: err.code, toolId, err }, "Tool engine unavailable during input preparation");
+  const cause = causeName(err);
+  const key = `${err.code ?? "unknown"}:${cause}:${toolId}`;
+  const now = Date.now();
+  const last = lastReported.get(key);
+  if (last !== undefined && now - last < REPORT_WINDOW_MS) return;
+  lastReported.set(key, now);
+  log.warn(
+    { code: err.code, cause: cause || undefined, toolId, err },
+    "Tool engine unavailable during input preparation",
+  );
   void reportError(err, { source: "http", toolId, statusCode: err.statusCode });
 }
 
 /**
  * Reply with an input handler's rejection. A 5xx one is also logged and
- * reported, once per tool, which suits endpoints the browser fires on its own
+ * reported, once per tool and window, which suits endpoints the browser fires on its own
  * (thumbnails, live previews) where a log line per request would bury the
  * signal (#1428).
  */
