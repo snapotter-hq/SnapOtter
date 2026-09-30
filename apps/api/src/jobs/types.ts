@@ -76,7 +76,7 @@ export const INVALID_CLIENT_JOB_ID_ERROR =
 // integer) and as an object-key segment (VALID_KEY in lib/object-storage.ts:
 // alphanumeric first character, no '..'), so the pattern is the intersection.
 // openapi.yaml documents the same pattern on every clientJobId field.
-export const CLIENT_JOB_ID_PATTERN = /^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][\w.-]{0,127}$/;
+export const CLIENT_JOB_ID_PATTERN = /^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 
 /**
  * Validate a client-supplied multipart clientJobId field. The value becomes a
