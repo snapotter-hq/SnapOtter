@@ -186,8 +186,8 @@ describe("Extreme aspect ratio images", () => {
         { name: "settings", content: JSON.stringify({ width: 50 }) },
       ]);
 
-      expect(res.statusCode).toBe(422);
-      expect(JSON.parse(res.body).error).toBe("Processing failed");
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toMatch(/Resize output must not exceed/);
     });
 
     it("resizes a 1x1000 image by height", async () => {
@@ -291,8 +291,8 @@ describe("Extreme aspect ratio images", () => {
         { name: "settings", content: JSON.stringify({ height: 50 }) },
       ]);
 
-      expect(res.statusCode).toBe(422);
-      expect(JSON.parse(res.body).error).toBe("Processing failed");
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toMatch(/Resize output must not exceed/);
     });
 
     it("crops a 1000x1 image to a 10x1 region", async () => {

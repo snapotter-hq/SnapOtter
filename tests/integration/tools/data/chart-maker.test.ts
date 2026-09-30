@@ -183,7 +183,7 @@ describe("Chart Maker", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(`${result.error} ${result.details ?? ""}`).toMatch(/numeric/i);
   });
@@ -360,7 +360,7 @@ describe("Chart Maker column detection", () => {
   it("names the columns it checked when the file holds no numbers", async () => {
     const res = await postChart("region,city\nEMEA,Berlin\nAPAC,Singapore\n");
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     const message = `${result.error} ${result.details ?? ""}`;
     expect(message).toMatch(/numeric/i);
@@ -413,8 +413,8 @@ describe("Chart Maker column detection", () => {
   it("still rejects a file whose only numeric column is negative", async () => {
     const res = await postChart("month,delta\nJan,-5\nFeb,-3\n");
 
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toMatch(/zero or greater/i);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/zero or greater/i);
   });
 
   it("rejects a CSV whose delimiter guess split the numbers apart", async () => {
@@ -422,8 +422,8 @@ describe("Chart Maker column detection", () => {
     // UndetectableDelimiter and splits anyway; charting 200 would be wrong.
     const res = await postChart("sales\n1,200\n2,400\n3,600\n");
 
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toMatch(/delimit/i);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/delimit/i);
   });
 
   it("ignores a stray extra field that only one row carries", async () => {
@@ -436,8 +436,8 @@ describe("Chart Maker column detection", () => {
     const header = Array.from({ length: 14 }, (_, i) => `Revenue FY26 Q${i + 1}`).join(",");
     const res = await postChart(`${header}\n${Array(14).fill("n/a").join(",")}\n`);
 
-    expect(res.statusCode).toBe(422);
-    const details: string = JSON.parse(res.body).details;
+    expect(res.statusCode).toBe(400);
+    const details: string = JSON.parse(res.body).error;
     // Over 280 chars and friendlyError swaps in a generic sentence instead.
     expect(details.length).toBeLessThanOrEqual(280);
     expect(details).toMatch(/numeric/i);

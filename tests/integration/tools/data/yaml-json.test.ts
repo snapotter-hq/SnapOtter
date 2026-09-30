@@ -70,11 +70,11 @@ describe("yaml-json (pure JS, no skipIf)", () => {
     expect(yamlText).toContain("SnapOtter");
   }, 30_000);
 
-  it("rejects malformed YAML with 422", async () => {
+  it("rejects malformed YAML with 400", async () => {
     const bad = Buffer.from("a: [unclosed");
     const res = await runTool("bad.yaml", bad);
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/not valid yaml/i);
+    expect(parsed.error).toMatch(/not valid yaml/i);
   }, 30_000);
 });

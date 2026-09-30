@@ -943,7 +943,7 @@ describe("Tool processing", () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it("returns 422 when crop exceeds image bounds", async () => {
+    it("returns 400 when crop exceeds image bounds", async () => {
       const { body: payload, contentType } = createMultipartPayload([
         { name: "file", filename: "crop.png", contentType: "image/png", content: PNG_200x150 },
         {
@@ -961,8 +961,8 @@ describe("Tool processing", () => {
         },
         payload,
       });
-      // Sharp should throw when crop extends beyond image — wrapped as 422
-      expect(res.statusCode).toBe(422);
+      // Sharp should throw when crop extends beyond image — rejected as bad input (400)
+      expect(res.statusCode).toBe(400);
     });
   });
 

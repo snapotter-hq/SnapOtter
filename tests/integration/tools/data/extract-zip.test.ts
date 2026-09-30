@@ -203,7 +203,7 @@ describe("extract-zip (pure JS, no skipIf)", () => {
     expect(parsed.error).toMatch(/unsafe entry path|invalid relative path|absolute path/i);
   }, 30_000);
 
-  it("rejects a high-ratio zip bomb with 422", async () => {
+  it("rejects a high-ratio zip bomb with 400", async () => {
     // Create a 60 MiB zero buffer - compresses to a very small zip
     const bomb = Buffer.alloc(60 * 1024 * 1024, 0);
     const zipBuf = await buildZipBuffer([{ name: "bomb.bin", content: bomb }]);
@@ -212,8 +212,8 @@ describe("extract-zip (pure JS, no skipIf)", () => {
     expect(zipBuf.length).toBeLessThan(1 * 1024 * 1024);
 
     const res = await runExtract("bomb.zip", zipBuf);
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/suspicious compression/i);
+    expect(parsed.error).toMatch(/suspicious compression/i);
   }, 60_000);
 });

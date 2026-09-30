@@ -72,9 +72,9 @@ describe.skipIf(!ffmpegAvailable())("ringtone-maker (requires ffmpeg)", () => {
     }
   }, 60_000);
 
-  it("rejects startS beyond audio duration (422)", async () => {
+  it("rejects startS beyond audio duration (400)", async () => {
     const res = await runTool({ startS: 5 });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     expect(res.body).toMatch(/beyond the end/i);
   }, 60_000);
 

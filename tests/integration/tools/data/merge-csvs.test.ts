@@ -51,7 +51,7 @@ describe("merge-csvs (pure JS, no skipIf)", () => {
     expect(text).toContain("beta");
   }, 30_000);
 
-  it("rejects mismatched headers with 422", async () => {
+  it("rejects mismatched headers with 400", async () => {
     const bad = Buffer.from("x,y\n10,20\n");
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny-a.csv", contentType: "text/csv", content: CSV_A },
@@ -65,9 +65,9 @@ describe("merge-csvs (pure JS, no skipIf)", () => {
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/different columns/i);
+    expect(parsed.error).toMatch(/different columns/i);
   }, 30_000);
 
   it("rejects a single file with 400", async () => {

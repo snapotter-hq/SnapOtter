@@ -61,7 +61,7 @@ describe.skipIf(!ffmpegAvailable())("video-loudnorm (requires ffmpeg)", () => {
     expect(dl.rawPayload.length).toBeGreaterThan(100);
   }, 60_000);
 
-  it("rejects a video with no audio track with 422", async () => {
+  it("rejects a video with no audio track with 400", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "silent.mp4", contentType: "video/mp4", content: silentMp4 },
       { name: "settings", content: JSON.stringify({}) },
@@ -72,7 +72,7 @@ describe.skipIf(!ffmpegAvailable())("video-loudnorm (requires ffmpeg)", () => {
       headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
       body,
     });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const resBody = JSON.parse(res.body);
     expect(resBody.details || resBody.error).toMatch(/no audio track/i);
   }, 60_000);

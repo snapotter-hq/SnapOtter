@@ -96,6 +96,6 @@ describe("csv-json (pure JS, no skipIf)", () => {
   it("rejects non-array JSON input for JSON-to-CSV", async () => {
     const obj = Buffer.from(JSON.stringify({ key: "value" }));
     const res = await runTool("obj.json", obj);
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
   }, 30_000);
 });

@@ -47,7 +47,7 @@ describe.skipIf(!ffmpegAvailable())("extract-subtitles (requires ffmpeg)", () =>
     expect(srtContent).toContain("SnapOtter subtitle one");
   }, 60_000);
 
-  it("rejects a video with no subtitle track (422)", async () => {
+  it("rejects a video with no subtitle track (400)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.mp4", contentType: "video/mp4", content: MP4 },
       { name: "settings", content: JSON.stringify({}) },
@@ -59,8 +59,8 @@ describe.skipIf(!ffmpegAvailable())("extract-subtitles (requires ffmpeg)", () =>
       body,
     });
 
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const parsed = JSON.parse(res.body);
-    expect(parsed.details).toMatch(/no subtitle track/i);
+    expect(parsed.error).toMatch(/no subtitle track/i);
   }, 60_000);
 });

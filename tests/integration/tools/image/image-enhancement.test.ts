@@ -1362,9 +1362,9 @@ describe("Undecodable input", () => {
     // fails the full pixel decode that analyzeImage() forces via .stats().
     const truncated = readFixture(fixtures.image.hostile.truncated);
     const res = await postTool({}, truncated, "truncated.jpg", "image/jpeg");
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    expect(body.error).toBe(UNDECODABLE_IMAGE_MESSAGE);
   });
 });
 

@@ -76,13 +76,13 @@ describe.skipIf(!ffmpegAvailable())("audio-channels (requires ffmpeg)", () => {
     expect(audio?.channels).toBe(2);
   }, 60_000);
 
-  it("stereo-to-mono on mono input returns 422", async () => {
+  it("stereo-to-mono on mono input returns 400", async () => {
     const res = await postTool("tiny.mp3", "audio/mpeg", MONO_MP3, {
       mode: "stereo-to-mono",
     });
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/stereo input/i);
+    expect(body.error).toMatch(/stereo input/i);
   }, 60_000);
 
   it("rejects missing mode (400)", async () => {

@@ -340,9 +340,9 @@ describe("target size semantics and reporting (#1272)", () => {
       .jpeg()
       .toBuffer();
     const res = await postTool({ mode: "targetSize", targetSizeKb: 0.2 }, noiseJpg);
-    expect(res.statusCode).toBe(422);
+    expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
-    expect(body.details).toBe(
+    expect(body.error).toBe(
       "Couldn't get this image under 0.2 KB, even after scaling it down. Try a larger target, or crop the image first.",
     );
   });

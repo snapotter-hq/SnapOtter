@@ -731,8 +731,8 @@ describe("Undecodable input", () => {
     await expect(sharp(truncated).metadata()).resolves.toBeDefined();
 
     const res = await postTool({ stripAll: true }, truncated, "truncated.png", "image/png");
-    expect(res.statusCode).toBe(422);
-    expect(JSON.parse(res.body).details).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe(UNDECODABLE_IMAGE_MESSAGE);
   });
 });
 
