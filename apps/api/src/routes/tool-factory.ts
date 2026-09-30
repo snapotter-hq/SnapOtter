@@ -26,7 +26,7 @@ import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../lib/object-storage.js";
+import { deletePrefix, getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingNumber } from "../lib/settings-helpers.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
@@ -288,6 +288,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       let clientJobIdRaw: string | null = null;
       let fileCount = 0;
       const received: ReceivedUpload[] = [];
+      let enqueued = false;
+
+      // Every rejection between the upload and enqueue lands here. Without a
+      // jobs row, nothing else ever removes the upload on S3 (#1690).
+      const discardUploads = () =>
+        deletePrefix(`uploads/${jobId}/`).catch((err) =>
+          request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads"),
+        );
 
       // Parse multipart parts (file parts stream to object storage).
       // request.parts() is the keep-alive-safe iterator from
@@ -331,66 +339,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
       } catch (err) {
+        await discardUploads();
         const failure = multipartFailure(err);
         return reply.status(failure.status).send(failure.body);
       }
-
-      if (fileCount > maxInputs) {
-        return reply.status(400).send({
-          error: `Too many files (max ${maxInputs})`,
-        });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
-      if (clientJobIdField === null) {
-        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
-      }
-      clientJobId = clientJobIdField ?? null;
-
-      // Require at least one file
-      if (received.length === 0) {
-        return reply.status(400).send({ error: "No file provided" });
-      }
-
-      // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
-      // need 2). Returns 400 pre-enqueue instead of a 422 from the worker.
-      if (received.length < minInputs) {
-        return reply.status(400).send({
-          error: `This tool needs at least ${minInputs} files`,
-        });
-      }
-
-      // Stamp the client-facing alias before validation starts (#886):
-      // decode can take seconds on a big HEIC, and a cancel clicked in
-      // that window needs a durable pointer to resolve. Awaited, and ahead
-      // of the first progress write, so the lazy persist layer can never
-      // create the row first. Insert-only: a reused id keeps its previous
-      // run's state until enqueueToolJob claims and re-points it.
-      const pool = resolveToolPool(config.toolId);
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId: authUser.id, pool });
-      }
-
-      const reportProgress = (percent: number, stage?: string) => {
-        if (!clientJobId) return;
-        void updateSingleFileProgress({
-          jobId: clientJobId,
-          phase: "processing",
-          percent,
-          stage,
-        });
-      };
-
-      reportProgress(5, "Validating...");
-
-      // Resolve the tool's modality (default "image" for registry-only test tools)
-      const toolMeta = TOOLS.find((t) => t.id === config.toolId);
-      const modality = toolMeta?.modality ?? "image";
 
       // Per-request scratch dir for input handlers that need temp files during
       // validation. MUST stay distinct from the worker's job scratch dir
@@ -402,6 +354,63 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       const scratchDir = join(tmpdir(), "snapotter-scratch", `${jobId}-prep`);
       await mkdir(scratchDir, { recursive: true });
       try {
+        if (fileCount > maxInputs) {
+          return reply.status(400).send({
+            error: `Too many files (max ${maxInputs})`,
+          });
+        }
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+        }
+
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+        }
+        clientJobId = clientJobIdField ?? null;
+
+        // Require at least one file
+        if (received.length === 0) {
+          return reply.status(400).send({ error: "No file provided" });
+        }
+
+        // Require the tool's minimum number of files (e.g. create-zip / merge-csvs
+        // need 2). Returns 400 pre-enqueue instead of a 422 from the worker.
+        if (received.length < minInputs) {
+          return reply.status(400).send({
+            error: `This tool needs at least ${minInputs} files`,
+          });
+        }
+
+        // Stamp the client-facing alias before validation starts (#886):
+        // decode can take seconds on a big HEIC, and a cancel clicked in
+        // that window needs a durable pointer to resolve. Awaited, and ahead
+        // of the first progress write, so the lazy persist layer can never
+        // create the row first. Insert-only: a reused id keeps its previous
+        // run's state until enqueueToolJob claims and re-points it.
+        const pool = resolveToolPool(config.toolId);
+        if (clientJobId && clientJobId !== jobId) {
+          await insertToolJobAlias({ jobId, clientJobId, userId: authUser.id, pool });
+        }
+
+        const reportProgress = (percent: number, stage?: string) => {
+          if (!clientJobId) return;
+          void updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "processing",
+            percent,
+            stage,
+          });
+        };
+
+        reportProgress(5, "Validating...");
+
+        // Resolve the tool's modality (default "image" for registry-only test tools)
+        const toolMeta = TOOLS.find((t) => t.id === config.toolId);
+        const modality = toolMeta?.modality ?? "image";
+
         // Reject files whose extension is not in the tool's acceptedInputs.
         // Image and media modalities validate content via their input handlers
         // (sharp decode, ffprobe); document/file modalities need an explicit
@@ -470,7 +479,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               const body: Record<string, string> = { error: errorMsg };
               if (err.details) body.details = err.details;
               if (err.code) body.code = err.code;
-              // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
               return reply.status(err.statusCode).send(body);
             }
             throw err;
@@ -505,7 +513,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
 
         // Parse and validate settings
         if (settingsRaw && settingsRaw.length > 65536) {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({ error: "Settings payload too large (max 64KB)" });
         }
         let settings: T;
@@ -513,7 +520,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
           const result = config.settingsSchema.safeParse(parsed);
           if (!result.success) {
-            // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
             return reply.status(400).send({
               error: "Invalid settings",
               details: formatZodErrors(result.error.issues),
@@ -521,7 +527,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
           settings = result.data;
         } catch {
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(400).send({ error: "Settings must be valid JSON" });
         }
 
@@ -551,7 +556,6 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         if (bundleId && !isToolInstalled(config.toolId)) {
           const missingBundleId = getFirstMissingBundleForTool(config.toolId) ?? bundleId;
           const bundle = FEATURE_BUNDLES[missingBundleId];
-          // Orphaned uploads/<jobId>/ dir will be cleaned by T10 TTL sweeper
           return reply.status(501).send({
             error: "Feature not installed",
             code: "FEATURE_NOT_INSTALLED",
@@ -594,6 +598,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const dbSettings = config.redactSettingsForAudit
           ? config.redactSettingsForAudit(settings)
           : undefined;
+        // From here the queued job owns uploads/<jobId>/, even if enqueue
+        // throws partway, so the finally below must leave it alone.
+        enqueued = true;
         await enqueueToolJob({
           jobId,
           toolId: config.toolId,
@@ -679,6 +686,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         }
       } finally {
         await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        if (!enqueued) await discardUploads();
       }
     },
   );
