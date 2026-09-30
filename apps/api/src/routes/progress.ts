@@ -807,7 +807,11 @@ async function jobStreamAccess(jobId: string, user: AuthUser): Promise<StreamAcc
     .select({ userId: schema.jobs.userId, settings: schema.jobs.settings })
     .from(schema.jobs)
     .where(eq(schema.jobs.id, jobId));
-  if (!row) return "missing";
+  if (!row) {
+    // files:all may watch any job, so there's no owner to wait for. Some
+    // frames never get a row at all (publishEphemeral doesn't persist).
+    return (await hasEffectivePermission(user, "files:all")) ? "allowed" : "missing";
+  }
   return streamAccess(row, user);
 }
 
