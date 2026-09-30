@@ -14,7 +14,9 @@
  */
 
 import { apiToolPath } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
   INVALID_CLIENT_JOB_ID_ERROR,
   parseClientJobIdField,
@@ -36,9 +38,11 @@ const CLIENT_JOB_ID_ROUTES = [
   { name: "svg-to-raster batch", url: `${apiToolPath("svg-to-raster")}/batch` },
 ];
 
-// Routes that used to drop a clientJobId they didn't like (a UUID-only check
-// on the AI routes and sign-pdf, a looser regex on pdf-to-image batch).
-const FORMERLY_SILENT_ROUTES = [
+// Routes that used to drop a clientJobId they didn't like: a UUID-only check
+// on the AI routes and sign-pdf, a looser regex on pdf-to-image batch. The
+// AI routes and sign-pdf stamp their client-facing alias row before the file
+// check, so a kept id leaves a jobs row behind and a dropped one leaves none.
+const ALIAS_ROUTES = [
   "ai-canvas-expand",
   "auto-subtitles",
   "background-replace",
@@ -58,9 +62,12 @@ const FORMERLY_SILENT_ROUTES = [
   "transcribe-audio",
   "transparency-fixer",
   "upscale",
-]
-  .map((toolId) => ({ name: toolId, url: apiToolPath(toolId) }))
-  .concat([{ name: "pdf-to-image batch", url: `${apiToolPath("pdf-to-image")}/batch` }]);
+].map((toolId) => ({ name: toolId, url: apiToolPath(toolId) }));
+
+const FORMERLY_SILENT_ROUTES = [
+  ...ALIAS_ROUTES,
+  { name: "pdf-to-image batch", url: `${apiToolPath("pdf-to-image")}/batch` },
+];
 
 // Force the bundle gates open so passport-photo (face-detection +
 // background-removal) reaches its multipart parse without AI bundles.
@@ -157,11 +164,27 @@ describe("clientJobId 400 gate on the routes that used to drop it (#1691)", () =
 
     // A non-UUID id the shared rule allows gets past the gate like any other,
     // and the request stops at the missing file instead.
-    it(`${route.name} accepts a non-UUID clientJobId and moves on to the file check`, async () => {
+    it(`${route.name} lets a non-UUID clientJobId through to the file check`, async () => {
       const res = await postClientJobId(route.url, "job_42");
 
       expect(res.statusCode).toBe(400);
-      expect(JSON.parse(res.body).error).not.toBe(INVALID_CLIENT_JOB_ID_ERROR);
+      expect(JSON.parse(res.body).error).toMatch(/^No .*files? provided$/);
+    });
+  }
+
+  // The old UUID check dropped these without a word; the alias row is the
+  // proof the id was kept and the caller's SSE channel is the one the run uses.
+  for (const route of ALIAS_ROUTES) {
+    it(`${route.name} keeps a non-UUID clientJobId as the run's alias`, async () => {
+      const clientJobId = `kept_${route.name}`;
+      await postClientJobId(route.url, clientJobId);
+
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(row).toBeDefined();
+      expect(row.type).toBe("single");
+      expect((row.settings as { artifactJobId?: unknown }).artifactJobId).toEqual(
+        expect.any(String),
+      );
     });
   }
 });
