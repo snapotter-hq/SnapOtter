@@ -3,31 +3,46 @@ import {
   normalizeGroupOps,
   normalizeUserOps,
   parseScimBody,
+  parseScimPatch,
   scimGroupBody,
-  scimPatchBody,
   scimUserBody,
 } from "../../../apps/api/src/routes/enterprise/scim-bodies.js";
 
 // #1511: SCIM bodies had no schema, so a wrong-typed field reached Postgres
 // as JSON text or an array literal, or threw a 500 partway through.
 
+const invalid = (detail: string) => ({ ok: false, detail, scimType: "invalidValue" });
+const syntax = (detail: string) => ({ ok: false, detail, scimType: "invalidSyntax" });
+
 describe("scimUserBody", () => {
-  it("coerces a number or boolean in a string attribute, as Postgres used to", () => {
+  it("coerces a whole number in a string attribute, as some IdPs map numeric ids", () => {
     expect(parseScimBody(scimUserBody, { userName: 42, externalId: 123 })).toEqual({
       ok: true,
       data: { userName: "42", externalId: "123" },
     });
   });
 
+  it("refuses a boolean in an identity field, a broken attribute mapping", () => {
+    expect(parseScimBody(scimUserBody, { userName: true })).toEqual(
+      invalid("userName must be a string, got boolean"),
+    );
+  });
+
+  it("refuses a number JSON parsing has already rounded, rather than store another id", () => {
+    // Parsed from JSON, the way the route receives it: the digits are already gone.
+    const body = JSON.parse('{"externalId": 12345678901234567890}');
+    expect(parseScimBody(scimUserBody, body)).toEqual(
+      invalid("externalId must be a string, got number"),
+    );
+  });
+
   it("refuses an object or array where a string belongs, naming the field", () => {
-    expect(parseScimBody(scimUserBody, { userName: "u", externalId: { id: 1 } })).toEqual({
-      ok: false,
-      detail: "externalId must be a string",
-    });
-    expect(parseScimBody(scimUserBody, { userName: ["u"] })).toEqual({
-      ok: false,
-      detail: "userName must be a string",
-    });
+    expect(parseScimBody(scimUserBody, { userName: "u", externalId: { id: 1 } })).toEqual(
+      invalid("externalId must be a string, got object"),
+    );
+    expect(parseScimBody(scimUserBody, { userName: ["u"] })).toEqual(
+      invalid("userName must be a string, got array"),
+    );
   });
 
   it("reads Entra's string booleans, in any case, and refuses other strings", () => {
@@ -42,21 +57,23 @@ describe("scimUserBody", () => {
         data: { active: read },
       });
     }
-    expect(parseScimBody(scimUserBody, { active: "yes" })).toEqual({
-      ok: false,
-      detail: "active must be a boolean",
-    });
+    expect(parseScimBody(scimUserBody, { active: "yes" })).toEqual(
+      invalid("active must be a boolean, got string"),
+    );
+  });
+
+  it("reads null as unassigned on every attribute", () => {
+    const body = { userName: null, externalId: null, active: null, emails: null };
+    expect(parseScimBody(scimUserBody, body)).toEqual({ ok: true, data: body });
   });
 
   it("refuses emails that aren't a list, and an entry without a value", () => {
-    expect(parseScimBody(scimUserBody, { emails: { value: "a@b.c" } })).toEqual({
-      ok: false,
-      detail: "emails must be an array",
-    });
-    expect(parseScimBody(scimUserBody, { emails: [{ primary: true }] })).toEqual({
-      ok: false,
-      detail: "emails.0.value is required",
-    });
+    expect(parseScimBody(scimUserBody, { emails: { value: "a@b.c" } })).toEqual(
+      invalid("emails must be an array, got object"),
+    );
+    expect(parseScimBody(scimUserBody, { emails: [{ primary: true }] })).toEqual(
+      invalid("emails.0.value is required"),
+    );
   });
 
   it("keeps attributes it doesn't know, as IdPs send extension schemas", () => {
@@ -73,38 +90,46 @@ describe("scimUserBody", () => {
 });
 
 describe("scimGroupBody", () => {
-  it("accepts null members, which RFC 7643 treats as an empty list", () => {
-    expect(parseScimBody(scimGroupBody, { displayName: "g", members: null })).toEqual({
+  it("accepts null members and displayName, which RFC 7643 treats as unassigned", () => {
+    expect(parseScimBody(scimGroupBody, { displayName: null, members: null })).toEqual({
       ok: true,
-      data: { displayName: "g", members: null },
+      data: { displayName: null, members: null },
     });
   });
 
   it("refuses members that aren't a list, and a member without a value", () => {
-    expect(parseScimBody(scimGroupBody, { members: { value: "u1" } })).toEqual({
-      ok: false,
-      detail: "members must be an array",
-    });
-    expect(parseScimBody(scimGroupBody, { members: [{}] })).toEqual({
-      ok: false,
-      detail: "members.0.value is required",
-    });
+    expect(parseScimBody(scimGroupBody, { members: { value: "u1" } })).toEqual(
+      invalid("members must be an array, got object"),
+    );
+    expect(parseScimBody(scimGroupBody, { members: [{}] })).toEqual(
+      invalid("members.0.value is required"),
+    );
   });
 });
 
-describe("scimPatchBody", () => {
-  it("refuses an operation without an op", () => {
-    expect(parseScimBody(scimPatchBody, { Operations: [{ path: "userName" }] })).toEqual({
-      ok: false,
-      detail: "Operations.0.op is required",
-    });
+describe("parseScimPatch", () => {
+  it("answers a malformed request with invalidSyntax", () => {
+    expect(parseScimPatch({ Operations: [{ path: "userName" }] })).toEqual(
+      syntax("Operations.0.op is required"),
+    );
+    expect(parseScimPatch({ Operations: { op: "add" } })).toEqual(
+      syntax("Operations must be an array, got object"),
+    );
   });
 
-  it("refuses Operations that aren't a list", () => {
-    expect(parseScimBody(scimPatchBody, { Operations: { op: "add" } })).toEqual({
-      ok: false,
-      detail: "Operations must be an array",
+  it("requires at least one operation, so an empty patch can't answer 200 doing nothing", () => {
+    expect(parseScimPatch({})).toEqual(syntax("Operations is required"));
+    expect(parseScimPatch(undefined)).toEqual(syntax("Operations is required"));
+    expect(parseScimPatch({ Operations: [] })).toEqual(syntax("Operations must not be empty"));
+  });
+
+  it("finds the Operations key in any case, as SCIM attribute names are case-insensitive", () => {
+    const parsed = parseScimPatch({
+      operations: [{ op: "replace", path: "active", value: false }],
     });
+    expect(parsed.ok && parsed.data.Operations).toEqual([
+      { op: "replace", path: "active", value: false },
+    ]);
   });
 });
 
@@ -116,6 +141,7 @@ describe("normalizeUserOps", () => {
       { op: "replace", path: "active", value: "False" },
       { op: "add", path: "emails", value: "a@b.c" },
       { op: "add", path: "emails", value: { value: "d@e.f", primary: "true" } },
+      { op: "replace", path: "emails", value: null },
     ]);
     expect(result).toEqual({
       ok: true,
@@ -125,14 +151,33 @@ describe("normalizeUserOps", () => {
         { op: "replace", path: "active", value: false },
         { op: "add", path: "emails", value: [{ value: "a@b.c", primary: true }] },
         { op: "add", path: "emails", value: [{ value: "d@e.f", primary: true }] },
+        { op: "replace", path: "emails", value: null },
       ],
     });
+  });
+
+  it("refuses an empty userName rather than write it", () => {
+    expect(normalizeUserOps([{ op: "replace", path: "userName", value: "  " }])).toEqual(
+      invalid("Operations.0.value must not be empty"),
+    );
+  });
+
+  it("refuses a null active rather than read it as a deactivation", () => {
+    expect(normalizeUserOps([{ op: "replace", path: "active", value: null }])).toEqual(
+      invalid("Operations.0.value must be a boolean, got null"),
+    );
+  });
+
+  it("names the missing value on a single email, not the list it could have been", () => {
+    expect(normalizeUserOps([{ op: "add", path: "emails", value: { primary: true } }])).toEqual(
+      invalid("Operations.0.value.value is required"),
+    );
   });
 
   it("checks a path-less value object and names the failing field", () => {
     expect(
       normalizeUserOps([{ op: "replace", value: { userName: "u", externalId: ["x"] } }]),
-    ).toEqual({ ok: false, detail: "Operations.0.value.externalId must be a string" });
+    ).toEqual(invalid("Operations.0.value.externalId must be a string, got array"));
   });
 
   it("names the operation when a path's value has the wrong type", () => {
@@ -141,7 +186,7 @@ describe("normalizeUserOps", () => {
         { op: "add", path: "emails", value: "a@b.c" },
         { op: "replace", path: "userName", value: { first: "u" } },
       ]),
-    ).toEqual({ ok: false, detail: "Operations.1.value must be a string" });
+    ).toEqual(invalid("Operations.1.value must be a string, got object"));
   });
 
   it("leaves operations on paths the route ignores alone", () => {
@@ -154,14 +199,14 @@ describe("normalizeGroupOps", () => {
   it("turns a single member into a list and a null replace into none", () => {
     expect(
       normalizeGroupOps([
-        { op: "add", path: "members", value: { value: "u1" } },
+        { op: "Add", path: "members", value: { value: "u1" } },
         { op: "replace", path: "members", value: null },
         { op: "replace", path: "members", value: [{ value: 5 }] },
       ]),
     ).toEqual({
       ok: true,
       data: [
-        { op: "add", path: "members", value: [{ value: "u1" }] },
+        { op: "Add", path: "members", value: [{ value: "u1" }] },
         { op: "replace", path: "members", value: [] },
         { op: "replace", path: "members", value: [{ value: "5" }] },
       ],
@@ -169,12 +214,18 @@ describe("normalizeGroupOps", () => {
   });
 
   it("refuses a member without a value and a displayName that isn't a string", () => {
-    expect(normalizeGroupOps([{ op: "add", path: "members", value: [{}] }])).toEqual({
-      ok: false,
-      detail: "Operations.0.value.0.value is required",
-    });
+    expect(normalizeGroupOps([{ op: "add", path: "members", value: [{}] }])).toEqual(
+      invalid("Operations.0.value.0.value is required"),
+    );
     expect(
       normalizeGroupOps([{ op: "replace", path: "displayName", value: { name: "g" } }]),
-    ).toEqual({ ok: false, detail: "Operations.0.value must be a string" });
+    ).toEqual(invalid("Operations.0.value must be a string, got object"));
+  });
+
+  it("lets a null displayName through to the route's own empty-name answer (#988)", () => {
+    expect(normalizeGroupOps([{ op: "replace", path: "displayName", value: null }])).toEqual({
+      ok: true,
+      data: [{ op: "replace", path: "displayName", value: null }],
+    });
   });
 });

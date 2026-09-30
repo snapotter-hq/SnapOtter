@@ -15,11 +15,12 @@ import {
   normalizeGroupOps,
   normalizeUserOps,
   parseScimBody,
+  parseScimPatch,
   type ScimEmail,
+  type ScimErrorType,
   type ScimMember,
   type ScimPatchOp,
   scimGroupBody,
-  scimPatchBody,
   scimUserBody,
 } from "./scim-bodies.js";
 
@@ -27,6 +28,23 @@ const SCIM_TOKEN_PREFIX = "so_scim_v2_";
 const SCIM_TOKEN_SUFFIX_PATTERN = /^[0-9a-f]{64}$/;
 
 // ── SCIM Error Format ────────────────────────────────────────────
+
+/**
+ * Refuse a malformed or wrong-typed request (#1511). The detail only goes back
+ * to the IdP, so log it too: an operator chasing a failing sync from this side
+ * otherwise sees a bare 400.
+ */
+function scimInvalid(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  refusal: { detail: string; scimType: ScimErrorType },
+) {
+  request.log.warn(
+    { route: request.routeOptions.url, detail: refusal.detail, scimType: refusal.scimType },
+    "SCIM request refused",
+  );
+  return reply.status(400).send(scimError(400, refusal.detail, refusal.scimType));
+}
 
 function scimError(status: number, detail: string, scimType?: string) {
   return {
@@ -439,14 +457,13 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const parsed = parseScimBody(scimUserBody, request.body);
-      if (!parsed.ok) {
-        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
-      }
+      if (!parsed.ok) return scimInvalid(request, reply, parsed);
       const body = parsed.data;
-      const userName = body.userName;
+      // Null is unassigned (RFC 7643 2.5): the same as not sending it.
+      const userName = body.userName ?? undefined;
       const externalId = scimExternalId(body.externalId);
       const active = body.active ?? true;
-      const emails = body.emails;
+      const emails = body.emails ?? undefined;
       if (!userName) {
         return reply.status(400).send(scimError(400, "userName is required"));
       }
@@ -648,13 +665,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const parsed = parseScimBody(scimUserBody, request.body);
-      if (!parsed.ok) {
-        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
-      }
+      if (!parsed.ok) return scimInvalid(request, reply, parsed);
       const body = parsed.data;
-      const userName = body.userName;
+      // Null is unassigned (RFC 7643 2.5): the same as not sending it.
+      const userName = body.userName ?? undefined;
       const active = body.active ?? true;
-      const emails = body.emails;
+      const emails = body.emails ?? undefined;
 
       if (!active && (await rejectLastActiveAdminDeactivation(existing, reply))) return;
 
@@ -744,16 +760,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "User not found"));
       }
 
-      const parsed = parseScimBody(scimPatchBody, request.body);
-      if (!parsed.ok) {
-        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
-      }
+      const parsed = parseScimPatch(request.body);
+      if (!parsed.ok) return scimInvalid(request, reply, parsed);
       // Every value checked before any operation is applied, so a wrong-typed
       // one refuses the whole patch (#1511).
-      const normalized = normalizeUserOps(parsed.data.Operations ?? []);
-      if (!normalized.ok) {
-        return reply.status(400).send(scimError(400, normalized.detail, "invalidValue"));
-      }
+      const normalized = normalizeUserOps(parsed.data.Operations);
+      if (!normalized.ok) return scimInvalid(request, reply, normalized);
       const operations = normalized.data;
       const deactivatesUser = operations.some((op) => {
         const opType = op.op.toLowerCase();
@@ -799,8 +811,10 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           } else if (op.path === "externalId") {
             updates.scimExternalId = scimExternalId(op.value as string | null);
           } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
-            const emails = op.value as ScimEmail[];
-            updates.email = emails.find((e) => e.primary)?.value ?? emails[0]?.value;
+            // Null clears the address; a list sets the primary (or first) one.
+            const emails = op.value as ScimEmail[] | null;
+            updates.email =
+              emails === null ? null : (emails.find((e) => e.primary)?.value ?? emails[0]?.value);
           } else if (op.path === "name.formatted" || op.path === "displayName") {
             // name.formatted maps to username display; no separate display name column
           }
@@ -921,9 +935,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const parsed = parseScimBody(scimGroupBody, request.body);
-      if (!parsed.ok) {
-        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
-      }
+      if (!parsed.ok) return scimInvalid(request, reply, parsed);
       const displayName = parsed.data.displayName?.trim();
       const members = parsed.data.members ?? undefined;
 
@@ -1103,9 +1115,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const parsed = parseScimBody(scimGroupBody, request.body);
-      if (!parsed.ok) {
-        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
-      }
+      if (!parsed.ok) return scimInvalid(request, reply, parsed);
       const body = parsed.data;
       const displayName = body.displayName?.trim();
 
@@ -1210,16 +1220,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "Group not found"));
       }
 
-      const parsed = parseScimBody(scimPatchBody, request.body);
-      if (!parsed.ok) {
-        return reply.status(400).send(scimError(400, parsed.detail, "invalidValue"));
-      }
+      const parsed = parseScimPatch(request.body);
+      if (!parsed.ok) return scimInvalid(request, reply, parsed);
       // Every value checked before any operation writes, with members always
       // a list (#1511).
-      const normalized = normalizeGroupOps(parsed.data.Operations ?? []);
-      if (!normalized.ok) {
-        return reply.status(400).send(scimError(400, normalized.detail, "invalidValue"));
-      }
+      const normalized = normalizeGroupOps(parsed.data.Operations);
+      if (!normalized.ok) return scimInvalid(request, reply, normalized);
       const operations = normalized.data;
 
       // Reject rather than skip an empty rename: a silent no-op leaves the IdP
