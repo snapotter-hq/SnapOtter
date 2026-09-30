@@ -1972,14 +1972,16 @@ describe("downloadVerifiedRuntimeRelease", () => {
   });
 
   // The stall tests below race a 10ms stall watchdog against the overall
-  // deadline, which starts before any setup. On a loaded runner that setup
-  // alone has taken over 500ms (#1617), long enough for the deadline to win and
-  // turn the expected "stalled" error into "timed out" (#1641). They only care
-  // about the watchdog, so the deadline sits past anything setup can take, and
-  // each test gets a short timeout instead: a watchdog that never fires hangs
-  // into that and fails, as it used to hang into the deadline.
+  // deadline, which starts before the download cache is set up. On a loaded
+  // runner that setup has taken over 500ms (#1617), long enough for the
+  // deadline to win and turn the expected "stalled" error into "timed out"
+  // (#1641). They only care about the watchdog, so the deadline sits past
+  // anything setup can take, and a watchdog that never fires fails on the test
+  // timeout instead. That timeout has to clear the install-lease helper, a
+  // blocking flock or python spawn with its own 5s limit that runs before the
+  // deadline starts, so a slow host doesn't read as a broken watchdog.
   const STALL_TEST_DEADLINE_MS = 60_000;
-  const stallTest = { timeout: 5_000 };
+  const stallTest = { timeout: 20_000 };
 
   it("cancels and retries a stalled response", stallTest, async () => {
     const fixture = signedIndex();
@@ -2053,75 +2055,79 @@ describe("downloadVerifiedRuntimeRelease", () => {
           stallTimeoutMs: 10,
           retry: { maxAttempts: 1 },
         }),
-      ).rejects.toThrow("stalled");
+      ).rejects.toThrow(/OCR runtime index download stalled for 10ms/);
     },
   );
 
-  it("enforces the overall deadline while a response body is stalled", async () => {
-    // This used to bound the wall-clock time of a 10ms deadline, which fired
-    // during setup, before fetch was ever called. So it never reached a
-    // stalled body, and on a loaded runner the setup alone passed the bound
-    // (#1617). Fake timers hold the deadline until the read is actually
-    // stalled, then fire it. The stall watchdog's timer never advances, so if
-    // the deadline couldn't interrupt the read, this would hang until the
-    // test's timeout instead of rejecting. The outer "timed out" message
-    // wraps any error once the deadline has aborted, so the cause is what
-    // proves the read itself was interrupted, and one attempt keeps a stall
-    // plus a retry sleep from standing in for it.
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    try {
-      const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-deadline-"));
-      temporaryDirectories.push(directory);
-      let bodyRead!: () => void;
-      const reading = new Promise<void>((resolve) => {
-        bodyRead = resolve;
-      });
-      const cancel = vi.fn();
-      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-        new Response(
-          new ReadableStream<Uint8Array>(
-            {
-              pull() {
-                bodyRead();
-                return new Promise(() => {});
+  it(
+    "enforces the overall deadline while a response body is stalled",
+    async () => {
+      // This used to bound the wall-clock time of a 10ms deadline, which fired
+      // during setup, before fetch was ever called. So it never reached a
+      // stalled body, and on a loaded runner the setup alone passed the bound
+      // (#1617). Fake timers hold the deadline until the read is actually
+      // stalled, then fire it. The stall watchdog's timer never advances, so if
+      // the deadline couldn't interrupt the read, this would hang until the
+      // test's timeout instead of rejecting. The outer "timed out" message
+      // wraps any error once the deadline has aborted, so the cause is what
+      // proves the read itself was interrupted, and one attempt keeps a stall
+      // plus a retry sleep from standing in for it.
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-deadline-"));
+        temporaryDirectories.push(directory);
+        let bodyRead!: () => void;
+        const reading = new Promise<void>((resolve) => {
+          bodyRead = resolve;
+        });
+        const cancel = vi.fn();
+        const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+          new Response(
+            new ReadableStream<Uint8Array>(
+              {
+                pull() {
+                  bodyRead();
+                  return new Promise(() => {});
+                },
+                cancel,
               },
-              cancel,
-            },
-            // No read-ahead: pull runs only once the installer reads the body.
-            { highWaterMark: 0 },
+              // No read-ahead: pull runs only once the installer reads the body.
+              { highWaterMark: 0 },
+            ),
+            { status: 200 },
           ),
-          { status: 200 },
-        ),
-      );
+        );
 
-      const download = downloadVerifiedRuntimeRelease({
-        aiDataDir: directory,
-        bundleRepo: "snapotter-hq/feature-bundles",
-        version: "2.1.0",
-        target: TARGET,
-        trustKeys: [],
-        fetchImpl,
-        timeoutMs: 10,
-        stallTimeoutMs: 1_000,
-        retry: { maxAttempts: 1 },
-      });
-      const outcome = expect(download).rejects.toMatchObject({
-        message: expect.stringContaining("timed out after 10ms"),
-        cause: expect.objectContaining({
-          message: expect.stringContaining("download was canceled or timed out"),
-        }),
-      });
-      // A download that fails before it reads the body settles first and
-      // surfaces its own error here, instead of a bare timeout.
-      await Promise.race([reading, download]);
-      await vi.advanceTimersByTimeAsync(10);
-      await outcome;
-      expect(fetchImpl).toHaveBeenCalledOnce();
-      expect(cancel).toHaveBeenCalledOnce();
-    } finally {
-      vi.useRealTimers();
-    }
-  }, 5_000);
+        const download = downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [],
+          fetchImpl,
+          timeoutMs: 10,
+          stallTimeoutMs: 1_000,
+          retry: { maxAttempts: 1 },
+        });
+        const outcome = expect(download).rejects.toMatchObject({
+          message: expect.stringContaining("timed out after 10ms"),
+          cause: expect.objectContaining({
+            message: expect.stringContaining("download was canceled or timed out"),
+          }),
+        });
+        // A download that fails before it reads the body settles first and
+        // surfaces its own error here, instead of a bare timeout.
+        await Promise.race([reading, download]);
+        await vi.advanceTimersByTimeAsync(10);
+        await outcome;
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(cancel).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+    stallTest.timeout,
+  );
 
   it(
     "does not let an unresponsive body cancellation defeat the stall watchdog",
@@ -2154,7 +2160,7 @@ describe("downloadVerifiedRuntimeRelease", () => {
           stallTimeoutMs: 10,
           retry: { maxAttempts: 1 },
         }),
-      ).rejects.toThrow("stalled");
+      ).rejects.toThrow(/OCR runtime index download stalled for 10ms/);
       expect(canceled).toHaveBeenCalledOnce();
     },
   );
