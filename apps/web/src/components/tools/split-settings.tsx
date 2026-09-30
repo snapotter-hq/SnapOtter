@@ -186,6 +186,7 @@ export function SplitSettings() {
           height: 0,
           blobUrl: t.blobUrl,
         })),
+        files.length,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : t.toolSettings.split.splitFailed);
@@ -234,7 +235,7 @@ export function SplitSettings() {
       downloadingTimer.current = setTimeout(() => setDownloadingIndex(null), 500);
       // This tile only. The guard goes quiet once every tile of the run has
       // been taken, and never on a multi-file run, whose other files' tiles
-      // are only in the zip (splitTileKeys).
+      // are only in the zip (splitTileKeys, runFileCount).
       claimToolResultItem("split", splitTileKey(tile));
     },
     [tiles, files, outputFormat],

@@ -778,7 +778,19 @@ describe("tools that keep their results outside the file store", () => {
       claimToolResultItem("split", splitTileKey(SEED_TILE));
       claimToolResult("split", splitResultKey(useSplitStore.getState().tiles, null));
 
-      expect(useToolResultClaims.getState().claimed.split).toHaveLength(1);
+      const claims = useToolResultClaims.getState().claimed.split;
+      expect(claims).toHaveLength(1);
+      expect((claims[0] as WeakRef<object>).deref()).toBe(useSplitStore.getState().tiles);
+    });
+
+    // An item taken after the whole result joins it rather than displacing it.
+    it("keeps the whole-result claim when an item is taken after it", () => {
+      useSplitStore.setState({ tiles: [SEED_TILE], runFileCount: 2 });
+      claimToolResult("split", splitResultKey(useSplitStore.getState().tiles, null));
+      claimToolResultItem("split", splitTileKey(SEED_TILE));
+
+      expect(useToolResultClaims.getState().claimed.split).toHaveLength(2);
+      expect(workAt(routeFor("split"))).toBeNull();
     });
 
     it("keeps one claim per item however many times it is taken", () => {
@@ -812,35 +824,34 @@ describe("tools that keep their results outside the file store", () => {
     const TILE_A = { row: 0, col: 0, label: "1", width: 10, height: 10, blobUrl: "blob:a" };
     const TILE_B = { row: 0, col: 1, label: "2", width: 10, height: 10, blobUrl: "blob:b" };
 
-    function seedOneFileSplit() {
-      useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
-      useSplitStore.setState({ tiles: [TILE_A, TILE_B], zipBlobUrl: "blob:tiles.zip" });
+    function seedSplit(runFileCount: number) {
+      useSplitStore.setState({
+        tiles: [TILE_A, TILE_B],
+        runFileCount,
+        zipBlobUrl: "blob:tiles.zip",
+      });
     }
 
     it("keeps warning while any tile is untaken", () => {
-      seedOneFileSplit();
+      seedSplit(1);
       claimToolResultItem("split", splitTileKey(TILE_A));
 
       expect(workAt(routeFor("split"))).toEqual({ kind: "unsaved", downloads: [] });
     });
 
     it("goes quiet once every tile is taken", () => {
-      seedOneFileSplit();
+      seedSplit(1);
       claimToolResultItem("split", splitTileKey(TILE_A));
       claimToolResultItem("split", splitTileKey(TILE_B));
 
       expect(workAt(routeFor("split"))).toBeNull();
     });
 
-    // The tiles on screen are the first file's; the zip has every file's.
+    // The tiles on screen are the first file's; the zip has every file's. The
+    // file store's live count does not enter into it: the run's does.
     it("keeps warning on a multi-file split with every tile on screen taken", () => {
-      seedOneFileSplit();
-      useFileStore
-        .getState()
-        .setFiles([
-          new File(["x"], "a.png", { type: "image/png" }),
-          new File(["y"], "b.png", { type: "image/png" }),
-        ]);
+      seedSplit(2);
+      useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
       claimToolResultItem("split", splitTileKey(TILE_A));
       claimToolResultItem("split", splitTileKey(TILE_B));
 

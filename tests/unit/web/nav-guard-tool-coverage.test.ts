@@ -273,8 +273,8 @@ describe("navigation guard tool coverage", () => {
       "useWorkInFlight warns about these tools' results and nothing in their own panels ever " +
         'tells it one was taken. Call claimToolResult("<tool-id>", <tool>ResultKey(...)) from a ' +
         "control that hands over the whole result: a download click, a copy that succeeded, the " +
-        "zip of everything a run produced. Not from a per-item control, which would answer for " +
-        "the items the user never took.",
+        "zip of everything a run produced. A per-item control calls claimToolResultItem " +
+        "instead, which answers for that item alone.",
     ).toEqual([]);
   });
 

@@ -6,8 +6,9 @@ import type { PageResult } from "@/stores/pdf-to-image-store";
 import type { TileInfo } from "@/stores/split-store";
 
 /**
- * Which result each own-store tool has had taken, keyed by tool id, valued by
- * that result's identity. A new run changes the identity, so the claim stops
+ * Which results each own-store tool has had taken, keyed by tool id, valued by
+ * the identities taken: the whole result, or items of it taken one at a time.
+ * A new run changes the identity, so the claim stops
  * matching and the guard speaks up again without any store having to remember
  * to clear anything. Same rule the file store enforces through updateEntry.
  *
@@ -245,9 +246,10 @@ export function splitTileKey(tile: TileInfo): ResultKey {
  *
  * The panel previews the first file's tiles only, while the zip carries every
  * file's, so with more than one file the tiles on screen are not the set and
- * none of them count. The split panel clears its tiles whenever the file set
- * changes, so the file count here is the count the run was made with.
+ * none of them count. Takes the count the run recorded with its tiles, never
+ * the file store's live one: that can change while the settings panel, whose
+ * effect clears the tiles, is unmounted.
  */
-export function splitTileKeys(tiles: TileInfo[], fileCount: number): ResultKey[] {
-  return fileCount === 1 ? tiles.map(splitTileKey) : [];
+export function splitTileKeys(tiles: TileInfo[], runFileCount: number): ResultKey[] {
+  return runFileCount === 1 ? tiles.map(splitTileKey) : [];
 }

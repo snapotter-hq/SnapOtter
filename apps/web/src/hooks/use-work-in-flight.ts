@@ -193,7 +193,7 @@ export function useWorkInFlight(): WorkReason | null {
   const splitProcessing = useSplitStore((s) => s.processing);
   const splitTiles = useSplitStore((s) => s.tiles);
   const splitZipBlobUrl = useSplitStore((s) => s.zipBlobUrl);
-  const fileCount = useFileStore((s) => s.files.length);
+  const splitRunFileCount = useSplitStore((s) => s.runFileCount);
 
   const path = normalizePath(pathname);
 
@@ -227,7 +227,7 @@ export function useWorkInFlight(): WorkReason | null {
       split: {
         busy: splitProcessing,
         key: splitResultKey(splitTiles, splitZipBlobUrl),
-        items: splitTileKeys(splitTiles, fileCount),
+        items: splitTileKeys(splitTiles, splitRunFileCount),
       },
     };
 
