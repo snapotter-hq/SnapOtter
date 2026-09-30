@@ -2373,8 +2373,14 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
       it("keeps an added member out when a later rename collides", async () => {
         const taken = await createScimGroup({ displayName: uniqueName("scim-grp-atomic-taken") });
-        const group = await createScimGroup({ displayName: uniqueName("scim-grp-atomic-add") });
         const user = await createScimUser({ userName: uniqueName("scim-grp-atomic-add-u") });
+        // Start the user somewhere other than Default, so staying put can't be
+        // confused with being moved back there.
+        const home = await createScimGroup({
+          displayName: uniqueName("scim-grp-atomic-home"),
+          members: [{ value: user.id }],
+        });
+        const group = await createScimGroup({ displayName: uniqueName("scim-grp-atomic-add") });
 
         const res = await patchGroup(group.id, [
           { op: "add", path: "members", value: [{ value: user.id }] },
@@ -2388,7 +2394,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           detail: "Group name already taken",
           scimType: "uniqueness",
         });
-        expect((await userRow(user.id))?.team).toBe(DEFAULT_TEAM_ID);
+        expect((await userRow(user.id))?.team).toBe(home.id);
         const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
         expect(row?.name).toBe(group.displayName);
       });
@@ -2402,7 +2408,9 @@ describe("SCIM licensed Users and Groups CRUD", () => {
 
         const res = await patchGroup(group.id, [
           { op: "remove", path: `members[value eq "${user.id}"]` },
-          { op: "replace", path: "displayName", value: "   " },
+          // Mixed-case op name: the check before any write has to match the
+          // same ops the loop treats as a rename.
+          { op: "Replace", path: "displayName", value: "   " },
         ]);
 
         expect(res.statusCode, res.body).toBe(400);
@@ -2429,6 +2437,32 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         expect(res.statusCode, res.body).toBe(409);
         expect((await userRow(kept.id))?.team).toBe(group.id);
         expect((await userRow(incoming.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
+
+      it("commits every operation of a successful multi-op PATCH, in order", async () => {
+        const previous = await createScimUser({ userName: uniqueName("scim-grp-multi-prev") });
+        const first = await createScimUser({ userName: uniqueName("scim-grp-multi-a") });
+        const second = await createScimUser({ userName: uniqueName("scim-grp-multi-b") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-grp-multi"),
+          members: [{ value: previous.id }],
+        });
+        const renamed = uniqueName("scim-grp-multi-renamed");
+
+        // The add only survives if it runs after the replace, and the rename
+        // lands alongside both.
+        const res = await patchGroup(group.id, [
+          { op: "replace", path: "members", value: [{ value: first.id }] },
+          { op: "add", path: "members", value: [{ value: second.id }] },
+          { op: "replace", path: "displayName", value: renamed },
+        ]);
+
+        expect(res.statusCode, res.body).toBe(200);
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+        expect(row?.name).toBe(renamed);
+        expect((await userRow(first.id))?.team).toBe(group.id);
+        expect((await userRow(second.id))?.team).toBe(group.id);
+        expect((await userRow(previous.id))?.team).toBe(DEFAULT_TEAM_ID);
       });
     });
 

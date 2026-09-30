@@ -57,6 +57,17 @@ async function updateScimUser(
   });
 }
 
+type ScimPatchOp = { op: string; path?: string; value?: unknown };
+
+/** The trimmed new name a Groups PATCH op renames to, empty when it names none. */
+function groupRenameTarget(op: ScimPatchOp): string {
+  return (op.value as string | undefined)?.trim() ?? "";
+}
+
+function isGroupRename(op: ScimPatchOp): boolean {
+  return op.op.toLowerCase() === "replace" && op.path === "displayName";
+}
+
 async function rejectLastActiveAdminDeactivation(
   user: { role: string },
   reply: FastifyReply,
@@ -1150,26 +1161,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "Group not found"));
       }
 
-      const body = request.body as {
-        schemas?: string[];
-        Operations?: Array<{
-          op: string;
-          path?: string;
-          value?: unknown;
-        }>;
-      };
+      const body = request.body as { schemas?: string[]; Operations?: ScimPatchOp[] };
 
       const operations = body.Operations ?? [];
 
       // Reject rather than skip an empty rename: a silent no-op leaves the IdP
       // thinking it applied while the team keeps its old name (#988). Checked
       // before any operation writes, so nothing is half-applied.
-      const emptyRename = operations.some(
-        (op) =>
-          op.op.toLowerCase() === "replace" &&
-          op.path === "displayName" &&
-          !(op.value as string | undefined)?.trim(),
-      );
+      const emptyRename = operations.some((op) => isGroupRename(op) && !groupRenameTarget(op));
       if (emptyRename) {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
@@ -1210,9 +1209,11 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
                   .where(and(eq(schema.users.id, userId), eq(schema.users.team, id)));
               }
             } else if (opType === "replace") {
-              if (op.path === "displayName") {
-                const newName = (op.value as string).trim();
-                await tx.update(schema.teams).set({ name: newName }).where(eq(schema.teams.id, id));
+              if (isGroupRename(op)) {
+                await tx
+                  .update(schema.teams)
+                  .set({ name: groupRenameTarget(op) })
+                  .where(eq(schema.teams.id, id));
               } else if (op.path === "members") {
                 // Full member replacement
                 const members = Array.isArray(op.value)
@@ -1243,10 +1244,22 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         });
       } catch (err) {
         // No conflict pre-check on the rename path, so before issue #968 a
-        // rename onto a taken name surfaced the 23505 as a 500. A rename is
-        // the only write here that can trip a unique index.
-        if (isUniqueViolation(err)) {
+        // rename onto a taken name surfaced the 23505 as a 500. Today a rename
+        // is the only write here that can trip a unique index; name the one
+        // that fired rather than blame the group name for an index added
+        // later, as userUpdateConflict does for users (#1006).
+        const constraint = uniqueViolationConstraint(err);
+        if (constraint === "teams_name_unique" || constraint === "teams_name_lower_unique") {
           return reply.status(409).send(scimError(409, "Group name already taken", "uniqueness"));
+        }
+        if (isUniqueViolation(err)) {
+          request.log.warn(
+            { constraint, teamId: id },
+            "SCIM group PATCH hit an unmapped unique constraint",
+          );
+          return reply
+            .status(409)
+            .send(scimError(409, "Update conflicts with an existing record", "uniqueness"));
         }
         throw err;
       }
