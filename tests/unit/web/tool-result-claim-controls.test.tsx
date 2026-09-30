@@ -85,8 +85,9 @@ const TILES = [
   { row: 0, col: 1, label: "2", width: 10, height: 10, blobUrl: "blob:tile-2" },
 ];
 
-function base64Result(filename: string) {
+function base64Result(filename: string, entryId = filename) {
   return {
+    entryId,
     filename,
     mimeType: "image/png",
     width: 1,
@@ -428,8 +429,80 @@ describe("image-to-base64 download controls", () => {
         new File(["a"], "a.png", { type: "image/png" }),
         new File(["b"], "b.png", { type: "image/png" }),
       ]);
-    useBase64Store.setState({ results: [base64Result("a.png"), base64Result("b.png")] });
+    const [a, b] = useFileStore.getState().entries;
+    useBase64Store.setState({
+      results: [base64Result("a.png", a.id), base64Result("b.png", b.id)],
+    });
   }
+
+  // Pasted screenshots are all "image.png", so two files sharing a name is
+  // ordinary. Each entry has to show its own text, not the first match (#1701).
+  describe("two files with the same name", () => {
+    function seedSameName() {
+      useFileStore
+        .getState()
+        .setFiles([
+          new File(["a"], "image.png", { type: "image/png" }),
+          new File(["b"], "image.png", { type: "image/png" }),
+        ]);
+      const [first, second] = useFileStore.getState().entries;
+      useBase64Store.setState({
+        results: [
+          { ...base64Result("image.png", first.id), dataUri: "data:image/png;base64,Zmlyc3Q=" },
+          { ...base64Result("image.png", second.id), dataUri: "data:image/png;base64,c2Vjb25k" },
+        ],
+      });
+    }
+
+    it("shows the second file's text when the second entry is selected", () => {
+      seedSameName();
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+      expect(queryByText("data:image/png;base64,Zmlyc3Q=")).not.toBeNull();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+
+      expect(queryByText("data:image/png;base64,c2Vjb25k")).not.toBeNull();
+      expect(queryByText("data:image/png;base64,Zmlyc3Q=")).toBeNull();
+    });
+
+    it("goes quiet once both are saved one at a time", () => {
+      seedSameName();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      fireEvent.click(getByText("Download .txt"));
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      fireEvent.click(getByText("Download .txt"));
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("shows a failure against the entry that failed, not its namesake", () => {
+      useFileStore
+        .getState()
+        .setFiles([
+          new File(["a"], "image.png", { type: "image/png" }),
+          new File(["b"], "image.png", { type: "image/png" }),
+        ]);
+      const [first, second] = useFileStore.getState().entries;
+      useBase64Store.setState({
+        results: [base64Result("image.png", first.id)],
+        errors: [{ entryId: second.id, filename: "image.png", error: "Decode exploded" }],
+      });
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+
+      expect(queryByText("Decode exploded")).toBeNull();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+
+      expect(queryByText("Decode exploded")).not.toBeNull();
+    });
+  });
 
   // With two results, taking one leaves the other, and the guard has to keep
   // saying so.
@@ -476,7 +549,9 @@ describe("image-to-base64 download controls", () => {
   describe("a run that encoded one file", () => {
     function seedOne() {
       useFileStore.getState().setFiles([new File(["a"], "a.png", { type: "image/png" })]);
-      useBase64Store.setState({ results: [base64Result("a.png")] });
+      useBase64Store.setState({
+        results: [base64Result("a.png", useFileStore.getState().entries[0].id)],
+      });
     }
 
     it("goes quiet once that file's text is saved", () => {
@@ -567,7 +642,10 @@ describe("image-to-base64 download controls", () => {
     const { getByText } = renderPanel(<ImageToBase64Results />);
     fireEvent.click(getByText("Download All as Text"));
 
-    useBase64Store.setState({ results: [base64Result("a.png"), base64Result("b.png")] });
+    const [a, b] = useFileStore.getState().entries;
+    useBase64Store.setState({
+      results: [base64Result("a.png", a.id), base64Result("b.png", b.id)],
+    });
 
     expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
   });

@@ -31,12 +31,12 @@ describe("image-to-base64 copy button on insecure contexts", () => {
   const originalExecCommand = document.execCommand;
 
   beforeEach(() => {
-    // The component looks results up by the selected file's name, so the file
-    // store needs a matching entry. jsdom has no URL.createObjectURL.
+    // The component looks results up by the selected file's entry id, so the
+    // file store needs an entry for it. jsdom has no URL.createObjectURL.
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:otter" }));
     useFileStore.getState().addFiles([new File(["png"], "otter.png", { type: "image/png" })]);
     useBase64Store.setState({
-      results: [RESULT],
+      results: [{ ...RESULT, entryId: useFileStore.getState().entries[0].id }],
       errors: [],
       processing: false,
       progress: null,

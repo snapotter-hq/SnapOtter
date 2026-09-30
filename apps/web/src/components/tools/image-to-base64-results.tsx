@@ -298,11 +298,10 @@ export function ImageToBase64Results() {
   }
 
   // -- Results ready: find result for the currently selected file --
-  const currentFileName = entries[selectedIndex]?.file.name ?? null;
-  const currentResult = currentFileName
-    ? results.find((r) => r.filename === currentFileName)
-    : null;
-  const currentError = currentFileName ? errors.find((e) => e.filename === currentFileName) : null;
+  // By entry, not name: two pasted screenshots are both "image.png" (#1701).
+  const currentEntryId = entries[selectedIndex]?.id ?? null;
+  const currentResult = currentEntryId ? results.find((r) => r.entryId === currentEntryId) : null;
+  const currentError = currentEntryId ? errors.find((e) => e.entryId === currentEntryId) : null;
 
   const hasMultiple = entries.length > 1;
 
