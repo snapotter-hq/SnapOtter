@@ -291,6 +291,74 @@ describe("normalizeGroupOps", () => {
     ).toEqual(invalid("Operations.0.value must be a string, got object"));
   });
 
+  it("matches paths case-insensitively, with the schema URN, and keeps a filter's id exact (#1683)", () => {
+    expect(
+      normalizeGroupOps([
+        { op: "Replace", path: "DisplayName", value: "g" },
+        { op: "Add", path: "MEMBERS", value: { value: "u1" } },
+        { op: "remove", path: 'Members[Value EQ "User-2"]' },
+        {
+          op: "replace",
+          path: "urn:ietf:params:scim:schemas:core:2.0:Group:displayName",
+          value: "h",
+        },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "Replace", path: "displayName", value: "g" },
+        { op: "Add", path: "members", value: [{ value: "u1" }] },
+        { op: "remove", path: 'members[value eq "User-2"]' },
+        { op: "replace", path: "displayName", value: "h" },
+      ],
+    });
+  });
+
+  it("turns a path-less replace into the path ops it stands for, ignoring other keys", () => {
+    // Okta renames a group this way, and sends the group's id alongside.
+    expect(
+      normalizeGroupOps([
+        { op: "replace", value: { id: "g1", DisplayName: "renamed", members: [{ value: "u1" }] } },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "replace", path: "displayName", value: "renamed" },
+        { op: "replace", path: "members", value: [{ value: "u1" }] },
+      ],
+    });
+  });
+
+  it("turns a remove with a member list into one removal per member", () => {
+    // Entra ID removes members this way instead of with a filter path.
+    expect(
+      normalizeGroupOps([
+        { op: "Remove", path: "members", value: [{ value: "u1" }, { value: "u2" }] },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "Remove", path: 'members[value eq "u1"]' },
+        { op: "Remove", path: 'members[value eq "u2"]' },
+      ],
+    });
+  });
+
+  it("refuses an unknown op, a remove with no path, removing displayName, and a non-object path-less value", () => {
+    expect(normalizeGroupOps([{ op: "update", path: "members" }])).toEqual(
+      syntax("Operations.0.op must be add, remove or replace"),
+    );
+    expect(normalizeGroupOps([{ op: "remove" }])).toEqual(
+      noTarget("Operations.0.path is required for remove"),
+    );
+    expect(normalizeGroupOps([{ op: "remove", path: "displayName" }])).toEqual(
+      invalid("Operations.0: displayName can't be removed"),
+    );
+    expect(normalizeGroupOps([{ op: "replace", value: "renamed" }])).toEqual(
+      invalid("Operations.0.value must be an object, got string"),
+    );
+  });
+
   it("lets a null displayName through to the route's own empty-name answer (#988)", () => {
     expect(normalizeGroupOps([{ op: "replace", path: "displayName", value: null }])).toEqual({
       ok: true,

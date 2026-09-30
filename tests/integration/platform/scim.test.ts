@@ -2374,6 +2374,100 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(rows).toHaveLength(0);
     });
 
+    describe("Groups PATCH operations it used to skip (#1683)", () => {
+      async function members(groupId: string): Promise<string[]> {
+        const rows = await db
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.team, groupId));
+        return rows.map((r) => r.id).sort();
+      }
+
+      it("applies a path-less replace, the way Okta renames a group", async () => {
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-okta") });
+        const renamed = uniqueName("scim-1683-okta-renamed");
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "replace", value: { id: group.id, displayName: renamed } }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const [row] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+        expect(row?.name).toBe(renamed);
+      });
+
+      it("removes members sent as a list on path members, the way Entra ID does", async () => {
+        const stay = await createScimUser({ userName: uniqueName("scim-1683-stay") });
+        const leave = await createScimUser({ userName: uniqueName("scim-1683-leave") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1683-entra"),
+          members: [{ value: stay.id }, { value: leave.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "Remove", path: "members", value: [{ value: leave.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await members(group.id)).toEqual([stay.id]);
+        expect((await userRow(leave.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
+
+      it("empties the group on a remove of members with no value", async () => {
+        const a = await createScimUser({ userName: uniqueName("scim-1683-all-a") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1683-all"),
+          members: [{ value: a.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "remove", path: "members" }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await members(group.id)).toEqual([]);
+      });
+
+      it("adds members through a cased path", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1683-cased") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-cased") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "Add", path: "Members", value: [{ value: user.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await members(group.id)).toEqual([user.id]);
+      });
+
+      it("refuses an unknown op and applies nothing before it", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1683-badop") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-badop") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "merge", path: "members", value: [] },
+          ],
+        });
+
+        expectRefused(res, "Operations.1.op must be add, remove or replace", "invalidSyntax");
+        expect(await members(group.id)).toEqual([]);
+      });
+
+      it("reports only real members when an added id matches no user", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1683-known") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1683-unknown") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }, { value: "no-such-user" }] },
+          ],
+        });
+
+        // Skipped and logged rather than refused: a member deleted here but
+        // still in the IdP's group would otherwise fail every sync for good.
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body).members.map((m: { value: string }) => m.value)).toEqual([
+          user.id,
+        ]);
+      });
+    });
+
     it("Groups PATCH refuses an object displayName", async () => {
       const group = await createScimGroup({ displayName: uniqueName("scim-typed-grp-patch") });
       const res = await send("PATCH", `Groups/${group.id}`, {
