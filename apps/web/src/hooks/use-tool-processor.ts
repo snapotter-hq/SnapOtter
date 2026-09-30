@@ -17,6 +17,7 @@ import {
   FRAME_HANDLING_FAILED,
   failedFrameMessage,
   type ProgressFrame,
+  parseResultBody,
 } from "@/lib/progress-frames";
 import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
@@ -719,6 +720,31 @@ export function useToolProcessor(toolId: string) {
         }
       };
 
+      // Writes a sync 2xx result the way the SSE completion branch does.
+      // Any throw from here is ours, not the server's (#1354).
+      const landSyncResult = (result: ProcessResult) => {
+        setWarning(result.warning ?? null);
+        setResultPayload(result as unknown as Record<string, unknown>);
+        if (result.savedFileId) {
+          useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+        }
+        useFileStore.getState().updateEntry(capturedIndex, {
+          processedUrl: result.downloadUrl,
+          processedPreviewUrl: result.previewUrl ?? null,
+          processedFilename: null,
+          resultNotes: pickResultNotes(result),
+          status: "completed",
+          originalSize: result.originalSize,
+          processedSize: result.processedSize,
+          ...(result.savedFileId && saveModeRef.current === "overwrite"
+            ? { serverFileId: result.savedFileId }
+            : {}),
+        });
+        // An auto-saved result is already in the library, so it was never at risk.
+        // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+        if (result.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
+      };
+
       xhr.onload = () => {
         if (xhr.status === 202) {
           asyncModeRef.current = true;
@@ -750,33 +776,26 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current = null;
         }
 
+        // Only a body that doesn't parse is the server's fault. A throw while
+        // landing a good result is our own store writes failing, which must
+        // not read as "Invalid response" and must still surface (#1354, the
+        // sync twin of #1287).
+        let handlingError: { cause: unknown } | null = null;
         if (xhr.status >= 200 && xhr.status < 300) {
+          let result: ProcessResult | null = null;
           try {
-            const result: ProcessResult = resolveServerUrls(JSON.parse(xhr.responseText));
-            setWarning(result.warning ?? null);
-            setResultPayload(result as unknown as Record<string, unknown>);
-            if (result.savedFileId) {
-              useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
-            }
-            useFileStore.getState().updateEntry(capturedIndex, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
-              processedFilename: null,
-              resultNotes: pickResultNotes(result),
-              status: "completed",
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
-              ...(result.savedFileId && saveModeRef.current === "overwrite"
-                ? { serverFileId: result.savedFileId }
-                : {}),
-            });
-            // An auto-saved result is already in the library, so it was never at risk.
-            // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-            if (result.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
+            result = parseResultBody<ProcessResult>(xhr.responseText);
           } catch {
             const message = "Invalid response from server";
             setError(message);
             failEntry(message);
+          }
+          if (result) {
+            try {
+              landSyncResult(result);
+            } catch (cause) {
+              handlingError = { cause };
+            }
           }
         } else {
           let message: string;
@@ -796,6 +815,29 @@ export function useToolProcessor(toolId: string) {
           if (xhr.status === 413) message = t.errors.fileTooLarge;
           setError(message);
           failEntry(message, xhr.status === 413 ? "upload_error" : undefined);
+        }
+
+        if (handlingError) {
+          // The run is over whatever threw. A second throw from the teardown
+          // must not replace the root cause, and the entry settle goes last
+          // on its own: it's the same store write that may have just thrown.
+          try {
+            setError(FRAME_HANDLING_FAILED);
+            setProcessing(false);
+            setProgress(IDLE_PROGRESS);
+            clearActiveJob();
+          } catch (teardownErr) {
+            console.error("Ending the run after a result handling error failed", teardownErr);
+          }
+          try {
+            failEntry(FRAME_HANDLING_FAILED);
+          } catch (settleErr) {
+            console.error(
+              "Failing the run's entry after a result handling error failed",
+              settleErr,
+            );
+          }
+          throw handlingError.cause;
         }
 
         setProcessing(false);

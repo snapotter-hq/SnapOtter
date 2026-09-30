@@ -5,7 +5,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { FRAME_HANDLING_FAILED, type ProgressFrame } from "@/lib/progress-frames";
+import { FRAME_HANDLING_FAILED, type ProgressFrame, parseResultBody } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
@@ -143,9 +143,8 @@ export function usePipelineProcessor() {
   //
   // Every exit calls this last, after its run-level teardown, and it never
   // throws: some exits run right after a store write threw (a broken
-  // completion write lands in the same catch as an unparseable body), and a
-  // second throw here must not leave the run stuck at processing with the
-  // cancel button still armed.
+  // completion write, #1287 and #1354), and a second throw here must not
+  // leave the run stuck at processing with the cancel button still armed.
   const settleProcessingEntries = useCallback((message: string) => {
     try {
       const { entries, updateEntry } = useFileStore.getState();
@@ -611,20 +610,32 @@ export function usePipelineProcessor() {
         }
 
         let failure: string | null = null;
+        // Only a body that doesn't parse is the server's fault. A throw while
+        // writing a good result is our own store failing, which must not
+        // read as "Invalid response" and must still surface (#1354, the sync
+        // twin of #1287).
+        let handlingError: { cause: unknown } | null = null;
         if (xhr.status >= 200 && xhr.status < 300) {
+          let result: ProcessResult | null = null;
           try {
-            const result: ProcessResult = resolveServerUrls(JSON.parse(xhr.responseText));
-            useFileStore.getState().updateEntry(capturedIndex, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
-              processedFilename: null,
-              status: "completed",
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
-              ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
-            });
+            result = parseResultBody<ProcessResult>(xhr.responseText);
           } catch {
             failure = "Invalid response from server";
+          }
+          if (result) {
+            try {
+              useFileStore.getState().updateEntry(capturedIndex, {
+                processedUrl: result.downloadUrl,
+                processedPreviewUrl: result.previewUrl ?? null,
+                processedFilename: null,
+                status: "completed",
+                originalSize: result.originalSize,
+                processedSize: result.processedSize,
+                ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+              });
+            } catch (cause) {
+              handlingError = { cause };
+            }
           }
         } else {
           let message: string;
@@ -647,6 +658,22 @@ export function usePipelineProcessor() {
             message = `Processing failed: ${xhr.status}`;
           }
           failure = message;
+        }
+
+        if (handlingError) {
+          // The run is over whatever threw. A second throw from the teardown
+          // must not replace the root cause; the settle goes last and logs
+          // rather than throws.
+          try {
+            setError(FRAME_HANDLING_FAILED);
+            setProcessing(false);
+            setProgress(IDLE_PROGRESS);
+            clearActiveJob();
+          } catch (teardownErr) {
+            console.error("Ending the run after a result handling error failed", teardownErr);
+          }
+          settleProcessingEntries(FRAME_HANDLING_FAILED);
+          throw handlingError.cause;
         }
 
         if (failure !== null) setError(failure);

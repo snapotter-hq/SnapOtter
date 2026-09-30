@@ -1075,14 +1075,20 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
     });
 
     try {
-      act(() => {
-        xhrs[0].upload.onload?.();
-        xhrs[0].status = 200;
-        xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
-        xhrs[0].onload?.();
-      });
+      // The good body parsed, so the store's own throw is what surfaces
+      // (#1354), not a claim that the server sent garbage.
+      expect(() =>
+        act(() => {
+          xhrs[0].upload.onload?.();
+          xhrs[0].status = 200;
+          xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+          xhrs[0].onload?.();
+        }),
+      ).toThrow("store broke");
 
-      expect(useFileStore.getState().error).toBe("Invalid response from server");
+      expect(useFileStore.getState().error).toBe(
+        "Something went wrong while tracking this job. Try again.",
+      );
       expect(useFileStore.getState().processing).toBe(false);
       expect(useFileStore.getState().activeJobId).toBeNull();
       expect(consoleError).toHaveBeenCalledWith(
@@ -1188,6 +1194,90 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       processedUrl: SINGLE_RESULT.downloadUrl,
       error: null,
     });
+    unmount();
+  });
+});
+
+/**
+ * #1354: the sync response path parsed the body and wrote the result under
+ * one catch, so a throw from our own store write on a good 200 read as
+ * "Invalid response from server" and vanished. Only an unparseable body
+ * blames the server now; a handling error ends the run with the client-side
+ * message and is rethrown for the console and Sentry.
+ */
+describe("usePipelineProcessor sync result handling errors (#1354)", () => {
+  const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
+  const realUpdateEntry = useFileStore.getState().updateEntry;
+  afterEach(() => {
+    useFileStore.setState({ updateEntry: realUpdateEntry });
+  });
+
+  function respond(status: number, body: string) {
+    xhrs[0].upload.onload?.();
+    xhrs[0].status = status;
+    xhrs[0].responseText = body;
+    xhrs[0].onload?.();
+  }
+
+  it("fails the run with a client-side message when the result write throws", () => {
+    const { unmount } = startSingleRun();
+    vi.spyOn(useFileStore.getState(), "updateEntry")
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockImplementation(realUpdateEntry);
+
+    expect(() => act(() => respond(200, JSON.stringify(SINGLE_RESULT)))).toThrow("boom");
+
+    expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: HANDLER_FAILURE,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    unmount();
+  });
+
+  it("rethrows the root cause when the teardown after it throws too", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startSingleRun();
+    // A store listener that breaks on every write: the result write throws
+    // the root cause, then the teardown's first write throws again.
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+    });
+
+    try {
+      expect(() => act(() => respond(200, JSON.stringify(SINGLE_RESULT)))).toThrow("root cause");
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+      unmount();
+    }
+  });
+
+  it.each([
+    ["an unparseable body", "not json"],
+    ["a JSON null body", "null"],
+    ["a JSON string body", JSON.stringify("ok")],
+  ])("still blames the server for %s", (_label, body) => {
+    const { unmount } = startSingleRun();
+
+    act(() => respond(200, body));
+
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
     unmount();
   });
 });

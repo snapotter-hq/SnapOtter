@@ -12,6 +12,7 @@ import {
   type JobFailure,
   jobFailureMessage,
   type ProgressFrame,
+  parseResultBody,
 } from "@/lib/progress-frames";
 import {
   addSignature,
@@ -285,7 +286,6 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         return;
       }
       landed = true;
-      setDownloadUrl(url);
       useFileStore.getState().updateEntry(capturedIndex, {
         processedUrl: url,
         processedFilename: signedFilenameFrom(url),
@@ -298,6 +298,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       // An auto-saved result is already in the library, so it was never at risk.
       // Must follow the updateEntry above; see the `claimed` invariant in file-store.
       if (typeof r.savedFileId === "string") useFileStore.getState().markClaimed(capturedIndex);
+      // Last, so a throw above never leaves the link up beside the error the
+      // run ends with (#1354).
+      setDownloadUrl(url);
     };
 
     const stopProgress = subscribeSignPdfJobProgress(clientJobId, {
@@ -343,10 +346,28 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       stopProgress();
       progressCleanupRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
+        // Only a body that doesn't parse is the server's fault. A throw while
+        // landing a good result is our own store writes failing: it ends the
+        // run the way the progress stream's handling error does, and still
+        // surfaces (#1354, the sync twin of #1287).
+        let result: Record<string, unknown> | null = null;
         try {
-          landResult(resolveServerUrls(JSON.parse(xhr.responseText)));
+          result = parseResultBody<Record<string, unknown>>(xhr.responseText);
         } catch {
           setError(t.errors.invalidResponse);
+        }
+        if (result) {
+          try {
+            landResult(result);
+          } catch (err) {
+            try {
+              setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+              endRun();
+            } catch (teardownErr) {
+              console.error("Ending the run after a result handling error failed", teardownErr);
+            }
+            throw err;
+          }
         }
       } else {
         try {

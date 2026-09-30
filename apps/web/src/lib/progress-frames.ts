@@ -1,3 +1,5 @@
+import { resolveServerUrls } from "@/lib/app-url";
+
 /** A parsed `/api/v1/jobs/:id/progress` SSE frame: the fields handlers read. */
 export interface ProgressFrame {
   type?: string;
@@ -19,6 +21,20 @@ export interface ProgressFrame {
  * that fails to parse is the only kind a handler may ignore.
  */
 export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this job. Try again.";
+
+/**
+ * Parses a sync 2xx tool response: the only step of landing one that may blame
+ * the server. It throws unless the body is a JSON object. Callers write the
+ * result outside the try around this, so a throw from their own store writes
+ * doesn't read as "Invalid response" (#1354, the sync twin of #1287).
+ */
+export function parseResultBody<T extends object>(text: string): T {
+  const body: unknown = JSON.parse(text);
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    throw new SyntaxError("The response body is not a JSON object");
+  }
+  return resolveServerUrls(body as T);
+}
 
 /**
  * How a job-progress subscriber reports a failed run. Subscribers that live
