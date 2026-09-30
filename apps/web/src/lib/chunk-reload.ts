@@ -79,10 +79,16 @@ export function installChunkReloadHandler(
   const navigation = (window as Window & { navigation?: EventTarget }).navigation;
   const onNavigate = (event: Event) => {
     const { destination, downloadRequest } = event as Event & {
-      destination?: { sameDocument?: boolean };
+      destination?: { sameDocument?: boolean; url?: string };
       downloadRequest?: string | null;
     };
-    if (destination?.sameDocument === false && !downloadRequest) leavingAt = Date.now();
+    if (destination?.sameDocument !== false) return;
+    // downloadRequest is null for a real navigation; a bare <a download> gives "".
+    if (downloadRequest != null) return;
+    // mailto: and other external schemes hand off to another app and the page
+    // stays; Chromium still fires a cross-document navigate for them.
+    if (!/^https?:/i.test(destination.url ?? "")) return;
+    leavingAt = Date.now();
   };
   // A page restored from the back/forward cache is no longer being left.
   const onPageShow = (event: PageTransitionEvent) => {

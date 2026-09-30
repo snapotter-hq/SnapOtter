@@ -201,9 +201,16 @@ describe("installChunkReloadHandler", () => {
     // before the import is aborted.
     let navigation: EventTarget;
 
-    function navigate(init: { sameDocument: boolean; downloadRequest?: string | null }): void {
+    function navigate(init: {
+      sameDocument: boolean;
+      downloadRequest?: string | null;
+      url?: string;
+    }): void {
       const event = Object.assign(new Event("navigate"), {
-        destination: { sameDocument: init.sameDocument },
+        destination: {
+          sameDocument: init.sameDocument,
+          url: init.url ?? "https://snapotter.example/logout",
+        },
         downloadRequest: init.downloadRequest ?? null,
       });
       navigation.dispatchEvent(event);
@@ -245,6 +252,23 @@ describe("installChunkReloadHandler", () => {
       expect(reload).toHaveBeenCalledTimes(1);
     });
 
+    it("still reloads after a bare <a download>, whose downloadRequest is an empty string", () => {
+      // ResultDownloadLink renders download="" (download={name ?? true}).
+      navigate({ sameDocument: false, downloadRequest: "" });
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it("still reloads after a mailto: link, which hands off to another app", () => {
+      // Chromium fires a cross-document navigate for mailto: while the page
+      // stays put (checked in Chromium 1.61's build; Firefox and WebKit don't).
+      navigate({ sameDocument: false, url: "mailto:contact@snapotter.com" });
+      fireChunkError();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
     it("reloads again once the leaving window has passed", () => {
       navigate({ sameDocument: false });
       vi.advanceTimersByTime(LEAVING_WINDOW_MS + 1);
@@ -254,12 +278,12 @@ describe("installChunkReloadHandler", () => {
     });
 
     it("stops listening to the Navigation API once uninstalled", () => {
+      const remove = vi.spyOn(navigation, "removeEventListener");
       uninstall();
-      navigate({ sameDocument: false });
-      uninstall = installChunkReloadHandler(reload);
-      fireChunkError();
 
-      expect(reload).toHaveBeenCalledTimes(1);
+      expect(remove).toHaveBeenCalledWith("navigate", expect.any(Function));
+      remove.mockRestore();
+      uninstall = installChunkReloadHandler(reload);
     });
   });
 });
