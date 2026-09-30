@@ -2236,6 +2236,42 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect((await userRow(id))?.role).toBe("disabled:user");
     });
 
+    it("Users PATCH matches a cased path, so a deactivation isn't skipped (#1731)", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-cased") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "Replace", path: "Active", value: "False" }],
+      });
+
+      // Attribute names are case-insensitive (RFC 7643 2.1). This used to
+      // answer 200 and leave the user active.
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(id))?.role).toBe("disabled:user");
+    });
+
+    it("Users PATCH refuses an op that isn't add, remove or replace", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-badop") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "delete", path: "active" }],
+      });
+
+      expectRefused(res, "Operations.0.op must be add, remove or replace", "invalidSyntax");
+      expect((await userRow(id))?.role).toBe("user");
+    });
+
+    it("Users PATCH still ignores attributes it doesn't store", async () => {
+      // IdPs send attributes SnapOtter keeps no column for (title,
+      // name.givenName, phoneNumbers). Refusing them would break every sync.
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-typed-patch-title"),
+      });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ op: "replace", path: "title", value: "Engineer" }],
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(id))?.username).toBe(userName);
+    });
+
     it("Users PATCH refuses a path-less value object with a wrong-typed field", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-bulk") });
       const res = await send("PATCH", `Users/${id}`, {

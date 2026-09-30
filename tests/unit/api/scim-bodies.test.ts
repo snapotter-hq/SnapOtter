@@ -189,6 +189,35 @@ describe("normalizeUserOps", () => {
     ).toEqual(invalid("Operations.1.value must be a string, got object"));
   });
 
+  it("matches paths case-insensitively and hands the route their canonical spelling (#1731)", () => {
+    expect(
+      normalizeUserOps([
+        { op: "Replace", path: "Active", value: "False" },
+        { op: "replace", path: "USERNAME", value: "u" },
+        { op: "remove", path: "ExternalId" },
+        { op: "replace", path: 'Emails[Type eq "work"].Value', value: "a@b.c" },
+      ]),
+    ).toEqual({
+      ok: true,
+      data: [
+        { op: "Replace", path: "active", value: false },
+        { op: "replace", path: "userName", value: "u" },
+        { op: "remove", path: "externalId" },
+        {
+          op: "replace",
+          path: 'emails[type eq "work"].value',
+          value: [{ value: "a@b.c", primary: true }],
+        },
+      ],
+    });
+  });
+
+  it("refuses an op that isn't add, remove or replace, before anything applies", () => {
+    expect(normalizeUserOps([{ op: "delete", path: "active" }])).toEqual(
+      syntax("Operations.0.op must be add, remove or replace"),
+    );
+  });
+
   it("leaves operations on paths the route ignores alone", () => {
     const ops = [{ op: "replace", path: "name.formatted", value: { any: "thing" } }];
     expect(normalizeUserOps(ops)).toEqual({ ok: true, data: ops });
