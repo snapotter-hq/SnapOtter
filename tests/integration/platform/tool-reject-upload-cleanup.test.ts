@@ -9,7 +9,7 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { apiToolPath } from "@snapotter/shared";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -55,31 +55,39 @@ async function post(parts: Parameters<typeof createMultipartPayload>[0]) {
 }
 
 const file = { name: "file", filename: "image.png", contentType: "image/png", content: PNG };
+const corrupt = { ...file, content: Buffer.from("not a png at all") };
 
+// The discard runs in the handler's finally, after the response is already
+// on its way, so the checks below poll or wait past it instead of reading
+// the workspace the moment inject resolves.
 describe("tool-factory discards the upload of a rejected request", () => {
   it.each([
     ["an invalid saveMode", [file, { name: "saveMode", content: "bogus" }]],
     ["an invalid clientJobId", [file, { name: "clientJobId", content: "has space" }]],
     ["settings that aren't JSON", [file, { name: "settings", content: "{not json" }]],
     ["too many files", [file, { ...file, filename: "second.png" }]],
+    ["a file the input handler rejects", [corrupt]],
   ] as const)("leaves no uploads dir behind for %s", async (_label, parts) => {
     const before = uploadDirs();
 
     const res = await post([...parts]);
 
-    expect(res.statusCode).toBe(400);
-    const leftover = [...uploadDirs()].filter((dir) => !before.has(dir));
-    expect(leftover).toEqual([]);
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.statusCode).toBeLessThan(500);
+    await vi.waitFor(
+      () => expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]),
+      { timeout: 5_000 },
+    );
   });
 
   it("keeps the upload of a request it accepts", async () => {
-    const before = uploadDirs();
-
     const res = await post([file, { name: "settings", content: JSON.stringify({ width: 50 }) }]);
 
     expect([200, 202]).toContain(res.statusCode);
     const { jobId } = JSON.parse(res.body) as { jobId: string };
-    expect(before.has(jobId)).toBe(false);
+    // Give the finally time to run: a misplaced enqueued flag would delete
+    // the upload a moment after the response, not before it.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     expect(uploadDirs().has(jobId)).toBe(true);
   });
 });

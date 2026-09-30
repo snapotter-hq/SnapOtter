@@ -10,12 +10,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
-    select: () => ({
+    select: vi.fn(() => ({
       from: () => ({
         where: () => ({ get: () => null }),
         all: () => [],
       }),
-    }),
+    })),
     insert: () => ({ values: () => ({ run: vi.fn() }) }),
   },
   pool: {},
@@ -47,6 +47,7 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
+  deletePrefix: vi.fn(() => Promise.resolve()),
   getObjectBuffer: vi.fn(() => Promise.resolve(Buffer.from("png-data"))),
   putObject: vi.fn(() => Promise.resolve()),
 }));
@@ -144,6 +145,7 @@ vi.mock("sharp", () => ({
 // ── Imports ─────────────────────────────────────────────────────────────
 
 import { apiToolPath } from "@snapotter/shared";
+import { db } from "../../../apps/api/src/db/index.js";
 import { enqueueToolJob, waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import {
@@ -151,6 +153,7 @@ import {
   isToolInstalled,
 } from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
+import { deletePrefix } from "../../../apps/api/src/lib/object-storage.js";
 import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import {
   createToolRoute,
@@ -305,6 +308,21 @@ function createMockRequest(opts: {
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
+/**
+ * Answer the factory's `select({ id })` jobs-row lookup with `rows`, leaving
+ * every other db.select (settings reads) on the default chain. Returns the
+ * function that puts the default back.
+ */
+function answerJobRowLookup(rows: unknown[]): () => void {
+  const select = vi.mocked(db.select);
+  const original = select.getMockImplementation();
+  select.mockImplementation(((fields?: Record<string, unknown>) =>
+    fields && "id" in fields
+      ? { from: () => ({ where: () => Promise.resolve(rows) }) }
+      : original?.()) as never);
+  return () => select.mockImplementation(original as never);
+}
+
 describe("createToolRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -412,6 +430,8 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({ error: "Settings must be valid JSON" }),
       );
+      // Nothing was enqueued, so the upload is the route's to remove (#1690).
+      expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
     });
 
     it("returns 400 when settings fail Zod validation", async () => {
@@ -581,6 +601,41 @@ describe("createToolRoute", () => {
           processedSize: 80,
         }),
       );
+      expect(deletePrefix).not.toHaveBeenCalled();
+    });
+
+    it("keeps the upload when enqueue fails after the jobs row was written", async () => {
+      vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("queue add failed"));
+      const restore = answerJobRowLookup([{ id: "row" }]);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await expect(handler(req, createMockReply())).rejects.toThrow("queue add failed");
+      } finally {
+        restore();
+      }
+      expect(deletePrefix).not.toHaveBeenCalled();
+    });
+
+    it("discards the upload when enqueue fails before the jobs row was written", async () => {
+      vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("insert failed"));
+      const restore = answerJobRowLookup([]);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await expect(handler(req, createMockReply())).rejects.toThrow("insert failed");
+      } finally {
+        restore();
+      }
+      expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
     });
 
     it("spreads resultPayload fields at top level in sync 200 envelope", async () => {

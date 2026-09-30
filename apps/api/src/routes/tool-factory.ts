@@ -339,9 +339,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
       } catch (err) {
-        await discardUploads();
         const failure = multipartFailure(err);
-        return reply.status(failure.status).send(failure.body);
+        reply.status(failure.status).send(failure.body);
+        await discardUploads();
+        return reply;
       }
 
       // Per-request scratch dir for input handlers that need temp files during
@@ -352,8 +353,8 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       // (both otherwise default to tmpdir()/snapotter-scratch/<jobId>). The
       // "-prep" suffix keeps the two from colliding.
       const scratchDir = join(tmpdir(), "snapotter-scratch", `${jobId}-prep`);
-      await mkdir(scratchDir, { recursive: true });
       try {
+        await mkdir(scratchDir, { recursive: true });
         if (fileCount > maxInputs) {
           return reply.status(400).send({
             error: `Too many files (max ${maxInputs})`,
@@ -598,24 +599,38 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const dbSettings = config.redactSettingsForAudit
           ? config.redactSettingsForAudit(settings)
           : undefined;
-        // From here the queued job owns uploads/<jobId>/, even if enqueue
-        // throws partway, so the finally below must leave it alone.
+        // Once enqueueToolJob has written the jobs row, that row owns
+        // uploads/<jobId>/ (a failed queue add is retried from it), so the
+        // finally below must leave the upload alone. If it threw before the
+        // row landed, nothing else will ever remove the upload.
         enqueued = true;
-        await enqueueToolJob({
-          jobId,
-          toolId: config.toolId,
-          userId,
-          pool,
-          inputRefs,
-          filename,
-          settings,
-          dbSettings,
-          fileId: fileId ?? undefined,
-          saveMode,
-          clientJobId: clientJobId ?? undefined,
-          kind: "tool",
-          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-        });
+        try {
+          await enqueueToolJob({
+            jobId,
+            toolId: config.toolId,
+            userId,
+            pool,
+            inputRefs,
+            filename,
+            settings,
+            dbSettings,
+            fileId: fileId ?? undefined,
+            saveMode,
+            clientJobId: clientJobId ?? undefined,
+            kind: "tool",
+            analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+          });
+        } catch (err) {
+          const rowExists = await db
+            .select({ id: schema.jobs.id })
+            .from(schema.jobs)
+            .where(eq(schema.jobs.id, jobId))
+            .then((rows) => rows.length > 0)
+            // Can't tell: keep the upload rather than delete a queued job's input.
+            .catch(() => true);
+          if (!rowExists) enqueued = false;
+          throw err;
+        }
 
         // Long tools never block the HTTP request (spec 4.5): straight to SSE.
         if (shouldSkipSyncWindow(toolMeta?.executionHint)) {
