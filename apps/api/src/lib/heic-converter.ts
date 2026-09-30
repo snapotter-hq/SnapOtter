@@ -25,25 +25,39 @@ const execFileAsync = promisify(execFile);
  * very large image can exhaust memory every time.
  *
  * Under a memory rlimit or a cgroup that fails malloc rather than killing the
- * process, heif-dec reports it itself (#1629): libheif's "Allocating <n> bytes
- * failed", or an abort on std::bad_alloc or on failing to start a decoder
- * thread. That's stderr as libheif 1.23 printed it under `ulimit -v`. Security
- * limits share libheif's "Memory allocation error" heading but are the file's
- * fault, so the match is on the allocation text, not the heading. stderr only:
- * the message carries a temp path derived from the upload.
+ * process, heif-dec reports it itself (#1629). Both shapes below are stderr as
+ * libheif 1.23 printed it in the shipped image under `ulimit -v`:
+ *
+ * - libheif's "Allocating <n> bytes failed". It only gets that far after the
+ *   size passed libheif's security limits, so the server couldn't supply a
+ *   bounded amount. Security limits share the "Memory allocation error"
+ *   heading ("Allocating <n> bytes exceeds the security limit"), but they're
+ *   the file's fault and stay a 422, so the match is on "failed".
+ * - An abort because a decoder thread couldn't start (EAGAIN from
+ *   pthread_create). In a container that's as often a pids or thread limit as
+ *   memory, so it gets its own message.
+ *
+ * An uncaught std::bad_alloc isn't matched: nothing bounds that allocation, so
+ * a crafted file could raise it on a healthy host. stderr is read rather than
+ * the message, which adds the command line.
  */
 const LIBHEIF_ALLOCATION_FAILED = /\bAllocating \d+ bytes failed\b/;
-const ABORTED_OUT_OF_MEMORY =
-  /instance of 'std::bad_alloc'|instance of 'std::system_error'\s+what\(\):\s+Resource temporarily unavailable/;
+const THREAD_START_ABORTED =
+  /instance of 'std::system_error'\s+what\(\):\s+Resource temporarily unavailable/;
 
 function asDecoderOutOfMemory(err: unknown): unknown {
   const { signal, stderr } = (err ?? {}) as { signal?: unknown; stderr?: unknown };
   const decoderOutput = typeof stderr === "string" ? stderr : "";
+  if (signal === "SIGABRT" && THREAD_START_ABORTED.test(decoderOutput)) {
+    return new DecoderOutOfMemoryError(
+      "The HEIF decoder couldn't start its decoding threads. The server hit a memory, thread or process limit.",
+      err,
+    );
+  }
   const outOfMemory =
     (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) ||
     signal === "SIGKILL" ||
-    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput) ||
-    (signal === "SIGABRT" && ABORTED_OUT_OF_MEMORY.test(decoderOutput));
+    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput);
   if (!outOfMemory) return err;
   return new DecoderOutOfMemoryError(
     "The HEIF decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
