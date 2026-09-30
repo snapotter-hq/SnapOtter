@@ -85,7 +85,7 @@ const TILES = [
   { row: 0, col: 1, label: "2", width: 10, height: 10, blobUrl: "blob:tile-2" },
 ];
 
-function base64Result(filename: string, entryId = filename) {
+function base64Result(filename: string, entryId: string) {
   return {
     entryId,
     filename,
