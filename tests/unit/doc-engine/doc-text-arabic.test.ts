@@ -376,6 +376,86 @@ describe.skipIf(!hasPython)("doc_text._inline_font_location", () => {
   });
 });
 
+/** A texttrace span as PyMuPDF returns it, reduced to what the helper reads: (unicode, glyph) per char. */
+type FakeSpan = { chars: Array<[number, number]> };
+
+const withoutGlyphIdSpans = (trace: FakeSpan[]) =>
+  callHelper<string | null>("text_without_glyph_id_spans", trace as unknown as string);
+
+/** Each char of text as a span char whose glyph id is its codepoint plus an offset. */
+function span(text: string, glyphOffset: number): FakeSpan {
+  return {
+    chars: [...text].map((ch) => [
+      ch.codePointAt(0) as number,
+      (ch.codePointAt(0) as number) + glyphOffset,
+    ]),
+  };
+}
+
+// The shape of #1566 case 2, measured on PyMuPDF 1.27.2.3: with ToUnicode
+// written as the name /Identity-H, texttrace reports each char's unicode as its
+// glyph id, and glyph ids below 0x20 (Roboto's space is glyph 4) as U+FFFD.
+const IDENTITY: FakeSpan = {
+  chars: [
+    [44, 44],
+    [73, 73],
+    [80, 80],
+    [80, 80],
+    [83, 83],
+    [0xfffd, 4],
+    [91, 91],
+    [83, 83],
+  ],
+};
+
+describe.skipIf(!hasPython)("doc_text.text_without_glyph_id_spans (#1566)", () => {
+  it("answers null when no span reads as glyph ids, so the caller keeps its own verdict", () => {
+    expect(withoutGlyphIdSpans([span("Hello world", -31)])).toBeNull();
+    expect(withoutGlyphIdSpans([])).toBeNull();
+  });
+
+  it("drops a span whose unicode is its glyph id and keeps the rest", () => {
+    expect(withoutGlyphIdSpans([IDENTITY, span("Hi there", -31)])).toBe("Hi there");
+  });
+
+  it("answers empty text when every span reads as glyph ids", () => {
+    expect(withoutGlyphIdSpans([IDENTITY])).toBe("");
+  });
+
+  it("leaves U+FFFD out of the judgement, so a #955 span isn't taken for glyph ids", () => {
+    // No ToUnicode at all: texttrace reports every char as U+FFFD.
+    const unmapped: FakeSpan = { chars: [...Array(8)].map((_, i) => [0xfffd, 40 + i]) };
+    expect(withoutGlyphIdSpans([unmapped])).toBeNull();
+  });
+
+  it("doesn't judge a span too short to tell from coincidence", () => {
+    expect(
+      withoutGlyphIdSpans([
+        {
+          chars: [
+            [44, 44],
+            [73, 73],
+          ],
+        },
+      ]),
+    ).toBeNull();
+  });
+
+  it("doesn't judge a span where only some chars line up", () => {
+    const partly: FakeSpan = {
+      chars: [
+        [44, 44],
+        [73, 73],
+        [80, 80],
+        [81, 50],
+        [82, 51],
+        [83, 52],
+      ],
+    };
+    expect(withoutGlyphIdSpans([partly])).toBeNull();
+  });
+});
+
 // The helpers above are only worth anything if extraction actually calls them,
 // and PyMuPDF is absent from CI so no test here can run main(). Guard the wiring
 // at the source level instead, the way pymupdf-message-redirect.test.ts does.
@@ -399,6 +479,10 @@ describe("doc_text.main wiring", () => {
     );
     expect(main).toMatch(/page\.get_text\(flags=unmapped_as_fffd\)/);
     expect(main).toMatch(/if draws_unmapped_composite_font\(page\)/);
+  });
+
+  it("drops glyph-id spans from a flagged page's verdict (#1566)", () => {
+    expect(main).toMatch(/text_without_glyph_id_spans\(page\.get_texttrace\(\)\)/);
   });
 
   it("reports the character count of the text it actually wrote", () => {

@@ -66,6 +66,8 @@ type FontPdfKind =
   | "type0-cid-is-unicode"
   | "type0-inline"
   | "type0-inline-no-tounicode"
+  | "type0-identity-name"
+  | "type0-identity-name-mixed"
   | "simple-unmapped-names";
 
 /** Build a one-page PDF of FONT_TEXT in one of these font shapes:
@@ -80,6 +82,11 @@ type FontPdfKind =
  *    resources, which get_fonts reports as xref 0.
  *  - "type0-inline-no-tounicode": the same inline dict with ToUnicode removed,
  *    so it extracts as glyph ids like "type0-no-tounicode" (#1566).
+ *  - "type0-identity-name": ToUnicode written as the name /Identity-H instead
+ *    of a stream. MuPDF takes it as an identity map, so the glyph ids come back
+ *    as if they were Unicode, with no U+FFFD to catch (#1566 case 2).
+ *  - "type0-identity-name-mixed": the same, plus a second line in Helvetica
+ *    that reads fine.
  *  - "simple-unmapped-names": base-14 Helvetica re-encoded with glyph names
  *    nothing can map. MuPDF falls back to the character code for simple fonts,
  *    and these codes are ASCII, so the text still extracts correctly.
@@ -97,9 +104,13 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    p.insert_text((72, 72), text, fontname='helv', fontsize=12)",
     "else:",
     "    p.insert_text((72, 72), text, fontname='rob', fontfile=font, fontsize=12)",
+    "if kind == 'type0-identity-name-mixed':",
+    "    p.insert_text((72, 120), text, fontname='helv', fontsize=12)",
     "for xref, _ext, ftype, *_ in p.get_fonts():",
     "    if kind in ('type0-no-tounicode', 'type0-cid-is-unicode', 'type0-inline-no-tounicode') and ftype == 'Type0':",
     "        d.xref_set_key(xref, 'ToUnicode', 'null')",
+    "    if kind.startswith('type0-identity-name') and ftype == 'Type0':",
+    "        d.xref_set_key(xref, 'ToUnicode', '/Identity-H')",
     "    if kind == 'type0-cid-is-unicode' and ftype == 'Type0':",
     "        cid_font = int(d.xref_get_key(xref, 'DescendantFonts')[1].strip('[]').split()[0])",
     "        glyphs = fitz.Font(fontfile=font); table = bytearray(2 * 0x80)",
@@ -196,6 +207,22 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const body = JSON.parse(res.body);
     expect(body.details).toMatch(/text layer/i);
     expect(body.details).toMatch(/OCR/);
+  }, 60_000);
+
+  it("tells the user to run OCR when ToUnicode is the name /Identity-H (#1566)", async () => {
+    // MuPDF honours the name as an identity map, so unlike #955 there's no
+    // U+FFFD to judge by: the glyph ids come back as ordinary letters.
+    const res = await runTool(makeFontPdf("type0-identity-name"), "identity-name.pdf");
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.details).toMatch(/text layer/i);
+    expect(body.details).toMatch(/OCR/);
+  }, 60_000);
+
+  it("still extracts a page whose other text reads fine next to an /Identity-H line", async () => {
+    const res = await runTool(makeFontPdf("type0-identity-name-mixed"), "identity-mixed.pdf");
+    expect(res.statusCode).toBe(200);
+    expect(await downloadText(res)).toContain(FONT_TEXT);
   }, 60_000);
 
   it("still extracts a composite font whose dict is written inline", async () => {
