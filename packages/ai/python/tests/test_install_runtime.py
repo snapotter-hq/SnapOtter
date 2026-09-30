@@ -643,11 +643,91 @@ class InstallRuntimeTests(unittest.TestCase):
                 6 * gib
             ),
             "/sys/fs/cgroup/system.slice/memory.max": str(5 * gib),
+            # The v2 root never has memory.max, only cgroup.controllers.
+            "/sys/fs/cgroup/cgroup.controllers": "cpuset cpu io memory pids\n",
         }
         with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
             Path, "read_text", new=read_from(host_files)
         ):
             self.assertEqual(self._real_effective_memory_bytes(), 5 * gib)
+
+    def test_effective_memory_treats_levels_without_the_memory_controller_as_unlimited(
+        self,
+    ) -> None:
+        # Raspberry Pi OS boots with cgroup_disable=memory: no level has
+        # memory.max, every level still has cgroup.controllers. The API's
+        # probe (packages/ai/src/runtime-resources.ts) reads that as no limit
+        # and so must the installer, or the two disagree (#1672).
+        gib = 1024 * 1024 * 1024
+        scope = "/sys/fs/cgroup/user.slice/user-1000.slice/session-1.scope"
+        files = {
+            "/proc/self/cgroup": "0::/user.slice/user-1000.slice/session-1.scope\n",
+            "/proc/self/mountinfo": (
+                "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+                "- cgroup2 cgroup rw\n"
+            ),
+            f"{scope}/cgroup.controllers": "cpuset cpu io pids\n",
+            "/sys/fs/cgroup/user.slice/user-1000.slice/cgroup.controllers": (
+                "cpuset cpu io pids\n"
+            ),
+            "/sys/fs/cgroup/user.slice/cgroup.controllers": "cpuset cpu io pids\n",
+            "/sys/fs/cgroup/cgroup.controllers": "cpuset cpu io pids\n",
+        }
+
+        def read_text(path, *args, **kwargs):
+            value = files.get(str(path))
+            if value is None:
+                raise FileNotFoundError(path)
+            return value
+
+        with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+            Path, "read_text", new=read_text
+        ):
+            self.assertEqual(self._real_effective_memory_bytes(), 8 * gib)
+
+        # A limit below a level without the controller still applies.
+        files[f"{scope}/memory.max"] = str(3 * gib)
+        with mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+            Path, "read_text", new=read_text
+        ):
+            self.assertEqual(self._real_effective_memory_bytes(), 3 * gib)
+
+    def test_effective_memory_fails_closed_when_a_missing_limit_has_no_controllers_file(
+        self,
+    ) -> None:
+        # A missing memory.max only means "no controller here" when the level
+        # itself is readable; otherwise the cgroup is gone or hidden.
+        gib = 1024 * 1024 * 1024
+        cases = {
+            "private namespace root": {
+                "/proc/self/cgroup": "0::/\n",
+                "/proc/self/mountinfo": (
+                    "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+                    "- cgroup2 cgroup rw\n"
+                ),
+            },
+            "cgroup v1 mount point": {
+                "/proc/self/cgroup": "5:memory:/\n",
+                "/proc/self/mountinfo": (
+                    "30 23 0:27 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime "
+                    "- cgroup cgroup rw,memory\n"
+                ),
+                # v1 has no cgroup.controllers fallback: this must not rescue it.
+                "/sys/fs/cgroup/memory/cgroup.controllers": "memory\n",
+            },
+        }
+        for label, files in cases.items():
+            def read_text(path, *args, _files=files, **kwargs):
+                value = _files.get(str(path))
+                if value is None:
+                    raise FileNotFoundError(path)
+                return value
+
+            with self.subTest(label), mock.patch.object(
+                os, "sysconf", side_effect=[8 * gib, 1]
+            ), mock.patch.object(Path, "read_text", new=read_text):
+                with self.assertRaisesRegex(install_runtime.PreflightError, "cgroup memory"):
+                    self._real_effective_memory_bytes()
 
     def test_effective_memory_fails_closed_when_a_non_root_limit_is_missing(
         self,

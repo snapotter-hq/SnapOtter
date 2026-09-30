@@ -363,9 +363,17 @@ def _process_cgroup_memory_limits() -> list[int] | None:
             if raw != "max" and raw.isdecimal() and int(raw) > 0:
                 limits.append(int(raw))
         except FileNotFoundError:
-            # The cgroup v2 root has no memory.max; every other level must.
-            if current != mount_point or filename != "memory.max":
+            # A v2 level has no memory.max when the memory controller isn't
+            # enabled there (always so at the root). That means no limit at
+            # this level, provided the level itself is readable. Matches
+            # packages/ai/src/runtime-resources.ts.
+            if filename != "memory.max":
                 unreadable = True
+            else:
+                try:
+                    Path(current, "cgroup.controllers").read_text(encoding="ascii")
+                except (OSError, UnicodeError):
+                    unreadable = True
         except (OSError, UnicodeError, ValueError):
             unreadable = True
         if current == mount_point:
