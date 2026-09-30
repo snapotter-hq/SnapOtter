@@ -818,6 +818,121 @@ class InstallRuntimeTests(unittest.TestCase):
                 ):
                     self._real_effective_memory_bytes()
 
+    def test_effective_memory_failures_name_the_file_and_the_reason(self) -> None:
+        # Each refusal says which file and what was wrong with it, worded like
+        # packages/ai/src/runtime-resources.ts, and keeps the OS error as the
+        # cause. The CLI prints only the message, so a read failure carries
+        # the OS reason in it too (#1673).
+        gib = 1024 * 1024 * 1024
+        v2_mount = (
+            "29 23 0:26 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime "
+            "- cgroup2 cgroup rw\n"
+        )
+        v1_mount = (
+            "30 23 0:27 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime "
+            "- cgroup cgroup rw,memory\n"
+        )
+        scope = "/sys/fs/cgroup/docker/deadbeef"
+        denied = PermissionError(13, "Permission denied")
+        cases = [
+            (
+                "cgroup membership unreadable",
+                {"/proc/self/cgroup": denied},
+                r"^unable to read the process cgroup memory capacity from "
+                r"/proc/self/cgroup: Permission denied$",
+                PermissionError,
+            ),
+            (
+                "cgroup membership empty",
+                {"/proc/self/cgroup": ""},
+                r"^unable to resolve the process cgroup memory capacity: "
+                r"/proc/self/cgroup is empty$",
+                None,
+            ),
+            (
+                "cgroup membership line unrecognised",
+                {"/proc/self/cgroup": "malformed-membership\n"},
+                r'^unable to resolve the process cgroup memory capacity: '
+                r'unrecognised /proc/self/cgroup line "malformed-membership"$',
+                None,
+            ),
+            (
+                "mountinfo unreadable",
+                {"/proc/self/cgroup": "0::/docker/deadbeef\n", "/proc/self/mountinfo": denied},
+                r"^unable to read the process cgroup memory capacity from "
+                r"/proc/self/mountinfo: Permission denied$",
+                PermissionError,
+            ),
+            (
+                "no mount covers the membership",
+                {"/proc/self/cgroup": "0::/docker/deadbeef\n", "/proc/self/mountinfo": v1_mount},
+                r'^unable to resolve the process cgroup memory capacity: no cgroup2 '
+                r'memory mount in /proc/self/mountinfo covers "/docker/deadbeef"$',
+                None,
+            ),
+            (
+                "limit file unreadable",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": denied,
+                },
+                rf"^unable to read the process cgroup memory capacity from "
+                rf"{scope}/memory.max: Permission denied$",
+                PermissionError,
+            ),
+            (
+                "limit file malformed",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": "lots\n",
+                },
+                rf'^malformed cgroup memory capacity in {scope}/memory.max: "lots"$',
+                None,
+            ),
+            (
+                "absent memory.max on a level that isn't readable",
+                {
+                    "/proc/self/cgroup": "0::/docker/deadbeef\n",
+                    "/proc/self/mountinfo": v2_mount,
+                    f"{scope}/memory.max": str(6 * gib),
+                    "/sys/fs/cgroup/cgroup.controllers": "memory\n",
+                },
+                r"^unable to read the process cgroup memory capacity from "
+                r"/sys/fs/cgroup/docker/cgroup.controllers \(memory.max is absent\): "
+                r"No such file or directory$",
+                FileNotFoundError,
+            ),
+            (
+                "cgroup v1 limit file missing",
+                {"/proc/self/cgroup": "5:memory:/\n", "/proc/self/mountinfo": v1_mount},
+                r"^unable to read the process cgroup memory capacity from "
+                r"/sys/fs/cgroup/memory/memory.limit_in_bytes: No such file or directory$",
+                FileNotFoundError,
+            ),
+        ]
+        for label, files, message, cause in cases:
+            def read_text(path, *args, _files=files, **kwargs):
+                value = _files.get(str(path))
+                if value is None:
+                    raise FileNotFoundError(2, "No such file or directory", str(path))
+                if isinstance(value, BaseException):
+                    raise value
+                return value
+
+            with self.subTest(label), mock.patch.object(
+                sys, "platform", "linux"
+            ), mock.patch.object(os, "sysconf", side_effect=[8 * gib, 1]), mock.patch.object(
+                Path, "read_text", new=read_text
+            ):
+                with self.assertRaisesRegex(install_runtime.PreflightError, message) as raised:
+                    self._real_effective_memory_bytes()
+                if cause is None:
+                    self.assertIsNone(raised.exception.__cause__)
+                else:
+                    self.assertIsInstance(raised.exception.__cause__, cause)
+
     def test_model_digests_must_bind_to_files_in_the_exact_manifest(self) -> None:
         artifact = self.fixture.artifact()
         artifact["models"]["pp-ocrv6-small"] = "f" * 64
