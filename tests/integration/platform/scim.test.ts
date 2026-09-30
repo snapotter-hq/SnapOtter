@@ -2125,6 +2125,123 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     });
   });
 
+  describe("wrong-typed request bodies (#1511)", () => {
+    // Every route cast request.body field by field, so a wrong-typed value
+    // reached Postgres as JSON text, or threw a 500 partway through.
+    async function send(method: "POST" | "PUT" | "PATCH", url: string, payload: unknown) {
+      return crudApp.app.inject({
+        method,
+        url: `/api/v1/scim/v2/${url}`,
+        headers: authHeaders(),
+        payload: payload as Record<string, unknown>,
+      });
+    }
+
+    function expectInvalidValue(res: { statusCode: number; body: string }, detail: string) {
+      expect(res.statusCode, res.body).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail,
+        scimType: "invalidValue",
+      });
+    }
+
+    it("Users POST refuses an object externalId and creates nobody", async () => {
+      const userName = uniqueName("scim-typed-post-obj");
+      const res = await send("POST", "Users", { userName, externalId: { id: 1 } });
+
+      expectInvalidValue(res, "externalId must be a string");
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, userName));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("Users POST stores a numeric externalId as its string", async () => {
+      const res = await send("POST", "Users", {
+        userName: uniqueName("scim-typed-post-num"),
+        externalId: 12345,
+      });
+
+      expect(res.statusCode, res.body).toBe(201);
+      expect(JSON.parse(res.body).externalId).toBe("12345");
+      expect((await userRow(JSON.parse(res.body).id))?.scimExternalId).toBe("12345");
+    });
+
+    it('Users POST reads active "false" as inactive, not as a truthy string', async () => {
+      const res = await send("POST", "Users", {
+        userName: uniqueName("scim-typed-post-inactive"),
+        active: "false",
+      });
+
+      expect(res.statusCode, res.body).toBe(201);
+      expect(JSON.parse(res.body).active).toBe(false);
+    });
+
+    it("Users PUT refuses emails that aren't a list and changes nothing", async () => {
+      const { id, userName } = await createScimUser({ userName: uniqueName("scim-typed-put") });
+      const res = await send("PUT", `Users/${id}`, {
+        userName: uniqueName("scim-typed-put-renamed"),
+        emails: { value: "x@example.com" },
+      });
+
+      expectInvalidValue(res, "emails must be an array");
+      expect((await userRow(id))?.username).toBe(userName);
+    });
+
+    it("Users PATCH refuses an operation without an op", async () => {
+      const { id } = await createScimUser({ userName: uniqueName("scim-typed-patch-op") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [{ path: "userName", value: "x" }],
+      });
+
+      expectInvalidValue(res, "Operations.0.op is required");
+    });
+
+    it("Users PATCH refuses an object userName and applies none of the operations", async () => {
+      const { id, userName } = await createScimUser({ userName: uniqueName("scim-typed-patch") });
+      const res = await send("PATCH", `Users/${id}`, {
+        Operations: [
+          { op: "replace", path: "emails", value: "patched@example.com" },
+          { op: "replace", path: "userName", value: { first: "u" } },
+        ],
+      });
+
+      expectInvalidValue(res, "Operations.1.value must be a string");
+      const row = await userRow(id);
+      expect(row?.username).toBe(userName);
+      expect(row?.email).toBeNull();
+    });
+
+    it("Groups POST refuses members that aren't a list and creates no group", async () => {
+      const displayName = uniqueName("scim-typed-grp-post");
+      const res = await send("POST", "Groups", { displayName, members: { value: "u1" } });
+
+      expectInvalidValue(res, "members must be an array");
+      const rows = await db.select().from(schema.teams).where(eq(schema.teams.name, displayName));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("Groups PATCH refuses an object displayName", async () => {
+      const group = await createScimGroup({ displayName: uniqueName("scim-typed-grp-patch") });
+      const res = await send("PATCH", `Groups/${group.id}`, {
+        Operations: [{ op: "replace", path: "displayName", value: { name: "g" } }],
+      });
+
+      expectInvalidValue(res, "Operations.0.value must be a string");
+    });
+
+    it("Groups PATCH adds a member sent as a single object", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-typed-grp-one") });
+      const group = await createScimGroup({ displayName: uniqueName("scim-typed-grp-one") });
+      const res = await send("PATCH", `Groups/${group.id}`, {
+        Operations: [{ op: "replace", path: "members", value: { value: user.id } }],
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await userRow(user.id))?.team).toBe(group.id);
+    });
+  });
+
   describe("Groups CRUD", () => {
     it("rejects group creation without displayName", async () => {
       const res = await crudApp.app.inject({
