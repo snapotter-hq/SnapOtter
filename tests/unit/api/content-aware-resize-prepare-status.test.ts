@@ -70,5 +70,6 @@ describe("content-aware-resize prepare catch", () => {
     const res = await send();
     expect(res.statusCode).toBe(422);
     expect(res.json().error).toBe("Failed to prepare image");
+    expect(prepare).toHaveBeenCalled();
   });
 });

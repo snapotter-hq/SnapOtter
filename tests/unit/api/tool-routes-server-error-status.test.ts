@@ -166,8 +166,8 @@ describe("compare", () => {
   });
 });
 
-// #1671: routes #1667 didn't reach. Each one stores (or, for passport-photo
-// generate, reads back) inside the same kind of catch-all.
+// #1671: routes #1667 didn't reach. Each one stores its result inside the
+// same kind of catch-all.
 describe("json-bodied routes", () => {
   let app: Awaited<ReturnType<typeof buildApp>> | undefined;
 
@@ -181,24 +181,29 @@ describe("json-bodied routes", () => {
     app = undefined;
   });
 
-  const point = { x: 0.5, y: 0.5 };
+  // A plausible face on a 200x200 background-removed image, so generate gets
+  // through the crop maths and reaches the putObject call.
   const passportBody = {
     jobId: "job",
     filename: "face.png",
     countryCode: "US",
     landmarks: {
-      leftEye: point,
-      rightEye: point,
-      eyeCenter: point,
-      chin: point,
-      forehead: point,
-      crown: point,
-      nose: point,
+      leftEye: { x: 0.42, y: 0.45 },
+      rightEye: { x: 0.58, y: 0.45 },
+      eyeCenter: { x: 0.5, y: 0.45 },
+      chin: { x: 0.5, y: 0.7 },
+      forehead: { x: 0.5, y: 0.32 },
+      crown: { x: 0.5, y: 0.25 },
+      nose: { x: 0.5, y: 0.55 },
       faceCenterX: 0.5,
     },
-    imageWidth: 100,
-    imageHeight: 100,
+    imageWidth: 200,
+    imageHeight: 200,
   };
+  const bgRemoved = () =>
+    sharp({ create: { width: 200, height: 200, channels: 4, background: "#fff" } })
+      .png()
+      .toBuffer();
 
   const cases = [
     {
@@ -222,13 +227,15 @@ describe("json-bodied routes", () => {
       register: registerPassportPhoto,
       url: "/api/v1/tools/image/passport-photo/generate",
       payload: passportBody,
-      fail: getObjectBuffer,
+      setup: () => getObjectBuffer.mockImplementation(bgRemoved),
+      fail: putObject,
       error: "Passport photo generation failed",
     },
   ];
 
   for (const c of cases) {
     it(`${c.name} surfaces a storage 503 with its code instead of answering 422`, async () => {
+      c.setup?.();
       c.fail.mockImplementation(async () => {
         throw storageDown();
       });
@@ -240,6 +247,7 @@ describe("json-bodied routes", () => {
     });
 
     it(`${c.name} still answers 422 for an ordinary failure`, async () => {
+      c.setup?.();
       c.fail.mockImplementation(async () => {
         throw new Error("bad input");
       });
