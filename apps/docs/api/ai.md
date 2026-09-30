@@ -60,6 +60,7 @@ Most AI tools require one or more feature bundles before they can run. The admin
 | `background-removal` | 4-5 GB | rembg / BiRefNet background matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
 | `face-detection` | 200-300 MB | MediaPipe face detection and landmarks | blur-faces, red-eye-removal, smart-crop |
 | `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | Diffusion inpainting, optional upgrade for Object Eraser | erase-object (large objects and structured backgrounds) |
 | `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
 | `photo-restoration` | 4-5 GB | scratch repair and restoration pipeline | restore-photo |
 | `ocr` | ~208-234 MiB download / ~409-488 MiB installed | Optional RapidOCR 3.9.1, ONNX Runtime 1.20.1, and pinned PP-OCR models | ocr, ocr-pdf (`balanced` and `best` only) |
@@ -73,6 +74,27 @@ Tools with cross-bundle dependencies:
 | `enhance-faces` | `upscale-enhance`, `face-detection` | Detects faces before running GFPGAN or CodeFormer enhancement on the selected face regions. |
 
 A tool is available only when all of its required bundles are installed, except OCR: its built-in `fast` tier remains available without the optional OCR pack. Partial installs are valid and are handled incrementally: installed bundles are reused, missing bundles are shown as downloads, and queued installs run one at a time so the shared Python environment is not modified concurrently.
+
+### Installing every bundle at once {#installing-every-bundle-at-once}
+
+Settings, AI Features has an **Install All** button that queues every bundle the host can run. It skips anything already installed, skips bundles reported incompatible with the host, and retries a failed bundle once before moving on. For a normal instance that button is the whole answer, and nothing below is needed.
+
+Budget the disk first. Together the bundles are roughly 20-25 GB installed, and they land in `/data/ai` on the data volume rather than in the image, so they survive `docker compose down` and container recreation. You install them once per host, not once per upgrade.
+
+For unattended provisioning where nobody is going to click anything, POST each bundle to the install endpoint with an admin API key. The server queues them, so send all eight without waiting:
+
+```bash
+KEY=si_your_admin_key
+for b in background-removal face-detection object-eraser-colorize inpaint-hq \
+         upscale-enhance photo-restoration ocr transcription; do
+  curl -sX POST -H "Authorization: Bearer $KEY" \
+    http://localhost:1349/api/v1/admin/features/$b/install
+done
+```
+
+Each call returns `202` with a `jobId` and a `queued` flag: `false` for the one that starts immediately, `true` for the rest. A bundle that is already installed returns `409` and is safe to ignore, which makes the loop re-runnable. Poll `GET /api/v1/features` for progress; every bundle reads `installed` when the run is done.
+
+Two things to expect. The `ocr` bundle runs a host-compatibility preflight and refuses hosts below its signed minimum, so it can fail while the other seven succeed (see [Accurate OCR runtime installation](#accurate-ocr-runtime-installation)). And `POST /api/v1/admin/features/reset` returns `409` while any install is in progress, so a run that is part way through has to finish or the container has to be restarted before the environment can be wiped.
 
 ### Accurate OCR runtime installation {#accurate-ocr-runtime-installation}
 
