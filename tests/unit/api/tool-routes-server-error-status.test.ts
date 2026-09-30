@@ -9,17 +9,27 @@ import multipart from "@fastify/multipart";
 import { apiToolPath, hasServerErrorStatus, SafeError } from "@snapotter/shared";
 import Fastify from "fastify";
 import sharp from "sharp";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
+const getObjectBuffer = vi.fn();
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
   putObject: (...args: unknown[]) => putObject(...args),
-  getObjectBuffer: vi.fn(),
+  getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
+}));
+
+vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
+  isBrowserAvailable: () => true,
+  captureHtml: async () => Buffer.from("png"),
+  capturePage: async () => Buffer.from("png"),
 }));
 
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
+import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
+import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
+import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 
 const SVG = Buffer.from(
@@ -153,5 +163,108 @@ describe("compare", () => {
     expect(res.statusCode).toBe(422);
     expect(res.json().error).toBe("Comparison failed");
     await app.close();
+  });
+});
+
+// #1671: routes #1667 didn't reach. Each one stores (or, for passport-photo
+// generate, reads back) inside the same kind of catch-all.
+describe("json-bodied routes", () => {
+  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+
+  beforeEach(() => {
+    putObject.mockReset();
+    getObjectBuffer.mockReset();
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const point = { x: 0.5, y: 0.5 };
+  const passportBody = {
+    jobId: "job",
+    filename: "face.png",
+    countryCode: "US",
+    landmarks: {
+      leftEye: point,
+      rightEye: point,
+      eyeCenter: point,
+      chin: point,
+      forehead: point,
+      crown: point,
+      nose: point,
+      faceCenterX: 0.5,
+    },
+    imageWidth: 100,
+    imageHeight: 100,
+  };
+
+  const cases = [
+    {
+      name: "qr-generate",
+      register: registerQrGenerate,
+      url: "/api/v1/tools/image/qr-generate",
+      payload: { text: "hello" },
+      fail: putObject,
+      error: "QR code generation failed",
+    },
+    {
+      name: "html-to-image",
+      register: registerHtmlToImage,
+      url: "/api/v1/tools/image/html-to-image",
+      payload: { html: "<p>hi</p>" },
+      fail: putObject,
+      error: "Screenshot capture failed",
+    },
+    {
+      name: "passport-photo generate",
+      register: registerPassportPhoto,
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+      fail: getObjectBuffer,
+      error: "Passport photo generation failed",
+    },
+  ];
+
+  for (const c of cases) {
+    it(`${c.name} surfaces a storage 503 with its code instead of answering 422`, async () => {
+      c.fail.mockImplementation(async () => {
+        throw storageDown();
+      });
+      app = await buildApp(c.register);
+      const res = await app.inject({ method: "POST", url: c.url, payload: c.payload });
+      expect(res.statusCode).toBe(503);
+      expect(res.json().code).toBe("STORAGE_UNAVAILABLE");
+      expect(c.fail).toHaveBeenCalled();
+    });
+
+    it(`${c.name} still answers 422 for an ordinary failure`, async () => {
+      c.fail.mockImplementation(async () => {
+        throw new Error("bad input");
+      });
+      app = await buildApp(c.register);
+      const res = await app.inject({ method: "POST", url: c.url, payload: c.payload });
+      expect(res.statusCode).toBe(422);
+      expect(res.json().error).toBe(c.error);
+      expect(c.fail).toHaveBeenCalled();
+    });
+  }
+
+  it("html-to-image answers a storage fault that mentions a timeout as storage, not a slow page", async () => {
+    putObject.mockImplementation(async () => {
+      throw new SafeError("Storage write timeout.", {
+        statusCode: 503,
+        code: "STORAGE_UNAVAILABLE",
+      });
+    });
+    app = await buildApp(registerHtmlToImage);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/html-to-image",
+      payload: { html: "<p>hi</p>" },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().code).toBe("STORAGE_UNAVAILABLE");
   });
 });

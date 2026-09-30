@@ -562,6 +562,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         return reply.send(response);
       } catch (err) {
+        if (hasServerErrorStatus(err)) throw err;
         request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
         return reply.status(422).send({
           error: "Passport photo generation failed",

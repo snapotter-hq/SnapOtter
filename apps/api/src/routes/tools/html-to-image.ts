@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { captureHtml, capturePage, isBrowserAvailable } from "../../lib/browser-service.js";
@@ -105,6 +106,7 @@ export function registerHtmlToImage(app: FastifyInstance) {
           processedSize: buffer.length,
         });
       } catch (err) {
+        if (hasServerErrorStatus(err)) throw err;
         const message = err instanceof Error ? err.message : "Unknown error";
 
         if (message.includes("Timeout") || message.includes("timeout")) {

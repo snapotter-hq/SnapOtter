@@ -79,6 +79,7 @@ export function registerContentAwareResize(app: FastifyInstance) {
         if (err instanceof InputValidationError) {
           return sendInputValidationError(reply, err, "content-aware-resize", request.log);
         }
+        if (hasServerErrorStatus(err)) throw err;
         return reply.status(422).send({
           error: "Failed to prepare image",
           details: friendlyError(err instanceof Error ? err.message : String(err)),

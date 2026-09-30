@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import sharp from "sharp";
@@ -105,6 +106,7 @@ export function registerQrGenerate(app: FastifyInstance) {
           processedSize: buffer.length,
         });
       } catch (err) {
+        if (hasServerErrorStatus(err)) throw err;
         return reply.status(422).send({
           error: "QR code generation failed",
           details: err instanceof Error ? err.message : "Unknown error",
