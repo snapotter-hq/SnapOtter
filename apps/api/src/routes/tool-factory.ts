@@ -709,13 +709,16 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               request.log.warn({ err: readErr, jobId }, "failed job row read failed");
               return null;
             });
-          if (typeof failure?.status === "number") {
-            const logLevel = failure.status >= 500 ? "error" : "info";
-            request.log[logLevel]({ err, toolId: config.toolId }, "tool rejected input");
+          if (typeof failure?.httpStatus === "number") {
+            if (failure.httpStatus >= 500) {
+              request.log.error({ err, toolId: config.toolId }, "tool processing failed");
+            } else {
+              request.log.info({ err, toolId: config.toolId }, "tool rejected input");
+            }
             const body: Record<string, unknown> = { error: failure.message };
             if (failure.details !== undefined) body.details = failure.details;
             if (failure.code) body.code = failure.code;
-            return reply.status(failure.status).send(body);
+            return reply.status(failure.httpStatus).send(body);
           }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.

@@ -802,7 +802,7 @@ describe("createToolRoute", () => {
     it("answers the status the worker recorded for rejected input", async () => {
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Start is past the end"));
       jobRows.rows = [
-        { error: { message: "Start is past the end", code: "OUT_OF_RANGE", status: 400 } },
+        { error: { message: "Start is past the end", code: "OUT_OF_RANGE", httpStatus: 400 } },
       ];
       const app = createMockApp();
       const id = "resize";

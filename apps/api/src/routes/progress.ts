@@ -59,6 +59,8 @@ export interface SingleFileProgress {
   code?: string;
   /** Operator hint that goes with `code` ("Check QPDF_PATH ..."). */
   details?: string;
+  /** HTTP status for rejected input, which a route waiting on the job answers (#1742). */
+  httpStatus?: number;
   result?: Record<string, unknown>;
 }
 
@@ -302,11 +304,13 @@ function singleFileErrorRow(progress: Omit<SingleFileProgress, "type">): {
   message: string;
   code?: string;
   details?: string;
+  httpStatus?: number;
 } {
   return {
     message: progress.error ?? "",
     ...(progress.code && { code: progress.code }),
     ...(progress.details && { details: progress.details }),
+    ...(progress.httpStatus !== undefined && { httpStatus: progress.httpStatus }),
   };
 }
 

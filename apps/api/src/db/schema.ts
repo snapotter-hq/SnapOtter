@@ -136,7 +136,7 @@ export const jobs = pgTable(
       message: string;
       details?: unknown;
       code?: string;
-      status?: number;
+      httpStatus?: number;
     }>(),
     bytesIn: bigint("bytes_in", { mode: "number" }),
     bytesOut: bigint("bytes_out", { mode: "number" }),
