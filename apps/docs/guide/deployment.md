@@ -43,6 +43,14 @@ services:
       # --- Bind mount permissions ---
       # - PUID=1000                # Match your host user's UID (run: id -u)
       # - PGID=1000                # Match your host user's GID (run: id -g)
+
+      # --- Engines (empty = the image's own binaries, see Configuration) ---
+      - FFMPEG_PATH=${FFMPEG_PATH:-}
+      - FFPROBE_PATH=${FFPROBE_PATH:-}
+      - QPDF_PATH=${QPDF_PATH:-}
+      - SOFFICE_PATH=${SOFFICE_PATH:-}
+      - PDFCPU_PATH=${PDFCPU_PATH:-}
+      - SNAPOTTER_HW_ACCEL=${SNAPOTTER_HW_ACCEL:-}  # nvenc|vaapi, needs your own ffmpeg build
     depends_on:
       postgres:
         condition: service_healthy
