@@ -261,4 +261,31 @@ test.describe("Automate Page", () => {
     await expect(page.getByText("Original").first()).toBeVisible();
     await expect(page.getByText("Processed").first()).toBeVisible();
   });
+
+  test("a failed pipeline run shows the failure card, not the original", async ({
+    loggedInPage: page,
+  }) => {
+    // #1352: the run's entry has to end at "failed", which is what gates the
+    // result pane's failure card. The side-panel banner alone used to be the
+    // only sign anything went wrong.
+    const message = "Step 1 (compress): target size must be positive";
+    await page.route("**/api/v1/pipeline/execute", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: message }),
+      }),
+    );
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    // The banner renders the message in a <span>; the failure card is the <p>.
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+  });
 });

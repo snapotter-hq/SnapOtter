@@ -235,6 +235,10 @@ describe("usePipelineProcessor cancel (#771)", () => {
     });
     expect(useFileStore.getState().error).toBe("Canceled");
     expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+    });
 
     hook.unmount();
   });
@@ -259,6 +263,10 @@ describe("usePipelineProcessor cancel (#771)", () => {
     expect(useFileStore.getState().error).toBe("Canceled");
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+    });
 
     hook.unmount();
   });
@@ -297,6 +305,10 @@ describe("usePipelineProcessor cancel (#771)", () => {
     });
     expect(useFileStore.getState().error).toBe("Canceled");
     expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+    });
 
     hook.unmount();
   });
@@ -335,6 +347,10 @@ describe("usePipelineProcessor cancel (#771)", () => {
       expect(useFileStore.getState().processing).toBe(false);
     });
     expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+    });
 
     hook.unmount();
   });
