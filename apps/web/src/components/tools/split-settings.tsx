@@ -8,7 +8,12 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
 import { useSplitStore } from "@/stores/split-store";
-import { claimToolResult, splitResultKey } from "@/stores/tool-result-claims";
+import {
+  claimToolResult,
+  claimToolResultItem,
+  splitResultKey,
+  splitTileKey,
+} from "@/stores/tool-result-claims";
 
 const MODES: SplitMode[] = ["grid", "tile-size"];
 
@@ -227,12 +232,10 @@ export function SplitSettings() {
       a.click();
       clearTimeout(downloadingTimer.current);
       downloadingTimer.current = setTimeout(() => setDownloadingIndex(null), 500);
-      // Deliberately claims nothing. One tile is not the set, and the claim is
-      // per tool, so claiming here would drop the warning for the tiles the
-      // user never took. Tracking which tiles have been taken is the right
-      // answer; warning about a tile already downloaded is the safe
-      // approximation until then, because silence is the costlier way to be
-      // wrong.
+      // This tile only. The guard goes quiet once every tile of the run has
+      // been taken, and never on a multi-file run, whose other files' tiles
+      // are only in the zip (splitTileKeys).
+      claimToolResultItem("split", splitTileKey(tile));
     },
     [tiles, files, outputFormat],
   );

@@ -11,6 +11,7 @@ import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useSplitStore } from "@/stores/split-store";
 import {
+  base64FileKey,
   base64ResultKey,
   collageResultKey,
   duplicateResultKey,
@@ -18,9 +19,11 @@ import {
   isUnclaimed,
   memeResultKey,
   passportPhotoResultKey,
+  pdfToImagePageKey,
   pdfToImageResultKey,
   type ResultKey,
   splitResultKey,
+  splitTileKeys,
   useToolResultClaims,
 } from "@/stores/tool-result-claims";
 
@@ -108,6 +111,13 @@ interface OwnStoreWork {
    * (stores/tool-result-claims.ts).
    */
   key: ResultKey;
+  /**
+   * The keys of the result's parts, where the user can take them one at a time
+   * (a tile, a page, one file's text). Taking all of them takes the result.
+   * Absent where there is no such control, or where the parts on screen are
+   * not the whole result (#1127).
+   */
+  items?: readonly ResultKey[];
 }
 
 /**
@@ -183,6 +193,7 @@ export function useWorkInFlight(): WorkReason | null {
   const splitProcessing = useSplitStore((s) => s.processing);
   const splitTiles = useSplitStore((s) => s.tiles);
   const splitZipBlobUrl = useSplitStore((s) => s.zipBlobUrl);
+  const fileCount = useFileStore((s) => s.files.length);
 
   const path = normalizePath(pathname);
 
@@ -194,7 +205,11 @@ export function useWorkInFlight(): WorkReason | null {
       collage: { busy: collagePhase === "processing", key: collageResultKey(collageResultUrl) },
       "find-duplicates": { busy: duplicateScanning, key: duplicateResultKey(duplicateResults) },
       "html-to-image": { busy: captureRunning, key: htmlToImageResultKey(captureResultUrl) },
-      "image-to-base64": { busy: base64Processing, key: base64ResultKey(base64Results) },
+      "image-to-base64": {
+        busy: base64Processing,
+        key: base64ResultKey(base64Results),
+        items: base64Results.map(base64FileKey),
+      },
       "meme-generator": { busy: memeGenerating, key: memeResultKey(memeResultUrl) },
       // Both requests count as a run: the analysis is a face-detection job the
       // user waits on. Only the generated photo counts as a result, though. The
@@ -207,10 +222,12 @@ export function useWorkInFlight(): WorkReason | null {
       "pdf-to-image": {
         busy: pdfToImageProcessing,
         key: pdfToImageResultKey(pdfToImageResults, pdfToImageZipUrl),
+        items: pdfToImageResults?.map(pdfToImagePageKey),
       },
       split: {
         busy: splitProcessing,
         key: splitResultKey(splitTiles, splitZipBlobUrl),
+        items: splitTileKeys(splitTiles, fileCount),
       },
     };
 
@@ -225,7 +242,9 @@ export function useWorkInFlight(): WorkReason | null {
       // three plain urls, text, a report) to offer as downloads from here.
       // Quiet once the user has taken this result, and loud again the moment a
       // run produces another one (#1123).
-      if (own && isUnclaimed(own.key, claimed[toolId])) return { kind: "unsaved", downloads: [] };
+      if (own && isUnclaimed(own.key, claimed[toolId], own.items)) {
+        return { kind: "unsaved", downloads: [] };
+      }
     }
 
     if (processing) return { kind: "processing" };
