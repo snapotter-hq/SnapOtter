@@ -694,7 +694,7 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
     try {
       expect(() => act(() => respond(200, JSON.stringify(RESULT)))).toThrow("root cause");
       expect(consoleError).toHaveBeenCalledWith(
-        "Ending the run after a result handling error failed",
+        "Ending the run failed",
         expect.objectContaining({ message: "teardown broke" }),
       );
       // Every teardown step still ran: the run is released for good.
@@ -1054,6 +1054,183 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
     expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().entries[0].status).toBe("processing");
+    unmount();
+  });
+});
+
+/**
+ * #1791: every sync exit ends the run through one guarded teardown. When the
+ * error write throws (a store listener that breaks, #1354), the writes after
+ * it used to be skipped: the entry stayed at "processing", so the tool page
+ * kept pulsing on the untouched original with no failure screen (#799), and
+ * the run's job ref kept pointing at a run that was over.
+ */
+describe("useToolProcessor ends a sync run whose error write throws (#1791)", () => {
+  const INTERRUPTED = "Processing was interrupted. Retry when reconnected.";
+  const TIMED_OUT = "Request timed out - the server may be overloaded. Try again.";
+  const RESULT = {
+    jobId: "server-job",
+    downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+    originalSize: 64,
+    processedSize: 32,
+  };
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let unsubscribe: (() => void) | null = null;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = null;
+    consoleError.mockRestore();
+  });
+
+  function startRun() {
+    const file = new File([new ArrayBuffer(64)], "clip.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+    return hook;
+  }
+
+  // Throws once, from the write that moves the store's error from null to set.
+  function breakErrorWrite() {
+    unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.error === null && state.error !== null) throw new Error("error write broke");
+    });
+  }
+
+  function respond(status: number, body: string) {
+    return () => {
+      xhrs[0].status = status;
+      xhrs[0].responseText = body;
+      xhrs[0].onload?.();
+    };
+  }
+
+  // The run's own job ref is released too: a cancel after the run ended has
+  // no job left to cancel, so it never reaches the server.
+  async function expectJobReleased(cancel: () => Promise<void>) {
+    await act(async () => {
+      await cancel();
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  }
+
+  it.each([
+    ["an app error response", respond(500, JSON.stringify({ error: "boom" })), "error", null],
+    [
+      "an error response whose body is not JSON",
+      respond(500, "<html>oops</html>"),
+      "Processing failed: 500",
+      null,
+    ],
+    [
+      "a 413",
+      respond(413, "<html>413 Request Entity Too Large</html>"),
+      en.errors.fileTooLarge,
+      "upload_error",
+    ],
+    [
+      "a 2xx body that does not parse",
+      respond(200, "<html>not json</html>"),
+      "Invalid response from server",
+      null,
+    ],
+    [
+      "a pre-upload 502 with a non-JSON body",
+      respond(502, "<html>bad gateway</html>"),
+      "Processing failed: 502",
+      null,
+    ],
+    ["the socket dying mid-upload", () => xhrs[0].onerror?.(), INTERRUPTED, null],
+    ["a client timeout mid-upload", () => xhrs[0].ontimeout?.(), TIMED_OUT, null],
+  ])(
+    "fails the entry on %s when the error write throws",
+    async (_label, fire, message, category) => {
+      const { result, unmount } = startRun();
+      breakErrorWrite();
+
+      // The listener's throw still surfaces, so it reaches Sentry.
+      expect(() => act(fire)).toThrow("error write broke");
+      // act() skips its flush when the callback throws, so render first.
+      act(() => {});
+
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: message,
+        errorCategory: category,
+      });
+      expect(useFileStore.getState().error).toBe(message);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(result.current.progress.phase).toBe("idle");
+      await expectJobReleased(result.current.cancelCurrentJob);
+
+      unmount();
+    },
+  );
+
+  it("fails the entry and rethrows the first error when every write in the teardown throws", async () => {
+    const { result, unmount } = startRun();
+    // Zustand commits each write before its listeners run, so every write
+    // lands and every listener call throws. Numbered, so the rethrow can be
+    // told apart from the ones that are only logged.
+    let writes = 0;
+    unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "first write broke" : "store broke");
+    });
+
+    expect(() => act(() => xhrs[0].onerror?.())).toThrow("first write broke");
+    act(() => {});
+    expect(consoleError).toHaveBeenCalledWith(
+      "Ending the run failed",
+      expect.objectContaining({ message: "store broke" }),
+    );
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: INTERRUPTED,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe(INTERRUPTED);
+    expect(consoleError).toHaveBeenCalledWith(
+      "Failing the run's entry failed",
+      expect.objectContaining({ message: "store broke" }),
+    );
+    unsubscribe();
+    unsubscribe = null;
+    await expectJobReleased(result.current.cancelCurrentJob);
+
+    unmount();
+  });
+
+  it("releases a landed run when turning processing off throws", async () => {
+    const { result, unmount } = startRun();
+    unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.processing && !state.processing) throw new Error("processing write broke");
+    });
+
+    expect(() => act(respond(200, JSON.stringify(RESULT)))).toThrow("processing write broke");
+    act(() => {});
+
+    // The result landed, and stays.
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT.downloadUrl,
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(result.current.resultPayload).toMatchObject({ downloadUrl: RESULT.downloadUrl });
+    await expectJobReleased(result.current.cancelCurrentJob);
+
     unmount();
   });
 });

@@ -748,6 +748,36 @@ export function useToolProcessor(toolId: string) {
         }
       };
 
+      // Every sync exit ends the run here, so none of them can stop halfway
+      // (#1791). clearActiveJob goes first because it nulls the run's refs
+      // before its own store write, and each write gets its own guard: a
+      // store listener that throws on the error write would otherwise skip
+      // the rest and leave the entry pulsing at "processing" with the job
+      // ref still pointing at a run that's over. Failing the entry goes last
+      // (#1698). Returns the first teardown error, for the caller to rethrow
+      // so it still reaches Sentry.
+      const endSyncRun = (
+        failure: { message: string; category?: FeedbackErrorCategory } | null,
+      ): { cause: unknown } | null => {
+        setProgress(IDLE_PROGRESS);
+        let firstError: { cause: unknown } | null = null;
+        const steps = [
+          clearActiveJob,
+          ...(failure ? [() => setError(failure.message)] : []),
+          () => setProcessing(false),
+        ];
+        for (const step of steps) {
+          try {
+            step();
+          } catch (cause) {
+            console.error("Ending the run failed", cause);
+            firstError ??= { cause };
+          }
+        }
+        if (failure) failEntry(failure.message, failure.category);
+        return firstError;
+      };
+
       // Writes a sync 2xx result the way the SSE completion branch does.
       // Any throw from here is ours, not the server's (#1354).
       const landSyncResult = (result: ProcessResult) => {
@@ -850,37 +880,15 @@ export function useToolProcessor(toolId: string) {
 
         if (handlingError) {
           // The run is over whatever threw. A second throw from the teardown
-          // must not replace the root cause, and the entry settle goes last
-          // on its own: it's the same store write that may have just thrown.
-          // A throw after updateEntry (markClaimed) leaves the entry completed
-          // under the error: the result did land, so failEntry keeps it.
-          // clearActiveJob goes first because it nulls the run's refs before
-          // its own store write, and each write gets its own guard: a store
-          // listener that throws on every write would otherwise stop the
-          // teardown at the first one and leave the cancel handle armed.
-          setProgress(IDLE_PROGRESS);
-          for (const step of [
-            clearActiveJob,
-            () => setError(FRAME_HANDLING_FAILED),
-            () => setProcessing(false),
-          ]) {
-            try {
-              step();
-            } catch (teardownErr) {
-              console.error("Ending the run after a result handling error failed", teardownErr);
-            }
-          }
-          failEntry(FRAME_HANDLING_FAILED);
+          // must not replace the root cause. A throw after updateEntry
+          // (markClaimed) leaves the entry completed under the error: the
+          // result did land, so failEntry keeps it.
+          endSyncRun({ message: FRAME_HANDLING_FAILED });
           throw handlingError.cause;
         }
 
-        if (failure) setError(failure.message);
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        clearActiveJob();
-        // Last: failing the entry is a store write that may throw, and the
-        // run has to end regardless (#1698).
-        if (failure) failEntry(failure.message, failure.category);
+        const teardownError = endSyncRun(failure);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.onerror = () => {
@@ -895,12 +903,10 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        const message = "Processing was interrupted. Retry when reconnected.";
-        setError(message);
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        clearActiveJob();
-        failEntry(message);
+        const teardownError = endSyncRun({
+          message: "Processing was interrupted. Retry when reconnected.",
+        });
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.ontimeout = () => {
@@ -912,12 +918,10 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current.close();
           eventSourceRef.current = null;
         }
-        const message = "Request timed out - the server may be overloaded. Try again.";
-        setError(message);
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        clearActiveJob();
-        failEntry(message);
+        const teardownError = endSyncRun({
+          message: "Request timed out - the server may be overloaded. Try again.",
+        });
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.open("POST", appUrl(apiToolPath(toolId)));
