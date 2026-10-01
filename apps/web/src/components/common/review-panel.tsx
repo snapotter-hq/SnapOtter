@@ -1,6 +1,6 @@
 import { ANALYTICS_EVENTS, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { AlertCircle, ArrowLeft, CheckCircle2, Download, FileText, FolderPlus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
@@ -12,6 +12,7 @@ import { format } from "@/lib/format";
 import { IGNORE_ERRORS } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
+import { type SaveFailure, useSaveToFilesStore } from "@/stores/save-to-files-store";
 import { ToolFeedbackPrompt } from "../feedback/tool-feedback-prompt";
 
 /** Tools whose primary output is text/data, not a downloadable file. */
@@ -59,20 +60,6 @@ function isIgnoredNetworkError(err: unknown): boolean {
       typeof pattern === "string" ? text.includes(pattern) : pattern.test(text),
     ),
   );
-}
-
-/**
- * Why a save failed, when the server said. "expired" (the result is gone) and
- * "tooLarge" (over the upload limit) can't succeed on a retry; "quota" can,
- * once the user frees some space. "generic" is everything else (#1350).
- */
-type SaveFailure = "expired" | "quota" | "tooLarge" | "generic";
-
-/** One result's save attempt. A result with no entry has never been saved. */
-interface SaveState {
-  status: "saving" | "saved" | "error";
-  /** Only read while `status` is "error". */
-  failure: SaveFailure;
 }
 
 /** What a failed library upload was about. Only 413s have a reason to show. */
@@ -141,44 +128,22 @@ export function ReviewPanel({
     useFileStore.getState().claimSelected();
   };
 
-  // The panel isn't remounted when it moves to another result (the thumbnail
-  // strip, or a re-run), so save state is kept per result, keyed by its URL.
-  // A save that ends after the user moved on lands on the result it was for,
-  // and coming back to a saved result still says so (#1502).
-  const [saveStates, setSaveStates] = useState<ReadonlyMap<string, SaveState>>(() => new Map());
-  const setSaveState = useCallback((url: string, state: SaveState | null) => {
-    setSaveStates((prev) => {
-      const next = new Map(prev);
-      if (state) next.set(url, state);
-      else next.delete(url);
-      return next;
-    });
-  }, []);
-  const saveStatus = saveStates.get(downloadUrl)?.status ?? "idle";
-  const saveFailure = saveStates.get(downloadUrl)?.failure ?? "generic";
-  // A generic error label resets itself after a few seconds. A retry clears
-  // the pending reset, or it would flip a retry's "Saved" back to an enabled
-  // button and invite a duplicate save.
-  const errorResetsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  useEffect(() => {
-    const timers = errorResetsRef.current;
-    return () => {
-      for (const timer of timers.values()) clearTimeout(timer);
-    };
-  }, []);
+  // Per result, keyed by its URL, in a store that outlives this panel (#1502).
+  const saveState = useSaveToFilesStore((s) => s.byUrl[downloadUrl]);
+  const saveStatus = saveState?.status ?? "idle";
+  const saveFailure = saveState?.status === "error" ? saveState.failure : "generic";
 
   const handleSaveToFiles = useCallback(async () => {
     // Capture before the awaits below: the thumbnail strip can move the
-    // selection while the upload is in flight, and the claim must land on the
-    // entry that was actually saved.
+    // selection while the upload is in flight, and the outcome and the claim
+    // must land on the result that was actually saved.
     const claimIndex = useFileStore.getState().selectedIndex;
     const url = downloadUrl;
-    clearTimeout(errorResetsRef.current.get(url));
-    errorResetsRef.current.delete(url);
-    setSaveState(url, { status: "saving", failure: "generic" });
+    const saves = useSaveToFilesStore.getState();
+    saves.saving(url);
     let failure: SaveFailure = "generic";
     try {
-      const res = await fetch(downloadUrl);
+      const res = await fetch(url);
       // An expired or missing result answers with an error page. Uploading
       // that body would put a broken file in the library and say "Saved"
       // (#1286). The message stays constant; captureHandledError tags the
@@ -208,7 +173,7 @@ export function ReviewPanel({
           statusCode: uploadRes.status,
         });
       }
-      setSaveState(url, { status: "saved", failure: "generic" });
+      saves.saved(url);
       useFileStore.getState().markClaimed(claimIndex);
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
@@ -229,20 +194,9 @@ export function ReviewPanel({
           { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
         );
       }
-      setSaveState(url, { status: "error", failure });
-      // A reason stays on screen: it tells the user what to do, and the
-      // generic label's reset would hand back a button that fails the same way.
-      if (failure === "generic") {
-        errorResetsRef.current.set(
-          url,
-          setTimeout(() => {
-            errorResetsRef.current.delete(url);
-            setSaveState(url, null);
-          }, 3000),
-        );
-      }
+      saves.failed(url, failure);
     }
-  }, [downloadUrl, filename, fileType, currentToolId, setSaveState]);
+  }, [downloadUrl, filename, fileType, currentToolId]);
 
   const hasBatchStats =
     totalCount != null && totalCount > 1 && successCount != null && failedCount != null;

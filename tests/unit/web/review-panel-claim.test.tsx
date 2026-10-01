@@ -23,6 +23,7 @@ vi.mock("@/components/feedback/tool-feedback-prompt", () => ({
 
 import { ReviewPanel } from "@/components/common/review-panel";
 import { useFileStore } from "@/stores/file-store";
+import { useSaveToFilesStore } from "@/stores/save-to-files-store";
 
 afterEach(() => {
   cleanup();
@@ -38,6 +39,9 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
+  // Save state is per result URL and outlives the panel (#1502); every test
+  // here renders the same URL.
+  useSaveToFilesStore.getState().reset();
 });
 
 function renderPanel() {

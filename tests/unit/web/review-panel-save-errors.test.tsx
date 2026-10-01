@@ -19,6 +19,7 @@ vi.mock("@/components/feedback/tool-feedback-prompt", () => ({
 
 import { ReviewPanel } from "@/components/common/review-panel";
 import { useFileStore } from "@/stores/file-store";
+import { useSaveToFilesStore } from "@/stores/save-to-files-store";
 
 const RESULT_URL = "/api/v1/download/job-1/a-resized.png";
 const UPLOAD_URL = "/api/v1/files/upload";
@@ -36,6 +37,9 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
+  // Save state is per result URL and outlives the panel (#1502); every test
+  // here starts on the same URL.
+  useSaveToFilesStore.getState().reset();
 });
 
 afterEach(() => {
@@ -459,7 +463,7 @@ describe("ReviewPanel Save to Files failure reasons (#1350)", () => {
     expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
   });
 
-  it("clears an expired result's message when the panel moves to another result", async () => {
+  it("doesn't show an expired result's message on the next result", async () => {
     stubFetch(
       () => Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
       () => Promise.resolve({ ok: true, status: 201 }),
@@ -703,7 +707,7 @@ describe("ReviewPanel save state per result (#1502)", () => {
     expect(saveButtonNamed(en.toolPage.resultExpired).disabled).toBe(true);
   });
 
-  it("resets a generic error on the result it happened to, even after a switch", async () => {
+  it("keeps a generic error on its result across a quick switch, then resets it", async () => {
     vi.useFakeTimers();
     vi.stubGlobal(
       "fetch",
@@ -712,14 +716,119 @@ describe("ReviewPanel save state per result (#1502)", () => {
 
     const view = renderPanel();
     await clickSave();
-    expect(screen.getByText(en.common.error)).toBeTruthy();
     view.rerender(panel("resize", OTHER_URL));
-
     await act(async () => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(1000);
     });
     view.rerender(panel("resize", RESULT_URL));
+    expect(screen.getByText(en.common.error)).toBeTruthy();
 
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+  });
+
+  it("resets a generic error without touching the result shown when its timer runs out", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === RESULT_URL
+          ? failedResult(500)()
+          : input === OTHER_URL
+            ? okResult()
+            : Promise.resolve({ ok: true, status: 201 }),
+      ),
+    );
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(panel("resize", OTHER_URL));
+    await clickSave();
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+    view.rerender(panel("resize", RESULT_URL));
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+  });
+
+  // A failure that lands while another result is shown belongs to the result
+  // the user clicked on, and is there when they come back.
+  it.each([
+    [
+      "expired",
+      failedResult(404),
+      () => Promise.resolve({ ok: true, status: 201 }),
+      en.toolPage.resultExpired,
+      true,
+    ],
+    [
+      "library full",
+      okResult,
+      () => Promise.resolve(quotaResponse()),
+      en.toolPage.libraryFull,
+      false,
+    ],
+  ])(
+    "shows a late %s failure on its own result when the user comes back",
+    async (_label, result, upload, label, disabled) => {
+      let finish: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string) =>
+          input === RESULT_URL ? gate.then(result) : input === OTHER_URL ? okResult() : upload(),
+        ),
+      );
+
+      const view = renderPanel();
+      await clickSave();
+      view.rerender(panel("resize", OTHER_URL));
+      await act(async () => {
+        finish();
+      });
+      expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+
+      view.rerender(panel("resize", RESULT_URL));
+      expect(saveButtonNamed(label).disabled).toBe(disabled);
+    },
+  );
+
+  // tool-page renders no panel for a result with nothing to show (a failed
+  // batch entry), so the state has to outlive the panel.
+  it("still says Saved after the panel unmounts and comes back", async () => {
+    stubTwoResults(() => Promise.resolve({ ok: true, status: 201 }));
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(<MemoryRouter />);
+    expect(screen.queryByText(en.toolPage.savedToFiles)).toBeNull();
+
+    view.rerender(panel());
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+  });
+
+  it("lands a save that ends while the panel is unmounted", async () => {
+    const { upload, finish } = gatedUpload();
+    const fetchMock = stubTwoResults(upload);
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(<MemoryRouter />);
+    await act(async () => {
+      finish();
+    });
+
+    view.rerender(panel());
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+    expect(uploadCalls(fetchMock)).toHaveLength(1);
+    expect(useFileStore.getState().entries[0].claimed).toBe(true);
   });
 });
