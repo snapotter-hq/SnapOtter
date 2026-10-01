@@ -2682,6 +2682,43 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         expect(details).not.toHaveProperty("movedMembers");
       });
 
+      it("finds Default by name, so a resync isn't read as moves when its id isn't the seed's", async () => {
+        // The seed is skipped when another team already holds the name, so the
+        // team named "Default" can have any id (#1474). PUT parks members there
+        // before re-adding them, and that must not read as a move.
+        const seededName = uniqueName("scim-1747-seed");
+        const otherDefault = `team-${randomUUID()}`;
+        await db
+          .update(schema.teams)
+          .set({ name: seededName })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+        try {
+          await db.insert(schema.teams).values({ id: otherDefault, name: "Default" });
+          const user = await createScimUser({ userName: uniqueName("scim-1747-named") });
+          const group = await createScimGroup({
+            displayName: uniqueName("scim-1747-named"),
+            members: [{ value: user.id }],
+          });
+          const res = await send("PUT", `Groups/${group.id}`, {
+            displayName: group.displayName,
+            members: [{ value: user.id }],
+          });
+
+          expect(res.statusCode, res.body).toBe(200);
+          expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+        } finally {
+          await db
+            .update(schema.users)
+            .set({ team: DEFAULT_TEAM_ID })
+            .where(eq(schema.users.team, otherDefault));
+          await db.delete(schema.teams).where(eq(schema.teams.id, otherDefault));
+          await db
+            .update(schema.teams)
+            .set({ name: "Default" })
+            .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+        }
+      });
+
       it("doesn't count re-adding a group's own member as a move", async () => {
         const user = await createScimUser({ userName: uniqueName("scim-1747-own") });
         const group = await createScimGroup({
