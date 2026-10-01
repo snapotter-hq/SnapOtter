@@ -1516,8 +1516,9 @@ test.describe("Processing State Cleanup", () => {
     await expect(cancel).toBeVisible({ timeout: 15_000 });
     releaseFrame();
 
-    // The banner renders the message in a <span>; the failure card is the <p>.
-    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+    // The settings form shows the error too; the failure card is the one in
+    // the preview area, and it only renders once the entry is "failed".
+    await expect(page.getByLabel("Preview area").getByText(message)).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
