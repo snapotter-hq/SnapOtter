@@ -3,6 +3,7 @@ import { ANALYTICS_EVENTS, CATEGORIES, SECTIONS, TOOLS, toolSection } from "@sna
 import { ChevronDown, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { SearchShortcutHint } from "@/components/common/search-shortcut-hint.js";
 import { ToolCard } from "@/components/common/tool-card.js";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.js";
 import { AppLayout } from "@/components/layout/app-layout.js";
@@ -283,9 +284,7 @@ function HomeSearchBar({
           <X className="h-4 w-4 text-muted-foreground" />
         </button>
       ) : (
-        <kbd className="absolute end-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 rounded border border-border bg-muted/50 text-[11px] text-muted-foreground font-mono">
-          <span className="text-xs">&#8984;</span>K
-        </kbd>
+        <SearchShortcutHint />
       )}
     </div>
   );
