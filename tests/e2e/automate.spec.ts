@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, getTestImagePath, test } from "./helpers";
 
 test.describe("Automate Page", () => {
@@ -304,6 +305,44 @@ test.describe("Automate Page", () => {
       timeout: 15_000,
     });
     await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+  });
+
+  test("a failed batch replaces the previous batch's result with the failure card", async ({
+    loggedInPage: page,
+  }) => {
+    // #1699: a batch never reset its entries, so after a good batch a failed
+    // one left the old result on screen as if this run had produced it.
+    test.setTimeout(90_000);
+    const fixture = (name: string) =>
+      path.join(process.cwd(), "tests", "fixtures", "image", "valid", name);
+    await gotoAutomate(page);
+    await addToolStep(page, "Remove Image Metadata", 1);
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /upload from computer/i }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([fixture("test-100x100.jpg"), fixture("qr-code.png")]);
+
+    const processAll = page.getByRole("button", { name: /^Process all/i });
+    await processAll.click();
+    const slider = page.locator("[aria-label='Before/after comparison slider']");
+    await expect(slider).toBeVisible({ timeout: 60_000 });
+
+    const message = "Step 1 (strip-metadata): the server refused this batch";
+    await page.route("**/api/v1/pipeline/batch", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: message }),
+      }),
+    );
+    await processAll.click();
+
+    // The banner renders the message in a <span>; the failure card is the <p>.
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(slider).toHaveCount(0);
+    await expect(processAll).toBeEnabled();
   });
 
   test("a 200 with no download URL shows the failure card", async ({ loggedInPage: page }) => {

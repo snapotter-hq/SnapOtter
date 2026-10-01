@@ -1383,3 +1383,274 @@ describe("usePipelineProcessor batch failure message (#1432)", () => {
     unmount();
   });
 });
+
+/**
+ * #1699: a batch run never reset the entries it was about to process, and a
+ * run-level failure never touched them, so whatever an earlier run left on an
+ * entry (its result URL, size, "completed") survived a failed batch and the
+ * Automate result pane kept showing it as this run's output. The batch now
+ * marks its entries "processing" with their old results cleared at kickoff,
+ * and every failure exit settles what is still "processing" as failed.
+ */
+describe("usePipelineProcessor batch entry settle (#1699)", () => {
+  const BATCH_FAILED = "Processing was interrupted. Retry when reconnected.";
+
+  function respondZip(index: number, names: Record<string, string> = ZIP_NAMES) {
+    xhrs[index].upload.onload?.();
+    xhrs[index].status = 200;
+    xhrs[index].response = zipBlob();
+    xhrs[index].getResponseHeader = vi.fn((name: string) =>
+      name === "X-File-Results" ? encodeURIComponent(JSON.stringify(names)) : null,
+    );
+    xhrs[index].onload?.();
+  }
+
+  function respondError(index: number, status: number, body: string) {
+    xhrs[index].upload.onload?.();
+    xhrs[index].status = status;
+    xhrs[index].response = body;
+    xhrs[index].onload?.();
+  }
+
+  function expectBatchFailed(message: string) {
+    expect(useFileStore.getState().error).toBe(message);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry).toMatchObject({
+        status: "failed",
+        error: message,
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+      });
+    }
+  }
+
+  it("fails every entry of a failed batch instead of keeping a successful batch's results", async () => {
+    let urlCount = 0;
+    vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:result-${urlCount++}`);
+    const { result, unmount } = startBatchRun();
+    act(() => respondZip(0));
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    const firstUrls = useFileStore.getState().entries.map((e) => e.processedUrl);
+    expect(new Set(firstUrls).size).toBe(2);
+
+    act(() => {
+      void result.current.processAll(useFileStore.getState().files, STEPS);
+    });
+    // The rerun starts from a clean slate: no earlier result can render as
+    // this run's while it is in flight.
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry).toMatchObject({ status: "processing", processedUrl: null, error: null });
+    }
+    // The old results' blob URLs are released, not leaked.
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(firstUrls[0]);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(firstUrls[1]);
+
+    act(() => respondError(1, 422, JSON.stringify({ error: "Step 1 (resize): bad width" })));
+
+    // parseApiError is mocked to "error" in this file.
+    await settled(() => expectBatchFailed("error"));
+    unmount();
+  });
+
+  it("fails an entry a single run completed when the batch after it fails", async () => {
+    // The issue's repro: one image through a single run, a second image
+    // added, then a batch the server rejects.
+    const { result, unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        ...SINGLE_RESULT,
+        previewUrl: `/api/v1/download/${JOB_ID}/preview.webp`,
+      });
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+    });
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new ArrayBuffer(16)], "second.jpg", { type: "image/jpeg" })]);
+    });
+
+    act(() => {
+      void result.current.processAll(useFileStore.getState().files, STEPS);
+    });
+    act(() => respondError(1, 422, JSON.stringify({ error: "Step 1 (resize): bad width" })));
+
+    await settled(() => expectBatchFailed("error"));
+    // The pane's processedUrl selector follows the selected entry, so the
+    // single run's result is gone from screen too.
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    // A server-side result URL is not a blob this page owns.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(SINGLE_RESULT.downloadUrl);
+    unmount();
+  });
+
+  it("fails every entry when the socket dies mid-upload", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+
+    expectBatchFailed(BATCH_FAILED);
+    unmount();
+  });
+
+  it("fails every entry when the request times out mid-upload", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].ontimeout?.();
+    });
+
+    expectBatchFailed("Request timed out - the server may be overloaded. Try again.");
+    unmount();
+  });
+
+  it("fails every entry with Canceled on a canceled batch response", async () => {
+    const { unmount } = startBatchRun();
+    act(() => respondError(0, 422, JSON.stringify({ error: "Canceled", canceled: true })));
+
+    await settled(() => expectBatchFailed("Canceled"));
+    unmount();
+  });
+
+  it("fails every entry on a failed terminal frame after a degrade", async () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      sendBatchFrame({ status: "failed", totalFiles: 2, completedFiles: 2, failedFiles: 2 });
+    });
+
+    await settled(() => expectBatchFailed("All files failed processing"));
+    unmount();
+  });
+
+  it("fails every entry when the server never confirms a degraded batch", () => {
+    vi.useFakeTimers();
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+
+    act(() => {
+      vi.advanceTimersByTime(30_001);
+    });
+
+    expectBatchFailed(
+      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+    );
+    unmount();
+  });
+
+  it("fails every entry with Canceled when the cancel finds no job server-side", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) })),
+    );
+    const { unmount } = startBatchRun();
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    expectBatchFailed("Canceled");
+    unmount();
+  });
+
+  it("clears an earlier result from a file missing from the batch ZIP", async () => {
+    const { result, unmount } = startBatchRun();
+    act(() => respondZip(0));
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+
+    act(() => {
+      void result.current.processAll(useFileStore.getState().files, STEPS);
+    });
+    act(() => respondZip(1, { "0": "first_resize.png" }));
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "File not found in batch results",
+      processedUrl: null,
+      processedPreviewUrl: null,
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    unmount();
+  });
+
+  it("keeps an entry the ZIP already settled when a later write fails the run", async () => {
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    // The first entry lands; writing the second one's result throws, and the
+    // run fails with only the still-unsettled entry swept. Installed before
+    // the run starts, because the batch captures updateEntry at kickoff.
+    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation((i, patch) => {
+      if (i === 1 && patch.status === "completed") throw new Error("store broke");
+      realUpdateEntry(i, patch);
+    });
+    const { unmount } = startBatchRun();
+
+    try {
+      act(() => respondZip(0));
+      await settled(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().error).toBe("Batch processing failed");
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "completed",
+        processedFilename: "first_resize.png",
+      });
+      expect(useFileStore.getState().entries[1]).toMatchObject({
+        status: "failed",
+        error: "Batch processing failed",
+      });
+    } finally {
+      spy.mockRestore();
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      unmount();
+    }
+  });
+
+  it("ends a failed batch even when failing its entries throws", () => {
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = startBatchRun();
+    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      act(() => {
+        xhrs[0].onerror?.();
+      });
+
+      expect(useFileStore.getState().error).toBe(BATCH_FAILED);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().activeJobId).toBeNull();
+      expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failing the run's entry failed",
+        expect.objectContaining({ message: "store broke" }),
+      );
+    } finally {
+      spy.mockRestore();
+      consoleError.mockRestore();
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      unmount();
+    }
+  });
+});
