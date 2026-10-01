@@ -107,13 +107,30 @@ describe("library upload MIME type (#1349)", () => {
     expect(storedMimeType).toBe("application/octet-stream");
   });
 
-  // The XXE payload fails validation on its raw bytes. What gets stored is the
-  // sanitized SVG, so that is what decides the type (#1550).
-  it("stores a sanitized hostile SVG as the SVG it now is", async () => {
+  // What gets stored for a hostile SVG is the sanitized one, so those are the
+  // bytes that decide the type (#1550). The XXE payload still doesn't decode
+  // once sanitized (its &xxe; reference outlives the DOCTYPE), so it keeps
+  // the octet-stream type #1349 gave it.
+  it("stores a sanitized XXE SVG that still doesn't decode without an image type", async () => {
     const { storedMimeType } = await uploadOne({
       filename: "xxe.svg",
-      contentType: "application/octet-stream",
+      contentType: "image/svg+xml",
       content: readFixture(fixtures.security.svgXxeFile),
+    });
+
+    expect(storedMimeType).toBe("application/octet-stream");
+  });
+
+  // A parameter entity pointing off-box fails to decode as uploaded, and the
+  // sanitizer's copy, with the DOCTYPE gone, is a clean SVG.
+  it("stores a hostile SVG that decodes once sanitized as image/svg+xml", async () => {
+    const { storedMimeType } = await uploadOne({
+      filename: "pe.svg",
+      contentType: "application/octet-stream",
+      content: Buffer.from(
+        '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY % p SYSTEM "http://127.0.0.1:1/evil.dtd"> %p;]>' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>',
+      ),
     });
 
     expect(storedMimeType).toBe("image/svg+xml");
