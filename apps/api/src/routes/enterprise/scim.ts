@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
+import { DEFAULT_TEAM_ID } from "../../db/schema.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
@@ -108,34 +109,99 @@ function isGroupRename(op: ScimPatchOp): boolean {
   return op.op.toLowerCase() === "replace" && op.path === "displayName";
 }
 
+/** What a group sync did to its members beyond the plain adds. */
+interface MemberSync {
+  /** Member ids that matched no user, skipped (#1683). */
+  unknown: string[];
+  /** Users taken out of another (non-Default) team to join this one (#1747). */
+  moved: { userId: string; fromTeam: string }[];
+}
+
+function emptyMemberSync(): MemberSync {
+  return { unknown: [], moved: [] };
+}
+
 /**
- * Move each listed user into the team, returning the ids that matched no user.
- * Those are skipped rather than refused: a member deleted here but still in the
- * IdP's group would otherwise fail every sync of that group for good (#1683).
+ * Move each listed user into the team. Ids that match no user are skipped
+ * rather than refused: a member deleted here but still in the IdP's group
+ * would otherwise fail every sync of that group for good (#1683).
+ *
+ * A user has one team, but an IdP puts users in several groups, so the last
+ * group to sync wins and the user leaves the team they were in. That stays the
+ * behaviour (#1747); the move is now reported, so an admin can see why a
+ * team's quota or policy stopped applying to someone. Coming from the Default
+ * team, or re-adding a member the group already has, isn't a move.
  */
 async function addMembers(
-  executor: Pick<typeof db, "update">,
+  executor: Pick<typeof db, "select" | "update">,
   teamId: string,
   members: ScimMember[],
-): Promise<string[]> {
-  const unknown: string[] = [];
+  into: MemberSync,
+): Promise<void> {
   for (const member of members) {
+    const [current] = await executor
+      .select({ team: schema.users.team })
+      .from(schema.users)
+      .where(eq(schema.users.id, member.value));
     const added = await executor
       .update(schema.users)
       .set({ team: teamId, updatedAt: new Date() })
       .where(eq(schema.users.id, member.value));
-    if (!added.rowCount) unknown.push(member.value);
+    if (!added.rowCount) {
+      into.unknown.push(member.value);
+    } else if (current && current.team !== teamId && current.team !== DEFAULT_TEAM_ID) {
+      into.moved.push({ userId: member.value, fromTeam: current.team });
+    }
   }
-  return unknown;
 }
 
-/** The response lists the real members; this tells the operator who was skipped. */
-function warnUnknownMembers(log: FastifyBaseLogger, teamId: string, unknown: string[]): void {
-  if (unknown.length === 0) return;
-  log.warn(
-    { teamId, unknownMembers: unknown },
-    "SCIM group named members that match no user; skipped",
-  );
+// A sync can name thousands of members; the audit row keeps the first few and
+// the full count, and the log line carries the same.
+const AUDIT_MEMBER_CAP = 50;
+
+/** The audit fields for a sync's skips and moves, absent when there were none (#1748). */
+function memberSyncDetails(sync: MemberSync): Record<string, unknown> {
+  return {
+    ...(sync.unknown.length > 0 && {
+      skippedMembers: sync.unknown.slice(0, AUDIT_MEMBER_CAP),
+      skippedCount: sync.unknown.length,
+    }),
+    ...(sync.moved.length > 0 && {
+      movedMembers: sync.moved.slice(0, AUDIT_MEMBER_CAP),
+      movedCount: sync.moved.length,
+    }),
+  };
+}
+
+/** The response lists the real members; this tells the operator who was skipped or moved. */
+function warnMemberSync(
+  log: FastifyBaseLogger,
+  teamId: string,
+  action: string,
+  sync: MemberSync,
+): void {
+  if (sync.unknown.length > 0) {
+    log.warn(
+      {
+        teamId,
+        action,
+        skippedCount: sync.unknown.length,
+        skippedMembers: sync.unknown.slice(0, AUDIT_MEMBER_CAP),
+      },
+      "SCIM group named members that match no user; skipped",
+    );
+  }
+  if (sync.moved.length > 0) {
+    log.warn(
+      {
+        teamId,
+        action,
+        movedCount: sync.moved.length,
+        movedMembers: sync.moved.slice(0, AUDIT_MEMBER_CAP),
+      },
+      "SCIM group sync moved users out of another team; users belong to one team",
+    );
+  }
 }
 
 async function rejectLastActiveAdminDeactivation(
@@ -1006,8 +1072,10 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Assign members to the team
+      const sync = emptyMemberSync();
       if (members && members.length > 0) {
-        warnUnknownMembers(request.log, id, await addMembers(db, id, members));
+        await addMembers(db, id, members, sync);
+        warnMemberSync(request.log, id, "created", sync);
       }
 
       // Fetch actual members
@@ -1024,6 +1092,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           teamName: displayName,
           action: "created",
           memberCount: teamMembers.length,
+          ...memberSyncDetails(sync),
         },
         request.ip,
         request.id,
@@ -1166,7 +1235,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      const unknownMembers: string[] = [];
+      const sync = emptyMemberSync();
 
       // All or nothing. The rename and both membership steps used to write
       // straight to the database, so a failure after the rename left the
@@ -1193,7 +1262,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
               .where(eq(schema.users.team, id));
 
             // Add new members
-            unknownMembers.push(...(await addMembers(tx, id, members)));
+            await addMembers(tx, id, members, sync);
           }
         });
       } catch (err) {
@@ -1204,7 +1273,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
-      warnUnknownMembers(request.log, id, unknownMembers);
+      warnMemberSync(request.log, id, "replaced", sync);
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       const teamMembers = await db
@@ -1220,6 +1289,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           teamName: updatedTeam.name,
           action: "replaced",
           memberCount: teamMembers.length,
+          ...memberSyncDetails(sync),
         },
         request.ip,
         request.id,
@@ -1260,7 +1330,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
 
-      const unknownMembers: string[] = [];
+      const sync = emptyMemberSync();
 
       // All or nothing. Each operation used to write straight to the database,
       // so member changes from earlier operations stayed committed when a
@@ -1272,7 +1342,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
             const opType = op.op.toLowerCase();
 
             if (opType === "add" && op.path === "members") {
-              unknownMembers.push(...(await addMembers(tx, id, op.value as ScimMember[])));
+              await addMembers(tx, id, op.value as ScimMember[], sync);
             } else if (opType === "remove" && op.path === "members") {
               // Removed members go to the Default team. A member list removes
               // those; no list removes every member (RFC 7644 3.5.2.2).
@@ -1309,7 +1379,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
                   .where(eq(schema.users.team, id));
 
                 // Add new members
-                unknownMembers.push(...(await addMembers(tx, id, members)));
+                await addMembers(tx, id, members, sync);
               }
             }
           }
@@ -1321,7 +1391,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
-      warnUnknownMembers(request.log, id, unknownMembers);
+      warnMemberSync(request.log, id, "patched", sync);
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       const teamMembers = await db
@@ -1337,6 +1407,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           teamName: updatedTeam.name,
           action: "patched",
           memberCount: teamMembers.length,
+          ...memberSyncDetails(sync),
         },
         request.ip,
         request.id,
