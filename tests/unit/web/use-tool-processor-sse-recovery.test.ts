@@ -256,27 +256,35 @@ describe("useToolProcessor SSE recovery", () => {
 
     it("still ends the run when the failed-frame settle throws", () => {
       const { unmount } = startRun({ async: true });
-      // The failed branch clears the job id before its entry write, so the
-      // handler-error path must not read that as an already-settled run.
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.spyOn(useFileStore.getState(), "updateEntry")
         .mockImplementationOnce(() => {
           throw new Error("boom");
         })
         .mockImplementation(realUpdateEntry);
 
-      expect(() =>
+      try {
+        // The entry settle runs after the teardown and logs its throw
+        // (#1698), so the run ends on the server's own error instead of
+        // falling into the generic frame-handling one.
         act(() => {
           MockEventSource.instances[0].onmessage?.({
             data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
           } as MessageEvent);
-        }),
-      ).toThrow("boom");
+        });
 
-      expect(useFileStore.getState().processing).toBe(false);
-      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
-      expect(useFileStore.getState().entries[0].status).toBe("failed");
-
-      unmount();
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(useFileStore.getState().activeJobId).toBeNull();
+        expect(useFileStore.getState().error).toBe("server said no");
+        expect(consoleError).toHaveBeenCalledWith(
+          "Failing the run's entry failed",
+          expect.objectContaining({ message: "boom" }),
+        );
+        expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+      } finally {
+        consoleError.mockRestore();
+        unmount();
+      }
     });
 
     it("rethrows the root cause when the teardown itself throws", () => {

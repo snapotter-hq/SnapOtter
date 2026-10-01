@@ -1477,6 +1477,37 @@ test.describe("Processing State Cleanup", () => {
     await page.unroute("**/api/v1/tools/image/resize");
   });
 
+  test("a failed run ends with its failure card and no cancel left armed", async ({
+    loggedInPage: page,
+  }) => {
+    // #1698: the run's teardown now comes before the entry settle. Both have
+    // to land: the entry at "failed" gates the failure card, and the
+    // teardown takes down the progress card and its cancel button.
+    const message = "Resize could not finish this image";
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: message }),
+      }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    // The banner renders the message in a <span>; the failure card is the <p>.
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Cancel" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Resize" })).toBeEnabled();
+
+    await page.unroute("**/api/v1/tools/image/resize");
+  });
+
   test("successful processing followed by clear resets fully", async ({ loggedInPage: page }) => {
     await page.goto("/image/resize");
     await uploadTestImage(page);

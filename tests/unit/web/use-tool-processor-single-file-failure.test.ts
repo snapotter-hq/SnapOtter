@@ -618,7 +618,7 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
       expect(useFileStore.getState().processing).toBe(false);
       expect(useFileStore.getState().activeJobId).toBeNull();
       expect(consoleError).toHaveBeenCalledWith(
-        "Failing the run's entry after a result handling error failed",
+        "Failing the run's entry failed",
         expect.objectContaining({ message: "store broke" }),
       );
     } finally {
@@ -712,6 +712,232 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().processing).toBe(false);
 
+    unmount();
+  });
+});
+
+/**
+ * #1698: every single-run failure exit used to fail the entry before its
+ * teardown. The entry settle is a store write, and when the store keeps
+ * throwing (the #1354 case) a second throw there escaped before
+ * setProcessing(false) and clearActiveJob(), leaving the spinner up and the
+ * cancel button armed with nothing left to settle the run. The settle now
+ * runs last at every exit and logs instead of throwing. The tool-hook twin
+ * of #1352's pipeline fix.
+ */
+describe("useToolProcessor settles the entry after the run's teardown (#1698)", () => {
+  const SETTLE_FAILED_LOG = "Failing the run's entry failed";
+  // Zustand copies state on every set, so a spy on getState().updateEntry
+  // rides along into later states; put the real action back explicitly.
+  const realUpdateEntry = useFileStore.getState().updateEntry;
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    consoleError.mockRestore();
+    useFileStore.setState({ updateEntry: realUpdateEntry });
+  });
+
+  function startRun() {
+    const file = new File([new ArrayBuffer(64)], "clip.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+    return hook;
+  }
+
+  function breakEntryWrites() {
+    vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+      throw new Error("store broke");
+    });
+  }
+
+  // The upload finished and the socket died: the #722 degrade to async,
+  // with a cancel handle armed and the evidence timer running.
+  function degrade() {
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().cancelCurrentJob).not.toBeNull();
+  }
+
+  function expectRunEnded(message: string) {
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+    expect(useFileStore.getState().error).toBe(message);
+    // The failed settle is logged, not lost.
+    expect(consoleError).toHaveBeenCalledWith(
+      SETTLE_FAILED_LOG,
+      expect.objectContaining({ message: "store broke" }),
+    );
+  }
+
+  it.each([
+    ["an app error response", 500, JSON.stringify({ error: "boom" }), "error"],
+    [
+      "an error response whose body is not JSON",
+      500,
+      "<html>oops</html>",
+      "Processing failed: 500",
+    ],
+    [
+      "a 2xx body that does not parse",
+      200,
+      "<html>not json</html>",
+      "Invalid response from server",
+    ],
+  ])("ends the run on %s when failing the entry throws", (_label, status, body, message) => {
+    const { unmount } = startRun();
+    breakEntryWrites();
+
+    act(() => {
+      xhrs[0].status = status;
+      xhrs[0].responseText = body;
+      xhrs[0].onload?.();
+    });
+
+    expectRunEnded(message);
+    unmount();
+  });
+
+  it("ends the run when the socket dies mid-upload and failing the entry throws", () => {
+    const { unmount } = startRun();
+    breakEntryWrites();
+
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+
+    expectRunEnded("Processing was interrupted. Retry when reconnected.");
+    unmount();
+  });
+
+  it("ends the run when the request times out mid-upload and failing the entry throws", () => {
+    const { unmount } = startRun();
+    breakEntryWrites();
+
+    act(() => {
+      xhrs[0].ontimeout?.();
+    });
+
+    expectRunEnded("Request timed out - the server may be overloaded. Try again.");
+    unmount();
+  });
+
+  it("ends the run with the frame's own error when failing the entry throws", () => {
+    const { unmount } = startRun();
+    degrade();
+    breakEntryWrites();
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "server said no" });
+    });
+
+    // The server's error, not the generic frame-handling one.
+    expectRunEnded("server said no");
+    unmount();
+  });
+
+  it("ends the run when a batch terminal frame reaches a single run and failing the entry throws", () => {
+    const { unmount } = startRun();
+    degrade();
+    breakEntryWrites();
+
+    act(() => {
+      latestSse().onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "failed",
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+        }),
+      } as MessageEvent);
+    });
+
+    expectRunEnded("Processing was interrupted. Retry when reconnected.");
+    unmount();
+  });
+
+  it("ends the run when the server never confirms it and failing the entry throws", () => {
+    const { unmount } = startRun();
+    degrade();
+    breakEntryWrites();
+
+    act(() => {
+      vi.advanceTimersByTime(30_001);
+    });
+
+    expectRunEnded(
+      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+    );
+    unmount();
+  });
+
+  it("ends the run when the cancel finds no job and failing the entry throws", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const { unmount } = startRun();
+    degrade();
+    breakEntryWrites();
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    expectRunEnded("Canceled");
+    unmount();
+  });
+
+  it("lets a cancel teardown that throws reach the caller instead of swallowing it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const { unmount } = startRun();
+    degrade();
+    const cancel = useFileStore.getState().cancelCurrentJob;
+    // A store listener that breaks on every write, so the teardown itself throws.
+    const unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("teardown broke");
+    });
+
+    try {
+      await act(async () => {
+        await expect(cancel?.()).rejects.toThrow("teardown broke");
+      });
+    } finally {
+      unsubscribe();
+      unmount();
+    }
+  });
+
+  it("keeps a run going when the cancel request itself fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+    );
+    const { unmount } = startRun();
+    degrade();
+
+    await act(async () => {
+      await useFileStore.getState().cancelCurrentJob?.();
+    });
+
+    // A cancel that never reached the server says nothing about the job;
+    // the progress stream still owns settling it.
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
     unmount();
   });
 });

@@ -209,12 +209,21 @@ export function useToolProcessor(toolId: string) {
   // screen on "failed" (#799, #929). Same sweep as the batch failRun; the
   // status guard leaves already-settled results alone, and sweeping instead
   // of indexing works after clearActiveJob has nulled activeEntryIndexRef.
+  //
+  // Every exit calls this last, after its run-level teardown, and it never
+  // throws: it's a store write, and when the store keeps throwing (#1354) a
+  // second throw here must not leave the run stuck at processing with the
+  // cancel button still armed (#1698, the twin of #1352's pipeline fix).
   const settleProcessingEntries = useCallback((message: string) => {
-    const { entries, updateEntry } = useFileStore.getState();
-    for (let i = 0; i < entries.length; i++) {
-      if (entries[i]?.status === "processing") {
-        updateEntry(i, { status: "failed", error: message });
+    try {
+      const { entries, updateEntry } = useFileStore.getState();
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i]?.status === "processing") {
+          updateEntry(i, { status: "failed", error: message });
+        }
       }
+    } catch (err) {
+      console.error("Failing the run's entry failed", err);
     }
   }, []);
 
@@ -240,10 +249,10 @@ export function useToolProcessor(toolId: string) {
         eventSourceRef.current = null;
       }
       clearActiveJob();
-      settleProcessingEntries(message);
       setError(message);
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
+      settleProcessingEntries(message);
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
@@ -257,49 +266,54 @@ export function useToolProcessor(toolId: string) {
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
+    // Only the request may fail quietly: a cancel that never reached the
+    // server says nothing about the job, and the progress stream still owns
+    // settling it. A throw from the teardown below is ours and must reach
+    // the caller instead of vanishing (#1698).
+    let res: Response;
     try {
-      const res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
+      res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
         method: "POST",
         headers: formatHeaders(),
       });
-      // Record intent only once the server acknowledged the cancel: a failed
-      // or refused POST must not repaint the run's real outcome as canceled
-      // (#767). The ack always precedes the terminal frame (the finalize
-      // still has children to drain), so labeling cannot race it.
-      if (res.ok) {
-        const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
-        if (body?.canceled === true && activeJobIdRef.current === jobId) {
-          batchRunRef.current?.markCanceled();
-        }
-      }
-      // 404 means no job exists server-side (possible in the degraded #722
-      // state when the request tail never arrived). Nothing will ever emit a
-      // frame, so settle locally as canceled instead of blaming the network
-      // 30 seconds later.
-      if (res.status === 404 && activeJobIdRef.current === jobId) {
-        // A batch upload may still be in flight; its settle path also has to
-        // abort the XHR and tear down the run's own state (#767). A refusal
-        // means the closure belongs to an earlier run: fall through and
-        // settle the live run the single-run way.
-        if (batchRunRef.current?.cancelLocally()) return;
-        clearJobEvidenceTimer();
-        clearStallTimer();
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        clearActiveJob();
-        // Same settle the batch failRun gives canceled entries: "failed"
-        // with "Canceled", so the failure screen renders instead of an
-        // eternal pulse (#929).
-        settleProcessingEntries("Canceled");
-        setError("Canceled");
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-      }
     } catch {
-      // Cancel request failed; SSE handler will clean up
+      return;
+    }
+    // Record intent only once the server acknowledged the cancel: a failed
+    // or refused POST must not repaint the run's real outcome as canceled
+    // (#767). The ack always precedes the terminal frame (the finalize
+    // still has children to drain), so labeling cannot race it.
+    if (res.ok) {
+      const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
+      if (body?.canceled === true && activeJobIdRef.current === jobId) {
+        batchRunRef.current?.markCanceled();
+      }
+    }
+    // 404 means no job exists server-side (possible in the degraded #722
+    // state when the request tail never arrived). Nothing will ever emit a
+    // frame, so settle locally as canceled instead of blaming the network
+    // 30 seconds later.
+    if (res.status === 404 && activeJobIdRef.current === jobId) {
+      // A batch upload may still be in flight; its settle path also has to
+      // abort the XHR and tear down the run's own state (#767). A refusal
+      // means the closure belongs to an earlier run: fall through and
+      // settle the live run the single-run way.
+      if (batchRunRef.current?.cancelLocally()) return;
+      clearJobEvidenceTimer();
+      clearStallTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      clearActiveJob();
+      setError("Canceled");
+      setProcessing(false);
+      setProgress(IDLE_PROGRESS);
+      // Same settle the batch failRun gives canceled entries: "failed"
+      // with "Canceled", so the failure screen renders instead of an
+      // eternal pulse (#929).
+      settleProcessingEntries("Canceled");
     }
   }, [
     clearJobEvidenceTimer,
@@ -331,14 +345,10 @@ export function useToolProcessor(toolId: string) {
       setError(FRAME_HANDLING_FAILED);
       setProcessing(false);
       setProgress(IDLE_PROGRESS);
-      // Last and on its own: the store write that threw may throw again, and
-      // the run-level teardown above has to happen regardless. The caller
-      // rethrows the original error; this one is only logged.
-      try {
-        settleProcessingEntries(FRAME_HANDLING_FAILED);
-      } catch (settleErr) {
-        console.error("Failing the run's entries after a frame handling error failed", settleErr);
-      }
+      // Last: the store write that threw may throw again, and the run-level
+      // teardown above has to happen regardless. The sweep logs rather than
+      // throws, and the caller rethrows the original error.
+      settleProcessingEntries(FRAME_HANDLING_FAILED);
     },
     [
       clearStallTimer,
@@ -429,11 +439,12 @@ export function useToolProcessor(toolId: string) {
                 // still leaves them pulsing at "processing" (#929).
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
+                const message = "Processing was interrupted. Retry when reconnected.";
                 clearActiveJob();
-                settleProcessingEntries("Processing was interrupted. Retry when reconnected.");
-                setError("Processing was interrupted. Retry when reconnected.");
+                setError(message);
                 setProcessing(false);
                 setProgress(IDLE_PROGRESS);
+                settleProcessingEntries(message);
               }
               return;
             }
@@ -492,10 +503,10 @@ export function useToolProcessor(toolId: string) {
               xhrRef.current?.abort();
               clearActiveJob();
               const message = failedFrameMessage(data, "Processing failed");
-              settleProcessingEntries(message);
               setError(message);
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
+              settleProcessingEntries(message);
               return;
             }
 
@@ -710,13 +721,19 @@ export function useToolProcessor(toolId: string) {
       // status === "processing" and gates the failure screen on
       // status === "failed", so an unsettled entry pulses on the untouched
       // original forever (#799, the single-file twin of #798's failRun).
+      // Like settleProcessingEntries, every exit calls it last, after the
+      // run's teardown, and it logs instead of throwing (#1698).
       const failEntry = (message: string, category?: FeedbackErrorCategory) => {
-        if (useFileStore.getState().entries[capturedIndex]?.status === "processing") {
-          useFileStore.getState().updateEntry(capturedIndex, {
-            status: "failed",
-            error: message,
-            errorCategory: category ?? null,
-          });
+        try {
+          if (useFileStore.getState().entries[capturedIndex]?.status === "processing") {
+            useFileStore.getState().updateEntry(capturedIndex, {
+              status: "failed",
+              error: message,
+              errorCategory: category ?? null,
+            });
+          }
+        } catch (err) {
+          console.error("Failing the run's entry failed", err);
         }
       };
 
@@ -784,14 +801,13 @@ export function useToolProcessor(toolId: string) {
         // not read as "Invalid response" and must still surface (#1354, the
         // sync twin of #1287).
         let handlingError: { cause: unknown } | null = null;
+        let failure: { message: string; category?: FeedbackErrorCategory } | null = null;
         if (xhr.status >= 200 && xhr.status < 300) {
           let result: ProcessResult | null = null;
           try {
             result = parseResultBody<ProcessResult>(xhr.responseText);
           } catch {
-            const message = "Invalid response from server";
-            setError(message);
-            failEntry(message);
+            failure = { message: "Invalid response from server" };
           }
           if (result) {
             try {
@@ -816,8 +832,7 @@ export function useToolProcessor(toolId: string) {
           // Our API's 413 and a reverse proxy's (an HTML body-size page) mean
           // the same thing to the user, in their language (#1341).
           if (xhr.status === 413) message = t.errors.fileTooLarge;
-          setError(message);
-          failEntry(message, xhr.status === 413 ? "upload_error" : undefined);
+          failure = { message, category: xhr.status === 413 ? "upload_error" : undefined };
         }
 
         if (handlingError) {
@@ -842,20 +857,17 @@ export function useToolProcessor(toolId: string) {
               console.error("Ending the run after a result handling error failed", teardownErr);
             }
           }
-          try {
-            failEntry(FRAME_HANDLING_FAILED);
-          } catch (settleErr) {
-            console.error(
-              "Failing the run's entry after a result handling error failed",
-              settleErr,
-            );
-          }
+          failEntry(FRAME_HANDLING_FAILED);
           throw handlingError.cause;
         }
 
+        if (failure) setError(failure.message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        // Last: failing the entry is a store write that may throw, and the
+        // run has to end regardless (#1698).
+        if (failure) failEntry(failure.message, failure.category);
       };
 
       xhr.onerror = () => {
@@ -872,10 +884,10 @@ export function useToolProcessor(toolId: string) {
         }
         const message = "Processing was interrupted. Retry when reconnected.";
         setError(message);
-        failEntry(message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        failEntry(message);
       };
 
       xhr.ontimeout = () => {
@@ -889,10 +901,10 @@ export function useToolProcessor(toolId: string) {
         }
         const message = "Request timed out - the server may be overloaded. Try again.";
         setError(message);
-        failEntry(message);
         setProcessing(false);
         setProgress(IDLE_PROGRESS);
         clearActiveJob();
+        failEntry(message);
       };
 
       xhr.open("POST", appUrl(apiToolPath(toolId)));
