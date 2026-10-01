@@ -28,7 +28,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import * as pdfjs from "pdfjs-dist";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
@@ -176,12 +176,14 @@ interface PlanCardProps {
   label: string;
   /** Thumbnail zoom multiplier (from THUMB_ZOOM_LEVELS). */
   scale: number;
-  onRotate: (delta: 90 | -90) => void;
-  onRemove: () => void;
 }
 
-/** One draggable output tile: the rendered page in its planned rotation. */
-function PlanCard({
+/**
+ * One draggable output tile: the rendered page in its planned rotation.
+ * Memoized on primitive props, so a thumbnail flush re-renders only the tiles
+ * whose image changed instead of all of them (#1746).
+ */
+const PlanCard = memo(function PlanCard({
   id,
   index,
   page,
@@ -189,11 +191,13 @@ function PlanCard({
   thumb,
   label,
   scale,
-  onRotate,
-  onRemove,
 }: PlanCardProps) {
   const { t } = useTranslation();
   const s = t.toolSettings["multi-tool-pdf"];
+  const rotatePage = useMultiToolStore((state) => state.rotatePage);
+  const removePage = useMultiToolStore((state) => state.removePage);
+  const onRotate = (delta: 90 | -90) => rotatePage(id, delta);
+  const onRemove = () => removePage(id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -281,17 +285,82 @@ function PlanCard({
       />
     </div>
   );
+});
+
+interface StripTileProps {
+  docIndex: number;
+  page: number;
+  thumb: string | undefined;
+  added: boolean;
+  planFull: boolean;
+  width: number;
+  height: number;
 }
 
-/** Thumbnail strip with per-page add and a delete button for one document. */
-function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale: number }) {
+/** One source-page tile in a document strip, memoized like PlanCard. */
+const StripTile = memo(function StripTile({
+  docIndex,
+  page,
+  thumb,
+  added,
+  planFull,
+  width,
+  height,
+}: StripTileProps) {
   const { t } = useTranslation();
   const s = t.toolSettings["multi-tool-pdf"];
-  const { plan, appendPage, appendDoc, removeDoc } = useMultiToolStore();
+  const appendPage = useMultiToolStore((state) => state.appendPage);
+  return (
+    <div className="relative shrink-0">
+      <div
+        className="rounded border border-border bg-muted overflow-hidden flex items-center justify-center"
+        style={{ width, height }}
+      >
+        {thumb ? (
+          <img src={thumb} alt="" className="max-w-full max-h-full object-contain" />
+        ) : (
+          <span className="text-[10px] text-muted-foreground">{page}</span>
+        )}
+      </div>
+      {added && <Check className="absolute bottom-0 left-0 h-3 w-3 bg-background text-primary" />}
+      <div className="absolute -top-1 -right-1">
+        <button
+          type="button"
+          onClick={() => appendPage(docIndex, page, useMultiToolStore.getState().plan.length - 1)}
+          disabled={planFull}
+          className="h-4 w-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label={format(s.addPage, { n: page })}
+          data-testid={`multi-tool-add-${docIndex}-${page}`}
+        >
+          <Plus className="h-2.5 w-2.5" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
+/** Thumbnail strip with per-page add and a delete button for one document. */
+const DocStrip = memo(function DocStrip({
+  doc,
+  index,
+  scale,
+}: {
+  doc: LoadedDoc;
+  index: number;
+  scale: number;
+}) {
+  const { t } = useTranslation();
+  const s = t.toolSettings["multi-tool-pdf"];
+  const plan = useMultiToolStore((state) => state.plan);
+  const appendDoc = useMultiToolStore((state) => state.appendDoc);
+  const removeDoc = useMultiToolStore((state) => state.removeDoc);
   const patchDoc = useMultiToolStore((state) => state.patchDoc);
   const setPrimary = useMultiToolStore((state) => state.setPrimary);
   const removeStoreFile = useFileStore((state) => state.removeFile);
-  const inPlan = new Set(plan.filter((p) => p.doc === index).map((p) => p.page));
+  const inPlan = useMemo(
+    () => new Set(plan.filter((p) => p.doc === index).map((p) => p.page)),
+    [plan, index],
+  );
   // The server rejects plans over the limit, so the add affordances stop at
   // it instead of building an arrangement that can never be submitted.
   const planFull = plan.length >= PDF_MULTI_TOOL_LIMITS.outputPages;
@@ -371,39 +440,18 @@ function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale:
         </div>
       )}
       <div className="flex gap-1 overflow-x-auto pb-1" data-testid={`multi-tool-doc-${index}`}>
-        {Array.from({ length: doc.pageCount }, (_, i) => i + 1).map((page) => {
-          const thumb = doc.thumbs[page];
-          const added = inPlan.has(page);
-          return (
-            <div key={page} className="relative shrink-0">
-              <div
-                className="rounded border border-border bg-muted overflow-hidden flex items-center justify-center"
-                style={{ width: stripW, height: stripH }}
-              >
-                {thumb ? (
-                  <img src={thumb} alt="" className="max-w-full max-h-full object-contain" />
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">{page}</span>
-                )}
-              </div>
-              {added && (
-                <Check className="absolute bottom-0 left-0 h-3 w-3 bg-background text-primary" />
-              )}
-              <div className="absolute -top-1 -right-1">
-                <button
-                  type="button"
-                  onClick={() => appendPage(index, page, plan.length - 1)}
-                  disabled={planFull}
-                  className="h-4 w-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label={format(s.addPage, { n: page })}
-                  data-testid={`multi-tool-add-${index}-${page}`}
-                >
-                  <Plus className="h-2.5 w-2.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {Array.from({ length: doc.pageCount }, (_, i) => i + 1).map((page) => (
+          <StripTile
+            key={page}
+            docIndex={index}
+            page={page}
+            thumb={doc.thumbs[page]}
+            added={inPlan.has(page)}
+            planFull={planFull}
+            width={stripW}
+            height={stripH}
+          />
+        ))}
       </div>
       <div className="flex items-center justify-between pt-1">
         <button
@@ -420,7 +468,7 @@ function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale:
       </div>
     </div>
   );
-}
+});
 
 /** Main-area page editor for the PDF Multi-Tool. */
 export function MultiToolPdfCanvas() {
@@ -431,10 +479,11 @@ export function MultiToolPdfCanvas() {
   const [skipped, setSkipped] = useState({ notPdf: 0, overLimit: 0 });
   const docs = useMultiToolStore((state) => state.docs);
   const plan = useMultiToolStore((state) => state.plan);
+  // A new array every render would re-render every sortable tile on each
+  // thumbnail flush, memo or not (#1746).
+  const planIds = useMemo(() => plan.map((p) => p.id), [plan]);
   const syncFiles = useMultiToolStore((state) => state.syncFiles);
   const movePage = useMultiToolStore((state) => state.movePage);
-  const removePage = useMultiToolStore((state) => state.removePage);
-  const rotatePage = useMultiToolStore((state) => state.rotatePage);
   const resetPlan = useMultiToolStore((state) => state.resetPlan);
   const clear = useMultiToolStore((state) => state.clear);
   const zoomIndex = useMultiToolStore((state) => state.zoomIndex);
@@ -622,7 +671,7 @@ export function MultiToolPdfCanvas() {
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <SortableContext items={plan.map((p) => p.id)} strategy={rectSortingStrategy}>
+              <SortableContext items={planIds} strategy={rectSortingStrategy}>
                 <div className="flex flex-wrap items-start gap-3">
                   {plan.map((entry, i) => (
                     <PlanCard
@@ -634,8 +683,6 @@ export function MultiToolPdfCanvas() {
                       thumb={docs[entry.doc]?.thumbs[entry.page]}
                       label={format(s.pageLabel, { n: i + 1 })}
                       scale={scale}
-                      onRotate={(delta) => rotatePage(entry.id, delta)}
-                      onRemove={() => removePage(entry.id)}
                     />
                   ))}
                 </div>
