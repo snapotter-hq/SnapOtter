@@ -118,6 +118,40 @@ describe("BASE_PATH configuration", () => {
         configure("/snapotter", "not a url");
         expect(() => loadEnv()).toThrow(/EXTERNAL_URL must be an absolute URL/);
       });
+
+      // Callback and logout URLs are EXTERNAL_URL plus a path, so a trailing
+      // slash would double up (#1599).
+      it.each([
+        ["", "https://example.com/", "https://example.com"],
+        ["", "https://example.com//", "https://example.com"],
+        ["/snapotter", "https://example.com/snapotter/", "https://example.com/snapotter"],
+      ])(
+        "strips the trailing slash from BASE_PATH %s with EXTERNAL_URL %s",
+        (basePath, input, output) => {
+          configure(basePath, input);
+          expect(loadEnv().EXTERNAL_URL).toBe(output);
+        },
+      );
+
+      // Appending a path after a query string or fragment lands outside the
+      // URL's path, and a non-http scheme can't receive an IdP redirect at all,
+      // so SSO could never work with these. Fail at boot instead (#1599).
+      it.each([
+        ["/snapotter", "file:///snapotter"],
+        ["/snapotter", "ftp://example.com/snapotter"],
+        ["/snapotter", "https://example.com/snapotter?x=1"],
+        ["/snapotter", "https://example.com/snapotter#top"],
+        ["", "https://example.com/?x=1"],
+        // URL parses these with an empty search and hash, but appending a path
+        // still lands after the "?" or "#".
+        ["", "https://example.com/?"],
+        ["/snapotter", "https://example.com/snapotter#"],
+      ])("rejects BASE_PATH %s with EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).toThrow(
+          /EXTERNAL_URL must be an http\(s\) URL with no query string or fragment/,
+        );
+      });
     },
   );
 
@@ -127,6 +161,22 @@ describe("BASE_PATH configuration", () => {
     vi.stubEnv("BASE_PATH", "/snapotter");
     vi.stubEnv("EXTERNAL_URL", "https://example.com");
     expect(() => loadEnv()).not.toThrow();
+  });
+
+  // The secure-cookie check reads EXTERNAL_URL with SSO off too, so the slash
+  // is trimmed whatever else is configured, while values SSO would reject
+  // still boot as before (#1599).
+  it.each([
+    ["", ""],
+    ["https://example.com", "https://example.com"],
+    ["https://example.com/", "https://example.com"],
+    ["https://example.com/snapotter/", "https://example.com/snapotter"],
+    ["https://example.com/?x=1", "https://example.com/?x=1"],
+  ])("normalizes EXTERNAL_URL %s without SSO", (input, output) => {
+    vi.stubEnv("OIDC_ENABLED", "false");
+    vi.stubEnv("SAML_ENABLED", "false");
+    vi.stubEnv("EXTERNAL_URL", input);
+    expect(loadEnv().EXTERNAL_URL).toBe(output);
   });
 });
 

@@ -17,6 +17,7 @@ import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
+import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
 // Hoisted so the vi.mock factories (which vitest hoists above the imports) can
 // close over them. saml.ts imports @node-saml STATICALLY, so it must be
@@ -465,14 +466,14 @@ describe("SAML callback", () => {
   });
 });
 
-describe.each(["", "/snapotter"])("SAML deployment at '%s'", (basePath) => {
+describe.each(SSO_DEPLOYMENTS)("SAML deployment at '%s', EXTERNAL_URL %s", (basePath, typed) => {
   const originalBasePath = env.BASE_PATH;
   let externalUrl: string;
 
   beforeAll(() => {
     externalUrl = env.EXTERNAL_URL;
     env.BASE_PATH = basePath;
-    env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+    env.EXTERNAL_URL = parseExternalUrl(typed);
   });
   afterAll(() => {
     env.BASE_PATH = originalBasePath;

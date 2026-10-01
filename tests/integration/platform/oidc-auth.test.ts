@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
+import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
 // The test app registers @fastify/cookie with this exact secret (see
 // tests/integration/test-server.ts). Sign our own oidc-state cookies with it
@@ -666,14 +667,14 @@ describe("OIDC login redirect", () => {
     expect(cookieStr).toContain("SameSite=Lax");
   });
 
-  describe.each(["", "/snapotter"])("deployment at '%s'", (basePath) => {
+  describe.each(SSO_DEPLOYMENTS)("deployment at '%s', EXTERNAL_URL %s", (basePath, typed) => {
     const originalBasePath = env.BASE_PATH;
     let externalUrl: string;
 
     beforeAll(() => {
       externalUrl = env.EXTERNAL_URL;
       env.BASE_PATH = basePath;
-      env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+      env.EXTERNAL_URL = parseExternalUrl(typed);
     });
     afterAll(() => {
       env.BASE_PATH = originalBasePath;

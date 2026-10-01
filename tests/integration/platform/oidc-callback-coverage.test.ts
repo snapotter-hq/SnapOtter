@@ -89,6 +89,7 @@ const { getOidcEndSessionEndpoint } = await import("../../../apps/api/src/plugin
 const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
 
 import type { TestApp } from "../test-server.js";
+import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
 // Sign our own oidc-state cookie with the exact secret buildTestApp() gives
 // @fastify/cookie, so callback branches are reachable without first driving a
@@ -289,14 +290,14 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
   }, 10_000);
 
-  describe.each(["", "/snapotter"])("deployment at '%s'", (basePath) => {
+  describe.each(SSO_DEPLOYMENTS)("deployment at '%s', EXTERNAL_URL %s", (basePath, typed) => {
     const originalBasePath = env.BASE_PATH;
     let externalUrl: string;
 
     beforeAll(() => {
       externalUrl = env.EXTERNAL_URL;
       env.BASE_PATH = basePath;
-      env.EXTERNAL_URL = `http://localhost:9999${basePath}`;
+      env.EXTERNAL_URL = parseExternalUrl(typed);
     });
     afterAll(() => {
       env.BASE_PATH = originalBasePath;
