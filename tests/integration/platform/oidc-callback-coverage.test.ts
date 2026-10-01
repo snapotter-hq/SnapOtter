@@ -41,7 +41,7 @@
 import { createServer, type Server } from "node:http";
 import { sign } from "@fastify/cookie";
 import { and, eq, sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authorizationCodeGrantMock = vi.hoisted(() => vi.fn());
 
@@ -279,10 +279,15 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     oidcApp = await buildTestApp();
   }, 30_000);
 
+  // Cleared before (not after) each test so a report from the cold-cache
+  // describe above can't leak into the first assertion here.
+  beforeEach(() => {
+    reportErrorSpy.mockClear();
+  });
+
   afterEach(() => {
     authorizationCodeGrantMock.mockReset();
     trackEventSpy.mockClear();
-    reportErrorSpy.mockClear();
     resolverFailure.next = null;
     // Reset the knobs individual tests tweak back to the describe defaults.
     (env as any).OIDC_AUTO_CREATE_USERS = true;
@@ -419,9 +424,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     });
   });
 
-  // Both omission cases below log in through the callback first, which warms
-  // the discovery cache with an end_session_endpoint. That leaves exactly one
-  // missing input per test, so each pins its own guard in the logout route.
+  // The logout cases below log in through the callback first, which warms the
+  // discovery cache with an end_session_endpoint, so each one changes a single
+  // input to the logout route and pins its own branch.
   async function oidcSessionWithWarmCache(): Promise<string> {
     const sub = `sub-warm-${Math.random().toString(36).slice(2, 10)}`;
     const login = await callbackWithClaims({ sub, preferred_username: sub });
