@@ -263,6 +263,23 @@ describe("Settings timers are cancelled when Settings closes", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("schedules nothing when a save settles after Settings has closed", async () => {
+    let settle: (value: unknown) => void = () => {};
+    apiPut.mockReturnValueOnce(
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    renderDe(<AdminSecuritySettings />);
+    fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
+    expect(apiPut).toHaveBeenCalled();
+
+    cleanup();
+    settle({});
+    await act(async () => {});
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("still clears the message after 3 seconds while Settings stays open", async () => {
     apiPut.mockRejectedValueOnce(new Error("down"));
     renderDe(<AdminSecuritySettings />);
