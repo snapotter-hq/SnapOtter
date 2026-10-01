@@ -150,16 +150,17 @@ export function usePipelineProcessor() {
   // throws: some exits run right after a store write threw (a broken
   // completion write, #1287 and #1354), and a second throw here must not
   // leave the run stuck at processing with the cancel button still armed.
+  // Each entry gets its own try, so one write that throws can't leave a
+  // batch's later entries pulsing (#1779).
   const settleProcessingEntries = useCallback((message: string) => {
-    try {
-      const { entries, updateEntry } = useFileStore.getState();
-      for (let i = 0; i < entries.length; i++) {
-        if (entries[i]?.status === "processing") {
-          updateEntry(i, { status: "failed", error: message });
-        }
+    const { entries, updateEntry } = useFileStore.getState();
+    for (let i = 0; i < entries.length; i++) {
+      if (entries[i]?.status !== "processing") continue;
+      try {
+        updateEntry(i, { status: "failed", error: message });
+      } catch (err) {
+        console.error("Failing the run's entry failed", err);
       }
-    } catch (err) {
-      console.error("Failing the run's entry failed", err);
     }
   }, []);
 
@@ -224,20 +225,26 @@ export function usePipelineProcessor() {
     // frame, so settle locally as canceled instead of blaming the network
     // 30 seconds later.
     if (res.status === 404 && activeJobIdRef.current === jobId) {
-      xhrRef.current?.abort();
-      clearJobEvidenceTimer();
-      clearStallTimer();
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
+      try {
+        xhrRef.current?.abort();
+        clearJobEvidenceTimer();
+        clearStallTimer();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+        batchRunRef.current = null;
+        clearActiveJob();
+        setError("Canceled");
+        setProcessing(false);
+        setProgress(IDLE_PROGRESS);
+      } finally {
+        // The stream is already closed, so nothing else will settle the
+        // entries: a throwing teardown must not leave them pulsing. Its
+        // throw still reaches the caller.
+        settleProcessingEntries("Canceled");
       }
-      batchRunRef.current = null;
-      clearActiveJob();
-      setError("Canceled");
-      setProcessing(false);
-      setProgress(IDLE_PROGRESS);
-      settleProcessingEntries("Canceled");
     }
   }, [
     clearJobEvidenceTimer,

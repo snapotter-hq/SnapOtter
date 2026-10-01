@@ -634,8 +634,16 @@ describe("usePipelineProcessor cancel failures (#1779)", () => {
       });
     } finally {
       unsubscribe();
-      hook.unmount();
     }
+
+    // The stream is closed, so nothing else will settle the run's entries:
+    // they must not be left pulsing at "processing".
+    const { entries } = useFileStore.getState();
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(entry).toMatchObject({ status: "failed", error: "Canceled" });
+    }
+    hook.unmount();
   });
 
   it.each([
