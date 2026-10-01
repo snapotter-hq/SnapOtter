@@ -68,6 +68,13 @@ function isIgnoredNetworkError(err: unknown): boolean {
  */
 type SaveFailure = "expired" | "quota" | "tooLarge" | "generic";
 
+/** One result's save attempt. A result with no entry has never been saved. */
+interface SaveState {
+  status: "saving" | "saved" | "error";
+  /** Only read while `status` is "error". */
+  failure: SaveFailure;
+}
+
 /** What a failed library upload was about. Only 413s have a reason to show. */
 async function uploadFailure(res: Response): Promise<SaveFailure> {
   if (res.status !== 413) return "generic";
@@ -134,33 +141,41 @@ export function ReviewPanel({
     useFileStore.getState().claimSelected();
   };
 
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [saveFailure, setSaveFailure] = useState<SaveFailure>("generic");
+  // The panel isn't remounted when it moves to another result (the thumbnail
+  // strip, or a re-run), so save state is kept per result, keyed by its URL.
+  // A save that ends after the user moved on lands on the result it was for,
+  // and coming back to a saved result still says so (#1502).
+  const [saveStates, setSaveStates] = useState<ReadonlyMap<string, SaveState>>(() => new Map());
+  const setSaveState = useCallback((url: string, state: SaveState | null) => {
+    setSaveStates((prev) => {
+      const next = new Map(prev);
+      if (state) next.set(url, state);
+      else next.delete(url);
+      return next;
+    });
+  }, []);
+  const saveStatus = saveStates.get(downloadUrl)?.status ?? "idle";
+  const saveFailure = saveStates.get(downloadUrl)?.failure ?? "generic";
   // A generic error label resets itself after a few seconds. A retry clears
   // the pending reset, or it would flip a retry's "Saved" back to an enabled
   // button and invite a duplicate save.
-  const errorResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => clearTimeout(errorResetRef.current ?? undefined), []);
-  // The panel isn't remounted when it moves to another result (the thumbnail
-  // strip, or a re-run). A failure with a reason stays up, and a save still in
-  // flight would otherwise land its outcome on the new result, so both are
-  // about the old one: clear them, and let a late save finish without
-  // touching this panel's state.
-  const shownUrlRef = useRef(downloadUrl);
+  const errorResetsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
-    shownUrlRef.current = downloadUrl;
-    clearTimeout(errorResetRef.current ?? undefined);
-    setSaveStatus((status) => (status === "error" || status === "saving" ? "idle" : status));
-  }, [downloadUrl]);
+    const timers = errorResetsRef.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+    };
+  }, []);
 
   const handleSaveToFiles = useCallback(async () => {
     // Capture before the awaits below: the thumbnail strip can move the
     // selection while the upload is in flight, and the claim must land on the
     // entry that was actually saved.
     const claimIndex = useFileStore.getState().selectedIndex;
-    const stillShown = () => shownUrlRef.current === downloadUrl;
-    clearTimeout(errorResetRef.current ?? undefined);
-    setSaveStatus("saving");
+    const url = downloadUrl;
+    clearTimeout(errorResetsRef.current.get(url));
+    errorResetsRef.current.delete(url);
+    setSaveState(url, { status: "saving", failure: "generic" });
     let failure: SaveFailure = "generic";
     try {
       const res = await fetch(downloadUrl);
@@ -193,7 +208,7 @@ export function ReviewPanel({
           statusCode: uploadRes.status,
         });
       }
-      if (stillShown()) setSaveStatus("saved");
+      setSaveState(url, { status: "saved", failure: "generic" });
       useFileStore.getState().markClaimed(claimIndex);
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
@@ -214,16 +229,20 @@ export function ReviewPanel({
           { error_class: "operational", ...(currentToolId ? { tool_id: currentToolId } : {}) },
         );
       }
-      if (!stillShown()) return;
-      setSaveFailure(failure);
-      setSaveStatus("error");
+      setSaveState(url, { status: "error", failure });
       // A reason stays on screen: it tells the user what to do, and the
       // generic label's reset would hand back a button that fails the same way.
       if (failure === "generic") {
-        errorResetRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+        errorResetsRef.current.set(
+          url,
+          setTimeout(() => {
+            errorResetsRef.current.delete(url);
+            setSaveState(url, null);
+          }, 3000),
+        );
       }
     }
-  }, [downloadUrl, filename, fileType, currentToolId]);
+  }, [downloadUrl, filename, fileType, currentToolId, setSaveState]);
 
   const hasBatchStats =
     totalCount != null && totalCount > 1 && successCount != null && failedCount != null;

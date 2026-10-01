@@ -1,9 +1,11 @@
+import path from "node:path";
 import type { Page } from "@playwright/test";
 import { en } from "@snapotter/shared";
 import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // ---------------------------------------------------------------------------
-// Save to Files when the save can't succeed (issues #1286, #1350)
+// Save to Files when the save can't succeed (issues #1286, #1350), and its
+// saved state across batch results (#1502)
 //
 // The review panel used to upload whatever the result URL returned, so an
 // expired result put its 404 body in the library and the panel said "Saved to
@@ -83,5 +85,44 @@ test.describe("Save to Files", () => {
     // Freeing space makes a retry worthwhile, so the button stays live.
     await expect(full).toBeEnabled();
     await expect(page.getByText(en.common.error)).toHaveCount(0);
+  });
+
+  // #1502: after saving one batch result, every other result said "Saved to
+  // Files", disabled, though nobody had saved it.
+  test("tracks the saved state per batch result", async ({ loggedInPage: page }) => {
+    await page.goto("/image/resize");
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.locator("[class*='border-dashed']").first().click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([
+      path.join(process.cwd(), "tests", "fixtures", "image", "valid", "test-100x100.jpg"),
+      path.join(process.cwd(), "tests", "fixtures", "image", "valid", "test-200x150.png"),
+    ]);
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: /resize.*2 files/i }).click();
+    await waitForProcessing(page);
+    await expect(page.getByText("1 / 2")).toBeVisible({ timeout: 15_000 });
+
+    // Answer the library upload here: this test is about the panel, and a
+    // real save would add to the library other specs read.
+    await page.route("**/api/v1/files/upload", (route) =>
+      route.fulfill({ status: 201, contentType: "application/json", body: "{}" }),
+    );
+    const uploads = trackUploads(page);
+
+    await page.getByRole("button", { name: en.toolPage.saveToFiles }).click();
+    const saved = page.getByRole("button", { name: en.toolPage.savedToFiles });
+    await expect(saved).toBeDisabled();
+
+    await page.getByRole("button", { name: "Next file" }).click();
+    await expect(page.getByText("2 / 2")).toBeVisible();
+    await expect(page.getByRole("button", { name: en.toolPage.saveToFiles })).toBeEnabled();
+    await expect(saved).toHaveCount(0);
+
+    // Back on the first result, which is in the library: no second copy.
+    await page.getByRole("button", { name: "Previous file" }).click();
+    await expect(page.getByText("1 / 2")).toBeVisible();
+    await expect(saved).toBeDisabled();
+    expect(uploads).toHaveLength(1);
   });
 });

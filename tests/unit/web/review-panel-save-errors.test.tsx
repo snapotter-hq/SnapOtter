@@ -586,3 +586,140 @@ describe("ReviewPanel Save to Files failure reasons (#1350)", () => {
     expect(screen.getByText(en.toolPage.libraryFull)).toBeTruthy();
   });
 });
+
+const OTHER_URL = "/api/v1/download/job-2/b-resized.png";
+
+/** Both results fetch fine; uploads go through `upload`. */
+function stubTwoResults(upload: () => Promise<unknown>) {
+  const fetchMock = vi.fn((input: string) =>
+    input === RESULT_URL || input === OTHER_URL ? okResult() : upload(),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+/** An upload that stays in flight until the returned `finish` is called. */
+function gatedUpload() {
+  let finish: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  return { upload: () => gate.then(() => ({ ok: true, status: 201 })), finish: () => finish() };
+}
+
+// #1502: the panel isn't remounted when the selection moves, and its save
+// state was one value for the whole panel. After saving one result, every
+// other result said "Saved to Files", disabled, though nobody had saved it.
+describe("ReviewPanel save state per result (#1502)", () => {
+  it("offers Save to Files on another result after saving the first", async () => {
+    const fetchMock = stubTwoResults(() => Promise.resolve({ ok: true, status: 201 }));
+
+    const view = renderPanel();
+    await clickSave();
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+
+    view.rerender(panel("resize", OTHER_URL));
+
+    expect(screen.queryByText(en.toolPage.savedToFiles)).toBeNull();
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+    expect(uploadCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("still says Saved when the user goes back to the result they saved", async () => {
+    const fetchMock = stubTwoResults(() => Promise.resolve({ ok: true, status: 201 }));
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(panel("resize", OTHER_URL));
+    view.rerender(panel("resize", RESULT_URL));
+
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+    expect(uploadCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("saves each result once, and remembers both", async () => {
+    const fetchMock = stubTwoResults(() => Promise.resolve({ ok: true, status: 201 }));
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(panel("resize", OTHER_URL));
+    await clickSave();
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+
+    view.rerender(panel("resize", RESULT_URL));
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+    expect(uploadCalls(fetchMock)).toHaveLength(2);
+  });
+
+  // A save that finishes while another result is shown still saved the one
+  // the user clicked on; coming back to it must not invite a second copy.
+  it("says Saved on return when the save finished while another result was shown", async () => {
+    const { upload, finish } = gatedUpload();
+    const fetchMock = stubTwoResults(upload);
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(panel("resize", OTHER_URL));
+    await act(async () => {
+      finish();
+    });
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+
+    view.rerender(panel("resize", RESULT_URL));
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+    expect(uploadCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("keeps a save in flight disabled when the user comes back before it ends", async () => {
+    const { upload, finish } = gatedUpload();
+    const fetchMock = stubTwoResults(upload);
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(panel("resize", OTHER_URL));
+    view.rerender(panel("resize", RESULT_URL));
+
+    expect(saveButtonNamed(en.common.saving).disabled).toBe(true);
+
+    await act(async () => {
+      finish();
+    });
+    expect(saveButtonNamed(en.toolPage.savedToFiles).disabled).toBe(true);
+    expect(uploadCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("still shows an expired result as expired when the user comes back to it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) => (input === RESULT_URL ? failedResult(404)() : okResult())),
+    );
+
+    const view = renderPanel();
+    await clickSave();
+    view.rerender(panel("resize", OTHER_URL));
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+
+    view.rerender(panel("resize", RESULT_URL));
+    expect(saveButtonNamed(en.toolPage.resultExpired).disabled).toBe(true);
+  });
+
+  it("resets a generic error on the result it happened to, even after a switch", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) => (input === RESULT_URL ? failedResult(500)() : okResult())),
+    );
+
+    const view = renderPanel();
+    await clickSave();
+    expect(screen.getByText(en.common.error)).toBeTruthy();
+    view.rerender(panel("resize", OTHER_URL));
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    view.rerender(panel("resize", RESULT_URL));
+
+    expect(saveButtonNamed(en.toolPage.saveToFiles).disabled).toBe(false);
+  });
+});
