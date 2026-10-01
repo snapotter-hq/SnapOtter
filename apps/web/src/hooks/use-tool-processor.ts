@@ -334,6 +334,11 @@ export function useToolProcessor(toolId: string) {
   const failRunOnHandlerError = useCallback(
     (es: EventSource) => {
       if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
+      // A failed run shows no result. The completion branch sets the payload
+      // only after its store writes, but its teardown can still throw after
+      // that (#1739).
+      setWarning(null);
+      setResultPayload(null);
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);

@@ -382,8 +382,38 @@ describe("useToolProcessor SSE recovery", () => {
         expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
         expect(result.current.resultPayload).toBeNull();
         expect(result.current.warning).toBeNull();
+        // The result did land before the claim threw, so the entry keeps it
+        // (the sync path's failEntry does the same).
+        expect(useFileStore.getState().entries[0].status).toBe("completed");
 
         unmount();
+      });
+
+      it("drops the payload when ending the run throws after it was set", () => {
+        const { result, unmount } = startRun({ async: true });
+        // clearActiveJob nulls the job ref before its store write, so a
+        // listener that throws on that write leaves processing on and the
+        // handler-error teardown still has a live run to fail.
+        const unsubscribe = useFileStore.subscribe((state, prev) => {
+          if (prev.activeJobId && !state.activeJobId) throw new Error("teardown write broke");
+        });
+
+        try {
+          expect(() =>
+            act(() => {
+              MockEventSource.instances[0].onmessage?.(WARNED_FRAME);
+            }),
+          ).toThrow("teardown write broke");
+          act(() => {});
+
+          expect(useFileStore.getState().processing).toBe(false);
+          expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+          expect(result.current.resultPayload).toBeNull();
+          expect(result.current.warning).toBeNull();
+        } finally {
+          unsubscribe();
+          unmount();
+        }
       });
 
       it("shows the payload and warning once a completion lands", () => {
