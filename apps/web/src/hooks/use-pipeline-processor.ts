@@ -138,13 +138,13 @@ export function usePipelineProcessor() {
     }
   }, []);
 
-  // A single run's failure must settle the entry its kickoff reset to
+  // A run's failure must settle the entries its kickoff reset to
   // "processing": the Automate result pane gates its failure card on
   // status === "failed" and the thumbnail strip badges off the same status
-  // (#1352, the pipeline twin of use-tool-processor's #799/#929 sweep). The
-  // status guard leaves an already-settled entry and its error alone, and
-  // sweeping instead of indexing works after clearActiveJob has nulled
-  // activeEntryIndexRef. Batch runs never mark entries "processing".
+  // (#1352, the pipeline twin of use-tool-processor's #799/#929 sweep; batch
+  // runs since #1699). The status guard leaves an already-settled entry and
+  // its error alone, and sweeping instead of indexing works after
+  // clearActiveJob has nulled activeEntryIndexRef.
   //
   // Every exit calls this last, after its run-level teardown, and it never
   // throws: some exits run right after a store write threw (a broken
@@ -771,6 +771,26 @@ export function usePipelineProcessor() {
       const { updateEntry, setBatchZip } = useFileStore.getState();
 
       setError(null);
+      // Mirror processSingle's reset for every entry this batch sends: an
+      // earlier run's result must not survive into this one, or a batch that
+      // fails leaves it on screen as if this run produced it (#1699). Each
+      // entry sits at "processing" until the ZIP settles it or a failure
+      // exit sweeps it. Blob URLs are results an earlier batch unpacked from
+      // its ZIP and nothing else holds them; a single run's server URL is
+      // not ours to revoke.
+      const priorEntries = useFileStore.getState().entries;
+      for (let i = 0; i < priorEntries.length; i++) {
+        const staleUrl = priorEntries[i]?.processedUrl;
+        if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
+        updateEntry(i, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "processing",
+          error: null,
+        });
+      }
       setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
       clearJobEvidenceTimer();
@@ -805,9 +825,14 @@ export function usePipelineProcessor() {
         setProgress(IDLE_PROGRESS);
       };
 
+      // Last, after the run-level teardown, the entries the ZIP never
+      // settled: the sweep leaves a settled one and its own error alone, and
+      // logs instead of throwing, so a broken store write can't keep the run
+      // at processing (#1699, the batch side of #1352).
       const failRun = (message: string) => {
         setError(message);
         finishRun();
+        settleProcessingEntries(message);
       };
 
       const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
@@ -834,6 +859,10 @@ export function usePipelineProcessor() {
             // After a user cancel, a missing result is the cancel doing its
             // job, not a lookup failure (#771).
             updateEntry(i, {
+              // No result for this file, so none may show: the pane's failure
+              // card only renders without a processedUrl (#1699).
+              processedUrl: null,
+              processedPreviewUrl: null,
               status: "failed",
               error: canceledByUserRef.current ? "Canceled" : "File not found in batch results",
             });
@@ -1075,6 +1104,7 @@ export function usePipelineProcessor() {
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,
+      settleProcessingEntries,
       startJobEvidenceTimer,
       trackDegrade,
       t,
