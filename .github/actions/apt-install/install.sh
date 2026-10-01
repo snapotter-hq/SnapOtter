@@ -21,18 +21,21 @@
 # 154 MB, so when APT_ARCHIVE_DIR is set (action.yml restores it from
 # actions/cache) apt downloads into it and installs from it:
 #
-# - After a successful update, every cached .deb whose SHA256 isn't in the
-#   freshly fetched, signature-checked index is deleted first. apt itself
-#   takes any archive-dir file of the right name and size without hashing
-#   it, so this is what keeps a stale or corrupt cache from installing.
-#   Packages that changed since the cache was saved download as usual.
-# - If the update itself fails, the cached archives are installed as local
-#   files with --no-download, so a mirror that is down entirely still can't
-#   fail a job whose cache is warm. Only if that fails too does the mirror
-#   swap below run.
-# - On success, archives the install didn't end up using are pruned, apt's
-#   partial/ and lock are removed, and the count goes to $GITHUB_OUTPUT as
-#   `debs` so action.yml skips saving an empty cache.
+# - apt takes any archive-dir file of the right name and size without
+#   hashing it. So before every index-based install, a cached .deb is
+#   deleted when the index lists its package but not its SHA256. Packages
+#   that changed since the cache was saved then download as usual.
+# - apt-get update exits 0 when it can't reach the mirror at all; it only
+#   prints "W: Failed to fetch". An update that couldn't fetch from a host
+#   the Ubuntu sources name, or left an index that can't resolve the
+#   requested packages, counts as failed, and the
+#   cached archives are then installed as local files with --no-download,
+#   so a warm cache survives a mirror that is down. That install trusts the
+#   cache as saved (every saved .deb was hash-checked by apt or by the step
+#   above), and never feeds a save. If it fails, the mirror swap runs.
+# - After an index-based install, archives it didn't use are pruned, apt's
+#   partial/ and lock are removed, and $GITHUB_OUTPUT gets `fresh`: how many
+#   kept archives weren't restored. action.yml saves only when it's non-zero.
 set -euo pipefail
 shopt -s nullglob
 
@@ -46,9 +49,11 @@ archive_dir="${APT_ARCHIVE_DIR:-}"
 lock_deadline=""
 
 apt_opts=()
+restored=""
 if [ -n "$archive_dir" ]; then
   mkdir -p "$archive_dir"
   apt_opts=(-o "Dir::Cache::Archives=$archive_dir" -o APT::Keep-Downloaded-Packages=true)
+  for f in "$archive_dir"/*.deb; do restored+="${f##*/}"$'\n'; done
 fi
 
 lock_wait_left() {
@@ -61,8 +66,27 @@ lock_wait_left() {
   fi
 }
 
+# Sets ubuntu_unreachable when apt couldn't fetch an index from a host the
+# Ubuntu sources name, which it reports as a warning with exit 0. Failures
+# from the runner's third-party sources (Microsoft's, say) don't count.
+read -r -a ubuntu_sources <<< "${UBUNTU_SOURCES:-/etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources}"
+ubuntu_unreachable=false
 apt_update() {
-  sudo timeout -k 30 "$1" apt-get update -qq
+  local out rc=0 host failed
+  out="$(sudo timeout -k 30 "$1" apt-get update -qq 2>&1)" || rc=$?
+  [ -z "$out" ] || printf '%s\n' "$out"
+  ubuntu_unreachable=false
+  failed="$(grep -E '^[WE]: Failed to fetch ' <<< "$out")" || return "$rc"
+  while read -r host; do
+    if grep -qF "Failed to fetch ${host}/" <<< "$failed"; then
+      ubuntu_unreachable=true
+    fi
+  done < <(cat "${ubuntu_sources[@]}" 2>/dev/null | grep -oE 'https?://[^/ ]+' | sort -u)
+  return "$rc"
+}
+# The index can resolve every requested package (empty lists can't).
+index_ready() {
+  apt-cache show --no-all-versions "${packages[@]}" >/dev/null 2>&1
 }
 # Extra arguments (--no-download, local .deb paths) go after the package list.
 apt_install() {
@@ -89,54 +113,77 @@ recover_dpkg() {
   fi
 }
 
-# Deletes every cached .deb whose content hash the current index doesn't list.
+# Deletes each cached .deb whose package the index lists without its SHA256.
+# A package the index doesn't list at all can't be installed from the index,
+# so its archive stays for the offline path.
 verify_cached_debs() {
+  [ -n "$archive_dir" ] || return 0
   local debs=("$archive_dir"/*.deb)
   [ "${#debs[@]}" -gt 0 ] || return 0
-  local names=() f base sum known kept=0
+  local names=() f base name sum records
   for f in "${debs[@]}"; do
     base="${f##*/}"
     names+=("${base%%_*}")
   done
-  # apt-cache exits non-zero when any one name is gone from the index; the
-  # records it did print still count. An empty result drops everything,
-  # which only costs a download.
-  known="$(apt-cache show "${names[@]}" 2>/dev/null | sed -n 's/^SHA256: //p')" || true
+  # One "name sha256" line per indexed version. apt-cache exits non-zero when
+  # any one name is missing; the records it printed for the rest still count.
+  records="$(apt-cache show "${names[@]}" 2>/dev/null |
+    awk '/^Package: /{p=$2} /^SHA256: /{print p, $2}')" || true
+  if [ -z "$records" ]; then
+    echo "::warning::the apt index lists none of the ${#debs[@]} cached packages; nothing to check them against"
+    return 0
+  fi
+  local matched=0 dropped=0 unknown=0
   for f in "${debs[@]}"; do
+    base="${f##*/}"
+    name="${base%%_*}"
+    if ! grep -q "^${name} " <<< "$records"; then
+      unknown=$((unknown + 1))
+      continue
+    fi
     sum="$(sha256sum "$f")"
     sum="${sum%% *}"
-    if [ -n "$known" ] && grep -qxF "$sum" <<< "$known"; then
-      kept=$((kept + 1))
+    if grep -qxF "${name} ${sum}" <<< "$records"; then
+      matched=$((matched + 1))
     else
       sudo rm -f "$f"
+      dropped=$((dropped + 1))
+      # A good copy downloaded under the same name is new to the cache.
+      restored="$(grep -vxF "$base" <<< "$restored")" || true
     fi
   done
-  echo "apt cache: ${kept} of ${#debs[@]} cached .deb archives match the index"
+  echo "apt cache: ${matched} of ${#debs[@]} cached .deb archives match the index, ${dropped} dropped, ${unknown} not in it"
 }
 
 install_offline() {
+  [ -n "$archive_dir" ] || return 1
   local debs=("$archive_dir"/*.deb)
   [ "${#debs[@]}" -gt 0 ] || return 1
-  echo "::warning::apt-get update failed; installing the ${#debs[@]} cached .deb archives without the network"
-  apt_install --no-download "${debs[@]}"
+  echo "::warning::the Ubuntu mirror is unreachable; installing the ${#debs[@]} cached .deb archives without the network"
+  if apt_install --no-download "${debs[@]}"; then return 0; fi
+  echo "::warning::installing from the cached archives failed; trying the mirrors"
+  recover_dpkg
+  return 1
 }
 
-# Keeps only the archives of package versions now installed, so the saved
-# cache is exactly what this install used.
+# Keeps only the archives of package versions now installed, so a saved
+# cache is exactly what this install used. Skipped after an offline install,
+# which reports nothing fresh, so it never saves.
 finish() {
   [ -n "$archive_dir" ] || return 0
-  local installed f base kept=0
+  local installed f base name kept=0 fresh=0
   installed="$(dpkg-query -W -f='${Package}_${Version}_${Architecture}\n' 2>/dev/null)" || true
   if [ -z "$installed" ]; then
     echo "::warning::dpkg-query listed nothing; not caching any .deb archives"
   fi
   for f in "$archive_dir"/*.deb; do
-    base="${f##*/}"
-    base="${base%.deb}"
+    name="${f##*/}"
+    base="${name%.deb}"
     # apt names archives name_version_arch.deb with ':' (epochs) as %3a.
     base="$(printf '%b' "${base//%/\\x}")"
     if [ -n "$installed" ] && grep -qxF "$base" <<< "$installed"; then
       kept=$((kept + 1))
+      grep -qxF "$name" <<< "$restored" || fresh=$((fresh + 1))
     else
       sudo rm -f "$f"
     fi
@@ -144,17 +191,17 @@ finish() {
   sudo rm -rf "$archive_dir/partial" "$archive_dir/lock"
   # apt wrote the archives as root; actions/cache runs as the runner user.
   sudo chown -R "$(id -u):$(id -g)" "$archive_dir"
-  echo "apt cache: keeping ${kept} .deb archives"
-  echo "debs=${kept}" >> "${GITHUB_OUTPUT:-/dev/null}"
+  echo "apt cache: keeping ${kept} .deb archives, ${fresh} of them new to the cache"
+  echo "fresh=${fresh}" >> "${GITHUB_OUTPUT:-/dev/null}"
 }
 
 azure_lists_ok=false
-if apt_update "$update_budget"; then
+if apt_update "$update_budget" && ! $ubuntu_unreachable && index_ready; then
   azure_lists_ok=true
-  [ -z "$archive_dir" ] || verify_cached_debs
+  verify_cached_debs
   if apt_install; then finish; exit 0; fi
-elif [ -n "$archive_dir" ] && install_offline; then
-  finish
+elif install_offline; then
+  echo "fresh=0" >> "${GITHUB_OUTPUT:-/dev/null}"
   exit 0
 fi
 
@@ -171,6 +218,7 @@ if $azure_lists_ok; then
   done
 else
   apt_update "$((update_budget * 3))" || apt_update "$((update_budget * 3))"
+  verify_cached_debs
 fi
 
 for i in 1 2 3; do

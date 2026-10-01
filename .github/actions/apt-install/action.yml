@@ -21,20 +21,28 @@ inputs:
 runs:
   using: composite
   steps:
-    # One key per runner image and package set, shared by every job that asks
-    # for the same packages (all four Integration shards share one). A new
-    # image version restores the previous one's archives through the prefix;
-    # install.sh drops whatever no longer matches the index.
+    # The cache is scoped by runner image and package set, so every job asking
+    # for the same packages shares it (all four Integration shards do). Each
+    # save gets its own key and restores take the newest entry under the
+    # prefix, so a run that had to fetch an updated package saves a cache that
+    # includes it; runs that fetched nothing save nothing. A new image version
+    # falls back to the previous one's archives, and install.sh drops whatever
+    # no longer matches the index.
     - name: Key the .deb archive cache
       id: key
       shell: bash
       env:
         PACKAGES: ${{ inputs.packages }}
+        RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
       run: |
         hash=$(printf '%s\n' $PACKAGES | sort -u | sha256sum | cut -c1-16)
         prefix="apt-debs-v1-${ImageOS:-unknown}-${RUNNER_ARCH}-${hash}-"
-        echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
-        echo "key=${prefix}${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+        image="${prefix}${ImageVersion:-unknown}-"
+        {
+          echo "prefix=${prefix}"
+          echo "image=${image}"
+          echo "key=${image}${RUN_KEY}"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Restore cached .deb archives
       id: restore
@@ -42,7 +50,9 @@ runs:
       with:
         path: ${{ runner.temp }}/apt-archives
         key: ${{ steps.key.outputs.key }}
-        restore-keys: ${{ steps.key.outputs.prefix }}
+        restore-keys: |
+          ${{ steps.key.outputs.image }}
+          ${{ steps.key.outputs.prefix }}
 
     - name: apt-get install (cache, Azure mirror, then archive.ubuntu.com)
       id: install
@@ -55,9 +65,10 @@ runs:
       run: bash "${{ github.action_path }}/install.sh"
 
     # Composite steps stop at the first failure, so only a completed install
-    # is ever saved. An exact hit is immutable; nothing to save.
+    # is ever saved. When all four shards fetch the same thing, one save wins
+    # and the others log a warning.
     - name: Save .deb archives
-      if: steps.restore.outputs.cache-hit != 'true' && steps.install.outputs.debs != '0'
+      if: steps.install.outputs.fresh != '' && steps.install.outputs.fresh != '0'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/apt-archives

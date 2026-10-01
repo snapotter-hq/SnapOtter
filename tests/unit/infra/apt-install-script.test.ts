@@ -50,6 +50,8 @@ function stubDir(first: FirstInstall, opts: StubOpts = {}) {
     find: "exit 0",
     mv: "exit 0",
     sleep: "exec /bin/sleep 0.05",
+    // The index knows every requested package.
+    "apt-cache": "exit 0",
     // Without fuser (exit 127), recover_dpkg can't wait and apt's own lock timeout must.
     fuser: opts.noFuser ? "exit 127" : `[ -e "${lock}" ]`,
     dpkg: `echo "dpkg $*" >> "${calls}"
@@ -171,9 +173,24 @@ describe.skipIf(process.platform === "win32")("apt-install action script (#1786)
 // sha256sum is stubbed to print the file's text. apt-get takes a package from
 // the archive dir when a file of the right name is there (real apt only checks
 // the size), otherwise downloads it, or fails when the mirror is down.
-const INDEX = ["qpdf 11.9.0-1 sha-qpdf-new", "ghostscript 10.02.1-1 sha-gs"];
+const INDEX = [
+  "qpdf 11.9.0-1 sha-qpdf-new",
+  "ghostscript 10.02.1-1 sha-gs",
+  // apt writes the epoch's ':' as %3a in the archive's filename.
+  "libx11-6 2:1.8.7-1 sha-x11",
+];
+const QPDF = "qpdf_11.9.0-1_amd64.deb";
+const GS = "ghostscript_10.02.1-1_amd64.deb";
+const X11 = "libx11-6_2%3a1.8.7-1_amd64.deb";
+const WARM = { [QPDF]: "sha-qpdf-new", [GS]: "sha-gs", [X11]: "sha-x11" };
 
-function cacheStubDir(mirror: "up" | "down", cached: Record<string, string>) {
+/**
+ * up: healthy. down: every Ubuntu fetch fails (the index files from before
+ * stay usable, as apt keeps them). down-then-up: only the first update fails.
+ */
+type Mirror = "up" | "down" | "down-then-up";
+
+function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
   const dir = mkdtempSync(join(tmpdir(), "apt-cache-"));
   const bin = join(dir, "bin");
   const archives = join(dir, "archives");
@@ -186,6 +203,14 @@ function cacheStubDir(mirror: "up" | "down", cached: Record<string, string>) {
   }
   writeFileSync(index, `${INDEX.join("\n")}\n`);
   writeFileSync(status, "");
+  writeFileSync(calls, "");
+  writeFileSync(
+    join(dir, "ubuntu.sources"),
+    "Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\n",
+  );
+  // Whether the mirror answers right now: "down-then-up" recovers once the
+  // first update has been tried.
+  const reachable = `{ [ "${mirror}" = up ] || { [ "${mirror}" = down-then-up ] && [ "$(grep -c ' update ' "${calls}")" -gt 1 ]; }; }`;
   const stubs: Record<string, string> = {
     sudo: 'exec "$@"',
     timeout: 'shift 3; exec "$@"',
@@ -199,6 +224,7 @@ function cacheStubDir(mirror: "up" | "down", cached: Record<string, string>) {
     "apt-cache": `shift
 rc=0
 for n in "$@"; do
+  case "$n" in -*) continue ;; esac
   if grep -q "^$n " "${index}"; then
     grep "^$n " "${index}" | while read -r p v s; do printf "Package: %s\\nVersion: %s\\nSHA256: %s\\n\\n" "$p" "$v" "$s"; done
   else
@@ -208,8 +234,13 @@ done
 exit $rc`,
     "apt-get": `echo "apt-get $*" >> "${calls}"
 case " $* " in *" update "*)
-  if [ "${mirror}" = up ]; then exit 0; fi
-  echo "E: Failed to fetch InRelease  Could not connect" >&2; exit 100 ;;
+  # Real apt: an unreachable mirror is a warning, and the exit code is 0. A
+  # third-party source on the runner failing must not count against Ubuntu.
+  echo "W: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  Could not connect" >&2
+  ${reachable} && exit 0
+  echo "W: Failed to fetch http://azure.archive.ubuntu.com/ubuntu/dists/noble/InRelease  Could not connect to azure.archive.ubuntu.com:80" >&2
+  echo "W: Some index files failed to download. They have been ignored, or old ones used instead." >&2
+  exit 0 ;;
 esac
 adir=$(echo "$*" | sed -nE 's/.*Dir::Cache::Archives=([^ ]+).*/\\1/p')
 offline=0; case " $* " in *" --no-download "*) offline=1 ;; esac
@@ -225,7 +256,7 @@ for p in $pkgs; do
   if [ "$offline" = 1 ]; then
     hit=""
     for l in $locals; do case "\${l##*/}" in "\${p}_"*) hit="$l" ;; esac; done
-    if [ -z "$hit" ]; then echo "E: Unable to locate package $p" >&2; exit 100; fi
+    if [ -z "$hit" ]; then echo "E: Can't find a source to download version of $p" >&2; exit 100; fi
     b="\${hit##*/}"; b="\${b%.deb}"; echo "$b" | sed 's/%3a/:/g' >> "${status}"
     echo "offline $p" >> "${calls}"
     continue
@@ -234,8 +265,8 @@ for p in $pkgs; do
   set -- $line; v=$2; s=$3
   f="$adir/\${p}_$(echo "$v" | sed 's/:/%3a/g')_amd64.deb"
   if [ -e "$f" ]; then
-    echo "cached $p" >> "${calls}"
-  elif [ "${mirror}" = up ]; then
+    echo "cached $p $(cat "$f")" >> "${calls}"
+  elif ${reachable}; then
     printf "%s" "$s" > "$f"; echo "downloaded $p" >> "${calls}"
   else
     echo "E: Failed to fetch $p" >&2; exit 100
@@ -249,10 +280,10 @@ done`,
     writeFileSync(path, `#!/bin/bash\n${body}\n`);
     chmodSync(path, 0o755);
   }
-  return { dir, archives, calls, status };
+  return { dir, archives, calls };
 }
 
-function runCached(mirror: "up" | "down", cached: Record<string, string> = {}) {
+function runCached(mirror: Mirror, cached: Record<string, string> = {}) {
   const stub = cacheStubDir(mirror, cached);
   const output = join(stub.dir, "github_output");
   writeFileSync(output, "");
@@ -261,12 +292,13 @@ function runCached(mirror: "up" | "down", cached: Record<string, string> = {}) {
     timeout: 30_000,
     env: {
       PATH: `${join(stub.dir, "bin")}:${process.env.PATH}`,
-      PACKAGES: "qpdf ghostscript",
+      PACKAGES: "qpdf ghostscript libx11-6",
       UPDATE_TIMEOUT: "1",
       INSTALL_TIMEOUT: "1",
       DPKG_LOCK_WAIT: "1",
       APT_ARCHIVE_DIR: stub.archives,
       GITHUB_OUTPUT: output,
+      UBUNTU_SOURCES: join(stub.dir, "ubuntu.sources"),
     },
   });
   const read = (p: string) => (existsSync(p) ? readFileSync(p, "utf8") : "");
@@ -280,76 +312,95 @@ function runCached(mirror: "up" | "down", cached: Record<string, string> = {}) {
   };
 }
 
-const QPDF = "qpdf_11.9.0-1_amd64.deb";
-const GS = "ghostscript_10.02.1-1_amd64.deb";
-
 describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#1801)", () => {
   it("on a miss, downloads into the archive dir and leaves only installed .debs to save", () => {
     const run = runCached("up");
     expect(run.status, run.output).toBe(0);
     expect(run.calls).toContain("downloaded qpdf");
-    expect(run.calls).toContain("downloaded ghostscript");
+    expect(run.calls).toContain("downloaded libx11-6");
     expect(run.calls).toContain("Dir::Cache::Archives=");
     // apt's own partial/ and lock must not end up in the saved cache.
-    expect(run.archives).toEqual([GS, QPDF]);
-    expect(run.githubOutput).toContain("debs=2");
+    expect(run.archives).toEqual([GS, X11, QPDF]);
+    expect(run.githubOutput).toBe("fresh=3\n");
   });
 
-  it("on a hit, installs from the cache without downloading anything", () => {
-    const run = runCached("up", { [QPDF]: "sha-qpdf-new", [GS]: "sha-gs" });
+  it("on a hit, installs from the cache without downloading, and asks for no save", () => {
+    const run = runCached("up", WARM);
     expect(run.status, run.output).toBe(0);
     expect(run.calls).not.toContain("downloaded");
-    expect(run.calls).toContain("cached qpdf");
-    expect(run.calls).toContain("cached ghostscript");
-    expect(run.output).toContain("2 of 2 cached .deb archives match the index");
+    expect(run.calls).toContain("cached qpdf sha-qpdf-new");
+    expect(run.calls).toContain("cached libx11-6 sha-x11");
+    expect(run.output).toContain("3 of 3 cached .deb archives match the index, 0 dropped");
+    expect(run.archives).toEqual([GS, X11, QPDF]);
+    expect(run.githubOutput).toBe("fresh=0\n");
   });
 
-  it("drops a cached .deb whose version the index no longer carries and fetches the new one", () => {
-    const run = runCached("up", { "qpdf_11.8.0-1_amd64.deb": "sha-qpdf-old", [GS]: "sha-gs" });
+  it("drops a cached .deb whose version the index no longer carries, fetches the new one, and saves", () => {
+    const run = runCached("up", {
+      "qpdf_11.8.0-1_amd64.deb": "sha-qpdf-old",
+      [GS]: "sha-gs",
+      [X11]: "sha-x11",
+    });
     expect(run.status, run.output).toBe(0);
     expect(run.calls).toContain("downloaded qpdf");
     expect(run.calls).toContain("cached ghostscript");
-    expect(run.archives).toEqual([GS, QPDF]);
+    expect(run.archives).toEqual([GS, X11, QPDF]);
+    expect(run.githubOutput).toBe("fresh=1\n");
   });
 
   it("never installs a cached .deb whose hash isn't in the signed index", () => {
     // Right filename and (for real apt) right size, wrong bytes: apt alone
     // would take it from the archive dir without checking the hash.
-    const run = runCached("up", { [QPDF]: "sha-tampered", [GS]: "sha-gs" });
+    const run = runCached("up", { ...WARM, [QPDF]: "sha-tampered" });
     expect(run.status, run.output).toBe(0);
-    expect(run.output).toContain("1 of 2 cached .deb archives match the index");
+    expect(run.output).toContain("2 of 3 cached .deb archives match the index, 1 dropped");
+    expect(run.calls).not.toContain("sha-tampered");
     expect(run.calls).toContain("downloaded qpdf");
+    expect(run.archive(QPDF)).toBe("sha-qpdf-new");
+    // Same filename as the bad copy, but new to the cache: save the good one.
+    expect(run.githubOutput).toBe("fresh=1\n");
+  });
+
+  it("installs from the cache with no network when the mirror is unreachable", () => {
+    // apt-get update exits 0 here, as real apt does; only its warning says
+    // the mirror was never reached.
+    const run = runCached("down", WARM);
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain("installing the 3 cached .deb archives without the network");
+    expect(run.calls).toMatch(/apt-get .*install .*--no-download/);
+    expect(run.calls).toContain("offline qpdf");
+    expect(run.calls).toContain("offline libx11-6");
+    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
+    // Nothing that bypassed the index check is ever saved.
+    expect(run.githubOutput).toBe("fresh=0\n");
+  });
+
+  it("checks the cache against the index after the mirror swap too", () => {
+    // The first update can't reach the mirror, the offline install fails (a
+    // package isn't cached), and the swapped mirror answers. The tampered
+    // qpdf archive must not ride along into that install.
+    const run = runCached("down-then-up", { [QPDF]: "sha-tampered", [GS]: "sha-gs" });
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain("installing from the cached archives failed");
+    expect(run.output).toContain("swapping to archive.ubuntu.com");
+    expect(run.calls).not.toContain("sha-tampered");
     expect(run.archive(QPDF)).toBe("sha-qpdf-new");
   });
 
-  it("installs from the cache with no network when the mirror is down", () => {
-    const run = runCached("down", { [QPDF]: "sha-qpdf-new", [GS]: "sha-gs" });
-    expect(run.status, run.output).toBe(0);
-    expect(run.output).toContain("installing the 2 cached .deb archives without the network");
-    expect(run.calls).toMatch(/apt-get .*install .*--no-download/);
-    expect(run.calls).toContain("offline qpdf");
-    expect(run.calls).toContain("offline ghostscript");
-    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
-  });
-
-  it("falls back to the mirror swap, and still fails bounded, when the mirror is down and nothing is cached", () => {
+  it("still fails, bounded, when the mirror is down and nothing is cached", () => {
     const run = runCached("down");
-    // Both post-swap updates fail, so set -e exits with apt-get's own code.
-    expect(run.status, run.output).not.toBe(0);
-    expect(run.output).toContain("swapping to archive.ubuntu.com");
+    expect(run.status, run.output).toBe(1);
+    expect(run.output).toContain("re-roll 3/3");
     expect(run.calls).not.toContain("--no-download");
+    expect(run.githubOutput).toBe("");
   });
 
   it("prunes cached .debs this install didn't use before the cache is saved", () => {
-    // A restore-key hit from an older runner image can carry archives no
-    // longer needed.
-    const run = runCached("up", {
-      [QPDF]: "sha-qpdf-new",
-      [GS]: "sha-gs",
-      "libfoo1_1.0-1_amd64.deb": "sha-foo",
-    });
+    // A restore from an older runner image can carry archives no longer
+    // needed. The index doesn't list libfoo1, so the check leaves it alone.
+    const run = runCached("up", { ...WARM, "libfoo1_1.0-1_amd64.deb": "sha-foo" });
     expect(run.status, run.output).toBe(0);
-    expect(run.archives).toEqual([GS, QPDF]);
-    expect(run.githubOutput).toContain("debs=2");
+    expect(run.output).toContain("1 not in it");
+    expect(run.archives).toEqual([GS, X11, QPDF]);
   });
 });
