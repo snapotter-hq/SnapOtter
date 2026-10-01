@@ -65,7 +65,10 @@ async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
   return config;
 }
 
-// openid-client waits 30s by default; a logout click shouldn't.
+// openid-client waits 30s by default; a logout click shouldn't. This is a
+// race rather than discovery's own `timeout` option because that option is
+// copied onto the cached Configuration, so a logout that filled the cache
+// would also cut the login token exchange down to 5s.
 const LOGOUT_DISCOVERY_TIMEOUT_MS = 5_000;
 
 /**
@@ -79,12 +82,7 @@ async function discoverForLogout(): Promise<oidc.Configuration> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(
-      () =>
-        reject(
-          new SafeError(`OIDC discovery did not answer within ${LOGOUT_DISCOVERY_TIMEOUT_MS} ms`, {
-            code: "OIDC_DISCOVERY_TIMEOUT",
-          }),
-        ),
+      () => reject(new SafeError("OIDC discovery timed out", { code: "OIDC_DISCOVERY_TIMEOUT" })),
       LOGOUT_DISCOVERY_TIMEOUT_MS,
     );
   });

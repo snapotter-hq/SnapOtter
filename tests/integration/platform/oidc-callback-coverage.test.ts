@@ -98,6 +98,7 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sanitizeUsername, UsernameRaceExhaustedError } = await import(
   "../../../apps/api/src/lib/external-auth-resolver.js"
 );
+const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
 const mfaModule = await import("../../../apps/api/src/plugins/mfa.js");
 const oidcModule = await import("../../../apps/api/src/plugins/oidc.js");
 const { getOidcEndSessionEndpoint } = oidcModule;
@@ -243,6 +244,20 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     mockServer = createServer((req, res) => {
       if (req.url?.startsWith("/hang/")) {
         hungResponses.push(res);
+        return;
+      }
+      // A provider that advertises no end_session_endpoint (#1787).
+      if (req.url === "/noend/.well-known/openid-configuration") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            issuer: `http://localhost:${mockPort}/noend`,
+            authorization_endpoint: `http://localhost:${mockPort}/authorize`,
+            token_endpoint: `http://localhost:${mockPort}/token`,
+            jwks_uri: `http://localhost:${mockPort}/jwks`,
+            response_types_supported: ["code"],
+          }),
+        );
         return;
       }
       if (req.url === "/.well-known/openid-configuration") {
@@ -611,6 +626,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     // Operational: an unreachable or broken IdP is an environment problem,
     // not a SnapOtter bug, so it reaches Sentry as a throttled warning.
     expect(err).toMatchObject({ name: "SafeError", kind: "operational", code });
+    // The real classifier must agree: an abort-shaped cause, say, would make
+    // it drop the event as "expected" and nothing would reach Sentry.
+    expect(classifyError(err, "http")).toBe("operational");
     return err as Error;
   }
 
@@ -626,6 +644,50 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       const err = expectReportedDiscoveryFault("OIDC_DISCOVERY_FAILED");
       expect(err.cause).toBeInstanceOf(Error);
     } finally {
+      (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+    }
+  });
+
+  it("omits logoutUrl without reporting when a cold-cache discovery finds no end_session_endpoint (#1787)", async () => {
+    const sessionToken = await oidcSessionWithWarmCache();
+    oidcModule.resetOidcDiscoveryCacheForTests();
+    (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/noend`;
+    try {
+      const res = await logoutWithSession(sessionToken);
+
+      await expectLoggedOutLocally(res, sessionToken);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+      // This discovery succeeded, so the cache now holds the /noend document.
+      oidcModule.resetOidcDiscoveryCacheForTests();
+    }
+  });
+
+  // Only an ID-token session with OIDC on needs the IdP. Any other logout on a
+  // cold cache must not wait on discovery, even with the IdP hanging.
+  it("never runs discovery on a cold cache for a logout that has no IdP session to end (#1787)", async () => {
+    const oidcToken = await oidcSessionWithWarmCache();
+    const passwordToken = await loginAsAdmin(oidcApp.app);
+    oidcModule.resetOidcDiscoveryCacheForTests();
+    (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/hang`;
+    try {
+      const started = Date.now();
+      const passwordRes = await oidcApp.app.inject({
+        method: "POST",
+        url: "/api/auth/logout",
+        headers: { authorization: `Bearer ${passwordToken}` },
+      });
+      (env as any).OIDC_ENABLED = false;
+      const oidcOffRes = await logoutWithSession(oidcToken);
+
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(passwordRes.json()).toEqual({ ok: true });
+      await expectLoggedOutLocally(oidcOffRes, oidcToken);
+      expect(hungResponses).toHaveLength(0);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      (env as any).OIDC_ENABLED = true;
       (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
     }
   });
