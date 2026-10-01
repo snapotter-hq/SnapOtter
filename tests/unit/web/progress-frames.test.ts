@@ -1,6 +1,20 @@
 // @vitest-environment jsdom
+import { isSafeMessageError } from "@snapotter/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { failedFrameMessage, frameFailure, parseResultBody } from "@/lib/progress-frames";
+
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
+
+import { captureHandledError } from "@/lib/analytics";
+import {
+  failedFrameMessage,
+  frameFailure,
+  MalformedResultError,
+  parseResultBody,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
 
 describe("failedFrameMessage (#1432)", () => {
   it("appends the operator hint an engine-unavailable frame carries", () => {
@@ -63,7 +77,32 @@ describe("parseResultBody (#1354)", () => {
     ["a number", "42"],
     ["an array", "[]"],
   ])("throws for %s", (_label, text) => {
-    expect(() => parseResultBody(text)).toThrow();
+    expect(() => parseResultBody(text)).toThrow(MalformedResultError);
+  });
+
+  // #1740: an object with nothing to download is no result either. Every
+  // caller lands `downloadUrl` as the entry's result, and every sync 2xx the
+  // API sends carries one.
+  it.each([
+    ["an empty object", "{}"],
+    ["a job id alone", '{"jobId":"j"}'],
+    ["a blank download URL", '{"downloadUrl":""}'],
+    ["a non-string download URL", '{"downloadUrl":42}'],
+  ])("throws for %s", (_label, text) => {
+    expect(() => parseResultBody(text)).toThrow(MalformedResultError);
+  });
+
+  // What it throws gets reported, so it must carry nothing from the body: no
+  // cause (Sentry appends a SafeError's cause, and JSON.parse quotes the text
+  // it choked on) and a message that is one of two constants.
+  it.each([
+    ["markup", "<html>secret-token</html>"],
+    ["an object without a URL", '{"note":"secret-token"}'],
+  ])("throws a constant, causeless error for %s", (_label, text) => {
+    const thrown = rejection(text);
+    expect(isSafeMessageError(thrown)).toBe(true);
+    expect(thrown.message).not.toContain("secret-token");
+    expect(thrown.cause).toBeUndefined();
   });
 
   it("moves result URLs under the deployment prefix", async () => {
@@ -74,5 +113,62 @@ describe("parseResultBody (#1354)", () => {
     expect(
       parseUnderPrefix<{ downloadUrl: string }>('{"downloadUrl":"/api/v1/download/j/out.png"}'),
     ).toEqual({ downloadUrl: "/snapotter/api/v1/download/j/out.png" });
+  });
+});
+
+/** What parseResultBody throws for a body it rejects. */
+function rejection(text: string): Error {
+  try {
+    parseResultBody(text);
+  } catch (err) {
+    return err as Error;
+  }
+  throw new Error(`parseResultBody accepted ${text}`);
+}
+
+// #1740: a malformed 2xx is a server bug the client sees and nobody else hears
+// about, so it goes to Sentry with a constant message and nothing from the body.
+describe("reportMalformedResult (#1740)", () => {
+  afterEach(() => {
+    vi.mocked(captureHandledError).mockClear();
+  });
+
+  function reported(): { error: Error; tags: Record<string, string> | undefined } {
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    return { error, tags };
+  }
+
+  it("reports a body with no download URL, with the status and tool", () => {
+    reportMalformedResult(rejection('{"note":"secret-token"}'), { status: 200, toolId: "resize" });
+
+    const { error, tags } = reported();
+    expect(isSafeMessageError(error)).toBe(true);
+    expect(error.name).toBe("ResultWithoutDownloadError");
+    expect(error.message).toBe("Tool result has no download URL");
+    expect(error.cause).toBeUndefined();
+    expect((error as { statusCode?: number }).statusCode).toBe(200);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
+  });
+
+  // Every report is built at the same line, so Sentry, which groups a stack
+  // by exception type, only tells the two apart by the type.
+  it("names a body that is not an object apart from one with no download URL", () => {
+    reportMalformedResult(rejection("<html>secret-token</html>"), { status: 200 });
+
+    const { error, tags } = reported();
+    expect(error.name).toBe("ResultNotAnObjectError");
+    expect(error.message).toBe("Tool result body is not a JSON object");
+    expect(tags).toEqual({ error_class: "operational" });
+  });
+
+  it("never forwards an error it did not make, nor blames the server for it", () => {
+    reportMalformedResult(new SyntaxError('Unexpected token "secret-token"'), { status: 200 });
+
+    const { error } = reported();
+    expect(isSafeMessageError(error)).toBe(true);
+    expect(error.name).toBe("ResultUnreadableError");
+    expect(error.message).toBe("Tool result could not be read");
+    expect(error.cause).toBeUndefined();
   });
 });

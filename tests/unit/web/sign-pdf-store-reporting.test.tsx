@@ -577,6 +577,76 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
   });
 });
 
+/**
+ * #1740: a result that isn't one is a server bug the user sees and nobody else
+ * hears about. Sign PDF said so on screen but never reported it, on either
+ * answer.
+ */
+describe("sign-pdf reports a malformed result", () => {
+  function expectReported(message: string, statusCode: number | undefined) {
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe(message);
+    expect(error.cause).toBeUndefined();
+    expect((error as { statusCode?: number }).statusCode).toBe(statusCode);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "sign-pdf" });
+  }
+
+  it.each([
+    ["an empty object", {}],
+    ["a job id with no download URL", { jobId: "job-1" }],
+  ])("reports a 200 with %s", async (_label, body) => {
+    renderPanel();
+
+    (await apply()).respond(200, body);
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(entry().status).not.toBe("completed");
+    expectReported("Tool result has no download URL", 200);
+  });
+
+  it("reports a 200 whose body does not parse, without its text", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    act(() => {
+      xhr.status = 200;
+      xhr.responseText = "<html>secret-token</html>";
+      xhr.onload?.();
+    });
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expectReported("Tool result body is not a JSON object", 200);
+  });
+
+  it("reports a streamed result with no download URL", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: { jobId: "job-1" } }),
+      });
+    });
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry().status).not.toBe("completed");
+    expect(entry().processedUrl).toBeNull();
+    expectReported("Tool result has no download URL", undefined);
+  });
+
+  it("reports nothing for a good result", async () => {
+    renderPanel();
+
+    (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
 describe("the navigation guard sees a sign end to end", () => {
   it("warns while it runs, offers the signed pdf, then goes quiet when it is taken", async () => {
     renderPanel();

@@ -11,8 +11,10 @@ import {
   frameFailure,
   type JobFailure,
   jobFailureMessage,
+  MalformedResultError,
   type ProgressFrame,
   parseResultBody,
+  reportMalformedResult,
 } from "@/lib/progress-frames";
 import {
   addSignature,
@@ -282,7 +284,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       if (landed) return;
       const url = typeof r.downloadUrl === "string" ? r.downloadUrl : null;
       if (!url) {
+        // Only the progress stream's result gets here: parseResultBody already
+        // turned a sync answer without one away. Still the server's bug (#1740).
         setError(t.errors.invalidResponse);
+        reportMalformedResult(new MalformedResultError("noDownloadUrl"), { toolId: "sign-pdf" });
         return;
       }
       landed = true;
@@ -346,15 +351,17 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       stopProgress();
       progressCleanupRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
-        // Only a body that doesn't parse is the server's fault. A throw while
-        // landing a good result is our own store writes failing: it ends the
-        // run the way the progress stream's handling error does, and still
-        // surfaces (#1354, the sync twin of #1287).
+        // Only a body that isn't a result is the server's fault, and it gets
+        // reported (#1740). A throw while landing a good result is our own
+        // store writes failing: it ends the run the way the progress stream's
+        // handling error does, and still surfaces (#1354, the sync twin of
+        // #1287).
         let result: Record<string, unknown> | null = null;
         try {
           result = parseResultBody<Record<string, unknown>>(xhr.responseText);
-        } catch {
+        } catch (err) {
           setError(t.errors.invalidResponse);
+          reportMalformedResult(err, { status: xhr.status, toolId: "sign-pdf" });
         }
         if (result) {
           try {

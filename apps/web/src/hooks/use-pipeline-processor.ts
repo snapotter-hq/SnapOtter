@@ -5,7 +5,12 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { FRAME_HANDLING_FAILED, type ProgressFrame, parseResultBody } from "@/lib/progress-frames";
+import {
+  FRAME_HANDLING_FAILED,
+  type ProgressFrame,
+  parseResultBody,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
@@ -610,17 +615,19 @@ export function usePipelineProcessor() {
         }
 
         let failure: string | null = null;
-        // Only a body that doesn't parse is the server's fault. A throw while
-        // writing a good result is our own store failing, which must not
-        // read as "Invalid response" and must still surface (#1354, the sync
-        // twin of #1287).
+        // Only a body that isn't a result is the server's fault, and it gets
+        // reported: the user sees it, so Sentry should too (#1740). A throw
+        // while writing a good result is our own store failing, which must
+        // not read as "Invalid response" and must still surface (#1354, the
+        // sync twin of #1287).
         let handlingError: { cause: unknown } | null = null;
         if (xhr.status >= 200 && xhr.status < 300) {
           let result: ProcessResult | null = null;
           try {
             result = parseResultBody<ProcessResult>(xhr.responseText);
-          } catch {
+          } catch (err) {
             failure = "Invalid response from server";
+            reportMalformedResult(err, { status: xhr.status });
           }
           if (result) {
             try {

@@ -1,3 +1,5 @@
+import { SafeError } from "@snapotter/shared";
+import { captureHandledError } from "@/lib/analytics";
 import { resolveServerUrls } from "@/lib/app-url";
 
 /** A parsed `/api/v1/jobs/:id/progress` SSE frame: the fields handlers read. */
@@ -23,17 +25,82 @@ export interface ProgressFrame {
 export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this job. Try again.";
 
 /**
+ * Why a tool result isn't one. Each reason reports under its own constant
+ * message and exception type, so Sentry keeps a proxy's HTML page apart from
+ * an API answer with nothing to download: it groups a stack by type, and every
+ * report is built at the same spot in reportMalformedResult.
+ */
+const MALFORMED_RESULT = {
+  notAnObject: { type: "ResultNotAnObjectError", message: "Tool result body is not a JSON object" },
+  noDownloadUrl: { type: "ResultWithoutDownloadError", message: "Tool result has no download URL" },
+} as const;
+
+/** What a caller's catch got when it wasn't a MalformedResultError: our own bug. */
+const RESULT_UNREADABLE = {
+  type: "ResultUnreadableError",
+  message: "Tool result could not be read",
+};
+
+/**
+ * A tool result that isn't one: the server's bug, not ours. The message is a
+ * constant and there is never a cause, because the body may hold user data
+ * and a SafeError's cause gets appended to its Sentry message (#1740).
+ */
+export class MalformedResultError extends SafeError {
+  readonly reason: keyof typeof MALFORMED_RESULT;
+
+  constructor(reason: keyof typeof MALFORMED_RESULT) {
+    super(MALFORMED_RESULT[reason].message, { kind: "operational" });
+    this.name = "MalformedResultError";
+    this.reason = reason;
+  }
+}
+
+/**
  * Parses a sync 2xx tool response, the step that rejects a malformed body. It
- * throws unless the body is a JSON object. Callers write the result outside
- * the try around this, so a throw from their own store writes doesn't read as
- * "Invalid response" (#1354, the sync twin of #1287).
+ * throws a MalformedResultError unless the body is a JSON object with a
+ * non-empty `downloadUrl` string: every caller lands that URL as the entry's
+ * result, and every sync 2xx the API sends carries one (#1740). Callers write
+ * the result outside the try around this, so a throw from their own store
+ * writes doesn't read as "Invalid response" (#1354, the sync twin of #1287).
  */
 export function parseResultBody<T extends object>(text: string): T {
-  const body: unknown = JSON.parse(text);
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // Not rethrown or kept as the cause: a SyntaxError quotes the text.
+    throw new MalformedResultError("notAnObject");
+  }
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    throw new Error("The response body is not a JSON object");
+    throw new MalformedResultError("notAnObject");
+  }
+  const { downloadUrl } = body as { downloadUrl?: unknown };
+  if (typeof downloadUrl !== "string" || !downloadUrl) {
+    throw new MalformedResultError("noDownloadUrl");
   }
   return resolveServerUrls(body as T);
+}
+
+/**
+ * Reports a result parseResultBody (or a caller's own check) rejected, so a
+ * server bug the user sees reaches Sentry too (#1740). The report is rebuilt
+ * from a constant, never the error itself: anything else that lands here, a
+ * SyntaxError say, can quote the body. `status` is the HTTP status of a sync
+ * answer and goes on as the `status_code` tag.
+ */
+export function reportMalformedResult(
+  err: unknown,
+  { status, toolId }: { status?: number; toolId?: string },
+): void {
+  const { type, message } =
+    err instanceof MalformedResultError ? MALFORMED_RESULT[err.reason] : RESULT_UNREADABLE;
+  const report = new SafeError(message, { kind: "operational", statusCode: status });
+  report.name = type;
+  void captureHandledError(
+    report,
+    toolId ? { error_class: "operational", tool_id: toolId } : { error_class: "operational" },
+  );
 }
 
 /**

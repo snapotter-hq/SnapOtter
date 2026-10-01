@@ -11,6 +11,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -31,6 +32,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -80,6 +82,7 @@ function sendSingleFrame(frame: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(captureHandledError).mockClear();
   vi.stubGlobal("URL", {
     ...globalThis.URL,
     createObjectURL: vi.fn(() => "blob:fake-url"),
@@ -740,6 +743,90 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
     });
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+/**
+ * #1740: a 2xx body that isn't a result is a server bug the user sees and
+ * nobody else hears about. An object with no download URL (`{}`) used to land
+ * as a completed run with nothing behind it, and no malformed body was ever
+ * reported.
+ */
+describe("useToolProcessor malformed 2xx results (#1740)", () => {
+  function startRun() {
+    const file = new File([new ArrayBuffer(64)], "clip.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+    return hook;
+  }
+
+  function respond(body: string) {
+    xhrs[0].status = 200;
+    xhrs[0].responseText = body;
+    xhrs[0].onload?.();
+  }
+
+  function expectReported(message: string) {
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe(message);
+    expect(error.cause).toBeUndefined();
+    expect((error as { statusCode?: number }).statusCode).toBe(200);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "trim-video" });
+  }
+
+  it.each([
+    ["an empty object", "{}"],
+    ["a job id with no download URL", JSON.stringify({ jobId: "j", processedSize: 3 })],
+  ])("fails the run on %s and reports it", (_label, body) => {
+    const { result, unmount } = startRun();
+
+    act(() => respond(body));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+      processedUrl: null,
+    });
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(result.current.resultPayload).toBeNull();
+    expectReported("Tool result has no download URL");
+
+    unmount();
+  });
+
+  it("reports a body that does not parse, without its text", () => {
+    const { unmount } = startRun();
+
+    act(() => respond("<html>secret-token</html>"));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+    });
+    expectReported("Tool result body is not a JSON object");
+
+    unmount();
+  });
+
+  it("does not report an error response", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].status = 500;
+      xhrs[0].responseText = "<html>Internal Server Error</html>";
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]?.status).toBe("failed");
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
 
     unmount();
   });

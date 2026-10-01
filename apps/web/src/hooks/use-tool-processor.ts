@@ -18,6 +18,7 @@ import {
   failedFrameMessage,
   type ProgressFrame,
   parseResultBody,
+  reportMalformedResult,
 } from "@/lib/progress-frames";
 import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
@@ -806,18 +807,20 @@ export function useToolProcessor(toolId: string) {
           eventSourceRef.current = null;
         }
 
-        // Only a body that doesn't parse is the server's fault. A throw while
-        // landing a good result is our own store writes failing, which must
-        // not read as "Invalid response" and must still surface (#1354, the
-        // sync twin of #1287).
+        // Only a body that isn't a result is the server's fault, and it gets
+        // reported: the user sees it, so Sentry should too (#1740). A throw
+        // while landing a good result is our own store writes failing, which
+        // must not read as "Invalid response" and must still surface (#1354,
+        // the sync twin of #1287).
         let handlingError: { cause: unknown } | null = null;
         let failure: { message: string; category?: FeedbackErrorCategory } | null = null;
         if (xhr.status >= 200 && xhr.status < 300) {
           let result: ProcessResult | null = null;
           try {
             result = parseResultBody<ProcessResult>(xhr.responseText);
-          } catch {
+          } catch (err) {
             failure = { message: "Invalid response from server" };
+            reportMalformedResult(err, { status: xhr.status, toolId });
           }
           if (result) {
             try {

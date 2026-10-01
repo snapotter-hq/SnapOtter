@@ -1003,6 +1003,26 @@ test.describe("Server Error Handling", () => {
 
     await page.unroute("**/api/v1/tools/image/resize");
   });
+
+  test("a 200 with no download URL fails the run", async ({ loggedInPage: page }) => {
+    // #1740: an object with nothing to download used to land as a completed
+    // run with no result behind it.
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    await expect(
+      page.getByText("Invalid response from server").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Resize" })).toBeEnabled();
+
+    await page.unroute("**/api/v1/tools/image/resize");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -305,4 +305,23 @@ test.describe("Automate Page", () => {
     });
     await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
   });
+
+  test("a 200 with no download URL shows the failure card", async ({ loggedInPage: page }) => {
+    // #1740: an object with nothing to download used to land as a completed
+    // run with no result behind it.
+    const message = "Invalid response from server";
+    await page.route("**/api/v1/pipeline/execute", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+
+    await expect(page.locator("p", { hasText: message }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+  });
 });

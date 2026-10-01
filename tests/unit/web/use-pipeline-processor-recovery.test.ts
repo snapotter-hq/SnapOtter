@@ -11,6 +11,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -24,7 +25,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
-import { track } from "@/lib/analytics";
+import { captureHandledError, track } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
 
@@ -159,6 +160,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.mocked(track).mockClear();
+  vi.mocked(captureHandledError).mockClear();
 });
 
 function startSingleRun() {
@@ -1283,6 +1285,72 @@ describe("usePipelineProcessor sync result handling errors (#1354)", () => {
       error: "Invalid response from server",
     });
     expect(useFileStore.getState().processing).toBe(false);
+    unmount();
+  });
+});
+
+/**
+ * #1740: a 2xx body that isn't a result is a server bug the user sees and
+ * nobody else hears about. An object with no download URL (`{}`) used to land
+ * as a completed run with nothing behind it, and no malformed body was ever
+ * reported.
+ */
+describe("usePipelineProcessor malformed 2xx results (#1740)", () => {
+  function respond(status: number, body: string) {
+    xhrs[0].upload.onload?.();
+    xhrs[0].status = status;
+    xhrs[0].responseText = body;
+    xhrs[0].onload?.();
+  }
+
+  function expectReported(message: string) {
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe(message);
+    expect(error.cause).toBeUndefined();
+    expect((error as { statusCode?: number }).statusCode).toBe(200);
+    expect(tags).toEqual({ error_class: "operational" });
+  }
+
+  it.each([
+    ["an empty object", "{}"],
+    ["a result with no download URL", JSON.stringify({ ...SINGLE_RESULT, downloadUrl: undefined })],
+  ])("fails the run on %s and reports it", (_label, body) => {
+    const { unmount } = startSingleRun();
+
+    act(() => respond(200, body));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+      processedUrl: null,
+    });
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().processing).toBe(false);
+    expectReported("Tool result has no download URL");
+    unmount();
+  });
+
+  it("reports a body that does not parse, without its text", () => {
+    const { unmount } = startSingleRun();
+
+    act(() => respond(200, "<html>secret-token</html>"));
+
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expectReported("Tool result body is not a JSON object");
+    unmount();
+  });
+
+  it("lands a good result without reporting anything", () => {
+    const { unmount } = startSingleRun();
+
+    act(() => respond(200, JSON.stringify(SINGLE_RESULT)));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+    });
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
     unmount();
   });
 });
