@@ -696,13 +696,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       if (session?.idToken && env.OIDC_ENABLED) {
         // A null endpoint means a local-only logout without a fault: the IdP
-        // advertises no end_session_endpoint, or this process hasn't run
-        // discovery yet (#1787). Neither throws. A throw is a fault (oidc.js
-        // is imported at boot, so this is a guard): the session below is
-        // still destroyed, but the IdP session stays open, so report it.
+        // advertises no end_session_endpoint. A process that hasn't run
+        // discovery yet runs it now instead of skipping the IdP (#1787). A
+        // throw is a fault (a failed or timed-out discovery, or a broken
+        // import): the session below is still destroyed, but the IdP session
+        // stays open, so report it.
         try {
           const { getOidcEndSessionEndpoint } = await import("./oidc.js");
-          const endSessionEndpoint = getOidcEndSessionEndpoint();
+          const endSessionEndpoint = await getOidcEndSessionEndpoint();
           if (endSessionEndpoint) {
             const params = new URLSearchParams({
               id_token_hint: session.idToken,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {} from "@fastify/cookie";
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as oidc from "openid-client";
@@ -65,14 +65,50 @@ async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
   return config;
 }
 
+// openid-client waits 30s by default; a logout click shouldn't.
+const LOGOUT_DISCOVERY_TIMEOUT_MS = 5_000;
+
 /**
- * Returns the cached end_session_endpoint for RP-initiated logout,
- * or null if OIDC discovery has not been completed yet.
+ * Discovery for the logout path, bounded by LOGOUT_DISCOVERY_TIMEOUT_MS and
+ * with every failure wrapped as an operational SafeError: an unreachable,
+ * slow, or misconfigured IdP is an environment problem, not a SnapOtter bug.
+ * A discovery that outlives the timeout keeps running and still fills the
+ * cache for the next logout; Promise.race handles its late rejection.
  */
-export function getOidcEndSessionEndpoint(): string | null {
-  if (!cachedConfig) return null;
-  const metadata = cachedConfig.config.serverMetadata();
-  return metadata.end_session_endpoint ?? null;
+async function discoverForLogout(): Promise<oidc.Configuration> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new SafeError(`OIDC discovery did not answer within ${LOGOUT_DISCOVERY_TIMEOUT_MS} ms`, {
+            code: "OIDC_DISCOVERY_TIMEOUT",
+          }),
+        ),
+      LOGOUT_DISCOVERY_TIMEOUT_MS,
+    );
+  });
+  const discovery = getOrDiscoverConfig().catch((cause: unknown) => {
+    throw new SafeError("OIDC discovery failed", { code: "OIDC_DISCOVERY_FAILED", cause });
+  });
+  try {
+    return await Promise.race([discovery, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The provider's end_session_endpoint for RP-initiated logout, or null when
+ * it advertises none. Any cached discovery is used as is, however old, so a
+ * warm process never waits on the IdP to log out. A cold one (fresh after a
+ * restart, or a replica that has served no login yet) discovers first:
+ * returning null there would skip the IdP logout and leave its session open
+ * (#1787). Rejects with a SafeError when that discovery fails or times out.
+ */
+export async function getOidcEndSessionEndpoint(): Promise<string | null> {
+  const config = cachedConfig?.config ?? (await discoverForLogout());
+  return config.serverMetadata().end_session_endpoint ?? null;
 }
 
 // ── Username helpers ──────────────────────────────────────────────
