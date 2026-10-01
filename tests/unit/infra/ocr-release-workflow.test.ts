@@ -123,6 +123,25 @@ describe("OCR v3 bundle release workflow", () => {
     expect(job(bundles, "build-ocr", "verify-ocr")).toContain(
       "Audit exact OCR runtime dependency lock",
     );
+
+    // The required "Python Dependency Audit" check must also cover the lock the
+    // HuggingFace publish job installs with the write token in scope (#1761).
+    const ciAuditJob = job(ci, "pip-audit", "ai-sidecar-rembg");
+    expect(ciAuditJob).toContain("name: Python Dependency Audit\n");
+    const lockStepStart = ciAuditJob.indexOf(
+      "- name: Audit exact OCR runtime and HF release dependency locks",
+    );
+    expect(lockStepStart, "lock audit step is missing").toBeGreaterThanOrEqual(0);
+    const lockStep = ciAuditJob.slice(lockStepStart);
+    const auditedLocks = [...lockStep.matchAll(/^ +(docker\/[\w.-]+\.txt)(?: \\|; do)$/gm)].map(
+      (match) => match[1],
+    );
+    expect(auditedLocks).toEqual([
+      "docker/ocr-runtime-requirements-amd64.txt",
+      "docker/ocr-runtime-requirements-arm64.txt",
+      "docker/hf-release-requirements.txt",
+    ]);
+    expect(lockStep).toContain('pip-audit -r "${requirements}" --no-deps --disable-pip --aliases');
   });
 
   it("scans and inventories both architecture-specific release images", () => {
@@ -661,7 +680,8 @@ describe("OCR v3 bundle release workflow", () => {
     expect(requirements).toContain("huggingface-hub==0.36.2");
     expect(requirements).toContain("hf-xet==");
     expect(requirements).toContain("--hash=sha256:");
-    // Same urllib3 advisories as the OCR runtime locks (#1760); CI only audits those.
+    // Same urllib3 advisories as the OCR runtime locks (#1760). CI's pip-audit
+    // job audits this lock too (#1761), so a new advisory turns the check red.
     expect(requirements).toMatch(
       /^urllib3==2\.8\.0 \\\n {4}--hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \\\n {4}--hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63$/m,
     );
