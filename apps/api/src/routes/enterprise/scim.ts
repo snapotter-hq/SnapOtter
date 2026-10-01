@@ -3,7 +3,6 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
-import { DEFAULT_TEAM_ID } from "../../db/schema.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
@@ -130,7 +129,9 @@ function emptyMemberSync(): MemberSync {
  * group to sync wins and the user leaves the team they were in. That stays the
  * behaviour (#1747); the move is now reported, so an admin can see why a
  * team's quota or policy stopped applying to someone. Coming from the Default
- * team, or re-adding a member the group already has, isn't a move.
+ * team, or re-adding a member the group already has, isn't a move. Default is
+ * the team named "Default", where removed members go: its id is only
+ * DEFAULT_TEAM_ID when the seed created it (#1474).
  */
 async function addMembers(
   executor: Pick<typeof db, "select" | "update">,
@@ -138,21 +139,47 @@ async function addMembers(
   members: ScimMember[],
   into: MemberSync,
 ): Promise<void> {
+  const [defaultTeam] = await executor
+    .select({ id: schema.teams.id })
+    .from(schema.teams)
+    .where(eq(schema.teams.name, "Default"));
+  const defaultId = defaultTeam?.id ?? schema.DEFAULT_TEAM_ID;
   for (const member of members) {
+    // Locked so a concurrent sync can't move the user between this read and
+    // the update, which would name the wrong team in the record.
     const [current] = await executor
       .select({ team: schema.users.team })
       .from(schema.users)
-      .where(eq(schema.users.id, member.value));
+      .where(eq(schema.users.id, member.value))
+      .for("update");
     const added = await executor
       .update(schema.users)
       .set({ team: teamId, updatedAt: new Date() })
       .where(eq(schema.users.id, member.value));
     if (!added.rowCount) {
       into.unknown.push(member.value);
-    } else if (current && current.team !== teamId && current.team !== DEFAULT_TEAM_ID) {
+    } else if (current && current.team !== teamId && current.team !== defaultId) {
       into.moved.push({ userId: member.value, fromTeam: current.team });
     }
   }
+}
+
+/**
+ * The sync as it stands once the request is done: each skipped id once, and
+ * only moves into users who are still members. An add followed by a remove in
+ * one PATCH moved the user out of their team but not into this one.
+ */
+function settleMemberSync(sync: MemberSync, finalMembers: { id: string }[]): MemberSync {
+  const stayed = new Set(finalMembers.map((member) => member.id));
+  const seen = new Set<string>();
+  return {
+    unknown: [...new Set(sync.unknown)],
+    moved: sync.moved.filter((move) => {
+      if (!stayed.has(move.userId) || seen.has(move.userId)) return false;
+      seen.add(move.userId);
+      return true;
+    }),
+  };
 }
 
 // A sync can name thousands of members; the audit row keeps the first few and
@@ -1075,7 +1102,6 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const sync = emptyMemberSync();
       if (members && members.length > 0) {
         await addMembers(db, id, members, sync);
-        warnMemberSync(request.log, id, "created", sync);
       }
 
       // Fetch actual members
@@ -1083,6 +1109,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         .select({ id: schema.users.id, username: schema.users.username })
         .from(schema.users)
         .where(eq(schema.users.team, id));
+      const settled = settleMemberSync(sync, teamMembers);
+      warnMemberSync(request.log, id, "created", settled);
 
       await auditLog(
         request.log,
@@ -1092,7 +1120,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           teamName: displayName,
           action: "created",
           memberCount: teamMembers.length,
-          ...memberSyncDetails(sync),
+          ...memberSyncDetails(settled),
         },
         request.ip,
         request.id,
@@ -1273,13 +1301,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
-      warnMemberSync(request.log, id, "replaced", sync);
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       const teamMembers = await db
         .select({ id: schema.users.id, username: schema.users.username })
         .from(schema.users)
         .where(eq(schema.users.team, id));
+      const settled = settleMemberSync(sync, teamMembers);
+      warnMemberSync(request.log, id, "replaced", settled);
 
       await auditLog(
         request.log,
@@ -1289,7 +1318,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           teamName: updatedTeam.name,
           action: "replaced",
           memberCount: teamMembers.length,
-          ...memberSyncDetails(sync),
+          ...memberSyncDetails(settled),
         },
         request.ip,
         request.id,
@@ -1391,13 +1420,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         if (conflict) return reply.status(409).send(conflict);
         throw err;
       }
-      warnMemberSync(request.log, id, "patched", sync);
 
       const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
       const teamMembers = await db
         .select({ id: schema.users.id, username: schema.users.username })
         .from(schema.users)
         .where(eq(schema.users.team, id));
+      const settled = settleMemberSync(sync, teamMembers);
+      warnMemberSync(request.log, id, "patched", settled);
 
       await auditLog(
         request.log,
@@ -1407,7 +1437,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           teamName: updatedTeam.name,
           action: "patched",
           memberCount: teamMembers.length,
-          ...memberSyncDetails(sync),
+          ...memberSyncDetails(settled),
         },
         request.ip,
         request.id,

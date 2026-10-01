@@ -2587,9 +2587,62 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         // Users have one team, so the last sync still wins (the owner's call
         // on #1747); what changed is that the move is on record.
         expect((await userRow(user.id))?.team).toBe(secondId);
-        expect((await lastSync(secondId)).movedMembers).toEqual([
-          { userId: user.id, fromTeam: first.id },
-        ]);
+        const details = await lastSync(secondId);
+        expect(details.movedMembers).toEqual([{ userId: user.id, fromTeam: first.id }]);
+        expect(details.movedCount).toBe(1);
+      });
+
+      it("doesn't count a PATCH add of a user already in the group as a move", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-again") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-again"),
+          members: [{ value: user.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "add", path: "members", value: [{ value: user.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+
+      it("doesn't record a move into a group the user was removed from in the same PATCH", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-addrm") });
+        await createScimGroup({
+          displayName: uniqueName("scim-1747-addrm-from"),
+          members: [{ value: user.id }],
+        });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1747-addrm-to") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "remove", path: `members[value eq "${user.id}"]` },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+
+      it("records nothing for a PATCH that rolled back", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-rollback") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-rb-first"),
+          members: [{ value: user.id }],
+        });
+        const taken = await createScimGroup({ displayName: uniqueName("scim-1747-rb-taken") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1747-rb-group") });
+        const before = await lastSync(group.id);
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "replace", path: "displayName", value: taken.displayName },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect((await userRow(user.id))?.team).toBe(first.id);
+        expect(await lastSync(group.id)).toEqual(before);
       });
 
       it("records moves on a PATCH add and a member replace", async () => {
