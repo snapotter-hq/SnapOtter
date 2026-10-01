@@ -28,6 +28,7 @@ describe("isApplePlatform", () => {
   it("falls back to the client-hint platform when navigator.platform is blank", () => {
     expect(isApplePlatform({ platform: "", userAgentData: { platform: "macOS" } })).toBe(true);
     expect(isApplePlatform({ platform: "", userAgentData: { platform: "Windows" } })).toBe(false);
+    expect(isApplePlatform({ platform: "", userAgentData: { platform: "Chrome OS" } })).toBe(false);
   });
 
   it("falls back to the user-agent string when both platform sources are blank", () => {
@@ -37,7 +38,10 @@ describe("isApplePlatform", () => {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
     const chromeAndroid =
       "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
+    const chromeIphone =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.0.0 Mobile/15E148 Safari/604.1";
     expect(isApplePlatform({ platform: "", userAgent: safariMac })).toBe(true);
+    expect(isApplePlatform({ platform: "", userAgent: chromeIphone })).toBe(true);
     expect(isApplePlatform({ platform: "", userAgent: chromeWindows })).toBe(false);
     expect(isApplePlatform({ platform: "", userAgent: chromeAndroid })).toBe(false);
   });

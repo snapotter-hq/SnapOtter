@@ -7,6 +7,9 @@ import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 
 function onPlatform(platform: string) {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
+  // jsdom's own platform is "", which already reads as non-Apple: without this
+  // check a spy that silently failed would leave the Ctrl cases passing.
+  expect(navigator.platform).toBe(platform);
 }
 
 afterEach(() => {
