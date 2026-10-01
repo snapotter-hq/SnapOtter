@@ -103,8 +103,13 @@ describe("OCR v3 bundle release workflow", () => {
       const requirements = readRequired(requirementsPath);
       expect(requirements).toMatch(/^requests==2\.33\.0 --hash=sha256:[a-f0-9]{64}$/m);
       expect(requirements).toMatch(/^idna==3\.15 --hash=sha256:[a-f0-9]{64}$/m);
+      // urllib3 2.7.0 carries CVE-2026-97687, CVE-2026-97688, and CVE-2026-97689 (#1760).
+      expect(requirements).toMatch(
+        /^urllib3==2\.8\.0 --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3$/m,
+      );
       expect(requirements).not.toMatch(/^requests==2\.32\.3\b/m);
       expect(requirements).not.toMatch(/^idna==3\.10\b/m);
+      expect(requirements).not.toMatch(/^urllib3==2\.7\.0\b/m);
     }
 
     const ci = readRequired(ciWorkflowPath);
@@ -656,6 +661,11 @@ describe("OCR v3 bundle release workflow", () => {
     expect(requirements).toContain("huggingface-hub==0.36.2");
     expect(requirements).toContain("hf-xet==");
     expect(requirements).toContain("--hash=sha256:");
+    // Same urllib3 advisories as the OCR runtime locks (#1760); CI only audits those.
+    expect(requirements).toMatch(
+      /^urllib3==2\.8\.0 \\\n {4}--hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \\\n {4}--hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63$/m,
+    );
+    expect(requirements).not.toMatch(/^urllib3==2\.7\.0\b/m);
   });
 
   it("signs one canonical two-target index and verifies it before upload", () => {
