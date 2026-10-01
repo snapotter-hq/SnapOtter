@@ -191,10 +191,20 @@ def draws_unmapped_composite_font(page):
 _IDENTITY_NAME_RE = re.compile(r"^/Identity-[HV]$")
 # The mapping sections of a ToUnicode CMap, and their entries. A bfrange's
 # destination is a hex string or an array; an array is never identity.
+# Hex strings may hold whitespace (<00 41>), which PDF ignores.
 _BFRANGE_BLOCK_RE = re.compile(rb"beginbfrange(.*?)endbfrange", re.S)
 _BFCHAR_BLOCK_RE = re.compile(rb"beginbfchar(.*?)endbfchar", re.S)
-_BFRANGE_ENTRY_RE = re.compile(rb"<([0-9A-Fa-f]+)>\s*<[0-9A-Fa-f]+>\s*(<[0-9A-Fa-f]+>|\[)")
-_BFCHAR_ENTRY_RE = re.compile(rb"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>")
+_CIDRANGE_BLOCK_RE = re.compile(rb"begincidrange(.*?)endcidrange", re.S)
+_HEX = rb"<([0-9A-Fa-f\s]+)>"
+_BFRANGE_ENTRY_RE = re.compile(_HEX + rb"\s*<[0-9A-Fa-f\s]+>\s*(<[0-9A-Fa-f\s]+>|\[)")
+_BFCHAR_ENTRY_RE = re.compile(_HEX + rb"\s*" + _HEX)
+_CIDRANGE_ENTRY_RE = re.compile(_HEX + rb"\s*<[0-9A-Fa-f\s]+>\s*(\d+)")
+# A CMap that only pulls in the predefined identity CMap.
+_USES_IDENTITY_RE = re.compile(rb"/Identity-[HV]\s+usecmap")
+
+
+def _hex_value(text):
+    return int(re.sub(rb"\s", b"", text) or b"0", 16)
 
 
 def cmap_is_identity(data):
@@ -203,20 +213,29 @@ def cmap_is_identity(data):
     MuPDF honours such a map, so with CID = glyph id each glyph id comes back
     as the character, the same soup as /ToUnicode /Identity-H (#1754). Read
     from the entries, not the CMapName: PyMuPDF writes its correct maps as
-    /Adobe-Identity-UCS too. A map with no entries proves nothing.
+    /Adobe-Identity-UCS too. Producers also paste in the Identity-H CMap
+    itself (a cidrange from each code to the same number) or a stream that
+    only says "/Identity-H usecmap"; both count. A map with no entries proves
+    nothing. A wrong answer here can't reject readable text on its own:
+    glyph_id_fonts still has to find the glyph ids in what MuPDF extracted.
     """
     entries = 0
     for block in _BFRANGE_BLOCK_RE.findall(data):
         for start, dest in _BFRANGE_ENTRY_RE.findall(block):
-            if dest == b"[" or int(dest[1:-1], 16) != int(start, 16):
+            if dest == b"[" or _hex_value(dest[1:-1]) != _hex_value(start):
                 return False
             entries += 1
     for block in _BFCHAR_BLOCK_RE.findall(data):
         for source, dest in _BFCHAR_ENTRY_RE.findall(block):
-            if int(dest, 16) != int(source, 16):
+            if _hex_value(dest) != _hex_value(source):
                 return False
             entries += 1
-    return entries > 0
+    for block in _CIDRANGE_BLOCK_RE.findall(data):
+        for start, cid in _CIDRANGE_ENTRY_RE.findall(block):
+            if int(cid) != _hex_value(start):
+                return False
+            entries += 1
+    return entries > 0 or bool(_USES_IDENTITY_RE.search(data))
 
 
 def _identity_to_unicode(doc, xref, prefix=""):
@@ -230,6 +249,23 @@ def _identity_to_unicode(doc, xref, prefix=""):
         and doc.xref_is_stream(stream)
         and cmap_is_identity(doc.xref_stream(stream))
     )
+
+
+# A font's ToUnicode verdict, keyed by its location. Fonts are shared across
+# pages and the check runs on every page, so each stream is read and parsed
+# once instead of once per page. Each run starts it empty: the docs
+# dispatcher execs every run in a fresh namespace, and a run opens one file.
+_identity_cache = {}
+
+
+def _identity_font(doc, xref, prefix):
+    key = (id(doc), xref, prefix)
+    if key not in _identity_cache:
+        # The CIDToGIDMap test is a dict read; the stream read only if it passes.
+        _identity_cache[key] = _cid_is_glyph_id(doc, xref, prefix) and _identity_to_unicode(
+            doc, xref, prefix
+        )
+    return _identity_cache[key]
 
 
 def maps_glyph_ids_as_unicode(page):
@@ -249,9 +285,18 @@ def maps_glyph_ids_as_unicode(page):
         location = (xref, "") if xref else _inline_font_location(page, referencer, refname)
         if not location or not 0 < location[0] < doc.xref_length():
             continue
-        if _identity_to_unicode(doc, *location) and _cid_is_glyph_id(doc, *location):
+        if _identity_font(doc, *location):
             return True
     return False
+
+
+def _span_font_name(name):
+    """A font name the way texttrace reports it: no subset tag, at most 31 characters."""
+    return re.sub(r"^[A-Z]{6}\+", "", name)[:31]
+
+
+def _is_type3_span(name, type3):
+    return name.startswith("Type3 (") or _span_font_name(name) in type3
 
 
 def type3_span_names(page):
@@ -262,10 +307,13 @@ def type3_span_names(page):
     ids (a hand-built one matched on 11 of 11) and must stay out of
     glyph_id_fonts (#1754). Measured on PyMuPDF 1.27.2.3, a Type3 span is
     named after the font's /Name, or "Type3 (<xref> 0 R)" without one; never
-    its /BaseFont, which get_fonts reports when there's no /Name. Every
-    candidate goes in: one that happens to match a glyph-id font only hides
-    that font, which errs toward the old verdict. An inline Type3 font has no
-    object number to name it by, so the caller keeps the old verdict.
+    its /BaseFont, which get_fonts reports instead. texttrace also drops a
+    subset tag and cuts names to 31 characters, so names are compared the way
+    _span_font_name writes them, and any span named "Type3 (...)" counts
+    whatever its generation number. Every candidate goes in: one that happens
+    to match a glyph-id font only hides that font, which errs toward the old
+    verdict. An inline Type3 font has no object number to name it by, so the
+    caller keeps the old verdict.
     """
     doc = page.parent
     names = set()
@@ -274,12 +322,11 @@ def type3_span_names(page):
             continue
         if not 0 < xref < doc.xref_length():
             return None
-        names.add(f"Type3 ({xref} 0 R)")
         if name:
-            names.add(name)
+            names.add(_span_font_name(name))
         own = doc.xref_get_key(xref, "Name")[1]
         if own.startswith("/"):
-            names.add(own[1:])
+            names.add(_span_font_name(own[1:]))
     return names
 
 
@@ -316,7 +363,7 @@ def glyph_id_fonts(trace, exclude=()):
     """
     tally = {}
     for span in trace:
-        if span["font"] in exclude:
+        if _is_type3_span(span["font"], exclude):
             continue
         mapped, same = tally.get(span["font"], (0, 0))
         for char in span["chars"]:

@@ -151,6 +151,8 @@ interface FakeFont {
    *  (get_fonts full=True names it as the referencer), and "missing" means the
    *  refname resolves to nothing. Defaults to "page". */
   location?: "page" | "inherited" | "xobject" | "missing";
+  /** A Type3 font's /Name, without the slash. */
+  name?: string;
 }
 
 /** Run draws_unmapped_composite_font against a fake page, so the font rule is
@@ -185,7 +187,8 @@ function onFakePage<T = boolean>(fn: string, fonts: FakeFont[]): T {
     "    return fonts[xref - 1]",
     "def font_key(i, key):",
     "    if key == 'Name':",
-    "        return ('null', 'null')",
+    "        name = fonts[i].get('name')",
+    "        return ('name', '/' + name) if name else ('null', 'null')",
     "    if key == 'ToUnicode':",
     "        kind, value = TO_UNICODE[fonts[i]['toUnicode']]",
     "        base = 400 if fonts[i]['toUnicode'] == 'identity-stream' else 100",
@@ -297,6 +300,15 @@ describe.skipIf(!hasPython)("doc_text.cmap_is_identity (#1754)", () => {
     expect(cmapIsIdentity(ranges("1 beginbfchar\n<0066> <00660069>\nendbfchar\n"))).toBe(false);
   });
 
+  it("accepts the pasted-in Identity-H CMap, a usecmap of it, and hex with spaces", () => {
+    expect(cmapIsIdentity(ranges("1 begincidrange\n<0000> <FFFF> 0\nendcidrange\n"))).toBe(true);
+    expect(cmapIsIdentity("/Identity-H usecmap\n")).toBe(true);
+    expect(cmapIsIdentity(ranges("1 beginbfrange\n<00 00> <FF FF> <00 00>\nendbfrange\n"))).toBe(
+      true,
+    );
+    expect(cmapIsIdentity(ranges("1 begincidrange\n<0000> <FFFF> 1\nendcidrange\n"))).toBe(false);
+  });
+
   it("refuses a range mapped through an array, and a CMap with no entries", () => {
     expect(
       cmapIsIdentity(ranges("1 beginbfrange\n<0000> <0001> [<0000> <0001>]\nendbfrange\n")),
@@ -341,15 +353,24 @@ describe.skipIf(!hasPython)("doc_text.maps_glyph_ids_as_unicode (#1566)", () => 
 });
 
 describe.skipIf(!hasPython)("doc_text.type3_span_names (#1754)", () => {
-  it("names each Type3 font the way texttrace does, by object number and by its name", () => {
-    // Measured on PyMuPDF 1.27.2.3: a span reads "Type3 (<xref> 0 R)" unless the
-    // font has /Name, which it then uses. get_fonts reports /Name or /BaseFont.
+  it("names each Type3 font the way texttrace does: no subset tag, at most 31 characters", () => {
+    // Measured on PyMuPDF 1.27.2.3: a span is named after /Name, else
+    // "Type3 (<xref> 0 R)" (matched by prefix in glyph_id_fonts). get_fonts
+    // reports /Name or /BaseFont, here the harness's "ABCDEF+Font".
     expect(
       type3SpanNames([
         { type: "Type0", toUnicode: "name" },
         { type: "Type3", toUnicode: "none" },
       ]),
-    ).toEqual(["ABCDEF+Font", "Type3 (2 0 R)"]);
+    ).toEqual(["Font"]);
+    expect(
+      type3SpanNames([{ type: "Type3", toUnicode: "none", name: "QWERTY+SubsetType3Font" }]),
+    ).toEqual(["Font", "SubsetType3Font"]);
+    const long = `T3${"x".repeat(60)}`;
+    expect(type3SpanNames([{ type: "Type3", toUnicode: "none", name: long }])).toEqual([
+      "Font",
+      long.slice(0, 31),
+    ]);
     expect(type3SpanNames([{ type: "Type0", toUnicode: "name" }])).toEqual([]);
   });
 
@@ -574,11 +595,13 @@ describe.skipIf(!hasPython)("doc_text.glyph_id_fonts (#1566)", () => {
   it("leaves out the fonts it's told to, so a Type3 font's own codes aren't taken for glyph ids", () => {
     // MuPDF reports a Type3 glyph as its character code, equal to the Unicode
     // for ASCII text (measured: 11 of 11 on a hand-built Type3 font).
-    const type3 = span("Type3 (13 0 R)", "Hello world", 0);
-    expect(callWith<string[]>("glyph_id_fonts", [IDENTITY, type3], ["Type3 (13 0 R)"])).toEqual([
+    const unnamed = span("Type3 (13 0 R)", "Hello world", 0);
+    const named = span("SubT3", "Hello world", 0);
+    // "Type3 (...)" is always left out; a named one by its normalized name.
+    expect(callWith<string[]>("glyph_id_fonts", [IDENTITY, unnamed, named], ["SubT3"])).toEqual([
       "Roboto-Black",
     ]);
-    expect(glyphIdFonts([IDENTITY, type3])).toEqual(["Roboto-Black", "Type3 (13 0 R)"]);
+    expect(glyphIdFonts([IDENTITY, named])).toEqual(["Roboto-Black", "SubT3"]);
   });
 
   it("doesn't judge a font with too few chars to tell from coincidence", () => {
