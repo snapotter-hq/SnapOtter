@@ -207,7 +207,8 @@ function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
   writeFileSync(calls, "");
   writeFileSync(
     join(dir, "ubuntu.sources"),
-    "Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\n\nTypes: deb\nURIs: http://security.ubuntu.com/ubuntu/\n",
+    // GitHub's ubuntu24 runners name a mirror list rather than a host.
+    "# Ubuntu sources\nTypes: deb\nURIs: mirror+file:/etc/apt/apt-mirrors.txt\n\nTypes: deb\nURIs: http://security.ubuntu.com/ubuntu/\n",
   );
   // Whether the mirror answers right now: "down-then-up" recovers once the
   // first update has been tried.
@@ -240,7 +241,7 @@ case " $* " in *" update "*)
   echo "W: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  Could not connect" >&2
   [ "${mirror}" = partial ] && echo "W: Failed to fetch http://security.ubuntu.com/ubuntu/dists/noble-security/InRelease  Could not connect" >&2
   ${reachable} && exit 0
-  echo "W: Failed to fetch http://azure.archive.ubuntu.com/ubuntu/dists/noble/InRelease  Could not connect to azure.archive.ubuntu.com:80" >&2
+  echo "W: Failed to fetch mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/InRelease  Could not connect to azure.archive.ubuntu.com:80 (10.255.255.1), connection timed out" >&2
   echo "W: Some index files failed to download. They have been ignored, or old ones used instead." >&2
   exit 0 ;;
 esac

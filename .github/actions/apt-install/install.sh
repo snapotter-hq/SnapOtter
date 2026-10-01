@@ -26,7 +26,7 @@
 #   deleted when the index lists its package but not its SHA256. Packages
 #   that changed since the cache was saved then download as usual.
 # - apt-get update exits 0 when it can't reach the mirror at all; it only
-#   prints "W: Failed to fetch". An update that couldn't fetch from a host
+#   prints "W: Failed to fetch". An update that couldn't fetch from a URI
 #   the Ubuntu sources name, or left an index that can't resolve the
 #   requested packages, counts as failed, and the
 #   cached archives are then installed as local files with --no-download,
@@ -70,22 +70,25 @@ lock_wait_left() {
   fi
 }
 
-# Sets ubuntu_unreachable when apt couldn't fetch an index from a host the
-# Ubuntu sources name, which it reports as a warning with exit 0. Failures
-# from the runner's third-party sources (Microsoft's, say) don't count.
+# Sets ubuntu_unreachable when apt couldn't fetch an index from a URI the
+# Ubuntu sources name, which it reports as a warning with exit 0. GitHub's
+# runners name `mirror+file:/etc/apt/apt-mirrors.txt` there, and apt reports
+# failures under that URI. Failures from the runner's third-party sources
+# (Microsoft's, say) don't count.
 read -r -a ubuntu_sources <<< "${UBUNTU_SOURCES:-/etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources}"
 ubuntu_unreachable=false
 apt_update() {
-  local out rc=0 host failed
+  local out rc=0 uri failed
   out="$(sudo timeout -k 30 "$1" apt-get update -qq 2>&1)" || rc=$?
   [ -z "$out" ] || printf '%s\n' "$out"
   ubuntu_unreachable=false
   failed="$(grep -E '^[WE]: Failed to fetch ' <<< "$out")" || return "$rc"
-  while read -r host; do
-    if grep -qF "Failed to fetch ${host}/" <<< "$failed"; then
+  while read -r uri; do
+    if grep -qF "Failed to fetch ${uri%/}/" <<< "$failed"; then
       ubuntu_unreachable=true
     fi
-  done < <(cat "${ubuntu_sources[@]}" 2>/dev/null | grep -oE 'https?://[^/ ]+' | sort -u)
+  done < <(cat "${ubuntu_sources[@]}" 2>/dev/null |
+    grep -vE '^[[:space:]]*#' | grep -oE '(mirror\+)?(https?|file):[^ ]+' | sort -u)
   return "$rc"
 }
 # The index can resolve every requested package (empty lists can't). Plain
