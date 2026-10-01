@@ -408,6 +408,283 @@ describe("Copy and message timers are cancelled when the page goes", () => {
   });
 });
 
+/** Clicks a copy control and waits until the copy has resolved into state. */
+async function copyAgain(button: HTMLElement) {
+  const calls = copyToClipboard.mock.calls.length + copyImageToClipboard.mock.calls.length;
+  await act(async () => {
+    fireEvent.click(button);
+  });
+  await waitFor(() =>
+    expect(copyToClipboard.mock.calls.length + copyImageToClipboard.mock.calls.length).toBe(
+      calls + 1,
+    ),
+  );
+  await act(async () => {});
+}
+
+const ticked = (button: HTMLElement) => button.querySelector(".text-success-ink") !== null;
+const says = (text: string) => (button: HTMLElement) => button.textContent?.includes(text) ?? false;
+
+type Race = {
+  name: string;
+  /** How long the slot's Copied flag stays up. */
+  ms: number;
+  /** Renders the panel; returns the first and second controls to copy with. */
+  mount: () => Promise<[HTMLElement, HTMLElement]>;
+  /** Whether a control shows its Copied state. */
+  lit: (button: HTMLElement) => boolean;
+};
+
+const barcodes = async () => {
+  useFileStore.setState({ files: [new File(["png"], "code.png", { type: "image/png" })] });
+  stubXhr({
+    filename: "code.png",
+    barcodes: [
+      { type: "QRCode", text: "hi" },
+      { type: "QRCode", text: "yo" },
+    ],
+    annotatedUrl: null,
+  });
+  render(<BarcodeReadSettings />);
+  fireEvent.click(screen.getByTestId("barcode-read-submit"));
+  await screen.findByText("yo");
+};
+
+const palette = async () => {
+  useFileStore.setState({ files: [new File(["png"], "a.png", { type: "image/png" })] });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ colors: ["#ff0000", "#00ff00"], hex: ["#ff0000", "#00ff00"] }),
+    })),
+  );
+  render(<ColorPaletteSettings />);
+  fireEvent.click(screen.getByTestId("color-palette-submit"));
+  await screen.findByTestId("color-palette-copy-css");
+};
+
+const races: Race[] = [
+  {
+    name: "color palette: copiedIdx",
+    ms: 1500,
+    mount: async () => {
+      await palette();
+      const swatch = (hex: string) => screen.getByText(hex).closest("button") as HTMLElement;
+      return [swatch("#ff0000"), swatch("#00ff00")];
+    },
+    lit: ticked,
+  },
+  {
+    name: "color palette: copiedExport",
+    ms: 1500,
+    mount: async () => {
+      await palette();
+      return [
+        screen.getByTestId("color-palette-copy-css"),
+        screen.getByTestId("color-palette-copy-json"),
+      ];
+    },
+    lit: ticked,
+  },
+  {
+    name: "sprite sheet: copiedExport",
+    ms: 1500,
+    mount: async () => {
+      toolPayload.current = {
+        frames: [{ index: 0, width: 1, height: 1, left: 0, top: 0 }],
+        cols: 1,
+        rows: 1,
+        cellWidth: 1,
+        cellHeight: 1,
+        canvasWidth: 1,
+        canvasHeight: 1,
+      };
+      render(<SpriteSheetSettings />);
+      return [
+        screen.getByTestId("sprite-sheet-copy-css"),
+        screen.getByTestId("sprite-sheet-copy-json"),
+      ];
+    },
+    lit: ticked,
+  },
+  {
+    name: "LQIP placeholder: copied",
+    ms: 1500,
+    mount: async () => {
+      toolPayload.current = {
+        dataUri: "data:image/webp;base64,AA==",
+        width: 16,
+        height: 9,
+        html: "<img>",
+      };
+      render(<LqipPlaceholderSettings />);
+      const [dataUri, html] = screen.getAllByRole("button", { name: en.common.copy });
+      return [dataUri, html];
+    },
+    lit: ticked,
+  },
+  {
+    name: "OCR PDF view: copied",
+    ms: 1500,
+    mount: async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ ok: true, text: async () => "extracted" })),
+      );
+      useFileStore.setState({
+        entries: [{ processedUrl: "blob:text", status: "completed" } as never],
+        selectedIndex: 0,
+      });
+      render(<OcrPdfView />);
+      const copy = await screen.findByRole("button", { name: en.common.copy });
+      return [copy, copy];
+    },
+    lit: says(ts["ocr-pdf-view"].copied),
+  },
+  {
+    name: "barcode reader: copiedIndex",
+    ms: 1500,
+    mount: async () => {
+      await barcodes();
+      const [hi, yo] = screen.getAllByTitle(ts["barcode-read"].copyValue);
+      return [hi, yo];
+    },
+    lit: ticked,
+  },
+  {
+    name: "barcode reader: copiedAll",
+    ms: 2000,
+    mount: async () => {
+      await barcodes();
+      const all = screen.getByRole("button", { name: ts["barcode-read"].copyAll });
+      return [all, all];
+    },
+    lit: says(ts["barcode-read"].copied),
+  },
+  {
+    name: "OCR: copied",
+    ms: 2000,
+    mount: async () => {
+      useFeaturesStore.setState({ bundles: [ocrBundle()], loaded: true, loadError: false });
+      useFileStore.setState({ files: [new File(["png"], "scan.png", { type: "image/png" })] });
+      vi.stubGlobal(
+        "EventSource",
+        class {
+          close() {}
+        },
+      );
+      stubXhr({ text: "hello" });
+      render(<OcrSettings />);
+      fireEvent.click(screen.getByTestId("ocr-submit"));
+      await screen.findByTestId("ocr-result-text");
+      const copy = screen.getByRole("button", { name: en.common.copy });
+      return [copy, copy];
+    },
+    lit: says(ts.ocr.copied),
+  },
+  {
+    name: "image to Base64: status",
+    ms: 2000,
+    mount: async () => {
+      useFileStore.getState().addFiles([new File(["png"], "otter.png", { type: "image/png" })]);
+      useBase64Store.setState({
+        results: [
+          {
+            filename: "otter.png",
+            mimeType: "image/png",
+            width: 2,
+            height: 2,
+            originalSize: 68,
+            encodedSize: 92,
+            overheadPercent: 35,
+            base64: "aGVsbG8=",
+            dataUri: "data:image/png;base64,aGVsbG8=",
+            entryId: useFileStore.getState().entries[0].id,
+          },
+        ],
+        errors: [],
+        processing: false,
+        progress: null,
+        expandedIndex: 0,
+      });
+      render(<ImageToBase64Results />);
+      const copy = screen.getAllByRole("button", { name: /copy/i })[0];
+      return [copy, copy];
+    },
+    lit: says(en.common.copied),
+  },
+  {
+    name: "editor export dialog: copyStatus",
+    ms: 2000,
+    mount: async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ blob: async () => new Blob(["x"]) })),
+      );
+      render(<ExportDialog onClose={() => {}} />);
+      const copy = screen.getByRole("button", { name: en.common.copy });
+      return [copy, copy];
+    },
+    lit: says(en.editor.ui.exportDialog.copied),
+  },
+  {
+    name: "login: enrollmentCodesCopied",
+    ms: 2000,
+    mount: async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            requiresMfaEnrollment: true,
+            enrollmentToken: "enroll-token-1",
+            uri: "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&issuer=SnapOtter",
+            recoveryCodes: ["AAAA-1111"],
+          }),
+        })),
+      );
+      renderLogin();
+      fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
+      fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "pw" } });
+      fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+      const copy = await screen.findByRole("button", {
+        name: en.settings.security.twoFactorCopyRecoveryCodes,
+      });
+      return [copy, copy];
+    },
+    lit: says(en.settings.security.twoFactorCodesCopied),
+  },
+];
+
+describe("A second copy inside the fade window gets its full time (#1798)", () => {
+  // Copy A, then copy B one second before A's flag is due to clear. A's reset
+  // timer must not take B's flag down with it.
+  it.each(races.map((race) => [race.name, race] as const))("%s", async (_name, race) => {
+    const [first, second] = await race.mount();
+    await copyAgain(first);
+    expect(race.lit(first)).toBe(true);
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms - 1000);
+    });
+    await copyAgain(second);
+    expect(race.lit(second)).toBe(true);
+
+    // A's timer is due now. On its own it would clear the slot B just filled.
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(race.lit(second)).toBe(true);
+
+    // B's own timer still clears it.
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms);
+    });
+    expect(race.lit(second)).toBe(false);
+  });
+});
+
 describe("Login focus still lands on the MFA field", () => {
   // The focus goes through useTimeouts, which drops calls made before its own
   // mount effect has run. The SSO redirect schedules it on first commit.
@@ -478,6 +755,18 @@ describe("Components never throw away a timer id", () => {
           ? [`${i + 1}: ${line.trim()}`]
           : [],
       );
+    expect(offenders).toEqual([]);
+  });
+
+  // A reset with no key is cleared early by an older timer for the same
+  // state when the action repeats inside the fade window (#1798). Name the
+  // state it clears: later(() => setCopied(false), 2000, "copied").
+  const unkeyedReset = /\blater\(\(\) => set\w+\([^()]*\), \w+\);/;
+
+  it.each(files)("%s keys every later() reset", (file) => {
+    const offenders = readFileSync(join(web, file), "utf8")
+      .split("\n")
+      .flatMap((line, i) => (unkeyedReset.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
     expect(offenders).toEqual([]);
   });
 

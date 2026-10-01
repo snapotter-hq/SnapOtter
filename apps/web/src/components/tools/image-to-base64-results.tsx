@@ -90,7 +90,7 @@ function CopyButton({
     const ok = await copyToClipboard(text);
     setStatus(ok ? "copied" : "failed");
     if (ok) onCopied?.();
-    later(() => setStatus("idle"), 2000);
+    later(() => setStatus("idle"), 2000, "status");
   }, [text, onCopied, later]);
 
   return (

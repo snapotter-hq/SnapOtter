@@ -59,7 +59,7 @@ export function ColorPaletteSettings() {
     const ok = await copyToClipboard(color);
     if (ok) {
       setCopiedIdx(idx);
-      later(() => setCopiedIdx(null), 1500);
+      later(() => setCopiedIdx(null), 1500, "copiedIdx");
     }
   };
 
@@ -69,7 +69,7 @@ export function ColorPaletteSettings() {
     const ok = await copyToClipboard(css);
     if (ok) {
       setCopiedExport("css");
-      later(() => setCopiedExport(null), 1500);
+      later(() => setCopiedExport(null), 1500, "copiedExport");
     }
   };
 
@@ -77,7 +77,7 @@ export function ColorPaletteSettings() {
     const ok = await copyToClipboard(JSON.stringify(colors));
     if (ok) {
       setCopiedExport("json");
-      later(() => setCopiedExport(null), 1500);
+      later(() => setCopiedExport(null), 1500, "copiedExport");
     }
   };
 

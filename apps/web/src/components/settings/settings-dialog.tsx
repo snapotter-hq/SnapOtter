@@ -446,7 +446,7 @@ function GeneralSection() {
       setSaveMsg(t.settings.general.saveFailed);
     } finally {
       setSaving(false);
-      later(() => setSaveMsg(null), 3000);
+      later(() => setSaveMsg(null), 3000, "saveMsg");
     }
   }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed, later]);
 
@@ -636,7 +636,7 @@ export function SystemSection() {
       setSaveMsg(t.settings.system.saveFailed);
     } finally {
       setSaving(false);
-      later(() => setSaveMsg(null), 3000);
+      later(() => setSaveMsg(null), 3000, "saveMsg");
     }
   }, [settings, t, later]);
 
@@ -1178,7 +1178,7 @@ export function AdminSecuritySettings() {
       });
     } finally {
       setSaving(false);
-      later(() => setSaveMsg(null), 3000);
+      later(() => setSaveMsg(null), 3000, "saveMsg");
     }
   }, [settings, t, later]);
 
@@ -1592,7 +1592,7 @@ export function PeopleSection() {
         );
       } finally {
         setAdding(false);
-        later(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000, "actionMsg");
       }
     },
     [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers, t, later],
@@ -1623,7 +1623,7 @@ export function PeopleSection() {
         });
       }
       setOpenMenuId(null);
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [loadUsers, t, later],
   );
@@ -1655,7 +1655,7 @@ export function PeopleSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [editingUser, editRole, editTeam, loadUsers, t, later],
   );
@@ -1684,7 +1684,7 @@ export function PeopleSection() {
             ),
         });
       }
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [resetPasswordUser, resetPassword, t, later],
   );
@@ -1831,7 +1831,7 @@ export function PeopleSection() {
                     const ok = await copyToClipboard(newPassword);
                     if (ok) {
                       setPwCopied(true);
-                      later(() => setPwCopied(false), 2000);
+                      later(() => setPwCopied(false), 2000, "pwCopied");
                     }
                   }}
                   className={cn(
@@ -2287,7 +2287,7 @@ export function ApiKeysSection() {
       const ok = await copyToClipboard(key);
       if (ok) {
         setCopied(true);
-        later(() => setCopied(false), 2000);
+        later(() => setCopied(false), 2000, "copied");
       }
     },
     [later],
@@ -2573,7 +2573,7 @@ export function TeamsSection() {
         });
       } finally {
         setCreating(false);
-        later(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000, "actionMsg");
       }
     },
     [newTeamName, loadTeams, t, later],
@@ -2602,7 +2602,7 @@ export function TeamsSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [editingTeamName, loadTeams, t, later],
   );
@@ -2628,7 +2628,7 @@ export function TeamsSection() {
         });
       }
       setOpenMenuId(null);
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [loadTeams, t, later],
   );
@@ -2666,7 +2666,7 @@ export function TeamsSection() {
         });
       } finally {
         setSavingQuota(false);
-        later(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000, "actionMsg");
       }
     },
     [quotaMb, retention, loadTeams, t, later],
@@ -3035,7 +3035,7 @@ export function RolesSection() {
           : null;
       if (invalid) {
         setActionMsg({ type: "error", text: invalid });
-        later(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000, "actionMsg");
         return;
       }
       try {
@@ -3064,7 +3064,7 @@ export function RolesSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [newName, newDescription, newPermissions, loadRoles, t, later],
   );
@@ -3075,7 +3075,7 @@ export function RolesSection() {
       if (!editingRole) return;
       if (!isValidRoleName(editName)) {
         setActionMsg({ type: "error", text: t.settings.roles.nameInvalid });
-        later(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000, "actionMsg");
         return;
       }
       try {
@@ -3101,7 +3101,7 @@ export function RolesSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [editingRole, editName, editDescription, editPermissions, loadRoles, t, later],
   );
@@ -3131,7 +3131,7 @@ export function RolesSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [loadRoles, t, later],
   );

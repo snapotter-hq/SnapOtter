@@ -328,7 +328,7 @@ export function OcrSettings() {
       const ok = await copyToClipboard(text);
       if (ok) {
         setCopied(true);
-        later(() => setCopied(false), 2000);
+        later(() => setCopied(false), 2000, "copied");
       }
     }
   };

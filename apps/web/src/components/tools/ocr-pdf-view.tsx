@@ -52,7 +52,7 @@ export function OcrPdfView() {
     // Clipboard API does not exist (Sentry WEB-G).
     if (await copyToClipboard(text)) {
       setCopied(true);
-      later(() => setCopied(false), 1500);
+      later(() => setCopied(false), 1500, "copied");
     }
   };
 

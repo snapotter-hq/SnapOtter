@@ -46,7 +46,7 @@ export function LqipPlaceholderSettings() {
     const ok = await copyToClipboard(text);
     if (ok) {
       setCopied(label);
-      later(() => setCopied(null), 1500);
+      later(() => setCopied(null), 1500, "copied");
     }
   };
 

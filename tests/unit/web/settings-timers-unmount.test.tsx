@@ -15,7 +15,7 @@ import "@testing-library/jest-dom/vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { de } from "@snapotter/shared/i18n/de.js";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -290,6 +290,212 @@ describe("Settings timers are cancelled when Settings closes", () => {
       vi.advanceTimersByTime(3000);
     });
     expect(screen.queryByText(s.security.securitySettingsFailed)).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+/** Clicks a copy control and waits until the copy has resolved into state. */
+async function copyAgain(button: HTMLElement) {
+  const calls = copyToClipboard.mock.calls.length;
+  await act(async () => {
+    fireEvent.click(button);
+  });
+  await waitFor(() => expect(copyToClipboard.mock.calls.length).toBe(calls + 1));
+  await act(async () => {});
+}
+
+/** Opens a row's actions menu in People or Teams and picks an entry. */
+async function pickRowAction(label: string) {
+  fireEvent.click(await screen.findByRole("button", { name: de.common.actions }));
+  fireEvent.click(within(screen.getByRole("menu")).getByText(label));
+}
+
+type Race = {
+  name: string;
+  /** How long the slot's message stays up. */
+  ms: number;
+  /** Renders the screen and runs the first action, whose message is up on return. */
+  first: () => Promise<void>;
+  /** Runs the second action, whose message is up on return. */
+  second: () => Promise<void>;
+  /** Whether the second action's message is still on screen. */
+  shown: () => boolean;
+};
+
+const has = (text: string) => () => screen.queryByText(text) !== null;
+
+const races: Race[] = [
+  {
+    name: "General: saveMsg",
+    ms: 3000,
+    first: async () => {
+      apiPut.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({});
+      renderDe(<SettingsDialog open onClose={() => {}} />);
+      fireEvent.click(await screen.findByRole("button", { name: s.general.saveButton }));
+      await screen.findByText(s.general.saveFailed);
+    },
+    second: async () => {
+      fireEvent.click(screen.getByRole("button", { name: s.general.saveButton }));
+      await screen.findByText(s.general.saveSuccess);
+    },
+    shown: has(s.general.saveSuccess),
+  },
+  {
+    name: "System: saveMsg",
+    ms: 3000,
+    first: async () => {
+      apiPut.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({});
+      renderDe(<SystemSection />);
+      fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
+      await screen.findByText(s.system.saveFailed);
+    },
+    second: async () => {
+      fireEvent.click(screen.getByRole("button", { name: s.system.saveButton }));
+      await screen.findByText(s.system.saveSuccess);
+    },
+    shown: has(s.system.saveSuccess),
+  },
+  {
+    name: "Admin security: saveMsg",
+    ms: 3000,
+    first: async () => {
+      apiPut.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({});
+      renderDe(<AdminSecuritySettings />);
+      fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
+      await screen.findByText(s.security.securitySettingsFailed);
+    },
+    second: async () => {
+      fireEvent.click(screen.getByRole("button", { name: s.system.saveButton }));
+      await screen.findByText(s.security.securitySettingsSaved);
+    },
+    shown: has(s.security.securitySettingsSaved),
+  },
+  {
+    name: "People: actionMsg",
+    ms: 3000,
+    first: async () => {
+      apiDelete.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({});
+      renderDe(<PeopleSection />);
+      await pickRowAction(s.people.deleteUserAction);
+      await screen.findByText(s.people.deleteFailed);
+    },
+    second: async () => {
+      await pickRowAction(s.people.deleteUserAction);
+      await screen.findByText(format(s.people.deleteSuccess, { username: "ada" }));
+    },
+    shown: has(format(s.people.deleteSuccess, { username: "ada" })),
+  },
+  (() => {
+    let copy: HTMLElement;
+    return {
+      name: "People: pwCopied",
+      ms: 2000,
+      first: async () => {
+        renderDe(<PeopleSection />);
+        fireEvent.click(await screen.findByRole("button", { name: s.people.addMembersButton }));
+        fireEvent.click(screen.getByRole("button", { name: de.changePassword.generateButton }));
+        const row = screen.getByPlaceholderText(de.auth.password).parentElement as HTMLElement;
+        copy = within(row).getByRole("button");
+        await copyAgain(copy);
+        expect(copy.title).toBe(s.people.passwordCopied);
+      },
+      second: () => copyAgain(copy),
+      shown: () => copy.title === s.people.passwordCopied,
+    };
+  })(),
+  (() => {
+    let copy: HTMLElement;
+    return {
+      name: "API keys: copied",
+      ms: 2000,
+      first: async () => {
+        apiPost.mockResolvedValueOnce({ key: "si_secret" });
+        renderDe(<ApiKeysSection />);
+        fireEvent.click(await screen.findByRole("button", { name: s.apiKeys.generateButton }));
+        await screen.findByText("si_secret");
+        copy = screen.getByRole("button", { name: de.common.copy });
+        await copyAgain(copy);
+        expect(copy.querySelector(".text-success-ink")).not.toBeNull();
+      },
+      second: () => copyAgain(copy),
+      shown: () => copy.querySelector(".text-success-ink") !== null,
+    };
+  })(),
+  {
+    name: "Teams: actionMsg",
+    ms: 3000,
+    first: async () => {
+      apiDelete.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({});
+      renderDe(<TeamsSection />);
+      await pickRowAction(s.teams.deleteAction);
+      await screen.findByText(s.teams.deleteFailed);
+    },
+    second: async () => {
+      await pickRowAction(s.teams.deleteAction);
+      await screen.findByText(format(s.teams.deleteSuccess, { name: "Design" }));
+    },
+    shown: has(format(s.teams.deleteSuccess, { name: "Design" })),
+  },
+  {
+    name: "Roles: actionMsg",
+    ms: 3000,
+    first: async () => {
+      apiDelete.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({});
+      renderDe(<RolesSection />);
+      fireEvent.click(await screen.findByRole("button", { name: de.a11y.deleteRole }));
+      await screen.findByText(s.roles.deleteFailed);
+    },
+    second: async () => {
+      fireEvent.click(screen.getByRole("button", { name: de.a11y.deleteRole }));
+      await screen.findByText(format(s.roles.deleteSuccess, { name: "auditor" }));
+    },
+    shown: has(format(s.roles.deleteSuccess, { name: "auditor" })),
+  },
+  (() => {
+    let copy: HTMLElement;
+    return {
+      name: "Two-factor: codesCopied",
+      ms: 2000,
+      first: async () => {
+        apiPost.mockResolvedValueOnce({ uri: "otpauth://totp/x?secret=ABC", recoveryCodes: ["a"] });
+        renderDe(<TwoFactorSettings />);
+        fireEvent.click(
+          await screen.findByRole("button", { name: s.security.enableTwoFactorButton }),
+        );
+        copy = await screen.findByRole("button", {
+          name: s.security.twoFactorCopyRecoveryCodes,
+        });
+        await copyAgain(copy);
+        expect(copy).toHaveTextContent(s.security.twoFactorCodesCopied);
+      },
+      second: () => copyAgain(copy),
+      shown: () => copy.textContent?.includes(s.security.twoFactorCodesCopied) ?? false,
+    };
+  })(),
+];
+
+describe("A second message inside the fade window gets its full time (#1798)", () => {
+  // Action A, then action B one second before A's message is due to clear.
+  // A's reset timer must not take B's message down with it.
+  it.each(races.map((race) => [race.name, race] as const))("%s", async (_name, race) => {
+    await race.first();
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms - 1000);
+    });
+    await race.second();
+    expect(race.shown()).toBe(true);
+
+    // A's timer is due now. On its own it would clear the slot B just filled.
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(race.shown()).toBe(true);
+
+    // B's own timer still clears it.
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms);
+    });
+    expect(race.shown()).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

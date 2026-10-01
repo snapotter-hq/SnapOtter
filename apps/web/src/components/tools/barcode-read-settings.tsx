@@ -221,7 +221,7 @@ export function BarcodeReadSettings() {
     const ok = await copyToClipboard(text);
     if (ok) {
       setCopiedIndex(globalIdx);
-      later(() => setCopiedIndex(null), 1500);
+      later(() => setCopiedIndex(null), 1500, "copiedIndex");
     }
   };
 
@@ -232,7 +232,7 @@ export function BarcodeReadSettings() {
     const ok = await copyToClipboard(allText);
     if (ok) {
       setCopiedAll(true);
-      later(() => setCopiedAll(false), 2000);
+      later(() => setCopiedAll(false), 2000, "copiedAll");
     }
   };
 

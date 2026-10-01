@@ -36,7 +36,7 @@ export function SpriteSheetSettings() {
   const later = useTimeouts();
   const flashCopied = (kind: "css" | "json") => {
     setCopiedExport(kind);
-    later(() => setCopiedExport(null), 1500);
+    later(() => setCopiedExport(null), 1500, "copiedExport");
   };
 
   const handleProcess = () => {

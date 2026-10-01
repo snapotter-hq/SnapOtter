@@ -323,11 +323,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       // Image copy has no fallback on plain-http installs (no ClipboardItem
       // there), so failure gets surfaced on the button instead of thrown.
       setCopyStatus((await copyImageToClipboard(blob)) ? "copied" : "failed");
-      later(() => setCopyStatus("idle"), 2000);
+      later(() => setCopyStatus("idle"), 2000, "copyStatus");
     } catch (err) {
       console.error("Copy to clipboard failed:", err);
       setCopyStatus("failed");
-      later(() => setCopyStatus("idle"), 2000);
+      later(() => setCopyStatus("idle"), 2000, "copyStatus");
     }
   }, [settings, canvasSize, later]);
 

@@ -432,7 +432,7 @@ export function LoginPage() {
     const ok = await copyToClipboard(enrollmentRecoveryCodes.join("\n"));
     if (ok) {
       setEnrollmentCodesCopied(true);
-      later(() => setEnrollmentCodesCopied(false), 2000);
+      later(() => setEnrollmentCodesCopied(false), 2000, "enrollmentCodesCopied");
     }
   };
 

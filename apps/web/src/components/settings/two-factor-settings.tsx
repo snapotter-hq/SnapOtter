@@ -159,7 +159,7 @@ export function TwoFactorSettings() {
     const ok = await copyToClipboard(enrollment.recoveryCodes.join("\n"));
     if (ok) {
       setCodesCopied(true);
-      later(() => setCodesCopied(false), 2000);
+      later(() => setCodesCopied(false), 2000, "codesCopied");
     } else {
       setMessage({ type: "error", text: t.settings.security.twoFactorCopyFailed });
     }
