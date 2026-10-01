@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { format } from "@/lib/format";
 import { cn, copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
@@ -83,6 +84,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const later = useTimeouts();
 
   const aspectRatio = canvasSize.width / canvasSize.height;
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -321,13 +323,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       // Image copy has no fallback on plain-http installs (no ClipboardItem
       // there), so failure gets surfaced on the button instead of thrown.
       setCopyStatus((await copyImageToClipboard(blob)) ? "copied" : "failed");
-      setTimeout(() => setCopyStatus("idle"), 2000);
+      later(() => setCopyStatus("idle"), 2000);
     } catch (err) {
       console.error("Copy to clipboard failed:", err);
       setCopyStatus("failed");
-      setTimeout(() => setCopyStatus("idle"), 2000);
+      later(() => setCopyStatus("idle"), 2000);
     }
-  }, [settings, canvasSize]);
+  }, [settings, canvasSize, later]);
 
   // Project save (.snapotter file)
   const handleSaveProject = useCallback(() => {

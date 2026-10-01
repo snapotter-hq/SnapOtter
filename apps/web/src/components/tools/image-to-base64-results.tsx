@@ -1,6 +1,7 @@
 import { Check, ClipboardCopy, Download, FileJson, FileText, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { format } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
 import type { Base64Result } from "@/stores/base64-store";
@@ -81,6 +82,7 @@ function CopyButton({
 }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const later = useTimeouts();
 
   const handleCopy = useCallback(async () => {
     // copyToClipboard falls back to execCommand on plain-http installs, where
@@ -88,8 +90,8 @@ function CopyButton({
     const ok = await copyToClipboard(text);
     setStatus(ok ? "copied" : "failed");
     if (ok) onCopied?.();
-    setTimeout(() => setStatus("idle"), 2000);
-  }, [text, onCopied]);
+    later(() => setStatus("idle"), 2000);
+  }, [text, onCopied, later]);
 
   return (
     <button

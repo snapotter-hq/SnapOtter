@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { format as formatMessage } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
@@ -203,6 +204,7 @@ function SpriteOutput({
   setCopiedExport: (v: "css" | "json" | null) => void;
 }) {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const frames = payload.frames as Frame[];
   const cols = payload.cols as number;
   const rows = payload.rows as number;
@@ -224,7 +226,7 @@ function SpriteOutput({
     const ok = await copyToClipboard(`${base}\n${rules}`);
     if (ok) {
       setCopiedExport("css");
-      setTimeout(() => setCopiedExport(null), 1500);
+      later(() => setCopiedExport(null), 1500);
     }
   };
 
@@ -238,7 +240,7 @@ function SpriteOutput({
     );
     if (ok) {
       setCopiedExport("json");
-      setTimeout(() => setCopiedExport(null), 1500);
+      later(() => setCopiedExport(null), 1500);
     }
   };
 

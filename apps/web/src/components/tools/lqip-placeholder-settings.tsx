@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -22,6 +23,7 @@ export function LqipPlaceholderSettings() {
   const [format, setFormat] = useState<Format>("webp");
   const [quality, setQuality] = useState(50);
   const [copied, setCopied] = useState<string | null>(null);
+  const later = useTimeouts();
 
   const handleProcess = () => {
     const settings = { width, blur, strategy, format, quality };
@@ -44,7 +46,7 @@ export function LqipPlaceholderSettings() {
     const ok = await copyToClipboard(text);
     if (ok) {
       setCopied(label);
-      setTimeout(() => setCopied(null), 1500);
+      later(() => setCopied(null), 1500);
     }
   };
 

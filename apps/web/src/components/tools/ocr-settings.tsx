@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -207,6 +208,7 @@ export function OcrSettings() {
   // ReviewPanel, so it surfaces the "saved to Files" confirmation inline (#565).
   const [savedLibraryFileId, setSavedLibraryFileId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const later = useTimeouts();
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStage, setProgressStage] = useState<string | undefined>();
@@ -326,7 +328,7 @@ export function OcrSettings() {
       const ok = await copyToClipboard(text);
       if (ok) {
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        later(() => setCopied(false), 2000);
       }
     }
   };

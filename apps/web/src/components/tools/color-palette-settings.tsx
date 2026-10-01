@@ -1,6 +1,7 @@
 import { Check, ClipboardCopy, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { copyToClipboard } from "@/lib/utils";
@@ -18,6 +19,7 @@ export function ColorPaletteSettings() {
   const [hexColors, setHexColors] = useState<string[]>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [copiedExport, setCopiedExport] = useState<"css" | "json" | null>(null);
+  const later = useTimeouts();
 
   const handleProcess = async () => {
     if (files.length === 0) return;
@@ -57,7 +59,7 @@ export function ColorPaletteSettings() {
     const ok = await copyToClipboard(color);
     if (ok) {
       setCopiedIdx(idx);
-      setTimeout(() => setCopiedIdx(null), 1500);
+      later(() => setCopiedIdx(null), 1500);
     }
   };
 
@@ -67,7 +69,7 @@ export function ColorPaletteSettings() {
     const ok = await copyToClipboard(css);
     if (ok) {
       setCopiedExport("css");
-      setTimeout(() => setCopiedExport(null), 1500);
+      later(() => setCopiedExport(null), 1500);
     }
   };
 
@@ -75,7 +77,7 @@ export function ColorPaletteSettings() {
     const ok = await copyToClipboard(JSON.stringify(colors));
     if (ok) {
       setCopiedExport("json");
-      setTimeout(() => setCopiedExport(null), 1500);
+      later(() => setCopiedExport(null), 1500);
     }
   };
 

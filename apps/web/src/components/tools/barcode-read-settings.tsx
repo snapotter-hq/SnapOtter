@@ -3,6 +3,7 @@ import { Check, Copy, Download, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
@@ -126,6 +127,7 @@ export function BarcodeReadSettings() {
   const [results, setResults] = useState<FileResult[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  const later = useTimeouts();
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStage, setProgressStage] = useState<string | undefined>();
@@ -219,7 +221,7 @@ export function BarcodeReadSettings() {
     const ok = await copyToClipboard(text);
     if (ok) {
       setCopiedIndex(globalIdx);
-      setTimeout(() => setCopiedIndex(null), 1500);
+      later(() => setCopiedIndex(null), 1500);
     }
   };
 
@@ -230,7 +232,7 @@ export function BarcodeReadSettings() {
     const ok = await copyToClipboard(allText);
     if (ok) {
       setCopiedAll(true);
-      setTimeout(() => setCopiedAll(false), 2000);
+      later(() => setCopiedAll(false), 2000);
     }
   };
 

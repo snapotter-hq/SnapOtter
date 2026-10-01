@@ -1,6 +1,7 @@
 import { Copy, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { DocumentView } from "./document-view";
@@ -20,6 +21,7 @@ export function OcrPdfView() {
   const [text, setText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const later = useTimeouts();
 
   useEffect(() => {
     if (!processedUrl) {
@@ -50,7 +52,7 @@ export function OcrPdfView() {
     // Clipboard API does not exist (Sentry WEB-G).
     if (await copyToClipboard(text)) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      later(() => setCopied(false), 1500);
     }
   };
 
