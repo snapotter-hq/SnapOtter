@@ -6,7 +6,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const dbMocks = vi.hoisted(() => ({ failure: null as Error | null }));
+const dbMocks = vi.hoisted(() => ({
+  failure: null as Error | null,
+  inserted: [] as Array<Record<string, unknown>>,
+}));
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -21,8 +24,9 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         }),
       }),
       insert: () => ({
-        values: async () => {
+        values: async (row: Record<string, unknown>) => {
           if (dbMocks.failure) throw dbMocks.failure;
+          dbMocks.inserted.push(row);
         },
       }),
       update: () => ({
@@ -244,6 +248,29 @@ describe("updateSingleFileProgress", () => {
 
     expect(persisted).toBeInstanceOf(Promise);
     await expect(persisted).resolves.toBeUndefined();
+  });
+
+  it("keeps a rejected input's HTTP status on the persisted failure row", async () => {
+    dbMocks.inserted = [];
+    await updateSingleFileProgress({
+      jobId: "single-http-status",
+      phase: "failed",
+      percent: 0,
+      error: "Page count does not match document 1",
+      code: "PAGE_COUNT",
+      httpStatus: 400,
+    });
+    await updateSingleFileProgress({
+      jobId: "single-no-http-status",
+      phase: "failed",
+      percent: 0,
+      error: "Sharp exploded",
+    });
+
+    expect(dbMocks.inserted.map((row) => row.error)).toEqual([
+      { message: "Page count does not match document 1", code: "PAGE_COUNT", httpStatus: 400 },
+      { message: "Sharp exploded" },
+    ]);
   });
 
   it("propagates a durable persistence failure to an awaiting terminal producer", async () => {
