@@ -4,8 +4,10 @@
  * SafeError: an error whose message was AUTHORED BY US and is safe to send to
  * Sentry verbatim. RULE: the message must be a CONSTANT string; anything
  * variable (exit codes, versions, counts) goes into `code` so Sentry grouping
- * stays stable. Detection is by marker property, not instanceof, so it
- * survives error copying across module boundaries.
+ * stays stable. An HTTP status goes into `statusCode`, which the web reporter
+ * sends as the `status_code` Sentry tag (#1351). Detection is by marker
+ * property, not instanceof, so it survives error copying across module
+ * boundaries.
  *
  * ToolInputError: the user's input was the problem (bad CSV, corrupt media).
  * Never reported to Sentry. Engine packages can import these helpers

@@ -185,9 +185,9 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
 
 /**
  * Set an allowlisted Sentry tag (route / tool_id / locale / error_class /
- * status_code, see sentry-scrub.ts TAG_ALLOWLIST) so web errors become filterable by which tool
- * and route the user was on. No-op until Sentry is initialized; lazy so this
- * module keeps no static @sentry/react import.
+ * status_code, see sentry-scrub.ts TAG_ALLOWLIST) so web errors become
+ * filterable by which tool and route the user was on. No-op until Sentry is
+ * initialized; lazy so this module keeps no static @sentry/react import.
  */
 export function setSentryTag(key: string, value: string): void {
   void import("@sentry/react")
@@ -204,7 +204,8 @@ export function setSentryTag(key: string, value: string): void {
  * (see sentry-scrub.ts TAG_ALLOWLIST), and the error must carry an authored
  * SafeError message or beforeSend reduces it to its type. A SafeError's
  * `statusCode` goes on as the `status_code` tag, so its message can stay
- * constant (#1351); a caller's own `status_code` tag wins. Lazy import so this
+ * constant (#1351); a caller's own valid `status_code` wins. Errors captured
+ * any other way (render crashes, early errors) don't get it. Lazy import so this
  * module keeps no static @sentry/react dependency.
  */
 export async function captureHandledError(
@@ -215,8 +216,12 @@ export async function captureHandledError(
   try {
     const Sentry = await import("@sentry/react");
     if (!Sentry.getClient()) return null;
-    const status = isSafeMessageError(error) ? httpStatusTag(error.statusCode) : undefined;
-    const allTags = status ? { status_code: status, ...tags } : tags;
+    // A caller's own status wins; one the scrubber would drop doesn't, so it
+    // can't cost the report the SafeError's real status.
+    const status =
+      httpStatusTag(tags?.status_code) ??
+      (isSafeMessageError(error) ? httpStatusTag(error.statusCode) : undefined);
+    const allTags = status ? { ...tags, status_code: status } : tags;
     return Sentry.withScope((scope) => {
       if (allTags) scope.setTags(allTags);
       return Sentry.captureException(error);

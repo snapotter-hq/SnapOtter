@@ -103,6 +103,14 @@ describe("captureHandledError", () => {
       });
     });
 
+    it("falls back to the SafeError's statusCode when the caller's status_code is not a status", async () => {
+      const err = new SafeError("x", { statusCode: 500 });
+      expect(await captureAndReadTags(err, { status_code: "abc", tool_id: "resize" })).toEqual({
+        status_code: "500",
+        tool_id: "resize",
+      });
+    });
+
     it.each([42, 600, 404.5])("leaves an out-of-range statusCode (%s) off", async (statusCode) => {
       const err = new SafeError("x", { statusCode });
       expect(await captureAndReadTags(err, { error_class: "operational" })).toEqual({
