@@ -3,7 +3,9 @@ description: >-
   apt-get install with every network step bounded by a timeout. The runner's
   Azure apt mirror can degrade to kB/s and eat an entire job budget before
   tests start (#876); when an attempt stalls or fails, sources are switched
-  to the canonical Ubuntu archive and the install is retried once.
+  to the canonical Ubuntu archive and the install is retried. Downloaded .deb
+  archives are cached per runner image and package list (#1801), so a warm
+  cache installs without fetching packages, and even with the mirror down.
 inputs:
   packages:
     description: Space-separated apt package list
@@ -19,10 +21,44 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: apt-get install (Azure mirror, then archive.ubuntu.com)
+    # One key per runner image and package set, shared by every job that asks
+    # for the same packages (all four Integration shards share one). A new
+    # image version restores the previous one's archives through the prefix;
+    # install.sh drops whatever no longer matches the index.
+    - name: Key the .deb archive cache
+      id: key
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        hash=$(printf '%s\n' $PACKAGES | sort -u | sha256sum | cut -c1-16)
+        prefix="apt-debs-v1-${ImageOS:-unknown}-${RUNNER_ARCH}-${hash}-"
+        echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore cached .deb archives
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/apt-archives
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.prefix }}
+
+    - name: apt-get install (cache, Azure mirror, then archive.ubuntu.com)
+      id: install
       shell: bash
       env:
         PACKAGES: ${{ inputs.packages }}
         UPDATE_TIMEOUT: ${{ inputs.update-timeout }}
         INSTALL_TIMEOUT: ${{ inputs.install-timeout }}
+        APT_ARCHIVE_DIR: ${{ runner.temp }}/apt-archives
       run: bash "${{ github.action_path }}/install.sh"
+
+    # Composite steps stop at the first failure, so only a completed install
+    # is ever saved. An exact hit is immutable; nothing to save.
+    - name: Save .deb archives
+      if: steps.restore.outputs.cache-hit != 'true' && steps.install.outputs.debs != '0'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/apt-archives
+        key: ${{ steps.key.outputs.key }}

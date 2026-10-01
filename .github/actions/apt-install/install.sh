@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bounded apt install with a mirror fallback (#876).
+# Bounded apt install with a mirror fallback (#876) and a .deb cache (#1801).
 #
 # Every network step runs under timeout(1): apt's own Acquire::http::Timeout
 # only catches dead connections, not a mirror that keeps trickling bytes at
@@ -16,15 +16,40 @@
 #   hostname-derived filename. Only when the Azure update itself failed is
 #   a real post-swap refresh needed, with patience instead of re-rolls
 #   (120s and 360s post-swap updates both died on a real degraded day).
+#
+# Re-rolls can't make a mirror that trickles to everyone at ~40 kB/s deliver
+# 154 MB, so when APT_ARCHIVE_DIR is set (action.yml restores it from
+# actions/cache) apt downloads into it and installs from it:
+#
+# - After a successful update, every cached .deb whose SHA256 isn't in the
+#   freshly fetched, signature-checked index is deleted first. apt itself
+#   takes any archive-dir file of the right name and size without hashing
+#   it, so this is what keeps a stale or corrupt cache from installing.
+#   Packages that changed since the cache was saved download as usual.
+# - If the update itself fails, the cached archives are installed as local
+#   files with --no-download, so a mirror that is down entirely still can't
+#   fail a job whose cache is warm. Only if that fails too does the mirror
+#   swap below run.
+# - On success, archives the install didn't end up using are pruned, apt's
+#   partial/ and lock are removed, and the count goes to $GITHUB_OUTPUT as
+#   `debs` so action.yml skips saving an empty cache.
 set -euo pipefail
+shopt -s nullglob
 
 read -r -a packages <<< "$PACKAGES"
 
 update_budget="${UPDATE_TIMEOUT:-120}"
 install_budget="${INSTALL_TIMEOUT:-300}"
 dpkg_lock_wait="${DPKG_LOCK_WAIT:-300}"
+archive_dir="${APT_ARCHIVE_DIR:-}"
 # One budget for every wait on the dpkg lock, started by the first wait.
 lock_deadline=""
+
+apt_opts=()
+if [ -n "$archive_dir" ]; then
+  mkdir -p "$archive_dir"
+  apt_opts=(-o "Dir::Cache::Archives=$archive_dir" -o APT::Keep-Downloaded-Packages=true)
+fi
 
 lock_wait_left() {
   if [ -z "$lock_deadline" ]; then
@@ -39,10 +64,11 @@ lock_wait_left() {
 apt_update() {
   sudo timeout -k 30 "$1" apt-get update -qq
 }
+# Extra arguments (--no-download, local .deb paths) go after the package list.
 apt_install() {
-  sudo timeout -k 30 "$install_budget" apt-get \
+  sudo timeout -k 30 "$install_budget" apt-get ${apt_opts[@]+"${apt_opts[@]}"} \
     -o DPkg::Lock::Timeout="$(lock_wait_left)" install -y \
-    --no-install-recommends "${packages[@]}"
+    --no-install-recommends "${packages[@]}" "$@"
 }
 # timeout signals apt-get, not the dpkg it started, so a slow download that
 # runs the budget out mid-configure leaves dpkg running and holding its lock
@@ -63,10 +89,73 @@ recover_dpkg() {
   fi
 }
 
+# Deletes every cached .deb whose content hash the current index doesn't list.
+verify_cached_debs() {
+  local debs=("$archive_dir"/*.deb)
+  [ "${#debs[@]}" -gt 0 ] || return 0
+  local names=() f base sum known kept=0
+  for f in "${debs[@]}"; do
+    base="${f##*/}"
+    names+=("${base%%_*}")
+  done
+  # apt-cache exits non-zero when any one name is gone from the index; the
+  # records it did print still count. An empty result drops everything,
+  # which only costs a download.
+  known="$(apt-cache show "${names[@]}" 2>/dev/null | sed -n 's/^SHA256: //p')" || true
+  for f in "${debs[@]}"; do
+    sum="$(sha256sum "$f")"
+    sum="${sum%% *}"
+    if [ -n "$known" ] && grep -qxF "$sum" <<< "$known"; then
+      kept=$((kept + 1))
+    else
+      sudo rm -f "$f"
+    fi
+  done
+  echo "apt cache: ${kept} of ${#debs[@]} cached .deb archives match the index"
+}
+
+install_offline() {
+  local debs=("$archive_dir"/*.deb)
+  [ "${#debs[@]}" -gt 0 ] || return 1
+  echo "::warning::apt-get update failed; installing the ${#debs[@]} cached .deb archives without the network"
+  apt_install --no-download "${debs[@]}"
+}
+
+# Keeps only the archives of package versions now installed, so the saved
+# cache is exactly what this install used.
+finish() {
+  [ -n "$archive_dir" ] || return 0
+  local installed f base kept=0
+  installed="$(dpkg-query -W -f='${Package}_${Version}_${Architecture}\n' 2>/dev/null)" || true
+  if [ -z "$installed" ]; then
+    echo "::warning::dpkg-query listed nothing; not caching any .deb archives"
+  fi
+  for f in "$archive_dir"/*.deb; do
+    base="${f##*/}"
+    base="${base%.deb}"
+    # apt names archives name_version_arch.deb with ':' (epochs) as %3a.
+    base="$(printf '%b' "${base//%/\\x}")"
+    if [ -n "$installed" ] && grep -qxF "$base" <<< "$installed"; then
+      kept=$((kept + 1))
+    else
+      sudo rm -f "$f"
+    fi
+  done
+  sudo rm -rf "$archive_dir/partial" "$archive_dir/lock"
+  # apt wrote the archives as root; actions/cache runs as the runner user.
+  sudo chown -R "$(id -u):$(id -g)" "$archive_dir"
+  echo "apt cache: keeping ${kept} .deb archives"
+  echo "debs=${kept}" >> "${GITHUB_OUTPUT:-/dev/null}"
+}
+
 azure_lists_ok=false
 if apt_update "$update_budget"; then
   azure_lists_ok=true
-  if apt_install; then exit 0; fi
+  [ -z "$archive_dir" ] || verify_cached_debs
+  if apt_install; then finish; exit 0; fi
+elif [ -n "$archive_dir" ] && install_offline; then
+  finish
+  exit 0
 fi
 
 echo "::warning::apt via the Azure mirror stalled or failed; swapping to archive.ubuntu.com"
@@ -78,7 +167,6 @@ sudo find /etc/apt/sources.list /etc/apt/sources.list.d -maxdepth 1 -type f \
 
 if $azure_lists_ok; then
   for f in /var/lib/apt/lists/azure.archive.ubuntu.com_*; do
-    [ -e "$f" ] || continue
     sudo mv "$f" "${f/azure.archive.ubuntu.com/archive.ubuntu.com}"
   done
 else
@@ -86,7 +174,7 @@ else
 fi
 
 for i in 1 2 3; do
-  if apt_install; then exit 0; fi
+  if apt_install; then finish; exit 0; fi
   echo "::warning::apt install re-roll ${i}/3 stalled or failed"
   recover_dpkg
 done
