@@ -427,8 +427,9 @@ export function EraseObjectSettings({
         try {
           result = parseResultBody<Record<string, unknown>>(xhr.responseText);
         } catch (err) {
-          setError(t.errors.invalidResponse);
+          // Reported first: a throw from the store write below must not lose it.
           reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
+          setError(t.errors.invalidResponse);
         }
         if (result) {
           try {

@@ -124,7 +124,11 @@ async function submit(count = 1): Promise<FakeXhr> {
 
 const realUpdateEntry = useFileStore.getState().updateEntry;
 
-/** The next updateEntry throws, as a broken store write would; later ones work. */
+/**
+ * The next updateEntry throws, as a broken store write would; later ones work.
+ * Call it once the request is out: from there the first entry write is the one
+ * landing the result. The rethrow test below leans on the same order.
+ */
 function breakNextEntryWrite() {
   vi.spyOn(useFileStore.getState(), "updateEntry")
     .mockImplementationOnce(() => {
@@ -175,6 +179,18 @@ describe("erase-object single file: its own failures apart from a bad response",
     expect(entry().status).toBe("completed");
     expect(useFileStore.getState().processing).toBe(false);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("claims an auto-saved result and links it on overwrite", async () => {
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    useFileStore.getState().updateEntry(0, { serverFileId: "file-1" });
+    renderPanel();
+
+    (await submit()).respond(200, { ...GOOD_BODY, savedFileId: "file-2" });
+
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBe("file-2");
+    expect(entry().serverFileId).toBe("file-2");
+    expect(entry().claimed).toBe(true);
   });
 
   it("ends the run with the tracking message when landing the result throws", async () => {
@@ -244,6 +260,21 @@ describe("erase-object single file: its own failures apart from a bad response",
     expectReported(message, 200);
   });
 
+  it("reports a malformed body even when showing the error throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    const unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => xhr.respond(200, {})).toThrow("store broke");
+      expectReported("Tool result has no download URL", 200);
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it("reports a body that does not parse without its text", async () => {
     renderPanel();
 
@@ -278,6 +309,8 @@ describe("erase-object batch: its own failures apart from a bad response", () =>
     breakNextEntryWrite();
 
     expect(() => first.respond(200, GOOD_BODY)).toThrow("boom");
+    // act() skips its flush when the callback throws; reset it before going on.
+    await act(async () => {});
     // The batch moves on to the next file once the first one settles.
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
     FakeXhr.instances[1].respond(200, GOOD_BODY);
