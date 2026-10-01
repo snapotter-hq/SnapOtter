@@ -481,7 +481,7 @@ export function MultiToolPdfCanvas() {
   }
 
   return (
-    <div className="flex h-full flex-col min-h-0" inert={processing}>
+    <div className="flex h-full w-full min-w-0 flex-col min-h-0" inert={processing}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-border">
         <p className="text-xs text-muted-foreground">{s.dragHint}</p>
         <div className="flex flex-wrap items-center gap-3">
