@@ -12,6 +12,10 @@ jobs:
     name: Regenerate linux visual baselines
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      # One name per run attempt, so a re-run never collides with the
+      # artifact or branch an earlier attempt left behind.
+      ARTIFACT_NAME: visual-baselines-${{ github.run_id }}-${{ github.run_attempt }}
     # The e2e webServer (playwright.config.ts) creates an isolated database via
     # tests/e2e-pg-create-db.cjs, so it needs Postgres + Redis on localhost.
     # Without these services the webServer fails with "failed to create database".
@@ -58,40 +62,50 @@ jobs:
         id: regenerate
         # One failing test must not cost the PNGs every other test wrote. The
         # steps below still collect, upload and PR them, and the last step
-        # turns the job red again (#1506).
+        # turns the job red again (#1506). The timeout turns a hang into a
+        # failure while there's still job time left to do that.
         continue-on-error: true
+        timeout-minutes: 100
         run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots
         env:
           PW_WORKERS: "2"
       - name: Collect regenerated baselines
         id: collect
         if: always()
-        run: bash scripts/visual-baselines-pr.sh collect "$RUNNER_TEMP/visual-baselines"
+        run: bash scripts/visual-baselines-pr.sh collect "$RUNNER_TEMP/visual-baselines" "$RUNNER_TEMP/changed-baselines"
       # Uploaded before any push, so a refused push still leaves every PNG
       # downloadable from the run (#1506).
       - name: Upload regenerated baselines
-        if: always() && steps.collect.outputs.count != '0' && steps.collect.outputs.count != ''
+        id: upload
+        if: always() && steps.collect.outcome == 'success' && steps.collect.outputs.count != '0'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: visual-baselines-${{ github.run_id }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ runner.temp }}/visual-baselines/
           if-no-files-found: error
+      # If collecting failed, keep the whole screenshot tree instead.
+      - name: Upload every screenshot (collect failed)
+        if: always() && steps.collect.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-all
+          path: tests/e2e/__screenshots__/
       - name: Open PR with refreshed baselines
-        if: ${{ !cancelled() && steps.collect.outputs.count != '0' && steps.collect.outputs.count != '' }}
+        if: ${{ !cancelled() && steps.collect.outcome == 'success' && steps.collect.outputs.count != '0' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          BRANCH: chore/visual-baselines-${{ github.run_id }}
+          BRANCH: chore/visual-baselines-${{ github.run_id }}-${{ github.run_attempt }}
           BASE_BRANCH: main
           SOURCE_REF: ${{ github.ref_name }}
           SOURCE_SHA: ${{ github.sha }}
           REGENERATE_OUTCOME: ${{ steps.regenerate.outcome }}
-          ARTIFACT_NAME: visual-baselines-${{ github.run_id }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GIT_AUTHOR_NAME: github-actions[bot]
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        run: bash scripts/visual-baselines-pr.sh push "$RUNNER_TEMP/visual-baselines/changed-baselines.txt"
+        run: bash scripts/visual-baselines-pr.sh push "$RUNNER_TEMP/changed-baselines"
       - name: Fail when regeneration failed
         if: steps.regenerate.outcome == 'failure'
         run: |

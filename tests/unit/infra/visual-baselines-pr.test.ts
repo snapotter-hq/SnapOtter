@@ -1,8 +1,10 @@
 // Runs scripts/visual-baselines-pr.sh against throwaway git repos. The bare
-// "origin" carries a pre-receive hook that refuses any branch whose tree
-// differs from main under .github/workflows/, which is what GitHub does to a
-// GITHUB_TOKEN push (#1506: run 36539469767 lost 20 regenerated PNGs that way
-// when main changed cla.yml mid-run). `gh` is a stub that logs its arguments.
+// "origin" carries a pre-receive hook that refuses a branch whose tree
+// differs from main under .github/workflows/. That stands in for GitHub
+// refusing a GITHUB_TOKEN push that would "create or update" a workflow, as
+// it did to run 36539469767 (#1506) when main changed cla.yml mid-run; the
+// tests check the script recovers from such a refusal and never loses the
+// PNGs, not GitHub's exact rule. `gh` is a stub that logs its arguments.
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -20,11 +22,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const SCRIPT = resolve("scripts/visual-baselines-pr.sh");
 const WORKFLOW = resolve(".github/workflows/update-visual-baselines.yml");
+const PLAYWRIGHT_CONFIG = resolve("playwright.config.ts");
 const SHOTS = "tests/e2e/__screenshots__/gui-visual-tools.spec.ts";
 const CHANGED = `${SHOTS}/tool-resize-linux.png`;
 const ADDED = `${SHOTS}/tool-compress-image-to-100kb-linux.png`;
 const UNTOUCHED = `${SHOTS}/tool-crop-linux.png`;
-const BRANCH = "chore/visual-baselines-123";
+const BRANCH = "chore/visual-baselines-123-1";
+const ARTIFACT = "visual-baselines-123-1";
 
 const cleanups: string[] = [];
 afterEach(() => {
@@ -55,7 +59,12 @@ function write(root: string, file: string, contents: string) {
   writeFileSync(join(root, file), contents);
 }
 
-type HookMode = "github" | "refuse-first" | "refuse-all";
+function stub(path: string, body: string) {
+  writeFileSync(path, `#!/bin/sh\n${body}\n`);
+  chmodSync(path, 0o755);
+}
+
+type HookMode = "github" | "refuse-all";
 
 /**
  * origin (bare, with the hook), a seed clone that owns main, and a shallow
@@ -69,25 +78,21 @@ function setup(hook: HookMode = "github") {
   const work = join(dir, "work");
   git(dir, "init", "-q", "--bare", "-b", "main", origin);
 
-  const counter = join(dir, "hook-count");
-  const refuseWorkflowDiff = `
-while read -r old new ref; do
+  const hooks: Record<HookMode, string> = {
+    github: `while read -r old new ref; do
   [ "$ref" = refs/heads/main ] && continue
   if [ -n "$(git diff --name-only refs/heads/main "$new" -- .github/workflows)" ]; then
     echo "refusing to allow a GitHub App to create or update workflow without workflows permission" >&2
     exit 1
   fi
-done`;
-  const hooks: Record<HookMode, string> = {
-    github: refuseWorkflowDiff,
-    "refuse-first": `n=$(cat "${counter}" 2>/dev/null || echo 0); echo $((n + 1)) > "${counter}"
-if [ "$n" = 0 ]; then echo "simulated transient refusal" >&2; exit 1; fi
-${refuseWorkflowDiff}`,
+done`,
     "refuse-all": `echo "simulated permanent refusal" >&2; exit 1`,
   };
 
   git(dir, "clone", "-q", `file://${origin}`, seed);
   write(seed, ".github/workflows/cla.yml", "name: CLA\n");
+  // The repo's real .gitignore has loose patterns like this one.
+  write(seed, ".gitignore", "settings-*.png\n");
   write(seed, CHANGED, "old-resize");
   write(seed, UNTOUCHED, "crop");
   git(seed, "add", ".");
@@ -95,9 +100,7 @@ ${refuseWorkflowDiff}`,
   git(seed, "push", "-q", "origin", "main");
 
   // Install the hook only now, so seeding main isn't subject to it.
-  const hookPath = join(origin, "hooks", "pre-receive");
-  writeFileSync(hookPath, `#!/bin/sh\n${hooks[hook]}\nexit 0\n`);
-  chmodSync(hookPath, 0o755);
+  stub(join(origin, "hooks", "pre-receive"), `${hooks[hook]}\nexit 0`);
 
   git(dir, "clone", "-q", "--depth=1", `file://${origin}`, work);
 
@@ -108,11 +111,10 @@ ${refuseWorkflowDiff}`,
   const bin = join(dir, "bin");
   const ghLog = join(dir, "gh.log");
   mkdirSync(bin);
-  writeFileSync(
+  stub(
     join(bin, "gh"),
-    `#!/bin/sh\nprintf '%s\\n' "$@" >> "${ghLog}"\necho https://github.com/example/pull/1\n`,
+    `printf '%s\\n' "$@" >> "${ghLog}"\necho https://github.com/example/pull/1`,
   );
-  chmodSync(join(bin, "gh"), 0o755);
 
   return { dir, origin, seed, work, bin, ghLog };
 }
@@ -136,9 +138,11 @@ function run(ctx: ReturnType<typeof setup>, args: string[], env: Record<string, 
       PATH: `${ctx.bin}:${process.env.PATH}`,
       GITHUB_STEP_SUMMARY: summary,
       GITHUB_OUTPUT: output,
+      GITHUB_RUN_ID: "123",
       BRANCH,
+      SOURCE_REF: "main",
       RETRY_DELAY: "0",
-      ARTIFACT_NAME: "visual-baselines-123",
+      ARTIFACT_NAME: ARTIFACT,
       ...env,
     },
   });
@@ -146,24 +150,44 @@ function run(ctx: ReturnType<typeof setup>, args: string[], env: Record<string, 
   return { ...result, summary: read(summary), output: read(output), gh: read(ctx.ghLog) };
 }
 
-function collectAndPush(ctx: ReturnType<typeof setup>, env: Record<string, string> = {}) {
+function collect(ctx: ReturnType<typeof setup>) {
   const staging = join(ctx.dir, "staging");
-  const collected = run(ctx, ["collect", staging]);
-  expect(collected.status, collected.stderr).toBe(0);
-  return { staging, pushed: run(ctx, ["push", join(staging, "changed-baselines.txt")], env) };
+  const list = join(ctx.dir, "changed-baselines");
+  const result = run(ctx, ["collect", staging, list]);
+  const listed = existsSync(list) ? readFileSync(list, "utf8").split("\0").filter(Boolean) : [];
+  return { staging, list, listed, result };
+}
+
+function collectAndPush(ctx: ReturnType<typeof setup>, env: Record<string, string> = {}) {
+  const collected = collect(ctx);
+  expect(collected.result.status, collected.result.stderr).toBe(0);
+  return { ...collected, pushed: run(ctx, ["push", collected.list], env) };
+}
+
+function branchFiles(ctx: ReturnType<typeof setup>): string[] {
+  return git(ctx.origin, "diff", "--name-only", "-z", "main", BRANCH)
+    .split("\0")
+    .filter(Boolean)
+    .sort();
+}
+
+function ghArgs(log: string): string[] {
+  return log.split("\n");
+}
+
+function flagValue(args: string[], flag: string): string | undefined {
+  expect(args).toContain(flag);
+  return args[args.indexOf(flag) + 1];
 }
 
 describe("visual-baselines-pr.sh collect", () => {
   it("stages every new and modified baseline with its repo path, and only those", () => {
     const ctx = setup();
-    const staging = join(ctx.dir, "staging");
-    const result = run(ctx, ["collect", staging]);
+    const { staging, listed, result } = collect(ctx);
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.output).toContain("count=2");
-    expect(readFileSync(join(staging, "changed-baselines.txt"), "utf8").trim().split("\n")).toEqual(
-      [ADDED, CHANGED].sort(),
-    );
+    expect([...listed].sort()).toEqual([ADDED, CHANGED].sort());
     expect(readFileSync(join(staging, CHANGED), "utf8")).toBe("new-resize");
     expect(readFileSync(join(staging, ADDED), "utf8")).toBe("compress-100kb");
     expect(existsSync(join(staging, UNTOUCHED))).toBe(false);
@@ -171,15 +195,31 @@ describe("visual-baselines-pr.sh collect", () => {
     expect(result.summary).toContain(CHANGED);
   });
 
+  it("keeps baselines a .gitignore pattern matches and names git would quote", () => {
+    const ctx = setup();
+    const ignored = `${SHOTS}/settings-panel-linux.png`;
+    const accented = `${SHOTS}/tool-café-linux.png`;
+    write(ctx.work, ignored, "settings");
+    write(ctx.work, accented, "cafe");
+    const { staging, listed, pushed } = collectAndPush(ctx);
+
+    expect([...listed].sort()).toEqual([ADDED, CHANGED, ignored, accented].sort());
+    expect(readFileSync(join(staging, ignored), "utf8")).toBe("settings");
+    expect(readFileSync(join(staging, accented), "utf8")).toBe("cafe");
+    expect(pushed.status, pushed.stderr).toBe(0);
+    expect(branchFiles(ctx)).toEqual([ADDED, CHANGED, ignored, accented].sort());
+  });
+
   it("reports zero when the run changed nothing", () => {
     const ctx = setup();
     git(ctx.work, "checkout", "--", CHANGED);
     rmSync(join(ctx.work, ADDED));
-    const result = run(ctx, ["collect", join(ctx.dir, "staging")]);
+    const { result, listed } = collect(ctx);
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.output).toContain("count=0");
     expect(result.stdout).toContain("No baseline changes.");
+    expect([...listed].sort()).toEqual([]);
   });
 });
 
@@ -208,52 +248,62 @@ describe("visual-baselines-pr.sh push", () => {
 
     expect(pushed.status, pushed.stderr).toBe(0);
     expect(git(ctx.origin, "rev-parse", `${BRANCH}^`)).toBe(newMain);
-    expect(git(ctx.origin, "diff", "--name-only", "main", BRANCH).split("\n").sort()).toEqual(
-      [ADDED, CHANGED].sort(),
-    );
+    expect(branchFiles(ctx)).toEqual([ADDED, CHANGED].sort());
     expect(git(ctx.origin, "show", `${BRANCH}:${CHANGED}`)).toBe("new-resize");
     expect(git(ctx.origin, "show", `${BRANCH}:${ADDED}`)).toBe("compress-100kb");
     // The checkout is left exactly as the run produced it.
     expect(git(ctx.work, "rev-parse", "HEAD")).toBe(headBefore);
     expect(readFileSync(join(ctx.work, CHANGED), "utf8")).toBe("new-resize");
 
-    const ghArgs = pushed.gh.split("\n");
-    expect(ghArgs.slice(0, 2)).toEqual(["pr", "create"]);
-    expect(ghArgs).toContain("--head");
-    expect(ghArgs[ghArgs.indexOf("--head") + 1]).toBe(BRANCH);
-    expect(ghArgs[ghArgs.indexOf("--base") + 1]).toBe("main");
-    expect(ghArgs).not.toContain("--draft");
+    const args = ghArgs(pushed.gh);
+    expect(args.slice(0, 2)).toEqual(["pr", "create"]);
+    expect(flagValue(args, "--head")).toBe(BRANCH);
+    expect(flagValue(args, "--base")).toBe("main");
+    expect(args).not.toContain("--draft");
     expect(pushed.summary).toContain("https://github.com/example/pull/1");
   });
 
-  it("keeps a run dispatched on a branch that edits a workflow pushable", () => {
+  it("opens a draft with restore steps for a run dispatched on a branch that edits a workflow", () => {
     const ctx = setup();
     // The dispatched ref carries its own workflow edit, as a fix branch does.
     write(ctx.work, ".github/workflows/cla.yml", "name: CLA on the fix branch\n");
-    git(
-      ctx.work,
-      "commit",
-      "-q",
-      "-m",
-      "ci: edit cla.yml on the fix branch",
-      ".github/workflows/cla.yml",
-    );
+    git(ctx.work, "commit", "-q", "-m", "ci: edit cla.yml", ".github/workflows/cla.yml");
     const { pushed } = collectAndPush(ctx, { SOURCE_REF: "fix/branch" });
 
     expect(pushed.status, pushed.stderr).toBe(0);
-    expect(git(ctx.origin, "diff", "--name-only", "main", BRANCH).split("\n").sort()).toEqual(
-      [ADDED, CHANGED].sort(),
-    );
-    expect(pushed.gh).toContain("fix/branch");
+    expect(branchFiles(ctx)).toEqual([ADDED, CHANGED].sort());
+    const args = ghArgs(pushed.gh);
+    expect(args).toContain("--draft");
+    const body = flagValue(args, "--body") ?? "";
+    expect(pushed.gh).toContain("`fix/branch`");
+    expect(pushed.gh).toContain(`gh run download 123 -n ${ARTIFACT} -D .`);
+    expect(body).toContain("Automated baseline refresh");
   });
 
-  it("refetches main and retries when a push is refused", () => {
-    const ctx = setup("refuse-first");
+  it("fetches main again and retries when main moves between fetch and push", () => {
+    const ctx = setup();
+    const realGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+    const moved = join(ctx.dir, "moved");
+    // On the script's first push, a workflow change lands on main first, so
+    // the commit it's pushing sits on a stale tip and the origin refuses it.
+    stub(
+      join(ctx.bin, "git"),
+      `if [ "$1" = push ] && [ ! -e "${moved}" ]; then
+  touch "${moved}"
+  printf 'on: push\\n' >> "${ctx.seed}/.github/workflows/cla.yml"
+  "${realGit}" -C "${ctx.seed}" commit -q -am "ci: move main during the push"
+  "${realGit}" -C "${ctx.seed}" push -q origin main
+fi
+exec "${realGit}" "$@"`,
+    );
     const { pushed } = collectAndPush(ctx);
 
     expect(pushed.status, pushed.stderr).toBe(0);
+    expect(pushed.stderr).toContain("refusing to allow a GitHub App");
     expect(pushed.stdout).toContain("Attempt 2/3");
-    expect(git(ctx.origin, "rev-parse", `${BRANCH}^`)).toBe(git(ctx.origin, "rev-parse", "main"));
+    expect(existsSync(moved)).toBe(true);
+    expect(git(ctx.origin, "rev-parse", `${BRANCH}^`)).toBe(git(ctx.seed, "rev-parse", "HEAD"));
+    expect(branchFiles(ctx)).toEqual([ADDED, CHANGED].sort());
   });
 
   it("fails loudly and points at the artifact when every push is refused", () => {
@@ -262,12 +312,33 @@ describe("visual-baselines-pr.sh push", () => {
 
     expect(pushed.status).not.toBe(0);
     expect(pushed.stdout).toContain("Attempt 3/3");
-    expect(pushed.stdout).toContain("visual-baselines-123 artifact");
-    expect(pushed.summary).toContain("gh run download");
-    expect(pushed.summary).toContain("visual-baselines-123");
+    expect(pushed.stdout).toContain(`${ARTIFACT} artifact`);
+    expect(pushed.summary).toContain(`gh run download 123 -n ${ARTIFACT} -D .`);
     expect(pushed.gh).toBe("");
     // The staged copies the artifact uploads are still there.
     expect(readFileSync(join(staging, CHANGED), "utf8")).toBe("new-resize");
+  });
+
+  it("says no copy survived when the upload failed too", () => {
+    const ctx = setup("refuse-all");
+    const { pushed } = collectAndPush(ctx, { UPLOAD_OUTCOME: "failure" });
+
+    expect(pushed.status).not.toBe(0);
+    expect(pushed.stdout).toContain("kept no copy");
+    expect(pushed.summary).not.toContain("gh run download");
+  });
+
+  it("points at the artifact when building the commit fails, not only when pushing does", () => {
+    const ctx = setup();
+    const { list } = collect(ctx);
+    // A listed file that has vanished makes `git add` fail mid-attempt.
+    rmSync(join(ctx.work, ADDED));
+    const pushed = run(ctx, ["push", list]);
+
+    expect(pushed.status).not.toBe(0);
+    expect(pushed.stdout).toContain(`${ARTIFACT} artifact`);
+    expect(pushed.summary).toContain("gh run download");
+    expect(git(ctx.origin, "branch", "--list", BRANCH)).toBe("");
   });
 
   it("opens a draft PR when the regenerate step failed", () => {
@@ -275,8 +346,19 @@ describe("visual-baselines-pr.sh push", () => {
     const { pushed } = collectAndPush(ctx, { REGENERATE_OUTCOME: "failure" });
 
     expect(pushed.status, pushed.stderr).toBe(0);
-    expect(pushed.gh.split("\n")).toContain("--draft");
+    expect(ghArgs(pushed.gh)).toContain("--draft");
     expect(pushed.gh).toContain("ended `failure`");
+  });
+
+  it("fails when the branch pushed but the PR could not be opened", () => {
+    const ctx = setup();
+    stub(join(ctx.bin, "gh"), "echo 'GraphQL: something went wrong' >&2; exit 1");
+    const { pushed } = collectAndPush(ctx);
+
+    expect(pushed.status).not.toBe(0);
+    expect(pushed.stdout).toContain(`Pushed ${BRANCH} but could not open its PR`);
+    expect(pushed.summary).toContain("PR not opened");
+    expect(git(ctx.origin, "branch", "--list", BRANCH)).toContain(BRANCH);
   });
 
   it("opens nothing when main already carries the same PNGs", () => {
@@ -303,50 +385,91 @@ interface Step {
   uses?: string;
   run?: string;
   "continue-on-error"?: boolean;
+  "timeout-minutes"?: number;
   with?: Record<string, string>;
+  env?: Record<string, string>;
 }
 
-describe("update-visual-baselines.yml", () => {
-  const steps = (
-    load(readFileSync(WORKFLOW, "utf8")) as {
-      jobs: Record<string, { steps: Step[] }>;
-    }
-  ).jobs["update-baselines"].steps;
-  const index = (predicate: (step: Step) => boolean) => steps.findIndex(predicate);
+/** A GitHub Actions expression as it appears in the workflow source. */
+const expr = (inner: string) => `$\{{ ${inner} }}`;
 
-  const regenerate = index((step) => step.run?.includes("--update-snapshots") ?? false);
-  const collect = index((step) => step.run?.includes("visual-baselines-pr.sh collect") ?? false);
-  const upload = index((step) => step.uses?.startsWith("actions/upload-artifact@") ?? false);
-  const push = index((step) => step.run?.includes("visual-baselines-pr.sh push") ?? false);
+describe("update-visual-baselines.yml", () => {
+  const job = (
+    load(readFileSync(WORKFLOW, "utf8")) as {
+      jobs: Record<string, { steps: Step[]; env?: Record<string, string> }>;
+    }
+  ).jobs["update-baselines"];
+  const steps = job.steps;
+  const find = (predicate: (step: Step) => boolean) => {
+    const at = steps.findIndex(predicate);
+    expect(at).toBeGreaterThanOrEqual(0);
+    return at;
+  };
+
+  const regenerate = find((step) => step.run?.includes("--update-snapshots") ?? false);
+  const collectStep = find((step) => step.run?.includes("visual-baselines-pr.sh collect") ?? false);
+  const upload = find((step) => step.id === "upload");
+  const push = find((step) => step.run?.includes("visual-baselines-pr.sh push") ?? false);
 
   it("keeps going past a failing regenerate step, then fails the job", () => {
     expect(steps[regenerate]["continue-on-error"]).toBe(true);
     expect(steps[regenerate].id).toBe("regenerate");
+    expect(steps[regenerate]["timeout-minutes"]).toBeGreaterThan(0);
     const failStep = steps
       .slice(push + 1)
-      .find((step) => step.if?.includes("steps.regenerate.outcome"));
+      .find((step) => step.if?.includes("steps.regenerate.outcome == 'failure'"));
     expect(failStep?.run).toContain("exit 1");
+    // With continue-on-error, `conclusion` always reads success; only
+    // `outcome` carries the failure into the PR.
+    expect(steps[push].env?.REGENERATE_OUTCOME).toBe(expr("steps.regenerate.outcome"));
   });
 
-  it("only runs projects that write @visual baselines", () => {
-    // The webkit device projects grep-invert @visual: they can fail the step
-    // but never write a baseline.
-    expect(steps[regenerate].run).not.toMatch(/webkit|firefox/);
-    expect(steps[regenerate].run).toContain("--project=chromium-visual");
+  it("runs exactly the projects that write @visual baselines", () => {
+    // The maintained baselines come from VISUAL_SPECS and the device specs.
+    // A device project that grep-inverts @visual writes none, and the legacy
+    // lane (LEGACY_VISUAL_SPECS) has none maintained anywhere.
+    const config = readFileSync(PLAYWRIGHT_CONFIG, "utf8");
+    const blocks = config.split(/\n {4}\{\n/).slice(1);
+    const visualProjects = blocks
+      .filter((block) => /testMatch: (VISUAL_SPECS|DEVICE_SPECS),/.test(block))
+      .filter((block) => !/grepInvert: \/@visual\//.test(block))
+      .map((block) => /^ {6}name: "([^"]+)",$/m.exec(block)?.[1]);
+    const run = steps[regenerate].run ?? "";
+    const projects = [...run.matchAll(/--project=(\S+)/g)].map((m) => m[1]).sort();
+    expect(projects).toEqual(
+      expect.arrayContaining(["chromium-visual", "mobile-chromium", "tablet-chromium"]),
+    );
+    expect(projects).toEqual([...visualProjects].sort());
+    expect(run).not.toMatch(/webkit|firefox/);
   });
 
   it("uploads the PNGs before it tries to push them, even after a failure", () => {
-    expect(regenerate).toBeGreaterThanOrEqual(0);
-    expect(regenerate).toBeLessThan(collect);
-    expect(collect).toBeLessThan(upload);
+    expect(regenerate).toBeLessThan(collectStep);
+    expect(collectStep).toBeLessThan(upload);
     expect(upload).toBeLessThan(push);
-    expect(steps[collect].if).toContain("always()");
+    expect(steps[collectStep].if).toContain("always()");
     expect(steps[upload].if).toContain("always()");
-    expect(steps[upload].with?.path).toContain("visual-baselines");
-    expect(steps[upload].uses).toMatch(/@[0-9a-f]{40}$/);
+    expect(steps[upload].uses).toMatch(/^actions\/upload-artifact@[0-9a-f]{40}$/);
+    // The upload reads what collect staged, under the name the push step's
+    // failure message tells people to download.
+    expect(steps[collectStep].run).toContain('"$RUNNER_TEMP/visual-baselines"');
+    expect(steps[upload].with?.path).toBe(`${expr("runner.temp")}/visual-baselines/`);
+    expect(steps[upload].with?.name).toBe(expr("env.ARTIFACT_NAME"));
+    expect(job.env?.ARTIFACT_NAME).toContain(expr("github.run_attempt"));
+    expect(steps[push].env?.UPLOAD_OUTCOME).toBe(expr("steps.upload.outcome"));
   });
 
-  it("never pushes from the old inline commit-and-push", () => {
+  it("keeps the screenshots when collecting them fails", () => {
+    const fallback = steps.find((step) => step.if?.includes("steps.collect.outcome == 'failure'"));
+    expect(fallback?.uses).toMatch(/^actions\/upload-artifact@/);
+    expect(fallback?.with?.path).toBe("tests/e2e/__screenshots__/");
+  });
+
+  it("pushes onto main under a branch unique to the run attempt", () => {
+    expect(steps[push].env?.BASE_BRANCH).toBe("main");
+    expect(steps[push].env?.BRANCH).toContain(
+      `${expr("github.run_id")}-${expr("github.run_attempt")}`,
+    );
     const inline = steps.filter((step) => /git (commit|push)\b/.test(step.run ?? ""));
     expect(inline).toEqual([]);
   });

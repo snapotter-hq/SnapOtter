@@ -2,26 +2,24 @@
 # Hands the PNGs the update-visual-baselines workflow regenerates to a PR, and
 # makes sure a failed push can never throw them away (#1506).
 #
-#   collect <staging-dir>
+#   collect <staging-dir> <list-file>
 #     Copies every new or modified baseline under tests/e2e/__screenshots__
-#     into <staging-dir> (repo-relative paths kept, so the uploaded artifact
-#     unzips straight into a checkout) and lists them in
-#     <staging-dir>/changed-baselines.txt. Writes count=<n> to $GITHUB_OUTPUT.
+#     into <staging-dir> with its repo-relative path, so the uploaded artifact
+#     unzips straight into a checkout, and writes their paths NUL-separated to
+#     <list-file>. Writes count=<n> to $GITHUB_OUTPUT.
 #
 #   push <list-file>
-#     Commits the listed files on top of the CURRENT tip of $BASE_BRANCH
+#     Commits the listed files on top of a freshly fetched tip of $BASE_BRANCH
 #     (default main), never on top of the dispatched commit, then pushes
-#     $BRANCH and opens a PR. GitHub refuses a GITHUB_TOKEN push whose branch
-#     differs from main under .github/workflows/, which is what happened when
-#     main changed a workflow mid-run (or when the run was dispatched on a
-#     branch that edits one). A branch that is main's tip plus PNGs never
-#     differs there. The commit is built with plumbing against a scratch
-#     index, so the working tree, and this script, are never touched. Each
-#     attempt refetches the tip, so main moving again between fetch and push
-#     costs a retry, not the run.
+#     $BRANCH and opens a PR. The commit is built with plumbing against a
+#     scratch index, so the working tree, and this script, are never touched.
+#     Each attempt fetches the tip again, so the base moving between fetch
+#     and push costs a retry, not the run. If every attempt fails, the step
+#     ends red and names the artifact that holds the PNGs.
 #
 # Env for push: BRANCH (required), BASE_BRANCH, SOURCE_REF, SOURCE_SHA,
-# REGENERATE_OUTCOME, ARTIFACT_NAME, RUN_URL, PUSH_ATTEMPTS, RETRY_DELAY.
+# REGENERATE_OUTCOME, ARTIFACT_NAME, UPLOAD_OUTCOME, RUN_URL, PUSH_ATTEMPTS,
+# RETRY_DELAY.
 set -euo pipefail
 
 SCREENSHOTS="tests/e2e/__screenshots__"
@@ -33,22 +31,35 @@ summary() {
   fi
 }
 
+list_lines() {
+  tr '\0' '\n' < "$1"
+}
+
 collect() {
-  local dest="$1"
-  local list="$dest/changed-baselines.txt"
+  local dest="$1" list="$2"
   mkdir -p "$dest"
   : > "$list"
-  # --modified also reports deletions; --update-snapshots never deletes, and
-  # a deleted file has nothing to upload, so only files on disk are kept.
-  git ls-files --modified --others --exclude-standard -- "$SCREENSHOTS" | sort -u |
-    while IFS= read -r file; do
-      [ -f "$file" ] || continue
-      mkdir -p "$dest/$(dirname "$file")"
-      cp "$file" "$dest/$file"
-      printf '%s\n' "$file" >> "$list"
-    done
+  # No --exclude-standard: .gitignore has loose patterns (settings-*.png,
+  # layout-*.png) that a new baseline name could match, and a skipped file
+  # here is a lost one. -z keeps non-ASCII names unquoted. --modified also
+  # reports deletions; --update-snapshots never deletes, so a listed path
+  # that isn't on disk is reported and left out.
+  local file raw
+  raw="$(mktemp)"
+  git ls-files -z --modified --others -- "$SCREENSHOTS" > "$raw"
+  sort -zu -o "$raw" "$raw"
+  while IFS= read -r -d '' file; do
+    if [ ! -f "$file" ]; then
+      echo "Not on disk, left out: $file"
+      continue
+    fi
+    mkdir -p "$dest/$(dirname "$file")"
+    cp "$file" "$dest/$file"
+    printf '%s\0' "$file" >> "$list"
+  done < "$raw"
+  rm -f "$raw"
   local count
-  count=$(wc -l < "$list" | tr -d ' ')
+  count=$(tr -cd '\0' < "$list" | wc -c | tr -d ' ')
   echo "count=$count" >> "${GITHUB_OUTPUT:-/dev/null}"
   if [ "$count" = "0" ]; then
     echo "No baseline changes."
@@ -56,8 +67,12 @@ collect() {
     return 0
   fi
   echo "$count new or modified baselines:"
-  cat "$list"
-  summary "### $count new or modified baselines" "" '```' "$(cat "$list")" '```'
+  list_lines "$list"
+  summary "### $count new or modified baselines" "" '```' "$(list_lines "$list")" '```'
+}
+
+restore_command() {
+  echo "gh run download ${GITHUB_RUN_ID:-<run-id>} -n ${ARTIFACT_NAME:-<artifact>} -D ."
 }
 
 pr_body() {
@@ -65,7 +80,15 @@ pr_body() {
   echo "Automated baseline refresh from the update-visual-baselines workflow${RUN_URL:+ ($RUN_URL)}."
   echo
   echo "Rendered from \`${SOURCE_REF:-unknown}\` at ${SOURCE_SHA}, committed on top of \`${BASE_BRANCH}\`."
-  echo "If that ref isn't \`${BASE_BRANCH}\`, cherry-pick this commit onto it rather than merging here."
+  if [ "${SOURCE_REF:-}" != "$BASE_BRANCH" ]; then
+    echo
+    echo "These match \`${SOURCE_REF:-unknown}\`, not \`${BASE_BRANCH}\`, which is why this PR is a draft."
+    echo "To apply them to that branch, run this from its checkout root:"
+    echo
+    echo '```'
+    restore_command
+    echo '```'
+  fi
   if [ "${REGENERATE_OUTCOME:-success}" != "success" ]; then
     echo
     echo "The regenerate step ended \`${REGENERATE_OUTCOME}\`, so some baselines may be missing or rendered"
@@ -75,8 +98,29 @@ pr_body() {
   echo "Review the image diffs before merging."
   echo
   echo '```'
-  cat "$list"
+  list_lines "$list"
   echo '```'
+}
+
+PUSHED=""
+
+# Runs on every exit from push, including a git error under set -e mid-attempt,
+# so a failed run always says where its PNGs went.
+on_push_exit() {
+  local code=$1
+  [ "$code" = 0 ] && return 0
+  [ -n "$PUSHED" ] && return 0
+  if [ "${UPLOAD_OUTCOME:-success}" = "success" ]; then
+    echo "::error::Could not push $BRANCH. The regenerated baselines are in the ${ARTIFACT_NAME:-run} artifact."
+    summary "### Push failed, baselines kept as an artifact" "" \
+      "\`$BRANCH\` was not pushed (the step log has GitHub's reason)." \
+      "Every regenerated PNG is in the \`${ARTIFACT_NAME:-run}\` artifact. To apply them, run this from a checkout root:" "" \
+      '```' "$(restore_command)" '```'
+  else
+    echo "::error::Could not push $BRANCH, and the artifact upload ended ${UPLOAD_OUTCOME}, so this run kept no copy of the baselines."
+    summary "### Push failed and no artifact" "" \
+      "\`$BRANCH\` was not pushed and the artifact upload ended \`${UPLOAD_OUTCOME}\`. Re-run the workflow."
+  fi
 }
 
 push() {
@@ -84,19 +128,21 @@ push() {
   : "${BRANCH:?BRANCH is required}"
   BASE_BRANCH="${BASE_BRANCH:-main}"
   SOURCE_SHA="${SOURCE_SHA:-$(git rev-parse HEAD)}"
+  trap 'on_push_exit $?' EXIT
   local attempts="${PUSH_ATTEMPTS:-3}"
   local delay="${RETRY_DELAY:-10}"
   local index
   index="$(mktemp)"
-  local pushed="" tip="" attempt
+  local tip="" attempt tree commit
   for attempt in $(seq 1 "$attempts"); do
     echo "Attempt $attempt/$attempts: committing onto the current $BASE_BRANCH tip"
     if git fetch --no-tags --depth=1 origin "$BASE_BRANCH"; then
       tip="$(git rev-parse FETCH_HEAD)"
       rm -f "$index"
       GIT_INDEX_FILE="$index" git read-tree "$tip"
-      GIT_INDEX_FILE="$index" GIT_LITERAL_PATHSPECS=1 git add --pathspec-from-file="$list"
-      local tree commit
+      # --force: a baseline whose name matches a .gitignore pattern still ships.
+      GIT_INDEX_FILE="$index" GIT_LITERAL_PATHSPECS=1 \
+        git add --force --pathspec-from-file="$list" --pathspec-file-nul
       tree="$(GIT_INDEX_FILE="$index" git write-tree)"
       if [ "$tree" = "$(git rev-parse "$tip^{tree}")" ]; then
         rm -f "$index"
@@ -106,28 +152,26 @@ push() {
       fi
       commit="$(git commit-tree "$tree" -p "$tip" -m "$TITLE")"
       git diff --stat "$tip" "$commit"
-      # --force: the branch is unique to this run, and a push that landed but
-      # reported an error must not turn every retry into a non-fast-forward.
+      # --force: the branch is unique to this run attempt, and a push that
+      # landed but reported an error must not turn every retry into a
+      # non-fast-forward.
       if git push --force origin "$commit:refs/heads/$BRANCH"; then
-        pushed=1
+        PUSHED=1
         break
       fi
     fi
     if [ "$attempt" -lt "$attempts" ]; then sleep $((delay * attempt)); fi
   done
   rm -f "$index"
-
-  if [ -z "$pushed" ]; then
-    echo "::error::Push of $BRANCH failed $attempts times. The regenerated baselines are in the ${ARTIFACT_NAME:-run} artifact."
-    summary "### Push failed, baselines kept as an artifact" "" \
-      "\`git push\` of \`$BRANCH\` failed $attempts times (see the step log for GitHub's reason)." \
-      "Every regenerated PNG is in the \`${ARTIFACT_NAME:-run}\` artifact. To apply them, run this from a checkout root:" "" \
-      '```' "gh run download ${GITHUB_RUN_ID:-<run-id>} -n ${ARTIFACT_NAME:-<artifact>} -D ." '```'
-    return 1
+  if [ -z "$PUSHED" ]; then
+    echo "Push of $BRANCH failed $attempts times."
+    exit 1
   fi
 
   local draft=()
-  if [ "${REGENERATE_OUTCOME:-success}" != "success" ]; then draft=(--draft); fi
+  if [ "${REGENERATE_OUTCOME:-success}" != "success" ] || [ "${SOURCE_REF:-}" != "$BASE_BRANCH" ]; then
+    draft=(--draft)
+  fi
   local url
   if ! url="$(gh pr create ${draft[@]+"${draft[@]}"} --title "$TITLE" --body "$(pr_body "$list")" \
     --base "$BASE_BRANCH" --head "$BRANCH")"; then
@@ -140,10 +184,10 @@ push() {
 }
 
 case "${1:-}" in
-  collect) collect "${2:?collect needs a staging dir}" ;;
+  collect) collect "${2:?collect needs a staging dir}" "${3:?collect needs a list file}" ;;
   push) push "${2:?push needs the list file}" ;;
   *)
-    echo "usage: $0 collect <staging-dir> | push <list-file>" >&2
+    echo "usage: $0 collect <staging-dir> <list-file> | push <list-file>" >&2
     exit 2
     ;;
 esac
