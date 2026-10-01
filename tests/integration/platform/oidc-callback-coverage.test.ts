@@ -21,7 +21,10 @@
  *     login failure, while any other resolver throw still surfaces as a 500.
  *   - RP-initiated logout (auth.ts POST /api/auth/logout): the logoutUrl built
  *     from the discovery cache the callback warms, including the
- *     post_logout_redirect_uri under a BASE_PATH prefix (#1355).
+ *     post_logout_redirect_uri under a BASE_PATH prefix (#1355), and the
+ *     line between an expected local-only logout (no ID token, OIDC off, no
+ *     end_session_endpoint) and a fault building the URL, which must still
+ *     log the user out but reach reportError (#1514).
  *
  * Like oidc-mfa-callback.test.ts, the cryptographic token exchange is mocked
  * at the `openid-client` boundary (only `authorizationCodeGrant`; discovery,
@@ -55,6 +58,14 @@ vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
   return { ...actual, trackEvent: trackEventSpy };
 });
 
+// reportError is mocked so the logout tests can tell a reported fault from an
+// expected local-only logout (#1514); every other error-report export stays real.
+const reportErrorSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual: Record<string, unknown> = await importOriginal();
+  return { ...actual, reportError: reportErrorSpy };
+});
+
 // resolveExternalUser stays REAL by default. The #978 tests swap in a throw for
 // one call each: the retry-exhaustion error the resolver raises after three
 // lost username races (three different identities taking the scanned name
@@ -85,7 +96,8 @@ const { sanitizeUsername, UsernameRaceExhaustedError } = await import(
   "../../../apps/api/src/lib/external-auth-resolver.js"
 );
 const mfaModule = await import("../../../apps/api/src/plugins/mfa.js");
-const { getOidcEndSessionEndpoint } = await import("../../../apps/api/src/plugins/oidc.js");
+const oidcModule = await import("../../../apps/api/src/plugins/oidc.js");
+const { getOidcEndSessionEndpoint } = oidcModule;
 const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
 
 import type { TestApp } from "../test-server.js";
@@ -270,6 +282,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   afterEach(() => {
     authorizationCodeGrantMock.mockReset();
     trackEventSpy.mockClear();
+    reportErrorSpy.mockClear();
     resolverFailure.next = null;
     // Reset the knobs individual tests tweak back to the describe defaults.
     (env as any).OIDC_AUTO_CREATE_USERS = true;
@@ -402,6 +415,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.id, sessionToken ?? ""));
       expect(session).toBeUndefined();
+      expect(reportErrorSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -430,6 +444,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("omits logoutUrl for an ID-token session once OIDC is switched off", async () => {
@@ -444,8 +459,77 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual({ ok: true });
+      expect(reportErrorSpy).not.toHaveBeenCalled();
     } finally {
       (env as any).OIDC_ENABLED = true;
+    }
+  });
+
+  // The logout route's dynamic import("./oidc.js") resolves to this same
+  // module instance, so a spy on getOidcEndSessionEndpoint drives the route
+  // the way the MFA spies drive the callback.
+  async function logoutWithSession(sessionToken: string) {
+    return oidcApp.app.inject({
+      method: "POST",
+      url: "/api/auth/logout",
+      cookies: { "snapotter-session": sessionToken },
+    });
+  }
+
+  async function expectLoggedOutLocally(
+    res: Awaited<ReturnType<typeof logoutWithSession>>,
+    sessionToken: string,
+  ) {
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    expect(res.cookies.find((c) => c.name === "snapotter-session")).toMatchObject({
+      path: "/",
+      value: "",
+    });
+    const [session] = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, sessionToken));
+    expect(session).toBeUndefined();
+  }
+
+  it("omits logoutUrl without reporting when discovery advertises no end_session_endpoint", async () => {
+    const sessionToken = await oidcSessionWithWarmCache();
+    const spy = vi.spyOn(oidcModule, "getOidcEndSessionEndpoint").mockReturnValue(null);
+    try {
+      const res = await logoutWithSession(sessionToken);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      await expectLoggedOutLocally(res, sessionToken);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // A throw here leaves the IdP session open, so the next SSO sign-in skips
+  // the IdP prompt and logout looks broken. The user still gets a local
+  // logout, and the fault reaches Sentry instead of vanishing (#1514).
+  it("still logs out locally and reports the fault when building the IdP logout URL throws (#1514)", async () => {
+    const sessionToken = await oidcSessionWithWarmCache();
+    const fault = new Error("simulated serverMetadata fault");
+    const spy = vi.spyOn(oidcModule, "getOidcEndSessionEndpoint").mockImplementation(() => {
+      throw fault;
+    });
+    try {
+      const res = await logoutWithSession(sessionToken);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      await expectLoggedOutLocally(res, sessionToken);
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(fault, {
+        source: "http",
+        route: "/api/auth/logout",
+        method: "POST",
+        subsystem: "oidc-logout",
+      });
+    } finally {
+      spy.mockRestore();
     }
   });
 

@@ -695,6 +695,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.sessions.id, token));
 
       if (session?.idToken && env.OIDC_ENABLED) {
+        // A null endpoint (discovery not cached yet, or an IdP that doesn't
+        // advertise end_session_endpoint) is an ordinary local-only logout.
+        // Anything thrown is a real fault: the session below is still
+        // destroyed, but the IdP session stays open, so it must be reported.
         try {
           const { getOidcEndSessionEndpoint } = await import("./oidc.js");
           const endSessionEndpoint = getOidcEndSessionEndpoint();
@@ -705,8 +709,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             });
             logoutUrl = `${endSessionEndpoint}?${params.toString()}`;
           }
-        } catch {
-          // OIDC plugin not loaded or discovery not cached
+        } catch (err) {
+          request.log.error(
+            { err },
+            "logout: failed to build the OIDC logout URL; IdP session left open",
+          );
+          // request.log has no Sentry bridge, and by catching here the error
+          // never reaches the global handler's reportError (#1514).
+          void reportError(err, {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            subsystem: "oidc-logout",
+          });
         }
       }
 
