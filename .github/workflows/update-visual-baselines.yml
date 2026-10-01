@@ -49,30 +49,51 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-      - name: Install Playwright browsers (chromium + webkit for device projects)
-        run: pnpm playwright install --with-deps chromium webkit
-      - name: Regenerate baselines (desktop + device projects)
-        run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=mobile-webkit --project=tablet-webkit --project=tablet-chromium --update-snapshots
+      - name: Install Playwright browsers
+        run: pnpm playwright install --with-deps chromium
+      # Only projects that write @visual baselines run here. The webkit device
+      # projects grep-invert @visual (playwright.config.ts), so they could only
+      # add failures; nightly runs them as functional tests.
+      - name: Regenerate baselines (desktop + chromium device projects)
+        id: regenerate
+        # One failing test must not cost the PNGs every other test wrote. The
+        # steps below still collect, upload and PR them, and the last step
+        # turns the job red again (#1506).
+        continue-on-error: true
+        run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots
         env:
           PW_WORKERS: "2"
+      - name: Collect regenerated baselines
+        id: collect
+        if: always()
+        run: bash scripts/visual-baselines-pr.sh collect "$RUNNER_TEMP/visual-baselines"
+      # Uploaded before any push, so a refused push still leaves every PNG
+      # downloadable from the run (#1506).
+      - name: Upload regenerated baselines
+        if: always() && steps.collect.outputs.count != '0' && steps.collect.outputs.count != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-baselines-${{ github.run_id }}
+          path: ${{ runner.temp }}/visual-baselines/
+          if-no-files-found: error
       - name: Open PR with refreshed baselines
+        if: ${{ !cancelled() && steps.collect.outputs.count != '0' && steps.collect.outputs.count != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          BRANCH: chore/visual-baselines-${{ github.run_id }}
+          BASE_BRANCH: main
+          SOURCE_REF: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+          REGENERATE_OUTCOME: ${{ steps.regenerate.outcome }}
+          ARTIFACT_NAME: visual-baselines-${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: bash scripts/visual-baselines-pr.sh push "$RUNNER_TEMP/visual-baselines/changed-baselines.txt"
+      - name: Fail when regeneration failed
+        if: steps.regenerate.outcome == 'failure'
         run: |
-          if git diff --quiet -- 'tests/e2e/__screenshots__'; then
-            untracked=$(git ls-files --others --exclude-standard -- 'tests/e2e/__screenshots__')
-            if [ -z "$untracked" ]; then
-              echo "No baseline changes."
-              exit 0
-            fi
-          fi
-          BRANCH="chore/visual-baselines-${GITHUB_RUN_ID}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add tests/e2e/__screenshots__
-          git commit -m "test(e2e): refresh linux visual baselines"
-          git push origin "$BRANCH"
-          gh pr create --title "test(e2e): refresh linux visual baselines" \
-            --body "Automated baseline refresh from the update-visual-baselines workflow. Review the image diffs before merging." \
-            --base main --head "$BRANCH"
+          echo "::error::The regenerate step failed. Whatever it rendered was still uploaded and, if the push worked, opened as a draft PR."
+          exit 1
