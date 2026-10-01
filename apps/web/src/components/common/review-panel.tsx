@@ -166,11 +166,11 @@ export function ReviewPanel({
       const res = await fetch(downloadUrl);
       // An expired or missing result answers with an error page. Uploading
       // that body would put a broken file in the library and say "Saved"
-      // (#1286). The status goes in the message because Sentry's scrubber
-      // keeps a SafeError's message but drops its code.
+      // (#1286). The message stays constant; captureHandledError tags the
+      // statusCode as status_code (#1351).
       if (!res.ok) {
         if (res.status === 404 || res.status === 410) failure = "expired";
-        throw new SafeError(`Save to Files could not fetch the result (HTTP ${res.status})`, {
+        throw new SafeError("Save to Files could not fetch the result", {
           code: `save-result-fetch-${res.status}`,
           statusCode: res.status,
         });
@@ -188,7 +188,7 @@ export function ReviewPanel({
       });
       if (!uploadRes.ok) {
         failure = await uploadFailure(uploadRes);
-        throw new SafeError(`Save to Files upload failed (HTTP ${uploadRes.status})`, {
+        throw new SafeError("Save to Files upload failed", {
           code: `save-upload-${uploadRes.status}`,
           statusCode: uploadRes.status,
         });

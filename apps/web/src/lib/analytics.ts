@@ -1,4 +1,9 @@
-import { type AnalyticsConfig, resolvePostHogClientHosts } from "@snapotter/shared";
+import {
+  type AnalyticsConfig,
+  httpStatusTag,
+  isSafeMessageError,
+  resolvePostHogClientHosts,
+} from "@snapotter/shared";
 import { appUrl } from "./app-url";
 import { flushEarlyErrors } from "./early-errors";
 
@@ -179,8 +184,8 @@ export async function initAnalytics(config: AnalyticsConfig): Promise<void> {
 }
 
 /**
- * Set an allowlisted Sentry tag (route / tool_id / locale / error_class, see
- * sentry-scrub.ts TAG_ALLOWLIST) so web errors become filterable by which tool
+ * Set an allowlisted Sentry tag (route / tool_id / locale / error_class /
+ * status_code, see sentry-scrub.ts TAG_ALLOWLIST) so web errors become filterable by which tool
  * and route the user was on. No-op until Sentry is initialized; lazy so this
  * module keeps no static @sentry/react import.
  */
@@ -197,7 +202,9 @@ export function setSentryTag(key: string, value: string): void {
  * copy can reference it, or null when telemetry is off (analytics disabled,
  * no web DSN baked, or opted out). Only allowlisted tags survive the scrubber
  * (see sentry-scrub.ts TAG_ALLOWLIST), and the error must carry an authored
- * SafeError message or beforeSend reduces it to its type. Lazy import so this
+ * SafeError message or beforeSend reduces it to its type. A SafeError's
+ * `statusCode` goes on as the `status_code` tag, so its message can stay
+ * constant (#1351); a caller's own `status_code` tag wins. Lazy import so this
  * module keeps no static @sentry/react dependency.
  */
 export async function captureHandledError(
@@ -208,8 +215,10 @@ export async function captureHandledError(
   try {
     const Sentry = await import("@sentry/react");
     if (!Sentry.getClient()) return null;
+    const status = isSafeMessageError(error) ? httpStatusTag(error.statusCode) : undefined;
+    const allTags = status ? { status_code: status, ...tags } : tags;
     return Sentry.withScope((scope) => {
-      if (tags) scope.setTags(tags);
+      if (allTags) scope.setTags(allTags);
       return Sentry.captureException(error);
     });
   } catch {

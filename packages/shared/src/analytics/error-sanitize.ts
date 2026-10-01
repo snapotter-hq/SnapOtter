@@ -238,3 +238,18 @@ export function isClientAbort(err: unknown): boolean {
     return false;
   }
 }
+
+/**
+ * An HTTP status as a Sentry `status_code` tag value, or undefined for anything
+ * that isn't an integer from 100 to 599. SafeError messages stay constant
+ * (tool-errors.ts), so a status travels as this tag instead (#1351). Strict on
+ * purpose: the value comes from a response, and the tag must never become a
+ * channel for free-form text.
+ */
+export function httpStatusTag(value: unknown): string | undefined {
+  if (typeof value === "string" && /^[1-5]\d\d$/.test(value)) return value;
+  if (typeof value === "number" && Number.isInteger(value) && value >= 100 && value <= 599) {
+    return String(value);
+  }
+  return undefined;
+}

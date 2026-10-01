@@ -1,3 +1,4 @@
+import { httpStatusTag, SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS } from "@/lib/sentry-scrub";
 
@@ -146,5 +147,96 @@ describe("buildWebBeforeSend", () => {
     const send = buildWebBeforeSend(() => true);
     expect(() => send({} as Record<string, any>, {})).not.toThrow();
     expect(() => send({ exception: { values: null } } as any, {})).not.toThrow();
+  });
+});
+
+// #1351: a SafeError's message stays constant, so the HTTP status rides along
+// as a tag. Only a plain three-digit status may pass; the tag must never
+// become a channel for free-form text.
+describe("status_code tag (#1351)", () => {
+  it("accepts an integer HTTP status from 100 to 599, as a string", () => {
+    expect(httpStatusTag(100)).toBe("100");
+    expect(httpStatusTag(404)).toBe("404");
+    expect(httpStatusTag(599)).toBe("599");
+    expect(httpStatusTag("502")).toBe("502");
+  });
+
+  it.each([
+    99,
+    600,
+    0,
+    -404,
+    404.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    "40",
+    "600",
+    "099",
+    " 404",
+    "404 ",
+    "4.0e2",
+    "0x194",
+    "404 /Users/alice/secret.pdf",
+    "https://host/x?status=404",
+    "abc",
+    "",
+    null,
+    undefined,
+    true,
+    { status: 404 },
+    [404],
+  ])("rejects %j", (value) => {
+    expect(httpStatusTag(value)).toBeUndefined();
+  });
+
+  function eventWithTags(tags: Record<string, unknown>): Record<string, any> {
+    return {
+      exception: { values: [{ type: "SafeError", value: "x" }] },
+      tags,
+    };
+  }
+
+  it("keeps a valid status_code tag next to the other allowlisted tags", () => {
+    const send = buildWebBeforeSend(() => true);
+    const out = send(eventWithTags({ status_code: "404", tool_id: "resize", drop_me: "x" }), {})!;
+    expect(out.tags).toEqual({ status_code: "404", tool_id: "resize" });
+  });
+
+  it("normalizes a numeric status_code tag to its string form", () => {
+    const send = buildWebBeforeSend(() => true);
+    const out = send(eventWithTags({ status_code: 502 }), {})!;
+    expect(out.tags).toEqual({ status_code: "502" });
+  });
+
+  it.each([
+    "404 /Users/alice/secret.pdf",
+    "https://host/api/v1/download/job/a.png",
+    "alice@example.com",
+    "600",
+    "99",
+    404.5,
+    null,
+  ])("drops a status_code tag of %j", (value) => {
+    const send = buildWebBeforeSend(() => true);
+    const out = send(eventWithTags({ status_code: value, tool_id: "resize" }), {})!;
+    expect(out.tags).toEqual({ tool_id: "resize" });
+  });
+
+  it("sends the constant SafeError message, with the status only in the tag", () => {
+    const send = buildWebBeforeSend(() => true);
+    const err = new SafeError("Save to Files upload failed", {
+      code: "save-upload-500",
+      statusCode: 500,
+    });
+    const out = send(eventWithTags({ status_code: "500", error_class: "operational" }), {
+      originalException: err,
+    })!;
+    expect(out.exception.values[0].value).toBe("Save to Files upload failed");
+    expect(out.tags).toEqual({ status_code: "500", error_class: "operational" });
+  });
+
+  it("still sends nothing at all when telemetry is off", () => {
+    const send = buildWebBeforeSend(() => false);
+    expect(send(eventWithTags({ status_code: "500" }), {})).toBeNull();
   });
 });

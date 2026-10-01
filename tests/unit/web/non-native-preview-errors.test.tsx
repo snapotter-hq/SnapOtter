@@ -16,10 +16,12 @@ const clip = (name: string) => (
   <NonNativePreview file={new File(["x"], name)} filename={name} fileSize={1} modality="video" />
 );
 
-function reported(): { message: string; tags: unknown }[] {
-  return vi
-    .mocked(captureHandledError)
-    .mock.calls.map(([error, tags]) => ({ message: (error as Error).message, tags }));
+function reported(): { message: string; statusCode: unknown; tags: unknown }[] {
+  return vi.mocked(captureHandledError).mock.calls.map(([error, tags]) => ({
+    message: (error as Error).message,
+    statusCode: (error as { statusCode?: unknown }).statusCode,
+    tags,
+  }));
 }
 
 // #1280: every failed preview used to land in the same "Preview generation
@@ -57,10 +59,12 @@ describe("NonNativePreview failure states", () => {
 
     expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
     expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
-    // Sentry's scrubber keeps the message and only allowlisted tags.
+    // Sentry's scrubber keeps the message and only allowlisted tags. The
+    // message is constant; captureHandledError tags the statusCode (#1351).
     expect(reported()).toEqual([
       {
-        message: "Media preview generation failed (HTTP 502)",
+        message: "Media preview generation failed",
+        statusCode: 502,
         tags: { error_class: "operational" },
       },
     ]);
@@ -70,8 +74,8 @@ describe("NonNativePreview failure states", () => {
     generateWith(async () => new Response("", { status: 429 }));
 
     expect(await screen.findByText(en.toolPage.previewFailed)).toBeTruthy();
-    expect(reported().map((r) => r.message)).toEqual([
-      "Media preview generation failed (HTTP 429)",
+    expect(reported().map(({ message, statusCode }) => ({ message, statusCode }))).toEqual([
+      { message: "Media preview generation failed", statusCode: 429 },
     ]);
   });
 

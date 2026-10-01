@@ -11,6 +11,7 @@ vi.mock("@/lib/analytics", () => ({
 }));
 
 import { NonNativePreview } from "@/components/common/non-native-preview";
+import { captureHandledError } from "@/lib/analytics";
 
 const SOURCE_URL = "/api/v1/download/job-1/clip.mkv";
 const PREVIEW_URL = "/api/v1/preview/generate";
@@ -145,6 +146,27 @@ describe("NonNativePreview source fetch (#1286)", () => {
     expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
     expect(screen.getByRole("button", { name: en.toolPage.generatePreview })).toBeTruthy();
   });
+
+  // #1351: the message stays constant and the status goes on as a tag. The
+  // error itself still carries no statusCode, so a source fetch's status can't
+  // be mistaken for the preview request's (a 413 there means "too large").
+  it.each([404, 502])(
+    "reports a %i source fetch with a constant message and the status as a tag",
+    async (status) => {
+      vi.mocked(captureHandledError).mockClear();
+      stubFetch(() =>
+        Promise.resolve({ ok: false, status, blob: () => Promise.resolve(new Blob()) }),
+      );
+
+      await generate();
+
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Media preview could not fetch its source");
+      expect((error as { statusCode?: unknown }).statusCode).toBeUndefined();
+      expect(tags).toEqual({ error_class: "operational", status_code: String(status) });
+    },
+  );
 
   it("still sends a source that fetched fine", async () => {
     const fetchMock = stubFetch(() =>

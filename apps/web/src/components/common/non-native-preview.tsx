@@ -89,6 +89,7 @@ export function NonNativePreview({
     abortRef.current = controller;
     let encoder: string | null = null;
     let expired = false;
+    let sourceStatus: string | undefined;
 
     try {
       let fileToUpload = file;
@@ -97,12 +98,14 @@ export function NonNativePreview({
         // An expired or missing result answers with an error page; don't send
         // that body off to be transcoded as the user's media (#1286). No
         // statusCode on purpose: a status here is about fetching the source,
-        // not about the preview request, and must not be read as one.
+        // not about the preview request, and must not be read as one. The
+        // report carries it as a tag instead (#1351).
         if (!res.ok) {
           // Only a processed result is fetched here (an input comes in as
           // `file`), so a 404 or 410 means the result expired (#1350).
           expired = res.status === 404 || res.status === 410;
-          throw new SafeError(`Media preview could not fetch its source (HTTP ${res.status})`, {
+          sourceStatus = String(res.status);
+          throw new SafeError("Media preview could not fetch its source", {
             code: `preview-source-http-${res.status}`,
           });
         }
@@ -124,9 +127,9 @@ export function NonNativePreview({
 
       if (!response.ok) {
         encoder = await previewFailureEncoder(response);
-        // The status goes in the message: Sentry's scrubber keeps a
-        // SafeError's message but drops its code.
-        throw new SafeError(`Media preview generation failed (HTTP ${response.status})`, {
+        // The message stays constant; captureHandledError tags the
+        // statusCode as status_code (#1351).
+        throw new SafeError("Media preview generation failed", {
           code: `preview-http-${response.status}`,
           statusCode: response.status,
         });
@@ -161,7 +164,10 @@ export function NonNativePreview({
                   code: "preview-request",
                   cause: err,
                 }),
-            { error_class: "operational" },
+            {
+              error_class: "operational",
+              ...(sourceStatus ? { status_code: sourceStatus } : {}),
+            },
           );
         }
       }

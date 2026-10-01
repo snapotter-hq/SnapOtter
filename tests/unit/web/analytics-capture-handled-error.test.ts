@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import type { AnalyticsConfig } from "@snapotter/shared";
+import { type AnalyticsConfig, SafeError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sentry = vi.hoisted(() => ({
@@ -63,6 +63,60 @@ describe("captureHandledError", () => {
     expect(scope.setTags).toHaveBeenCalledWith({
       tool_id: "pixelate",
       error_class: "operational",
+    });
+  });
+
+  // #1351: the status stays out of the SafeError message and goes on as a tag,
+  // so every call site gets it without having to remember.
+  describe("status_code tag", () => {
+    async function captureAndReadTags(
+      err: Error,
+      tags?: Record<string, string>,
+    ): Promise<Record<string, string> | undefined> {
+      const a = await freshAnalytics();
+      await a.initAnalytics({ enabled: true } as AnalyticsConfig);
+      sentry.getClient.mockReturnValue({});
+      const scope = { setTags: vi.fn(), setTag: vi.fn() };
+      sentry.withScope.mockImplementation((cb: (s: unknown) => unknown) => cb(scope));
+      await a.captureHandledError(err, tags);
+      expect(sentry.captureException).toHaveBeenCalledWith(err);
+      return scope.setTags.mock.calls[0]?.[0];
+    }
+
+    it("tags a SafeError's statusCode", async () => {
+      const err = new SafeError("Save to Files upload failed", { statusCode: 503 });
+      expect(await captureAndReadTags(err, { error_class: "operational" })).toEqual({
+        status_code: "503",
+        error_class: "operational",
+      });
+    });
+
+    it("tags it even when the caller passes no tags", async () => {
+      const err = new SafeError("Media preview generation failed", { statusCode: 502 });
+      expect(await captureAndReadTags(err)).toEqual({ status_code: "502" });
+    });
+
+    it("lets a caller's explicit status_code stand", async () => {
+      const err = new SafeError("x", { statusCode: 500 });
+      expect(await captureAndReadTags(err, { status_code: "404" })).toEqual({
+        status_code: "404",
+      });
+    });
+
+    it.each([42, 600, 404.5])("leaves an out-of-range statusCode (%s) off", async (statusCode) => {
+      const err = new SafeError("x", { statusCode });
+      expect(await captureAndReadTags(err, { error_class: "operational" })).toEqual({
+        error_class: "operational",
+      });
+    });
+
+    it("leaves a SafeError without a statusCode untagged", async () => {
+      expect(await captureAndReadTags(new SafeError("x"))).toBeUndefined();
+    });
+
+    it("does not read a statusCode off an error that isn't a SafeError", async () => {
+      const err = Object.assign(new Error("x"), { statusCode: 500 });
+      expect(await captureAndReadTags(err)).toBeUndefined();
     });
   });
 });

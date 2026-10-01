@@ -6,7 +6,7 @@
  * redactMessage. Frame paths keep the host-less pathname so debug-id source maps
  * still resolve.
  */
-import { rebuildErrorValue, redactMessage } from "@snapotter/shared";
+import { httpStatusTag, rebuildErrorValue, redactMessage } from "@snapotter/shared";
 
 export const IGNORE_ERRORS: (string | RegExp)[] = [
   /^AbortError/,
@@ -64,7 +64,10 @@ export const DENY_URLS: RegExp[] = [
 const CEILING_PER_HOUR = 500;
 const HOUR_MS = 3600_000;
 
-const TAG_ALLOWLIST = new Set(["route", "tool_id", "locale", "error_class"]);
+// status_code (the API's name for the same tag) carries a SafeError's HTTP
+// status, since its message stays constant (#1351). It's the one tag whose
+// value comes from a response, so beforeSend also checks it's a bare status.
+const TAG_ALLOWLIST = new Set(["route", "tool_id", "locale", "error_class", "status_code"]);
 
 // Sentry event/hint are typed loosely on purpose: this module must not import
 // @sentry/react (analytics.ts loads the SDK lazily and passes events through).
@@ -144,6 +147,11 @@ export function buildWebBeforeSend(isActive: () => boolean) {
     if (tags) {
       for (const key of Object.keys(tags)) {
         if (!TAG_ALLOWLIST.has(key)) delete tags[key];
+      }
+      if ("status_code" in tags) {
+        const status = httpStatusTag(tags.status_code);
+        if (status) tags.status_code = status;
+        else delete tags.status_code;
       }
     }
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { ANALYTICS_EVENTS, en, isSafeMessageError } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en, isSafeMessageError, type SafeError } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -121,7 +121,10 @@ describe("ReviewPanel Save to Files failures (#1286)", () => {
     expect(useFileStore.getState().entries[0].claimed).toBe(false);
     expect(savedEvents()).toHaveLength(0);
     expect(consoleError).toHaveBeenCalled();
-    expect(reportedError().message).toContain("HTTP 404");
+    // #1351: a constant message, with the status carried for the Sentry tag.
+    const err = reportedError() as SafeError;
+    expect(err.message).toBe("Save to Files could not fetch the result");
+    expect(err.statusCode).toBe(404);
   });
 
   // Offline or a dropped connection: the user sees the error, but Sentry's
@@ -202,7 +205,9 @@ describe("ReviewPanel Save to Files failures (#1286)", () => {
     expect(useFileStore.getState().entries[0].claimed).toBe(false);
     expect(savedEvents()).toHaveLength(0);
     expect(consoleError).toHaveBeenCalled();
-    expect(reportedError().message).toContain("HTTP 500");
+    const err = reportedError() as SafeError;
+    expect(err.message).toBe("Save to Files upload failed");
+    expect(err.statusCode).toBe(500);
   });
 
   it("leaves the tool tag off a report when there is no tool id", async () => {
