@@ -69,6 +69,9 @@ type FontPdfKind =
   | "type0-identity-name"
   | "type0-identity-name-mixed"
   | "type0-identity-name-plus-cid-is-unicode"
+  | "type0-identity-stream"
+  | "type0-identity-name-plus-type3"
+  | "type0-identity-name-plus-type3-codes"
   | "simple-unmapped-names";
 
 /** Build a one-page PDF of FONT_TEXT in one of these font shapes:
@@ -92,6 +95,14 @@ type FontPdfKind =
  *    in Montserrat in the "type0-cid-is-unicode" shape, which only reads right
  *    through MuPDF's CID fallback. Set smaller because Montserrat Black at 12pt
  *    runs past the page edge.
+ *  - "type0-identity-stream": ToUnicode is a real stream, but one that maps
+ *    every code to itself, so the glyph ids come back as text just like the
+ *    /Identity-H name (#1754).
+ *  - "type0-identity-name-plus-type3": the /Identity-H line plus a line in a
+ *    hand-built Type3 font. MuPDF reports a Type3 glyph as its character code,
+ *    so that readable line also has Unicode equal to its glyph ids.
+ *  - "type0-identity-name-plus-type3-codes": the same, but the Type3 line is
+ *    drawn with control codes, so it reads as nothing.
  *  - "simple-unmapped-names": base-14 Helvetica re-encoded with glyph names
  *    nothing can map. MuPDF falls back to the character code for simple fonts,
  *    and these codes are ASCII, so the text still extracts correctly.
@@ -111,6 +122,29 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    p.insert_text((72, 72), text, fontname='rob', fontfile=font, fontsize=12)",
     "if kind == 'type0-identity-name-mixed':",
     "    p.insert_text((72, 120), text, fontname='helv', fontsize=12)",
+    "IDENTITY_CMAP = b'1 begincodespacerange\\n<0000> <FFFF>\\nendcodespacerange\\n1 beginbfrange\\n<0000> <FFFF> <0000>\\nendbfrange\\n'",
+    "def add_type3(codes):",
+    "    proc = d.get_new_xref(); d.update_object(proc, '<<>>')",
+    "    d.update_stream(proc, b'600 0 0 0 500 700 d1 0 0 500 700 re f')",
+    "    used = sorted(set(codes))",
+    "    procs = ' '.join('/g%d %d 0 R' % (c, proc) for c in used)",
+    "    diffs = ' '.join('%d /g%d' % (c, c) for c in used)",
+    "    t3 = d.get_new_xref()",
+    "    d.update_object(t3, '<</Type/Font/Subtype/Type3/FontBBox[0 0 600 700]/FontMatrix[0.001 0 0 0.001 0 0]/CharProcs<<%s>>/Encoding<</Type/Encoding/Differences[%s]>>/FirstChar 1/LastChar 126/Widths[%s]>>' % (procs, diffs, ' '.join(['600'] * 126)))",
+    "    resources = int(d.xref_get_key(p.xref, 'Resources')[1].split()[0])",
+    "    d.xref_set_key(resources, 'Font/T3', '%d 0 R' % t3)",
+    "    content = d.get_new_xref(); d.update_object(content, '<<>>')",
+    "    d.update_stream(content, ('BT /T3 9 Tf 72 150 Td <%s> Tj ET' % ''.join('%02x' % c for c in codes)).encode('latin1'))",
+    "    d.xref_set_key(p.xref, 'Contents', '[%s]' % ' '.join('%d 0 R' % x for x in p.get_contents() + [content]))",
+    "if kind == 'type0-identity-stream':",
+    "    for xref, _ext, ftype, *_ in p.get_fonts():",
+    "        if ftype == 'Type0':",
+    "            d.update_stream(int(d.xref_get_key(xref, 'ToUnicode')[1].split()[0]), IDENTITY_CMAP)",
+    "if kind.startswith('type0-identity-name-plus-type3'):",
+    "    for xref, _ext, ftype, *_ in p.get_fonts():",
+    "        if ftype == 'Type0':",
+    "            d.xref_set_key(xref, 'ToUnicode', '/Identity-H')",
+    "    add_type3([ord(ch) for ch in text] if kind == 'type0-identity-name-plus-type3' else list(range(1, 20)))",
     "mont = font.replace('Roboto-Black', 'Montserrat-Black')",
     "if kind == 'type0-identity-name-plus-cid-is-unicode':",
     "    p.insert_text((72, 120), text, fontname='mont', fontfile=mont, fontsize=9)",
@@ -258,6 +292,30 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     );
     expect(res.statusCode).toBe(200);
     expect(await downloadText(res)).toContain(FONT_TEXT);
+  }, 60_000);
+
+  it("tells the user to run OCR when ToUnicode is a stream mapping every code to itself (#1754)", async () => {
+    const res = await runTool(makeFontPdf("type0-identity-stream"), "identity-stream.pdf");
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.details).toMatch(/text layer/i);
+    expect(body.details).toMatch(/OCR/);
+  }, 60_000);
+
+  it("still extracts a page whose Type3 text reads fine next to an /Identity-H line (#1754)", async () => {
+    const res = await runTool(makeFontPdf("type0-identity-name-plus-type3"), "identity-type3.pdf");
+    expect(res.statusCode).toBe(200);
+    expect(await downloadText(res)).toContain(FONT_TEXT);
+  }, 60_000);
+
+  it("tells the user to run OCR when the only other text is a Type3 line of control codes (#1754)", async () => {
+    // Before #1754 any Type3 font switched the check off, so the soup counted
+    // as readable here.
+    const res = await runTool(
+      makeFontPdf("type0-identity-name-plus-type3-codes"),
+      "identity-type3-codes.pdf",
+    );
+    expect(res.statusCode).toBe(422);
   }, 60_000);
 
   it("still extracts a composite font whose dict is written inline", async () => {

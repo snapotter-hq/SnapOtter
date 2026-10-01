@@ -139,8 +139,9 @@ describe.skipIf(!hasPython)("doc_text.has_readable_text", () => {
 
 interface FakeFont {
   type: string;
-  /** "stream" is a real map; "name" is /Identity-H; "dangling" points at no object. */
-  toUnicode: "stream" | "none" | "name" | "dangling";
+  /** "stream" is a real map; "identity-stream" a stream mapping every code to
+   *  itself; "name" is /Identity-H; "dangling" points at no object. */
+  toUnicode: "stream" | "identity-stream" | "none" | "name" | "dangling";
   /** On the descendant CIDFont. "stream" is the tFPDF/TCPDF CID = Unicode shape. */
   cidToGid?: "absent" | "identity" | "stream";
   /** Defaults to an indirect font; 0 is how get_fonts reports an inline font dict. */
@@ -159,7 +160,7 @@ interface FakeFont {
  *  xref_object() text, xref_is_stream(), and "bad xref" for an object number
  *  out of range, as the real one raises. A missing key answers ('null', 'null'),
  *  as it does in PyMuPDF. */
-function onFakePage(fn: string, fonts: FakeFont[]): boolean {
+function onFakePage<T = boolean>(fn: string, fonts: FakeFont[]): T {
   const code = [
     "import sys, json",
     `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
@@ -167,7 +168,10 @@ function onFakePage(fn: string, fonts: FakeFont[]): boolean {
     "fonts = json.loads(sys.argv[1])",
     "LENGTH = 1000",
     "TO_UNICODE = {'stream': ('xref', '%d 0 R'), 'none': ('null', 'null'),",
-    "              'name': ('name', '/Identity-H'), 'dangling': ('xref', '5000 0 R')}",
+    "              'name': ('name', '/Identity-H'), 'dangling': ('xref', '5000 0 R'),",
+    "              'identity-stream': ('xref', '%d 0 R')}",
+    "REAL_CMAP = b'1 beginbfrange\\n<0004> <0062> <0020>\\nendbfrange\\n'",
+    "IDENTITY_CMAP = b'1 beginbfrange\\n<0000> <FFFF> <0000>\\nendbfrange\\n'",
     "CID_TO_GID = {'absent': '', 'identity': '/CIDToGIDMap/Identity', 'stream': '/CIDToGIDMap %d 0 R'}",
     "PAGE, PAGES, XOBJECT = 900, 901, 902",
     "HOLDER = {'page': PAGE, 'inherited': PAGES, 'xobject': XOBJECT, 'missing': PAGE}",
@@ -180,9 +184,12 @@ function onFakePage(fn: string, fonts: FakeFont[]): boolean {
     "        raise ValueError('bad xref')",
     "    return fonts[xref - 1]",
     "def font_key(i, key):",
+    "    if key == 'Name':",
+    "        return ('null', 'null')",
     "    if key == 'ToUnicode':",
     "        kind, value = TO_UNICODE[fonts[i]['toUnicode']]",
-    "        return (kind, value % (100 + i) if '%d' in value else value)",
+    "        base = 400 if fonts[i]['toUnicode'] == 'identity-stream' else 100",
+    "        return (kind, value % (base + i) if '%d' in value else value)",
     "    assert key == 'DescendantFonts', key",
     "    return ('array', '[%d 0 R]' % (200 + i))",
     "def has_resources(holder):",
@@ -207,7 +214,10 @@ function onFakePage(fn: string, fonts: FakeFont[]): boolean {
     "    def xref_length(self):",
     "        return LENGTH",
     "    def xref_is_stream(self, xref):",
-    "        return 100 <= xref < 200 or 300 <= xref < 400",
+    "        return 100 <= xref < 200 or 300 <= xref < 500",
+    "    def xref_stream(self, xref):",
+    "        assert 100 <= xref < 200 or 400 <= xref < 500, xref",
+    "        return IDENTITY_CMAP if xref >= 400 else REAL_CMAP",
     "    def xref_get_key(self, xref, key):",
     "        if xref in (PAGE, PAGES, XOBJECT):",
     "            return tree_key(xref, key)",
@@ -229,19 +239,72 @@ function onFakePage(fn: string, fonts: FakeFont[]): boolean {
     "            referencer = XOBJECT if inline(f) and location(f) == 'xobject' else 0",
     "            rows.append(row + (referencer,) if full else row)",
     "        return rows",
-    `sys.stdout.write(json.dumps(${fn}(Page())))`,
+    `result = ${fn}(Page())`,
+    "sys.stdout.write(json.dumps(sorted(result) if isinstance(result, set) else result))",
   ].join("\n");
   const res = spawnSync("python3", ["-c", code, JSON.stringify(fonts)], {
     encoding: "utf8",
     timeout: 5000,
   });
   if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
-  return JSON.parse(res.stdout) as boolean;
+  return JSON.parse(res.stdout) as T;
 }
 
 const drawsUnmappedComposite = (fonts: FakeFont[]) =>
   onFakePage("draws_unmapped_composite_font", fonts);
 const mapsGlyphIdsAsUnicode = (fonts: FakeFont[]) => onFakePage("maps_glyph_ids_as_unicode", fonts);
+const type3SpanNames = (fonts: FakeFont[]) =>
+  onFakePage<string[] | null>("type3_span_names", fonts);
+
+/** Run cmap_is_identity on a CMap given as text. */
+function cmapIsIdentity(cmap: string): boolean {
+  const code = [
+    "import sys, json",
+    `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+    "from doc_text import cmap_is_identity",
+    "sys.stdout.write(json.dumps(cmap_is_identity(sys.argv[1].encode('latin1'))))",
+  ].join("\n");
+  const res = spawnSync("python3", ["-c", code, cmap], { encoding: "utf8", timeout: 5000 });
+  if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+  return JSON.parse(res.stdout) as boolean;
+}
+
+describe.skipIf(!hasPython)("doc_text.cmap_is_identity (#1754)", () => {
+  const ranges = (body: string) =>
+    `1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${body}`;
+
+  it("accepts a CMap whose every range and char maps a code to itself", () => {
+    expect(cmapIsIdentity(ranges("1 beginbfrange\n<0000> <FFFF> <0000>\nendbfrange\n"))).toBe(true);
+    expect(
+      cmapIsIdentity(
+        ranges(
+          "2 beginbfrange\n<0000> <00FF> <0000>\n<0100> <01FF> <0100>\nendbfrange\n1 beginbfchar\n<0041> <0041>\nendbfchar\n",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a real map, even one PyMuPDF names Adobe-Identity-UCS", () => {
+    // PyMuPDF writes its correct maps under that CMapName, so the name proves nothing.
+    expect(
+      cmapIsIdentity(
+        "/CMapName /Adobe-Identity-UCS def\n" +
+          ranges("1 beginbfrange\n<0004> <0062> <0020>\nendbfrange\n"),
+      ),
+    ).toBe(false);
+    expect(cmapIsIdentity(ranges("1 beginbfchar\n<0041> <0042>\nendbfchar\n"))).toBe(false);
+    // A ligature maps one code to two characters.
+    expect(cmapIsIdentity(ranges("1 beginbfchar\n<0066> <00660069>\nendbfchar\n"))).toBe(false);
+  });
+
+  it("refuses a range mapped through an array, and a CMap with no entries", () => {
+    expect(
+      cmapIsIdentity(ranges("1 beginbfrange\n<0000> <0001> [<0000> <0001>]\nendbfrange\n")),
+    ).toBe(false);
+    expect(cmapIsIdentity(ranges(""))).toBe(false);
+    expect(cmapIsIdentity("")).toBe(false);
+  });
+});
 
 describe.skipIf(!hasPython)("doc_text.maps_glyph_ids_as_unicode (#1566)", () => {
   it("accepts a Type0 font whose ToUnicode is the name /Identity-H", () => {
@@ -261,11 +324,37 @@ describe.skipIf(!hasPython)("doc_text.maps_glyph_ids_as_unicode (#1566)", () => 
     );
   });
 
-  it("stands down when the page also uses a Type3 font, whose readable text looks the same", () => {
+  it("accepts a ToUnicode stream that maps every code to itself (#1754)", () => {
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "identity-stream" }])).toBe(true);
+    expect(
+      mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "identity-stream", cidToGid: "stream" }]),
+    ).toBe(false);
+  });
+
+  it("no longer stands down for a Type3 font on the page (#1754)", () => {
+    // Its spans are left out of the tally by name instead (type3_span_names).
     const identity: FakeFont = { type: "Type0", toUnicode: "name" };
     const type3: FakeFont = { type: "Type3", toUnicode: "none" };
-    expect(mapsGlyphIdsAsUnicode([identity, type3])).toBe(false);
-    expect(mapsGlyphIdsAsUnicode([type3, identity])).toBe(false);
+    expect(mapsGlyphIdsAsUnicode([identity, type3])).toBe(true);
+    expect(mapsGlyphIdsAsUnicode([type3, identity])).toBe(true);
+  });
+});
+
+describe.skipIf(!hasPython)("doc_text.type3_span_names (#1754)", () => {
+  it("names each Type3 font the way texttrace does, by object number and by its name", () => {
+    // Measured on PyMuPDF 1.27.2.3: a span reads "Type3 (<xref> 0 R)" unless the
+    // font has /Name, which it then uses. get_fonts reports /Name or /BaseFont.
+    expect(
+      type3SpanNames([
+        { type: "Type0", toUnicode: "name" },
+        { type: "Type3", toUnicode: "none" },
+      ]),
+    ).toEqual(["ABCDEF+Font", "Type3 (2 0 R)"]);
+    expect(type3SpanNames([{ type: "Type0", toUnicode: "name" }])).toEqual([]);
+  });
+
+  it("can't name an inline Type3 font, so the caller keeps the old verdict", () => {
+    expect(type3SpanNames([{ type: "Type3", toUnicode: "none", xref: 0 }])).toBeNull();
   });
 });
 
@@ -482,6 +571,16 @@ describe.skipIf(!hasPython)("doc_text.glyph_id_fonts (#1566)", () => {
     expect(glyphIdFonts([unmapped])).toEqual([]);
   });
 
+  it("leaves out the fonts it's told to, so a Type3 font's own codes aren't taken for glyph ids", () => {
+    // MuPDF reports a Type3 glyph as its character code, equal to the Unicode
+    // for ASCII text (measured: 11 of 11 on a hand-built Type3 font).
+    const type3 = span("Type3 (13 0 R)", "Hello world", 0);
+    expect(callWith<string[]>("glyph_id_fonts", [IDENTITY, type3], ["Type3 (13 0 R)"])).toEqual([
+      "Roboto-Black",
+    ]);
+    expect(glyphIdFonts([IDENTITY, type3])).toEqual(["Roboto-Black", "Type3 (13 0 R)"]);
+  });
+
   it("doesn't judge a font with too few chars to tell from coincidence", () => {
     expect(
       glyphIdFonts([
@@ -563,18 +662,23 @@ describe("doc_text.main wiring", () => {
       /unmapped_as_fffd = fitz\.TEXTFLAGS_TEXT & ~fitz\.TEXT_CID_FOR_UNKNOWN_UNICODE/,
     );
     expect(main).toMatch(/page\.get_text\(flags=unmapped_as_fffd\)/);
-    expect(main).toMatch(/if draws_unmapped_composite_font\(page\)/);
+    expect(main).toMatch(/flagged = draws_unmapped_composite_font\(page\)/);
   });
 
   it("drops glyph-id spans from a flagged page's verdict (#1566)", () => {
-    expect(main).toMatch(/readable = _judge_without_glyph_id_fonts\(page\)/);
+    // Every page, not just flagged ones: an identity ToUnicode stream isn't
+    // flagged by draws_unmapped_composite_font (#1754).
+    expect(main).toMatch(
+      /readable = _judge_without_glyph_id_fonts\(page\)\n\s+if readable is not None:/,
+    );
     const judge = source.slice(
       source.indexOf("def _judge_without_glyph_id_fonts("),
       source.indexOf("def main("),
     );
     // Only on the identity-name shape: a Type3 font's readable text looks the same.
     expect(judge).toMatch(/if not maps_glyph_ids_as_unicode\(page\)/);
-    expect(judge).toMatch(/glyph_id_fonts\(page\.get_texttrace\(\)\)/);
+    expect(judge).toMatch(/glyph_id_fonts\(page\.get_texttrace\(\), type3\)/);
+    expect(judge).toMatch(/type3 = type3_span_names\(page\)/);
     expect(judge).toMatch(/text_outside_fonts\(page\.get_text\("dict"\), fonts\)/);
     // Verdict-only, so a failure keeps the #955 verdict rather than failing extraction.
     expect(judge).toMatch(/except Exception as exc:[\s\S]*return None/);
