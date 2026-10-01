@@ -13,7 +13,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 const failures = vi.hoisted(() => ({
   kill: null as Record<string, unknown> | null,
+  // Per binary, for fallback chains: each listed command's decode fails once.
+  byCommand: {} as Record<string, Record<string, unknown>>,
+  read: null as Error | null,
 }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    readFile: (async (path: unknown, ...rest: unknown[]) => {
+      if (failures.read && /any-out-[^/\\]*\.png$/.test(String(path))) {
+        const err = failures.read;
+        failures.read = null;
+        throw err;
+      }
+      return (actual.readFile as (...args: unknown[]) => unknown)(path, ...rest);
+    }) as typeof actual.readFile,
+  };
+});
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -23,6 +41,13 @@ vi.mock("node:child_process", async (importOriginal) => {
   // the decode itself fails, not the `--version` probe, and only once.
   const execFile = Object.assign((...args: unknown[]) => actual.execFile(...(args as [string])), {
     [promisify.custom]: (file: string, argv: string[], options?: unknown) => {
+      const decoding = argv.some((arg) => /-in-[^/\\]*\.\w+(\[0\])?$/.test(arg));
+      const binary = String(file).split(/[/\\]/).pop() as string;
+      const chained = failures.byCommand[binary];
+      if (decoding && chained) {
+        delete failures.byCommand[binary];
+        return Promise.reject(Object.assign(new Error(`Command failed: ${binary}`), chained));
+      }
       if (failures.kill && argv.some((arg) => /(any|psd)-in-[^/\\]*\.\w+(\[0\])?$/.test(arg))) {
         const fields = failures.kill;
         failures.kill = null;
@@ -39,6 +64,8 @@ const { asDecoderOutOfMemory, decodeAnyFormat, decodeToSharpCompat, isDecoderUna
 
 afterEach(() => {
   failures.kill = null;
+  failures.byCommand = {};
+  failures.read = null;
 });
 
 const LIBHEIF_ALLOCATION =
@@ -160,5 +187,51 @@ describe("decoders that run ImageMagick (#1751)", () => {
     );
     expect(isDecoderUnavailable(err)).toBe(false);
     expect((err as { stderr?: unknown }).stderr).toBe(fields.stderr);
+  });
+
+  it("answers V8 failing to allocate ImageMagick's output as a 503", async () => {
+    failures.read = new RangeError("Array buffer allocation failed");
+    // A real decode that writes output, so the read is what fails.
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const err = await decodeAnyFormat(readFixture(fixtures.image.formats("bmp")), "bmp").catch(
+      (e: unknown) => e as Error,
+    );
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("reads a chain where one decoder ran out of memory and the next lacks the delegate as memory", async () => {
+    // djxl killed, then ImageMagick with no JXL delegate: neither judged the
+    // file, and before #1751 the answer named a missing package.
+    failures.byCommand.djxl = { code: null, signal: "SIGKILL", stderr: "" };
+    const noDelegate = {
+      code: 1,
+      signal: null,
+      stderr:
+        "magick: no decode delegate for this image format `JXL' @ error/constitute.c/ReadImage/741.\n",
+    };
+    failures.byCommand.magick = noDelegate;
+    failures.byCommand.convert = noDelegate;
+    const err = await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl").catch(
+      (e: unknown) => e as Error,
+    );
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("still lets a real verdict from another decoder in the chain win over running out of memory", async () => {
+    failures.byCommand.djxl = { code: null, signal: "SIGKILL", stderr: "" };
+    const corrupt = {
+      code: 1,
+      signal: null,
+      stderr: "magick: improper image header `x.jxl' @ error/jxl.c/ReadJXLImage/123.\n",
+    };
+    failures.byCommand.magick = corrupt;
+    failures.byCommand.convert = corrupt;
+    const err = await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl").catch(
+      (e: unknown) => e as Error,
+    );
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect((err as { stderr?: unknown }).stderr).toBe(corrupt.stderr);
   });
 });

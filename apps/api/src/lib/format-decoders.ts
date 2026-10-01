@@ -18,8 +18,8 @@ const execFileAsync = promisify(execFile);
  * ENGINE_UNAVAILABLE the media and document input handlers use instead of the
  * plain Error a corrupt upload produces (#795). As a SafeError with a status,
  * the global error handler logs it, reports it, and shows its message. The
- * HEIF decode also uses it when the server runs out of memory mid-decode, for
- * the same reason (#1577).
+ * decoders also use it when the server runs out of memory mid-decode, for the
+ * same reason (#1577, #1751).
  */
 export class DecoderUnavailableError extends SafeError {
   constructor(message: string, cause?: unknown) {
@@ -181,13 +181,23 @@ function unavailable(err: unknown): boolean {
 /**
  * The error a failed fallback chain surfaces: the first decoder that actually
  * judged the file, so a real rejection keeps its 422 even when a later
- * fallback can't read the format at all. With no verdict, the first decoder
- * that was unavailable (the chain's own decoder, named in the cause), which
- * asDecoderUnavailable then turns into a 503 (#1429).
+ * fallback can't read the format at all. With no verdict, a decoder that ran
+ * out of memory, then the first that was unavailable (the chain's own
+ * decoder, named in the cause), which the caller turns into a 503 (#1429).
+ * Out of memory goes first among those so a killed decoder followed by one
+ * without the delegate reads as the server's memory, not a missing package,
+ * and is reported as the intermittent fault it is (#1751). A real verdict
+ * still wins over it: the other decoder judged the file.
  */
 function chainFailure(failures: unknown[]): unknown {
-  const verdict = failures.find((err) => !unavailable(err) && !inconclusive(err));
-  return verdict ?? failures.find(unavailable) ?? failures[0];
+  const verdict = failures.find(
+    (err) => !unavailable(err) && !inconclusive(err) && !outOfMemory(err),
+  );
+  return verdict ?? failures.find(outOfMemory) ?? failures.find(unavailable) ?? failures[0];
+}
+
+function outOfMemory(err: unknown): boolean {
+  return asDecoderOutOfMemory(err) !== err;
 }
 
 export interface DecodeSafetyOptions {
@@ -572,7 +582,11 @@ export async function decodeAnyFormat(
     ).catch((err: unknown) => {
       throw asDecoderUnavailable(asDecoderOutOfMemory(err));
     });
-    return await assertDecodedWithinLimit(await readFile(outputPath), options);
+    // V8 unable to allocate ImageMagick's output is the server's memory too.
+    const decoded = await readFile(outputPath).catch((err: unknown) => {
+      throw asDecoderOutOfMemory(err);
+    });
+    return await assertDecodedWithinLimit(decoded, options);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});
