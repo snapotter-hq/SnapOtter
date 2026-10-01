@@ -66,8 +66,8 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
             } catch (cause) {
               // The hooks swallow only a cancel request that never arrived;
               // what reaches here is their own teardown breaking (#1779).
-              // Report it rather than leave an unhandled rejection, and
-              // re-enable the button so the cancel can be retried.
+              // Report it rather than leave an unhandled rejection; the
+              // finally still re-enables the button.
               console.error("Canceling the run failed", cause);
               void captureHandledError(
                 new SafeError("Canceling the run failed", { kind: "bug", cause }),
