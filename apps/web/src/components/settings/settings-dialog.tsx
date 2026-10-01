@@ -42,6 +42,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
+import { useTimeouts } from "@/hooks/use-timeouts";
 import {
   ApiError,
   apiDelete,
@@ -376,6 +377,7 @@ interface TeamEntry {
 
 function GeneralSection() {
   const { t, locale, setLocale, supportedLocales } = useTranslation();
+  const later = useTimeouts();
   const { authEnabled } = useAuth();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -444,9 +446,9 @@ function GeneralSection() {
       setSaveMsg(t.settings.general.saveFailed);
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
+      later(() => setSaveMsg(null), 3000);
     }
-  }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed]);
+  }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed, later]);
 
   const username = user?.username || "admin";
   const role = user?.role || t.settings.general.roleUnknown;
@@ -555,6 +557,7 @@ function GeneralSection() {
 
 export function SystemSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const { role, hasPermission } = useAuth();
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
@@ -633,9 +636,9 @@ export function SystemSection() {
       setSaveMsg(t.settings.system.saveFailed);
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
+      later(() => setSaveMsg(null), 3000);
     }
-  }, [settings, t]);
+  }, [settings, t, later]);
 
   if (loading) {
     return (
@@ -1110,6 +1113,7 @@ function securitySettingLabel(t: TranslationKeys, key: string): string | undefin
 
 export function AdminSecuritySettings() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const [settings, setSettings] = useState<Record<string, string>>({});
   // Snapshot of the last server state; a save sends only the fields this tab changed
   // so an unrelated edit here can never echo (and revert) another admin's change,
@@ -1174,9 +1178,9 @@ export function AdminSecuritySettings() {
       });
     } finally {
       setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
+      later(() => setSaveMsg(null), 3000);
     }
-  }, [settings, t]);
+  }, [settings, t, later]);
 
   if (loading) {
     return (
@@ -1458,6 +1462,7 @@ function generatePassword(): string {
 
 export function PeopleSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const isMobile = useMobile();
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [maxUsers, setMaxUsers] = useState(0);
@@ -1587,10 +1592,10 @@ export function PeopleSection() {
         );
       } finally {
         setAdding(false);
-        setTimeout(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000);
       }
     },
-    [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers, t],
+    [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers, t, later],
   );
 
   const handleDeleteUser = useCallback(
@@ -1618,9 +1623,9 @@ export function PeopleSection() {
         });
       }
       setOpenMenuId(null);
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [loadUsers, t],
+    [loadUsers, t, later],
   );
 
   const handleUpdateUser = useCallback(
@@ -1650,9 +1655,9 @@ export function PeopleSection() {
           ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [editingUser, editRole, editTeam, loadUsers, t],
+    [editingUser, editRole, editTeam, loadUsers, t, later],
   );
 
   const handleResetPassword = useCallback(
@@ -1679,9 +1684,9 @@ export function PeopleSection() {
             ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [resetPasswordUser, resetPassword, t],
+    [resetPasswordUser, resetPassword, t, later],
   );
 
   // A picker whose list fell back (built-in roles, Default) may not hold the
@@ -1826,7 +1831,7 @@ export function PeopleSection() {
                     const ok = await copyToClipboard(newPassword);
                     if (ok) {
                       setPwCopied(true);
-                      setTimeout(() => setPwCopied(false), 2000);
+                      later(() => setPwCopied(false), 2000);
                     }
                   }}
                   className={cn(
@@ -2220,6 +2225,7 @@ export function PeopleSection() {
 
 export function ApiKeysSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const [keys, setKeys] = useState<ApiKeyEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -2276,13 +2282,16 @@ export function ApiKeysSection() {
     }
   }, [keyName, showScoping, scopedPerms, expiresAt, loadKeys, t]);
 
-  const copyKey = useCallback(async (key: string) => {
-    const ok = await copyToClipboard(key);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, []);
+  const copyKey = useCallback(
+    async (key: string) => {
+      const ok = await copyToClipboard(key);
+      if (ok) {
+        setCopied(true);
+        later(() => setCopied(false), 2000);
+      }
+    },
+    [later],
+  );
 
   const deleteKey = useCallback(
     async (id: number) => {
@@ -2493,6 +2502,7 @@ export function ApiKeysSection() {
 
 export function TeamsSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const isMobile = useMobile();
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2563,10 +2573,10 @@ export function TeamsSection() {
         });
       } finally {
         setCreating(false);
-        setTimeout(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000);
       }
     },
-    [newTeamName, loadTeams, t],
+    [newTeamName, loadTeams, t, later],
   );
 
   const handleRename = useCallback(
@@ -2592,9 +2602,9 @@ export function TeamsSection() {
           ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [editingTeamName, loadTeams, t],
+    [editingTeamName, loadTeams, t, later],
   );
 
   const handleDelete = useCallback(
@@ -2618,9 +2628,9 @@ export function TeamsSection() {
         });
       }
       setOpenMenuId(null);
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [loadTeams, t],
+    [loadTeams, t, later],
   );
 
   const handleExpandTeam = useCallback(
@@ -2656,10 +2666,10 @@ export function TeamsSection() {
         });
       } finally {
         setSavingQuota(false);
-        setTimeout(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000);
       }
     },
-    [quotaMb, retention, loadTeams, t],
+    [quotaMb, retention, loadTeams, t, later],
   );
 
   if (loading) {
@@ -2979,6 +2989,7 @@ const PERMISSION_GROUPS = [
 
 export function RolesSection() {
   const { t } = useTranslation();
+  const later = useTimeouts();
   const [roles, setRoles] = useState<RoleEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -3024,7 +3035,7 @@ export function RolesSection() {
           : null;
       if (invalid) {
         setActionMsg({ type: "error", text: invalid });
-        setTimeout(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000);
         return;
       }
       try {
@@ -3053,9 +3064,9 @@ export function RolesSection() {
           ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [newName, newDescription, newPermissions, loadRoles, t],
+    [newName, newDescription, newPermissions, loadRoles, t, later],
   );
 
   const handleUpdate = useCallback(
@@ -3064,7 +3075,7 @@ export function RolesSection() {
       if (!editingRole) return;
       if (!isValidRoleName(editName)) {
         setActionMsg({ type: "error", text: t.settings.roles.nameInvalid });
-        setTimeout(() => setActionMsg(null), 3000);
+        later(() => setActionMsg(null), 3000);
         return;
       }
       try {
@@ -3090,9 +3101,9 @@ export function RolesSection() {
           ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [editingRole, editName, editDescription, editPermissions, loadRoles, t],
+    [editingRole, editName, editDescription, editPermissions, loadRoles, t, later],
   );
 
   const handleDelete = useCallback(
@@ -3120,9 +3131,9 @@ export function RolesSection() {
           ),
         });
       }
-      setTimeout(() => setActionMsg(null), 3000);
+      later(() => setActionMsg(null), 3000);
     },
-    [loadRoles, t],
+    [loadRoles, t, later],
   );
 
   const togglePermission = (perm: string, list: string[], setter: (v: string[]) => void) => {
