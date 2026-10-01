@@ -31,6 +31,13 @@ export function SpriteSheetSettings() {
   const [format, setFormat] = useState<OutputFormat>("png");
   const [quality, setQuality] = useState(90);
   const [copiedExport, setCopiedExport] = useState<"css" | "json" | null>(null);
+  // The flag lives here, so its reset does too: a re-run unmounts SpriteOutput
+  // but not this panel, and a reset owned by the child would leave it stuck.
+  const later = useTimeouts();
+  const flashCopied = (kind: "css" | "json") => {
+    setCopiedExport(kind);
+    later(() => setCopiedExport(null), 1500);
+  };
 
   const handleProcess = () => {
     const settings = { columns, padding, background, format, quality };
@@ -185,7 +192,7 @@ export function SpriteSheetSettings() {
           payload={resultPayload}
           format={format}
           copiedExport={copiedExport}
-          setCopiedExport={setCopiedExport}
+          onCopied={flashCopied}
         />
       )}
     </form>
@@ -196,15 +203,14 @@ function SpriteOutput({
   payload,
   format,
   copiedExport,
-  setCopiedExport,
+  onCopied,
 }: {
   payload: Record<string, unknown>;
   format: OutputFormat;
   copiedExport: "css" | "json" | null;
-  setCopiedExport: (v: "css" | "json" | null) => void;
+  onCopied: (kind: "css" | "json") => void;
 }) {
   const { t } = useTranslation();
-  const later = useTimeouts();
   const frames = payload.frames as Frame[];
   const cols = payload.cols as number;
   const rows = payload.rows as number;
@@ -225,8 +231,7 @@ function SpriteOutput({
       .join("\n");
     const ok = await copyToClipboard(`${base}\n${rules}`);
     if (ok) {
-      setCopiedExport("css");
-      later(() => setCopiedExport(null), 1500);
+      onCopied("css");
     }
   };
 
@@ -239,8 +244,7 @@ function SpriteOutput({
       ),
     );
     if (ok) {
-      setCopiedExport("json");
-      later(() => setCopiedExport(null), 1500);
+      onCopied("json");
     }
   };
 

@@ -239,6 +239,9 @@ export function LoginPage() {
   const [enrollmentCode, setEnrollmentCode] = useState("");
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [enrollmentCodesCopied, setEnrollmentCodesCopied] = useState(false);
+  // Keep this above the redirect effect below. useTimeouts arms itself in its
+  // own effect, effects run in hook order, and that effect schedules the MFA
+  // focus on first commit; a later() before arming is silently dropped.
   const later = useTimeouts();
 
   useEffect(() => {

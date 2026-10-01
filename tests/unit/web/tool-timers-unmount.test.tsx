@@ -120,9 +120,14 @@ function ocrBundle(): FeatureBundleState {
   };
 }
 
-/** Clicks a copy control and waits until the copy has resolved into state. */
+/**
+ * Clicks a copy control, waits until the copy has resolved into state, and
+ * checks that it scheduled its reset (so the unmount check below is not just
+ * counting some unrelated interval).
+ */
 async function copyVia(button: HTMLElement) {
   const calls = copyToClipboard.mock.calls.length + copyImageToClipboard.mock.calls.length;
+  const timers = vi.getTimerCount();
   await act(async () => {
     fireEvent.click(button);
   });
@@ -132,6 +137,15 @@ async function copyVia(button: HTMLElement) {
     ),
   );
   await act(async () => {});
+  expect(vi.getTimerCount()).toBeGreaterThan(timers);
+}
+
+function renderLogin(path = "/login") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <LoginPage />
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(() => {
@@ -314,11 +328,7 @@ const flows: Flow[] = [
           }),
         })),
       );
-      render(
-        <MemoryRouter initialEntries={["/login"]}>
-          <LoginPage />
-        </MemoryRouter>,
-      );
+      renderLogin();
       fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
       fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "pw" } });
       fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
@@ -332,15 +342,13 @@ const flows: Flow[] = [
   [
     "login: the rotating phrase mid-swap",
     async () => {
-      render(
-        <MemoryRouter initialEntries={["/login"]}>
-          <LoginPage />
-        </MemoryRouter>,
-      );
+      renderLogin();
       // The phrase rotates every 3 s, fading out for 300 ms before it swaps.
+      const timers = vi.getTimerCount();
       await act(async () => {
         vi.advanceTimersByTime(3000);
       });
+      expect(vi.getTimerCount()).toBeGreaterThan(timers);
     },
   ],
 ];
@@ -357,16 +365,78 @@ describe("Copy and message timers are cancelled when the page goes", () => {
 
   it("still clears the Copied flag while the page stays up", async () => {
     toolPayload.current = { dataUri: "data:image/webp;base64,AA==", width: 16, height: 9 };
-    const { container } = render(<LqipPlaceholderSettings />);
-    const copy = screen.getAllByRole("button", { name: en.common.copy })[0];
-    await copyVia(copy);
-    expect(copy.querySelector(".text-success-ink")).not.toBeNull();
+    render(<LqipPlaceholderSettings />);
+    const copyButton = () => screen.getAllByRole("button", { name: en.common.copy })[0];
+    await copyVia(copyButton());
+    expect(copyButton().querySelector(".text-success-ink")).not.toBeNull();
 
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
-    expect(container.querySelector(".text-success-ink")).toBeNull();
+    expect(copyButton().querySelector(".text-success-ink")).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clears the sprite sheet's Copied flag across a re-run", async () => {
+    const payload = {
+      frames: [{ index: 0, width: 1, height: 1, left: 0, top: 0 }],
+      cols: 1,
+      rows: 1,
+      cellWidth: 1,
+      cellHeight: 1,
+      canvasWidth: 1,
+      canvasHeight: 1,
+    };
+    toolPayload.current = payload;
+    const { rerender } = render(<SpriteSheetSettings />);
+    await copyVia(screen.getByTestId("sprite-sheet-copy-css"));
+
+    // A new run clears the result, which unmounts the output (and its buttons)
+    // while the panel that owns the Copied flag stays up.
+    toolPayload.current = null;
+    rerender(<SpriteSheetSettings />);
+    expect(screen.queryByTestId("sprite-sheet-output")).toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+
+    toolPayload.current = payload;
+    rerender(<SpriteSheetSettings />);
+    expect(
+      screen.getByTestId("sprite-sheet-copy-css").querySelector(".text-success-ink"),
+    ).toBeNull();
+  });
+});
+
+describe("Login focus still lands on the MFA field", () => {
+  // The focus goes through useTimeouts, which drops calls made before its own
+  // mount effect has run. The SSO redirect schedules it on first commit.
+  it("after an SSO redirect hands back an mfaToken", async () => {
+    renderLogin("/login?mfaToken=abc-123");
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(screen.getByPlaceholderText("000000")).toHaveFocus();
+  });
+
+  it("after a password login that needs a code", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ requiresMfa: true, mfaToken: "mfa-1" }),
+      })),
+    );
+    renderLogin();
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+    const code = await screen.findByPlaceholderText("000000");
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(code).toHaveFocus();
   });
 });
 
@@ -375,14 +445,17 @@ describe("Components never throw away a timer id", () => {
   // the component that scheduled it. Use useTimeouts() (cleared on unmount),
   // or keep the id and clear it in an effect cleanup.
   const web = join(__dirname, "../../../apps/web/src");
-  // Fire-and-forget on purpose, and not tied to a component's lifetime.
-  const allowed = new Set([
+  // Fire-and-forget on purpose, and not tied to a component's lifetime. Keyed
+  // by file and exact (trimmed) line, so a new bare timer in these files still
+  // trips the guard.
+  const allowed: Record<string, string[]> = {
     // Module-level SSE helpers: the reconnect checks the helper's own `done`.
-    "components/tools/erase-object-settings.tsx",
-    "components/tools/sign-pdf-settings.tsx",
+    "components/tools/erase-object-settings.tsx": ["setTimeout(open, 500);"],
+    "components/tools/sign-pdf-settings.tsx": ["setTimeout(open, 500);"],
     // Writes the file store after navigating away, which is the point.
-    "components/files/file-details.tsx",
-  ]);
+    "components/files/file-details.tsx": ["setTimeout(() => {"],
+  };
+  const bareTimer = /(^|[;{]|=>|\bvoid)\s*(?:(?:window|globalThis)\.)?setTimeout\s*\(/;
 
   function walk(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
@@ -392,24 +465,28 @@ describe("Components never throw away a timer id", () => {
     });
   }
 
-  const files = [...walk(join(web, "components")), ...walk(join(web, "pages"))]
-    .map((path) => relative(web, path))
-    .filter((file) => !allowed.has(file));
+  const files = [...walk(join(web, "components")), ...walk(join(web, "pages"))].map((path) =>
+    relative(web, path),
+  );
 
   it.each(files)("%s", (file) => {
+    const permitted = allowed[file] ?? [];
     const offenders = readFileSync(join(web, file), "utf8")
       .split("\n")
       .flatMap((line, i) =>
-        /(^|[;{]|=>)\s*setTimeout\s*\(/.test(line) && !/new Promise/.test(line)
+        bareTimer.test(line) && !/new Promise/.test(line) && !permitted.includes(line.trim())
           ? [`${i + 1}: ${line.trim()}`]
           : [],
       );
     expect(offenders).toEqual([]);
   });
 
-  it("allows only files that exist and still need it", () => {
-    for (const file of allowed) {
-      expect(readFileSync(join(web, file), "utf8")).toMatch(/^\s*setTimeout\s*\(/m);
+  it("allows only lines that still exist", () => {
+    for (const [file, lines] of Object.entries(allowed)) {
+      const source = readFileSync(join(web, file), "utf8")
+        .split("\n")
+        .map((line) => line.trim());
+      for (const line of lines) expect(source).toContain(line);
     }
   });
 });
