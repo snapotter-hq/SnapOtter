@@ -233,7 +233,6 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-no-tounicode"), "glyph-ids.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
   }, 60_000);
@@ -264,7 +263,6 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-inline-no-tounicode"), "inline-glyph-ids.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
   }, 60_000);
@@ -275,7 +273,6 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-identity-name"), "identity-name.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
   }, 60_000);
@@ -302,7 +299,6 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-identity-stream"), "identity-stream.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
     expect(body.error).toMatch(/text layer/i);
     expect(body.error).toMatch(/OCR/);
   }, 60_000);
@@ -321,6 +317,9 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
       "identity-type3-codes.pdf",
     );
     expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
   }, 60_000);
 
   it("still extracts a composite font whose dict is written inline", async () => {
