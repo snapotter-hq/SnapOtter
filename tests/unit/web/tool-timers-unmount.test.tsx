@@ -666,14 +666,14 @@ describe("A second copy inside the fade window gets its full time (#1798)", () =
     await copyAgain(first);
     expect(race.lit(first)).toBe(true);
     await act(async () => {
-      vi.advanceTimersByTime(race.ms - 1000);
+      vi.advanceTimersByTime(race.ms - 500);
     });
     await copyAgain(second);
     expect(race.lit(second)).toBe(true);
 
     // A's timer is due now. On its own it would clear the slot B just filled.
     await act(async () => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(500);
     });
     expect(race.lit(second)).toBe(true);
 
@@ -682,6 +682,36 @@ describe("A second copy inside the fade window gets its full time (#1798)", () =
       vi.advanceTimersByTime(race.ms);
     });
     expect(race.lit(second)).toBe(false);
+  });
+});
+
+describe("A failed copy then a good one share the slot (#1798)", () => {
+  it("editor export dialog: Copied outlives the Failed reset", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ blob: async () => new Blob(["x"]) })),
+    );
+    copyImageToClipboard.mockResolvedValueOnce(false);
+    render(<ExportDialog onClose={() => {}} />);
+    const copy = screen.getByRole("button", { name: en.common.copy });
+    await copyAgain(copy);
+    expect(copy).not.toHaveTextContent(en.editor.ui.exportDialog.copied);
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    await copyAgain(copy);
+    expect(copy).toHaveTextContent(en.editor.ui.exportDialog.copied);
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(copy).toHaveTextContent(en.editor.ui.exportDialog.copied);
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(copy).not.toHaveTextContent(en.editor.ui.exportDialog.copied);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -759,14 +789,21 @@ describe("Components never throw away a timer id", () => {
   });
 
   // A reset with no key is cleared early by an older timer for the same
-  // state when the action repeats inside the fade window (#1798). Name the
-  // state it clears: later(() => setCopied(false), 2000, "copied").
-  const unkeyedReset = /\blater\(\(\) => set\w+\([^()]*\), \w+\);/;
+  // state when the action repeats inside the fade window (#1798), and a key
+  // shared by two states cancels one's reset when the other is scheduled,
+  // leaving its message stuck. Key each reset by the state it clears:
+  // later(() => setCopied(false), 2000, "copied").
+  const reset = /\blater\(\(\) => set\w/;
+  const keyed = /\blater\(\(\) => set(\w)(\w*)\(.*\), [^,]+, "(\w+)"\);$/;
 
-  it.each(files)("%s keys every later() reset", (file) => {
+  it.each(files)("%s keys every later() reset by its state", (file) => {
     const offenders = readFileSync(join(web, file), "utf8")
       .split("\n")
-      .flatMap((line, i) => (unkeyedReset.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+      .flatMap((line, i) => {
+        if (!reset.test(line)) return [];
+        const m = keyed.exec(line.trim());
+        return m && m[3] === m[1].toLowerCase() + m[2] ? [] : [`${i + 1}: ${line.trim()}`];
+      });
     expect(offenders).toEqual([]);
   });
 

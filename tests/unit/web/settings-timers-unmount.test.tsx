@@ -480,14 +480,14 @@ describe("A second message inside the fade window gets its full time (#1798)", (
   it.each(races.map((race) => [race.name, race] as const))("%s", async (_name, race) => {
     await race.first();
     await act(async () => {
-      vi.advanceTimersByTime(race.ms - 1000);
+      vi.advanceTimersByTime(race.ms - 500);
     });
     await race.second();
     expect(race.shown()).toBe(true);
 
     // A's timer is due now. On its own it would clear the slot B just filled.
     await act(async () => {
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(500);
     });
     expect(race.shown()).toBe(true);
 
