@@ -462,18 +462,18 @@ test.describe("Visual Desktop (1280x720)", () => {
     });
 
     // Dark theme: setTheme clicks the nav toggle, which takes focus, so focus
-    // the search bar again after the switch. Without this the dark shot is the
-    // plain home page with nothing focused (#1527). The focus ring is under the
-    // 1% pixel tolerance, so the screenshot alone would not notice.
+    // the search bar again after the switch. Without this the dark shot shows
+    // the search box unfocused (#1527). The focus ring is under the 1% pixel
+    // tolerance, so the screenshot alone would not notice. setTheme's shortcut
+    // fallback is ignored while the input has focus, so check the theme too.
     await setTheme(page, "dark");
+    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
     await page.keyboard.press(`${MOD}+k`);
     await expect(search).toBeFocused();
     await page.waitForTimeout(300);
     await expect(page).toHaveScreenshot("desktop-home-search-focused-dark.png", {
       fullPage: false,
     });
-
-    await setTheme(page, "light");
   });
 
   // ---- Tool page - strip-metadata (no-comparison mode) ----
