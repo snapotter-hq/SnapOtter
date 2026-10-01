@@ -331,8 +331,12 @@ function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale:
   const handleRemoveDoc = () => {
     // Resolve by stable id at click time: the index prop can be stale, and
     // one File can back two documents, so the File can't say which was clicked.
+    const files = useFileStore.getState().files;
     const at = removeDoc(doc.id);
-    if (at >= 0) removeStoreFile(at);
+    if (at < 0) return;
+    // The upload list can briefly run ahead of docs (syncFiles runs in an effect).
+    const upload = files[at] === doc.file ? at : files.indexOf(doc.file);
+    if (upload >= 0) removeStoreFile(upload);
   };
 
   const stripW = Math.round(STRIP_W * scale);
