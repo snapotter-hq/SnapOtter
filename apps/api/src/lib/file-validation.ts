@@ -1,10 +1,11 @@
+import { extToMime, formatToMime } from "@snapotter/image-engine";
 import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../config.js";
 import { isSvgBuffer } from "./svg-sanitize.js";
 
 /** Formats we accept as input. */
-const SUPPORTED_INPUT_FORMATS = new Set([
+export const SUPPORTED_INPUT_FORMATS = new Set([
   "jpeg",
   "png",
   "webp",
@@ -160,6 +161,33 @@ const CLI_DECODED_FORMATS = new Set([
  */
 export function isRawExtension(ext: string): boolean {
   return RAW_EXTENSIONS.has(ext.toLowerCase().replace(/^\./, ""));
+}
+
+/**
+ * The image/* type for bytes validateImageBuffer() accepted, from the format
+ * it detected there (#1550). The file library offers a file to image tools by
+ * that prefix, so every SUPPORTED_INPUT_FORMATS member must land on one; a
+ * format image-engine's table doesn't know falls back to
+ * application/octet-stream, and the unit test over that set catches it.
+ *
+ * The validator folds every camera RAW into "raw" and HEIC into "heif", so for
+ * those the extension picks the specific type, but only an extension of the
+ * family the bytes proved: HEIF bytes named photo.png stay image/heif.
+ *
+ * @param format - ValidationResult.format
+ * @param filename - The name the bytes were validated under
+ */
+export function validatedImageMime(format: string, filename?: string): string {
+  const ext = filename?.includes(".") ? (filename.split(".").pop()?.toLowerCase() ?? "") : "";
+  if (format === "raw") {
+    const rawMime = isRawExtension(ext) ? extToMime(ext) : "";
+    return rawMime.startsWith("image/") ? rawMime : "image/x-dcraw";
+  }
+  if (format === "heif") return ext === "heic" ? "image/heic" : "image/heif";
+  // EPS's registered type is application/postscript, which the library's image
+  // filter would hide. image/x-eps is the freedesktop.org name for EPS.
+  if (format === "eps") return "image/x-eps";
+  return formatToMime(format);
 }
 
 /**

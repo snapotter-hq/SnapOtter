@@ -30,7 +30,11 @@ import {
   saveThumbnail,
   streamStoredFile,
 } from "../lib/file-storage.js";
-import { type ValidationResult, validateImageBuffer } from "../lib/file-validation.js";
+import {
+  type ValidationResult,
+  validatedImageMime,
+  validateImageBuffer,
+} from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
   decodeToSharpCompat,
@@ -46,19 +50,6 @@ import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js"
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
-
-function formatToMime(format: string): string {
-  const map: Record<string, string> = {
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    avif: "image/avif",
-  };
-  return map[format] ?? "application/octet-stream";
-}
 
 function extToMime(ext: string): string {
   const clean = ext.toLowerCase().replace(/^\./, "");
@@ -363,12 +354,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
           if (buffer.length === 0) continue;
 
-          // Try image validation; non-image files skip validation and use MIME from extension
-          const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
-          const isValidImage = validation?.valid === true;
-
           // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
-          // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
+          // Keyed on content, NOT on validation: a hostile SVG (a DOCTYPE with
           // an external entity, say) makes Sharp fail validation, and gating the
           // sanitizer on a successful decode would store the payload untouched.
           // Handled here rather than thrown so the answer stays specific: the
@@ -405,9 +392,16 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             return sendOverQuota(reply, batchOverQuota);
           }
 
+          // Validated after sanitizing, so the type describes the bytes that
+          // are stored: a hostile SVG that only decodes once it's clean is an
+          // SVG (#1550). Non-images fail here and keep a type from
+          // unverifiedMime().
+          const validation = await validateImageBuffer(safeBuffer, part.filename).catch(() => null);
+          const isValidImage = validation?.valid === true;
+
           const safeName = sanitizeFilename(part.filename ?? "upload");
           const mimeType = isValidImage
-            ? formatToMime(validation.format)
+            ? validatedImageMime(validation.format, part.filename)
             : unverifiedMime(part.mimetype || "application/octet-stream");
           const dimensions = measuredDimensions(isValidImage ? validation : null);
 
@@ -907,8 +901,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: "parentId is required" });
     }
 
-    // Try image validation; non-image outputs from trusted tools are accepted
-    const validation = await validateImageBuffer(fileBuffer, filename).catch(() => null);
+    // Sanitize SVG results to prevent XXE, SSRF, and script injection
+    const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
+
+    // Try image validation on the bytes that will be stored; non-image outputs
+    // from trusted tools are accepted
+    const validation = await validateImageBuffer(safeResultBuffer, filename).catch(() => null);
     const isValidImage = validation?.valid === true;
 
     // Look up the parent to compute the next version and carry forward the tool chain
@@ -940,12 +938,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const resultName = `${baseName}${ext}`;
 
     const mimeType = isValidImage
-      ? formatToMime(validation.format)
+      ? validatedImageMime(validation.format, filename)
       : unverifiedMime(extToMime(ext));
     const dimensions = measuredDimensions(isValidImage ? validation : null);
-
-    // Sanitize SVG results to prevent XXE, SSRF, and script injection
-    const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
 
     // Re-check quota with actual file size before persisting
     const resultOverQuota = await quotaRefusal(db, userId, safeResultBuffer.length);
