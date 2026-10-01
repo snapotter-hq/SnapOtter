@@ -14,6 +14,8 @@ import {
   type JobFailure,
   jobFailureMessage,
   type ProgressFrame,
+  parseResultBody,
+  reportMalformedResult,
 } from "@/lib/progress-frames";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
@@ -253,12 +255,25 @@ export function EraseObjectSettings({
         if (xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
+          // Only a body that isn't a result is the server's fault, and it gets
+          // reported (#1740). A throw while landing a good one is our own store
+          // write failing: it fails this file the way the progress stream's
+          // handling error does, and still surfaces (#1734, after #1354).
+          let result: Record<string, unknown>;
           try {
-            applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
-            resolve();
-          } catch {
+            result = parseResultBody<Record<string, unknown>>(xhr.responseText);
+          } catch (err) {
             reject(new Error(t.errors.invalidResponse));
+            reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
+            return;
           }
+          try {
+            applyResult(result);
+          } catch (err) {
+            reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+            throw err;
+          }
+          resolve();
         } else {
           try {
             const body = JSON.parse(xhr.responseText);
@@ -407,10 +422,32 @@ export function EraseObjectSettings({
       progressCleanupRef.current = null;
 
       if (xhr.status >= 200 && xhr.status < 300) {
+        // Same split as the batch path in processOneFile (#1734).
+        let result: Record<string, unknown> | null = null;
         try {
-          applyResult(resolveServerUrls(JSON.parse(xhr.responseText)));
-        } catch {
+          result = parseResultBody<Record<string, unknown>>(xhr.responseText);
+        } catch (err) {
           setError(t.errors.invalidResponse);
+          reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
+        }
+        if (result) {
+          try {
+            applyResult(result);
+          } catch (err) {
+            // Both are store writes, so each is guarded on its own: a second
+            // throw from setError must not leave the run stuck at processing.
+            for (const teardown of [
+              () => setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors)),
+              finishUi,
+            ]) {
+              try {
+                teardown();
+              } catch (teardownErr) {
+                console.error("Ending the run after a result handling error failed", teardownErr);
+              }
+            }
+            throw err;
+          }
         }
       } else {
         try {
