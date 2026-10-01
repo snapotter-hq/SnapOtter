@@ -224,16 +224,18 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeImageOnlyPdf(), "scanned.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/text layer/i);
-    expect(body.details).toMatch(/OCR/);
+    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
   }, 60_000);
 
   it("tells the user to run OCR when a composite font has no ToUnicode map (#955)", async () => {
     const res = await runTool(makeFontPdf("type0-no-tounicode"), "glyph-ids.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/text layer/i);
-    expect(body.details).toMatch(/OCR/);
+    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
   }, 60_000);
 
   it("still extracts a composite font that carries its ToUnicode map", async () => {
@@ -262,8 +264,9 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-inline-no-tounicode"), "inline-glyph-ids.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/text layer/i);
-    expect(body.details).toMatch(/OCR/);
+    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
   }, 60_000);
 
   it("tells the user to run OCR when ToUnicode is the name /Identity-H (#1566)", async () => {
@@ -272,8 +275,9 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-identity-name"), "identity-name.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/text layer/i);
-    expect(body.details).toMatch(/OCR/);
+    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
   }, 60_000);
 
   it("still extracts a page whose other text reads fine next to an /Identity-H line", async () => {
@@ -298,8 +302,9 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
     const res = await runTool(makeFontPdf("type0-identity-stream"), "identity-stream.pdf");
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
-    expect(body.details).toMatch(/text layer/i);
-    expect(body.details).toMatch(/OCR/);
+    // A worker's InputValidationError keeps its status and puts the reason in `error` (#1757).
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
   }, 60_000);
 
   it("still extracts a page whose Type3 text reads fine next to an /Identity-H line (#1754)", async () => {
