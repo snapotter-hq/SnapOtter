@@ -107,17 +107,16 @@ describe("library upload MIME type (#1349)", () => {
     expect(storedMimeType).toBe("application/octet-stream");
   });
 
-  // The XXE payload fails validation on its raw bytes and is stored sanitized.
-  // It gets application/octet-stream, the same type a benign SVG gets today
-  // because formatToMime() has no svg entry (#1550 covers both).
-  it("stores a sanitized hostile SVG without its image/svg+xml claim", async () => {
+  // The XXE payload fails validation on its raw bytes. What gets stored is the
+  // sanitized SVG, so that is what decides the type (#1550).
+  it("stores a sanitized hostile SVG as the SVG it now is", async () => {
     const { storedMimeType } = await uploadOne({
       filename: "xxe.svg",
-      contentType: "image/svg+xml",
+      contentType: "application/octet-stream",
       content: readFixture(fixtures.security.svgXxeFile),
     });
 
-    expect(storedMimeType).toBe("application/octet-stream");
+    expect(storedMimeType).toBe("image/svg+xml");
   });
 
   it("stores the sniffed type for a real PNG, whatever the client claimed", async () => {
@@ -153,6 +152,88 @@ describe("library upload MIME type (#1349)", () => {
     expect(video.storedMimeType).toBe("video/mp4");
     expect(pdf.storedMimeType).toBe("application/pdf");
     expect(docx.storedMimeType).toBe(DOCX_MIME);
+  });
+});
+
+// Every image format the validator accepts gets an image/* type, so the
+// library's image filter offers it to image tools (#1550). Each is uploaded
+// with a non-image claim, so the type can only have come from the bytes.
+const SNIFFED_IMAGE_TYPES: [ext: string, mime: string][] = [
+  ["jpg", "image/jpeg"],
+  ["png", "image/png"],
+  ["apng", "image/png"],
+  ["webp", "image/webp"],
+  ["gif", "image/gif"],
+  ["bmp", "image/bmp"],
+  ["tiff", "image/tiff"],
+  ["avif", "image/avif"],
+  ["svg", "image/svg+xml"],
+  ["svgz", "image/svg+xml"],
+  ["heic", "image/heic"],
+  ["heif", "image/heif"],
+  ["psd", "image/vnd.adobe.photoshop"],
+  ["dng", "image/x-adobe-dng"],
+  ["cr2", "image/x-canon-cr2"],
+  ["nef", "image/x-nikon-nef"],
+  ["arw", "image/x-sony-arw"],
+  ["orf", "image/x-olympus-orf"],
+  ["rw2", "image/x-panasonic-rw2"],
+  ["ico", "image/x-icon"],
+  ["cur", "image/x-icon"],
+  ["jxl", "image/jxl"],
+  ["jp2", "image/jp2"],
+  ["tga", "image/x-tga"],
+  ["exr", "image/x-exr"],
+  ["hdr", "image/vnd.radiance"],
+  ["qoi", "image/qoi"],
+  ["eps", "image/x-eps"],
+  ["dds", "image/vnd.ms-dds"],
+  ["dpx", "image/x-dpx"],
+  ["fits", "image/fits"],
+  ["ppm", "image/x-portable-pixmap"],
+  ["pgm", "image/x-portable-graymap"],
+  ["pbm", "image/x-portable-bitmap"],
+];
+
+describe("library upload MIME type for every accepted image format (#1550)", () => {
+  it.each(SNIFFED_IMAGE_TYPES)("stores a valid .%s upload as %s", async (ext, mime) => {
+    const { storedMimeType } = await uploadOne({
+      filename: `sample.${ext}`,
+      contentType: "application/octet-stream",
+      content: readFixture(fixtures.image.formats(ext)),
+    });
+
+    expect(storedMimeType).toBe(mime);
+  });
+
+  // The extension only narrows a family the bytes already proved: it can't
+  // turn HEIF bytes into some other format's type.
+  it("doesn't take the type from an extension the bytes contradict", async () => {
+    const heic = await uploadOne({
+      filename: "holiday.png",
+      contentType: "image/png",
+      content: readFixture(fixtures.image.formats("heic")),
+    });
+
+    expect(heic.storedMimeType).toBe("image/heif");
+  });
+
+  it("still serves a thumbnail for a HEIC row stored as image/heic", async () => {
+    const { created, storedMimeType } = await uploadOne({
+      filename: "photo.heic",
+      contentType: "image/heic",
+      content: readFixture(fixtures.image.formats("heic")),
+    });
+    expect(storedMimeType).toBe("image/heic");
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${created.id}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.headers["content-type"]).toBe("image/jpeg");
   });
 });
 
@@ -197,5 +278,33 @@ describe("save-result MIME type (#1349)", () => {
 
     expect(pdf.mimeType).toBe("application/pdf");
     expect(png.mimeType).toBe("image/png");
+  });
+
+  it("stores the sniffed type for a HEIC, PSD, and SVG result (#1550)", async () => {
+    const { created: parent } = await uploadOne({
+      filename: "parent.png",
+      contentType: "image/png",
+      content: PNG,
+    });
+
+    const heic = await saveResult(
+      parent.id,
+      "result.heic",
+      readFixture(fixtures.image.formats("heic")),
+    );
+    const psd = await saveResult(
+      parent.id,
+      "result.psd",
+      readFixture(fixtures.image.formats("psd")),
+    );
+    const svg = await saveResult(
+      parent.id,
+      "result.svg",
+      readFixture(fixtures.image.formats("svg")),
+    );
+
+    expect(heic.mimeType).toBe("image/heic");
+    expect(psd.mimeType).toBe("image/vnd.adobe.photoshop");
+    expect(svg.mimeType).toBe("image/svg+xml");
   });
 });
