@@ -25,6 +25,12 @@ const PDF = readFixture(fixtures.document.pdf3);
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 // The body #1286's client saved into the library in place of a result image.
 const JSON_ERROR_BODY = Buffer.from('{"error":"File not found"}');
+// A parameter entity pointing off-box: Sharp can't decode it as sent, and can
+// once the sanitizer has dropped the DOCTYPE.
+const PARAMETER_ENTITY_SVG = Buffer.from(
+  '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY % p SYSTEM "http://127.0.0.1:1/evil.dtd"> %p;]>' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>',
+);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -121,16 +127,11 @@ describe("library upload MIME type (#1349)", () => {
     expect(storedMimeType).toBe("application/octet-stream");
   });
 
-  // A parameter entity pointing off-box fails to decode as uploaded, and the
-  // sanitizer's copy, with the DOCTYPE gone, is a clean SVG.
   it("stores a hostile SVG that decodes once sanitized as image/svg+xml", async () => {
     const { storedMimeType } = await uploadOne({
       filename: "pe.svg",
       contentType: "application/octet-stream",
-      content: Buffer.from(
-        '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY % p SYSTEM "http://127.0.0.1:1/evil.dtd"> %p;]>' +
-          '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>',
-      ),
+      content: PARAMETER_ENTITY_SVG,
     });
 
     expect(storedMimeType).toBe("image/svg+xml");
@@ -320,5 +321,17 @@ describe("save-result MIME type (#1349)", () => {
     expect(heic.mimeType).toBe("image/heic");
     expect(psd.mimeType).toBe("image/vnd.adobe.photoshop");
     expect(svg.mimeType).toBe("image/svg+xml");
+  });
+
+  it("types an SVG result by its sanitized bytes (#1550)", async () => {
+    const { created: parent } = await uploadOne({
+      filename: "parent.png",
+      contentType: "image/png",
+      content: PNG,
+    });
+
+    const saved = await saveResult(parent.id, "result.svg", PARAMETER_ENTITY_SVG);
+
+    expect(saved.mimeType).toBe("image/svg+xml");
   });
 });
