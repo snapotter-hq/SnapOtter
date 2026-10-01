@@ -3810,6 +3810,8 @@ export const ru: TranslationKeys = {
       reset: "Сбросить план",
       emptyPlan: "В плане пока нет страниц. Добавьте страницы из документов выше.",
       docFailed: "Не удалось прочитать документ.",
+      skippedNotPdf: "Пропущено файлов: {count}. Можно добавлять только PDF.",
+      skippedOverLimit: "Не добавлено PDF: {count}. В редакторе может быть не более {docs} PDF.",
       pageLabel: "Позиция {n}",
       planSummary: "Будет собрано страниц: {pages} из {docs} документ(ов).",
       submit: "Собрать PDF ({pages} стр.)",

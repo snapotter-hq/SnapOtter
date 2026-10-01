@@ -3800,6 +3800,8 @@ export const vi: TranslationKeys = {
       reset: "Đặt lại kế hoạch",
       emptyPlan: "Chưa có trang nào trong kế hoạch. Hãy thêm trang từ các tài liệu ở trên.",
       docFailed: "Không thể đọc một tài liệu.",
+      skippedNotPdf: "Đã bỏ qua {count} tệp: chỉ có thể thêm tệp PDF.",
+      skippedOverLimit: "Chưa thêm {count} tệp PDF: trình chỉnh sửa chứa tối đa {docs} tệp PDF.",
       pageLabel: "Vị trí {n}",
       planSummary: "Sẽ ghép {pages} trang từ {docs} tài liệu.",
       submit: "Tạo PDF ({pages} trang)",

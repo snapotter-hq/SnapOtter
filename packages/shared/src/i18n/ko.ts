@@ -3736,6 +3736,9 @@ export const ko: TranslationKeys = {
       reset: "계획 초기화",
       emptyPlan: "계획에 페이지가 없습니다. 위 문서에서 페이지를 추가하세요.",
       docFailed: "문서 하나를 읽을 수 없습니다.",
+      skippedNotPdf: "파일 {count}개를 건너뛰었습니다. PDF만 추가할 수 있습니다.",
+      skippedOverLimit:
+        "PDF {count}개를 추가하지 못했습니다. 편집기에는 PDF를 최대 {docs}개까지 넣을 수 있습니다.",
       pageLabel: "위치 {n}",
       planSummary: "{docs}개 문서에서 {pages}개 페이지를 조립합니다.",
       submit: "PDF 만들기 ({pages}페이지)",

@@ -3809,6 +3809,9 @@ export const pl: TranslationKeys = {
       reset: "Przywróć plan",
       emptyPlan: "W planie nie ma jeszcze stron. Dodaj strony z dokumentów powyżej.",
       docFailed: "Nie udało się odczytać dokumentu.",
+      skippedNotPdf: "Pominięto plików: {count}. Można dodawać tylko pliki PDF.",
+      skippedOverLimit:
+        "Nie dodano plików PDF: {count}. Edytor mieści maksymalnie {docs} plików PDF.",
       pageLabel: "Pozycja {n}",
       planSummary: "Zostanie zmontowana(e) {pages} strona/stron z {docs} dokument(ów).",
       submit: "Zbuduj PDF ({pages} stron)",

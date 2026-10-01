@@ -3802,6 +3802,8 @@ export const id: TranslationKeys = {
       reset: "Atur ulang rencana",
       emptyPlan: "Belum ada halaman dalam rencana. Tambahkan halaman dari dokumen di atas.",
       docFailed: "Sebuah dokumen tidak dapat dibaca.",
+      skippedNotPdf: "{count} file dilewati: hanya PDF yang dapat ditambahkan.",
+      skippedOverLimit: "{count} PDF tidak ditambahkan: editor menampung maksimal {docs} PDF.",
       pageLabel: "Posisi {n}",
       planSummary: "{pages} halaman dari {docs} dokumen akan dirakit.",
       submit: "Buat PDF ({pages} halaman)",

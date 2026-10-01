@@ -3801,6 +3801,9 @@ export const sv: TranslationKeys = {
       reset: "Återställ planen",
       emptyPlan: "Inga sidor i planen än. Lägg till sidor från dokumenten ovan.",
       docFailed: "Ett dokument kunde inte läsas.",
+      skippedNotPdf: "{count} fil(er) hoppades över: endast PDF-filer kan läggas till.",
+      skippedOverLimit:
+        "{count} PDF-fil(er) lades inte till: redigeraren rymmer högst {docs} PDF-filer.",
       pageLabel: "Position {n}",
       planSummary: "{pages} sida/sidor från {docs} dokument kommer att sammanställas.",
       submit: "Skapa PDF ({pages} sidor)",

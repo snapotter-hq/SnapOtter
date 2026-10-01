@@ -3778,6 +3778,8 @@ export const ar: TranslationKeys = {
       reset: "إعادة تعيين الخطة",
       emptyPlan: "لا توجد صفحات في الخطة بعد. أضف صفحات من المستندات أعلاه.",
       docFailed: "تعذّرت قراءة أحد المستندات.",
+      skippedNotPdf: "تم تخطي {count} ملف: يمكن إضافة ملفات PDF فقط.",
+      skippedOverLimit: "لم تتم إضافة {count} ملف PDF: يتسع المحرر لـ {docs} ملفات PDF كحد أقصى.",
       pageLabel: "الموضع {n}",
       planSummary: "سيتم تجميع {pages} صفحة من {docs} مستند.",
       submit: "إنشاء PDF ({pages} صفحة)",

@@ -3606,6 +3606,8 @@ export const hi: TranslationKeys = {
       reset: "योजना रीसेट करें",
       emptyPlan: "योजना में अभी कोई पेज नहीं है। ऊपर के दस्तावेज़ों से पेज जोड़ें।",
       docFailed: "एक दस्तावेज़ पढ़ा नहीं जा सका।",
+      skippedNotPdf: "{count} फ़ाइल(ें) छोड़ी गईं: केवल PDF जोड़े जा सकते हैं।",
+      skippedOverLimit: "{count} PDF नहीं जोड़े गए: एडिटर में अधिकतम {docs} PDF आ सकते हैं।",
       pageLabel: "स्थिति {n}",
       planSummary: "{docs} दस्तावेज़(ों) से {pages} पेज जोड़े जाएँगे।",
       submit: "PDF बनाएं ({pages} पेज)",

@@ -3758,6 +3758,9 @@ export const ja: TranslationKeys = {
       reset: "プランをリセット",
       emptyPlan: "プランにページがありません。上のドキュメントからページを追加してください。",
       docFailed: "ドキュメントを 1 つ読み込めませんでした。",
+      skippedNotPdf: "{count} 個のファイルをスキップしました。追加できるのは PDF のみです。",
+      skippedOverLimit:
+        "{count} 個の PDF を追加できませんでした。追加できる PDF は最大 {docs} 個です。",
       pageLabel: "位置 {n}",
       planSummary: "{docs} 個のドキュメントから {pages} ページを組み立てます。",
       submit: "PDF を作成 ({pages} ページ)",

@@ -3819,6 +3819,8 @@ export const nl: TranslationKeys = {
       reset: "Plan herstellen",
       emptyPlan: "Nog geen pagina's in het plan. Voeg pagina's toe vanuit de documenten hierboven.",
       docFailed: "Een document kon niet worden gelezen.",
+      skippedNotPdf: "{count} bestand(en) overgeslagen: alleen PDF’s kunnen worden toegevoegd.",
+      skippedOverLimit: "{count} PDF(’s) niet toegevoegd: de editor bevat maximaal {docs} PDF’s.",
       pageLabel: "Positie {n}",
       planSummary: "{pages} pagina('s) uit {docs} document(en) worden samengesteld.",
       submit: "PDF maken ({pages} pagina's)",

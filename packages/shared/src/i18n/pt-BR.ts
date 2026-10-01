@@ -3811,6 +3811,9 @@ export const ptBR: TranslationKeys = {
       reset: "Redefinir plano",
       emptyPlan: "Nenhuma página no plano ainda. Adicione páginas dos documentos acima.",
       docFailed: "Não foi possível ler um documento.",
+      skippedNotPdf: "{count} arquivo(s) ignorado(s): só é possível adicionar PDFs.",
+      skippedOverLimit:
+        "{count} PDF(s) não adicionado(s): o editor comporta no máximo {docs} PDFs.",
       pageLabel: "Posição {n}",
       planSummary: "{pages} página(s) de {docs} documento(s) serão montadas.",
       submit: "Criar PDF ({pages} páginas)",

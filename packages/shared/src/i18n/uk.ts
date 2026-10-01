@@ -3811,6 +3811,8 @@ export const uk: TranslationKeys = {
       reset: "Скинути план",
       emptyPlan: "У плані поки немає сторінок. Додайте сторінки з документів вище.",
       docFailed: "Не вдалося прочитати документ.",
+      skippedNotPdf: "Пропущено файлів: {count}. Можна додавати лише PDF.",
+      skippedOverLimit: "Не додано PDF: {count}. У редакторі може бути не більше {docs} PDF.",
       pageLabel: "Позиція {n}",
       planSummary: "Буде зібрано сторінок: {pages} з {docs} документ(ів).",
       submit: "Зібрати PDF ({pages} стор.)",

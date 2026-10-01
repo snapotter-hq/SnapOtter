@@ -3811,6 +3811,8 @@ export const it: TranslationKeys = {
       reset: "Ripristina piano",
       emptyPlan: "Nessuna pagina nel piano. Aggiungi pagine dai documenti sopra.",
       docFailed: "Impossibile leggere un documento.",
+      skippedNotPdf: "{count} file ignorato/i: si possono aggiungere solo PDF.",
+      skippedOverLimit: "{count} PDF non aggiunto/i: l'editor accetta al massimo {docs} PDF.",
       pageLabel: "Posizione {n}",
       planSummary: "Verranno assemblate {pages} pagina/e da {docs} documento/i.",
       submit: "Crea PDF ({pages} pagine)",

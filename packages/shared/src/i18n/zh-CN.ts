@@ -3539,6 +3539,8 @@ export const zhCN: TranslationKeys = {
       reset: "重置计划",
       emptyPlan: "计划中还没有页面。请从上方的文档中添加页面。",
       docFailed: "无法读取某个文档。",
+      skippedNotPdf: "已跳过 {count} 个文件：只能添加 PDF。",
+      skippedOverLimit: "{count} 个 PDF 未添加：编辑器最多容纳 {docs} 个 PDF。",
       pageLabel: "位置 {n}",
       planSummary: "将从 {docs} 个文档组装 {pages} 页。",
       submit: "生成 PDF（{pages} 页）",

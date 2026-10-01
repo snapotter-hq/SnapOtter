@@ -3538,6 +3538,8 @@ export const zhTW: TranslationKeys = {
       reset: "重設計畫",
       emptyPlan: "計畫中還沒有頁面。請從上方的文件加入頁面。",
       docFailed: "無法讀取某個文件。",
+      skippedNotPdf: "已略過 {count} 個檔案：只能加入 PDF。",
+      skippedOverLimit: "{count} 個 PDF 未加入：編輯器最多可容納 {docs} 個 PDF。",
       pageLabel: "位置 {n}",
       planSummary: "將從 {docs} 個文件組合 {pages} 頁。",
       submit: "產生 PDF（{pages} 頁）",

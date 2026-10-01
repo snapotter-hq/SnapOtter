@@ -3809,6 +3809,8 @@ export const tr: TranslationKeys = {
       reset: "Planı sıfırla",
       emptyPlan: "Planda henüz sayfa yok. Yukarıdaki belgelerden sayfa ekleyin.",
       docFailed: "Bir belge okunamadı.",
+      skippedNotPdf: "{count} dosya atlandı: yalnızca PDF eklenebilir.",
+      skippedOverLimit: "{count} PDF eklenmedi: düzenleyici en fazla {docs} PDF alır.",
       pageLabel: "Konum {n}",
       planSummary: "{docs} belgeden {pages} sayfa birleştirilecek.",
       submit: "PDF oluştur ({pages} sayfa)",

@@ -3742,6 +3742,8 @@ export const en = {
       reset: "Reset plan",
       emptyPlan: "No pages in the plan yet. Add pages from the documents above.",
       docFailed: "A document could not be read.",
+      skippedNotPdf: "{count} file(s) skipped: only PDFs can be added.",
+      skippedOverLimit: "{count} PDF(s) not added: the editor holds up to {docs} PDFs.",
       pageLabel: "Position {n}",
       planSummary: "{pages} page(s) from {docs} document(s) will be assembled.",
       submit: "Build PDF ({pages} pages)",

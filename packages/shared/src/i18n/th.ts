@@ -3756,6 +3756,8 @@ export const th: TranslationKeys = {
       reset: "รีเซ็ตแผน",
       emptyPlan: "ยังไม่มีหน้าในแผน เพิ่มหน้าจากเอกสารด้านบน",
       docFailed: "ไม่สามารถอ่านเอกสารฉบับหนึ่งได้",
+      skippedNotPdf: "ข้าม {count} ไฟล์ เพิ่มได้เฉพาะไฟล์ PDF",
+      skippedOverLimit: "ไม่ได้เพิ่ม {count} ไฟล์ PDF ตัวแก้ไขรองรับ PDF ได้สูงสุด {docs} ไฟล์",
       pageLabel: "ตำแหน่ง {n}",
       planSummary: "จะประกอบ {pages} หน้าจาก {docs} เอกสาร",
       submit: "สร้าง PDF ({pages} หน้า)",

@@ -3824,6 +3824,8 @@ export const fr: TranslationKeys = {
       emptyPlan:
         "Aucune page dans le plan pour l'instant. Ajoutez des pages depuis les documents ci-dessus.",
       docFailed: "Un document n'a pas pu être lu.",
+      skippedNotPdf: "{count} fichier(s) ignoré(s) : seuls les PDF peuvent être ajoutés.",
+      skippedOverLimit: "{count} PDF non ajouté(s) : l'éditeur accepte au maximum {docs} PDF.",
       pageLabel: "Position {n}",
       planSummary: "{pages} page(s) de {docs} document(s) seront assemblées.",
       submit: "Créer le PDF ({pages} pages)",

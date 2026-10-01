@@ -28,7 +28,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import * as pdfjs from "pdfjs-dist";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
@@ -427,6 +427,8 @@ export function MultiToolPdfCanvas() {
   const { t } = useTranslation();
   const s = t.toolSettings["multi-tool-pdf"];
   const { files, addFiles, reset: resetFiles, processing } = useFileStore();
+  // What the last Add PDF pick left out, so it isn't dropped without a word.
+  const [skipped, setSkipped] = useState({ notPdf: 0, overLimit: 0 });
   const docs = useMultiToolStore((state) => state.docs);
   const plan = useMultiToolStore((state) => state.plan);
   const syncFiles = useMultiToolStore((state) => state.syncFiles);
@@ -550,12 +552,20 @@ export function MultiToolPdfCanvas() {
             // Every picked PDF joins as its own document, in pick order.
             // accept=".pdf" is only a picker hint (force-selection bypasses
             // it), so filter here; a non-PDF would fail pdfjs and the server.
-            const picked = Array.from(e.target.files ?? []).filter(
+            const chosen = Array.from(e.target.files ?? []);
+            const picked = chosen.filter(
               (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"),
             );
             e.target.value = "";
-            const room = PDF_MULTI_TOOL_LIMITS.documents - useFileStore.getState().files.length;
+            const room = Math.max(
+              0,
+              PDF_MULTI_TOOL_LIMITS.documents - useFileStore.getState().files.length,
+            );
             if (room > 0 && picked.length > 0) addFiles(picked.slice(0, room));
+            setSkipped({
+              notPdf: chosen.length - picked.length,
+              overLimit: Math.max(0, picked.length - room),
+            });
           }}
         />
       </div>
@@ -575,6 +585,23 @@ export function MultiToolPdfCanvas() {
           <span className="text-[10px]">{s.addDocument}</span>
         </button>
       </div>
+      {(skipped.notPdf > 0 || skipped.overLimit > 0) && (
+        <div
+          role="status"
+          className="px-4 py-1.5 border-b border-border text-xs text-muted-foreground space-y-0.5"
+          data-testid="multi-tool-skipped"
+        >
+          {skipped.notPdf > 0 && <p>{format(s.skippedNotPdf, { count: skipped.notPdf })}</p>}
+          {skipped.overLimit > 0 && (
+            <p>
+              {format(s.skippedOverLimit, {
+                count: skipped.overLimit,
+                docs: PDF_MULTI_TOOL_LIMITS.documents,
+              })}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto p-4">
         {!primaryReady ? (

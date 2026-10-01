@@ -3823,6 +3823,8 @@ export const de: TranslationKeys = {
       reset: "Plan zurücksetzen",
       emptyPlan: "Noch keine Seiten im Plan. Füge Seiten aus den Dokumenten oben hinzu.",
       docFailed: "Ein Dokument konnte nicht gelesen werden.",
+      skippedNotPdf: "{count} Datei(en) übersprungen: Nur PDFs können hinzugefügt werden.",
+      skippedOverLimit: "{count} PDF(s) nicht hinzugefügt: Der Editor fasst höchstens {docs} PDFs.",
       pageLabel: "Position {n}",
       planSummary: "{pages} Seite(n) aus {docs} Dokument(en) werden zusammengesetzt.",
       submit: "PDF erstellen ({pages} Seiten)",

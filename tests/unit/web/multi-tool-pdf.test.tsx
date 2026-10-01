@@ -336,6 +336,28 @@ describe("PDF multi-tool editor regressions", () => {
     expect(screen.getByTestId("multi-tool-add-doc")).toBeDisabled();
   });
 
+  it("says how many picked files were skipped and why", async () => {
+    const view = await seedPrimary();
+    const input = view.container.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(screen.queryByTestId("multi-tool-skipped")).toBeNull();
+
+    const notes = new File(["x"], "notes.txt", { type: "text/plain" });
+    fireEvent.change(input, { target: { files: [notes, file("extra.pdf")] } });
+    expect(screen.getByTestId("multi-tool-skipped")).toHaveTextContent(
+      "1 file(s) skipped: only PDFs can be added.",
+    );
+
+    const room = PDF_MULTI_TOOL_LIMITS.documents - useFileStore.getState().files.length;
+    const picked = Array.from({ length: room + 3 }, (_, i) => file(`more-${i}.pdf`));
+    fireEvent.change(input, { target: { files: picked } });
+    expect(useFileStore.getState().files).toHaveLength(PDF_MULTI_TOOL_LIMITS.documents);
+    const notice = screen.getByTestId("multi-tool-skipped");
+    expect(notice).toHaveTextContent(
+      `3 PDF(s) not added: the editor holds up to ${PDF_MULTI_TOOL_LIMITS.documents} PDFs.`,
+    );
+    expect(notice).not.toHaveTextContent("only PDFs");
+  });
+
   it("submits duplicate rotations with the surviving upload order", async () => {
     await seedPrimary();
     fireEvent.click(screen.getByTestId("multi-tool-add-0-1"));
