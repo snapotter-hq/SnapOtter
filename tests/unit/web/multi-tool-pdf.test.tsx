@@ -107,6 +107,50 @@ describe("PDF multi-tool editor regressions", () => {
     expect(screen.getByTestId("multi-tool-pdf-submit")).toBeEnabled();
   });
 
+  it("removes the clicked document when one File backs two of them", async () => {
+    const shared = file("same.pdf");
+    useFileStore.getState().setFiles([shared, shared]);
+    editor();
+    act(() => {
+      useMultiToolStore.getState().setPrimary(shared, 1);
+      useMultiToolStore.getState().patchDoc(1, { pageCount: 1 });
+      useMultiToolStore.getState().appendPage(1, 1, -1);
+    });
+    const [first, second] = useMultiToolStore.getState().docs;
+    expect(useMultiToolStore.getState().plan.map((p) => p.doc)).toEqual([0, 1]);
+
+    fireEvent.click(screen.getByTestId("multi-tool-remove-doc-0"));
+
+    expect(useMultiToolStore.getState().docs.map((d) => d.id)).toEqual([second.id]);
+    expect(useMultiToolStore.getState().docs.map((d) => d.id)).not.toContain(first.id);
+    expect(useMultiToolStore.getState().plan.map(({ doc, page }) => ({ doc, page }))).toEqual([
+      { doc: 0, page: 1 },
+    ]);
+    expect(useFileStore.getState().files).toEqual([shared]);
+  });
+
+  it("renumbers later documents' pages when a middle document is removed", async () => {
+    const [a, b, c] = [file("a.pdf"), file("b.pdf"), file("c.pdf")];
+    useFileStore.getState().setFiles([a, b, c]);
+    editor();
+    act(() => {
+      useMultiToolStore.getState().setPrimary(a, 1);
+      useMultiToolStore.getState().patchDoc(1, { pageCount: 1 });
+      useMultiToolStore.getState().patchDoc(2, { pageCount: 2 });
+      useMultiToolStore.getState().appendPage(1, 1, -1);
+      useMultiToolStore.getState().appendPage(2, 2, -1);
+    });
+
+    fireEvent.click(screen.getByTestId("multi-tool-remove-doc-1"));
+
+    expect(useFileStore.getState().files).toEqual([a, c]);
+    expect(useMultiToolStore.getState().docs.map((d) => d.file)).toEqual([a, c]);
+    expect(useMultiToolStore.getState().plan.map(({ doc, page }) => ({ doc, page }))).toEqual([
+      { doc: 0, page: 1 },
+      { doc: 1, page: 2 },
+    ]);
+  });
+
   it("does not call a still-loading document fully in the plan", async () => {
     const view = await seedPrimary();
     fireEvent.change(view.container.querySelector('input[type="file"]') as HTMLInputElement, {

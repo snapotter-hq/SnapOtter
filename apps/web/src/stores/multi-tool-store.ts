@@ -45,6 +45,12 @@ interface MultiToolState {
   setPrimary: (file: File, pageCount: number) => void;
   /** Reconcile the upload list, retaining surviving documents and their plan entries. */
   syncFiles: (files: File[]) => void;
+  /**
+   * Drop the document with this id and its plan pages, renumbering the rest.
+   * Returns the position it held (-1 if unknown) so the caller removes the
+   * same upload. Needed because one File can back two documents.
+   */
+  removeDoc: (id: string) => number;
   /** Fill thumbnail/count state for a doc as renders complete. */
   patchDoc: (
     doc: number,
@@ -151,6 +157,19 @@ export const useMultiToolStore = create<MultiToolState>((set, get) => ({
       });
       return { docs, plan };
     }),
+
+  removeDoc: (id) => {
+    const at = get().docs.findIndex((d) => d.id === id);
+    if (at < 0) return -1;
+    set((state) => ({
+      docs: state.docs.filter((_, i) => i !== at),
+      plan: state.plan.flatMap((page) => {
+        if (page.doc === at) return [];
+        return [page.doc > at ? { ...page, doc: page.doc - 1 } : page];
+      }),
+    }));
+    return at;
+  },
 
   patchDoc: (doc, patch) =>
     set((state) => ({

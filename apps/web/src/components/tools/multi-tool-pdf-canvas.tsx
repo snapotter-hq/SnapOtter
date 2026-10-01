@@ -287,7 +287,7 @@ function PlanCard({
 function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale: number }) {
   const { t } = useTranslation();
   const s = t.toolSettings["multi-tool-pdf"];
-  const { plan, appendPage, appendDoc, syncFiles } = useMultiToolStore();
+  const { plan, appendPage, appendDoc, removeDoc } = useMultiToolStore();
   const patchDoc = useMultiToolStore((state) => state.patchDoc);
   const setPrimary = useMultiToolStore((state) => state.setPrimary);
   const removeStoreFile = useFileStore((state) => state.removeFile);
@@ -329,12 +329,10 @@ function DocStrip({ doc, index, scale }: { doc: LoadedDoc; index: number; scale:
   }, [doc.id, doc.file, patchDoc, setPrimary]);
 
   const handleRemoveDoc = () => {
-    // Resolve the file-store position at click time through the File itself:
-    // the index prop can be stale if the list moved between render and click.
-    // Duplicate File identities are interchangeable, so indexOf is safe.
-    const at = useFileStore.getState().files.indexOf(doc.file);
+    // Resolve by stable id at click time: the index prop can be stale, and
+    // one File can back two documents, so the File can't say which was clicked.
+    const at = removeDoc(doc.id);
     if (at >= 0) removeStoreFile(at);
-    syncFiles(useFileStore.getState().files);
   };
 
   const stripW = Math.round(STRIP_W * scale);
