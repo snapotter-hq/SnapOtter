@@ -1085,23 +1085,40 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       // commits (issue #927). Unqualified so it also covers the lower(name)
       // index (issue #970): this pre-check is exact-case, so a mixed-case
       // twin of an existing team only ever surfaces at the insert.
-      const inserted = await db
-        .insert(schema.teams)
-        .values({
-          id,
-          name: displayName,
-          createdAt: now,
-        })
-        .onConflictDoNothing();
+      //
+      // All or nothing: the insert and the member moves used to write
+      // straight to the database, so a failure after the insert left the
+      // team and the moved members behind a 500, and the IdP's retry got a
+      // 409 (#1763).
+      const sync = emptyMemberSync();
+      let created = false;
+      try {
+        await db.transaction(async (tx) => {
+          const inserted = await tx
+            .insert(schema.teams)
+            .values({
+              id,
+              name: displayName,
+              createdAt: now,
+            })
+            .onConflictDoNothing();
 
-      if (!inserted.rowCount) {
-        return reply.status(409).send(scimError(409, "Group already exists", "uniqueness"));
+          if (!inserted.rowCount) return;
+          created = true;
+
+          // Assign members to the team
+          if (members && members.length > 0) {
+            await addMembers(tx, id, members, sync);
+          }
+        });
+      } catch (err) {
+        const conflict = groupWriteConflict(err, request.log, id);
+        if (conflict) return reply.status(409).send(conflict);
+        throw err;
       }
 
-      // Assign members to the team
-      const sync = emptyMemberSync();
-      if (members && members.length > 0) {
-        await addMembers(db, id, members, sync);
+      if (!created) {
+        return reply.status(409).send(scimError(409, "Group already exists", "uniqueness"));
       }
 
       // Fetch actual members

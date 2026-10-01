@@ -3394,6 +3394,35 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
     });
 
+    describe("a POST that fails after its insert creates nothing (#1763)", () => {
+      // POST inserted the team, then moved each member into it, each straight
+      // to the database. A failure after the insert left the team and the
+      // moved members behind a 500, and the IdP's retry got a 409.
+      it("leaves no team and moves no one when a later member write fails", async () => {
+        const first = await createScimUser({ userName: uniqueName("scim-grp-post-atomic-in") });
+        const displayName = uniqueName("scim-grp-post-atomic");
+
+        // Postgres rejects a NUL byte in a text parameter, so the second
+        // member's UPDATE fails after the team insert and the first add have
+        // run. This relies on member ids not being checked up front; if they
+        // ever are, fail inside the transaction another way.
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Groups",
+          headers: authHeaders(),
+          payload: { displayName, members: [{ value: first.id }, { value: "no\u0000such-user" }] },
+        });
+
+        expect(res.statusCode, res.body).toBe(500);
+        const teams = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.name, displayName));
+        expect(teams).toEqual([]);
+        expect((await userRow(first.id))?.team).toBe(DEFAULT_TEAM_ID);
+      });
+    });
+
     it("PATCH adds members from an array value and from a single object value", async () => {
       const group = await createScimGroup({ displayName: uniqueName("scim-group-addm") });
       const memberA = await createScimUser({ userName: uniqueName("scim-grp-add-a") });
