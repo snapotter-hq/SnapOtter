@@ -1409,6 +1409,32 @@ describe("usePipelineProcessor malformed completed frames (#1794)", () => {
     unmount();
   });
 
+  it("lands nothing from a bad result that carries a saved file and preview", () => {
+    const { unmount } = startAsyncRun();
+    const serverFileIdBefore = useFileStore.getState().entries[0].serverFileId;
+
+    act(() =>
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          ...SINGLE_RESULT,
+          downloadUrl: undefined,
+          savedFileId: "saved-1",
+          previewUrl: `/api/v1/download/${JOB_ID}/preview.png`,
+        },
+      }),
+    );
+
+    expectRunFailed();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      serverFileId: serverFileIdBefore,
+      processedPreviewUrl: null,
+    });
+    expectReported("Tool result has no download URL");
+    unmount();
+  });
+
   it("fails the run on a completed frame with no result at all", () => {
     const { unmount } = startAsyncRun();
 

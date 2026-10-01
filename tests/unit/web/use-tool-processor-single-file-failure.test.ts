@@ -900,6 +900,32 @@ describe("useToolProcessor malformed completed frames (#1794)", () => {
     hook.unmount();
   });
 
+  it("lands nothing from a bad result that carries a saved file, warning and preview", () => {
+    const hook = startAsyncRun();
+
+    act(() =>
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: JOB_ID,
+          savedFileId: "saved-1",
+          warning: "scaled down",
+          previewUrl: `/api/v1/download/${JOB_ID}/preview.png`,
+        },
+      }),
+    );
+
+    expectRunFailed(hook.result);
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      claimed: false,
+      processedPreviewUrl: null,
+    });
+    expectReported("Tool result has no download URL");
+    hook.unmount();
+  });
+
   it("fails the run on a completed frame with no result at all", () => {
     const hook = startAsyncRun();
 
