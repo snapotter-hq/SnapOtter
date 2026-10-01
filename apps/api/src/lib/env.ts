@@ -152,11 +152,12 @@ const envSchema = z
     SAML_USERNAME_ATTRIBUTE: z.string().default(""),
     SAML_EMAIL_ATTRIBUTE: z.string().default("email"),
     // Callback and logout URLs append a path to this, so a trailing slash
-    // would double up into "//api/auth/..." (#1599).
+    // would double up into "//api/auth/..." (#1599). Whitespace goes first: a
+    // newline from an env file or secret mount would otherwise hide the slash.
     EXTERNAL_URL: z
       .string()
       .default("")
-      .transform((v) => v.replace(/\/+$/, "")),
+      .transform((v) => v.trim().replace(/\/+$/, "")),
     COOKIE_SECRET: z.string().default(""),
     REDIS_URL: z.string().default("redis://localhost:6379"),
     SYNC_WAIT_MS: z.coerce.number().default(8000),

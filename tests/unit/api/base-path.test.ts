@@ -172,7 +172,9 @@ describe("BASE_PATH configuration", () => {
     ["https://example.com/", "https://example.com"],
     ["https://example.com/snapotter/", "https://example.com/snapotter"],
     ["https://example.com/?x=1", "https://example.com/?x=1"],
-  ])("normalizes EXTERNAL_URL %s without SSO", (input, output) => {
+    [" https://example.com/\n", "https://example.com"],
+    ["https://example.com/snapotter/ ", "https://example.com/snapotter"],
+  ])("normalizes EXTERNAL_URL %j without SSO", (input, output) => {
     vi.stubEnv("OIDC_ENABLED", "false");
     vi.stubEnv("SAML_ENABLED", "false");
     vi.stubEnv("EXTERNAL_URL", input);
