@@ -828,11 +828,15 @@ export function usePipelineProcessor() {
       // Last, after the run-level teardown, the entries the ZIP never
       // settled: the sweep leaves a settled one and its own error alone, and
       // logs instead of throwing, so a broken store write can't keep the run
-      // at processing (#1699, the batch side of #1352).
+      // at processing (#1699, the batch side of #1352). It runs even when the
+      // teardown throws, and that throw still propagates.
       const failRun = (message: string) => {
-        setError(message);
-        finishRun();
-        settleProcessingEntries(message);
+        try {
+          setError(message);
+          finishRun();
+        } finally {
+          settleProcessingEntries(message);
+        }
       };
 
       const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {

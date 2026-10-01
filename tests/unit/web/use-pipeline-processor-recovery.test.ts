@@ -1423,6 +1423,7 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
         processedUrl: null,
         processedPreviewUrl: null,
         processedFilename: null,
+        processedSize: null,
       });
     }
   }
@@ -1652,5 +1653,109 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
       useFileStore.setState({ updateEntry: realUpdateEntry });
       unmount();
     }
+  });
+
+  it("still fails the entries when the run's teardown throws, and surfaces the throw", () => {
+    const { unmount } = startBatchRun();
+    // Breaks clearActiveJob's store write inside the teardown.
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("listener broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          xhrs[0].onerror?.();
+        }),
+      ).toThrow("listener broke");
+
+      for (const entry of useFileStore.getState().entries) {
+        expect(entry).toMatchObject({ status: "failed", error: BATCH_FAILED });
+      }
+    } finally {
+      unsubscribe();
+      unmount();
+    }
+  });
+
+  it("fails every entry when a batch frame's handling throws", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    xhrs[0].abort.mockImplementationOnce(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() =>
+      act(() => {
+        sendBatchFrame(completedBatchTerminal());
+      }),
+    ).toThrow("abort broke");
+
+    expectBatchFailed("Something went wrong while tracking this job. Try again.");
+    unmount();
+  });
+
+  it("fails every entry when the server answers with a ZIP that does not unpack", async () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = new Blob(["not a zip"], { type: "application/zip" });
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => expectBatchFailed("Batch processing failed"));
+    unmount();
+  });
+
+  it("fails every entry when the durable ZIP is already gone", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(null) })),
+    );
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      sendBatchFrame(completedBatchTerminal());
+    });
+
+    await settled(() =>
+      expectBatchFailed("Completed result is no longer available. Run the job again."),
+    );
+    unmount();
+  });
+
+  it("fails every entry when every durable ZIP download attempt fails", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("network down"))),
+    );
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      sendBatchFrame(completedBatchTerminal());
+    });
+
+    // Three attempts, 2s and 5s apart.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_000);
+    });
+
+    expectBatchFailed(BATCH_FAILED);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    unmount();
   });
 });
