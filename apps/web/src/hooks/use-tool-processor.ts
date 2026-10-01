@@ -1054,18 +1054,37 @@ export function useToolProcessor(toolId: string) {
       };
 
       const failRun = (message: string, reason: string, category?: FeedbackErrorCategory) => {
-        // Entries were set to "processing" at kickoff (the reset loop above). A
-        // whole-run failure that never reached settleFromZip must settle them,
-        // or the result pane keeps pulsing on the stale original because the
-        // entry never leaves "processing" (#746).
-        const runEntries = useFileStore.getState().entries;
-        for (let i = 0; i < runEntries.length; i++) {
-          if (runEntries[i]?.status === "processing") {
-            updateEntry(i, { status: "failed", error: message, errorCategory: category ?? null });
+        try {
+          setError(message);
+          finishRun();
+        } finally {
+          // Entries were set to "processing" at kickoff (the reset loop
+          // above). A whole-run failure that never reached settleFromZip must
+          // settle them, or the result pane keeps pulsing on the stale
+          // original because the entry never leaves "processing" (#746).
+          //
+          // After the teardown, and logged rather than thrown: it's a store
+          // write, and when it throws (#1354) the throw must not skip the
+          // teardown or the outcome report. The evidence timer and the cancel
+          // 404 end a batch through here, so nothing else would settle the
+          // run (#1778, the batch twin of #1698). In a finally so a throwing
+          // teardown can't leave the entries pulsing either; that throw still
+          // reaches the caller.
+          try {
+            const runEntries = useFileStore.getState().entries;
+            for (let i = 0; i < runEntries.length; i++) {
+              if (runEntries[i]?.status === "processing") {
+                updateEntry(i, {
+                  status: "failed",
+                  error: message,
+                  errorCategory: category ?? null,
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Failing the run's entry failed", err);
           }
         }
-        setError(message);
-        finishRun();
         // A canceled run reports the cancel, whichever path carried it in.
         trackBatch(canceledByUser ? "canceled" : "failed", canceledByUser ? "canceled" : reason);
       };

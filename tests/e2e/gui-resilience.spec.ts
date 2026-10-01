@@ -1,3 +1,4 @@
+import type { Route } from "@playwright/test";
 import {
   expect,
   getE2eRunRoot,
@@ -1546,6 +1547,69 @@ test.describe("Processing State Cleanup", () => {
 
     await page.unroute("**/api/v1/tools/image/resize");
     await page.unroute("**/api/v1/jobs/*/progress");
+  });
+
+  test("a canceled batch the server never saw ends with its failure card and disarms cancel", async ({
+    loggedInPage: page,
+  }) => {
+    // #1778: a failed batch tears the run down before it fails the entries.
+    // Both have to land: the entries at "failed" gate the failure card, and
+    // the teardown takes down the progress card's armed cancel button. The
+    // cancel 404 is one of the exits that ends a batch only through failRun.
+    // A real browser's store doesn't throw, so this guards the reordered exit
+    // end to end; the throwing-write regression itself is pinned in
+    // tests/unit/web/use-tool-processor-batch-recovery.test.ts.
+    await page.goto("/image/resize");
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.locator("[class*='border-dashed']").first().click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([
+      `${process.cwd()}/tests/fixtures/image/valid/test-100x100.jpg`,
+      `${process.cwd()}/tests/fixtures/image/valid/test-200x150.png`,
+    ]);
+    await expect(page.getByText("Files (2)")).toBeVisible();
+
+    // The batch POST and its progress stream never answer, and the server
+    // has no job to cancel: the degraded state the cancel 404 settles.
+    let releaseHeld: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      releaseHeld = resolve;
+    });
+    const hold = async (route: Route) => {
+      await held;
+      await route.abort().catch(() => {});
+    };
+    await page.route("**/api/v1/tools/image/resize/batch", hold);
+    await page.route("**/api/v1/jobs/*/progress", hold);
+    await page.route("**/api/v1/jobs/*/cancel", (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Job not found" }),
+      }),
+    );
+
+    try {
+      await page.locator("input[placeholder='Auto']").first().fill("50");
+      await page.getByRole("button", { name: /resize.*2 files/i }).click();
+
+      const cancel = page.getByRole("button", { name: "Cancel", exact: true });
+      await expect(cancel).toBeVisible({ timeout: 15_000 });
+      await cancel.click();
+
+      // The failure card renders in the preview area only once the entry is
+      // "failed"; the cancel button goes with the run's teardown.
+      await expect(page.getByLabel("Preview area").getByText("Canceled")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+      await expect(cancel).toHaveCount(0);
+    } finally {
+      releaseHeld();
+      await page.unroute("**/api/v1/tools/image/resize/batch");
+      await page.unroute("**/api/v1/jobs/*/progress");
+      await page.unroute("**/api/v1/jobs/*/cancel");
+    }
   });
 
   test("successful processing followed by clear resets fully", async ({ loggedInPage: page }) => {
