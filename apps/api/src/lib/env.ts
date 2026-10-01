@@ -151,7 +151,12 @@ const envSchema = z
     SAML_PROVIDER_NAME: z.string().default(""),
     SAML_USERNAME_ATTRIBUTE: z.string().default(""),
     SAML_EMAIL_ATTRIBUTE: z.string().default("email"),
-    EXTERNAL_URL: z.string().default(""),
+    // Callback and logout URLs append a path to this, so a trailing slash
+    // would double up into "//api/auth/..." (#1599).
+    EXTERNAL_URL: z
+      .string()
+      .default("")
+      .transform((v) => v.replace(/\/+$/, "")),
     COOKIE_SECRET: z.string().default(""),
     REDIS_URL: z.string().default("redis://localhost:6379"),
     SYNC_WAIT_MS: z.coerce.number().default(8000),
@@ -253,7 +258,23 @@ const envSchema = z
     if ((data.OIDC_ENABLED || data.SAML_ENABLED) && data.EXTERNAL_URL) {
       let externalPath: string | null = null;
       try {
-        externalPath = new URL(data.EXTERNAL_URL).pathname.replace(/\/$/, "");
+        const url = new URL(data.EXTERNAL_URL);
+        // A path appended after a query string or fragment never reaches the
+        // callback route, and an IdP can only redirect to http(s). The raw
+        // check also catches a bare trailing "?" or "#", which URL drops.
+        if (
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          !/[?#]/.test(data.EXTERNAL_URL)
+        ) {
+          externalPath = url.pathname.replace(/\/$/, "");
+        } else {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["EXTERNAL_URL"],
+            message:
+              "EXTERNAL_URL must be an http(s) URL with no query string or fragment, such as https://example.com/snapotter",
+          });
+        }
       } catch {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
