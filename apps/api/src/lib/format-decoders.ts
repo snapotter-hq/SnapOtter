@@ -18,8 +18,8 @@ const execFileAsync = promisify(execFile);
  * ENGINE_UNAVAILABLE the media and document input handlers use instead of the
  * plain Error a corrupt upload produces (#795). As a SafeError with a status,
  * the global error handler logs it, reports it, and shows its message. The
- * HEIF decode also uses it when the server runs out of memory mid-decode, for
- * the same reason (#1577).
+ * decoders also use it when the server runs out of memory mid-decode, for the
+ * same reason (#1577, #1751).
  */
 export class DecoderUnavailableError extends SafeError {
   constructor(message: string, cause?: unknown) {
@@ -111,6 +111,62 @@ function lacksFormatSupport(err: unknown): boolean {
   return stderr !== undefined && MISSING_SUPPORT.test(String(stderr));
 }
 
+/**
+ * The server running out of memory mid-decode, which says nothing about the
+ * upload. It gets the same 503 ENGINE_UNAVAILABLE as a missing decoder, so
+ * every caller that already lets isDecoderUnavailable through answers it that
+ * way instead of a 422 blaming the file (#1577). The message doesn't promise a
+ * retry will work: with no pixel limits passed, a very large image can exhaust
+ * memory every time.
+ *
+ * - V8 unable to allocate a buffer for the decoded output.
+ * - SIGKILL, the kernel OOM killer's signal. execFile's own timeout and abort
+ *   send SIGTERM, which is often a hostile file, so that stays out.
+ * - libheif's "Allocating <n> bytes failed", which only fires after the size
+ *   passed libheif's security limits (#1629). Security limits share the
+ *   "Memory allocation error" heading but are the file's fault, so the match
+ *   is on "failed".
+ * - A decoder thread that couldn't start: an abort on std::system_error
+ *   "Resource temporarily unavailable" (EAGAIN from pthread_create), or
+ *   libgomp's "Thread creation failed" (#1751). In a container that's as
+ *   often a pids or thread limit as memory, so it gets its own message.
+ *
+ * The libheif and thread shapes are stderr from the shipped image under
+ * `ulimit -v`: heif-dec, and ImageMagick decoding a HEIC through libheif.
+ * Not matched: an uncaught std::bad_alloc and ImageMagick's "memory
+ * allocation failed", since nothing bounds those allocations and a crafted
+ * file can raise them on a healthy host, and ImageMagick's "cache resources
+ * exhausted", which our own -limit flags produce. stderr is read rather than
+ * the message, which adds the command line.
+ */
+const LIBHEIF_ALLOCATION_FAILED = /\bAllocating \d+ bytes failed\b/;
+const THREAD_START_ABORTED =
+  /instance of 'std::system_error'\s+what\(\):\s+Resource temporarily unavailable/;
+const OPENMP_THREAD_FAILED = /libgomp: Thread creation failed: Resource temporarily unavailable/;
+
+export function asDecoderOutOfMemory(err: unknown): unknown {
+  const { signal, stderr } = (err ?? {}) as { signal?: unknown; stderr?: unknown };
+  const decoderOutput = typeof stderr === "string" ? stderr : "";
+  if (
+    (signal === "SIGABRT" && THREAD_START_ABORTED.test(decoderOutput)) ||
+    OPENMP_THREAD_FAILED.test(decoderOutput)
+  ) {
+    return new DecoderOutOfMemoryError(
+      "The image decoder couldn't start its decoding threads. The server hit a memory, thread or process limit.",
+      err,
+    );
+  }
+  const outOfMemory =
+    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) ||
+    signal === "SIGKILL" ||
+    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput);
+  if (!outOfMemory) return err;
+  return new DecoderOutOfMemoryError(
+    "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
+    err,
+  );
+}
+
 /** Killed or timed out, or exited 0 without writing its output: no verdict either way. */
 function inconclusive(err: unknown): boolean {
   const e = err as { killed?: unknown; signal?: unknown; code?: unknown; syscall?: unknown } | null;
@@ -125,13 +181,23 @@ function unavailable(err: unknown): boolean {
 /**
  * The error a failed fallback chain surfaces: the first decoder that actually
  * judged the file, so a real rejection keeps its 422 even when a later
- * fallback can't read the format at all. With no verdict, the first decoder
- * that was unavailable (the chain's own decoder, named in the cause), which
- * asDecoderUnavailable then turns into a 503 (#1429).
+ * fallback can't read the format at all. With no verdict, a decoder that ran
+ * out of memory, then the first that was unavailable (the chain's own
+ * decoder, named in the cause), which the caller turns into a 503 (#1429).
+ * Out of memory goes first among those so a killed decoder followed by one
+ * without the delegate reads as the server's memory, not a missing package,
+ * and is reported as the intermittent fault it is (#1751). A real verdict
+ * still wins over it: the other decoder judged the file.
  */
 function chainFailure(failures: unknown[]): unknown {
-  const verdict = failures.find((err) => !unavailable(err) && !inconclusive(err));
-  return verdict ?? failures.find(unavailable) ?? failures[0];
+  const verdict = failures.find(
+    (err) => !unavailable(err) && !inconclusive(err) && !outOfMemory(err),
+  );
+  return verdict ?? failures.find(outOfMemory) ?? failures.find(unavailable) ?? failures[0];
+}
+
+function outOfMemory(err: unknown): boolean {
+  return asDecoderOutOfMemory(err) !== err;
 }
 
 export interface DecodeSafetyOptions {
@@ -421,7 +487,7 @@ export async function decodeToSharpCompat(
   try {
     decoded = await decodeByFormat(buffer, format, ext, options);
   } catch (err) {
-    throw asDecoderUnavailable(err);
+    throw asDecoderUnavailable(asDecoderOutOfMemory(err));
   }
   return assertDecodedWithinLimit(decoded, options);
 }
@@ -514,9 +580,13 @@ export async function decodeAnyFormat(
       magickArgs(cmd, [inputPath, "-colorspace", "sRGB", `png:${outputPath}`], options),
       commandOptions(options, 120_000),
     ).catch((err: unknown) => {
-      throw asDecoderUnavailable(err);
+      throw asDecoderUnavailable(asDecoderOutOfMemory(err));
     });
-    return await assertDecodedWithinLimit(await readFile(outputPath), options);
+    // V8 unable to allocate ImageMagick's output is the server's memory too.
+    const decoded = await readFile(outputPath).catch((err: unknown) => {
+      throw asDecoderOutOfMemory(err);
+    });
+    return await assertDecodedWithinLimit(decoded, options);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});

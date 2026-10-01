@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { hashPassword, verifyPassword } from "../../../apps/api/src/plugins/auth.js";
@@ -2502,6 +2502,236 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         expect(JSON.parse(res.body).members.map((m: { value: string }) => m.value)).toEqual([
           user.id,
         ]);
+      });
+    });
+
+    // Skips and moves used to be invisible: the audit row only had memberCount,
+    // and a user in two IdP groups was moved out of the first with no trace.
+    describe("Groups sync audit: skipped and moved members (#1747, #1748)", () => {
+      async function lastSync(teamId: string): Promise<Record<string, unknown>> {
+        const [row] = await db
+          .select({ details: schema.auditLog.details })
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${teamId}`,
+            ),
+          )
+          .orderBy(desc(schema.auditLog.createdAt))
+          .limit(1);
+        return (row?.details ?? {}) as Record<string, unknown>;
+      }
+
+      it("records member ids a PATCH skipped because they match no user", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1748-known") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1748-patch") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }, { value: "no-such-user" }] },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const details = await lastSync(group.id);
+        expect(details.action).toBe("patched");
+        expect(details.skippedMembers).toEqual(["no-such-user"]);
+        expect(details.skippedCount).toBe(1);
+      });
+
+      it("records skipped ids on a create and a replace too", async () => {
+        const created = await send("POST", "Groups", {
+          displayName: uniqueName("scim-1748-post"),
+          members: [{ value: "gone-1" }],
+        });
+        expect(created.statusCode, created.body).toBe(201);
+        const groupId = JSON.parse(created.body).id;
+        expect((await lastSync(groupId)).skippedMembers).toEqual(["gone-1"]);
+
+        const replaced = await send("PUT", `Groups/${groupId}`, {
+          displayName: uniqueName("scim-1748-put"),
+          members: [{ value: "gone-2" }],
+        });
+        expect(replaced.statusCode, replaced.body).toBe(200);
+        const details = await lastSync(groupId);
+        expect(details.action).toBe("replaced");
+        expect(details.skippedMembers).toEqual(["gone-2"]);
+      });
+
+      it("caps the skipped list but keeps the full count", async () => {
+        const group = await createScimGroup({ displayName: uniqueName("scim-1748-cap") });
+        const ids = Array.from({ length: 60 }, (_, i) => ({ value: `missing-${i}` }));
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "add", path: "members", value: ids }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        const details = await lastSync(group.id);
+        expect(details.skippedMembers).toHaveLength(50);
+        expect(details.skippedCount).toBe(60);
+      });
+
+      it("records a user moved out of another group, and still moves them", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-both") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-first"),
+          members: [{ value: user.id }],
+        });
+        const second = await send("POST", "Groups", {
+          displayName: uniqueName("scim-1747-second"),
+          members: [{ value: user.id }],
+        });
+
+        expect(second.statusCode, second.body).toBe(201);
+        const secondId = JSON.parse(second.body).id;
+        // Users have one team, so the last sync still wins (the owner's call
+        // on #1747); what changed is that the move is on record.
+        expect((await userRow(user.id))?.team).toBe(secondId);
+        const details = await lastSync(secondId);
+        expect(details.movedMembers).toEqual([{ userId: user.id, fromTeam: first.id }]);
+        expect(details.movedCount).toBe(1);
+      });
+
+      it("doesn't count a PATCH add of a user already in the group as a move", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-again") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-again"),
+          members: [{ value: user.id }],
+        });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [{ op: "add", path: "members", value: [{ value: user.id }] }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+
+      it("doesn't record a move into a group the user was removed from in the same PATCH", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-addrm") });
+        await createScimGroup({
+          displayName: uniqueName("scim-1747-addrm-from"),
+          members: [{ value: user.id }],
+        });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1747-addrm-to") });
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "remove", path: `members[value eq "${user.id}"]` },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+      });
+
+      it("records nothing for a PATCH that rolled back", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-rollback") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-rb-first"),
+          members: [{ value: user.id }],
+        });
+        const taken = await createScimGroup({ displayName: uniqueName("scim-1747-rb-taken") });
+        const group = await createScimGroup({ displayName: uniqueName("scim-1747-rb-group") });
+        const before = await lastSync(group.id);
+        const res = await send("PATCH", `Groups/${group.id}`, {
+          Operations: [
+            { op: "add", path: "members", value: [{ value: user.id }] },
+            { op: "replace", path: "displayName", value: taken.displayName },
+          ],
+        });
+
+        expect(res.statusCode, res.body).toBe(409);
+        expect((await userRow(user.id))?.team).toBe(first.id);
+        expect(await lastSync(group.id)).toEqual(before);
+      });
+
+      it("records moves on a PATCH add and a member replace", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-patch") });
+        const first = await createScimGroup({
+          displayName: uniqueName("scim-1747-p-first"),
+          members: [{ value: user.id }],
+        });
+        const second = await createScimGroup({ displayName: uniqueName("scim-1747-p-second") });
+        const added = await send("PATCH", `Groups/${second.id}`, {
+          Operations: [{ op: "add", path: "members", value: [{ value: user.id }] }],
+        });
+        expect(added.statusCode, added.body).toBe(200);
+        expect((await lastSync(second.id)).movedMembers).toEqual([
+          { userId: user.id, fromTeam: first.id },
+        ]);
+
+        const replaced = await send("PATCH", `Groups/${first.id}`, {
+          Operations: [{ op: "replace", path: "members", value: [{ value: user.id }] }],
+        });
+        expect(replaced.statusCode, replaced.body).toBe(200);
+        expect((await lastSync(first.id)).movedMembers).toEqual([
+          { userId: user.id, fromTeam: second.id },
+        ]);
+      });
+
+      it("leaves both fields off a clean sync, including a user coming from Default", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-clean") });
+        expect((await userRow(user.id))?.team).toBe(DEFAULT_TEAM_ID);
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-clean"),
+          members: [{ value: user.id }],
+        });
+
+        const details = await lastSync(group.id);
+        expect(details).not.toHaveProperty("skippedMembers");
+        expect(details).not.toHaveProperty("movedMembers");
+      });
+
+      it("finds Default by name, so a resync isn't read as moves when its id isn't the seed's", async () => {
+        // The seed is skipped when another team already holds the name, so the
+        // team named "Default" can have any id (#1474). PUT parks members there
+        // before re-adding them, and that must not read as a move.
+        const seededName = uniqueName("scim-1747-seed");
+        const otherDefault = `team-${randomUUID()}`;
+        await db
+          .update(schema.teams)
+          .set({ name: seededName })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+        try {
+          await db.insert(schema.teams).values({ id: otherDefault, name: "Default" });
+          const user = await createScimUser({ userName: uniqueName("scim-1747-named") });
+          const group = await createScimGroup({
+            displayName: uniqueName("scim-1747-named"),
+            members: [{ value: user.id }],
+          });
+          const res = await send("PUT", `Groups/${group.id}`, {
+            displayName: group.displayName,
+            members: [{ value: user.id }],
+          });
+
+          expect(res.statusCode, res.body).toBe(200);
+          expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
+        } finally {
+          await db
+            .update(schema.users)
+            .set({ team: DEFAULT_TEAM_ID })
+            .where(eq(schema.users.team, otherDefault));
+          await db.delete(schema.teams).where(eq(schema.teams.id, otherDefault));
+          await db
+            .update(schema.teams)
+            .set({ name: "Default" })
+            .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+        }
+      });
+
+      it("doesn't count re-adding a group's own member as a move", async () => {
+        const user = await createScimUser({ userName: uniqueName("scim-1747-own") });
+        const group = await createScimGroup({
+          displayName: uniqueName("scim-1747-own"),
+          members: [{ value: user.id }],
+        });
+        const res = await send("PUT", `Groups/${group.id}`, {
+          displayName: group.displayName,
+          members: [{ value: user.id }],
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(await lastSync(group.id)).not.toHaveProperty("movedMembers");
       });
     });
 

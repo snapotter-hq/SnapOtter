@@ -2,7 +2,7 @@ import type { FastifyBaseLogger, FastifyReply } from "fastify";
 import type { InputValidationError } from "../modality/contract.js";
 import { reportError } from "./error-report.js";
 
-// A broken engine stays broken, but some faults come and go: the HEIF decoder
+// A broken engine stays broken, but some faults come and go: an image decoder
 // running out of memory is reported as the same ENGINE_UNAVAILABLE (#1577).
 // Once per process hid every repeat of those, so a report lasts a window, and
 // the cause's name is part of the key so one kind can't hide the other (#1628).
