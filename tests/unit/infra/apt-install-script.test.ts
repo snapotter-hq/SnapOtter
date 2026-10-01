@@ -17,7 +17,11 @@ import { describe, expect, it } from "vitest";
 const SCRIPT = resolve(".github/actions/apt-install/install.sh");
 
 /** Behaviour of the first `apt-get install` call (the Azure mirror attempt). */
-type FirstInstall = "succeeds" | "times-out-leaving-dpkg" | "times-out-leaving-hung-dpkg";
+type FirstInstall =
+  | "succeeds"
+  | "times-out-leaving-dpkg"
+  | "times-out-leaving-hung-dpkg"
+  | "every-attempt-times-out-leaving-dpkg";
 
 function stubDir(first: FirstInstall, opts: { noFuser?: boolean } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "apt-install-"));
@@ -39,6 +43,12 @@ if [ -e "${lock}" ]; then echo "dpkg: error: dpkg database lock was locked by an
     "apt-get": `echo "apt-get $*" >> "${calls}"
 case " $* " in *" update "*) exit 0 ;; esac
 n=$(grep -c "^apt-get .*install" "${calls}")
+if [ "${first}" = every-attempt-times-out-leaving-dpkg ]; then
+  # Each attempt's orphan holds the lock a bit under half the budget.
+  touch "${lock}"
+  ( /bin/sleep 2.5; rm -f "${lock}" ) >/dev/null 2>&1 &
+  exit 124
+fi
 if [ "$n" = 1 ] && [ "${first}" != succeeds ]; then
   # timeout killed apt-get mid-configure; the dpkg it started carries on.
   touch "${lock}"
@@ -116,6 +126,16 @@ describe.skipIf(process.platform === "win32")("apt-install action script (#1786)
     const run = runScript("times-out-leaving-dpkg", {}, { noFuser: true });
     expect(run.status, run.output).toBe(0);
     expect(run.installed).toBe(true);
+  });
+
+  it("spends one lock-wait budget across all re-rolls, not one per re-roll", () => {
+    // Every attempt leaves a dpkg holding the lock for 2.5s against a 4s
+    // budget. bash's SECONDS ticks whole seconds, so a per-call deadline
+    // allows 3-4s and never runs out; a shared one has at most 1.5s left for
+    // the second wait.
+    const run = runScript("every-attempt-times-out-leaving-dpkg", { DPKG_LOCK_WAIT: "4" });
+    expect(run.status, run.output).toBe(1);
+    expect(run.output).toContain("dpkg still holds its lock");
   });
 
   it("still gives up, bounded, when the dpkg holding the lock never finishes", () => {

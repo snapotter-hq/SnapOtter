@@ -23,31 +23,44 @@ read -r -a packages <<< "$PACKAGES"
 update_budget="${UPDATE_TIMEOUT:-120}"
 install_budget="${INSTALL_TIMEOUT:-300}"
 dpkg_lock_wait="${DPKG_LOCK_WAIT:-300}"
+# One budget for every wait on the dpkg lock, started by the first wait.
+lock_deadline=""
+
+lock_wait_left() {
+  if [ -z "$lock_deadline" ]; then
+    echo "$dpkg_lock_wait"
+  elif [ "$SECONDS" -lt "$lock_deadline" ]; then
+    echo $((lock_deadline - SECONDS))
+  else
+    echo 0
+  fi
+}
 
 apt_update() {
   sudo timeout -k 30 "$1" apt-get update -qq
 }
 apt_install() {
   sudo timeout -k 30 "$install_budget" apt-get \
-    -o DPkg::Lock::Timeout="$dpkg_lock_wait" install -y \
+    -o DPkg::Lock::Timeout="$(lock_wait_left)" install -y \
     --no-install-recommends "${packages[@]}"
 }
 # timeout signals apt-get, not the dpkg it started, so a slow download that
 # runs the budget out mid-configure leaves dpkg running and holding its lock
 # (#1786). Configuring needs no network, so let it finish rather than kill
-# it, then tidy up whatever it didn't reach. The wait is spent once: a dpkg
-# that outlasts it is hung, and later re-rolls shouldn't each wait again.
+# it, then tidy up whatever it didn't reach. All waits share one budget, so
+# a dpkg that keeps the lock can't stretch the job past its timeout.
 recover_dpkg() {
-  local deadline=$((SECONDS + dpkg_lock_wait))
+  [ -n "$lock_deadline" ] || lock_deadline=$((SECONDS + dpkg_lock_wait))
   while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do
-    if [ "$SECONDS" -ge "$deadline" ]; then
-      echo "::warning::dpkg still holds its lock after ${dpkg_lock_wait}s"
-      dpkg_lock_wait=0
+    if [ "$SECONDS" -ge "$lock_deadline" ]; then
+      echo "::warning::dpkg still holds its lock after the ${dpkg_lock_wait}s wait"
       break
     fi
     sleep 5
   done
-  sudo dpkg --configure -a || true
+  if ! sudo dpkg --configure -a; then
+    echo "::warning::dpkg --configure -a failed; the next install attempt will report why"
+  fi
 }
 
 azure_lists_ok=false
