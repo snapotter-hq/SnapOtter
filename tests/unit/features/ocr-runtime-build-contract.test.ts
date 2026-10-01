@@ -218,7 +218,7 @@ describe("OCR v3 runtime artifact contract", () => {
       expect(lines.some((line) => /^onnxruntime==1\.20\.1\b/.test(line))).toBe(true);
       expect(lines.some((line) => /^pillow==12\.3\.0\b/.test(line))).toBe(true);
       expect(lines.some((line) => /^protobuf==5\.29\.6\b/.test(line))).toBe(true);
-      expect(lines.some((line) => /^urllib3==2\.7\.0\b/.test(line))).toBe(true);
+      expect(lines.some((line) => /^urllib3==2\.8\.0\b/.test(line))).toBe(true);
       for (const line of lines) {
         expect(line, `unlocked requirement in ${target}`).toMatch(
           /^[A-Za-z0-9_.-]+==[^\s]+\s+--hash=sha256:[a-f0-9]{64}$/,
