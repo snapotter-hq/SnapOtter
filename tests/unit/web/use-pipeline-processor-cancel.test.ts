@@ -605,3 +605,84 @@ describe("usePipelineProcessor cancel (#771)", () => {
     hook.unmount();
   });
 });
+
+/**
+ * #1779: only the cancel request may fail quietly. A cancel that never reached
+ * the server says nothing about the job and the progress stream still settles
+ * it, but a throw from the hook's own 404 teardown has nobody left to clean up
+ * after it, so it must reject the cancel instead of vanishing.
+ */
+describe("usePipelineProcessor cancel failures (#1779)", () => {
+  it.each([
+    ["single", startSingleRun],
+    ["batch", startBatchRun],
+  ])("lets a %s run's cancel teardown that throws reach the caller", async (_kind, start) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const hook = start();
+    const cancel = useFileStore.getState().cancelCurrentJob;
+    // A store listener that breaks on every write, so the teardown itself throws.
+    const unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("teardown broke");
+    });
+
+    try {
+      await act(async () => {
+        await expect(cancel?.()).rejects.toThrow("teardown broke");
+      });
+    } finally {
+      unsubscribe();
+      hook.unmount();
+    }
+  });
+
+  it.each([
+    ["single", startSingleRun],
+    ["batch", startBatchRun],
+  ])("keeps a %s run going when the cancel request itself fails", async (_kind, start) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+    );
+    const hook = start();
+
+    await act(async () => {
+      await expect(useFileStore.getState().cancelCurrentJob?.()).resolves.toBeUndefined();
+    });
+
+    // The progress stream still owns settling the run.
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+    expect(useFileStore.getState().entries.every((e) => e.status === "processing")).toBe(true);
+
+    hook.unmount();
+  });
+
+  it("keeps a run going when an acknowledged cancel's body is unreadable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError("Unexpected end of JSON input")),
+        } as unknown as Response),
+      ),
+    );
+    const hook = startSingleRun();
+
+    await act(async () => {
+      await expect(useFileStore.getState().cancelCurrentJob?.()).resolves.toBeUndefined();
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+    expect(useFileStore.getState().error).toBeNull();
+
+    hook.unmount();
+  });
+});

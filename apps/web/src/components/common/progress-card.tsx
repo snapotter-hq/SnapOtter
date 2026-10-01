@@ -1,6 +1,8 @@
+import { SafeError } from "@snapotter/shared";
 import { Loader2, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 interface ProgressCardProps {
@@ -61,6 +63,16 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
             setCanceling(true);
             try {
               await cancelCurrentJob();
+            } catch (cause) {
+              // The hooks swallow only a cancel request that never arrived;
+              // what reaches here is their own teardown breaking (#1779).
+              // Report it rather than leave an unhandled rejection, and
+              // re-enable the button so the cancel can be retried.
+              console.error("Canceling the run failed", cause);
+              void captureHandledError(
+                new SafeError("Canceling the run failed", { kind: "bug", cause }),
+                { error_class: "bug" },
+              );
             } finally {
               setCanceling(false);
             }

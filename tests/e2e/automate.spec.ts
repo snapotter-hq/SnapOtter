@@ -345,6 +345,69 @@ test.describe("Automate Page", () => {
     await expect(processAll).toBeEnabled();
   });
 
+  // --- Cancel (#1779) ---
+
+  /** Start a run whose upload the server never answers, and return its cancel button. */
+  async function startHeldRun(page: import("@playwright/test").Page) {
+    // Never fulfilled: the run stays mid-upload until the cancel settles it.
+    await page.route("**/api/v1/pipeline/execute", () => {});
+    await gotoAutomate(page);
+    await addToolStep(page, "Compress", 1);
+    await uploadTestFile(page);
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    const cancel = page
+      .getByRole("status")
+      .getByRole("button", { name: "Cancel", exact: true })
+      .filter({ visible: true });
+    await expect(cancel).toBeEnabled({ timeout: 15_000 });
+    return cancel;
+  }
+
+  test("canceling a run the server never saw settles it as canceled", async ({
+    loggedInPage: page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    await page.route("**/api/v1/jobs/*/cancel", (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Job not found" }),
+      }),
+    );
+    const cancel = await startHeldRun(page);
+
+    await cancel.click();
+
+    await expect(page.locator("p", { hasText: "Canceled" }).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeEnabled();
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("a cancel request that never arrives leaves the run going", async ({
+    loggedInPage: page,
+  }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    let cancelAttempts = 0;
+    await page.route("**/api/v1/jobs/*/cancel", (route) => {
+      cancelAttempts++;
+      return route.abort("failed");
+    });
+    const cancel = await startHeldRun(page);
+
+    await cancel.click();
+
+    // The run is still the server's to settle: the card stays, and the
+    // button comes back for another try.
+    await expect.poll(() => cancelAttempts).toBe(1);
+    await expect(cancel).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Process", exact: true })).toBeDisabled();
+    expect(pageErrors).toEqual([]);
+  });
+
   test("a 200 with no download URL shows the failure card", async ({ loggedInPage: page }) => {
     // #1740: an object with nothing to download used to land as a completed
     // run with no result behind it.

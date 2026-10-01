@@ -199,40 +199,45 @@ export function usePipelineProcessor() {
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
+    // Only the request may fail quietly: a cancel that never reached the
+    // server says nothing about the job, and the progress stream still owns
+    // settling it. A throw from the teardown below is ours and must reach
+    // the caller instead of vanishing (#1779, the twin of #1698).
+    let res: Response;
     try {
-      const res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
+      res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
         method: "POST",
         headers: formatHeaders(),
       });
-      // Record intent only on an acknowledged cancel: a failed or refused
-      // POST must not repaint the run's real outcome as canceled (#767).
-      if (res.ok) {
-        const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
-        if (body?.canceled === true && activeJobIdRef.current === jobId) {
-          canceledByUserRef.current = true;
-        }
-      }
-      // 404 means no job exists server-side. Nothing will ever emit a
-      // frame, so settle locally as canceled instead of blaming the network
-      // 30 seconds later.
-      if (res.status === 404 && activeJobIdRef.current === jobId) {
-        xhrRef.current?.abort();
-        clearJobEvidenceTimer();
-        clearStallTimer();
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
-        batchRunRef.current = null;
-        clearActiveJob();
-        setError("Canceled");
-        setProcessing(false);
-        setProgress(IDLE_PROGRESS);
-        settleProcessingEntries("Canceled");
-      }
     } catch {
-      // Cancel request failed; the SSE handler owns cleanup
+      return;
+    }
+    // Record intent only on an acknowledged cancel: a failed or refused
+    // POST must not repaint the run's real outcome as canceled (#767).
+    if (res.ok) {
+      const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
+      if (body?.canceled === true && activeJobIdRef.current === jobId) {
+        canceledByUserRef.current = true;
+      }
+    }
+    // 404 means no job exists server-side. Nothing will ever emit a
+    // frame, so settle locally as canceled instead of blaming the network
+    // 30 seconds later.
+    if (res.status === 404 && activeJobIdRef.current === jobId) {
+      xhrRef.current?.abort();
+      clearJobEvidenceTimer();
+      clearStallTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      batchRunRef.current = null;
+      clearActiveJob();
+      setError("Canceled");
+      setProcessing(false);
+      setProgress(IDLE_PROGRESS);
+      settleProcessingEntries("Canceled");
     }
   }, [
     clearJobEvidenceTimer,
