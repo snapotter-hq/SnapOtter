@@ -329,8 +329,8 @@ export function useToolProcessor(toolId: string) {
   // batch closure, then fail the entries it left at "processing". A throw
   // after the run already settled leaves that outcome alone: the real error
   // (or result) it recorded beats a generic one. Settled means processing is
-  // off too: the failed-frame branch clears the job id before its own entry
-  // writes, so a throw there still has a live run to end.
+  // off too: the failed-frame branch clears the job id before setError turns
+  // processing off, so a throw between the two still has a live run to end.
   const failRunOnHandlerError = useCallback(
     (es: EventSource) => {
       if (!activeJobIdRef.current && !useFileStore.getState().processing) return;

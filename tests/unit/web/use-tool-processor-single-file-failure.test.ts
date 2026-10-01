@@ -394,6 +394,35 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     unmount();
   });
 
+  it("settles the entry to failed when a batch terminal frame reaches a single run", () => {
+    const { unmount } = startRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    act(() => {
+      latestSse().onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "failed",
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+        }),
+      } as MessageEvent);
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Processing was interrupted. Retry when reconnected.",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("settles the entry to failed when the job-evidence timeout fires", () => {
     const { unmount } = startRun();
 
