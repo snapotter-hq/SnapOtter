@@ -9,6 +9,7 @@ vi.mock("@/lib/analytics", async () => {
 
 import { captureHandledError } from "@/lib/analytics";
 import {
+  checkToolResult,
   failedFrameMessage,
   frameFailure,
   MalformedResultError,
@@ -113,6 +114,35 @@ describe("parseResultBody (#1354)", () => {
     expect(
       parseUnderPrefix<{ downloadUrl: string }>('{"downloadUrl":"/api/v1/download/j/out.png"}'),
     ).toEqual({ downloadUrl: "/snapotter/api/v1/download/j/out.png" });
+  });
+});
+
+// #1794: a completed progress frame's `result` is already parsed, so the hooks
+// run the same check on the value itself.
+describe("checkToolResult (#1794)", () => {
+  it("returns the result it was given", () => {
+    const result = { downloadUrl: "/api/v1/download/j/out.png", processedSize: 3 };
+    expect(checkToolResult(result)).toBe(result);
+  });
+
+  it.each([
+    ["undefined", undefined, "notAnObject"],
+    ["null", null, "notAnObject"],
+    ["a string", "ok", "notAnObject"],
+    ["an array", [{ downloadUrl: "/x" }], "notAnObject"],
+    ["an empty object", {}, "noDownloadUrl"],
+    ["a blank download URL", { downloadUrl: "" }, "noDownloadUrl"],
+    ["a non-string download URL", { downloadUrl: 42 }, "noDownloadUrl"],
+  ])("rejects %s", (_label, value, reason) => {
+    let thrown: unknown;
+    try {
+      checkToolResult(value);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(MalformedResultError);
+    expect((thrown as MalformedResultError).reason).toBe(reason);
+    expect((thrown as Error).cause).toBeUndefined();
   });
 });
 

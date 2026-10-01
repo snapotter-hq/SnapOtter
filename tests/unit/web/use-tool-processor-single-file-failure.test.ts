@@ -833,6 +833,153 @@ describe("useToolProcessor malformed 2xx results (#1740)", () => {
 });
 
 /**
+ * #1794: the progress stream's completed frame is the async twin of the sync
+ * 2xx answer #1740 checks. One with no download URL used to land as a
+ * finished run with nothing behind it, and nobody heard about it.
+ */
+describe("useToolProcessor malformed completed frames (#1794)", () => {
+  const GOOD_RESULT = {
+    jobId: JOB_ID,
+    downloadUrl: `/api/v1/download/${JOB_ID}/clip_trimmed.mp4`,
+    originalSize: 64,
+    processedSize: 32,
+  };
+
+  function startAsyncRun() {
+    const file = new File([new ArrayBuffer(64)], "clip.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    return hook;
+  }
+
+  function expectReported(message: string) {
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe(message);
+    expect(error.cause).toBeUndefined();
+    // No HTTP answer stands behind a progress frame.
+    expect((error as { statusCode?: number }).statusCode).toBeUndefined();
+    expect(tags).toEqual({ error_class: "operational", tool_id: "trim-video" });
+  }
+
+  function expectRunFailed(result: { current: { resultPayload: unknown; warning: unknown } }) {
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+      processedUrl: null,
+    });
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(result.current.resultPayload).toBeNull();
+    expect(result.current.warning).toBeNull();
+    expect(latestSse().close).toHaveBeenCalled();
+  }
+
+  it.each([
+    ["an empty result", {}],
+    ["a result with no download URL", { ...GOOD_RESULT, downloadUrl: undefined }],
+    ["a result with an empty download URL", { ...GOOD_RESULT, downloadUrl: "" }],
+    ["a result whose download URL is not a string", { ...GOOD_RESULT, downloadUrl: 7 }],
+  ])("fails the run on %s and reports it", (_label, result) => {
+    const hook = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result }));
+
+    expectRunFailed(hook.result);
+    expectReported("Tool result has no download URL");
+    hook.unmount();
+  });
+
+  it("fails the run on a completed frame with no result at all", () => {
+    const hook = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100 }));
+
+    expectRunFailed(hook.result);
+    expectReported("Tool result body is not a JSON object");
+    hook.unmount();
+  });
+
+  it("reports a replayed bad frame once", () => {
+    const hook = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: {} }));
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: {} }));
+
+    expectReported("Tool result has no download URL");
+    hook.unmount();
+  });
+
+  it("fails a sync run whose stream completes first, and stops its POST", () => {
+    const file = new File([new ArrayBuffer(64)], "clip.mp4", { type: "video/mp4" });
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: {} }));
+
+    expectRunFailed(hook.result);
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expectReported("Tool result has no download URL");
+    hook.unmount();
+  });
+
+  it("lands a good frame untouched and reports nothing", () => {
+    const hook = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: GOOD_RESULT }));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: GOOD_RESULT.downloadUrl,
+      error: null,
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(hook.result.current.resultPayload).toMatchObject(GOOD_RESULT);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("still reads a store throw while landing a good frame as ours", () => {
+    const hook = startAsyncRun();
+    // Zustand copies state on every set, so put the real action back explicitly.
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    vi.spyOn(useFileStore.getState(), "updateEntry")
+      .mockImplementationOnce(() => {
+        throw new Error("store write failed");
+      })
+      .mockImplementation(realUpdateEntry);
+
+    try {
+      expect(() =>
+        act(() => sendSingleFrame({ phase: "complete", percent: 100, result: GOOD_RESULT })),
+      ).toThrow("store write failed");
+
+      expect(useFileStore.getState().error).toBe(
+        "Something went wrong while tracking this job. Try again.",
+      );
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      hook.unmount();
+    }
+  });
+});
+
+/**
  * #1698: every single-run failure exit used to fail the entry before its
  * teardown. The entry settle is a store write, and when the store keeps
  * throwing (the #1354 case) a second throw there escaped before

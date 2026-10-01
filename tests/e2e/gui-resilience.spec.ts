@@ -1549,6 +1549,58 @@ test.describe("Processing State Cleanup", () => {
     await page.unroute("**/api/v1/jobs/*/progress");
   });
 
+  test("an async run that completes with nothing to download fails instead of finishing", async ({
+    loggedInPage: page,
+  }) => {
+    // #1794: a completed frame whose result has no download URL used to land
+    // as a finished run with no file behind it. It now fails the run the same
+    // way a sync 2xx with no download URL does (#1740).
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+
+    let releaseFrame: () => void = () => {};
+    const frameReleased = new Promise<void>((resolve) => {
+      releaseFrame = resolve;
+    });
+    await page.route("**/api/v1/jobs/*/progress", async (route) => {
+      await frameReleased;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          result: { jobId: "e2e-1794", originalSize: 64, processedSize: 32 },
+        })}\n\n`,
+      });
+    });
+    await page.route("**/api/v1/tools/image/resize", (route) =>
+      route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId: "e2e-1794", async: true }),
+      }),
+    );
+
+    await page.locator("input[placeholder='Auto']").first().fill("50");
+    await page.getByRole("button", { name: "Resize" }).click();
+
+    const cancel = page.getByRole("button", { name: "Cancel" });
+    await expect(cancel).toBeVisible({ timeout: 15_000 });
+    releaseFrame();
+
+    await expect(
+      page.getByLabel("Preview area").getByText("Invalid response from server"),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(cancel).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /download/i })).toHaveCount(0);
+
+    await page.unroute("**/api/v1/tools/image/resize");
+    await page.unroute("**/api/v1/jobs/*/progress");
+  });
+
   test("a canceled batch the server never saw ends with its failure card and disarms cancel", async ({
     loggedInPage: page,
   }) => {

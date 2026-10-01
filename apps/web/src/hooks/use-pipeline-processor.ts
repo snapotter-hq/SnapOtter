@@ -6,6 +6,7 @@ import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import {
+  checkToolResult,
   FRAME_HANDLING_FAILED,
   type ProgressFrame,
   parseResultBody,
@@ -382,7 +383,35 @@ export function usePipelineProcessor() {
             clearJobEvidenceTimer();
             if (asyncModeRef.current) resetStallTimer();
 
-            if (data.phase === "complete" && data.result) {
+            // Ends the run on the server's word: a failed frame, or a
+            // completed one with nothing to download.
+            const endFailedRun = (message: string) => {
+              clearStallTimer();
+              if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              eventSourceRef.current = null;
+              xhrRef.current?.abort();
+              clearActiveJob();
+              batchRunRef.current = null;
+              setError(message);
+              setProcessing(false);
+              setProgress(IDLE_PROGRESS);
+              settleProcessingEntries(message);
+            };
+
+            if (data.phase === "complete") {
+              // A result with nothing to download is the server's bug, the
+              // twin of a sync 2xx body with no downloadUrl (#1740), so it
+              // fails the run and gets reported (#1794). Checked before any
+              // store write: a throw from those is still ours (#1287).
+              let result: ProcessResult;
+              try {
+                result = checkToolResult<ProcessResult>(data.result);
+              } catch (err) {
+                reportMalformedResult(err, {});
+                endFailedRun("Invalid response from server");
+                return;
+              }
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -392,7 +421,6 @@ export function usePipelineProcessor() {
               xhrRef.current?.abort();
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
-              const result = data.result as unknown as ProcessResult;
               useFileStore.getState().updateEntry(idx, {
                 processedUrl: result.downloadUrl,
                 processedPreviewUrl: result.previewUrl ?? null,
@@ -410,18 +438,7 @@ export function usePipelineProcessor() {
             }
 
             if (data.phase === "failed") {
-              clearStallTimer();
-              if (elapsedRef.current) clearInterval(elapsedRef.current);
-              es.close();
-              eventSourceRef.current = null;
-              xhrRef.current?.abort();
-              clearActiveJob();
-              batchRunRef.current = null;
-              const message = data.error || "Processing failed";
-              setError(message);
-              setProcessing(false);
-              setProgress(IDLE_PROGRESS);
-              settleProcessingEntries(message);
+              endFailedRun(data.error || "Processing failed");
               return;
             }
 

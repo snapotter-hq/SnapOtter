@@ -14,6 +14,7 @@ import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import {
+  checkToolResult,
   FRAME_HANDLING_FAILED,
   failedFrameMessage,
   type ProgressFrame,
@@ -461,7 +462,36 @@ export function useToolProcessor(toolId: string) {
             clearJobEvidenceTimer();
             if (asyncModeRef.current) resetStallTimer();
 
-            if (data.phase === "complete" && data.result) {
+            // Ends the run on the server's word: a failed frame, or a
+            // completed one with nothing to download.
+            const endFailedRun = (message: string) => {
+              clearStallTimer();
+              if (elapsedRef.current) clearInterval(elapsedRef.current);
+              es.close();
+              eventSourceRef.current = null;
+              // Settle the still-open POST so its late onerror/ontimeout
+              // cannot replace this specific error with a generic one.
+              xhrRef.current?.abort();
+              clearActiveJob();
+              setError(message);
+              setProcessing(false);
+              setProgress(IDLE_PROGRESS);
+              settleProcessingEntries(message);
+            };
+
+            if (data.phase === "complete") {
+              // A result with nothing to download is the server's bug, the
+              // twin of a sync 2xx body with no downloadUrl (#1740), so it
+              // fails the run and gets reported (#1794). Checked before any
+              // store write: a throw from those is still ours (#1287).
+              let result: ProcessResult;
+              try {
+                result = checkToolResult<ProcessResult>(data.result);
+              } catch (err) {
+                reportMalformedResult(err, { toolId });
+                endFailedRun("Invalid response from server");
+                return;
+              }
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -472,7 +502,6 @@ export function useToolProcessor(toolId: string) {
               xhrRef.current?.abort();
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
-              const result = data.result as unknown as ProcessResult;
               if (result.savedFileId) {
                 useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
               }
@@ -505,19 +534,7 @@ export function useToolProcessor(toolId: string) {
             }
 
             if (data.phase === "failed") {
-              clearStallTimer();
-              if (elapsedRef.current) clearInterval(elapsedRef.current);
-              es.close();
-              eventSourceRef.current = null;
-              // Settle the still-open POST so its late onerror/ontimeout
-              // cannot replace this specific error with a generic one.
-              xhrRef.current?.abort();
-              clearActiveJob();
-              const message = failedFrameMessage(data, "Processing failed");
-              setError(message);
-              setProcessing(false);
-              setProgress(IDLE_PROGRESS);
-              settleProcessingEntries(message);
+              endFailedRun(failedFrameMessage(data, "Processing failed"));
               return;
             }
 
@@ -564,6 +581,7 @@ export function useToolProcessor(toolId: string) {
       settleProcessingEntries,
       setError,
       setProcessing,
+      toolId,
     ],
   );
 

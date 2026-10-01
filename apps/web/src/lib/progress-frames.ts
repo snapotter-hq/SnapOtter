@@ -72,6 +72,16 @@ export function parseResultBody<T extends object>(text: string): T {
     // Not rethrown or kept as the cause: a SyntaxError quotes the text.
     throw new MalformedResultError("notAnObject");
   }
+  return resolveServerUrls(checkToolResult<T>(body));
+}
+
+/**
+ * Checks that a tool result is one: a JSON object with a non-empty
+ * `downloadUrl` string, or it throws a MalformedResultError. parseResultBody
+ * runs it on a sync 2xx body, and the processing hooks on a completed progress
+ * frame's `result`, which the worker builds the same way (#1794).
+ */
+export function checkToolResult<T extends object>(body: unknown): T {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     throw new MalformedResultError("notAnObject");
   }
@@ -79,15 +89,16 @@ export function parseResultBody<T extends object>(text: string): T {
   if (typeof downloadUrl !== "string" || !downloadUrl) {
     throw new MalformedResultError("noDownloadUrl");
   }
-  return resolveServerUrls(body as T);
+  return body as T;
 }
 
 /**
- * Reports a result parseResultBody (or a caller's own check) rejected, so a
- * server bug the user sees reaches Sentry too (#1740). The report is rebuilt
- * from a constant, never the error itself: anything else that lands here, a
- * SyntaxError say, can quote the body. `status` is the HTTP status of a sync
- * answer and goes on as the `status_code` tag.
+ * Reports a result parseResultBody or checkToolResult (or a caller's own
+ * check) rejected, so a server bug the user sees reaches Sentry too (#1740).
+ * The report is rebuilt from a constant, never the error itself: anything else
+ * that lands here, a SyntaxError say, can quote the body. `status` is the HTTP
+ * status of a sync answer and goes on as the `status_code` tag; a progress
+ * frame has none.
  */
 export function reportMalformedResult(
   err: unknown,

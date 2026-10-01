@@ -1355,6 +1355,133 @@ describe("usePipelineProcessor malformed 2xx results (#1740)", () => {
   });
 });
 
+/**
+ * #1794: the progress stream's completed frame is the async twin of the sync
+ * 2xx answer #1740 checks. One with no download URL used to land as a
+ * finished run with nothing behind it, and nobody heard about it.
+ */
+describe("usePipelineProcessor malformed completed frames (#1794)", () => {
+  function startAsyncRun() {
+    const hook = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    return hook;
+  }
+
+  function expectReported(message: string) {
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe(message);
+    expect(error.cause).toBeUndefined();
+    // No HTTP answer stands behind a progress frame.
+    expect((error as { statusCode?: number }).statusCode).toBeUndefined();
+    expect(tags).toEqual({ error_class: "operational" });
+  }
+
+  function expectRunFailed() {
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Invalid response from server",
+      processedUrl: null,
+    });
+    expect(useFileStore.getState().error).toBe("Invalid response from server");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(latestSse().close).toHaveBeenCalled();
+  }
+
+  it.each([
+    ["an empty result", {}],
+    ["a result with no download URL", { ...SINGLE_RESULT, downloadUrl: undefined }],
+    ["a result with an empty download URL", { ...SINGLE_RESULT, downloadUrl: "" }],
+    ["a result whose download URL is not a string", { ...SINGLE_RESULT, downloadUrl: 7 }],
+  ])("fails the run on %s and reports it", (_label, result) => {
+    const { unmount } = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result }));
+
+    expectRunFailed();
+    expectReported("Tool result has no download URL");
+    unmount();
+  });
+
+  it("fails the run on a completed frame with no result at all", () => {
+    const { unmount } = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100 }));
+
+    expectRunFailed();
+    expectReported("Tool result body is not a JSON object");
+    unmount();
+  });
+
+  it("reports a replayed bad frame once", () => {
+    const { unmount } = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: {} }));
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: {} }));
+
+    expectReported("Tool result has no download URL");
+    unmount();
+  });
+
+  it("fails a sync run whose stream completes first, and stops its POST", () => {
+    const { unmount } = startSingleRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: {} }));
+
+    expectRunFailed();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expectReported("Tool result has no download URL");
+    unmount();
+  });
+
+  it("lands a good frame untouched and reports nothing", () => {
+    const { unmount } = startAsyncRun();
+
+    act(() => sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT }));
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+      error: null,
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("still reads a store throw while landing a good frame as ours", () => {
+    const { unmount } = startAsyncRun();
+    // Zustand copies state on every set, so put the real action back explicitly.
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    vi.spyOn(useFileStore.getState(), "updateEntry")
+      .mockImplementationOnce(() => {
+        throw new Error("store write failed");
+      })
+      .mockImplementation(realUpdateEntry);
+
+    try {
+      expect(() =>
+        act(() => sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT })),
+      ).toThrow("store write failed");
+
+      expect(useFileStore.getState().error).toBe(
+        "Something went wrong while tracking this job. Try again.",
+      );
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      unmount();
+    }
+  });
+});
+
 describe("usePipelineProcessor batch failure message (#1432)", () => {
   it("reads a coded batch failure through parseApiError instead of the first file", async () => {
     const { unmount } = startBatchRun();
