@@ -9,6 +9,7 @@ import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { trackEvent } from "../lib/analytics.js";
 import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
+import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
 import {
   type ExternalAuthResult,
@@ -56,8 +57,11 @@ async function getOrDiscoverConfig(): Promise<oidc.Configuration> {
     undefined,
     {
       // No request in scope here; this gates plain-http issuer URLs for dev
-      // setups, so only the declared origin matters.
-      execute: env.EXTERNAL_URL.startsWith("https") ? undefined : [oidc.allowInsecureRequests],
+      // setups, so only the declared origin matters. The scheme is parsed, so
+      // an "HTTPS://" spelling can't switch insecure discovery on (#1775).
+      // isHttpsUrl is false for an unparseable value, but with OIDC on the
+      // boot check in env.ts only lets an http(s) URL through.
+      execute: isHttpsUrl(env.EXTERNAL_URL) ? undefined : [oidc.allowInsecureRequests],
     },
   );
 

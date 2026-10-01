@@ -4,7 +4,7 @@ import { join } from "node:path";
 import Fastify from "fastify";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { stripBasePath } from "../../../apps/api/src/lib/base-path.js";
-import { loadEnv } from "../../../apps/api/src/lib/env.js";
+import { isHttpsUrl, loadEnv } from "../../../apps/api/src/lib/env.js";
 
 const config = vi.hoisted(() => ({ BASE_PATH: "" }));
 vi.mock("../../../apps/api/src/config.js", () => ({ env: config }));
@@ -152,6 +152,25 @@ describe("BASE_PATH configuration", () => {
           /EXTERNAL_URL must be an http\(s\) URL with no query string or fragment/,
         );
       });
+
+      // Credentials in the public base URL would be copied into every
+      // redirect_uri, ACS URL, and entity ID sent to the IdP (#1775).
+      it.each([
+        ["", "https://user:pass@example.com"],
+        ["/snapotter", "https://user@example.com/snapotter"],
+        ["", "https://:pass@example.com/"],
+      ])("rejects BASE_PATH %s with credentials in EXTERNAL_URL %s", (basePath, externalUrl) => {
+        configure(basePath, externalUrl);
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL must not contain a username or password/);
+      });
+
+      // The boot check reads the parsed scheme, so an uppercase spelling
+      // boots, and it boots unchanged: every SSO URL keeps the spelling the
+      // IdP has registered (#1775).
+      it("boots an uppercase HTTPS EXTERNAL_URL without rewriting it", () => {
+        configure("/snapotter", "HTTPS://Example.com/snapotter/");
+        expect(loadEnv().EXTERNAL_URL).toBe("HTTPS://Example.com/snapotter");
+      });
     },
   );
 
@@ -174,11 +193,39 @@ describe("BASE_PATH configuration", () => {
     ["https://example.com/?x=1", "https://example.com/?x=1"],
     [" https://example.com/\n", "https://example.com"],
     ["https://example.com/snapotter/ ", "https://example.com/snapotter"],
+    // Only the trim and slash strip: the spelling, scheme case included, is
+    // what every SSO URL is built from, so it isn't rewritten (#1775).
+    ["HTTPS://Example.com/", "HTTPS://Example.com"],
+    // SSO rejects credentials, but with SSO off the value boots as before.
+    ["https://user:pass@example.com/", "https://user:pass@example.com"],
   ])("normalizes EXTERNAL_URL %j without SSO", (input, output) => {
     vi.stubEnv("OIDC_ENABLED", "false");
     vi.stubEnv("SAML_ENABLED", "false");
     vi.stubEnv("EXTERNAL_URL", input);
     expect(loadEnv().EXTERNAL_URL).toBe(output);
+  });
+});
+
+// The https checks for OIDC discovery and the Secure cookie read the scheme
+// from the parsed URL, never a string prefix (#1775).
+describe("isHttpsUrl", () => {
+  it.each([
+    ["https://example.com", true],
+    ["HTTPS://example.com", true],
+    ["Https://Example.com/snapotter", true],
+    [" https://example.com\n", true],
+    ["HTTPS://example.com/?a=1", true],
+    // WHATWG reads a special scheme without slashes as that scheme.
+    ["https:example.com", true],
+    ["http://example.com", false],
+    ["HTTP://example.com", false],
+    ["httpsx://example.com", false],
+    ["ftp://example.com", false],
+    ["", false],
+    ["https//example.com", false],
+    ["https://exa mple.com", false],
+  ])("%j is https: %s", (value, expected) => {
+    expect(isHttpsUrl(value)).toBe(expected);
   });
 });
 

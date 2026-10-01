@@ -15,6 +15,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
+import { parseExternalUrl } from "./sso-deployments.js";
 
 let testApp: TestApp;
 
@@ -78,5 +79,36 @@ describe("session cookie Secure flag", () => {
     } finally {
       (env as { EXTERNAL_URL: string }).EXTERNAL_URL = orig;
     }
+  });
+
+  /** Log in with EXTERNAL_URL set as boot parses `typed`, return the session cookie. */
+  async function loginWithExternalUrl(typed: string): Promise<string> {
+    const orig = env.EXTERNAL_URL;
+    (env as { EXTERNAL_URL: string }).EXTERNAL_URL = parseExternalUrl(typed);
+    try {
+      return await loginSetCookie();
+    } finally {
+      (env as { EXTERNAL_URL: string }).EXTERNAL_URL = orig;
+    }
+  }
+
+  // The scheme is case-insensitive, so an uppercase spelling is still an
+  // https origin. The prefix match on "https" missed it and dropped Secure
+  // behind a proxy that sends no X-Forwarded-Proto (#1775).
+  it.each(["HTTPS://snapotter.example.com", "Https://Snapotter.Example.com/"])(
+    "sets Secure from an uppercase https EXTERNAL_URL %s",
+    async (typed) => {
+      expect(await loginWithExternalUrl(typed)).toMatch(SECURE_ATTR);
+    },
+  );
+
+  // With SSO off EXTERNAL_URL isn't validated, and this typo got Secure from
+  // the old prefix match, so parsing the scheme must not quietly take it away.
+  it("keeps Secure for an unparseable EXTERNAL_URL that starts with https", async () => {
+    expect(await loginWithExternalUrl("https//snapotter.example.com")).toMatch(SECURE_ATTR);
+  });
+
+  it("stays non-Secure for an uppercase plain-http EXTERNAL_URL", async () => {
+    expect(await loginWithExternalUrl("HTTP://snapotter.example.com")).not.toMatch(SECURE_ATTR);
   });
 });

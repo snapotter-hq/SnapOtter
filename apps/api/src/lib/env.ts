@@ -2,6 +2,19 @@ import { availableParallelism } from "node:os";
 import { z } from "zod";
 import { DEFAULT_TRUST_PROXY, parseTrustProxy } from "./trust-proxy.js";
 
+/**
+ * Whether a URL is https, read from the parsed scheme rather than a string
+ * prefix, which an uppercase "HTTPS://" slips past (#1775). False for a value
+ * that doesn't parse.
+ */
+export function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value.trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
@@ -260,10 +273,19 @@ const envSchema = z
       let externalPath: string | null = null;
       try {
         const url = new URL(data.EXTERNAL_URL);
-        // A path appended after a query string or fragment never reaches the
-        // callback route, and an IdP can only redirect to http(s). The raw
-        // check also catches a bare trailing "?" or "#", which URL drops.
-        if (
+        if (url.username || url.password) {
+          // Credentials would be copied into every redirect_uri, ACS URL, and
+          // entity ID sent to the IdP (#1775).
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["EXTERNAL_URL"],
+            message:
+              "EXTERNAL_URL must not contain a username or password; use the public URL alone, such as https://example.com/snapotter",
+          });
+        } else if (
+          // A path appended after a query string or fragment never reaches the
+          // callback route, and an IdP can only redirect to http(s). The raw
+          // check also catches a bare trailing "?" or "#", which URL drops.
           (url.protocol === "http:" || url.protocol === "https:") &&
           !/[?#]/.test(data.EXTERNAL_URL)
         ) {
