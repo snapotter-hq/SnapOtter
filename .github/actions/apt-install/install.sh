@@ -32,7 +32,11 @@
 #   cached archives are then installed as local files with --no-download,
 #   so a warm cache survives a mirror that is down. That install trusts the
 #   cache as saved (every saved .deb was hash-checked by apt or by the step
-#   above), and never feeds a save. If it fails, the mirror swap runs.
+#   above), and never feeds a save. Afterwards one bounded update against
+#   archive.ubuntu.com tries to leave an index for later steps. If the
+#   offline install fails, the mirror swap runs; expect that right after a
+#   runner image rollout, when the cache comes from the previous image and
+#   some of its archives would be downgrades.
 # - After an index-based install, archives it didn't use are pruned, apt's
 #   partial/ and lock are removed, and $GITHUB_OUTPUT gets `fresh`: how many
 #   kept archives weren't restored. action.yml saves only when it's non-zero.
@@ -84,7 +88,8 @@ apt_update() {
   done < <(cat "${ubuntu_sources[@]}" 2>/dev/null | grep -oE 'https?://[^/ ]+' | sort -u)
   return "$rc"
 }
-# The index can resolve every requested package (empty lists can't).
+# The index can resolve every requested package (empty lists can't). Plain
+# package names only: a virtual name would read as an unusable index.
 index_ready() {
   apt-cache show --no-all-versions "${packages[@]}" >/dev/null 2>&1
 }
@@ -195,29 +200,51 @@ finish() {
   echo "fresh=${fresh}" >> "${GITHUB_OUTPUT:-/dev/null}"
 }
 
+swap_to_archive() {
+  # Classic sources.list and deb822 ubuntu.sources both just name the host.
+  sudo find /etc/apt/sources.list /etc/apt/sources.list.d -maxdepth 1 -type f \
+    -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} + 2>/dev/null || true
+}
+
+update_ok=false
+if apt_update "$update_budget" && index_ready; then update_ok=true; fi
+cached=false
+[ -z "$archive_dir" ] || [ -z "$(compgen -G "$archive_dir/*.deb")" ] || cached=true
+
 azure_lists_ok=false
-if apt_update "$update_budget" && ! $ubuntu_unreachable && index_ready; then
+# With nothing cached, a partly failed update still goes ahead as it always
+# did; with a cache, any Ubuntu host failing sends the install offline.
+if $update_ok && ! { $ubuntu_unreachable && $cached; }; then
   azure_lists_ok=true
   verify_cached_debs
   if apt_install; then finish; exit 0; fi
 elif install_offline; then
   echo "fresh=0" >> "${GITHUB_OUTPUT:-/dev/null}"
+  # Later steps may still query apt (ci.yml looks up the ImageMagick EXR
+  # coder), so try once, bounded, for an index from the canonical archive.
+  # The install already succeeded; no index only gets a warning.
+  swap_to_archive
+  if ! apt_update "$update_budget" || $ubuntu_unreachable || ! index_ready; then
+    echo "::warning::no fresh apt index after the offline install; later apt steps in this job may fail"
+  fi
   exit 0
 fi
 
 echo "::warning::apt via the Azure mirror stalled or failed; swapping to archive.ubuntu.com"
 # A timed-out apt can leave packages unpacked but unconfigured.
 recover_dpkg
-# Classic sources.list and deb822 ubuntu.sources both just name the host.
-sudo find /etc/apt/sources.list /etc/apt/sources.list.d -maxdepth 1 -type f \
-  -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} + 2>/dev/null || true
+swap_to_archive
 
 if $azure_lists_ok; then
   for f in /var/lib/apt/lists/azure.archive.ubuntu.com_*; do
     sudo mv "$f" "${f/azure.archive.ubuntu.com/archive.ubuntu.com}"
   done
 else
-  apt_update "$((update_budget * 3))" || apt_update "$((update_budget * 3))"
+  # A second, equally patient try when the first errored or couldn't reach
+  # the archive (apt reports the latter with exit 0).
+  if ! apt_update "$((update_budget * 3))" || $ubuntu_unreachable; then
+    apt_update "$((update_budget * 3))"
+  fi
   verify_cached_debs
 fi
 

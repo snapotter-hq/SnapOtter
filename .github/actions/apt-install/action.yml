@@ -8,7 +8,7 @@ description: >-
   cache installs without fetching packages, and even with the mirror down.
 inputs:
   packages:
-    description: Space-separated apt package list
+    description: Space-separated apt package names (real packages, not virtual ones)
     required: true
   update-timeout:
     description: Seconds allowed for each apt-get update attempt
@@ -66,9 +66,13 @@ runs:
 
     # Composite steps stop at the first failure, so only a completed install
     # is ever saved. When all four shards fetch the same thing, one save wins
-    # and the others log a warning.
+    # and the others log a warning. Branches other than main save only when
+    # nothing at all was restored: a PR restores main's entry, and a full
+    # copy per PR per upstream package update would crowd out other caches.
     - name: Save .deb archives
-      if: steps.install.outputs.fresh != '' && steps.install.outputs.fresh != '0'
+      if: >-
+        steps.install.outputs.fresh != '' && steps.install.outputs.fresh != '0' &&
+        (github.ref == 'refs/heads/main' || steps.restore.outputs.cache-matched-key == '')
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/apt-archives

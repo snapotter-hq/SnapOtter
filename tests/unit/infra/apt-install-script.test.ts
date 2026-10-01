@@ -187,8 +187,9 @@ const WARM = { [QPDF]: "sha-qpdf-new", [GS]: "sha-gs", [X11]: "sha-x11" };
 /**
  * up: healthy. down: every Ubuntu fetch fails (the index files from before
  * stay usable, as apt keeps them). down-then-up: only the first update fails.
+ * partial: the security host's index fails, everything else works.
  */
-type Mirror = "up" | "down" | "down-then-up";
+type Mirror = "up" | "down" | "down-then-up" | "partial";
 
 function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
   const dir = mkdtempSync(join(tmpdir(), "apt-cache-"));
@@ -206,11 +207,11 @@ function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
   writeFileSync(calls, "");
   writeFileSync(
     join(dir, "ubuntu.sources"),
-    "Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\n",
+    "Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\n\nTypes: deb\nURIs: http://security.ubuntu.com/ubuntu/\n",
   );
   // Whether the mirror answers right now: "down-then-up" recovers once the
   // first update has been tried.
-  const reachable = `{ [ "${mirror}" = up ] || { [ "${mirror}" = down-then-up ] && [ "$(grep -c ' update ' "${calls}")" -gt 1 ]; }; }`;
+  const reachable = `{ [ "${mirror}" = up ] || [ "${mirror}" = partial ] || { [ "${mirror}" = down-then-up ] && [ "$(grep -c ' update ' "${calls}")" -gt 1 ]; }; }`;
   const stubs: Record<string, string> = {
     sudo: 'exec "$@"',
     timeout: 'shift 3; exec "$@"',
@@ -237,6 +238,7 @@ case " $* " in *" update "*)
   # Real apt: an unreachable mirror is a warning, and the exit code is 0. A
   # third-party source on the runner failing must not count against Ubuntu.
   echo "W: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  Could not connect" >&2
+  [ "${mirror}" = partial ] && echo "W: Failed to fetch http://security.ubuntu.com/ubuntu/dists/noble-security/InRelease  Could not connect" >&2
   ${reachable} && exit 0
   echo "W: Failed to fetch http://azure.archive.ubuntu.com/ubuntu/dists/noble/InRelease  Could not connect to azure.archive.ubuntu.com:80" >&2
   echo "W: Some index files failed to download. They have been ignored, or old ones used instead." >&2
@@ -373,6 +375,26 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     expect(run.output).not.toContain("swapping to archive.ubuntu.com");
     // Nothing that bypassed the index check is ever saved.
     expect(run.githubOutput).toBe("fresh=0\n");
+    // One more bounded update, so later steps that query apt get an index if
+    // the canonical archive answers; here it doesn't, which only warns.
+    expect(run.calls.match(/ update -qq/g)).toHaveLength(2);
+    expect(run.output).toContain("no fresh apt index after the offline install");
+  });
+
+  it("goes offline when one Ubuntu host fails and the cache can cover it", () => {
+    const run = runCached("partial", WARM);
+    expect(run.status, run.output).toBe(0);
+    expect(run.calls).toContain("offline qpdf");
+    expect(run.calls).not.toContain("downloaded");
+    expect(run.githubOutput).toBe("fresh=0\n");
+  });
+
+  it("with nothing cached, installs through a partly failed update as before", () => {
+    const run = runCached("partial");
+    expect(run.status, run.output).toBe(0);
+    expect(run.calls).toContain("downloaded qpdf");
+    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
+    expect(run.githubOutput).toBe("fresh=3\n");
   });
 
   it("checks the cache against the index after the mirror swap too", () => {
