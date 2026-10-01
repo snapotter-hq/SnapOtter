@@ -81,7 +81,7 @@ describe("file-validation SVGZ gzip guard (L235-L236)", () => {
   it("accepts an .svgz file that starts with the gzip magic 1f 8b", async () => {
     const buf = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00]);
     const res = await validateImageBuffer(buf, "icon.svgz");
-    expect(res).toEqual({ valid: true, format: "svg", width: 0, height: 0 });
+    expect(res).toEqual({ valid: true, format: "svg", width: 0, height: 0, nameOnly: true });
   });
 
   it("rejects an .svgz whose first byte is not 0x1f (kills the byte[0] check)", async () => {

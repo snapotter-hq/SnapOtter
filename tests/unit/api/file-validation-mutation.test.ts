@@ -44,6 +44,14 @@ function expectValid(
   expect(result).toEqual({ valid: true, format, width, height });
 }
 
+/** Assert a format accepted on the filename alone, flagged nameOnly (#1550). */
+function expectValidByName(
+  result: Awaited<ReturnType<typeof validateImageBuffer>>,
+  format: string,
+): void {
+  expect(result).toEqual({ valid: true, format, width: 0, height: 0, nameOnly: true });
+}
+
 /** Assert a rejection carrying the exact reason string. */
 function expectRejected(
   result: Awaited<ReturnType<typeof validateImageBuffer>>,
@@ -596,7 +604,7 @@ describe("validateImageBuffer - extension-driven detection", () => {
     const buf = Buffer.alloc(32);
     buf[0] = 0x1f;
     buf[1] = 0x8b;
-    expectValid(await validateImageBuffer(buf, "icon.svgz"), "svg", 0, 0);
+    expectValidByName(await validateImageBuffer(buf, "icon.svgz"), "svg");
   });
 
   it("rejects a .svgz file whose first gzip byte is wrong", async () => {
@@ -655,7 +663,7 @@ describe("validateImageBuffer - extension-driven detection", () => {
     // A .rw2 (Panasonic) buffer with no recognized magic -> raw via L249.
     const buf = Buffer.alloc(32);
     buf[0] = 0x01; // non-null so it is not the all-null case
-    expectValid(await validateImageBuffer(buf, "photo.rw2"), "raw", 0, 0);
+    expectValidByName(await validateImageBuffer(buf, "photo.rw2"), "raw");
   });
 
   it("does NOT fall back to raw for a non-RAW extension with unrecognized magic", async () => {
@@ -667,25 +675,23 @@ describe("validateImageBuffer - extension-driven detection", () => {
   it("forces tga for a .tga file even when the bytes match another format", async () => {
     // CUR magic (0x00 0x00 0x02 0x00) but a .tga extension: the tga override
     // (L228-230) wins over magic detection -> format is tga (CLI-decoded).
-    expectValid(
+    expectValidByName(
       await validateImageBuffer(withLeadingBytes([0x00, 0x00, 0x02, 0x00]), "sprite.tga"),
       "tga",
-      0,
-      0,
     );
   });
 
   it("forces tga for a .tga file with no recognizable magic at all", async () => {
     const buf = Buffer.alloc(32);
     buf[0] = 0x01;
-    expectValid(await validateImageBuffer(buf, "sprite.tga"), "tga", 0, 0);
+    expectValidByName(await validateImageBuffer(buf, "sprite.tga"), "tga");
   });
 
   it("uses only the final dotted segment as the extension", async () => {
     // "archive.tar.dng" -> ext "dng" -> RAW fallback fires for a no-magic body.
     const buf = Buffer.alloc(32);
     buf[0] = 0x01;
-    expectValid(await validateImageBuffer(buf, "archive.tar.dng"), "raw", 0, 0);
+    expectValidByName(await validateImageBuffer(buf, "archive.tar.dng"), "raw");
   });
 
   it("treats a filename with no dot as having no extension", async () => {

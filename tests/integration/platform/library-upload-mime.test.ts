@@ -186,7 +186,6 @@ const SNIFFED_IMAGE_TYPES: [ext: string, mime: string][] = [
   ["tiff", "image/tiff"],
   ["avif", "image/avif"],
   ["svg", "image/svg+xml"],
-  ["svgz", "image/svg+xml"],
   ["heic", "image/heic"],
   ["heif", "image/heif"],
   ["psd", "image/vnd.adobe.photoshop"],
@@ -197,7 +196,6 @@ const SNIFFED_IMAGE_TYPES: [ext: string, mime: string][] = [
   ["cur", "image/x-icon"],
   ["jxl", "image/jxl"],
   ["jp2", "image/jp2"],
-  ["tga", "image/x-tga"],
   ["exr", "image/x-exr"],
   ["hdr", "image/vnd.radiance"],
   ["qoi", "image/qoi"],
@@ -221,6 +219,30 @@ describe("library upload MIME type for every accepted image format (#1550)", () 
     expect(storedMimeType).toBe(mime);
   });
 
+  // The validator takes these on their name, with nothing in the bytes it can
+  // point to (#1550): TGA has no signature, RW2's isn't in its table, and an
+  // SVGZ is never opened. A name is a claim, so none of them earns an image
+  // type, real file or not.
+  it.each([
+    ["sample.tga", readFixture(fixtures.image.formats("tga"))],
+    ["sample.svgz", readFixture(fixtures.image.formats("svgz"))],
+    // The first megabyte keeps it under the suite's upload cap; RAW isn't decoded here.
+    ["sample.rw2", readFixture(fixtures.image.formats("rw2")).subarray(0, 1024 * 1024)],
+    ["notes.tga", Buffer.from("plain text, not a picture\n")],
+    ["notes.cr2", Buffer.from("plain text, not a picture\n")],
+  ])(
+    "stores %s, typed only by its name, as application/octet-stream",
+    async (filename, content) => {
+      const { storedMimeType } = await uploadOne({
+        filename,
+        contentType: "image/x-whatever",
+        content,
+      });
+
+      expect(storedMimeType).toBe("application/octet-stream");
+    },
+  );
+
   // The extension only narrows a family the bytes already proved: it can't
   // turn HEIF bytes into some other format's type.
   it("doesn't take the type from an extension the bytes contradict", async () => {
@@ -231,6 +253,28 @@ describe("library upload MIME type for every accepted image format (#1550)", () 
     });
 
     expect(heic.storedMimeType).toBe("image/heif");
+  });
+
+  // An SVG row is now typed image/svg+xml, which a browser would render. The
+  // download has to stay an attachment the browser won't sniff.
+  it("serves an SVG row as a nosniff attachment", async () => {
+    const { created, storedMimeType } = await uploadOne({
+      filename: "drawing.svg",
+      contentType: "image/svg+xml",
+      content: readFixture(fixtures.image.formats("svg")),
+    });
+    expect(storedMimeType).toBe("image/svg+xml");
+
+    const download = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${created.id}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["content-type"]).toBe("image/svg+xml");
+    expect(String(download.headers["content-disposition"])).toMatch(/^attachment;/);
+    expect(download.headers["x-content-type-options"]).toBe("nosniff");
   });
 
   it("still serves a thumbnail for a HEIC row stored as image/heic", async () => {
@@ -333,5 +377,23 @@ describe("save-result MIME type (#1349)", () => {
     const saved = await saveResult(parent.id, "result.svg", PARAMETER_ENTITY_SVG);
 
     expect(saved.mimeType).toBe("image/svg+xml");
+  });
+
+  it("types a result by its bytes, not the name it's saved under (#1550)", async () => {
+    const { created: parent } = await uploadOne({
+      filename: "parent.png",
+      contentType: "image/png",
+      content: PNG,
+    });
+
+    const heifAsPng = await saveResult(
+      parent.id,
+      "result.png",
+      readFixture(fixtures.image.formats("heic")),
+    );
+    const textAsTga = await saveResult(parent.id, "result.tga", JSON_ERROR_BODY);
+
+    expect(heifAsPng.mimeType).toBe("image/heif");
+    expect(textAsTga.mimeType).toBe("application/octet-stream");
   });
 });

@@ -5,7 +5,7 @@ import { env } from "../config.js";
 import { isSvgBuffer } from "./svg-sanitize.js";
 
 /** Formats we accept as input. */
-export const SUPPORTED_INPUT_FORMATS = new Set([
+export const SUPPORTED_INPUT_FORMATS: ReadonlySet<string> = new Set([
   "jpeg",
   "png",
   "webp",
@@ -123,6 +123,14 @@ export interface ValidationResult {
   format: string;
   width: number;
   height: number;
+  /**
+   * True when the format came from the filename alone, with nothing in the
+   * bytes to back it and no decode: TGA, a camera RAW without a signature the
+   * table knows (RW2, ORF, PEF, ...), and SVGZ. Such a result is accepted for
+   * processing, where the decoder has the final say, but it is no evidence the
+   * bytes are an image.
+   */
+  nameOnly?: true;
 }
 
 export interface ValidationError {
@@ -164,20 +172,26 @@ export function isRawExtension(ext: string): boolean {
 }
 
 /**
- * The image/* type for bytes validateImageBuffer() accepted, from the format
- * it detected there (#1550). The file library offers a file to image tools by
- * that prefix, so every SUPPORTED_INPUT_FORMATS member must land on one; a
- * format image-engine's table doesn't know falls back to
- * application/octet-stream, and the unit test over that set catches it.
+ * The image/* type to store for bytes validateImageBuffer() accepted, from the
+ * format it found in them (#1550), or null when it found the format in the
+ * filename alone (`nameOnly`): a type must never be vouched for by a name
+ * (#1349), so the caller treats those bytes as unverified.
+ *
+ * The file library offers a file to image tools by the image/ prefix, so every
+ * SUPPORTED_INPUT_FORMATS member must land on one; a format image-engine's
+ * table doesn't know falls back to application/octet-stream, and the unit
+ * test over that set catches it.
  *
  * The validator folds every camera RAW into "raw" and HEIC into "heif", so for
  * those the extension picks the specific type, but only an extension of the
  * family the bytes proved: HEIF bytes named photo.png stay image/heif.
  *
- * @param format - ValidationResult.format
+ * @param validation - What validateImageBuffer() returned for the bytes
  * @param filename - The name the bytes were validated under
  */
-export function validatedImageMime(format: string, filename?: string): string {
+export function validatedImageMime(validation: ValidationResult, filename?: string): string | null {
+  if (validation.nameOnly) return null;
+  const { format } = validation;
   const ext = filename?.includes(".") ? (filename.split(".").pop()?.toLowerCase() ?? "") : "";
   if (format === "raw") {
     const rawMime = isRawExtension(ext) ? extToMime(ext) : "";
@@ -231,8 +245,10 @@ export async function validateImageBuffer(
   }
 
   // TGA has no magic bytes and its header can match other formats (e.g. CUR)
+  let nameOnly = false;
   if (ext === "tga") {
     detectedFormat = "tga";
+    nameOnly = true;
   }
 
   // SVGZ: gzip-compressed SVG, detected by extension + gzip magic.
@@ -240,7 +256,7 @@ export async function validateImageBuffer(
   // decompression happens later in the route pipeline.
   if (!detectedFormat && ext === "svgz") {
     if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
-      return { valid: true, format: "svg", width: 0, height: 0 };
+      return { valid: true, format: "svg", width: 0, height: 0, nameOnly: true };
     }
   }
 
@@ -254,6 +270,7 @@ export async function validateImageBuffer(
   // extension-based detection for known Camera RAW extensions.
   if (!detectedFormat && ext && isRawExtension(ext)) {
     detectedFormat = "raw";
+    nameOnly = true;
   }
 
   if (!detectedFormat) {
@@ -272,7 +289,9 @@ export async function validateImageBuffer(
   // For formats Sharp can't decode natively, skip the dimension check.
   // The actual decoding happens later in the tool pipeline.
   if (CLI_DECODED_FORMATS.has(detectedFormat)) {
-    return { valid: true, format: detectedFormat, width: 0, height: 0 };
+    return nameOnly
+      ? { valid: true, format: detectedFormat, width: 0, height: 0, nameOnly: true }
+      : { valid: true, format: detectedFormat, width: 0, height: 0 };
   }
 
   try {

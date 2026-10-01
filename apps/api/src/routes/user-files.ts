@@ -400,9 +400,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           const isValidImage = validation?.valid === true;
 
           const safeName = sanitizeFilename(part.filename ?? "upload");
-          const mimeType = isValidImage
-            ? validatedImageMime(validation.format, part.filename)
-            : unverifiedMime(part.mimetype || "application/octet-stream");
+          const mimeType =
+            (isValidImage && validatedImageMime(validation, part.filename)) ||
+            unverifiedMime(part.mimetype || "application/octet-stream");
           const dimensions = measuredDimensions(isValidImage ? validation : null);
 
           const storedName = await saveFile(safeBuffer, safeName);
@@ -937,9 +937,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const baseName = parent.originalName.replace(/\.[^.]+$/, "");
     const resultName = `${baseName}${ext}`;
 
-    const mimeType = isValidImage
-      ? validatedImageMime(validation.format, filename)
-      : unverifiedMime(extToMime(ext));
+    const mimeType =
+      (isValidImage && validatedImageMime(validation, filename)) || unverifiedMime(extToMime(ext));
     const dimensions = measuredDimensions(isValidImage ? validation : null);
 
     // Re-check quota with actual file size before persisting
