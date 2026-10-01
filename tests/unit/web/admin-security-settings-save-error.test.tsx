@@ -41,7 +41,9 @@ describe("AdminSecuritySettings save errors", () => {
     render(<AdminSecuritySettings />);
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
-    const input = screen.getByLabelText("Minimum Password Length");
+    // The form renders only after the settings load settles, so wait for it
+    // rather than reading it as soon as the request is sent (#1785).
+    const input = await screen.findByLabelText("Minimum Password Length");
     expect(input).toHaveAttribute("min", "8");
   });
 

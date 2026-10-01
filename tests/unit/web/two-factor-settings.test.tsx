@@ -40,6 +40,29 @@ const ENROLL_RESPONSE = {
   recoveryCodes: ["aaaa1111", "bbbb2222"],
 };
 
+/**
+ * Answer the enroll request on a later macrotask, the way a real network
+ * response arrives. With an immediately-resolved mock, a synchronous query
+ * placed after `waitFor(() => expect(apiPost).toHaveBeenCalled...)` usually
+ * finds the enrolled view anyway and only fails on a loaded CI runner (#1785).
+ * Delaying the answer makes that mistake fail on every run.
+ */
+const respondToEnroll = () =>
+  apiPost.mockImplementationOnce(
+    () => new Promise((resolve) => setTimeout(() => resolve(ENROLL_RESPONSE), 20)),
+  );
+
+/**
+ * Click Enable and wait for the enrolled view itself, not just the request:
+ * apiPost is called on the click, but the view renders only once its promise
+ * settles.
+ */
+const startEnrollment = async () => {
+  fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
+  expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll");
+  return (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+};
+
 afterEach(() => {
   cleanup();
   useAuth.mockReset();
@@ -66,15 +89,13 @@ describe("TwoFactorSettings", () => {
 
   it("starts enrollment and shows the QR code, manual secret, and recovery codes", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
 
     render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
 
-    await waitFor(() => {
-      expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll");
-    });
-    expect(screen.getByText("JBSWY3DPEHPK3PXP")).toBeInTheDocument();
+    expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll");
+    expect(await screen.findByText("JBSWY3DPEHPK3PXP")).toBeInTheDocument();
     expect(screen.getByText("aaaa1111")).toBeInTheDocument();
     expect(screen.getByText("bbbb2222")).toBeInTheDocument();
   });
@@ -106,14 +127,13 @@ describe("TwoFactorSettings", () => {
 
   it("verifies the code and confirms enrollment", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
     apiPost.mockResolvedValueOnce({ ok: true });
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
+    const codeInput = await startEnrollment();
 
-    fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "123456" } });
+    fireEvent.change(codeInput, { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
 
     await waitFor(() => {
@@ -124,14 +144,13 @@ describe("TwoFactorSettings", () => {
 
   it("says the code is wrong and stays on the verify step", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
     apiPost.mockRejectedValueOnce(apiError(400, "INVALID_CODE", "Invalid TOTP or recovery code"));
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
+    const codeInput = await startEnrollment();
 
-    fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "000000" } });
+    fireEvent.change(codeInput, { target: { value: "000000" } });
     fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
 
     expect(await screen.findByText(en.auth.mfaInvalidCode)).toBeInTheDocument();
@@ -141,16 +160,15 @@ describe("TwoFactorSettings", () => {
 
   it("doesn't blame the code when verify fails on the server's side", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
     apiPost.mockRejectedValueOnce(
       apiError(500, "DECRYPTION_FAILED", "Failed to decrypt TOTP secret"),
     );
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
+    const codeInput = await startEnrollment();
 
-    fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "123456" } });
+    fireEvent.change(codeInput, { target: { value: "123456" } });
     fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
 
     // Must not be mislabeled as a wrong code -- a decryption/config failure
@@ -162,11 +180,10 @@ describe("TwoFactorSettings", () => {
 
   it("cancels enrollment and returns to the idle view without verifying", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
+    await startEnrollment();
 
     fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
@@ -216,11 +233,10 @@ describe("TwoFactorSettings", () => {
 
   it("copies recovery codes to the clipboard", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
+    await startEnrollment();
 
     fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
 
@@ -232,12 +248,11 @@ describe("TwoFactorSettings", () => {
 
   it("shows an error instead of silently doing nothing when the clipboard write fails", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
     copyToClipboard.mockResolvedValueOnce(false);
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
+    await startEnrollment();
 
     fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
 
@@ -249,13 +264,10 @@ describe("TwoFactorSettings", () => {
 
   it("strips non-digit characters from the verify code as the user types", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
-
-    const codeInput = screen.getByPlaceholderText("000000") as HTMLInputElement;
+    const codeInput = await startEnrollment();
     fireEvent.change(codeInput, { target: { value: "12ab34" } });
 
     expect(codeInput.value).toBe("1234");
@@ -263,13 +275,10 @@ describe("TwoFactorSettings", () => {
 
   it("keeps the confirm button disabled until the code reaches 6 digits", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
-    apiPost.mockResolvedValueOnce(ENROLL_RESPONSE);
+    respondToEnroll();
 
     render(<TwoFactorSettings />);
-    fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll"));
-
-    const codeInput = screen.getByPlaceholderText("000000");
+    const codeInput = await startEnrollment();
     const confirmButton = screen.getByRole("button", { name: /confirm and enable/i });
 
     fireEvent.change(codeInput, { target: { value: "12345" } });
