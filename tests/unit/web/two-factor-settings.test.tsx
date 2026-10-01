@@ -20,13 +20,6 @@ vi.mock("@/lib/utils", async (importOriginal) => {
   return { ...actual, copyToClipboard };
 });
 
-vi.mock("qr-code-styling", () => ({
-  default: class {
-    append() {}
-    update() {}
-  },
-}));
-
 import { en } from "@snapotter/shared";
 import { TwoFactorSettings } from "@/components/settings/two-factor-settings";
 import { ApiError } from "@/lib/api";
@@ -91,13 +84,33 @@ describe("TwoFactorSettings", () => {
     useAuth.mockReturnValue({ totpEnabled: false });
     respondToEnroll();
 
-    render(<TwoFactorSettings />);
+    const { container } = render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
 
     expect(apiPost).toHaveBeenCalledWith("/auth/mfa/enroll");
     expect(await screen.findByText("JBSWY3DPEHPK3PXP")).toBeInTheDocument();
     expect(screen.getByText("aaaa1111")).toBeInTheDocument();
     expect(screen.getByText("bbbb2222")).toBeInTheDocument();
+    // qr-code-styling runs for real here (a bare-specifier vi.mock of it never
+    // applied from this root-level file) and draws a canvas from an effect
+    // that runs just after the render above, so wait for it.
+    await waitFor(() => expect(container.querySelector("canvas")).toBeInTheDocument());
+  });
+
+  it("ignores a second Enable click while enrollment is still pending", async () => {
+    useAuth.mockReturnValue({ totpEnabled: false });
+    respondToEnroll();
+
+    render(<TwoFactorSettings />);
+    const enable = screen.getByRole("button", { name: /enable two-factor authentication/i });
+    fireEvent.click(enable);
+
+    expect(enable).toBeDisabled();
+    fireEvent.click(enable);
+    expect(apiPost).toHaveBeenCalledTimes(1);
+
+    expect(await screen.findByText("JBSWY3DPEHPK3PXP")).toBeInTheDocument();
+    expect(apiPost).toHaveBeenCalledTimes(1);
   });
 
   it("names the missing licence when enrollment is rejected (#1445)", async () => {

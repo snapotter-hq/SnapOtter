@@ -4,7 +4,16 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const apiGet = vi.hoisted(() => vi.fn().mockResolvedValue({ settings: {} }));
+// Settle the settings load on a later macrotask, like a real response, so a
+// test that reads the form before it renders fails every run, not just on a
+// loaded CI runner (#1785).
+const apiGet = vi.hoisted(() =>
+  vi
+    .fn()
+    .mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ settings: {} }), 20)),
+    ),
+);
 const apiPut = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (importOriginal) => {
