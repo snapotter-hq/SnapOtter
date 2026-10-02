@@ -91,6 +91,8 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
       if (!isLatest()) return;
       console.error("[file-library-modal] failed to load the file library", err);
       setFiles([]);
+      // The ticked files are gone from the list, so Import has nothing to fetch.
+      setCheckedIds(new Set());
       setLoadFailed(true);
     } finally {
       if (isLatest()) setLoading(false);

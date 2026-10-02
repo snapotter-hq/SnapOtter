@@ -66,7 +66,7 @@ describe("FileLibraryModal list fetch (#1933)", () => {
 
     render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
 
-    expect(await screen.findByText(en.files.loadFailed)).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(en.files.loadFailed);
     expect(screen.queryByText(en.files.noFilesFound)).not.toBeInTheDocument();
     expect(consoleError).toHaveBeenCalledWith(expect.any(String), cause);
 
@@ -97,6 +97,30 @@ describe("FileLibraryModal list fetch (#1933)", () => {
     fireEvent.click(screen.getByRole("button", { name: en.common.retry }));
     await waitFor(() => expect(apiListFiles).toHaveBeenCalledTimes(3));
     expect(apiListFiles.mock.calls[2][0]).toMatchObject({ search: "otter" });
+  });
+
+  it("drops the previous list and its ticks when a later search fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    apiListFiles.mockResolvedValueOnce({ files: [userFile("a", "beaver.png")], total: 1 });
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    fireEvent.click(await screen.findByText("beaver.png"));
+    expect(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
+      }),
+    ).toBeEnabled();
+
+    apiListFiles.mockRejectedValueOnce(new Error("API down"));
+    fireEvent.change(screen.getByPlaceholderText(en.files.searchPlaceholder), {
+      target: { value: "otter" },
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(await screen.findByText(en.files.loadFailed)).toBeInTheDocument();
+    expect(screen.queryByText("beaver.png")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.commonUi.fileLibrary.import })).toBeDisabled();
   });
 
   it("ignores a search answer that lands after a reopen's unfiltered list", async () => {
