@@ -39,6 +39,7 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];
     vi.stubGlobal("EventSource", FakeEventSource);
+    vi.mocked(captureHandledError).mockClear();
   });
 
   afterEach(() => {
@@ -161,6 +162,31 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     });
 
     expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
+  });
+
+  // #1830 split "complete with no result" off the progress branch; a running
+  // job's progress frame must still only report progress.
+  it("passes a progress frame through without ending the run", () => {
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+    const onFailed = vi.fn();
+    const cleanup = subscribe("job-progress", {
+      onProgress,
+      onComplete,
+      onFailed,
+      onStall: vi.fn(),
+    });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "processing", percent: 40 }),
+    });
+
+    expect(onProgress).toHaveBeenCalledWith(40);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(FakeEventSource.instances[0].readyState).toBe(FakeEventSource.OPEN);
+    cleanup();
   });
 
   it("ignores a malformed frame and keeps waiting", () => {

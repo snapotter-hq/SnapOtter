@@ -445,6 +445,7 @@ describe("erase-object single file: a completed frame with nothing to download (
     const unsubscribe = useFileStore.subscribe(() => {
       throw new Error("store broke");
     });
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
 
     try {
       expect(() =>
@@ -456,7 +457,12 @@ describe("erase-object single file: a completed frame with nothing to download (
       // stays the error: it is not relabelled as our own tracking failure.
       expect(useFileStore.getState().error).toBe(en.errors.invalidResponse);
       expectReported("Tool result has no download URL", undefined);
+      // The stream already let go of the run, so the teardown must still run
+      // or it sits at processing for good.
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(clearIntervalSpy).toHaveBeenCalled();
     } finally {
+      clearIntervalSpy.mockRestore();
       unsubscribe();
     }
   });

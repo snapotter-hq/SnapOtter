@@ -159,12 +159,7 @@ export function jobFailureMessage(
   errors: { processingFailedNoDetail: string; jobTrackingFailed: string; invalidResponse: string },
 ): string {
   if ("message" in failure) return failure.message;
-  switch (failure.reason) {
-    case "noDetail":
-      return errors.processingFailedNoDetail;
-    case "invalidResponse":
-      return errors.invalidResponse;
-    case "trackingFailed":
-      return errors.jobTrackingFailed;
-  }
+  if (failure.reason === "noDetail") return errors.processingFailedNoDetail;
+  if (failure.reason === "invalidResponse") return errors.invalidResponse;
+  return errors.jobTrackingFailed;
 }

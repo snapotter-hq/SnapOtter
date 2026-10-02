@@ -395,8 +395,14 @@ export function EraseObjectSettings({
       },
       onFailed: (failure) => {
         progressCleanupRef.current = null;
-        setError(jobFailureMessage(failure, t.errors));
-        finishUi();
+        // setError is a store write, and the stream has already let go of the
+        // run: a throw from it must not skip finishUi and leave the run at
+        // processing for good (#1830). It still surfaces, after the teardown.
+        try {
+          setError(jobFailureMessage(failure, t.errors));
+        } finally {
+          finishUi();
+        }
       },
       onStall: () => {
         progressCleanupRef.current = null;
