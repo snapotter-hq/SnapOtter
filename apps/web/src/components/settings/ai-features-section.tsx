@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { apiGet, formatHeaders } from "@/lib/api";
+import { apiGet, failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
@@ -271,8 +271,8 @@ function ImportBundleSection({ onImported }: { onImported: () => void }) {
         return;
       }
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(body.error || `Import failed: ${res.status}`);
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Import failed: ${res.status}`));
       }
 
       setFeedback({ type: "success", message: t.settings.aiFeatures.importSuccess });

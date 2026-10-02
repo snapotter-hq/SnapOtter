@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { formatHeaders } from "@/lib/api";
+import { useTranslation } from "@/contexts/i18n-context";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ export function useUrlImport() {
   const [entries, setEntries] = useState<UrlImportEntry[]>([]);
   const [importing, setImporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { t } = useTranslation();
 
   // -- helpers --
 
@@ -53,12 +55,12 @@ export function useUrlImport() {
         signal,
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as Record<string, string>).error || `Fetch failed: ${res.status}`);
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Fetch failed: ${res.status}`));
       }
       return resolveServerUrls(await res.json());
     },
-    [],
+    [t],
   );
 
   const resultToEntry = useCallback((result: FetchUrlResult): UrlImportEntry => {

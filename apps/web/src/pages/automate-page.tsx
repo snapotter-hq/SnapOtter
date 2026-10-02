@@ -37,7 +37,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
-import { formatHeaders, getFileDownloadUrl } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders, getFileDownloadUrl } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
@@ -373,8 +373,8 @@ export function AutomatePage() {
         });
 
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: t.automate.importFailed }));
-          setImportError(err.error || t.automate.importFailed);
+          const body = await res.json().catch(() => null);
+          setImportError(failedAnswerMessage(t, body, res.status, t.automate.importFailed));
           return;
         }
 
@@ -390,15 +390,7 @@ export function AutomatePage() {
       }
     };
     input.click();
-  }, [
-    setSavedPipelines,
-    t.automate.invalidPipelineFile,
-    t.automate.noSteps,
-    t.automate.newerVersion,
-    t.automate.missingName,
-    t.automate.couldNotRead,
-    t.automate.importFailed,
-  ]);
+  }, [setSavedPipelines, t]);
 
   useEffect(() => {
     if (!importError) return;

@@ -11,9 +11,9 @@ export function HtmlToImageSettings() {
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      store.capture();
+      store.capture(t);
     },
-    [store],
+    [store, t],
   );
 
   return (

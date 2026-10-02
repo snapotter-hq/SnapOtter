@@ -1,5 +1,6 @@
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -190,7 +191,8 @@ interface MemeState {
   setTextAlign: (a: string) => void;
   setAllCaps: (v: boolean) => void;
   fetchTemplates: () => Promise<void>;
-  generateMeme: () => Promise<void>;
+  /** `t` words a failed answer (#1915); the store has no locale of its own. */
+  generateMeme: (t?: TranslationKeys) => Promise<void>;
   backToGallery: () => void;
   backToEditor: () => void;
   reset: () => void;
@@ -290,7 +292,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
     }
   },
 
-  generateMeme: async () => {
+  generateMeme: async (t = en) => {
     const state = get();
     set({ generating: true, error: null });
 
@@ -327,9 +329,9 @@ export const useMemeStore = create<MemeState>((set, get) => ({
       }
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
+        const body = await response.json().catch(() => null);
         throw new Error(
-          (body as Record<string, string>).error || `Generation failed: ${response.status}`,
+          failedAnswerMessage(t, body, response.status, `Generation failed: ${response.status}`),
         );
       }
 

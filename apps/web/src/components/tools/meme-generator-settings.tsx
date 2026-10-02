@@ -82,8 +82,8 @@ function EditorSettings() {
     : ((customLayout && PRESET_LAYOUTS[customLayout]?.boxes) ?? PRESET_LAYOUTS["top-bottom"].boxes);
 
   const handleGenerate = useCallback(() => {
-    generateMeme();
-  }, [generateMeme]);
+    generateMeme(t);
+  }, [generateMeme, t]);
 
   return (
     <div className="space-y-3">

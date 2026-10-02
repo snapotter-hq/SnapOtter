@@ -1792,7 +1792,8 @@ describe("useCollageStore", () => {
 // ==========================================================================
 
 // Mock the api module to prevent real network calls
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   apiGet: vi.fn(),
   apiPost: vi.fn(),
   apiPut: vi.fn(),

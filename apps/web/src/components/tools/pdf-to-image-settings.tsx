@@ -49,9 +49,9 @@ export function PdfToImageSettings() {
   useEffect(() => {
     if (file && file !== store.file) {
       store.setFile(file);
-      store.loadPreview(file);
+      store.loadPreview(file, t);
     }
-  }, [file, store]);
+  }, [file, store, t]);
 
   const isLossy = LOSSY_FORMATS.includes(store.format);
   const selectedCount = store.selectedPages.size;
@@ -232,7 +232,7 @@ export function PdfToImageSettings() {
       <button
         type="button"
         data-testid="pdf-to-image-submit"
-        onClick={() => store.convert()}
+        onClick={() => store.convert(t)}
         disabled={!store.file || !store.pageCount || store.processing || selectedCount === 0}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >

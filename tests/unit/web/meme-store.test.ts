@@ -8,7 +8,10 @@ vi.stubGlobal("URL", { ...globalThis.URL, createObjectURL, revokeObjectURL });
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
-vi.mock("@/lib/api", () => ({ formatHeaders: vi.fn(() => ({})) }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  formatHeaders: vi.fn(() => ({})),
+}));
 
 import type { MemeTemplate } from "@/stores/meme-store";
 import {

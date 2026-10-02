@@ -12,13 +12,15 @@ const { apiGetMock, formatHeadersMock } = vi.hoisted(() => ({
   formatHeadersMock: vi.fn(() => ({ Authorization: "Bearer test" })),
 }));
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   apiGet: apiGetMock,
   formatHeaders: formatHeadersMock,
 }));
 
 import { AiFeaturesSection } from "@/components/settings/ai-features-section";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
 const fetchMock = vi.fn();
@@ -155,6 +157,42 @@ describe("offline AI bundle import", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(expected);
     expect(screen.queryByText(/SERVER-TEXT/)).toBeNull();
+  });
+});
+
+describe("offline AI bundle import: a failed answer (#1915)", () => {
+  const fallback = "Import failed: 422";
+  it.each([
+    ["an object error", { error: { reason: "x" } }, fallback],
+    ["details alone", { details: "Not enough memory" }, "Not enough memory"],
+    ["a string error", { error: "Bad file" }, "Bad file"],
+    [
+      "the error handler's echo of one message",
+      { error: "Bad file", details: "Bad file" },
+      "Bad file",
+    ],
+    ["a body that is not JSON", null, fallback],
+  ])("shows %s as readable text", async (_label, body, reason) => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => {
+        if (body === null) throw new SyntaxError("Unexpected token '<'");
+        return body;
+      },
+    });
+    renderSection();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Legacy AI bundle" }));
+    fireEvent.change(screen.getByLabelText("Legacy bundle archive (.tar.gz)"), {
+      target: { files: [new File(["legacy"], "legacy-bundle.tar.gz")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      format(en.settings.aiFeatures.importError, { error: reason }),
+    );
+    expect(document.body.textContent).not.toContain("[object Object]");
   });
 });
 

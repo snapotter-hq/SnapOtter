@@ -1,5 +1,6 @@
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
 interface HtmlToImageState {
@@ -26,7 +27,8 @@ interface HtmlToImageState {
   setDevicePreset: (preset: "desktop" | "tablet" | "mobile" | "custom") => void;
   setViewportWidth: (width: number) => void;
   setViewportHeight: (height: number) => void;
-  capture: () => Promise<void>;
+  /** `t` words a failed answer (#1915); the store has no locale of its own. */
+  capture: (t?: TranslationKeys) => Promise<void>;
   reset: () => void;
 }
 
@@ -59,7 +61,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
   setViewportWidth: (viewportWidth) => set({ viewportWidth }),
   setViewportHeight: (viewportHeight) => set({ viewportHeight }),
 
-  capture: async () => {
+  capture: async (t = en) => {
     const state = get();
     const hasInput = state.mode === "url" ? state.url : state.htmlContent;
     if (!hasInput || state.capturing) return;
@@ -81,15 +83,17 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         }),
       });
 
-      const data = resolveServerUrls(await res.json());
-
       if (!res.ok) {
+        // A proxy's error page is not JSON; it still ends on the fallback.
+        const body = await res.json().catch(() => null);
         set({
-          error: data.details || data.error || "Capture failed",
+          error: failedAnswerMessage(t, body, res.status, "Capture failed"),
           capturing: false,
         });
         return;
       }
+
+      const data = resolveServerUrls(await res.json());
 
       set({
         resultUrl: data.downloadUrl,
