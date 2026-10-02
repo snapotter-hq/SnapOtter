@@ -637,6 +637,32 @@ describe("sign-pdf reports a malformed result", () => {
     expectReported("Tool result has no download URL", undefined);
   });
 
+  // #1885: a completed frame with no result used to fall into the progress
+  // branch and sit at processing until the five-minute stall timer, and a
+  // result that isn't an object was filed under the wrong type.
+  it.each([
+    ["no result", {}],
+    ["a string result", { result: "done" }],
+    ["an array result", { result: [] }],
+  ])("ends the run at once on a streamed frame with %s", async (_label, extra) => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", ...extra }),
+      });
+    });
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expect(screen.queryByText(en.toolSettings["sign-pdf"].stall)).not.toBeInTheDocument();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry().status).not.toBe("completed");
+    expect(entry().processedUrl).toBeNull();
+    expectReported("Tool result body is not a JSON object", undefined);
+  });
+
   it("reports nothing for a good result", async () => {
     renderPanel();
 

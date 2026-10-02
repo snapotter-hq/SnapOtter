@@ -206,83 +206,93 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
   });
 });
 
-// #1830: Erase Object checks a completed frame's result the way the shared
-// hooks do since #1794. Sign PDF checks it in its component's landResult.
-describe("erase-object async progress: a completed frame with nothing to download", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    FakeEventSource.instances = [];
-    vi.stubGlobal("EventSource", FakeEventSource);
-    vi.mocked(captureHandledError).mockClear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-  });
-
-  it.each([
-    ["an empty result", { result: {} }],
-    ["a non-string download URL", { result: { downloadUrl: 42 } }],
-    ["an array result", { result: [] }],
-    ["no result at all", {}],
-  ])("fails the run as an invalid response for %s", (_label, extra) => {
-    const onComplete = vi.fn();
-    const onFailed = vi.fn();
-    const onStall = vi.fn();
-    subscribeEraseObjectJobProgress("job-empty", { onComplete, onFailed, onStall });
-
-    FakeEventSource.instances[0].onmessage?.({
-      data: JSON.stringify({ type: "single", phase: "complete", ...extra }),
+// #1830 and #1885: both subscribers check a completed frame's result the way
+// the shared hooks do since #1794, so a frame with nothing to download ends the
+// run at once instead of waiting out the stall timer.
+describe.each(subscribers)(
+  "%s async progress: a completed frame with nothing to download",
+  (name, subscribe) => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      FakeEventSource.instances = [];
+      vi.stubGlobal("EventSource", FakeEventSource);
+      vi.mocked(captureHandledError).mockClear();
     });
 
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(onFailed).toHaveBeenCalledOnce();
-    expect(onFailed).toHaveBeenCalledWith({ reason: "invalidResponse" });
-    expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
-    expect(FakeEventSource.instances[0].readyState).toBe(2);
-    // The run is over: the stall timer went with the stream.
-    vi.advanceTimersByTime(10 * 60_000);
-    expect(onStall).not.toHaveBeenCalled();
-  });
-
-  it("rethrows a throw from onFailed without relabelling it as a tracking failure", () => {
-    const onFailed = vi.fn(() => {
-      throw new Error("onFailed broke");
-    });
-    subscribeEraseObjectJobProgress("job-empty-throw", {
-      onComplete: vi.fn(),
-      onFailed,
-      onStall: vi.fn(),
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
     });
 
-    expect(() =>
+    it.each([
+      ["an empty result", { result: {} }, "ResultWithoutDownloadError"],
+      ["a non-string download URL", { result: { downloadUrl: 42 } }, "ResultWithoutDownloadError"],
+      ["an array result", { result: [] }, "ResultNotAnObjectError"],
+      ["a string result", { result: "done" }, "ResultNotAnObjectError"],
+      ["a null result", { result: null }, "ResultNotAnObjectError"],
+      ["no result at all", {}, "ResultNotAnObjectError"],
+    ])("fails the run as an invalid response for %s", (_label, extra, reportedAs) => {
+      const onComplete = vi.fn();
+      const onFailed = vi.fn();
+      const onStall = vi.fn();
+      subscribe("job-empty", { onComplete, onFailed, onStall });
+
       FakeEventSource.instances[0].onmessage?.({
-        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
-      }),
-    ).toThrow("onFailed broke");
-    expect(onFailed).toHaveBeenCalledOnce();
-    expect(onFailed).toHaveBeenCalledWith({ reason: "invalidResponse" });
-    expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
-  });
+        data: JSON.stringify({ type: "single", phase: "complete", ...extra }),
+      });
 
-  it("ignores a completed frame of another kind", () => {
-    const onComplete = vi.fn();
-    const onFailed = vi.fn();
-    const cleanup = subscribeEraseObjectJobProgress("job-batch-frame", {
-      onComplete,
-      onFailed,
-      onStall: vi.fn(),
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onFailed).toHaveBeenCalledOnce();
+      expect(onFailed).toHaveBeenCalledWith({ reason: "invalidResponse" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.name).toBe(reportedAs);
+      expect((reported as { statusCode?: number }).statusCode).toBeUndefined();
+      expect(tags).toEqual({ error_class: "operational", tool_id: name });
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+      // The run is over: the stall timer went with the stream.
+      vi.advanceTimersByTime(10 * 60_000);
+      expect(onStall).not.toHaveBeenCalled();
     });
 
-    FakeEventSource.instances[0].onmessage?.({
-      data: JSON.stringify({ type: "batch", phase: "complete" }),
+    it("rethrows a throw from onFailed without relabelling it as a tracking failure", () => {
+      const onFailed = vi.fn(() => {
+        throw new Error("onFailed broke");
+      });
+      subscribe("job-empty-throw", {
+        onComplete: vi.fn(),
+        onFailed,
+        onStall: vi.fn(),
+      });
+
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        }),
+      ).toThrow("onFailed broke");
+      expect(onFailed).toHaveBeenCalledOnce();
+      expect(onFailed).toHaveBeenCalledWith({ reason: "invalidResponse" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
     });
 
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(onFailed).not.toHaveBeenCalled();
-    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
-    expect(FakeEventSource.instances[0].readyState).toBe(FakeEventSource.OPEN);
-    cleanup();
-  });
-});
+    it("ignores a completed frame of another kind", () => {
+      const onComplete = vi.fn();
+      const onFailed = vi.fn();
+      const cleanup = subscribe("job-batch-frame", {
+        onComplete,
+        onFailed,
+        onStall: vi.fn(),
+      });
+
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "batch", phase: "complete" }),
+      });
+
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onFailed).not.toHaveBeenCalled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+      expect(FakeEventSource.instances[0].readyState).toBe(FakeEventSource.OPEN);
+      cleanup();
+    });
+  },
+);

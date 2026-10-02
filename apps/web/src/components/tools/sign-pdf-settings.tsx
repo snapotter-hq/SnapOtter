@@ -8,10 +8,10 @@ import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import {
+  checkToolResult,
   frameFailure,
   type JobFailure,
   jobFailureMessage,
-  MalformedResultError,
   type ProgressFrame,
   parseResultBody,
   reportMalformedResult,
@@ -96,6 +96,23 @@ export function subscribeSignPdfJobProgress(
       } catch {
         return;
       }
+      // A completed frame with nothing to download is the server's bug, the
+      // twin of a sync 2xx body with no downloadUrl (#1740). It used to fall
+      // through to the progress branch and wait out the stall timer (#1885).
+      // It ends the run outside the catch below, so a throw while showing the
+      // error can't relabel it as ours (#1830).
+      let completed: Record<string, unknown> | null = null;
+      if (data.type === "single" && data.phase === "complete") {
+        try {
+          completed = checkToolResult<Record<string, unknown>>(data.result);
+        } catch (err) {
+          cleanup();
+          // Reported first: a throw from onFailed's store writes must not lose it.
+          reportMalformedResult(err, { toolId: "sign-pdf" });
+          handlers.onFailed({ reason: "invalidResponse" });
+          return;
+        }
+      }
       try {
         if (data.type === "heartbeat") {
           resetStall();
@@ -103,9 +120,9 @@ export function subscribeSignPdfJobProgress(
         }
         if (data.type !== "single") return;
         resetStall();
-        if (data.phase === "complete" && data.result) {
+        if (completed) {
           cleanup();
-          handlers.onComplete(data.result);
+          handlers.onComplete(completed);
           return;
         }
         if (data.phase === "failed") {
@@ -282,14 +299,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     let landed = false;
     const landResult = (r: Record<string, unknown>) => {
       if (landed) return;
-      const url = typeof r.downloadUrl === "string" ? r.downloadUrl : null;
-      if (!url) {
-        // Only the progress stream's result gets here: parseResultBody already
-        // turned a sync answer without one away. Still the server's bug (#1740).
-        setError(t.errors.invalidResponse);
-        reportMalformedResult(new MalformedResultError("noDownloadUrl"), { toolId: "sign-pdf" });
-        return;
-      }
+      // Both answers were checked before they got here: parseResultBody turns
+      // a sync body without one away, and the progress subscriber a completed
+      // frame (#1885), each reporting it as the server's bug (#1740).
+      const url = r.downloadUrl as string;
       landed = true;
       useFileStore.getState().updateEntry(capturedIndex, {
         processedUrl: url,
