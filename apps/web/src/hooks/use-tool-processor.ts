@@ -220,19 +220,24 @@ export function useToolProcessor(toolId: string) {
   // second throw here must not leave the run stuck at processing with the
   // cancel button still armed (#1698, the twin of #1352's pipeline fix).
   // The throw is reported as well as logged, or it never reaches Sentry
-  // (#1812).
+  // (#1812). Each entry gets its own try, so one write that throws can't
+  // leave a batch's later entries pulsing (#1821, the twin of the pipeline's
+  // #1779), and the settle reports once, not once per entry.
   const settleProcessingEntries = useCallback(
     (message: string) => {
-      try {
-        const { entries, updateEntry } = useFileStore.getState();
-        for (let i = 0; i < entries.length; i++) {
-          if (entries[i]?.status === "processing") {
-            updateEntry(i, { status: "failed", error: message });
-          }
+      const { entries, updateEntry } = useFileStore.getState();
+      let firstError: { cause: unknown } | null = null;
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i]?.status !== "processing") continue;
+        try {
+          updateEntry(i, { status: "failed", error: message });
+        } catch (err) {
+          console.error("Failing the run's entry failed", err);
+          firstError ??= { cause: err };
         }
-      } catch (err) {
-        console.error("Failing the run's entry failed", err);
-        reportRunEndFailure("Failing a tool run's entries failed", err, toolId);
+      }
+      if (firstError) {
+        reportRunEndFailure("Failing a tool run's entries failed", firstError.cause, toolId);
       }
     },
     [toolId],

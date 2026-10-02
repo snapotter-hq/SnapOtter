@@ -1696,4 +1696,107 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
 
     unmount();
   });
+
+  it("fails every entry of a batch when the store keeps throwing after the start", async () => {
+    const files = [clipFile("a.mp4"), clipFile("b.mp4"), clipFile("c.mp4")];
+    useFileStore.getState().setFiles(files);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    // Every write from the one that turns processing on throws, so failing
+    // the first entry throws too and must not leave the others pulsing.
+    let broken = false;
+    unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (broken) throw new Error("store broke");
+      if (!prev.processing && state.processing) {
+        broken = true;
+        throw new Error("kickoff broke");
+      }
+    });
+
+    let thrown: unknown;
+    await act(async () => {
+      await result.current.processAllFiles(files, { startS: 0, endS: 2 }).catch((err: unknown) => {
+        thrown = err;
+      });
+    });
+    expect(() => {
+      throw thrown;
+    }).toThrow("kickoff broke");
+    unsubscribe();
+    unsubscribe = null;
+
+    expectRunEnded(3);
+    // One report for the settle, however many of its writes threw.
+    expectReportedOnce(TOOL_SETTLE_REPORT);
+
+    unmount();
+  });
+
+  it("ends the run once when the send itself throws", () => {
+    const file = clipFile();
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    vi.mocked(XMLHttpRequest).mockImplementationOnce(() => {
+      const xhr: MockXhr = {
+        status: 0,
+        responseText: "",
+        timeout: 0,
+        upload: {},
+        open: vi.fn(),
+        send: vi.fn(() => {
+          throw new Error("send broke");
+        }),
+        setRequestHeader: vi.fn(),
+        abort: vi.fn(),
+      };
+      xhrs.push(xhr);
+      return xhr as unknown as XMLHttpRequest;
+    });
+
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2 }))).toThrow(
+      "send broke",
+    );
+    act(() => {});
+
+    expectRunEnded(1);
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("runs normally on the next try after a start that threw", () => {
+    const file = clipFile();
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2n }))).toThrow(
+      TypeError,
+    );
+    act(() => {});
+
+    act(() => result.current.processFiles([file], { startS: 0, endS: 2 }));
+    expect(xhrs).toHaveLength(1);
+    expect(xhrs[0].send).toHaveBeenCalledTimes(1);
+    expect(latestSse().close).not.toHaveBeenCalled();
+    expect(useFileStore.getState()).toMatchObject({ processing: true, error: null });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        jobId: "server-job",
+        downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+        originalSize: 64,
+        processedSize: 32,
+      });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      error: null,
+    });
+    expect(useFileStore.getState()).toMatchObject({ processing: false, error: null });
+
+    unmount();
+  });
 });

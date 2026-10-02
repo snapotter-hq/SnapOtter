@@ -2055,6 +2055,36 @@ describe("usePipelineProcessor ends a run whose start throws (#1821)", () => {
     unmount();
   });
 
+  it("runs normally on the next try after a start that threw", () => {
+    const [file] = photoFiles(1);
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    expect(() => act(() => result.current.processSingle(file, UNSERIALIZABLE_STEPS))).toThrow(
+      TypeError,
+    );
+    act(() => {});
+
+    act(() => result.current.processSingle(file, STEPS));
+    expect(xhrs).toHaveLength(1);
+    expect(xhrs[0].send).toHaveBeenCalledTimes(1);
+    expect(latestSse().close).not.toHaveBeenCalled();
+    expect(useFileStore.getState()).toMatchObject({ processing: true, error: null });
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      error: null,
+    });
+    expect(useFileStore.getState()).toMatchObject({ processing: false, error: null });
+    unmount();
+  });
+
   it("rethrows the root cause and reports a teardown that throws too, once", () => {
     const [file] = photoFiles(1);
     useFileStore.getState().setFiles([file]);
