@@ -40,6 +40,7 @@ vi.mock("qr-code-styling", () => ({
 import { AvatarDropdown } from "@/components/layout/avatar-dropdown";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { appUrl } from "@/lib/app-url";
 import { logoutDestination } from "@/lib/logout-destination";
 
 const HOSTILE = [
@@ -67,31 +68,44 @@ describe("logoutDestination", () => {
   });
 
   it.each(HOSTILE)("sends %j to the login page instead", (url) => {
-    expect(logoutDestination(url)).toBe("/login");
+    expect(logoutDestination(url)).toBe(appUrl("/login"));
   });
 
   it.each([undefined, null, 42, { href: "https://idp.example/" }, ["https://idp.example/"]])(
     "sends a non-string logoutUrl (%j) to the login page",
     (value) => {
-      expect(logoutDestination(value)).toBe("/login");
+      expect(logoutDestination(value)).toBe(appUrl("/login"));
     },
   );
 });
 
 // window.location.href assignment, captured instead of navigating jsdom.
 let navigatedTo: string[];
+// The handlers' catch also goes to the login page, so a test expecting the
+// login page must prove the logout response was read, or a throw anywhere
+// in the try would pass it.
+let logoutBodyRead: ReturnType<typeof vi.fn>;
 
 function stubLogoutResponse(body: unknown) {
+  logoutBodyRead = vi.fn(async () => body);
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/auth/logout")) {
-        return { ok: true, status: 200, json: async () => body };
+        return { ok: true, status: 200, json: logoutBodyRead };
       }
       throw new Error(`unexpected fetch in test: ${url}`);
     }),
   );
+}
+
+async function expectSingleNavigationAfterReadingResponse() {
+  await waitFor(() => expect(navigatedTo).toHaveLength(1));
+  // A late second assignment would land after the first one; give it a turn.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(navigatedTo).toHaveLength(1);
+  expect(logoutBodyRead).toHaveBeenCalledTimes(1);
 }
 
 beforeEach(() => {
@@ -136,7 +150,7 @@ async function logOutFromAvatarMenu() {
   );
   fireEvent.click(screen.getByTestId("user-menu"));
   fireEvent.click(screen.getByRole("button", { name: "Log out" }));
-  await waitFor(() => expect(navigatedTo).toHaveLength(1));
+  await expectSingleNavigationAfterReadingResponse();
 }
 
 async function logOutFromSettings() {
@@ -146,7 +160,7 @@ async function logOutFromSettings() {
     </I18nProvider>,
   );
   fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
-  await waitFor(() => expect(navigatedTo).toHaveLength(1));
+  await expectSingleNavigationAfterReadingResponse();
 }
 
 describe.each([
@@ -161,7 +175,7 @@ describe.each([
 
     await logOut();
 
-    expect(navigatedTo).toEqual(["/login"]);
+    expect(navigatedTo).toEqual([appUrl("/login")]);
   });
 
   it("follows an https logoutUrl to the IdP", async () => {
@@ -178,6 +192,6 @@ describe.each([
 
     await logOut();
 
-    expect(navigatedTo).toEqual(["/login"]);
+    expect(navigatedTo).toEqual([appUrl("/login")]);
   });
 });

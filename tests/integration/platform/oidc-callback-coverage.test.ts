@@ -834,22 +834,25 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   // Log out against /scheme/<key>, whose end_session_endpoint is
   // SCHEME_ENDPOINTS[key]. With the default http EXTERNAL_URL the route runs
   // the discovery itself on a cold cache. An https EXTERNAL_URL turns off
-  // plain-http discovery, which the mock IdP needs, so that case discovers
-  // first under http and switches EXTERNAL_URL just for the logout.
-  async function logoutWithEndSessionEndpoint(key: string, externalUrl = "http://localhost:9999") {
+  // plain-http discovery, which the mock IdP needs, so passing externalUrl
+  // discovers first under the ambient http one and switches EXTERNAL_URL
+  // just for the logout.
+  async function logoutWithEndSessionEndpoint(key: string, externalUrl?: string) {
     const sessionToken = await oidcSessionWithWarmCache();
+    const prevExternalUrl = env.EXTERNAL_URL;
+    const prevIssuerUrl = env.OIDC_ISSUER_URL;
     oidcModule.resetOidcDiscoveryCacheForTests();
     (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/scheme/${key}`;
     try {
-      if (externalUrl !== env.EXTERNAL_URL) {
+      if (externalUrl !== undefined) {
         expect(await getOidcEndSessionEndpoint()).toBe(SCHEME_ENDPOINTS[key](mockPort));
         (env as any).EXTERNAL_URL = externalUrl;
       }
       const res = await logoutWithSession(sessionToken);
       return { res, sessionToken };
     } finally {
-      (env as any).EXTERNAL_URL = "http://localhost:9999";
-      (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+      (env as any).EXTERNAL_URL = prevExternalUrl;
+      (env as any).OIDC_ISSUER_URL = prevIssuerUrl;
       // This discovery succeeded, so the cache now holds that issuer's document.
       oidcModule.resetOidcDiscoveryCacheForTests();
     }
@@ -904,8 +907,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   });
 
   it.each([
-    ["http", "http://localhost:9999"],
-    ["https", "http://localhost:9999"],
+    ["http", undefined],
+    ["https", undefined],
     ["https", "https://snapotter.example.test"],
   ])(
     "returns logoutUrl for a %s end_session_endpoint with EXTERNAL_URL %s (#1855)",
@@ -918,7 +921,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       const logoutUrl = new URL(body.logoutUrl ?? "");
       expect(`${logoutUrl.origin}${logoutUrl.pathname}`).toBe(SCHEME_ENDPOINTS[key](mockPort));
       expect(logoutUrl.searchParams.get("id_token_hint")).toBe("fake-id-token");
-      expect(logoutUrl.searchParams.get("post_logout_redirect_uri")).toBe(`${externalUrl}/login`);
+      expect(logoutUrl.searchParams.get("post_logout_redirect_uri")).toBe(
+        `${externalUrl ?? "http://localhost:9999"}/login`,
+      );
       await expectSessionGone(sessionToken);
       expect(reportErrorSpy).not.toHaveBeenCalled();
     },
@@ -928,15 +933,18 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   // logout endpoint (which would carry the ID token in the clear) gets the
   // same answer. A local-dev IdP on http needs an http EXTERNAL_URL to be
   // discovered at all, so it keeps working (the case above).
-  it("omits logoutUrl and reports an http end_session_endpoint when EXTERNAL_URL is https (#1855)", async () => {
-    const { res, sessionToken } = await logoutWithEndSessionEndpoint(
-      "http",
-      "https://snapotter.example.test",
-    );
+  it.each(["http", "javascript"])(
+    "omits logoutUrl and reports a %s end_session_endpoint when EXTERNAL_URL is https (#1855)",
+    async (key) => {
+      const { res, sessionToken } = await logoutWithEndSessionEndpoint(
+        key,
+        "https://snapotter.example.test",
+      );
 
-    await expectLoggedOutLocally(res, sessionToken);
-    expectReportedSchemeFault();
-  });
+      await expectLoggedOutLocally(res, sessionToken);
+      expectReportedSchemeFault();
+    },
+  );
 
   // Only an ID-token session with OIDC on needs the IdP. Any other logout on a
   // cold cache must not wait on discovery, even with the IdP hanging.

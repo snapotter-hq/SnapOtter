@@ -718,9 +718,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             // would run in our origin (#1855). Plain http only where discovery
             // itself may use it (an http EXTERNAL_URL, i.e. a dev setup); on
             // https it would also send the ID token in the clear. The message
-            // is constant so no part of the endpoint reaches Sentry.
+            // is constant so no part of the endpoint reaches Sentry; only the
+            // local log names the scheme, so an operator can tell an http
+            // endpoint on an https deployment from a hostile one.
             const allowed = isHttpsUrl(env.EXTERNAL_URL) ? ["https:"] : ["https:", "http:"];
             if (!allowed.includes(url.protocol)) {
+              request.log.warn(
+                { scheme: url.protocol.slice(0, 32), userId: session.userId },
+                "logout: OIDC end_session_endpoint scheme not allowed",
+              );
               throw new SafeError("OIDC end_session_endpoint has an unsupported scheme", {
                 code: "OIDC_END_SESSION_SCHEME",
               });
