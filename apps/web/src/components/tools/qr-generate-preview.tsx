@@ -115,7 +115,11 @@ export function QrGeneratePreview() {
         className="rounded-xl border border-border p-6 shadow-sm"
         style={store.bgTransparent ? { background: CHECKER_BG } : undefined}
       >
-        <div ref={containerRef} className="flex items-center justify-center" />
+        <div
+          ref={containerRef}
+          data-testid="qr-preview"
+          className="flex items-center justify-center"
+        />
       </div>
       {isEmpty && (
         <p className="text-sm text-muted-foreground">
