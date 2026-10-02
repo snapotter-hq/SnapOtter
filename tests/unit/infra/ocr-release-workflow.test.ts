@@ -115,14 +115,14 @@ describe("OCR v3 bundle release workflow", () => {
     const ci = readRequired(ciWorkflowPath);
     const bundles = readRequired(bundlesWorkflowPath);
     for (const workflow of [ci, bundles]) {
-      expect(workflow).toContain('pip install "pip-audit==2.10.0"');
+      expect(workflow).toContain('"pip-audit==2.10.0"');
       expect(workflow).toContain("docker/ocr-runtime-requirements-amd64.txt");
       expect(workflow).toContain("docker/ocr-runtime-requirements-arm64.txt");
-      expect(workflow).toContain("--no-deps --disable-pip --aliases");
+      expect(workflow).toContain("--no-deps --disable-pip --aliases --strict");
     }
-    expect(job(bundles, "build-ocr", "verify-ocr")).toContain(
-      "Audit exact OCR runtime dependency lock",
-    );
+    // The release-time OCR audit lives in its own secretless job (#1950), so
+    // nothing unhashed runs on the runner that logs in to GHCR.
+    expect(job(bundles, "build-ocr", "verify-ocr")).not.toContain("pip-audit");
 
     // The required "Python Dependency Audit" check must also cover the lock the
     // HuggingFace publish job installs with the write token in scope (#1761).
@@ -138,6 +138,22 @@ describe("OCR v3 bundle release workflow", () => {
     expect(ciParsed.defaults).toBeUndefined();
     expect(ciAuditJob.defaults).toBeUndefined();
     expect(ciAuditJob["continue-on-error"]).toBeUndefined();
+    // --strict on both audits (#1950): without it pip-audit skips an entry it
+    // can't check (a URL pin, a package PyPI no longer lists) and exits 0.
+    const sidecarStep = ciAuditJob.steps.find(
+      (step) => step.name === "Run pip-audit (ignoring CVEs blocked by dependency constraints)",
+    );
+    expect(sidecarStep, "sidecar requirements audit step is missing").toBeDefined();
+    expect(Object.keys(sidecarStep ?? {}).sort()).toEqual(["name", "run"]);
+    expect(sidecarStep?.run).toBe(
+      [
+        "pip-audit -r packages/ai/python/requirements.txt",
+        "--ignore-vuln CVE-2024-27763",
+        "--ignore-vuln CVE-2026-40086",
+        "--ignore-vuln GHSA-55v6-g8pm-pw4c",
+        "--strict",
+      ].join(" "),
+    );
     const lockStep = ciAuditJob.steps.find(
       (step) => step.name === "Audit exact OCR runtime and HF release dependency locks",
     );
@@ -149,7 +165,7 @@ describe("OCR v3 bundle release workflow", () => {
         "  docker/ocr-runtime-requirements-amd64.txt \\",
         "  docker/ocr-runtime-requirements-arm64.txt \\",
         "  docker/hf-release-requirements.txt; do",
-        '  pip-audit -r "${requirements}" --no-deps --disable-pip --aliases',
+        '  pip-audit -r "${requirements}" --no-deps --disable-pip --aliases --strict',
         "done",
         "",
       ].join("\n"),
@@ -791,6 +807,104 @@ describe("OCR v3 bundle release workflow", () => {
     expect(firstSecretStep).toBeGreaterThan(install);
   });
 
+  it("audits the OCR runtime locks at release time, off the GHCR-token runner (#1950)", () => {
+    // build-ocr logs in to GHCR and builds the runtime that gets signed and
+    // shipped. pip-audit is not hash-locked, so it runs in its own secretless
+    // job (fresh runner) rather than ahead of those steps, where it could write
+    // $GITHUB_ENV or $GITHUB_PATH. Parsed rather than substring-matched, so
+    // `|| true`, `continue-on-error`, an `if:`, a custom shell, a dropped
+    // `needs` edge or a dropped --strict can't turn the guard into a no-op.
+    type Step = Record<string, unknown> & { with?: Record<string, unknown> };
+    type Job = Record<string, unknown> & { steps: Step[] };
+    const parsed = load(readRequired(bundlesWorkflowPath)) as {
+      env?: unknown;
+      defaults?: unknown;
+      jobs: Record<string, Job>;
+    };
+    const auditJob = parsed.jobs["audit-ocr-release-locks"];
+    const buildJob = parsed.jobs["build-ocr"];
+    expect(auditJob, "audit-ocr-release-locks job is missing").toBeDefined();
+    expect(parsed.env).toBeUndefined();
+    expect(parsed.defaults).toBeUndefined();
+
+    expect(Object.keys(auditJob).sort()).toEqual([
+      "name",
+      "needs",
+      "permissions",
+      "runs-on",
+      "steps",
+      "timeout-minutes",
+    ]);
+    expect(auditJob["runs-on"]).toBe("ubuntu-latest");
+    expect(auditJob.needs).toBe("validate-inputs");
+    expect(auditJob.permissions).toEqual({ contents: "read" });
+    expect(JSON.stringify(auditJob)).not.toContain("secrets.");
+
+    const [checkout, python, audit, ...rest] = auditJob.steps;
+    expect(rest).toEqual([]);
+    expect(Object.keys(checkout).sort()).toEqual(["name", "uses", "with"]);
+    expect(Object.keys(python).sort()).toEqual(["name", "uses", "with"]);
+    expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+    expect(checkout.with).toEqual({
+      ref: "${{ inputs.release_commit }}",
+      "persist-credentials": false,
+    });
+    expect(python.uses).toBe("actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1");
+    expect(python.with).toEqual({ "python-version": "3.11.14" });
+    expect(Object.keys(audit).sort()).toEqual(["name", "run"]);
+    expect(audit.run).toBe(
+      [
+        'python -m pip install --disable-pip-version-check "pip-audit==2.10.0"',
+        "pip-audit -r docker/ocr-runtime-requirements-amd64.txt --no-deps --disable-pip --aliases --strict",
+        "pip-audit -r docker/ocr-runtime-requirements-arm64.txt --no-deps --disable-pip --aliases --strict",
+        "",
+      ].join("\n"),
+    );
+
+    // build-ocr waits on the audit and can't run past a failed one, and no
+    // auditor runs on its own runner.
+    expect(buildJob.needs).toEqual([
+      "validate-inputs",
+      "preflight-gpu-runner",
+      "audit-ocr-release-locks",
+    ]);
+    expect(buildJob.if).toBeUndefined();
+    expect(buildJob["continue-on-error"]).toBeUndefined();
+    expect(JSON.stringify(buildJob)).not.toContain("pip-audit");
+    expect(JSON.stringify(buildJob)).not.toContain("pip install");
+  });
+
+  it("downloads only the named OCR release artifacts into the publish job (#1950)", () => {
+    // Every job in the run can upload an artifact with ACTIONS_RUNTIME_TOKEN,
+    // including the audit jobs running unhashed pip-audit. An unscoped or
+    // pattern download would pull whatever they planted onto the runner that
+    // holds the HuggingFace token, so each download names one exact artifact.
+    type Step = Record<string, unknown> & { with?: Record<string, unknown> };
+    const parsed = load(readRequired(bundlesWorkflowPath)) as {
+      jobs: Record<string, { steps: Step[] }>;
+    };
+    const downloads = parsed.jobs.publish.steps.filter((step) =>
+      String(step.uses ?? "").startsWith("actions/download-artifact@"),
+    );
+    const targets = ["linux-amd64-cpu-py312", "linux-arm64-cpu-py311"];
+    const expected = [
+      ...targets.map((target) => `ocr-${target}`),
+      ...targets.map((target) => `ocr-security-${target}`),
+      ...targets.map((target) => `ocr-quality-${target}`),
+      "ocr-quality-linux-amd64-cpu-py312-nvidia",
+      "ocr-runtime-metadata",
+    ];
+
+    expect(downloads.map((step) => step.with?.name).sort()).toEqual([...expected].sort());
+    for (const step of downloads) {
+      expect(Object.keys(step).sort()).toEqual(["name", "uses", "with"]);
+      expect(step.with).toEqual({
+        name: step.with?.name,
+        path: `/tmp/artifacts/${String(step.with?.name)}`,
+      });
+    }
+  });
+
   it("signs one canonical two-target index and verifies it before upload", () => {
     const workflow = readRequired(bundlesWorkflowPath);
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
@@ -1093,8 +1207,9 @@ describe("OCR v3 bundle release workflow", () => {
     );
     expect(bundles).toContain("release_commit:");
     expect(bundles).toContain("required: true");
-    // Build, both verifies, sign, publish, and the hf lock audit (#1838).
-    expect(bundles.match(/ref: \$\{\{ inputs\.release_commit \}\}/g)).toHaveLength(6);
+    // Build, both verifies, sign, publish, the hf lock audit (#1838), and the
+    // OCR lock audit (#1950).
+    expect(bundles.match(/ref: \$\{\{ inputs\.release_commit \}\}/g)).toHaveLength(7);
     expect(bundles).toContain('git rev-parse "refs/tags/v${VERSION}^{commit}"');
     expect(bundles).toContain('[[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}"');
     expect(bundles).toContain('"${tag_commit}" == "${RELEASE_COMMIT}"');

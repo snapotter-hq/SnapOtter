@@ -479,18 +479,21 @@ jobs:
           --ignore-vuln CVE-2024-27763
           --ignore-vuln CVE-2026-40086
           --ignore-vuln GHSA-55v6-g8pm-pw4c
+          --strict
 
       # hf-release-requirements.txt is the tooling the ai-bundles publish job
       # installs with the HuggingFace write token in scope (#1761). Like the OCR
       # locks it is fully pinned and hashed, so --no-deps --disable-pip reads it
-      # as is.
+      # as is. --strict here and above (#1950): without it pip-audit skips an
+      # entry it can't check (a URL pin, a package PyPI no longer lists) and
+      # still exits 0, and pip's --require-hashes installs a hashed URL pin.
       - name: Audit exact OCR runtime and HF release dependency locks
         run: |
           for requirements in \
             docker/ocr-runtime-requirements-amd64.txt \
             docker/ocr-runtime-requirements-arm64.txt \
             docker/hf-release-requirements.txt; do
-            pip-audit -r "${requirements}" --no-deps --disable-pip --aliases
+            pip-audit -r "${requirements}" --no-deps --disable-pip --aliases --strict
           done
 
   ai-sidecar-rembg:
