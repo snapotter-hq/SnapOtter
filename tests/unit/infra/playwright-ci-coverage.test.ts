@@ -197,6 +197,7 @@ describe("nightly visual comparison (#1507)", () => {
   const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
 
   it("can't be switched off or made to pass on a failure", () => {
+    expect(lanes).toHaveLength(2);
     expect(job?.if).toBeUndefined();
     expect(job?.["continue-on-error"]).toBeUndefined();
     for (const lane of lanes) {
