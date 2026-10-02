@@ -207,6 +207,28 @@ Görüntüleme modları: `"side-by-side"`, `"before-after"`, `"live-preview"`, `
 
 E2e testlerin güvenilir biçimde hedefleyebilmesi için eylem düğmenize bir `data-testid` özniteliği ekleyin (yukarıda gösterildiği gibi).
 
+### 5. Görsel referanslar {#_5-visual-baselines}
+
+Ekran görüntüsü testleri hiçbir pikselin değişmesine izin vermez ve yeni bir araç, testlerin oluşturduğu görüntüyü değiştirir: ana sayfadaki ve katalogdaki araç sayıları, ızgaradaki yeni bir kart ve referansı olana kadar `tests/e2e/gui-visual-tools.spec.ts` dosyasının "snapshot doesn't exist" hatasıyla başarısız olduğu kendi sayfası. Gece çalışan görsel karşılaştırmanın yeşil kalması için referansları araçla aynı PR'da yenileyin.
+
+Linux referansları CI'dan gelir. Dalınızı gönderin, ardından yenilemeyi o dal üzerinde başlatın:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+İş akışı, yeniden oluşturulan PNG'lerle `main` dalına karşı taslak bir PR açar. Açıklamasında bir `gh run download` komutu bulunur; PNG'leri dalınıza almak için bunu checkout'unuzun kök dizininde çalıştırın, commit edin ve taslak PR'ı kapatın. Değişmesini beklediğiniz bir görüntüyü `changed` kaçırırsa bunun yerine `update_snapshots=all` kullanın. Başlatmak için depoya yazma erişimi gerekir; dalınız bir fork'taysa PR'da referans yenilemesi gerektiğini belirtin, bir maintainer çalıştıracaktır.
+
+Mac kullanıyorsanız darwin referanslarını da yenileyin:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Mac kullanmıyorsanız bunu PR'da belirtin, bir maintainer onları ekleyecektir. Her durumda, commit etmeden önce her yeni veya değişmiş PNG'yi açın: referans, bozuk olsun olmasın, ne oluşturulduysa onu kaydeder.
+
+Bir sürüm için bunların hiçbiri gerekmez. Uygulama sürümü, onu gösteren her ekran görüntüsünde maskelenir, bu yüzden sürümü yükseltmek hiçbir referansı değiştirmez.
+
 ## Docker derlemeleri {#docker-builds}
 
 Tam üretim imajını yerelde derleyin:

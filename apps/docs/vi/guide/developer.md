@@ -207,6 +207,28 @@ Thêm vào `packages/shared/src/i18n/en.ts`:
 
 Thêm một thuộc tính `data-testid` vào nút hành động của bạn (như đã trình bày ở trên) để các kiểm thử e2e có thể nhắm vào nó một cách đáng tin cậy.
 
+### 5. Ảnh chuẩn trực quan {#_5-visual-baselines}
+
+Các kiểm thử ảnh chụp màn hình không cho phép thay đổi dù chỉ một điểm ảnh, và một công cụ mới sẽ thay đổi những gì chúng hiển thị: số lượng công cụ trên trang chủ và trong danh mục, một thẻ mới trong lưới, và trang riêng của công cụ, nơi `tests/e2e/gui-visual-tools.spec.ts` thất bại với "snapshot doesn't exist" cho đến khi trang có ảnh chuẩn. Hãy cập nhật ảnh chuẩn trong cùng PR với công cụ để phép so sánh trực quan hằng đêm vẫn xanh.
+
+Ảnh chuẩn Linux được tạo trên CI. Hãy push nhánh của bạn, rồi chạy cập nhật trên nhánh đó:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Workflow sẽ mở một PR nháp nhắm vào `main` với các PNG được tạo lại. Phần mô tả của nó có lệnh `gh run download`; hãy chạy lệnh đó từ thư mục gốc của bản checkout để đưa các PNG vào nhánh của bạn, commit chúng rồi đóng PR nháp. Dùng `update_snapshots=all` thay thế nếu `changed` bỏ sót một ảnh mà bạn cho là sẽ thay đổi. Việc chạy cần quyền ghi vào kho mã, nên nếu nhánh của bạn nằm trên fork, hãy ghi trong PR rằng cần cập nhật ảnh chuẩn và một maintainer sẽ chạy nó.
+
+Trên Mac, hãy cập nhật cả ảnh chuẩn darwin:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Nếu bạn không dùng Mac, hãy nói rõ trong PR và một maintainer sẽ bổ sung. Dù thế nào, hãy mở từng PNG mới hoặc đã thay đổi trước khi commit: ảnh chuẩn ghi lại mọi thứ đã được hiển thị, dù hỏng hay không.
+
+Một bản phát hành không cần làm gì trong số này. Phiên bản ứng dụng được che trong mọi ảnh chụp màn hình có hiển thị nó, nên việc tăng phiên bản không làm thay đổi ảnh chuẩn nào.
+
 ## Dựng Docker {#docker-builds}
 
 Dựng image sản xuất đầy đủ ở cục bộ:
