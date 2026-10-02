@@ -51,12 +51,10 @@ const RESULT_UNREADABLE = {
  * constant and there is never a cause, because the body may hold user data
  * and a SafeError's cause gets appended to its Sentry message (#1740).
  */
-export type MalformedResultReason = keyof typeof MALFORMED_RESULT;
-
 export class MalformedResultError extends SafeError {
-  readonly reason: MalformedResultReason;
+  readonly reason: keyof typeof MALFORMED_RESULT;
 
-  constructor(reason: MalformedResultReason) {
+  constructor(reason: keyof typeof MALFORMED_RESULT) {
     super(MALFORMED_RESULT[reason].message, { kind: "operational" });
     this.name = "MalformedResultError";
     this.reason = reason;

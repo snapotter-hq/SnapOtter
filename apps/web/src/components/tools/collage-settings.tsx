@@ -127,15 +127,24 @@ export function CollageSettings() {
 
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            store.setProgress(100);
             // Only a body that isn't a result is the server's fault, and it
-            // gets reported (#1740, #1795).
+            // gets reported (#1740, #1795). A throw from our own progress write
+            // ends the run as ours, the same as landing the result below.
+            let result: CollageResult;
             try {
-              resolve(parseResultBody<CollageResult>(xhr.responseText));
+              result = parseResultBody<CollageResult>(xhr.responseText);
             } catch (err) {
               reject(new Error(t.errors.invalidResponse));
               reportMalformedResult(err, { status: xhr.status, toolId: "collage" });
+              return;
             }
+            try {
+              store.setProgress(100);
+            } catch (err) {
+              reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+              throw err;
+            }
+            resolve(result);
           } else {
             try {
               const body = JSON.parse(xhr.responseText);

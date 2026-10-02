@@ -13,6 +13,7 @@ import { BarcodeReadSettings } from "@/components/tools/barcode-read-settings";
 import { CollageSettings } from "@/components/tools/collage-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { captureHandledError } from "@/lib/analytics";
+import { format } from "@/lib/format";
 import { useCollageStore } from "@/stores/collage-store";
 import { useFileStore } from "@/stores/file-store";
 
@@ -86,6 +87,29 @@ function expectReported(message: string, toolId: string, statusCode = 200) {
   expect(tags).toEqual({ error_class: "operational", tool_id: toolId });
 }
 
+/**
+ * Collage lands its result after an await, so a rethrow leaves the click
+ * handler as a rejection. Takes that over from vitest until `restore`, so a
+ * test can assert on it instead of failing the run. Call `restore` in a
+ * finally that starts right after this, or vitest's listener stays gone.
+ */
+function takeOverUnhandledRejections() {
+  const saved = process.listeners("unhandledRejection");
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => {
+    rejections.push(reason);
+  };
+  process.removeAllListeners("unhandledRejection");
+  process.on("unhandledRejection", onRejection);
+  return {
+    rejections,
+    restore() {
+      process.off("unhandledRejection", onRejection);
+      for (const listener of saved) process.on("unhandledRejection", listener);
+    },
+  };
+}
+
 /** A body a proxy might send: its text must never reach the report. */
 const HTML_BODY = "<html>secret-token</html>";
 
@@ -146,6 +170,15 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
     expect(screen.queryByTestId("stitch-download")).not.toBeInTheDocument();
     expect(useFileStore.getState().processing).toBe(false);
     expectReported(message, "stitch");
+  });
+
+  it("reports the status the answer came with", async () => {
+    render(<StitchSettings />);
+
+    (await submit("stitch-submit")).respondRaw(201, "{}");
+
+    await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
+    expectReported(NO_DOWNLOAD_URL, "stitch", 201);
   });
 
   it("ends the run with the tracking message when landing the result throws", async () => {
@@ -226,28 +259,57 @@ describe("collage: a malformed sync answer apart from our own store write", () =
     expectReported(message, "collage");
   });
 
-  it("ends the run with the tracking message when landing the result throws", async () => {
-    // The result lands after the panel's minimum spinner time, so the rethrow
-    // leaves the click handler as a rejection. Take that over from vitest for
-    // this test only, so it can be asserted on instead of failing the run.
-    const saved = process.listeners("unhandledRejection");
-    const rejections: unknown[] = [];
-    const onRejection = (reason: unknown) => {
-      rejections.push(reason);
-    };
-    process.removeAllListeners("unhandledRejection");
-    process.on("unhandledRejection", onRejection);
+  it("reports the status the answer came with", async () => {
+    render(<CollageSettings />);
+
+    (await submit("collage-submit")).respondRaw(201, "{}");
+
+    await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
+    expectReported(NO_DOWNLOAD_URL, "collage", 201);
+  });
+
+  it("ends the run when the progress write on a good answer throws", async () => {
     render(<CollageSettings />);
     const xhr = await submit("collage-submit");
     let thrown = false;
     const unsubscribe = useCollageStore.subscribe((s) => {
-      if (s.resultUrl && !thrown) {
+      if (s.progress === 100 && !thrown) {
         thrown = true;
         throw new Error("boom");
       }
     });
 
     try {
+      // Before #1795 this throw skipped resolve and reject both, so the run
+      // sat at processing for good.
+      expect(() => xhr.respond(200, GOOD_BODY)).toThrow("boom");
+      await act(async () => {});
+
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument(),
+      );
+      expect(useCollageStore.getState().phase).toBe("editing");
+      expect(screen.queryByTestId("collage-download")).not.toBeInTheDocument();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("ends the run with the tracking message when landing the result throws", async () => {
+    const { rejections, restore } = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      render(<CollageSettings />);
+      const xhr = await submit("collage-submit");
+      let thrown = false;
+      unsubscribe = useCollageStore.subscribe((s) => {
+        if (s.resultUrl && !thrown) {
+          thrown = true;
+          throw new Error("boom");
+        }
+      });
+
       xhr.respond(200, GOOD_BODY);
 
       await waitFor(
@@ -262,32 +324,26 @@ describe("collage: a malformed sync answer apart from our own store write", () =
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
     } finally {
       unsubscribe();
-      process.off("unhandledRejection", onRejection);
-      for (const listener of saved) process.on("unhandledRejection", listener);
+      restore();
     }
   });
 
   it("still rethrows the root cause when ending the run throws too", async () => {
-    const saved = process.listeners("unhandledRejection");
-    const rejections: unknown[] = [];
-    const onRejection = (reason: unknown) => {
-      rejections.push(reason);
-    };
-    process.removeAllListeners("unhandledRejection");
-    process.on("unhandledRejection", onRejection);
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    render(<CollageSettings />);
-    const xhr = await submit("collage-submit");
-    // Breaks every write once the result lands: setResult throws the root
-    // cause, then the teardown's setError throws again.
-    let writes = 0;
-    const unsubscribe = useCollageStore.subscribe((s) => {
-      if (!s.resultUrl) return;
-      writes++;
-      throw new Error(writes === 1 ? "root cause" : "teardown broke");
-    });
-
+    const { rejections, restore } = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
     try {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      render(<CollageSettings />);
+      const xhr = await submit("collage-submit");
+      // Breaks every write once the result lands: setResult throws the root
+      // cause, then the teardown's setError throws again.
+      let writes = 0;
+      unsubscribe = useCollageStore.subscribe((s) => {
+        if (!s.resultUrl) return;
+        writes++;
+        throw new Error(writes === 1 ? "root cause" : "teardown broke");
+      });
+
       xhr.respond(200, GOOD_BODY);
 
       await waitFor(
@@ -303,8 +359,7 @@ describe("collage: a malformed sync answer apart from our own store write", () =
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
     } finally {
       unsubscribe();
-      process.off("unhandledRejection", onRejection);
-      for (const listener of saved) process.on("unhandledRejection", listener);
+      restore();
     }
   });
 });
@@ -369,7 +424,33 @@ describe("barcode read: a malformed sync answer apart from our own store write",
   it.each([
     ["a body that does not parse", HTML_BODY, NOT_AN_OBJECT],
     ["a JSON string body", '"ok"', NOT_AN_OBJECT],
+    ["a JSON array body", "[]", NOT_AN_OBJECT],
     ["an empty object", "{}", NOT_A_BARCODE_RESULT],
+    [
+      "a filename that is not a string",
+      JSON.stringify({ filename: 7, barcodes: [], annotatedUrl: null }),
+      NOT_A_BARCODE_RESULT,
+    ],
+    [
+      "a barcode with no type",
+      JSON.stringify({ filename: "photo.png", barcodes: [{ text: "x" }], annotatedUrl: null }),
+      NOT_A_BARCODE_RESULT,
+    ],
+    [
+      "a barcode that is null",
+      JSON.stringify({ filename: "photo.png", barcodes: [null], annotatedUrl: null }),
+      NOT_A_BARCODE_RESULT,
+    ],
+    [
+      "a blank annotated image URL",
+      JSON.stringify({ filename: "photo.png", barcodes: [], annotatedUrl: "" }),
+      NOT_A_BARCODE_RESULT,
+    ],
+    [
+      "no annotated image URL at all",
+      JSON.stringify({ filename: "photo.png", barcodes: [] }),
+      NOT_A_BARCODE_RESULT,
+    ],
     [
       "a barcode list that is not a list",
       JSON.stringify({ filename: "photo.png", barcodes: "none", annotatedUrl: null }),
@@ -396,6 +477,15 @@ describe("barcode read: a malformed sync answer apart from our own store write",
     expectReported(message, "barcode-read");
   });
 
+  it("reports the status the answer came with", async () => {
+    render(<BarcodeReadSettings />);
+
+    (await submit("barcode-read-submit")).respondRaw(201, "{}");
+    await settle();
+
+    expectReported(NOT_A_BARCODE_RESULT, "barcode-read", 201);
+  });
+
   it("fails the file with the tracking message when landing its result throws", async () => {
     const realUpdateEntry = useFileStore.getState().updateEntry;
     // The panel reads updateEntry off the store when the run starts, and
@@ -415,10 +505,91 @@ describe("barcode read: a malformed sync answer apart from our own store write",
 
       expect(useFileStore.getState().error).toBe(`photo.png: ${en.errors.jobTrackingFailed}`);
       expect(useFileStore.getState().error).not.toContain(en.errors.invalidResponse);
+      // The barcodes went in before the write that threw: one row, no
+      // placeholder row on top of it.
+      expect(screen.getAllByText("hello-otter")).toHaveLength(1);
+      expect(
+        screen.queryByText(en.toolSettings["barcode-read"].noBarcodesFound),
+      ).not.toBeInTheDocument();
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
     } finally {
       useFileStore.setState({ updateEntry: realUpdateEntry });
     }
+  });
+
+  describe("over several files", () => {
+    beforeEach(() => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    });
+
+    /** Answers each file's request in turn, once the panel has sent it. */
+    async function answerEach(...answers: Array<(xhr: FakeXhr) => void>) {
+      render(<BarcodeReadSettings />);
+      fireEvent.click(screen.getByTestId("barcode-read-submit"));
+      for (const [i, answer] of answers.entries()) {
+        await waitFor(() => expect(FakeXhr.instances).toHaveLength(i + 1));
+        answer(FakeXhr.instances[i]);
+        await act(async () => {});
+      }
+      await settle();
+    }
+
+    const filesFailed = (count: number) =>
+      format(en.toolSettings["barcode-read"].filesFailed, { count, total: 2 });
+
+    it("keeps a good file's result when the other answer is malformed", async () => {
+      await answerEach(
+        (xhr) => xhr.respond(200, {}),
+        (xhr) => xhr.respond(200, { ...GOOD_BODY, filename: "two.png" }),
+      );
+
+      expect(useFileStore.getState().error).toBe(filesFailed(1));
+      expect(screen.getByText("one.png")).toBeInTheDocument();
+      expect(screen.getByText("two.png")).toBeInTheDocument();
+      expect(screen.getByText("hello-otter")).toBeInTheDocument();
+      expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+      expect(useFileStore.getState().entries[1].processedUrl).toBe(ANNOTATED_URL);
+      expectReported(NOT_A_BARCODE_RESULT, "barcode-read");
+    });
+
+    it("keeps a row for a malformed answer that comes second", async () => {
+      await answerEach(
+        (xhr) => xhr.respond(200, { ...GOOD_BODY, filename: "one.png" }),
+        (xhr) => xhr.respondRaw(200, HTML_BODY),
+      );
+
+      expect(useFileStore.getState().error).toBe(filesFailed(1));
+      expect(screen.getByText("one.png")).toBeInTheDocument();
+      expect(screen.getByText("two.png")).toBeInTheDocument();
+      expectReported(NOT_AN_OBJECT, "barcode-read");
+    });
+
+    it("adds no extra row when landing the second file throws", async () => {
+      const realUpdateEntry = useFileStore.getState().updateEntry;
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(realUpdateEntry)
+        .mockImplementationOnce(() => {
+          throw new Error("boom");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      try {
+        await answerEach(
+          (xhr) => xhr.respond(200, { ...GOOD_BODY, filename: "one.png" }),
+          (xhr) =>
+            expect(() => xhr.respond(200, { ...GOOD_BODY, filename: "two.png" })).toThrow("boom"),
+        );
+
+        expect(useFileStore.getState().error).toBe(filesFailed(1));
+        expect(screen.getAllByText("hello-otter")).toHaveLength(2);
+        expect(
+          screen.queryByText(en.toolSettings["barcode-read"].noBarcodesFound),
+        ).not.toBeInTheDocument();
+        expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+      } finally {
+        useFileStore.setState({ updateEntry: realUpdateEntry });
+      }
+    });
   });
 
   it("shows the server's error text for a failed request without reporting it", async () => {
