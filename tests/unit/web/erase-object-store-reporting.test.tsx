@@ -54,9 +54,14 @@ class FakeXhr {
   ontimeout: (() => void) | null = null;
   upload: { onprogress: unknown; onload: unknown } = { onprogress: null, onload: null };
   url = "";
+  aborted = false;
 
   constructor() {
     FakeXhr.instances.push(this);
+  }
+
+  abort() {
+    this.aborted = true;
   }
 
   open(_method: string, url: string) {
@@ -906,5 +911,164 @@ describe("erase-object batch: a store that keeps throwing (#1810)", () => {
       unsubscribe();
       unhandled.restore();
     }
+  });
+});
+
+const STALL_MS = 5 * 60_000;
+
+/**
+ * Captures the progress stream's stall timers (the one five-minute timeout the
+ * panel arms) so a test can fire the stall without faking every timer, which
+ * would stall Testing Library's own waitFor too.
+ */
+function captureStallTimers() {
+  const realSetTimeout = globalThis.setTimeout;
+  const stalls: (() => void)[] = [];
+  const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: () => void,
+    ms?: number,
+  ) => {
+    if (ms === STALL_MS) stalls.push(handler);
+    return realSetTimeout(ms === STALL_MS ? () => {} : handler, ms === STALL_MS ? 0 : ms);
+  }) as typeof setTimeout);
+  return {
+    /** Fire the most recently armed stall, as five quiet minutes would. */
+    fireLatest() {
+      const stall = stalls.at(-1);
+      if (!stall) throw new Error("no stall timer armed");
+      act(() => stall());
+    },
+    restore() {
+      spy.mockRestore();
+    },
+  };
+}
+
+const FAILED_FRAME = { type: "single", phase: "failed", error: "Object erasing failed" };
+
+describe("erase-object batch: a file the progress stream gave up on (#1893)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  /** File one is still uploading when its stream gives up; the batch moves on. */
+  async function giveUpOnFirstThenAnswerItLate(giveUp: () => void) {
+    renderPanel(2);
+    const first = await submit(1);
+    giveUp();
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+    // The abandoned request answers after the batch is over.
+    first.respond(200, GOOD_BODY);
+    return first;
+  }
+
+  it("aborts the request and keeps the file failed after a failed frame", async () => {
+    const first = await giveUpOnFirstThenAnswerItLate(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      }),
+    );
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(first.aborted).toBe(true);
+    expect(entry(1).status).toBe("completed");
+    expect(FakeXhr.instances[1].aborted).toBe(false);
+  });
+
+  it("aborts the request and keeps the file failed after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      const first = await giveUpOnFirstThenAnswerItLate(() => stalls.fireLatest());
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.toolSettings["erase-object"].stallBatch);
+      expect(entry(0).errorCategory).toBe("timeout");
+      expect(entry(0).processedUrl).toBeNull();
+      expect(first.aborted).toBe(true);
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("ignores a late network error or timeout on the abandoned request", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    act(() => first.onerror?.());
+    act(() => first.ontimeout?.());
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(1).status).toBe("completed");
+  });
+
+  it("does not abort a request that answered first", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(first.aborted).toBe(false);
+    expect(entry(0).status).toBe("completed");
+  });
+});
+
+describe("erase-object single file: a run the progress stream gave up on (#1893)", () => {
+  it("aborts the request and keeps the failure after a failed frame", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    xhr.respond(200, GOOD_BODY);
+
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(entry().status).not.toBe("completed");
+    expect(entry().processedUrl).toBeNull();
+    expect(xhr.aborted).toBe(true);
+  });
+
+  it("aborts the request and keeps the stall message after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+      expect(useFileStore.getState().processing).toBe(false);
+
+      xhr.respond(200, GOOD_BODY);
+
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      expect(entry().status).not.toBe("completed");
+      expect(entry().processedUrl).toBeNull();
+      expect(xhr.aborted).toBe(true);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("ignores a late network error on the abandoned request", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    act(() => xhr.onerror?.());
+
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
   });
 });

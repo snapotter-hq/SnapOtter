@@ -247,15 +247,28 @@ export function EraseObjectSettings({
         });
       };
 
+      // The request outlives a progress stream that gave up on it (a failed
+      // frame, or the stall timer, which runs from before the upload starts).
+      // Abort it then, and drop whatever it answers after, or a late 2xx
+      // flips the failed file back to completed once the batch has moved on
+      // (#1893).
+      const xhr = new XMLHttpRequest();
+      let abandoned = false;
+      const abandon = (err: Error) => {
+        abandoned = true;
+        xhr.abort();
+        reject(err);
+      };
+
       const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
         onProgress,
         onComplete: (r) => {
           applyResult(r);
           resolve();
         },
-        onFailed: (failure) => reject(new Error(jobFailureMessage(failure, t.errors))),
+        onFailed: (failure) => abandon(new Error(jobFailureMessage(failure, t.errors))),
         onStall: () =>
-          reject(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
+          abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -267,10 +280,9 @@ export function EraseObjectSettings({
       formData.append("quality", String(quality));
       formData.append("qualityMode", qualityMode);
 
-      const xhr = new XMLHttpRequest();
       xhr.timeout = 600_000;
       xhr.onload = () => {
-        if (xhr.status === 202) return;
+        if (abandoned || xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
           // Only a body that isn't a result is the server's fault, and it gets
@@ -310,10 +322,12 @@ export function EraseObjectSettings({
         }
       };
       xhr.onerror = () => {
+        if (abandoned) return;
         stopProgress();
         reject(new Error(t.errors.network));
       };
       xhr.ontimeout = () => {
+        if (abandoned) return;
         stopProgress();
         reject(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
       };
@@ -384,6 +398,15 @@ export function EraseObjectSettings({
       setProgressStage(null);
     };
 
+    // Same as the batch path (#1893): a stream that gave up on the run aborts
+    // its request, and anything the request answers after that is dropped.
+    const xhr = new XMLHttpRequest();
+    let abandoned = false;
+    const abandonRequest = () => {
+      abandoned = true;
+      xhr.abort();
+    };
+
     const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
       onProgress: (percent) => {
         setProgressPhase("processing");
@@ -396,6 +419,7 @@ export function EraseObjectSettings({
       },
       onFailed: (failure) => {
         progressCleanupRef.current = null;
+        abandonRequest();
         // setError is a store write, and the stream has already let go of the
         // run: a throw from it must not skip finishUi and leave the run at
         // processing for good (#1830). It still surfaces, after the teardown.
@@ -407,6 +431,7 @@ export function EraseObjectSettings({
       },
       onStall: () => {
         progressCleanupRef.current = null;
+        abandonRequest();
         setError(t.toolSettings["erase-object"].stall);
         finishUi();
       },
@@ -427,7 +452,6 @@ export function EraseObjectSettings({
       formData.append("saveMode", saveMode);
     }
 
-    const xhr = new XMLHttpRequest();
     xhr.timeout = 600_000;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -440,7 +464,7 @@ export function EraseObjectSettings({
     };
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
-      if (xhr.status === 202) return;
+      if (abandoned || xhr.status === 202) return;
 
       stopProgress();
       progressCleanupRef.current = null;
@@ -502,12 +526,14 @@ export function EraseObjectSettings({
       finishUi();
     };
     xhr.onerror = () => {
+      if (abandoned) return;
       stopProgress();
       progressCleanupRef.current = null;
       setError(t.errors.network);
       finishUi();
     };
     xhr.ontimeout = () => {
+      if (abandoned) return;
       stopProgress();
       progressCleanupRef.current = null;
       setError(t.toolSettings["erase-object"].timeoutOverloaded);
