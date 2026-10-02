@@ -13,9 +13,11 @@
 #   invalidates the cache by hostname. When the Azure update succeeded,
 #   relabeling its just-fetched list files sidesteps the refresh entirely:
 #   the mirrors carry identical content and apt keys downloaded indexes by
-#   hostname-derived filename. Only when the Azure update itself failed is
-#   a real post-swap refresh needed, with patience instead of re-rolls
-#   (120s and 360s post-swap updates both died on a real degraded day).
+#   hostname-derived filename. (Runners whose sources name a mirror list
+#   key them by the list instead, so their swap invalidates nothing.) Only
+#   when the Azure update itself failed is a real post-swap refresh needed,
+#   with patience instead of re-rolls (120s and 360s post-swap updates both
+#   died on a real degraded day).
 #
 # Re-rolls can't make a mirror that trickles to everyone at ~40 kB/s deliver
 # 154 MB, so when APT_ARCHIVE_DIR is set (action.yml restores it from
@@ -49,6 +51,9 @@ update_budget="${UPDATE_TIMEOUT:-120}"
 install_budget="${INSTALL_TIMEOUT:-300}"
 dpkg_lock_wait="${DPKG_LOCK_WAIT:-300}"
 archive_dir="${APT_ARCHIVE_DIR:-}"
+# What the mirror swap edits. Overridable so the tests can use scratch copies.
+apt_etc="${APT_ETC_DIR:-/etc/apt}"
+apt_lists="${APT_LISTS_DIR:-/var/lib/apt/lists}"
 # One budget for every wait on the dpkg lock, started by the first wait.
 lock_deadline=""
 
@@ -203,10 +208,30 @@ finish() {
   echo "fresh=${fresh}" >> "${GITHUB_OUTPUT:-/dev/null}"
 }
 
+# When the swap was written (#877) the runners named the Azure host in
+# sources.list or a .sources file. GitHub's ubuntu-24.04 and ubuntu-22.04
+# runners now name mirror+file:/etc/apt/apt-mirrors.txt there instead, and
+# the host is a line in that list, which apt walks top to bottom (#1808). Rewriting the host in place keeps each
+# entry's position and metadata, and keeps the mirror+file URI that apt's
+# index files are named after.
 swap_to_archive() {
-  # Classic sources.list and deb822 ubuntu.sources both just name the host.
-  sudo find /etc/apt/sources.list /etc/apt/sources.list.d -maxdepth 1 -type f \
-    -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} + 2>/dev/null || true
+  local f new swapped=()
+  for f in "$apt_etc/sources.list" "$apt_etc"/sources.list.d/* "$apt_etc/apt-mirrors.txt"; do
+    [ -f "$f" ] || continue
+    grep -q 'azure\.archive\.ubuntu\.com' "$f" || continue
+    new="$(sed 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' "$f")"
+    # tee rewrites the file in place, so its owner and mode stay as they were.
+    if printf '%s\n' "$new" | sudo tee "$f" >/dev/null; then
+      swapped+=("$f")
+    else
+      echo "::warning::could not rewrite $f"
+    fi
+  done
+  if [ "${#swapped[@]}" -gt 0 ]; then
+    echo "apt sources: replaced azure.archive.ubuntu.com with archive.ubuntu.com in ${swapped[*]}"
+  else
+    echo "::warning::no apt source or mirror list names azure.archive.ubuntu.com, so the re-rolls use the sources as they are"
+  fi
 }
 
 update_ok=false
@@ -233,13 +258,15 @@ elif install_offline; then
   exit 0
 fi
 
-echo "::warning::apt via the Azure mirror stalled or failed; swapping to archive.ubuntu.com"
+echo "::warning::apt via the Azure mirror stalled or failed"
 # A timed-out apt can leave packages unpacked but unconfigured.
 recover_dpkg
 swap_to_archive
 
 if $azure_lists_ok; then
-  for f in /var/lib/apt/lists/azure.archive.ubuntu.com_*; do
+  # Only sources that name the host directly leave index files named after
+  # it; mirror-list runners have none to relabel.
+  for f in "$apt_lists"/azure.archive.ubuntu.com_*; do
     sudo mv "$f" "${f/azure.archive.ubuntu.com/archive.ubuntu.com}"
   done
 else

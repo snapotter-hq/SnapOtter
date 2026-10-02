@@ -30,6 +30,21 @@ interface StubOpts {
   lockedAtStartSeconds?: number;
 }
 
+/**
+ * Scratch stand-ins for /etc/apt and /var/lib/apt/lists, so the mirror swap
+ * edits files the test owns instead of the machine's real apt config.
+ */
+function aptDirs(dir: string) {
+  const etc = join(dir, "etc-apt");
+  const lists = join(dir, "apt-lists");
+  mkdirSync(join(etc, "sources.list.d"), { recursive: true });
+  mkdirSync(lists);
+  return { etc, lists };
+}
+
+/** Writes a runner's apt config into the scratch dirs before the script runs. */
+type AptLayout = (etc: string, lists: string) => void;
+
 function stubDir(first: FirstInstall, opts: StubOpts = {}) {
   const dir = mkdtempSync(join(tmpdir(), "apt-install-"));
   const bin = join(dir, "bin");
@@ -46,9 +61,6 @@ function stubDir(first: FirstInstall, opts: StubOpts = {}) {
     sudo: 'exec "$@"',
     // timeout -k <grace> <budget> cmd...: run cmd as-is; the stubs decide its outcome.
     timeout: 'shift 3; exec "$@"',
-    // The mirror swap edits /etc/apt and /var/lib/apt/lists; nothing to do here.
-    find: "exit 0",
-    mv: "exit 0",
     sleep: "exec /bin/sleep 0.05",
     // The index knows every requested package.
     "apt-cache": "exit 0",
@@ -92,11 +104,17 @@ touch "${dir}/installed"`,
     writeFileSync(path, `#!/bin/bash\n${body}\n`, { flag: "w" });
     chmodSync(path, 0o755);
   }
-  return { dir, bin, calls };
+  return { dir, bin, calls, ...aptDirs(dir) };
 }
 
-function runScript(first: FirstInstall, env: Record<string, string> = {}, opts: StubOpts = {}) {
-  const { dir, bin, calls } = stubDir(first, opts);
+function runScript(
+  first: FirstInstall,
+  env: Record<string, string> = {},
+  opts: StubOpts = {},
+  layout?: AptLayout,
+) {
+  const { dir, bin, calls, etc, lists } = stubDir(first, opts);
+  layout?.(etc, lists);
   const res = spawnSync("bash", [SCRIPT], {
     encoding: "utf8",
     timeout: 30_000,
@@ -106,6 +124,8 @@ function runScript(first: FirstInstall, env: Record<string, string> = {}, opts: 
       UPDATE_TIMEOUT: "1",
       INSTALL_TIMEOUT: "1",
       DPKG_LOCK_WAIT: "5",
+      APT_ETC_DIR: etc,
+      APT_LISTS_DIR: lists,
       ...env,
     },
   });
@@ -114,6 +134,8 @@ function runScript(first: FirstInstall, env: Record<string, string> = {}, opts: 
     output: `${res.stdout}${res.stderr}`,
     installed: existsSync(join(dir, "installed")),
     calls: existsSync(calls) ? readFileSync(calls, "utf8") : "",
+    etc,
+    lists,
   };
 }
 
@@ -122,7 +144,7 @@ describe.skipIf(process.platform === "win32")("apt-install action script (#1786)
     const run = runScript("succeeds");
     expect(run.status, run.output).toBe(0);
     expect(run.installed).toBe(true);
-    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
+    expect(run.output).not.toContain("apt via the Azure mirror stalled or failed");
   });
 
   it("waits for the dpkg a timed-out install left behind instead of failing every re-roll", () => {
@@ -141,7 +163,7 @@ describe.skipIf(process.platform === "win32")("apt-install action script (#1786)
     expect(run.status, run.output).toBe(0);
     expect(run.installed).toBe(true);
     expect(run.output).not.toContain("Could not get lock");
-    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
+    expect(run.output).not.toContain("apt via the Azure mirror stalled or failed");
   });
 
   it("still waits through apt's lock timeout when fuser isn't installed", () => {
@@ -216,8 +238,6 @@ function cacheStubDir(mirror: Mirror, cached: Record<string, string>) {
   const stubs: Record<string, string> = {
     sudo: 'exec "$@"',
     timeout: 'shift 3; exec "$@"',
-    find: "exit 0",
-    mv: "exit 0",
     sleep: "exec /bin/sleep 0.05",
     fuser: "exit 1",
     dpkg: `echo "dpkg $*" >> "${calls}"`,
@@ -283,7 +303,7 @@ done`,
     writeFileSync(path, `#!/bin/bash\n${body}\n`);
     chmodSync(path, 0o755);
   }
-  return { dir, archives, calls };
+  return { dir, archives, calls, ...aptDirs(dir) };
 }
 
 function runCached(mirror: Mirror, cached: Record<string, string> = {}) {
@@ -302,6 +322,8 @@ function runCached(mirror: Mirror, cached: Record<string, string> = {}) {
       APT_ARCHIVE_DIR: stub.archives,
       GITHUB_OUTPUT: output,
       UBUNTU_SOURCES: join(stub.dir, "ubuntu.sources"),
+      APT_ETC_DIR: stub.etc,
+      APT_LISTS_DIR: stub.lists,
     },
   });
   const read = (p: string) => (existsSync(p) ? readFileSync(p, "utf8") : "");
@@ -373,7 +395,7 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     expect(run.calls).toMatch(/apt-get .*install .*--no-download/);
     expect(run.calls).toContain("offline qpdf");
     expect(run.calls).toContain("offline libx11-6");
-    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
+    expect(run.output).not.toContain("apt via the Azure mirror stalled or failed");
     // Nothing that bypassed the index check is ever saved.
     expect(run.githubOutput).toBe("fresh=0\n");
     // One more bounded update, so later steps that query apt get an index if
@@ -394,7 +416,7 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     const run = runCached("partial");
     expect(run.status, run.output).toBe(0);
     expect(run.calls).toContain("downloaded qpdf");
-    expect(run.output).not.toContain("swapping to archive.ubuntu.com");
+    expect(run.output).not.toContain("apt via the Azure mirror stalled or failed");
     expect(run.githubOutput).toBe("fresh=3\n");
   });
 
@@ -405,7 +427,7 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     const run = runCached("down-then-up", { [QPDF]: "sha-tampered", [GS]: "sha-gs" });
     expect(run.status, run.output).toBe(0);
     expect(run.output).toContain("installing from the cached archives failed");
-    expect(run.output).toContain("swapping to archive.ubuntu.com");
+    expect(run.output).toContain("apt via the Azure mirror stalled or failed");
     expect(run.calls).not.toContain("sha-tampered");
     expect(run.archive(QPDF)).toBe("sha-qpdf-new");
   });
@@ -425,5 +447,89 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     expect(run.status, run.output).toBe(0);
     expect(run.output).toContain("1 not in it");
     expect(run.archives).toEqual([GS, X11, QPDF]);
+  });
+});
+
+// The mirror swap (#1808). GitHub's ubuntu-24.04 and ubuntu-22.04 runners
+// don't name the Azure host in their sources: those say
+// mirror+file:/etc/apt/apt-mirrors.txt, and that file (copied below as seen on
+// a runner) lists the hosts apt tries in order. Sources that name the host
+// directly, as the runners did when the swap was written (#877), leave index
+// files named after it.
+const AZURE = "http://azure.archive.ubuntu.com/ubuntu/";
+const MIRROR_LIST = `${AZURE}\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n`;
+const UBUNTU24_SOURCES =
+  "Types: deb\nURIs: mirror+file:/etc/apt/apt-mirrors.txt\nSuites: noble noble-updates\nComponents: main universe\n";
+const MICROSOFT = "deb [arch=amd64] https://packages.microsoft.com/ubuntu/24.04/prod noble main\n";
+
+const mirrorListRunner: AptLayout = (etc) => {
+  writeFileSync(join(etc, "apt-mirrors.txt"), MIRROR_LIST);
+  writeFileSync(join(etc, "sources.list.d", "ubuntu.sources"), UBUNTU24_SOURCES);
+  writeFileSync(join(etc, "sources.list.d", "microsoft-prod.list"), MICROSOFT);
+  writeFileSync(join(etc, "sources.list"), "# Ubuntu sources have moved to ubuntu.sources\n");
+};
+
+const hostInSources: AptLayout = (etc, lists) => {
+  writeFileSync(
+    join(etc, "sources.list"),
+    `deb ${AZURE} jammy main restricted\ndeb ${AZURE} jammy-updates main restricted\n`,
+  );
+  writeFileSync(join(etc, "sources.list.d", "microsoft-prod.list"), MICROSOFT);
+  writeFileSync(join(lists, "azure.archive.ubuntu.com_ubuntu_dists_jammy_InRelease"), "index");
+};
+
+describe.skipIf(process.platform === "win32")("apt-install mirror swap (#1808)", () => {
+  it("takes the Azure mirror out of apt-mirrors.txt on runners whose sources name the mirror list", () => {
+    // On main the swap only edited sources files, found no Azure host there,
+    // and every re-roll went back through the same mirror list.
+    const run = runScript("times-out-leaving-dpkg", {}, {}, mirrorListRunner);
+    expect(run.status, run.output).toBe(0);
+    const mirrors = readFileSync(join(run.etc, "apt-mirrors.txt"), "utf8");
+    expect(mirrors).not.toContain("azure.archive.ubuntu.com");
+    // Each entry keeps its place and its metadata, so apt's order holds.
+    expect(mirrors.split("\n")[0]).toBe("http://archive.ubuntu.com/ubuntu/\tpriority:1");
+    expect(mirrors).toContain("https://security.ubuntu.com/ubuntu/\tpriority:3");
+    expect(run.output).toContain("replaced azure.archive.ubuntu.com with archive.ubuntu.com in");
+    expect(run.output).toContain("apt-mirrors.txt");
+    // The sources keep naming the list, so the index files apt keyed by it stay valid.
+    expect(readFileSync(join(run.etc, "sources.list.d", "ubuntu.sources"), "utf8")).toBe(
+      UBUNTU24_SOURCES,
+    );
+    expect(readFileSync(join(run.etc, "sources.list.d", "microsoft-prod.list"), "utf8")).toBe(
+      MICROSOFT,
+    );
+  });
+
+  it("still repoints sources.list and relabels its index files where the host is named directly", () => {
+    const run = runScript("times-out-leaving-dpkg", {}, {}, hostInSources);
+    expect(run.status, run.output).toBe(0);
+    const sources = readFileSync(join(run.etc, "sources.list"), "utf8");
+    expect(sources).not.toContain("azure.archive.ubuntu.com");
+    expect(sources).toContain(
+      "deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted",
+    );
+    expect(readdirSync(run.lists)).toEqual(["archive.ubuntu.com_ubuntu_dists_jammy_InRelease"]);
+    expect(readFileSync(join(run.etc, "sources.list.d", "microsoft-prod.list"), "utf8")).toBe(
+      MICROSOFT,
+    );
+  });
+
+  it("says so, instead of claiming a swap, when nothing names the Azure mirror", () => {
+    const run = runScript("times-out-leaving-dpkg", {}, {}, (etc) => {
+      writeFileSync(
+        join(etc, "sources.list"),
+        "deb http://archive.ubuntu.com/ubuntu/ noble main\n",
+      );
+    });
+    expect(run.status, run.output).toBe(0);
+    expect(run.output).toContain("apt via the Azure mirror stalled or failed");
+    expect(run.output).toContain("no apt source or mirror list names azure.archive.ubuntu.com");
+    expect(run.output).not.toContain("replaced azure.archive.ubuntu.com");
+  });
+
+  it("leaves apt's config alone when the first install succeeds", () => {
+    const run = runScript("succeeds", {}, {}, mirrorListRunner);
+    expect(run.status, run.output).toBe(0);
+    expect(readFileSync(join(run.etc, "apt-mirrors.txt"), "utf8")).toBe(MIRROR_LIST);
   });
 });
