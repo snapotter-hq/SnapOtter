@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -108,12 +110,18 @@ export function ContextMenu({
     };
   }, [onClose]);
 
+  // These name the editor's react-hotkeys-hook bindings (use-editor-shortcuts),
+  // so the modifier follows that library's rule. Duplicate has no binding of
+  // its own (mod+d is Deselect), so it shows no hint.
+  const modIsMeta = hotkeysModIsMeta();
+  const hint = (keys: string) => formatShortcut(keys, modIsMeta);
+
   const objectItems: MenuItem[] = [
     {
       id: "cut",
       label: t.editor.menu.edit.cut,
       icon: Scissors,
-      shortcut: "Ctrl+X",
+      shortcut: hint("mod+x"),
       action: () => {
         cutObjects();
         onClose();
@@ -123,7 +131,7 @@ export function ContextMenu({
       id: "copy",
       label: t.editor.menu.edit.copy,
       icon: Copy,
-      shortcut: "Ctrl+C",
+      shortcut: hint("mod+c"),
       action: () => {
         copyObjects();
         onClose();
@@ -133,7 +141,7 @@ export function ContextMenu({
       id: "paste",
       label: t.editor.menu.edit.paste,
       icon: ClipboardPaste,
-      shortcut: "Ctrl+V",
+      shortcut: hint("mod+v"),
       action: () => {
         pasteObjects();
         onClose();
@@ -144,7 +152,6 @@ export function ContextMenu({
       id: "duplicate",
       label: t.editor.ui.contextMenu.duplicate,
       icon: CopyPlus,
-      shortcut: "Ctrl+D",
       action: () => {
         copyObjectsFn();
         pasteObjectsFn();
@@ -206,7 +213,7 @@ export function ContextMenu({
       id: "paste",
       label: t.editor.menu.edit.paste,
       icon: ClipboardPaste,
-      shortcut: "Ctrl+V",
+      shortcut: hint("mod+v"),
       action: () => {
         pasteObjects();
         onClose();
@@ -217,7 +224,7 @@ export function ContextMenu({
       id: "selectAll",
       label: t.editor.ui.contextMenu.selectAll,
       icon: MousePointer,
-      shortcut: "Ctrl+A",
+      shortcut: hint("mod+a"),
       action: () => {
         setSelection({
           type: "rect",

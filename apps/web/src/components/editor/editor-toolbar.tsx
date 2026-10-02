@@ -28,6 +28,8 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { hotkeysModIsMeta } from "@/lib/platform";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 import { IconButton } from "./common/icon-button";
@@ -71,7 +73,7 @@ const TOOL_GROUPS: ToolGroup[] = [
   {
     tools: [
       { tool: "move", icon: MousePointer2, shortcut: "V" },
-      { tool: "transform", icon: Maximize2, shortcut: "Ctrl+T" },
+      { tool: "transform", icon: Maximize2, shortcut: "mod+t" },
     ],
   },
   {
@@ -138,6 +140,8 @@ export function EditorToolbar() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const setTool = useEditorStore((s) => s.setTool);
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
+  // Shortcuts are react-hotkeys-hook bindings, so `mod` follows its rule.
+  const modIsMeta = hotkeysModIsMeta();
 
   const toolLabels: Record<ToolbarTool, string> = {
     move: t.editor.toolbar.move,
@@ -175,7 +179,7 @@ export function EditorToolbar() {
               key={entry.tool}
               icon={entry.icon}
               label={toolLabels[entry.tool]}
-              shortcut={entry.shortcut}
+              shortcut={formatShortcut(entry.shortcut, modIsMeta)}
               active={activeTool === entry.tool}
               disabled={!sourceImageUrl && entry.tool !== "hand" && entry.tool !== "zoom"}
               onClick={() => setTool(entry.tool)}
