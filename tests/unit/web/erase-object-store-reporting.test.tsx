@@ -995,22 +995,6 @@ describe("erase-object batch: a file the progress stream gave up on (#1893)", ()
     }
   });
 
-  it("ignores a late network error or timeout on the abandoned request", async () => {
-    renderPanel(2);
-    const first = await submit(1);
-    act(() => {
-      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
-    });
-    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
-    act(() => first.onerror?.());
-    act(() => first.ontimeout?.());
-    FakeXhr.instances[1].respond(200, GOOD_BODY);
-    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
-
-    expect(entry(0).error).toBe("Object erasing failed");
-    expect(entry(1).status).toBe("completed");
-  });
-
   it("does not abort a request that answered first", async () => {
     renderPanel(2);
     const first = await submit(1);
@@ -1070,5 +1054,32 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
     act(() => xhr.onerror?.());
 
     expect(useFileStore.getState().error).toBe("Object erasing failed");
+  });
+
+  it("ignores a late timeout on the abandoned request", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    act(() => xhr.ontimeout?.());
+
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+  });
+
+  it("ignores a late error answer on the abandoned request", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+
+      xhr.respond(422, { error: "Object erasing failed" });
+
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
   });
 });
