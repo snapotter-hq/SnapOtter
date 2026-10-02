@@ -21,7 +21,10 @@ import {
   buildBeforeSend,
   buildBeforeSendTransaction,
 } from "../../../apps/api/src/lib/sentry-scrub.js";
-import { buildGatedTransport } from "../../../apps/api/src/lib/sentry-transport.js";
+import {
+  buildGatedSpotlight,
+  buildGatedTransport,
+} from "../../../apps/api/src/lib/sentry-transport.js";
 
 type Envelope = Parameters<ReturnType<Parameters<typeof buildGatedTransport>[1]>["send"]>[0];
 type TransportOptions = Parameters<Parameters<typeof buildGatedTransport>[1]>[0];
@@ -75,6 +78,85 @@ describe("buildGatedTransport", () => {
   });
 });
 
+describe("buildGatedSpotlight (#1966)", () => {
+  type Hook = (...args: unknown[]) => void;
+  type MakeSpotlight = Parameters<typeof buildGatedSpotlight>[1];
+
+  function setup(spotlight: unknown, active: { on: boolean }) {
+    const hooks: Hook[] = [];
+    const unsubscribe = vi.fn();
+    const client = {
+      getOptions: () => ({ spotlight }),
+      on: vi.fn((_hook: string, cb: Hook) => {
+        hooks.push(cb);
+        return unsubscribe;
+      }),
+      getDsn: () => "dsn",
+    };
+    const copied: unknown[][] = [];
+    let seenClient: { on: Hook; getDsn(): unknown } | undefined;
+    let returned: unknown;
+    const make = vi.fn(() => ({
+      name: "Spotlight",
+      setup(c: { on: Hook; getDsn(): unknown }) {
+        seenClient = c;
+        returned = c.on("beforeEnvelope", (...args: unknown[]) => copied.push(args));
+      },
+    }));
+    const integration = buildGatedSpotlight(() => active.on, make as unknown as MakeSpotlight);
+    integration.setup?.(client as never);
+    const emit = (...args: unknown[]) => {
+      for (const cb of hooks) cb(...args);
+    };
+    return {
+      client,
+      copied,
+      emit,
+      make,
+      unsubscribe,
+      integration,
+      seen: () => seenClient,
+      returned: () => returned,
+    };
+  }
+
+  it("takes the SDK integration's name, so the SDK never adds its own ungated copy", () => {
+    expect(setup(false, { on: true }).integration.name).toBe("Spotlight");
+  });
+
+  it("does nothing when Spotlight is not configured", () => {
+    for (const off of [undefined, false]) {
+      const { make, client } = setup(off, { on: true });
+      expect(make).not.toHaveBeenCalled();
+      expect(client.on).not.toHaveBeenCalled();
+    }
+  });
+
+  it("passes a configured sidecar url through, and the SDK default for `true`", () => {
+    expect(setup("http://sidecar:8969/stream", { on: true }).make).toHaveBeenCalledWith({
+      sidecarUrl: "http://sidecar:8969/stream",
+    });
+    expect(setup(true, { on: true }).make).toHaveBeenCalledWith({ sidecarUrl: undefined });
+  });
+
+  it("runs the sidecar copy only while the gate is on, asked on every envelope", () => {
+    const active = { on: true };
+    const { copied, emit } = setup(true, active);
+    emit("a", "hint");
+    active.on = false;
+    emit("b");
+    active.on = true;
+    emit("c");
+    expect(copied).toEqual([["a", "hint"], ["c"]]);
+  });
+
+  it("forwards everything else on the client, and the unsubscribe on() returns", () => {
+    const { seen, returned, unsubscribe } = setup(true, { on: true });
+    expect(seen()?.getDsn()).toBe("dsn");
+    expect(returned()).toBe(unsubscribe);
+  });
+});
+
 describe("the real SDK behind the gated transport (#1919)", () => {
   const itemTypes: string[] = [];
   // The same gate instrument.ts passes: primed and the setting on.
@@ -113,7 +195,7 @@ describe("the real SDK behind the gated transport (#1919)", () => {
       dsn: "https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/1",
       // Sessions are only sent with a release.
       release: "snapotter@test",
-      integrations: buildSentryIntegrations(Sentry, false),
+      integrations: buildSentryIntegrations(Sentry, false, sentryActive),
       sendClientReports: false,
       beforeSend: buildBeforeSend(sentryActive) as never,
       beforeSendTransaction: buildBeforeSendTransaction(sentryActive) as never,

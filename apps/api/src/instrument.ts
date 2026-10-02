@@ -45,8 +45,10 @@ if (dsn && !telemetryEnvKilled()) {
       environment: process.env.SNAPOTTER_ENV || "production",
       sendDefaultPii: false,
       // No request bodies or cookies collected (#1880); the beforeSend hooks
-      // below strip query strings and auth headers. See sentry-integrations.ts.
-      integrations: buildSentryIntegrations(Sentry, tracingEnabled),
+      // below strip query strings and auth headers. Spotlight, when an operator
+      // sets SENTRY_SPOTLIGHT, sits behind the analytics gate (#1966). See
+      // sentry-integrations.ts.
+      integrations: buildSentryIntegrations(Sentry, tracingEnabled, sentryActive),
       ...(tracingEnabled
         ? {
             tracesSampler: buildTracesSampler(

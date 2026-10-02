@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   nodeSend: vi.fn(async () => ({ statusCode: 200 })),
   nodeFlush: vi.fn(async () => true),
   makeNodeTransport: vi.fn(),
+  spotlightIntegration: vi.fn(),
 }));
 
 vi.mock("@sentry/node", () => ({
@@ -20,6 +21,7 @@ vi.mock("@sentry/node", () => ({
   httpIntegration: h.httpIntegration,
   requestDataIntegration: h.requestDataIntegration,
   makeNodeTransport: h.makeNodeTransport,
+  spotlightIntegration: h.spotlightIntegration,
 }));
 
 type InitOptions = {
@@ -54,6 +56,7 @@ const OUR_HTTP = { trackIncomingRequestsAsSessions: false, maxIncomingRequestBod
 const OUR_REQUEST_DATA = {
   include: { cookies: false, data: false, query_string: false, ip: false },
 };
+const GATED_SPOTLIGHT = expect.objectContaining({ name: "Spotlight" });
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -66,6 +69,7 @@ describe("instrument.ts Sentry wiring (#1880)", () => {
     expect(options.integrations).toEqual([
       { name: "Http", options: OUR_HTTP },
       { name: "RequestData", options: OUR_REQUEST_DATA },
+      GATED_SPOTLIGHT,
     ]);
     expect(options.beforeSend).toBeTypeOf("function");
     expect(options.beforeSendTransaction).toBeTypeOf("function");
@@ -80,6 +84,7 @@ describe("instrument.ts Sentry wiring (#1880)", () => {
       { name: "Postgres" },
       { name: "Http", options: OUR_HTTP },
       { name: "RequestData", options: OUR_REQUEST_DATA },
+      GATED_SPOTLIGHT,
     ]);
     expect(options.beforeSendTransaction).toBeTypeOf("function");
     expect(options.tracesSampler).toBeTypeOf("function");
@@ -145,6 +150,52 @@ describe("instrument.ts Sentry wiring (#1880)", () => {
       await gate.refreshAnalyticsGate();
       await expect(transport?.send(envelope)).resolves.toEqual({ statusCode: 200 });
       expect(h.nodeSend).toHaveBeenCalledWith(envelope);
+    } finally {
+      gate.__resetGateForTests();
+    }
+  });
+
+  it("hands Spotlight the analytics gate, so SENTRY_SPOTLIGHT stops copying when opted out (#1966)", async () => {
+    const options = await loadInstrument({
+      SENTRY_TRACES_SAMPLE_RATE: "0",
+      ANALYTICS_BAKED_OVERRIDE: "on",
+    });
+    type Hook = (envelope: unknown) => void;
+    const integrations = options.integrations as Array<{ name: string; setup(c: unknown): void }>;
+    const spotlight = integrations.find((i) => i.name === "Spotlight");
+    // A stand-in for the SDK's integration: it copies each envelope it is handed.
+    const copied: unknown[] = [];
+    h.spotlightIntegration.mockImplementation(() => ({
+      name: "Spotlight",
+      setup(c: { on(hook: string, cb: Hook): void }) {
+        c.on("beforeEnvelope", (envelope) => copied.push(envelope));
+      },
+    }));
+    const hooks: Hook[] = [];
+    spotlight?.setup({
+      getOptions: () => ({ spotlight: true }),
+      on: (_hook: string, cb: Hook) => {
+        hooks.push(cb);
+        return () => {};
+      },
+    });
+    expect(hooks).toHaveLength(1);
+    const emit = (envelope: unknown) => {
+      for (const cb of hooks) cb(envelope);
+    };
+    const gate = await import("../../../apps/api/src/lib/analytics-gate.js");
+    try {
+      // Boot window: the setting has never been read.
+      emit("boot");
+      gate.__setReaderForTests(async () => false);
+      await gate.refreshAnalyticsGate();
+      emit("off");
+      expect(copied).toEqual([]);
+
+      gate.__setReaderForTests(async () => true);
+      await gate.refreshAnalyticsGate();
+      emit("on");
+      expect(copied).toEqual(["on"]);
     } finally {
       gate.__resetGateForTests();
     }

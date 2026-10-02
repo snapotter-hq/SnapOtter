@@ -5,6 +5,7 @@
  * with exactly the production list.
  */
 import type * as SentryNode from "@sentry/node";
+import { buildGatedSpotlight } from "./sentry-transport.js";
 
 type SentryModule = typeof SentryNode;
 type SentryIntegrations = NonNullable<Parameters<SentryModule["init"]>[0]>["integrations"];
@@ -12,6 +13,7 @@ type SentryIntegrations = NonNullable<Parameters<SentryModule["init"]>[0]>["inte
 export function buildSentryIntegrations(
   Sentry: SentryModule,
   tracingEnabled: boolean,
+  isActive: () => boolean,
 ): SentryIntegrations {
   // Both replace the default instance of the same name (#1880). The http
   // integration buffers up to 10 KB of every incoming request body by default,
@@ -30,6 +32,8 @@ export function buildSentryIntegrations(
     Sentry.requestDataIntegration({
       include: { cookies: false, data: false, query_string: false, ip: false },
     }),
+    // Only does anything when SENTRY_SPOTLIGHT is set; see sentry-transport.ts.
+    buildGatedSpotlight(isActive, Sentry.spotlightIntegration),
   ];
   // With tracing on, use the function form to DROP the default Redis
   // integration (the array form is additive and would keep it). With tracing

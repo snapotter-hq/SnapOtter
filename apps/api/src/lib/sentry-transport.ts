@@ -30,3 +30,51 @@ export function buildGatedTransport(
     };
   };
 }
+
+type SpotlightFactory = (typeof SentryNode)["spotlightIntegration"];
+type SentryIntegration = ReturnType<SpotlightFactory>;
+type SentryClient = Parameters<NonNullable<SentryIntegration["setup"]>>[0];
+type HookRegistrar = (hook: string, callback: (...args: unknown[]) => void) => () => void;
+
+/**
+ * Spotlight behind the same gate (#1966). With SENTRY_SPOTLIGHT set, the SDK's
+ * Spotlight integration POSTs a copy of every envelope to the sidecar from the
+ * client's beforeEnvelope hook, which fires before the transport, so the gate
+ * above never sees that copy. This takes the integration's name, which stops
+ * the SDK adding its own ungated one, and sets the real one up against a
+ * client whose hook callbacks only run while analytics is on.
+ *
+ * The SDK has already resolved SENTRY_SPOTLIGHT into the client's `spotlight`
+ * option by setup time, so the env var means exactly what it did before.
+ */
+export function buildGatedSpotlight(
+  isActive: () => boolean,
+  makeSpotlight: SpotlightFactory,
+): SentryIntegration {
+  return {
+    name: "Spotlight",
+    setup(client) {
+      const { spotlight } = client.getOptions() as { spotlight?: boolean | string };
+      if (!spotlight) return;
+      const inner = makeSpotlight({
+        sidecarUrl: typeof spotlight === "string" ? spotlight : undefined,
+      });
+      inner.setup?.(gateClientHooks(client, isActive));
+    },
+  };
+}
+
+function gateClientHooks(client: SentryClient, isActive: () => boolean): SentryClient {
+  const on = client.on.bind(client) as unknown as HookRegistrar;
+  const gatedOn: HookRegistrar = (hook, callback) =>
+    on(hook, (...args) => {
+      if (isActive()) callback(...args);
+    });
+  return new Proxy(client, {
+    get(target, prop) {
+      if (prop === "on") return gatedOn;
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}

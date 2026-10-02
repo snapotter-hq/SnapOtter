@@ -123,7 +123,7 @@ export async function startHarness({
   Sentry.init({
     dsn: "https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/1",
     sendDefaultPii: false,
-    integrations: buildSentryIntegrations(Sentry, tracing),
+    integrations: buildSentryIntegrations(Sentry, tracing, sentryActive),
     ...(tracing ? { tracesSampler: buildTracesSampler(1) as never } : {}),
     sendClientReports: false,
     beforeSend: ((event: Payload, hint: Parameters<typeof beforeSend>[1]) => {
