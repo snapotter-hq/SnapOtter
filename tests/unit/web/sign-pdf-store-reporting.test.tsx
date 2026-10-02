@@ -311,6 +311,172 @@ describe("sign-pdf clears the store's processing flag on every exit path", () =>
 });
 
 /**
+ * #1969: a failed sign used to leave its entry at "pending" with no error, so
+ * the thumbnail strip never marked it failed and the page's report-issue
+ * button never showed. Every failure path now writes the failure to the entry
+ * the run started on, with a category wherever the message is translated and
+ * couldn't be classified from its text.
+ */
+describe("sign-pdf marks its entry failed on every failure path", () => {
+  const sp = en.toolSettings["sign-pdf"];
+
+  it("marks it failed with the server's error when the request fails", async () => {
+    renderPanel();
+
+    (await apply()).respond(422, { error: "Processing failed" });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe("Processing failed");
+    expect(entry().errorCategory).toBeNull();
+  });
+
+  it("marks it failed with the status when the error body has no message", async () => {
+    renderPanel();
+
+    (await apply()).respond(500, {});
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.failedWithStatus.replace("{status}", "500"));
+  });
+
+  it("marks it failed on a network error", async () => {
+    renderPanel();
+
+    const xhr = await apply();
+    act(() => xhr.onerror?.());
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.network);
+    expect(entry().errorCategory).toBe("upload_error");
+  });
+
+  it("marks it failed when the request times out", async () => {
+    renderPanel();
+
+    const xhr = await apply();
+    act(() => xhr.ontimeout?.());
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(sp.timeout);
+    expect(entry().errorCategory).toBe("timeout");
+  });
+
+  it("marks it failed when the signatures cannot be exported", async () => {
+    renderPanel(
+      fakeCanvas({
+        exportPlacements: () => Promise.reject(new Error("canvas is tainted")),
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+
+    await waitFor(() => expect(entry().status).toBe("failed"));
+    expect(entry().error).toBe(sp.exportFailed);
+  });
+
+  it("marks it failed when a 200's body does not parse", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    act(() => {
+      xhr.status = 200;
+      xhr.responseText = "<html>not json</html>";
+      xhr.onload?.();
+    });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.invalidResponse);
+  });
+
+  it("marks it failed when the stream reports a failure", async () => {
+    renderPanel();
+
+    (await apply()).respond(202, { jobId: "job-1", async: true });
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe("sidecar died");
+  });
+
+  it("marks it failed when the stream stalls", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+
+      (await apply()).respond(202, { jobId: "job-1", async: true });
+      stalls.fireLatest();
+
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(sp.stall);
+      expect(entry().errorCategory).toBe("timeout");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("marks the entry the run started against, not the live selection", async () => {
+    useFileStore.getState().setFiles([pdf("contract.pdf"), pdf("lease.pdf")]);
+    renderPanel();
+
+    const xhr = await apply();
+    act(() => useFileStore.getState().setSelectedIndex(1));
+    xhr.respond(422, { error: "Processing failed" });
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(1).status).toBe("pending");
+    expect(entry(1).error).toBeNull();
+  });
+
+  it("clears the failure when the next run starts", async () => {
+    renderPanel();
+
+    (await apply()).respond(422, { error: "Processing failed" });
+    expect(entry().status).toBe("failed");
+
+    fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+
+    expect(entry().status).toBe("pending");
+    expect(entry().error).toBeNull();
+    expect(entry().errorCategory).toBeNull();
+  });
+
+  it("leaves the navigation guard quiet about a failed sign", async () => {
+    renderPanel();
+
+    (await apply()).respond(422, { error: "Processing failed" });
+
+    expect(guardWork()).toBeNull();
+  });
+
+  it("still ends the run and reports it when the failure write throws", async () => {
+    const realUpdateEntry = useFileStore.getState().updateEntry;
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderPanel();
+      const xhr = await apply();
+      vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementationOnce(() => {
+        throw new Error("boom");
+      });
+
+      xhr.respond(422, { error: "Processing failed" });
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByText("Processing failed")).toBeInTheDocument();
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Failing a Sign PDF run's entry failed" }),
+        expect.objectContaining({ tool_id: "sign-pdf" }),
+      );
+    } finally {
+      useFileStore.setState({ updateEntry: realUpdateEntry });
+      consoleError.mockRestore();
+    }
+  });
+});
+
+/**
  * The panel writes the store's processing flag, so it owes the store the same
  * teardown use-tool-processor does on unmount. Without it, leaving the page
  * mid-sign leaves the flag behind: on the sync path a stale onload clears a

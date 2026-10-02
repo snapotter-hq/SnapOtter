@@ -832,8 +832,15 @@ export function ToolPage() {
     }
 
     // Show error state for failed batch files (before interactive canvas blocks,
-    // which also match !hasProcessed and would show the canvas instead of the error)
-    if (hasFile && !hasProcessed && currentEntry?.status === "failed") {
+    // which also match !hasProcessed and would show the canvas instead of the error).
+    // interactive-sign keeps its canvas: its panel shows the error, and swapping
+    // the canvas out would throw away the signatures the user placed (#1969).
+    if (
+      hasFile &&
+      !hasProcessed &&
+      currentEntry?.status === "failed" &&
+      displayMode !== "interactive-sign"
+    ) {
       return (
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center max-w-sm">

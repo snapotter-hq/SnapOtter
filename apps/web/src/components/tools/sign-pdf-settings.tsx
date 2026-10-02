@@ -1,4 +1,4 @@
-import { SafeError } from "@snapotter/shared";
+import { type FeedbackErrorCategory, SafeError } from "@snapotter/shared";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
@@ -285,6 +285,37 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       useFileStore.getState().setProcessing(false);
     };
 
+    /**
+     * Ends a run that failed. Besides the panel's error and endRun, the
+     * failure goes on the entry the run started on, so the thumbnail strip
+     * marks it failed and the page offers its report-issue button (#1969).
+     * `category` is for messages that are translated, which can't be
+     * classified from their text. The entry write goes last and never throws,
+     * like use-tool-processor's failEntry: a store listener that throws there
+     * must not leave the run half-ended. An entry that already holds this
+     * run's result keeps it; only the "pending" the run reset it to is failed.
+     */
+    const failRun = (message: string, category?: FeedbackErrorCategory) => {
+      setError(message);
+      endRun();
+      try {
+        if (useFileStore.getState().entries[capturedIndex]?.status === "pending") {
+          useFileStore.getState().updateEntry(capturedIndex, {
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          });
+        }
+      } catch (err) {
+        console.error("Failing the Sign PDF run's entry failed", err);
+        // The console alone never reaches Sentry (#1882).
+        void captureHandledError(
+          new SafeError("Failing a Sign PDF run's entry failed", { kind: "bug", cause: err }),
+          { error_class: "bug", tool_id: "sign-pdf" },
+        );
+      }
+    };
+
     const exported = await canvas.exportPlacements().catch((cause: unknown) => {
       // Without this the run never ends: the button stays disabled and the
       // navigation guard warns for as long as the page is open. Reported
@@ -297,8 +328,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       return null;
     });
     if (!exported) {
-      setError(sp.exportFailed);
-      endRun();
+      failRun(sp.exportFailed);
       return;
     }
     const { pngs, placements } = exported;
@@ -362,13 +392,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       },
       onFailed: (failure) => {
         abandonRequest();
-        setError(jobFailureMessage(failure, t.errors));
-        finish();
+        progressCleanupRef.current = null;
+        failRun(jobFailureMessage(failure, t.errors));
       },
       onStall: () => {
         abandonRequest();
-        setError(sp.stall);
-        finish();
+        progressCleanupRef.current = null;
+        failRun(sp.stall, "timeout");
       },
     });
     const stopProgress = subscription.stop;
@@ -409,57 +439,54 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         try {
           result = parseResultBody<SignResult>(xhr.responseText);
         } catch (err) {
-          setError(t.errors.invalidResponse);
+          failRun(t.errors.invalidResponse);
           reportMalformedResult(err, { status: xhr.status, toolId: "sign-pdf" });
+          return;
         }
-        if (result) {
-          try {
-            landResult(result);
-          } catch (err) {
-            try {
-              setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
-              endRun();
-            } catch (teardownErr) {
-              console.error("Ending the run after a result handling error failed", teardownErr);
-              // The console alone never reaches Sentry (#1882).
-              reportRunEndFailure(
-                "Ending a Sign PDF run after a result handling error failed",
-                teardownErr,
-                "sign-pdf",
-              );
-            }
-            throw err;
-          }
-        }
-      } else {
         try {
-          const b = JSON.parse(xhr.responseText);
-          setError(
-            typeof b.error === "string"
-              ? b.error
-              : typeof b.details === "string"
-                ? b.details
-                : format(t.errors.failedWithStatus, { status: xhr.status }),
-          );
-        } catch {
-          setError(format(t.errors.processingFailedWithStatus, { status: xhr.status }));
+          landResult(result);
+        } catch (err) {
+          try {
+            failRun(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+          } catch (teardownErr) {
+            console.error("Ending the run after a result handling error failed", teardownErr);
+            // The console alone never reaches Sentry (#1882).
+            reportRunEndFailure(
+              "Ending a Sign PDF run after a result handling error failed",
+              teardownErr,
+              "sign-pdf",
+            );
+          }
+          throw err;
         }
+        endRun();
+        return;
       }
-      endRun();
+      let message: string;
+      try {
+        const b = JSON.parse(xhr.responseText);
+        message =
+          typeof b.error === "string"
+            ? b.error
+            : typeof b.details === "string"
+              ? b.details
+              : format(t.errors.failedWithStatus, { status: xhr.status });
+      } catch {
+        message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
+      }
+      failRun(message);
     };
     xhr.onerror = () => {
       if (abandoned) return;
       stopProgress();
       progressCleanupRef.current = null;
-      setError(t.errors.network);
-      endRun();
+      failRun(t.errors.network, "upload_error");
     };
     xhr.ontimeout = () => {
       if (abandoned) return;
       stopProgress();
       progressCleanupRef.current = null;
-      setError(sp.timeout);
-      endRun();
+      failRun(sp.timeout, "timeout");
     };
     xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));
     formatHeaders().forEach((value, key) => {

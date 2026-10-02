@@ -76,6 +76,39 @@ test.describe("Sign PDF tool", () => {
     await expect(apply).toBeEnabled();
   });
 
+  // #1969: a failed sign marks its entry failed, which turns on the page's
+  // report-issue button. The page's failed-file card must not take the canvas
+  // away with it, or the placed signatures would be lost and Apply would have
+  // nothing to retry with. The request is answered here, so this runs without
+  // PyMuPDF.
+  test("keeps the canvas and the placed signature when the sign fails", async ({
+    loggedInPage: page,
+  }) => {
+    await page.route("**/api/v1/tools/pdf/sign-pdf", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Processing failed" }),
+      }),
+    );
+
+    await page.goto("/pdf/sign-pdf");
+    await uploadPdf(page);
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible({ timeout: 15_000 });
+    await placeUploadedSignature(page);
+
+    const apply = page.getByRole("button", { name: /Apply & Download/ });
+    await expect(apply).toBeEnabled();
+    await apply.click();
+
+    await expect(page.getByText("Processing failed")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Report issue" })).toBeVisible();
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
+    await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(0);
+    // The placement survived, so the user can retry straight away.
+    await expect(apply).toBeEnabled();
+  });
+
   // Stamping calls the Python sidecar (doc_sign, which needs PyMuPDF). The e2e
   // webServer boots the API with the system Python, which has no PyMuPDF here
   // (and PyMuPDF-less CI shards exist too), so the actual stamp + signed-PDF
