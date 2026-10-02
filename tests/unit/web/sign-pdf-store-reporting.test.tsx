@@ -63,6 +63,10 @@ class FakeXhr {
   url = "";
   body: FormData | null = null;
   aborted = false;
+  /** The browser's upload channel: progress events while the body is sent. */
+  upload: { onprogress: ((event: ProgressEvent) => void) | null } = { onprogress: null };
+  /** A browser sends no upload events to a handler attached after send(). */
+  uploadHandlerAtSend = false;
 
   constructor() {
     FakeXhr.instances.push(this);
@@ -76,11 +80,19 @@ class FakeXhr {
 
   send(body: FormData) {
     this.body = body;
+    this.uploadHandlerAtSend = this.upload.onprogress !== null;
   }
 
   /** As the real one does: no load event ever fires after this. */
   abort() {
     this.aborted = true;
+  }
+
+  /** Report upload bytes moving, as the browser does while the PDF is sent. */
+  uploadProgress(loaded: number, total: number) {
+    act(() => {
+      this.upload.onprogress?.(new ProgressEvent("progress", { loaded, total }));
+    });
   }
 
   /** Answer the request the way the API does for a fast sign. */
@@ -731,27 +743,46 @@ const STALL_MS = 5 * 60_000;
 /**
  * Captures the progress stream's stall timer (the one five-minute timeout the
  * panel arms) so a test can fire the stall without faking every timer, which
- * would stall Testing Library's own waitFor too.
+ * would stall Testing Library's own waitFor too. Tracks clearTimeout as well,
+ * so a test can tell a stall that was pushed back from one still counting.
  */
 function captureStallTimers() {
   const realSetTimeout = globalThis.setTimeout;
-  const stalls: (() => void)[] = [];
-  const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+  const realClearTimeout = globalThis.clearTimeout;
+  const stalls: { fire: () => void; cleared: boolean }[] = [];
+  const byHandle = new Map<unknown, (typeof stalls)[number]>();
+  const setSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
     handler: () => void,
     ms?: number,
   ) => {
-    if (ms === STALL_MS) stalls.push(handler);
-    return realSetTimeout(ms === STALL_MS ? () => {} : handler, ms === STALL_MS ? 0 : ms);
+    if (ms !== STALL_MS) return realSetTimeout(handler, ms);
+    const handle = realSetTimeout(() => {}, 0);
+    const stall = { fire: handler, cleared: false };
+    stalls.push(stall);
+    byHandle.set(handle, stall);
+    return handle;
   }) as typeof setTimeout);
+  const clearSpy = vi.spyOn(globalThis, "clearTimeout").mockImplementation(((
+    handle?: Parameters<typeof clearTimeout>[0],
+  ) => {
+    const stall = byHandle.get(handle);
+    if (stall) stall.cleared = true;
+    realClearTimeout(handle);
+  }) as typeof clearTimeout);
   return {
     /** Fire the most recently armed stall, as five quiet minutes would. */
     fireLatest() {
       const stall = stalls.at(-1);
       if (!stall) throw new Error("no stall timer armed");
-      act(() => stall());
+      act(() => stall.fire());
+    },
+    /** Every stall armed so far, in order, with whether it was cleared. */
+    all() {
+      return stalls;
     },
     restore() {
-      spy.mockRestore();
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
     },
   };
 }
@@ -929,5 +960,80 @@ describe("sign-pdf drops a request the progress stream gave up on", () => {
 
     expect(xhr.aborted).toBe(false);
     expect(entry().status).toBe("completed");
+  });
+});
+
+/**
+ * #1968: the stall timer is armed before the upload starts, and only the
+ * progress stream used to reset it. A large PDF still uploading while the
+ * stream was quiet (a buffering proxy) got called stalled, and since #1958 the
+ * stall also aborts the request, cutting off an upload that was still moving.
+ */
+describe("sign-pdf counts upload progress as a sign of life", () => {
+  it("pushes the stall back while upload bytes are moving", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      expect(xhr.uploadHandlerAtSend).toBe(true);
+      const armedBeforeUpload = stalls.all().at(-1);
+      expect(armedBeforeUpload?.cleared).toBe(false);
+
+      xhr.uploadProgress(1, 4);
+
+      // The five minutes that started before the upload never run out.
+      expect(armedBeforeUpload?.cleared).toBe(true);
+      expect(stalls.all().at(-1)?.cleared).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(screen.queryByText(en.toolSettings["sign-pdf"].stall)).not.toBeInTheDocument();
+
+      xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("still stalls after five quiet minutes once the upload stops moving", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      xhr.uploadProgress(4, 4);
+
+      stalls.fireLatest();
+
+      expect(xhr.aborted).toBe(true);
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not arm a new stall for upload progress after the run ended", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: DOWNLOAD_URL },
+          }),
+        });
+      });
+      const armed = stalls.all().length;
+
+      xhr.uploadProgress(4, 4);
+
+      expect(stalls.all()).toHaveLength(armed);
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    } finally {
+      stalls.restore();
+    }
   });
 });

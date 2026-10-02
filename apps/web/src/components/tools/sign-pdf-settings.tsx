@@ -41,19 +41,32 @@ interface ProgressHandlers {
   onStall: () => void;
 }
 
+/** A live progress subscription. */
+export interface ProgressSubscription {
+  /** End it: close the stream and drop the stall timer. Safe to call twice. */
+  stop: () => void;
+  /**
+   * Count something outside the stream as a sign of life and restart the stall
+   * timer, the way a heartbeat does. The request's upload progress calls it, so
+   * a large PDF still uploading while the stream is quiet isn't called stalled
+   * (#1968). Does nothing once the subscription has ended.
+   */
+  touch: () => void;
+}
+
 /**
  * Subscribe to async (202) job progress with the same mobile-resilient recovery
  * as the standard tool processor (PRs #203/#204). Reconnects on tab refocus (the
  * progress endpoint replays the terminal frame from Redis and, after that cache
  * expires, from the durable job record, so a job that finished while SSE was dead
  * still resolves) and arms a stall timeout that fails gracefully instead of
- * hanging at the last percent. Returns a cleanup the caller must invoke on sync
- * completion, error, or unmount.
+ * hanging at the last percent. The caller must `stop()` it on sync completion,
+ * error, or unmount, and should `touch()` it while the upload is moving.
  */
 export function subscribeSignPdfJobProgress(
   clientJobId: string,
   handlers: ProgressHandlers,
-): () => void {
+): ProgressSubscription {
   let es: EventSource | null = null;
   let stall: ReturnType<typeof setTimeout> | null = null;
   let done = false;
@@ -75,6 +88,8 @@ export function subscribeSignPdfJobProgress(
   };
 
   const resetStall = () => {
+    // A late touch after the run ended must not arm a stall that would end it twice.
+    if (done) return;
     if (stall) clearTimeout(stall);
     stall = setTimeout(() => {
       cleanup();
@@ -155,7 +170,7 @@ export function subscribeSignPdfJobProgress(
   document.addEventListener("visibilitychange", onVisible);
   open();
   resetStall();
-  return cleanup;
+  return { stop: cleanup, touch: resetStall };
 }
 
 /**
@@ -324,7 +339,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     };
 
     // The request outlives a progress stream that gave up on the run (a failed
-    // frame, or the stall timer, which runs from before the upload starts).
+    // frame, or the stall timer, which upload progress pushes back; see below).
     // Abort it then, and drop whatever it answers after, or a late 200 puts the
     // signed PDF's link up beside the stall error and a late network error,
     // timeout, or 4xx replaces that error with its own (#1958).
@@ -339,7 +354,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       xhr.abort();
     };
 
-    const stopProgress = subscribeSignPdfJobProgress(clientJobId, {
+    const subscription = subscribeSignPdfJobProgress(clientJobId, {
       onProgress: (percent) => setProgress(percent),
       onComplete: (r) => {
         landResult(r);
@@ -356,6 +371,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         finish();
       },
     });
+    const stopProgress = subscription.stop;
     progressCleanupRef.current = stopProgress;
 
     const form = new FormData();
@@ -374,6 +390,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     });
 
     xhr.timeout = 600_000;
+    // The stall timer is armed before the upload starts, and on a quiet stream
+    // only this keeps it from cutting off a large PDF that is still uploading
+    // (#1968). xhr.timeout still bounds the request as a whole.
+    xhr.upload.onprogress = () => subscription.touch();
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
       if (abandoned || xhr.status === 202) return;

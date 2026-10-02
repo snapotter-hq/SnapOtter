@@ -29,9 +29,15 @@ class FakeEventSource {
   }
 }
 
+// Sign PDF's subscriber returns { stop, touch } since #1968; the shared cases
+// below only need the stop half.
 const subscribers = [
   ["erase-object", subscribeEraseObjectJobProgress],
-  ["sign-pdf", subscribeSignPdfJobProgress],
+  [
+    "sign-pdf",
+    (...args: Parameters<typeof subscribeSignPdfJobProgress>) =>
+      subscribeSignPdfJobProgress(...args).stop,
+  ],
 ] as const;
 
 describe.each(subscribers)("%s async progress", (_name, subscribe) => {
@@ -296,3 +302,68 @@ describe.each(subscribers)(
     });
   },
 );
+
+// #1968: the stall timer is armed before the upload starts. touch() lets the
+// upload's own progress count as a sign of life, so a quiet stream can't cut
+// off a large PDF that is still uploading.
+describe("sign-pdf async progress: touch", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("restarts the stall timeout the way a heartbeat does", () => {
+    const onStall = vi.fn();
+    const { stop, touch } = subscribeSignPdfJobProgress("job-touch", {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onStall,
+    });
+
+    vi.advanceTimersByTime(4 * 60_000 + 59_000);
+    touch();
+    vi.advanceTimersByTime(2_000);
+    expect(onStall).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(4 * 60_000 + 59_000);
+    expect(onStall).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it("does nothing after stop", () => {
+    const onStall = vi.fn();
+    const { stop, touch } = subscribeSignPdfJobProgress("job-touch-stopped", {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onStall,
+    });
+
+    stop();
+    touch();
+    vi.advanceTimersByTime(10 * 60_000);
+
+    expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it("does nothing after the stall already ended the run", () => {
+    const onStall = vi.fn();
+    const { touch } = subscribeSignPdfJobProgress("job-touch-stalled", {
+      onComplete: vi.fn(),
+      onFailed: vi.fn(),
+      onStall,
+    });
+
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(onStall).toHaveBeenCalledOnce();
+
+    touch();
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(onStall).toHaveBeenCalledOnce();
+  });
+});
