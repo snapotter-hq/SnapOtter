@@ -375,25 +375,30 @@ jobs:
       # --update-snapshots=none: the default (missing) writes an absent
       # baseline on the first attempt, and the CI retry then passes against
       # the file it just wrote. none fails both attempts instead.
+      # --fail-on-flaky-tests: with zero changed pixels allowed, a shot that
+      # differs once and matches on the retry is a real intermittent diff,
+      # and passing it would also throw its diff report away.
       # PLAYWRIGHT_RUN_ID is fixed per lane because Playwright writes its report
       # under test-results/e2e-runs/<run id>/, and the upload needs that path.
       - name: Compare desktop screenshots
         id: desktop
-        run: pnpm playwright test --project=chromium-visual --update-snapshots=none
+        run: pnpm playwright test --project=chromium-visual --update-snapshots=none --fail-on-flaky-tests
         env:
           PW_WORKERS: "2"
           PLAYWRIGHT_RUN_ID: visual-desktop
       - name: Compare device screenshots
         id: device
         if: ${{ !cancelled() }}
-        run: pnpm playwright test --project=mobile-chromium --project=tablet-chromium --grep @visual --update-snapshots=none
+        run: pnpm playwright test --project=mobile-chromium --project=tablet-chromium --grep @visual --update-snapshots=none --fail-on-flaky-tests
         env:
           PW_WORKERS: "2"
           PLAYWRIGHT_RUN_ID: visual-device
       # The report holds the expected, actual and diff image for every
       # failing shot; playwright-output holds the same PNGs as plain files.
+      # Gated on the lanes rather than failure(), so a missing report after a
+      # failed comparison is an error here instead of a warning (#1025).
       - name: Upload diff report on failure
-        if: failure()
+        if: ${{ !cancelled() && (steps.desktop.outcome == 'failure' || steps.device.outcome == 'failure') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ env.ARTIFACT_NAME }}
@@ -402,6 +407,7 @@ jobs:
             test-results/e2e-runs/visual-device/playwright-report/
             test-results/e2e-runs/visual-desktop/playwright-output/
             test-results/e2e-runs/visual-device/playwright-output/
+          if-no-files-found: error
           retention-days: 14
       - name: Summarize
         if: ${{ !cancelled() }}

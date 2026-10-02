@@ -38,6 +38,7 @@ interface Step {
   name?: string;
   id?: string;
   if?: string;
+  "continue-on-error"?: boolean | string;
   uses?: string;
   run?: string;
   env?: Record<string, string>;
@@ -45,7 +46,10 @@ interface Step {
 }
 
 interface Workflow {
-  jobs?: Record<string, { "runs-on"?: string; steps?: Step[] }>;
+  jobs?: Record<
+    string,
+    { "runs-on"?: string; if?: string; "continue-on-error"?: boolean | string; steps?: Step[] }
+  >;
 }
 
 /**
@@ -53,7 +57,21 @@ interface Workflow {
  * nothing. update-visual-baselines.yml renders every visual project that way,
  * and that run used to count as covering them (#1507).
  */
-const UPDATES_SNAPSHOTS = /--update-snapshots(?!=none\b)/;
+const UPDATES_SNAPSHOTS = /--update-snapshots(?!=none\b)|(?:^|\s)-u(?:\s|$)/;
+
+/**
+ * Only an explicit none really compares: the default, missing, writes an
+ * absent baseline and passes the CI retry against it. --ignore-snapshots
+ * skips the comparison outright.
+ */
+function comparesScreenshots(command: string): boolean {
+  return (
+    command.includes("--update-snapshots=none") &&
+    !command.includes("--ignore-snapshots") &&
+    !command.includes("--pass-with-no-tests") &&
+    !/--grep-invert[= ]["']?[^\s"']*@visual/.test(command)
+  );
+}
 
 function rootScripts(): Record<string, string> {
   return (
@@ -155,9 +173,7 @@ describe("Playwright CI coverage", () => {
     );
     const comparing = corpus
       .split("\n")
-      .filter(
-        (line) => line.includes("playwright test") && !/--grep-invert[= ]"?@visual/.test(line),
-      );
+      .filter((line) => line.includes("playwright test") && comparesScreenshots(line));
     const uncompared = visualProjects.filter(
       (project) => !comparing.some((line) => line.includes(`--project=${project}`)),
     );
@@ -180,6 +196,15 @@ describe("nightly visual comparison (#1507)", () => {
   const lanes = steps.filter((step) => step.run?.includes("playwright test"));
   const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
 
+  it("can't be switched off or made to pass on a failure", () => {
+    expect(job?.if).toBeUndefined();
+    expect(job?.["continue-on-error"]).toBeUndefined();
+    for (const lane of lanes) {
+      expect(lane["continue-on-error"], lane.name).toBeUndefined();
+      expect([undefined, `$\{{ !cancelled() }}`], lane.name).toContain(lane.if);
+    }
+  });
+
   it("runs on the runner image the linux baselines come from", () => {
     // update-visual-baselines.yml renders on ubuntu-latest. Another Ubuntu
     // release (the test fleet's, say) renders fonts differently and fails every shot.
@@ -194,15 +219,31 @@ describe("nightly visual comparison (#1507)", () => {
     // Every lane runs even when an earlier one failed.
     for (const lane of lanes.slice(1)) expect(lane.if).toContain("!cancelled()");
     for (const lane of lanes) {
-      // The default, missing, writes an absent baseline and lets the CI retry
-      // pass against it. none fails both attempts instead.
-      expect(lane.run).toContain("--update-snapshots=none");
-      expect(lane.run).not.toContain("--grep-invert");
+      expect(comparesScreenshots(lane.run ?? ""), lane.name).toBe(true);
+      // A shot that only matches on the retry is a real diff at zero pixels.
+      expect(lane.run).toContain("--fail-on-flaky-tests");
+    }
+  });
+
+  it("has @visual shots for both device projects the lane names", () => {
+    // Playwright drops a project that matches no tests and only fails when
+    // the whole run is empty, so one tag going missing would go unnoticed.
+    const spec = readFileSync(path.join(root, "tests/e2e/device-visual.spec.ts"), "utf8");
+    const titles = [...spec.matchAll(/test\.describe\("([^"]*)"/g)].map((m) => m[1]);
+    for (const device of ["@mobile", "@tablet"]) {
+      expect(titles.some((title) => title.includes(device) && title.includes("@visual"))).toBe(
+        true,
+      );
     }
   });
 
   it("uploads each lane's diff report when a comparison fails", () => {
-    expect(upload?.if).toBe("failure()");
+    for (const lane of lanes) {
+      expect(lane.id, `${lane.name} needs an id`).toBeTruthy();
+      expect(upload?.if).toContain(`steps.${lane.id}.outcome == 'failure'`);
+    }
+    // A failed comparison with no report to show for it is an error.
+    expect(upload?.with?.["if-no-files-found"]).toBe("error");
     // Playwright writes its report under test-results/e2e-runs/<run id>/, so a
     // fixed run id per lane is what gives the upload a path to find (#1025).
     for (const lane of lanes) {
