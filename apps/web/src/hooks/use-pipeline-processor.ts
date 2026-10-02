@@ -366,10 +366,11 @@ export function usePipelineProcessor() {
   // that run instead. Only claimed refs are a failed start's to tear down;
   // with no live run there is nothing to spare. Behind a live run the
   // kickoff has only reset outcome state and marked entries processing, so
-  // it fails those entries and leaves the run, its processing flag and its
-  // error slot alone. A batch run owns every entry, so behind one there is
-  // nothing to fail. The caller rethrows, so the start's throw is still
-  // reported.
+  // it fails every entry left at processing except the live run's, and
+  // leaves the run, its processing flag and its error slot alone (a
+  // non-null setError also turns processing off). A batch run owns every
+  // entry, so behind one there is nothing to fail. The caller rethrows, so
+  // the start's throw is still reported.
   const endStartBeforeClaim = useCallback(() => {
     if (!activeJobIdRef.current) {
       endRunAtStart();

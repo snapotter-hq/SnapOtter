@@ -28,12 +28,13 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, generateId: () => "33333333-3333-4333-8333-333333333333" };
+  return { ...actual, generateId: vi.fn(() => "33333333-3333-4333-8333-333333333333") };
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
+import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
@@ -1820,14 +1821,22 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
     originalSize: 64,
     processedSize: 32,
   };
+  const SECOND_ID = "55555555-5555-4555-8555-555555555555";
   let unsubscribe: (() => void) | null = null;
   afterEach(() => {
     unsubscribe?.();
     unsubscribe = null;
+    vi.mocked(generateId).mockImplementation(() => JOB_ID);
   });
 
   function clipFile(name = "clip.mp4") {
     return new File([new ArrayBuffer(64)], name, { type: "video/mp4" });
+  }
+
+  // The live run holds JOB_ID; a start that claims gets its own id, so a
+  // ref the failed start took over can't pass for the live run's.
+  function giveNextStartItsOwnId() {
+    vi.mocked(generateId).mockImplementation(() => SECOND_ID);
   }
 
   // Throws once, from the next store write that matches.
@@ -1851,6 +1860,7 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
       xhrs[0].upload.onload?.();
     });
     expect(useFileStore.getState().processing).toBe(true);
+    giveNextStartItsOwnId();
     return hook;
   }
 
@@ -1986,6 +1996,7 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
     });
     expect(xhrs).toHaveLength(1);
     const liveSse = latestSse();
+    giveNextStartItsOwnId();
     breakNextWrite();
 
     expect(() => act(() => result.current.processFiles(files, { startS: 0, endS: 2 }))).toThrow(
@@ -2021,6 +2032,29 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
       activeJobId: null,
     });
     expect(xhrs).toHaveLength(0);
+    unmount();
+  });
+
+  // The other half of the claim: once a start has taken the refs over, the
+  // earlier run is superseded and a throw ends the start the #1821 way. (The
+  // earlier run's late 200 is #944's, whose sync onload has no run guard.)
+  it("ends the run it took over when a start throws after its claim", () => {
+    const file = clipFile();
+    const { result, unmount } = startLiveRun([file]);
+
+    // JSON.stringify throws on a BigInt, after the claim and the stream.
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2n }))).toThrow(
+      TypeError,
+    );
+    act(() => {});
+
+    const state = useFileStore.getState();
+    expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(state).toMatchObject({ processing: false, error: START_FAILURE, activeJobId: null });
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(state.entries[0]).toMatchObject({ status: "failed", error: START_FAILURE });
+    expect(xhrs).toHaveLength(1);
     unmount();
   });
 });

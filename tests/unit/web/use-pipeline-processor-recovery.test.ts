@@ -36,11 +36,12 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, generateId: () => "44444444-4444-4444-8444-444444444444" };
+  return { ...actual, generateId: vi.fn(() => "44444444-4444-4444-8444-444444444444") };
 });
 
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
 import { captureHandledError, track } from "@/lib/analytics";
+import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
 
@@ -2925,10 +2926,12 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
  */
 describe("usePipelineProcessor leaves a live run alone when a later start throws early (#1911)", () => {
   const START_FAILURE = "Something went wrong while tracking this job. Try again.";
+  const SECOND_ID = "55555555-5555-4555-8555-555555555555";
   let unsubscribe: (() => void) | null = null;
   afterEach(() => {
     unsubscribe?.();
     unsubscribe = null;
+    vi.mocked(generateId).mockImplementation(() => JOB_ID);
   });
 
   function photoFiles(count: number) {
@@ -2936,6 +2939,12 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
       { length: count },
       (_, i) => new File([new ArrayBuffer(16)], `photo-${i}.png`, { type: "image/png" }),
     );
+  }
+
+  // The live run holds JOB_ID; a start that claims gets its own id, so a
+  // ref the failed start took over can't pass for the live run's.
+  function giveNextStartItsOwnId() {
+    vi.mocked(generateId).mockImplementation(() => SECOND_ID);
   }
 
   // Throws once, from the next store write that matches.
@@ -2964,6 +2973,7 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
       xhrs[0].upload.onload?.();
     });
     expect(useFileStore.getState()).toMatchObject({ processing: true, activeJobId: JOB_ID });
+    giveNextStartItsOwnId();
     return hook;
   }
 
@@ -3003,6 +3013,72 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
 
     expectLiveRunIntact();
     landLiveRunResult();
+    unmount();
+  });
+
+  it("keeps the live run's job, so its dropped socket still degrades to the async path", () => {
+    const files = photoFiles(1);
+    const { result, unmount } = startLiveRun(files);
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processSingle(files[0], STEPS))).toThrow(
+      "second start broke",
+    );
+    stopBreaking();
+
+    // The degrade only acts while the run still owns the job ref.
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState()).toMatchObject({
+      processing: true,
+      error: null,
+      activeJobId: JOB_ID,
+    });
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    unmount();
+  });
+
+  // The other half of the claim: once a start has taken the refs over, the
+  // earlier run is superseded and a throw ends the start the #1821 way, so
+  // the earlier run's late answer finds no run to land on.
+  it("ends the run it took over when a start throws after its claim", () => {
+    const files = photoFiles(1);
+    const { result, unmount } = startLiveRun(files);
+
+    // JSON.stringify throws on a BigInt, after the claim and the stream.
+    const unserializable = [
+      { id: "s1", toolId: "resize", settings: { width: 50n } },
+    ] as unknown as PipelineStep[];
+    expect(() => act(() => result.current.processSingle(files[0], unserializable))).toThrow(
+      TypeError,
+    );
+    act(() => {});
+
+    const state = useFileStore.getState();
+    expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(state).toMatchObject({ processing: false, error: START_FAILURE, activeJobId: null });
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(state.entries[0]).toMatchObject({ status: "failed", error: START_FAILURE });
+    expect(xhrs).toHaveLength(1);
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: START_FAILURE,
+    });
     unmount();
   });
 
@@ -3064,6 +3140,7 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
     });
     expect(xhrs).toHaveLength(1);
     const liveSse = latestSse();
+    giveNextStartItsOwnId();
     breakNextWrite();
 
     expect(() => act(() => result.current.processSingle(files[0], STEPS))).toThrow(
