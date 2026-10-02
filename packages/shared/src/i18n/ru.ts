@@ -4345,7 +4345,7 @@ export const ru: TranslationKeys = {
       dropDescription: "Перетащите изображение сюда для начала работы",
       openImageButton: "Открыть изображение",
       newDocumentButton: "Новый документ",
-      pasteHint: "Или вставьте из буфера обмена (Ctrl+V)",
+      pasteHint: "Или вставьте из буфера обмена ({shortcut})",
     },
     mobile: {
       heading: "Рекомендуется настольный ПК",
@@ -4590,8 +4590,8 @@ export const ru: TranslationKeys = {
         median: "Медиана",
       },
       history: {
-        undoTitle: "Отменить (Ctrl+Z)",
-        redoTitle: "Повторить (Ctrl+Shift+Z)",
+        undoTitle: "Отменить ({shortcut})",
+        redoTitle: "Повторить ({shortcut})",
         empty: "История пуста",
         unknown: "Неизвестно",
         actions: {
@@ -4647,7 +4647,7 @@ export const ru: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Новый слой (Ctrl+Shift+N)",
+        newLayerTitle: "Новый слой ({shortcut})",
         blend: "Режим",
         opacity: "Непрозр.",
         hideLayer: "Скрыть слой",

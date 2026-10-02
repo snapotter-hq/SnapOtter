@@ -4344,7 +4344,7 @@ export const pl: TranslationKeys = {
       dropDescription: "Przeciągnij tutaj obraz, aby rozpocząć",
       openImageButton: "Otwórz obraz",
       newDocumentButton: "Nowy dokument",
-      pasteHint: "Lub wklej ze schowka (Ctrl+V)",
+      pasteHint: "Lub wklej ze schowka ({shortcut})",
     },
     mobile: {
       heading: "Zalecany komputer stacjonarny",
@@ -4590,8 +4590,8 @@ export const pl: TranslationKeys = {
         median: "Mediana",
       },
       history: {
-        undoTitle: "Cofnij (Ctrl+Z)",
-        redoTitle: "Ponów (Ctrl+Shift+Z)",
+        undoTitle: "Cofnij ({shortcut})",
+        redoTitle: "Ponów ({shortcut})",
         empty: "Brak historii",
         unknown: "Nieznane",
         actions: {
@@ -4647,7 +4647,7 @@ export const pl: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Nowa warstwa (Ctrl+Shift+N)",
+        newLayerTitle: "Nowa warstwa ({shortcut})",
         blend: "Mieszanie",
         opacity: "Krycie",
         hideLayer: "Ukryj warstwę",

@@ -4307,7 +4307,7 @@ export const ar: TranslationKeys = {
       dropDescription: "اسحب صورة هنا للبدء",
       openImageButton: "فتح صورة",
       newDocumentButton: "مستند جديد",
-      pasteHint: "أو الصق من الحافظة (Ctrl+V)",
+      pasteHint: "أو الصق من الحافظة ({shortcut})",
     },
     mobile: {
       heading: "يُفضل استخدام سطح المكتب",
@@ -4552,8 +4552,8 @@ export const ar: TranslationKeys = {
         median: "الوسيط",
       },
       history: {
-        undoTitle: "تراجع (Ctrl+Z)",
-        redoTitle: "إعادة (Ctrl+Shift+Z)",
+        undoTitle: "تراجع ({shortcut})",
+        redoTitle: "إعادة ({shortcut})",
         empty: "لا يوجد سجل بعد",
         unknown: "غير معروف",
         actions: {
@@ -4609,7 +4609,7 @@ export const ar: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "طبقة جديدة (Ctrl+Shift+N)",
+        newLayerTitle: "طبقة جديدة ({shortcut})",
         blend: "المزج",
         opacity: "الشفافية",
         hideLayer: "إخفاء الطبقة",

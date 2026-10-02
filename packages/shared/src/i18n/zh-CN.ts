@@ -4065,7 +4065,7 @@ export const zhCN: TranslationKeys = {
       dropDescription: "拖放图片到此处开始编辑",
       openImageButton: "打开图片",
       newDocumentButton: "新建文档",
-      pasteHint: "或从剪贴板粘贴（Ctrl+V）",
+      pasteHint: "或从剪贴板粘贴（{shortcut}）",
     },
     mobile: {
       heading: "建议使用桌面设备",
@@ -4309,8 +4309,8 @@ export const zhCN: TranslationKeys = {
         median: "中间值",
       },
       history: {
-        undoTitle: "撤销（Ctrl+Z）",
-        redoTitle: "重做（Ctrl+Shift+Z）",
+        undoTitle: "撤销（{shortcut}）",
+        redoTitle: "重做（{shortcut}）",
         empty: "暂无历史记录",
         unknown: "未知",
         actions: {
@@ -4366,7 +4366,7 @@ export const zhCN: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "新建图层（Ctrl+Shift+N）",
+        newLayerTitle: "新建图层（{shortcut}）",
         blend: "混合",
         opacity: "不透明度",
         hideLayer: "隐藏图层",

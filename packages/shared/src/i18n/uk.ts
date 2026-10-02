@@ -4345,7 +4345,7 @@ export const uk: TranslationKeys = {
       dropDescription: "Перетягніть зображення сюди для початку роботи",
       openImageButton: "Відкрити зображення",
       newDocumentButton: "Новий документ",
-      pasteHint: "Або вставте з буфера обміну (Ctrl+V)",
+      pasteHint: "Або вставте з буфера обміну ({shortcut})",
     },
     mobile: {
       heading: "Рекомендовано настільний ПК",
@@ -4591,8 +4591,8 @@ export const uk: TranslationKeys = {
         median: "Медіана",
       },
       history: {
-        undoTitle: "Скасувати (Ctrl+Z)",
-        redoTitle: "Повторити (Ctrl+Shift+Z)",
+        undoTitle: "Скасувати ({shortcut})",
+        redoTitle: "Повторити ({shortcut})",
         empty: "Історія поки порожня",
         unknown: "Невідомо",
         actions: {
@@ -4648,7 +4648,7 @@ export const uk: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Новий шар (Ctrl+Shift+N)",
+        newLayerTitle: "Новий шар ({shortcut})",
         blend: "Накладання",
         opacity: "Непрозорість",
         hideLayer: "Сховати шар",

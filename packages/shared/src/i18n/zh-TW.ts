@@ -4064,7 +4064,7 @@ export const zhTW: TranslationKeys = {
       dropDescription: "將影像拖放到此處開始編輯",
       openImageButton: "開啟影像",
       newDocumentButton: "新增文件",
-      pasteHint: "或從剪貼簿貼上（Ctrl+V）",
+      pasteHint: "或從剪貼簿貼上（{shortcut}）",
     },
     mobile: {
       heading: "建議使用桌面版",
@@ -4308,8 +4308,8 @@ export const zhTW: TranslationKeys = {
         median: "中位數",
       },
       history: {
-        undoTitle: "復原（Ctrl+Z）",
-        redoTitle: "重做（Ctrl+Shift+Z）",
+        undoTitle: "復原（{shortcut}）",
+        redoTitle: "重做（{shortcut}）",
         empty: "尚無歷史記錄",
         unknown: "未知",
         actions: {
@@ -4365,7 +4365,7 @@ export const zhTW: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "新增圖層（Ctrl+Shift+N）",
+        newLayerTitle: "新增圖層（{shortcut}）",
         blend: "混合",
         opacity: "不透明度",
         hideLayer: "隱藏圖層",

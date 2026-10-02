@@ -4336,7 +4336,7 @@ export const id: TranslationKeys = {
       dropDescription: "Seret gambar ke sini untuk memulai",
       openImageButton: "Buka Gambar",
       newDocumentButton: "Dokumen Baru",
-      pasteHint: "Atau tempel dari clipboard (Ctrl+V)",
+      pasteHint: "Atau tempel dari clipboard ({shortcut})",
     },
     mobile: {
       heading: "Disarankan Desktop",
@@ -4582,8 +4582,8 @@ export const id: TranslationKeys = {
         median: "Median",
       },
       history: {
-        undoTitle: "Urungkan (Ctrl+Z)",
-        redoTitle: "Ulangi (Ctrl+Shift+Z)",
+        undoTitle: "Urungkan ({shortcut})",
+        redoTitle: "Ulangi ({shortcut})",
         empty: "Belum ada riwayat",
         unknown: "Tidak diketahui",
         actions: {
@@ -4639,7 +4639,7 @@ export const id: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Layer Baru (Ctrl+Shift+N)",
+        newLayerTitle: "Layer Baru ({shortcut})",
         blend: "Campuran",
         opacity: "Opasitas",
         hideLayer: "Sembunyikan layer",

@@ -22,7 +22,9 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { format } from "@/lib/format";
+import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { HistoryAction } from "@/types/editor";
@@ -204,7 +206,9 @@ export function HistoryPanel() {
               : "text-muted-foreground/30 cursor-not-allowed",
           )}
           aria-label={t.a11y.undo}
-          title={t.editor.panels.history.undoTitle}
+          title={format(t.editor.panels.history.undoTitle, {
+            shortcut: formatShortcut("mod+z", hotkeysModIsMeta()),
+          })}
         >
           <Undo2 size={14} />
         </button>
@@ -219,7 +223,9 @@ export function HistoryPanel() {
               : "text-muted-foreground/30 cursor-not-allowed",
           )}
           aria-label={t.a11y.redo}
-          title={t.editor.panels.history.redoTitle}
+          title={format(t.editor.panels.history.redoTitle, {
+            shortcut: formatShortcut("mod+shift+z", hotkeysModIsMeta()),
+          })}
         >
           <Redo2 size={14} />
         </button>

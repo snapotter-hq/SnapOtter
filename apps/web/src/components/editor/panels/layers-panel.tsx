@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { format } from "@/lib/format";
+import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { EditorLayer, ObjectEffects } from "@/types/editor";
@@ -206,7 +208,9 @@ export function LayersPanel() {
           type="button"
           onClick={addLayer}
           className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title={t.editor.panels.layers.newLayerTitle}
+          title={format(t.editor.panels.layers.newLayerTitle, {
+            shortcut: formatShortcut("mod+shift+n", hotkeysModIsMeta()),
+          })}
           aria-label={t.a11y.addLayer}
           data-testid="add-layer-btn"
         >

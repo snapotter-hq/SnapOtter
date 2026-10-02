@@ -4285,7 +4285,7 @@ export const th: TranslationKeys = {
       dropDescription: "ลากภาพมาวางที่นี่เพื่อเริ่มต้น",
       openImageButton: "เปิดภาพ",
       newDocumentButton: "เอกสารใหม่",
-      pasteHint: "หรือวางจากคลิปบอร์ด (Ctrl+V)",
+      pasteHint: "หรือวางจากคลิปบอร์ด ({shortcut})",
     },
     mobile: {
       heading: "แนะนำให้ใช้คอมพิวเตอร์",
@@ -4530,8 +4530,8 @@ export const th: TranslationKeys = {
         median: "มัธยฐาน",
       },
       history: {
-        undoTitle: "เลิกทำ (Ctrl+Z)",
-        redoTitle: "ทำซ้ำ (Ctrl+Shift+Z)",
+        undoTitle: "เลิกทำ ({shortcut})",
+        redoTitle: "ทำซ้ำ ({shortcut})",
         empty: "ยังไม่มีประวัติ",
         unknown: "ไม่ทราบ",
         actions: {
@@ -4587,7 +4587,7 @@ export const th: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "เลเยอร์ใหม่ (Ctrl+Shift+N)",
+        newLayerTitle: "เลเยอร์ใหม่ ({shortcut})",
         blend: "ผสม",
         opacity: "ความทึบ",
         hideLayer: "ซ่อนเลเยอร์",

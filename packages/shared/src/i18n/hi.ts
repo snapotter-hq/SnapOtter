@@ -4137,7 +4137,7 @@ export const hi: TranslationKeys = {
       dropDescription: "शुरू करने के लिए यहां इमेज खींचें",
       openImageButton: "इमेज खोलें",
       newDocumentButton: "नया दस्तावेज़",
-      pasteHint: "या क्लिपबोर्ड से पेस्ट करें (Ctrl+V)",
+      pasteHint: "या क्लिपबोर्ड से पेस्ट करें ({shortcut})",
     },
     mobile: {
       heading: "डेस्कटॉप सुझाया गया",
@@ -4382,8 +4382,8 @@ export const hi: TranslationKeys = {
         median: "माध्यिका",
       },
       history: {
-        undoTitle: "पूर्ववत करें (Ctrl+Z)",
-        redoTitle: "पुनः करें (Ctrl+Shift+Z)",
+        undoTitle: "पूर्ववत करें ({shortcut})",
+        redoTitle: "पुनः करें ({shortcut})",
         empty: "अभी तक कोई इतिहास नहीं",
         unknown: "अज्ञात",
         actions: {
@@ -4439,7 +4439,7 @@ export const hi: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "नई लेयर (Ctrl+Shift+N)",
+        newLayerTitle: "नई लेयर ({shortcut})",
         blend: "ब्लेंड",
         opacity: "ओपेसिटी",
         hideLayer: "लेयर छुपाएं",

@@ -3,6 +3,8 @@
 import { FilePlus, ImagePlus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { format } from "@/lib/format";
 import { useEditorStore } from "@/stores/editor-store";
 import { NewDocumentDialog } from "./new-document-dialog";
 
@@ -101,7 +103,11 @@ export function WelcomeScreen() {
             </button>
           </div>
 
-          <p className="text-xs text-muted-foreground">{t.editor.welcome.pasteHint}</p>
+          <p className="text-xs text-muted-foreground">
+            {/* The system paste event, not a react-hotkeys-hook binding, so the OS
+              picks the modifier: formatShortcut's default rule. */}
+            {format(t.editor.welcome.pasteHint, { shortcut: formatShortcut("mod+v") })}
+          </p>
         </div>
       </section>
 

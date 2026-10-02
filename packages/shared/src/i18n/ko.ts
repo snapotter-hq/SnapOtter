@@ -4268,7 +4268,7 @@ export const ko: TranslationKeys = {
       dropDescription: "여기에 이미지를 드롭하여 시작하세요",
       openImageButton: "이미지 열기",
       newDocumentButton: "새 문서",
-      pasteHint: "또는 클립보드에서 붙여넣기 (Ctrl+V)",
+      pasteHint: "또는 클립보드에서 붙여넣기 ({shortcut})",
     },
     mobile: {
       heading: "데스크톱 환경 권장",
@@ -4513,8 +4513,8 @@ export const ko: TranslationKeys = {
         median: "중앙값",
       },
       history: {
-        undoTitle: "실행 취소 (Ctrl+Z)",
-        redoTitle: "다시 실행 (Ctrl+Shift+Z)",
+        undoTitle: "실행 취소 ({shortcut})",
+        redoTitle: "다시 실행 ({shortcut})",
         empty: "아직 기록이 없습니다",
         unknown: "알 수 없음",
         actions: {
@@ -4570,7 +4570,7 @@ export const ko: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "새 레이어 (Ctrl+Shift+N)",
+        newLayerTitle: "새 레이어 ({shortcut})",
         blend: "블렌드",
         opacity: "불투명도",
         hideLayer: "레이어 숨기기",

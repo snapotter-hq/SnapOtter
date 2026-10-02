@@ -4332,7 +4332,7 @@ export const vi: TranslationKeys = {
       dropDescription: "Kéo thả hình ảnh vào đây để bắt đầu",
       openImageButton: "Mở hình ảnh",
       newDocumentButton: "Tài liệu mới",
-      pasteHint: "Hoặc dán từ bộ nhớ tạm (Ctrl+V)",
+      pasteHint: "Hoặc dán từ bộ nhớ tạm ({shortcut})",
     },
     mobile: {
       heading: "Khuyến nghị dùng máy tính",
@@ -4577,8 +4577,8 @@ export const vi: TranslationKeys = {
         median: "Trung vị",
       },
       history: {
-        undoTitle: "Hoàn tác (Ctrl+Z)",
-        redoTitle: "Làm lại (Ctrl+Shift+Z)",
+        undoTitle: "Hoàn tác ({shortcut})",
+        redoTitle: "Làm lại ({shortcut})",
         empty: "Chưa có lịch sử",
         unknown: "Không rõ",
         actions: {
@@ -4634,7 +4634,7 @@ export const vi: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Lớp mới (Ctrl+Shift+N)",
+        newLayerTitle: "Lớp mới ({shortcut})",
         blend: "Hòa trộn",
         opacity: "Độ mờ",
         hideLayer: "Ẩn lớp",

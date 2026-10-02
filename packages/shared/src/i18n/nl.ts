@@ -4354,7 +4354,7 @@ export const nl: TranslationKeys = {
       dropDescription: "Sleep een afbeelding hierheen om te beginnen",
       openImageButton: "Afbeelding openen",
       newDocumentButton: "Nieuw document",
-      pasteHint: "Of plak vanuit het klembord (Ctrl+V)",
+      pasteHint: "Of plak vanuit het klembord ({shortcut})",
     },
     mobile: {
       heading: "Desktop aanbevolen",
@@ -4600,8 +4600,8 @@ export const nl: TranslationKeys = {
         median: "Mediaan",
       },
       history: {
-        undoTitle: "Ongedaan maken (Ctrl+Z)",
-        redoTitle: "Opnieuw (Ctrl+Shift+Z)",
+        undoTitle: "Ongedaan maken ({shortcut})",
+        redoTitle: "Opnieuw ({shortcut})",
         empty: "Nog geen geschiedenis",
         unknown: "Onbekend",
         actions: {
@@ -4657,7 +4657,7 @@ export const nl: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Nieuwe laag (Ctrl+Shift+N)",
+        newLayerTitle: "Nieuwe laag ({shortcut})",
         blend: "Overvloeien",
         opacity: "Dekking",
         hideLayer: "Laag verbergen",

@@ -4336,7 +4336,7 @@ export const sv: TranslationKeys = {
       dropDescription: "Släpp en bild här för att börja",
       openImageButton: "Öppna bild",
       newDocumentButton: "Nytt dokument",
-      pasteHint: "Eller klistra in från urklipp (Ctrl+V)",
+      pasteHint: "Eller klistra in från urklipp ({shortcut})",
     },
     mobile: {
       heading: "Dator rekommenderas",
@@ -4582,8 +4582,8 @@ export const sv: TranslationKeys = {
         median: "Median",
       },
       history: {
-        undoTitle: "Ångra (Ctrl+Z)",
-        redoTitle: "Gör om (Ctrl+Shift+Z)",
+        undoTitle: "Ångra ({shortcut})",
+        redoTitle: "Gör om ({shortcut})",
         empty: "Ingen historik ännu",
         unknown: "Okänd",
         actions: {
@@ -4639,7 +4639,7 @@ export const sv: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Nytt lager (Ctrl+Shift+N)",
+        newLayerTitle: "Nytt lager ({shortcut})",
         blend: "Blandning",
         opacity: "Opacitet",
         hideLayer: "Dölj lager",

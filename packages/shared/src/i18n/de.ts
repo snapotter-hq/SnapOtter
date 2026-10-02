@@ -4362,7 +4362,7 @@ export const de: TranslationKeys = {
       dropDescription: "Ziehen Sie ein Bild hierher, um zu beginnen",
       openImageButton: "Bild öffnen",
       newDocumentButton: "Neues Dokument",
-      pasteHint: "Oder aus der Zwischenablage einfügen (Strg+V)",
+      pasteHint: "Oder aus der Zwischenablage einfügen ({shortcut})",
     },
     mobile: {
       heading: "Desktop empfohlen",
@@ -4608,8 +4608,8 @@ export const de: TranslationKeys = {
         median: "Median",
       },
       history: {
-        undoTitle: "Rückgängig (Strg+Z)",
-        redoTitle: "Wiederholen (Strg+Umschalt+Z)",
+        undoTitle: "Rückgängig ({shortcut})",
+        redoTitle: "Wiederholen ({shortcut})",
         empty: "Noch kein Verlauf",
         unknown: "Unbekannt",
         actions: {
@@ -4665,7 +4665,7 @@ export const de: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Neue Ebene (Strg+Umschalt+N)",
+        newLayerTitle: "Neue Ebene ({shortcut})",
         blend: "Modus",
         opacity: "Deckkraft",
         hideLayer: "Ebene ausblenden",

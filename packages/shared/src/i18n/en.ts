@@ -4273,7 +4273,7 @@ export const en = {
       dropDescription: "Drop an image here to get started",
       openImageButton: "Open Image",
       newDocumentButton: "New Document",
-      pasteHint: "Or paste from clipboard (Ctrl+V)",
+      pasteHint: "Or paste from clipboard ({shortcut})",
     },
     mobile: {
       heading: "Desktop Recommended",
@@ -4518,8 +4518,8 @@ export const en = {
         median: "Median",
       },
       history: {
-        undoTitle: "Undo (Ctrl+Z)",
-        redoTitle: "Redo (Ctrl+Shift+Z)",
+        undoTitle: "Undo ({shortcut})",
+        redoTitle: "Redo ({shortcut})",
         empty: "No history yet",
         unknown: "Unknown",
         actions: {
@@ -4575,7 +4575,7 @@ export const en = {
         },
       },
       layers: {
-        newLayerTitle: "New Layer (Ctrl+Shift+N)",
+        newLayerTitle: "New Layer ({shortcut})",
         blend: "Blend",
         opacity: "Opacity",
         hideLayer: "Hide layer",

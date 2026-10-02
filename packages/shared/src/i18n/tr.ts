@@ -4342,7 +4342,7 @@ export const tr: TranslationKeys = {
       dropDescription: "Başlamak için buraya bir görüntü bırakın",
       openImageButton: "Görüntü Aç",
       newDocumentButton: "Yeni Belge",
-      pasteHint: "Veya panodan yapıştırın (Ctrl+V)",
+      pasteHint: "Veya panodan yapıştırın ({shortcut})",
     },
     mobile: {
       heading: "Masaüstü Önerilir",
@@ -4588,8 +4588,8 @@ export const tr: TranslationKeys = {
         median: "Medyan",
       },
       history: {
-        undoTitle: "Geri Al (Ctrl+Z)",
-        redoTitle: "Yinele (Ctrl+Shift+Z)",
+        undoTitle: "Geri Al ({shortcut})",
+        redoTitle: "Yinele ({shortcut})",
         empty: "Henüz geçmiş yok",
         unknown: "Bilinmiyor",
         actions: {
@@ -4645,7 +4645,7 @@ export const tr: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Yeni Katman (Ctrl+Shift+N)",
+        newLayerTitle: "Yeni Katman ({shortcut})",
         blend: "Karışım",
         opacity: "Opaklık",
         hideLayer: "Katmanı gizle",

@@ -4346,7 +4346,7 @@ export const ptBR: TranslationKeys = {
       dropDescription: "Arraste uma imagem aqui para começar",
       openImageButton: "Abrir imagem",
       newDocumentButton: "Novo documento",
-      pasteHint: "Ou cole da área de transferência (Ctrl+V)",
+      pasteHint: "Ou cole da área de transferência ({shortcut})",
     },
     mobile: {
       heading: "Recomendado para desktop",
@@ -4592,8 +4592,8 @@ export const ptBR: TranslationKeys = {
         median: "Mediana",
       },
       history: {
-        undoTitle: "Desfazer (Ctrl+Z)",
-        redoTitle: "Refazer (Ctrl+Shift+Z)",
+        undoTitle: "Desfazer ({shortcut})",
+        redoTitle: "Refazer ({shortcut})",
         empty: "Nenhum histórico ainda",
         unknown: "Desconhecido",
         actions: {
@@ -4649,7 +4649,7 @@ export const ptBR: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Nova camada (Ctrl+Shift+N)",
+        newLayerTitle: "Nova camada ({shortcut})",
         blend: "Mesclagem",
         opacity: "Opacidade",
         hideLayer: "Ocultar camada",

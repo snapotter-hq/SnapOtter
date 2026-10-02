@@ -152,10 +152,12 @@ export function useKeyboardShortcuts() {
 }
 
 /**
- * Returns a human-readable label for a keyboard shortcut.
+ * Returns a human-readable label for a keyboard shortcut. `mac` picks the
+ * Apple glyphs; it defaults to this module's own handler's rule, so a hint for
+ * a key some other handler listens for (the editor's react-hotkeys-hook
+ * bindings) passes that handler's rule instead.
  */
-export function formatShortcut(keys: string): string {
-  const mac = isApplePlatform();
+export function formatShortcut(keys: string, mac: boolean = isApplePlatform()): string {
   return keys
     .split("+")
     .map((k) => {

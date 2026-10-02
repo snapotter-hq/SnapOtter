@@ -4336,7 +4336,7 @@ export const es: TranslationKeys = {
       dropDescription: "Arrastra una imagen aquí para comenzar",
       openImageButton: "Abrir imagen",
       newDocumentButton: "Nuevo documento",
-      pasteHint: "O pega desde el portapapeles (Ctrl+V)",
+      pasteHint: "O pega desde el portapapeles ({shortcut})",
     },
     mobile: {
       heading: "Se recomienda escritorio",
@@ -4582,8 +4582,8 @@ export const es: TranslationKeys = {
         median: "Mediana",
       },
       history: {
-        undoTitle: "Deshacer (Ctrl+Z)",
-        redoTitle: "Rehacer (Ctrl+Mayús+Z)",
+        undoTitle: "Deshacer ({shortcut})",
+        redoTitle: "Rehacer ({shortcut})",
         empty: "Aún no hay historial",
         unknown: "Desconocido",
         actions: {
@@ -4639,7 +4639,7 @@ export const es: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Nueva capa (Ctrl+Mayús+N)",
+        newLayerTitle: "Nueva capa ({shortcut})",
         blend: "Mezcla",
         opacity: "Opacidad",
         hideLayer: "Ocultar capa",

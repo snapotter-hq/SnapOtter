@@ -31,3 +31,19 @@ export function isApplePlatform(
   const hint = nav.platform || nav.userAgentData?.platform || nav.userAgent || "";
   return APPLE_PLATFORM.test(hint);
 }
+
+/**
+ * Whether react-hotkeys-hook binds `mod` to Cmd rather than Ctrl. The editor's
+ * shortcuts (`use-editor-shortcuts.ts`) go through that library, so a hint for
+ * one of them has to follow its rule, which differs from `isApplePlatform()`:
+ * it reads only the user-agent string and treats iPhone, iPad and iPod as
+ * Ctrl platforms. Mirrors `parseHotkeys.ts` in react-hotkeys-hook 5.3.3.
+ */
+export function hotkeysModIsMeta(
+  nav: PlatformNavigator | undefined = typeof navigator === "undefined"
+    ? undefined
+    : (navigator as PlatformNavigator),
+): boolean {
+  const ua = nav?.userAgent ?? "";
+  return /mac/i.test(ua) && !/iphone|ipad|ipod/i.test(ua);
+}

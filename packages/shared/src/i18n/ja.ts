@@ -4292,7 +4292,7 @@ export const ja: TranslationKeys = {
       dropDescription: "ここに画像をドロップして開始",
       openImageButton: "画像を開く",
       newDocumentButton: "新規ドキュメント",
-      pasteHint: "またはクリップボードから貼り付け（Ctrl+V）",
+      pasteHint: "またはクリップボードから貼り付け（{shortcut}）",
     },
     mobile: {
       heading: "デスクトップ推奨",
@@ -4537,8 +4537,8 @@ export const ja: TranslationKeys = {
         median: "中央値",
       },
       history: {
-        undoTitle: "元に戻す（Ctrl+Z）",
-        redoTitle: "やり直し（Ctrl+Shift+Z）",
+        undoTitle: "元に戻す（{shortcut}）",
+        redoTitle: "やり直し（{shortcut}）",
         empty: "履歴はまだありません",
         unknown: "不明",
         actions: {
@@ -4594,7 +4594,7 @@ export const ja: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "新規レイヤー（Ctrl+Shift+N）",
+        newLayerTitle: "新規レイヤー（{shortcut}）",
         blend: "描画モード",
         opacity: "不透明度",
         hideLayer: "レイヤーを非表示",

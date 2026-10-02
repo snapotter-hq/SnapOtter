@@ -4347,7 +4347,7 @@ export const it: TranslationKeys = {
       dropDescription: "Trascina un'immagine qui per iniziare",
       openImageButton: "Apri immagine",
       newDocumentButton: "Nuovo documento",
-      pasteHint: "Oppure incolla dagli appunti (Ctrl+V)",
+      pasteHint: "Oppure incolla dagli appunti ({shortcut})",
     },
     mobile: {
       heading: "Si consiglia il desktop",
@@ -4593,8 +4593,8 @@ export const it: TranslationKeys = {
         median: "Mediana",
       },
       history: {
-        undoTitle: "Annulla (Ctrl+Z)",
-        redoTitle: "Ripeti (Ctrl+Maiusc+Z)",
+        undoTitle: "Annulla ({shortcut})",
+        redoTitle: "Ripeti ({shortcut})",
         empty: "Nessuna cronologia",
         unknown: "Sconosciuto",
         actions: {
@@ -4650,7 +4650,7 @@ export const it: TranslationKeys = {
         },
       },
       layers: {
-        newLayerTitle: "Nuovo livello (Ctrl+Maiusc+N)",
+        newLayerTitle: "Nuovo livello ({shortcut})",
         blend: "Fusione",
         opacity: "Opacità",
         hideLayer: "Nascondi livello",
