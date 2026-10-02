@@ -522,7 +522,9 @@ function GeneralSection() {
         label={t.settings.general.appVersionLabel}
         description={t.settings.general.appVersionDescription}
       >
-        <span className="text-sm font-mono text-muted-foreground">{APP_VERSION}</span>
+        <span data-testid="app-version" className="text-sm font-mono text-muted-foreground">
+          {APP_VERSION}
+        </span>
       </SettingRow>
 
       <div className="flex items-center gap-3 pt-2">
@@ -3880,7 +3882,9 @@ function AboutSection() {
         <p className="text-sm text-muted-foreground">{t.settings.about.appDescription}</p>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground">{t.settings.about.versionLabel}</span>
-          <span className="font-mono text-foreground">{APP_VERSION}</span>
+          <span data-testid="app-version" className="font-mono text-foreground">
+            {APP_VERSION}
+          </span>
         </div>
       </div>
 

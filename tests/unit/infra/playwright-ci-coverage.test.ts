@@ -262,4 +262,14 @@ describe("nightly visual comparison (#1507)", () => {
     // all, not changed: a post-release refresh must catch every drifted shot.
     expect(summary?.run).toContain("-f update_snapshots=all");
   });
+
+  it("links the summary to the new-tool refresh steps in the developer guide (#1862)", () => {
+    const summary = steps.find((step) => step.run?.includes("GITHUB_STEP_SUMMARY"));
+    const anchor = "_5-visual-baselines";
+    expect(summary?.run).toContain(`docs.snapotter.com/guide/developer#${anchor}`);
+    // A renamed heading would leave the link pointing at nothing.
+    const guide = readFileSync(path.join(root, "apps/docs/guide/developer.md"), "utf8");
+    expect(guide).toContain(`{#${anchor}}`);
+    expect(guide).toContain("update-visual-baselines.yml");
+  });
 });
