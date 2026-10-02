@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { en } from "@snapotter/shared";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -100,7 +101,8 @@ describe("image-to-base64 settings", () => {
     expect(results).toEqual([expect.objectContaining({ entryId: first.id, base64: "Zmlyc3Q=" })]);
     expect(errors).toEqual([
       expect.objectContaining({ entryId: second.id, error: "Unsupported" }),
-      expect.objectContaining({ entryId: third.id, error: "Too big" }),
+      // A 413 reads as the translated size message, not the body (#1916).
+      expect.objectContaining({ entryId: third.id, error: en.errors.fileTooLarge }),
     ]);
   });
 

@@ -239,7 +239,14 @@ export function ImageToPdfSettings() {
           );
         } catch {
           setError(
-            format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, { status: xhr.status }),
+            failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+                status: xhr.status,
+              }),
+            ),
           );
         }
       }

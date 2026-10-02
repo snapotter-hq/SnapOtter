@@ -107,6 +107,16 @@ describe("parseApiError and failedAnswerMessage", () => {
     expect(failedAnswerMessage(en, body, STATUS, FALLBACK)).toBe(FALLBACK);
   });
 
+  // The API's own 413 and a reverse proxy's body-size page read the same to
+  // the user, in their language, as useToolProcessor shows them (#1916).
+  it.each([
+    ["the API's JSON body", { error: "File too large", details: "Max 100 MB" }],
+    ["a proxy page that did not parse", null],
+    ["an empty object", {}],
+  ])("answers a 413 with %s as the translated file-too-large message", (_label, body) => {
+    expect(failedAnswerMessage(de, body, 413, FALLBACK)).toBe(de.errors.fileTooLarge);
+  });
+
   it("keeps parseApiError's status fallback when no fallback is passed", () => {
     expect(parseApiError({ error: { reason: "x" } }, STATUS)).toBe("Processing failed: 422");
   });
@@ -157,7 +167,7 @@ class FakeXhr {
     act(() => {
       this.status = status;
       this.readyState = 4;
-      this.responseText = JSON.stringify(body);
+      this.responseText = body === NOT_JSON ? PROXY_PAGE : JSON.stringify(body);
       this.onload?.();
     });
   }
@@ -184,6 +194,7 @@ function chooseFile(container: HTMLElement, file: File) {
 
 /** A proxy's error page: res.json() rejects on it. */
 const NOT_JSON = Symbol("not JSON");
+const PROXY_PAGE = "<html><body><h1>413 Request Entity Too Large</h1></body></html>";
 
 let answer: { status: number; body: unknown };
 
@@ -442,6 +453,36 @@ describe.each(PANELS)("$panel: a failed answer", (row) => {
   });
 });
 
+// Barcode Read's catch branch for a body that is not JSON still builds its
+// own status line, so its proxy-page row waits on the issue that tracks it.
+const PROXY_413_PENDING = new Set(["barcode-read"]);
+
+describe.each(PANELS)("$panel: a 413", (row) => {
+  const shapes: Array<[string, unknown]> = [
+    ["the API's JSON body", { error: "File too large", details: "Max 100 MB" }],
+  ];
+  if (!PROXY_413_PENDING.has(row.panel)) shapes.push(["a proxy's HTML page", NOT_JSON]);
+
+  it.each(shapes)("shows %s as the translated file-too-large message", async (_label, body) => {
+    const message = de.errors.fileTooLarge;
+    const expected = row.framed ? row.framed(message) : message;
+    answer = { status: 413, body };
+    await row.start();
+    if (row.transport === "xhr") {
+      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+      FakeXhr.instances[0].respond(413, body);
+    }
+
+    if (row.shown) {
+      await waitFor(() => expect(row.shown?.()).toBe(expected), { timeout: 3000 });
+    } else {
+      await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument(), {
+        timeout: 3000,
+      });
+    }
+  });
+});
+
 describe("ocr: a failed answer", () => {
   it.each(answers(`Failed: ${STATUS}`))(
     "rejects %s with readable text",
@@ -478,6 +519,19 @@ describe("ocr: a failed answer", () => {
     await expect(run).rejects.toThrow(
       format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name }),
     );
+  });
+
+  it("rejects the API's 413 with the file-too-large message in the locale it was given", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(413, { error: "File too large" });
+
+    await expect(run).rejects.toThrow(de.errors.fileTooLarge);
   });
 
   it("is handed the panel's locale", () => {
