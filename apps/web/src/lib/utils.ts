@@ -21,10 +21,15 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       textarea.style.position = "fixed";
       textarea.style.opacity = "0";
       document.body.appendChild(textarea);
-      textarea.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      return ok;
+      // The textarea holds the copied text (often an API key or recovery
+      // codes), so it has to leave the DOM even when select() or execCommand
+      // throws (#1937).
+      try {
+        textarea.select();
+        return document.execCommand("copy");
+      } finally {
+        textarea.remove();
+      }
     } catch {
       return false;
     }
