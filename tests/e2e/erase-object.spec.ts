@@ -326,6 +326,49 @@ test.describe("Erase Object tool", () => {
     await expect(page.getByTestId("erase-object-download")).toHaveCount(0);
   });
 
+  // #1810: the batch's teardown now runs after its loop whatever happened in
+  // it. A failed file must not stop the next one, and the run must end.
+  test("an Erase All batch moves past a failed file and ends", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /Add more/i }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(fixturePath("image/valid/test-100x100.jpg"));
+    await page.waitForTimeout(500);
+    await page.locator("button").filter({ hasText: "test-100x100.jpg" }).first().click();
+    await page.waitForTimeout(500);
+    await paintStroke(page);
+    await expect(page.getByTestId("erase-object-submit")).toHaveText("Erase All (2)");
+
+    let requests = 0;
+    await page.route("**/api/v1/tools/image/erase-object", (route) => {
+      requests++;
+      return requests === 1
+        ? route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "Object erasing failed" }),
+          })
+        : route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              downloadUrl: "/api/v1/download/job-2/test-100x100.png",
+              originalSize: 1000,
+              processedSize: 900,
+            }),
+          });
+    });
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect.poll(() => requests, { timeout: 15_000 }).toBe(2);
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled({ timeout: 15_000 });
+  });
+
   test("a completed stream with a result lands it", async ({ loggedInPage: page }) => {
     await gotoEraser(page);
     await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
