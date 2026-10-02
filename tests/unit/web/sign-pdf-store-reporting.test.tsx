@@ -515,6 +515,17 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
       );
       expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
       expect(useFileStore.getState().processing).toBe(false);
+      // The teardown's own throw reaches Sentry once, as a handled error
+      // (#1882). The root cause is rethrown, so it isn't reported here.
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending a Sign PDF run after a result handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "sign-pdf" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
     } finally {
       unsubscribe();
       consoleError.mockRestore();

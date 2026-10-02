@@ -432,7 +432,13 @@ describe("collage: a malformed sync answer apart from our own store write", () =
       );
       // zustand sets the state before its listeners run, so the write landed.
       expect(useCollageStore.getState().error).toBe(en.errors.jobTrackingFailed);
-      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+      // The teardown's own throw reaches Sentry once, as a handled error
+      // (#1882). The root cause is rethrown, so it isn't reported here.
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending a Collage run after a result handling error failed");
+      expect(error.cause).toMatchObject({ message: "teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "collage" });
     } finally {
       unsubscribe();
       restore();

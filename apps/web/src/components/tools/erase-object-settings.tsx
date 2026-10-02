@@ -461,6 +461,7 @@ export function EraseObjectSettings({
           } catch (err) {
             // Both are store writes, so each is guarded on its own: a second
             // throw from setError must not leave the run stuck at processing.
+            let teardownError: { cause: unknown } | null = null;
             for (const teardown of [
               () => setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors)),
               finishUi,
@@ -469,7 +470,17 @@ export function EraseObjectSettings({
                 teardown();
               } catch (teardownErr) {
                 console.error("Ending the run after a result handling error failed", teardownErr);
+                teardownError ??= { cause: teardownErr };
               }
+            }
+            // Once per run, with the first throw: the console alone never
+            // reaches Sentry (#1882).
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending an Erase Object run after a result handling error failed",
+                teardownError.cause,
+                "erase-object",
+              );
             }
             throw err;
           }

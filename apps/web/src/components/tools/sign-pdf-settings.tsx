@@ -16,6 +16,7 @@ import {
   parseResultBody,
   reportMalformedResult,
 } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import {
   addSignature,
   deleteSignature,
@@ -387,6 +388,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
               endRun();
             } catch (teardownErr) {
               console.error("Ending the run after a result handling error failed", teardownErr);
+              // The console alone never reaches Sentry (#1882).
+              reportRunEndFailure(
+                "Ending a Sign PDF run after a result handling error failed",
+                teardownErr,
+                "sign-pdf",
+              );
             }
             throw err;
           }

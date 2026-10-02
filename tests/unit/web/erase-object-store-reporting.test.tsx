@@ -215,11 +215,12 @@ describe("erase-object single file: its own failures apart from a bad response",
     renderPanel();
     const xhr = await submit();
     // A store listener that breaks on every write: landing the result throws
-    // the root cause, then the teardown's store write throws again.
+    // the root cause, then each of the teardown's store writes throws again.
     let writes = 0;
     const unsubscribe = useFileStore.subscribe(() => {
       writes++;
-      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
     });
     const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
 
@@ -238,6 +239,17 @@ describe("erase-object single file: its own failures apart from a bad response",
       // The UI teardown still ran after setError threw: the elapsed counter
       // stops instead of ticking for as long as the page is open.
       expect(clearIntervalSpy).toHaveBeenCalled();
+      // Both teardown writes threw; the run reports once, with the first
+      // (#1882). The root cause is rethrown, so it isn't reported here.
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run after a result handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
     } finally {
       clearIntervalSpy.mockRestore();
       unsubscribe();

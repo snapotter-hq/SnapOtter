@@ -15,7 +15,10 @@ export type RunEndFailure =
   | "Ending a pipeline run after a result handling error failed"
   | "Ending a tool run after its start failed"
   | "Ending a pipeline run after its start failed"
-  | "Ending an Erase Object batch after a store error failed";
+  | "Ending an Erase Object batch after a store error failed"
+  | "Ending a Collage run after a result handling error failed"
+  | "Ending a Sign PDF run after a result handling error failed"
+  | "Ending an Erase Object run after a result handling error failed";
 
 /**
  * Reports a store write that threw while a run was ending (#1812). Those

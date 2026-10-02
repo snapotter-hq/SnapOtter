@@ -13,6 +13,7 @@ import {
 } from "@/lib/collage-templates";
 import { format, plural } from "@/lib/format";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
@@ -190,6 +191,12 @@ export function CollageSettings() {
         store.setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
       } catch (teardownErr) {
         console.error("Ending the run after a result handling error failed", teardownErr);
+        // The console alone never reaches Sentry (#1882).
+        reportRunEndFailure(
+          "Ending a Collage run after a result handling error failed",
+          teardownErr,
+          "collage",
+        );
       }
       throw err;
     }
