@@ -428,7 +428,9 @@ jobs:
               echo "A screenshot no longer matches its committed linux baseline, or has none. The \`$ARTIFACT_NAME\` artifact holds the Playwright report with the expected, actual and diff image for each failing shot (open it with \`pnpm exec playwright show-report <dir>\`)."
               echo
             fi
-            echo "If the new rendering is intended, refresh the baselines with [Update Visual Baselines](https://github.com/$REPO/actions/workflows/update-visual-baselines.yml) (\`.github/workflows/update-visual-baselines.yml\`): run it on main and it opens a PR with the regenerated PNGs. If it isn't intended, the diff is the regression."
+            echo "If the new rendering is intended, refresh the baselines: dispatch [Update Visual Baselines](https://github.com/$REPO/actions/workflows/update-visual-baselines.yml) (\`.github/workflows/update-visual-baselines.yml\`) on main with \`update_snapshots=all\`, i.e. \`gh workflow run update-visual-baselines.yml --ref main -f update_snapshots=all\`. It opens a PR with the regenerated PNGs. If the new rendering isn't intended, the diff is the regression."
+            echo
+            echo "Expect this after every release (Settings shows the version string) and every new tool (home-page counts and cards). Whether to mask those or keep refreshing is tracked in #1862."
           } >> "$GITHUB_STEP_SUMMARY"
 
   docker-e2e:

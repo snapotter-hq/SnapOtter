@@ -259,5 +259,7 @@ describe("nightly visual comparison (#1507)", () => {
     const summary = steps.find((step) => step.run?.includes("GITHUB_STEP_SUMMARY"));
     expect(summary?.if).toContain("!cancelled()");
     expect(summary?.run).toContain("update-visual-baselines.yml");
+    // all, not changed: a post-release refresh must catch every drifted shot.
+    expect(summary?.run).toContain("-f update_snapshots=all");
   });
 });
