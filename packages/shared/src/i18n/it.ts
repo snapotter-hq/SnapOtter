@@ -1986,9 +1986,9 @@ export const it: TranslationKeys = {
       clear: "Cancella",
       outputFormat: "Formato di output",
       quality: "Qualità",
-      paintHint: "Dipingi sopra gli oggetti che vuoi rimuovere. Usa Ctrl+Z per annullare.",
+      paintHint: "Dipingi sopra gli oggetti che vuoi rimuovere. Usa {shortcut} per annullare.",
       lassoHint:
-        "Traccia un anello attorno all'oggetto che vuoi rimuovere. Usa Ctrl+Z per annullare.",
+        "Traccia un anello attorno all'oggetto che vuoi rimuovere. Usa {shortcut} per annullare.",
       submit: "Cancella oggetto",
       submitBatch: "Cancella tutti ({count})",
       progressLabel: "Cancellazione oggetto",

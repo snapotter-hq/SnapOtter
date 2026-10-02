@@ -1995,9 +1995,9 @@ export const fr: TranslationKeys = {
       outputFormat: "Format de sortie",
       quality: "Qualité",
       paintHint:
-        "Peignez sur les objets que vous souhaitez supprimer. Utilisez Ctrl+Z pour annuler.",
+        "Peignez sur les objets que vous souhaitez supprimer. Utilisez {shortcut} pour annuler.",
       lassoHint:
-        "Tracez une boucle autour de l'objet que vous souhaitez supprimer. Utilisez Ctrl+Z pour annuler.",
+        "Tracez une boucle autour de l'objet que vous souhaitez supprimer. Utilisez {shortcut} pour annuler.",
       submit: "Effacer l'objet",
       submitBatch: "Tout effacer ({count})",
       progressLabel: "Effacement de l'objet",

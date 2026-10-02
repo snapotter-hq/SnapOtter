@@ -1993,9 +1993,9 @@ export const de: TranslationKeys = {
       outputFormat: "Ausgabeformat",
       quality: "Qualität",
       paintHint:
-        "Malen Sie über die Objekte, die Sie entfernen möchten. Strg+Z zum Rückgängigmachen.",
+        "Malen Sie über die Objekte, die Sie entfernen möchten. {shortcut} zum Rückgängigmachen.",
       lassoHint:
-        "Ziehen Sie eine Schlaufe um das Objekt, das Sie entfernen möchten. Strg+Z zum Rückgängigmachen.",
+        "Ziehen Sie eine Schlaufe um das Objekt, das Sie entfernen möchten. {shortcut} zum Rückgängigmachen.",
       submit: "Objekt entfernen",
       submitBatch: "Alle entfernen ({count})",
       progressLabel: "Objekt wird entfernt",

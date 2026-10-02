@@ -1986,8 +1986,9 @@ export const ptBR: TranslationKeys = {
       clear: "Limpar",
       outputFormat: "Formato de saída",
       quality: "Qualidade",
-      paintHint: "Pinte sobre os objetos que deseja remover. Use Ctrl+Z para desfazer.",
-      lassoHint: "Desenhe um laço ao redor do objeto que deseja remover. Use Ctrl+Z para desfazer.",
+      paintHint: "Pinte sobre os objetos que deseja remover. Use {shortcut} para desfazer.",
+      lassoHint:
+        "Desenhe um laço ao redor do objeto que deseja remover. Use {shortcut} para desfazer.",
       submit: "Apagar objeto",
       submitBatch: "Apagar todos ({count})",
       progressLabel: "Apagando objeto",

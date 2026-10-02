@@ -1986,9 +1986,9 @@ export const tr: TranslationKeys = {
       outputFormat: "Çıktı Biçimi",
       quality: "Kalite",
       paintHint:
-        "Kaldırmak istediğiniz nesnelerin üzerini boyayın. Geri almak için Ctrl+Z kullanın.",
+        "Kaldırmak istediğiniz nesnelerin üzerini boyayın. Geri almak için {shortcut} kullanın.",
       lassoHint:
-        "Kaldırmak istediğiniz nesnenin etrafına bir ilmek çizin. Geri almak için Ctrl+Z kullanın.",
+        "Kaldırmak istediğiniz nesnenin etrafına bir ilmek çizin. Geri almak için {shortcut} kullanın.",
       submit: "Nesneyi Sil",
       submitBatch: "Tümünü Sil ({count})",
       progressLabel: "Nesne siliniyor",
