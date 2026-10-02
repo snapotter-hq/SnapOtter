@@ -47,7 +47,12 @@ test.describe("Image Editor - Full GUI Test Suite", () => {
     // Check sidebar has Editor item
     await page.goto("/");
     await page.waitForTimeout(2000);
-    const editorLink = page.locator('a:has-text("Editor")');
+    // Scope to the top-nav landmark: tool cards are links too, and a card whose
+    // description says "editor" (PDF Multi-Tool) matches any page-wide text search.
+    // The name is anchored, not exact, because the "Beta" badge joins it ("EditorBeta").
+    const editorLink = page
+      .getByRole("navigation", { name: "Navigation" })
+      .getByRole("link", { name: /^Editor/ });
     await expect(editorLink).toBeVisible();
     await snap(page, "sidebar-with-editor");
 
