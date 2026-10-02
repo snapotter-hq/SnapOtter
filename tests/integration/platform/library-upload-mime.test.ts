@@ -254,6 +254,8 @@ describe("library upload MIME type for every accepted image format (#1550)", () 
     ["notes.tga", Buffer.from("plain text, not a picture\n")],
     ["notes.cr2", Buffer.from("plain text, not a picture\n")],
     ["notes.orf", Buffer.from("plain text, not a picture\n")],
+    // Opens with ORF's big-endian signature, but points at no IFD.
+    ["mmorpg.orf", Buffer.from("MMORPG notes, not a picture\n")],
     ["notes.rw2", Buffer.from("plain text, not a picture\n")],
     ["notes.svgz", gzipSync("plain text, not a picture\n")],
   ])(

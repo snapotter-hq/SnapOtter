@@ -1,10 +1,32 @@
 import { gzipSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  TGA_MAX_RLE_PACKETS,
   validatedImageMime,
   validateImageBuffer,
 } from "../../../apps/api/src/lib/file-validation.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
+
+// Counts what every gunzip stream the validator opens hands back, so the bomb
+// test can assert how much was inflated rather than guess from heap numbers.
+const inflated = vi.hoisted(() => ({ bytes: 0 }));
+vi.mock("node:zlib", async (importOriginal) => {
+  const zlib = await importOriginal<typeof import("node:zlib")>();
+  return {
+    ...zlib,
+    createGunzip: (...args: Parameters<typeof zlib.createGunzip>) => {
+      const gunzip = zlib.createGunzip(...args);
+      gunzip.on("data", (chunk: Buffer) => {
+        inflated.bytes += chunk.length;
+      });
+      return gunzip;
+    },
+  };
+});
+
+beforeEach(() => {
+  inflated.bytes = 0;
+});
 
 // TGA, Olympus ORF, Panasonic RW2 and SVGZ used to be accepted on their name
 // alone (`nameOnly`), so the library stored real ones untyped (#1782). Each
@@ -27,11 +49,20 @@ async function mimeFor(bytes: Buffer, filename: string): Promise<string | null> 
   return validatedImageMime(validation, filename);
 }
 
-/** A TIFF-style header: four signature bytes, then IFD offset 8, then padding. */
-function rawHeader(signature: number[]): Buffer {
+/**
+ * A TIFF-style header: four signature bytes, the first IFD's offset (8 unless
+ * given) in the byte order the signature names, and a one-entry IFD there.
+ */
+function rawHeader(signature: number[], ifd = 8, entries = 1): Buffer {
   const buf = Buffer.alloc(64);
   Buffer.from(signature).copy(buf, 0);
-  buf.writeUInt32LE(8, 4);
+  const littleEndian = signature[0] === 0x49;
+  if (littleEndian) buf.writeUInt32LE(ifd, 4);
+  else buf.writeUInt32BE(ifd, 4);
+  if (ifd + 2 <= buf.length) {
+    if (littleEndian) buf.writeUInt16LE(entries, ifd);
+    else buf.writeUInt16BE(entries, ifd);
+  }
   return buf;
 }
 
@@ -95,6 +126,47 @@ describe("camera RAW signatures (#1782)", () => {
       reason: "Unrecognized image format",
     });
   });
+
+  // IIRO, IIRS and MMOR are printable ASCII, so text can open with them. The
+  // IFD they point at is what tells a TIFF from a note about an MMORPG.
+  it.each(["MMORPG notes, nothing to see\n", "IIROC filing rules\n", "IIRS: a line of text\n"])(
+    "doesn't take text opening %j for an ORF",
+    async (text) => {
+      const bytes = Buffer.from(text);
+      expect(await validateImageBuffer(bytes, "notes.txt")).toEqual({
+        valid: false,
+        reason: "Unrecognized image format",
+      });
+      byNameOnly(await validateImageBuffer(bytes, "notes.orf"), "raw");
+    },
+  );
+
+  it.each([
+    ["an IFD offset inside the header", 4, 1],
+    ["an IFD offset past the end", 64, 1],
+    ["an IFD with no entries", 8, 0],
+    ["an IFD claiming more entries than fit", 8, 5],
+    ["an IFD claiming over 1000 entries", 8, 1001],
+  ])("leaves an ORF signature with %s to the name", async (_label, ifd, entries) => {
+    const header = rawHeader([0x49, 0x49, 0x52, 0x4f], ifd, entries);
+    byNameOnly(await validateImageBuffer(header, "photo.orf"), "raw");
+  });
+
+  it("reads a big-endian ORF's IFD in big-endian order", async () => {
+    // Little-endian, offset 8 reads as 0x08000000: past the end.
+    const header = rawHeader([0x4d, 0x4d, 0x4f, 0x52]);
+    byBytes(await validateImageBuffer(header, "P7198607.ORF"), "raw");
+    header.writeUInt32LE(8, 4);
+    byNameOnly(await validateImageBuffer(header, "P7198607.ORF"), "raw");
+  });
+
+  it("checks an RW2's IFD too", async () => {
+    byBytes(await validateImageBuffer(rawHeader([0x49, 0x49, 0x55, 0x00], 24), "a.rw2"), "raw");
+    byNameOnly(
+      await validateImageBuffer(rawHeader([0x49, 0x49, 0x55, 0x00], 24, 0), "a.rw2"),
+      "raw",
+    );
+  });
 });
 
 describe("TGA header and pixel data (#1782)", () => {
@@ -123,11 +195,82 @@ describe("TGA header and pixel data (#1782)", () => {
     byNameOnly(await validateImageBuffer(fake, "notes.tga"), "tga");
   });
 
-  it("keeps a TGA cut short of its pixel data name-only", async () => {
-    byNameOnly(await validateImageBuffer(TGA.subarray(0, TGA.length - 1), "cut.tga"), "tga");
-    const rle = readFixture(fixtures.image.edge.tgaGrayRle);
-    byNameOnly(await validateImageBuffer(rle.subarray(0, rle.length - 1), "cut.tga"), "tga");
+  // Each layout cut one byte short of the end of its pixel data, which is the
+  // end of the file except for the footer one (a 26-byte footer follows it).
+  // These are what pin the size arithmetic: the colour map's length, each
+  // packet's width, the per-pixel byte count.
+  it.each([
+    ["uncompressed true-colour", TGA, 0],
+    ["uncompressed colour-mapped", readFixture(fixtures.image.edge.tgaColormap), 0],
+    ["RLE colour-mapped", readFixture(fixtures.image.edge.tgaColormapRle), 0],
+    ["RLE grayscale", readFixture(fixtures.image.edge.tgaGrayRle), 0],
+    ["RLE 32-bit", readFixture(fixtures.image.edge.tgaRgbaRle), 0],
+    ["RLE with runs and a footer", readFixture(fixtures.image.edge.tga2RleFooter), 26],
+  ])("keeps a %s TGA cut short of its pixel data name-only", async (_label, bytes, footer) => {
+    const dataEnd = bytes.length - footer;
+    byBytes(await validateImageBuffer(bytes.subarray(0, dataEnd), "cut.tga"), "tga");
+    byNameOnly(await validateImageBuffer(bytes.subarray(0, dataEnd - 1), "cut.tga"), "tga");
+  });
+
+  it("keeps a TGA shorter than its header name-only", async () => {
     byNameOnly(await validateImageBuffer(TGA.subarray(0, 17), "cut.tga"), "tga");
+  });
+
+  it("skips the image ID field before the pixel data", async () => {
+    const withId = Buffer.concat([TGA.subarray(0, 18), Buffer.from("hello"), TGA.subarray(18)]);
+    withId[0] = 5;
+    byBytes(await validateImageBuffer(withId, "art.tga"), "tga");
+    byNameOnly(await validateImageBuffer(withId.subarray(0, withId.length - 1), "art.tga"), "tga");
+  });
+
+  // A true-colour image may carry a colour map it doesn't use; it still sits
+  // between the header and the pixels.
+  it("skips a colour map on a true-colour image", async () => {
+    const withMap = Buffer.concat([TGA.subarray(0, 18), Buffer.alloc(6, 0x7f), TGA.subarray(18)]);
+    withMap[1] = 1;
+    withMap.writeUInt16LE(2, 5);
+    withMap[7] = 24;
+    byBytes(await validateImageBuffer(withMap, "art.tga"), "tga");
+    // The same header with the map's bytes missing comes up six bytes short.
+    const header = Buffer.from(withMap.subarray(0, 18));
+    byNameOnly(
+      await validateImageBuffer(Buffer.concat([header, TGA.subarray(18)]), "a.tga"),
+      "tga",
+    );
+  });
+
+  // 15-bit entries and 16-bit indices both take two bytes each: rounding the
+  // bit depth down instead of up would undercount both.
+  it("sizes a 15-bit colour map and 16-bit indices in whole bytes", async () => {
+    const header = Buffer.alloc(18);
+    header[1] = 1; // colour map present
+    header[2] = 1; // colour-mapped
+    header.writeUInt16LE(3, 5); // three entries
+    header[7] = 15;
+    header.writeUInt16LE(2, 12);
+    header.writeUInt16LE(2, 14);
+    header[16] = 16;
+    const image = Buffer.concat([header, Buffer.alloc(3 * 2, 0x55), Buffer.alloc(4 * 2, 0x01)]);
+    byBytes(await validateImageBuffer(image, "map.tga"), "tga");
+    byNameOnly(await validateImageBuffer(image.subarray(0, image.length - 1), "map.tga"), "tga");
+  });
+
+  // The walk is capped so a crafted file of one-pixel packets can't hold the
+  // event loop for its whole length. 2048 x 2048 one-pixel packets is exactly
+  // the cap; one more row is past it, and stays name-only.
+  it("stops walking RLE packets at the cap", async () => {
+    const onePixelPackets = (width: number, height: number) => {
+      const header = Buffer.alloc(18);
+      header[2] = 11; // RLE grayscale
+      header.writeUInt16LE(width, 12);
+      header.writeUInt16LE(height, 14);
+      header[16] = 8;
+      // Raw packets of one pixel each: header byte 0x00, then the pixel.
+      return Buffer.concat([header, Buffer.alloc(width * height * 2, 0)]);
+    };
+    expect(2048 * 2048).toBe(TGA_MAX_RLE_PACKETS);
+    byBytes(await validateImageBuffer(onePixelPackets(2048, 2048), "big.tga"), "tga");
+    byNameOnly(await validateImageBuffer(onePixelPackets(2048, 2049), "big.tga"), "tga");
   });
 
   // Each header field outside what the format allows, on an otherwise valid
@@ -139,10 +282,27 @@ describe("TGA header and pixel data (#1782)", () => {
     ["image type 4", 2, 4],
     ["image type 32 (Huffman, unsupported)", 2, 32],
     ["pixel depth 12", 16, 12],
-    ["reserved descriptor bits", 17, 0xc0],
+    ["reserved descriptor bit 6", 17, 0x40],
+    ["reserved descriptor bit 7", 17, 0x80],
   ])("keeps a header with %s name-only", async (_label, offset, value) => {
     const bytes = Buffer.from(TGA);
     bytes[offset] = value;
+    byNameOnly(await validateImageBuffer(bytes, "art.tga"), "tga");
+  });
+
+  // Pixel depths are per image type: 24 bits is a true-colour depth only.
+  it.each([
+    ["colour-mapped", fixtures.image.edge.tgaColormap],
+    ["grayscale", fixtures.image.edge.tgaGrayRle],
+  ])("keeps a %s header with 24-bit pixels name-only", async (_label, path) => {
+    const bytes = Buffer.from(readFixture(path));
+    bytes[16] = 24;
+    byNameOnly(await validateImageBuffer(bytes, "art.tga"), "tga");
+  });
+
+  it("keeps a colour map of no entries name-only", async () => {
+    const bytes = Buffer.from(readFixture(fixtures.image.edge.tgaColormap));
+    bytes.writeUInt16LE(0, 5);
     byNameOnly(await validateImageBuffer(bytes, "art.tga"), "tga");
   });
 
@@ -179,6 +339,9 @@ describe("SVGZ contents (#1782)", () => {
   it("types the real SVGZ fixture from its inflated contents", async () => {
     byBytes(await validateImageBuffer(SVGZ, "sample.svgz"), "svg");
     expect(await mimeFor(SVGZ, "sample.svgz")).toBe("image/svg+xml");
+    // It inflates to about 117KB; only the head is read.
+    expect(inflated.bytes).toBeGreaterThan(0);
+    expect(inflated.bytes).toBeLessThan(2 * 64 * 1024);
   });
 
   it("types a gzip stream cut short once its head proves an SVG", async () => {
@@ -201,9 +364,10 @@ describe("SVGZ contents (#1782)", () => {
     const bomb = gzipSync(
       Buffer.concat([Buffer.alloc(64 * 1024 * 1024, 0x20), Buffer.from("<svg/>")]),
     );
-    const before = process.memoryUsage().arrayBuffers;
     byNameOnly(await validateImageBuffer(bomb, "bomb.svgz"), "svg");
-    expect(process.memoryUsage().arrayBuffers - before).toBeLessThan(16 * 1024 * 1024);
+    // The limit plus at most one zlib output chunk (16KB by default), not 64MB.
+    expect(inflated.bytes).toBeGreaterThanOrEqual(4096);
+    expect(inflated.bytes).toBeLessThan(4096 + 64 * 1024);
   });
 
   it("needs the .svgz name before it looks inside a gzip stream", async () => {

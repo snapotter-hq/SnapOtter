@@ -40,6 +40,11 @@ interface MagicEntry {
   bytes: number[];
   offset: number;
   format: string;
+  /**
+   * A TIFF variant whose signature is plain ASCII (ORF's "IIRO"), so text can
+   * start with it: also require a first IFD that sits inside the buffer.
+   */
+  tiffIfd?: true;
 }
 
 const MAGIC_BYTES: MagicEntry[] = [
@@ -67,11 +72,11 @@ const MAGIC_BYTES: MagicEntry[] = [
   { bytes: [0x00, 0x4d, 0x52, 0x4d], offset: 0, format: "raw" },
   // Olympus ORF: a TIFF with its own magic, "IIRO" on most bodies, "IIRS" on
   // some compacts, "MMOR" on the big-endian E-10 and E-20
-  { bytes: [0x49, 0x49, 0x52, 0x4f], offset: 0, format: "raw" },
-  { bytes: [0x49, 0x49, 0x52, 0x53], offset: 0, format: "raw" },
-  { bytes: [0x4d, 0x4d, 0x4f, 0x52], offset: 0, format: "raw" },
+  { bytes: [0x49, 0x49, 0x52, 0x4f], offset: 0, format: "raw", tiffIfd: true },
+  { bytes: [0x49, 0x49, 0x52, 0x53], offset: 0, format: "raw", tiffIfd: true },
+  { bytes: [0x4d, 0x4d, 0x4f, 0x52], offset: 0, format: "raw", tiffIfd: true },
   // Panasonic RW2 and RAW, Leica RWL: "IIU\x00"
-  { bytes: [0x49, 0x49, 0x55, 0x00], offset: 0, format: "raw" },
+  { bytes: [0x49, 0x49, 0x55, 0x00], offset: 0, format: "raw", tiffIfd: true },
   // JXL ISOBMFF container
   { bytes: [0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20], offset: 0, format: "jxl" },
   // JXL raw codestream
@@ -366,6 +371,7 @@ function detectMagicBytes(buffer: Buffer): string | null {
     }
 
     if (match) {
+      if (entry.tiffIfd && !hasTiffIfd(buffer)) continue;
       // For RIFF, verify WEBP signature at bytes 8-11
       if (entry.format === "webp") {
         if (buffer.length < 12) continue;
@@ -412,6 +418,25 @@ function detectHdrText(buffer: Buffer): string | null {
   }
   return null;
 }
+/** Most entries a first IFD may claim before the claim is taken as noise. */
+const TIFF_MAX_IFD_ENTRIES = 1000;
+
+/**
+ * Whether a TIFF-style header (byte order from bytes 0-1) points at a first
+ * IFD that fits in the buffer: an offset past the 8-byte header, and an entry
+ * count of 1 to TIFF_MAX_IFD_ENTRIES whose 12-byte entries all fit. Text that
+ * happens to open with "IIRO" or "MMOR" fails it, since ASCII in the offset
+ * and count fields reads as numbers far too large.
+ */
+function hasTiffIfd(buffer: Buffer): boolean {
+  if (buffer.length < 8) return false;
+  const littleEndian = buffer[0] === 0x49;
+  const ifd = littleEndian ? buffer.readUInt32LE(4) : buffer.readUInt32BE(4);
+  if (ifd < 8 || ifd + 2 > buffer.length) return false;
+  const entries = littleEndian ? buffer.readUInt16LE(ifd) : buffer.readUInt16BE(ifd);
+  return entries >= 1 && entries <= TIFF_MAX_IFD_ENTRIES && ifd + 2 + entries * 12 <= buffer.length;
+}
+
 const TGA_HEADER_BYTES = 18;
 
 /** Legal pixel depths per TGA image type, by the type's low three bits. */
@@ -422,6 +447,11 @@ const TGA_PIXEL_DEPTHS: Readonly<Record<number, readonly number[]>> = {
 };
 const TGA_IMAGE_TYPES = new Set([1, 2, 3, 9, 10, 11]); // +8 is the RLE variant
 const TGA_COLOR_MAP_DEPTHS = new Set([15, 16, 24, 32]);
+/**
+ * Most RLE packets isTgaBuffer() walks, a few milliseconds of work. A packet
+ * carries up to 128 pixels, so a real encoder stays under this past 500MP.
+ */
+export const TGA_MAX_RLE_PACKETS = 4 * 1024 * 1024;
 
 /**
  * Whether the bytes are a TGA: every header field holds a value the format
@@ -468,12 +498,15 @@ function isTgaBuffer(buffer: Buffer): boolean {
   if (imageType < 8) return buffer.length >= dataStart + pixels * bytesPerPixel;
 
   // RLE: each packet is a header byte (high bit set: one pixel repeated; clear:
-  // that many literal pixels) and its pixel bytes. Every packet moves at least
-  // two bytes on, so the walk is bounded by the buffer, not by width x height.
+  // that many literal pixels) and its pixel bytes. The walk runs on the event
+  // loop, so it stops at TGA_MAX_RLE_PACKETS rather than at the end of the
+  // buffer: a crafted file of one-pixel packets would otherwise hold the loop
+  // for its whole length. A file past the budget isn't proven, so it stays
+  // name-only and still reaches the decoder.
   let offset = dataStart;
   let remaining = pixels;
-  while (remaining > 0) {
-    if (offset >= buffer.length) return false;
+  for (let packets = 0; remaining > 0; packets++) {
+    if (offset >= buffer.length || packets >= TGA_MAX_RLE_PACKETS) return false;
     const packet = buffer[offset];
     const count = (packet & 0x7f) + 1;
     offset += 1 + (packet & 0x80 ? bytesPerPixel : count * bytesPerPixel);
@@ -488,10 +521,12 @@ function isTgaBuffer(buffer: Buffer): boolean {
  * decompression bomb counts on; this never holds more than `limit` plus one
  * zlib output chunk.
  *
- * A stream that is corrupt or cut short yields what inflated before the
- * fault, possibly nothing. That isn't an error to report: the caller only
- * wants to know whether the bytes prove a format, and too little output just
- * means they don't.
+ * A stream cut short yields what inflated before it ran out. A corrupt one
+ * yields at most that, and often nothing: zlib can report the fault before it
+ * hands over any output, as it does for a bad checksum on a small file (the
+ * same input decompressSvgz() rejects). That isn't an error to report: the
+ * caller only wants to know whether the bytes prove a format, and too little
+ * output just means they don't.
  */
 function gunzipHead(buffer: Buffer, limit: number): Promise<Buffer> {
   return new Promise((resolve) => {
