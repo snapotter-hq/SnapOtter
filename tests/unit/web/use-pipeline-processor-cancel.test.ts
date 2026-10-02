@@ -704,3 +704,71 @@ describe("usePipelineProcessor cancel failures (#1779)", () => {
     hook.unmount();
   });
 });
+
+type FileStoreState = ReturnType<typeof useFileStore.getState>;
+
+/**
+ * Store listeners that make a run's teardown throw (#1814). Zustand commits a
+ * write before its listeners run, so each broken write still lands.
+ */
+const BREAKING_LISTENERS = {
+  // Every store write throws.
+  "every write": () => {
+    throw new Error("teardown broke");
+  },
+  // Only the write that clears the cancel handle throws, so the writes after
+  // it have to run anyway.
+  "the cancel-handle write": (state: FileStoreState, prev: FileStoreState) => {
+    if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+  },
+} as const;
+
+/**
+ * #1814: a cancel 404 whose teardown throws must still end the run. The throw
+ * from clearActiveJob's write had already hidden the cancel button, and every
+ * write after it was skipped: the run sat at processing with no error, no
+ * cancel button and a closed stream, with nothing left that could end it.
+ * Each write now gets its own guard, and the first throw still reaches the
+ * cancel button's catch.
+ */
+describe("usePipelineProcessor ends a canceled run whose teardown throws (#1814)", () => {
+  it.each([
+    ["single", "every write"],
+    ["single", "the cancel-handle write"],
+    ["batch", "every write"],
+    ["batch", "the cancel-handle write"],
+  ] as const)("ends a %s run when %s throws", async (kind, listener) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const hook = kind === "single" ? startSingleRun() : startBatchRun();
+    expect(useFileStore.getState().processing).toBe(true);
+    const cancel = useFileStore.getState().cancelCurrentJob;
+    const unsubscribe = useFileStore.subscribe(BREAKING_LISTENERS[listener]);
+
+    try {
+      await act(async () => {
+        await expect(cancel?.()).rejects.toThrow("teardown broke");
+      });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe("Canceled");
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(hook.result.current.progress.phase).toBe("idle");
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(state.entries.length).toBeGreaterThan(0);
+    for (const entry of state.entries) {
+      expect(entry).toMatchObject({ status: "failed", error: "Canceled" });
+    }
+    hook.unmount();
+  });
+});

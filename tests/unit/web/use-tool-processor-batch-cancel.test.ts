@@ -12,6 +12,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -319,6 +320,62 @@ describe("useToolProcessor batch cancel (#767)", () => {
 
     // trackBatch lands through a dynamic analytics import, one tick after
     // the run settles; assert with a wait so the event is not raced.
+    await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
+    expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
+
+    hook.unmount();
+  });
+
+  // #1814: a local cancel whose teardown throws must still end the batch.
+  // Zustand commits a write before its listeners run, so a throw there used
+  // to skip every write after it and the outcome report: the run kept its
+  // timers, its stream and its job handle, with nothing left to end it.
+  it.each([
+    [
+      "every write",
+      () => {
+        throw new Error("teardown broke");
+      },
+    ],
+    [
+      "the cancel-handle write",
+      (
+        state: ReturnType<typeof useFileStore.getState>,
+        prev: ReturnType<typeof useFileStore.getState>,
+      ) => {
+        if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+      },
+    ],
+  ] as const)("ends a locally canceled batch when %s throws (#1814)", async (_name, listener) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const hook = startBatchRun();
+    const unsubscribe = useFileStore.subscribe(listener);
+
+    try {
+      await act(async () => {
+        // The first throw still reaches the cancel button's catch.
+        await expect(hook.result.current.cancelCurrentJob()).rejects.toThrow("teardown broke");
+      });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+
+    const state = useFileStore.getState();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe("Canceled");
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(hook.result.current.progress.phase).toBe("idle");
+    expect(latestSse().close).toHaveBeenCalled();
+    for (const entry of state.entries) {
+      expect(entry).toMatchObject({ status: "failed", error: "Canceled" });
+    }
     await settled(() => expect(batchProcessedEvents()).toHaveLength(1));
     expect(batchProcessedEvents()[0][1]).toMatchObject({ status: "canceled" });
 

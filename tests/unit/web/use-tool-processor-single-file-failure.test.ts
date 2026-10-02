@@ -1241,6 +1241,56 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
     }
   });
 
+  // #1814: the throw from clearActiveJob's write had already hidden the
+  // cancel button (zustand commits before its listeners run), and every
+  // write after it was skipped, so the run sat at processing with a closed
+  // stream and nothing left that could end it.
+  it.each([
+    [
+      "every write",
+      () => {
+        throw new Error("teardown broke");
+      },
+    ],
+    [
+      "the cancel-handle write",
+      (
+        state: ReturnType<typeof useFileStore.getState>,
+        prev: ReturnType<typeof useFileStore.getState>,
+      ) => {
+        if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+      },
+    ],
+  ] as const)("ends a canceled run when %s throws (#1814)", async (_name, listener) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const { result, unmount } = startRun();
+    degrade();
+    const cancel = useFileStore.getState().cancelCurrentJob;
+    const unsubscribe = useFileStore.subscribe(listener);
+
+    try {
+      await act(async () => {
+        // The first throw still reaches the cancel button's catch.
+        await expect(cancel?.()).rejects.toThrow("teardown broke");
+      });
+    } finally {
+      unsubscribe();
+    }
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe("Canceled");
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(result.current.progress.phase).toBe("idle");
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(state.entries[0]).toMatchObject({ status: "failed", error: "Canceled" });
+    unmount();
+  });
+
   it("keeps a run going when the cancel request itself fails", async () => {
     vi.stubGlobal(
       "fetch",

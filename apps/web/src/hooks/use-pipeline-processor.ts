@@ -13,6 +13,7 @@ import {
   reportMalformedResult,
 } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
@@ -233,6 +234,10 @@ export function usePipelineProcessor() {
     // frame, so settle locally as canceled instead of blaming the network
     // 30 seconds later.
     if (res.status === 404 && activeJobIdRef.current === jobId) {
+      // The stream closes here, so nothing else will ever end this run:
+      // each write gets its own guard, or one that throws would leave the
+      // run spinning with its cancel button already gone (#1814).
+      let teardownError: { cause: unknown } | null = null;
       try {
         xhrRef.current?.abort();
         clearJobEvidenceTimer();
@@ -243,16 +248,19 @@ export function usePipelineProcessor() {
           eventSourceRef.current = null;
         }
         batchRunRef.current = null;
-        clearActiveJob();
-        setError("Canceled");
-        setProcessing(false);
         setProgress(IDLE_PROGRESS);
+        teardownError = runEndWrites([
+          clearActiveJob,
+          () => setError("Canceled"),
+          () => setProcessing(false),
+        ]);
       } finally {
-        // The stream is already closed, so nothing else will settle the
-        // entries: a throwing teardown must not leave them pulsing. Its
-        // throw still reaches the caller.
+        // Last, and it never throws: a throwing teardown must not leave the
+        // entries pulsing either.
         settleProcessingEntries("Canceled");
       }
+      // The first throw still reaches the cancel button's catch (#1779).
+      if (teardownError) throw teardownError.cause;
     }
   }, [
     clearJobEvidenceTimer,
