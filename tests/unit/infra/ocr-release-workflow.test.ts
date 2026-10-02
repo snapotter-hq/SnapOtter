@@ -726,15 +726,25 @@ describe("OCR v3 bundle release workflow", () => {
     // vulnerability service or index, or widen the token's scope.
     expect(parsed.env).toBeUndefined();
     expect(parsed.defaults).toBeUndefined();
-    for (const key of ["defaults", "continue-on-error", "if", "env", "strategy"]) {
-      expect(auditJob[key], `audit job must not set ${key}`).toBeUndefined();
-    }
+    // An exact key set, so no `if`, `env`, `defaults`, `continue-on-error`,
+    // `container`, `services` or `environment` can creep in unnoticed.
+    expect(Object.keys(auditJob).sort()).toEqual([
+      "name",
+      "needs",
+      "permissions",
+      "runs-on",
+      "steps",
+      "timeout-minutes",
+    ]);
+    expect(auditJob["runs-on"]).toBe("ubuntu-latest");
     expect(auditJob.needs).toBe("validate-inputs");
     expect(auditJob.permissions).toEqual({ contents: "read" });
     expect(JSON.stringify(auditJob)).not.toContain("secrets.");
 
     const [checkout, python, audit, ...rest] = auditJob.steps;
     expect(rest).toEqual([]);
+    expect(Object.keys(checkout).sort()).toEqual(["name", "uses", "with"]);
+    expect(Object.keys(python).sort()).toEqual(["name", "uses", "with"]);
     expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
     expect(checkout.with).toEqual({
       ref: "${{ inputs.release_commit }}",
