@@ -12,6 +12,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
+import { parseFileResultsHeader, unpackBatchZip } from "@/lib/batch-zip";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import {
@@ -1229,17 +1230,30 @@ export function useToolProcessor(toolId: string) {
           if (teardownError) throw teardownError.cause;
         };
 
+        // How a ZIP answer settles. `reason` is what batch_processed reports
+        // if settling fails, which depends on the path the ZIP came in by
+        // (#1161); `status` is the HTTP status of a sync answer.
+        interface ZipSettle {
+          fileResults: Record<string, string>;
+          fileNotes: Record<string, unknown>;
+          reason: string;
+          status?: number;
+        }
+
+        // A ZIP that won't unpack fails the run here, once, logged and
+        // reported by unpackBatchZip (#1805). Anything else that throws is our
+        // own code, and settleOrFail handles it.
         const settleFromZip = async (
           zipBlob: Blob,
-          fileResults: Record<string, string>,
-          fileNotes: Record<string, unknown> = {},
+          { fileResults, fileNotes, reason, status }: ZipSettle,
         ) => {
+          const extracted = await unpackBatchZip(zipBlob, { status, toolId });
+          if (!extracted) {
+            failRun("Batch processing failed", reason);
+            return;
+          }
+          // Only a ZIP that opened is kept as the batch's download.
           setBatchZip(zipBlob, `batch-${toolId}.zip`);
-
-          // Extract files from ZIP using fflate
-          const { unzipSync } = await import("fflate");
-          const zipBuffer = new Uint8Array((await zipBlob.arrayBuffer()) as ArrayBuffer);
-          const extracted = unzipSync(zipBuffer);
 
           const entries = useFileStore.getState().entries;
           for (let i = 0; i < entries.length; i++) {
@@ -1290,15 +1304,41 @@ export function useToolProcessor(toolId: string) {
           );
         };
 
+        // A throw while settling is our own code (a store write, the fflate
+        // chunk), not the answer. It fails the run unless every entry already
+        // settled, which means the teardown at the end threw and the outcome
+        // on screen is the real one. Then it's rethrown, so it reaches the
+        // console and Sentry's global handler instead of disappearing (#1805).
+        const settleOrFail = async (zipBlob: Blob, settle: ZipSettle) => {
+          try {
+            await settleFromZip(zipBlob, settle);
+          } catch (cause) {
+            const unsettled = useFileStore
+              .getState()
+              .entries.some((entry) => entry.status === "processing");
+            if (activeJobIdRef.current === clientJobId && unsettled) {
+              try {
+                failRun("Batch processing failed", settle.reason);
+              } catch (teardownErr) {
+                console.error("Failing the batch after a settle error failed", teardownErr);
+              }
+            }
+            throw cause;
+          }
+        };
+
         // A degraded run settles here: download the durable ZIP the terminal
-        // frame points at. Retried, because the reason we are on this path is
-        // that the network just proved flaky.
+        // frame points at. Only the download is retried, because the reason
+        // we are on this path is that the network just proved flaky; a ZIP
+        // that arrived and won't settle fails once, without blaming the
+        // network (#1805).
         const downloadAndSettle = async (result: Record<string, unknown>) => {
           const url = serverUrl(String(result.downloadUrl));
           const fileResults = (result.fileResults ?? {}) as Record<string, string>;
           const fileNotes = asNotesMap(result.fileNotes);
           let refusedStatus: number | null = null;
-          for (let attempt = 0; attempt < 3; attempt++) {
+          let zipBlob: Blob | null = null;
+          for (let attempt = 0; attempt < 3 && !zipBlob; attempt++) {
             if (activeJobIdRef.current !== clientJobId) return;
             try {
               const res = await fetch(url, { headers: formatHeaders() });
@@ -1311,10 +1351,7 @@ export function useToolProcessor(toolId: string) {
                 break;
               }
               if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
-              const blob = await res.blob();
-              if (activeJobIdRef.current !== clientJobId) return;
-              await settleFromZip(blob, fileResults, fileNotes);
-              return;
+              zipBlob = await res.blob();
             } catch {
               if (attempt < 2) {
                 await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2_000 : 5_000));
@@ -1331,7 +1368,13 @@ export function useToolProcessor(toolId: string) {
             );
             return;
           }
-          failRun("Processing was interrupted. Retry when reconnected.", "download-failed");
+          if (!zipBlob) {
+            failRun("Processing was interrupted. Retry when reconnected.", "download-failed");
+            return;
+          }
+          // A durable ZIP that won't settle still reports "download-failed",
+          // as it did before #1805; whether it should say what broke is #1929.
+          await settleOrFail(zipBlob, { fileResults, fileNotes, reason: "download-failed" });
         };
 
         batchRunRef.current = {
@@ -1449,29 +1492,21 @@ export function useToolProcessor(toolId: string) {
           }
 
           if (xhr.status >= 200 && xhr.status < 300) {
-            let fileResults: Record<string, string> = {};
-            try {
-              fileResults = JSON.parse(
-                decodeURIComponent(xhr.getResponseHeader("X-File-Results") ?? "%7B%7D"),
-              );
-            } catch {
-              // Malformed header - fall back to empty mapping, all entries marked failed
-            }
+            const fileResults = parseFileResultsHeader(xhr.getResponseHeader("X-File-Results"), {
+              status: xhr.status,
+              toolId,
+            });
             // Absent on servers from before #1292, which is no notes. A header
             // that doesn't parse to an object only costs the notes, never the
             // results, but it's logged: silently dropping it would settle every
             // file as fine, the exact thing the notes exist to prevent.
             const fileNotes = parseFileNotesHeader(xhr.getResponseHeader("X-File-Notes"));
-            const zipBlob = xhr.response as Blob;
-            void (async () => {
-              try {
-                if (activeJobIdRef.current !== clientJobId) return;
-                await settleFromZip(zipBlob, fileResults, fileNotes);
-              } catch {
-                if (activeJobIdRef.current !== clientJobId) return;
-                failRun("Batch processing failed", "unzip-failed");
-              }
-            })();
+            void settleOrFail(xhr.response as Blob, {
+              fileResults,
+              fileNotes,
+              reason: "unzip-failed",
+              status: xhr.status,
+            });
             return;
           }
 

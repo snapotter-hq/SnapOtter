@@ -4,6 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
+import { parseFileResultsHeader, unpackBatchZip } from "@/lib/batch-zip";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import {
@@ -946,13 +947,21 @@ export function usePipelineProcessor() {
           }
         };
 
-        const settleFromZip = async (zipBlob: Blob, fileResults: Record<string, string>) => {
+        // A ZIP that won't unpack fails the run here, once, logged and
+        // reported by unpackBatchZip (#1805). Anything else that throws is our
+        // own code, and settleOrFail handles it.
+        const settleFromZip = async (
+          zipBlob: Blob,
+          fileResults: Record<string, string>,
+          status?: number,
+        ) => {
+          const extracted = await unpackBatchZip(zipBlob, { status });
+          if (!extracted) {
+            failRun("Batch processing failed");
+            return;
+          }
+          // Only a ZIP that opened is kept as the batch's download.
           setBatchZip(zipBlob, "batch-pipeline.zip");
-
-          // Extract files from ZIP using fflate
-          const { unzipSync } = await import("fflate");
-          const zipBuffer = new Uint8Array((await zipBlob.arrayBuffer()) as ArrayBuffer);
-          const extracted = unzipSync(zipBuffer);
 
           const entries = useFileStore.getState().entries;
           for (let i = 0; i < entries.length; i++) {
@@ -983,13 +992,43 @@ export function usePipelineProcessor() {
           finishRun();
         };
 
+        // A throw while settling is our own code (a store write, the fflate
+        // chunk), not the answer. It fails the run unless every entry already
+        // settled, which means the teardown at the end threw and the outcome
+        // on screen is the real one. Then it's rethrown, so it reaches the
+        // console and Sentry's global handler instead of disappearing (#1805).
+        const settleOrFail = async (
+          zipBlob: Blob,
+          fileResults: Record<string, string>,
+          status?: number,
+        ) => {
+          try {
+            await settleFromZip(zipBlob, fileResults, status);
+          } catch (cause) {
+            const unsettled = useFileStore
+              .getState()
+              .entries.some((entry) => entry.status === "processing");
+            if (activeJobIdRef.current === clientJobId && unsettled) {
+              try {
+                failRun("Batch processing failed");
+              } catch (teardownErr) {
+                console.error("Failing the batch after a settle error failed", teardownErr);
+              }
+            }
+            throw cause;
+          }
+        };
+
         // A degraded run settles here: download the durable ZIP the terminal
-        // frame points at. Retried, because the reason we are on this path is
-        // that the network just proved flaky.
+        // frame points at. Only the download is retried, because the reason
+        // we are on this path is that the network just proved flaky; a ZIP
+        // that arrived and won't settle fails once, without blaming the
+        // network (#1805).
         const downloadAndSettle = async (result: Record<string, unknown>) => {
           const url = serverUrl(String(result.downloadUrl));
           const fileResults = (result.fileResults ?? {}) as Record<string, string>;
-          for (let attempt = 0; attempt < 3; attempt++) {
+          let zipBlob: Blob | null = null;
+          for (let attempt = 0; attempt < 3 && !zipBlob; attempt++) {
             if (activeJobIdRef.current !== clientJobId) return;
             try {
               const res = await fetch(url, { headers: formatHeaders() });
@@ -1005,10 +1044,7 @@ export function usePipelineProcessor() {
                 return;
               }
               if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
-              const blob = await res.blob();
-              if (activeJobIdRef.current !== clientJobId) return;
-              await settleFromZip(blob, fileResults);
-              return;
+              zipBlob = await res.blob();
             } catch {
               if (attempt < 2) {
                 await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2_000 : 5_000));
@@ -1016,7 +1052,11 @@ export function usePipelineProcessor() {
             }
           }
           if (activeJobIdRef.current !== clientJobId) return;
-          failRun("Processing was interrupted. Retry when reconnected.");
+          if (!zipBlob) {
+            failRun("Processing was interrupted. Retry when reconnected.");
+            return;
+          }
+          await settleOrFail(zipBlob, fileResults);
         };
 
         batchRunRef.current = {
@@ -1112,24 +1152,10 @@ export function usePipelineProcessor() {
           }
 
           if (xhr.status >= 200 && xhr.status < 300) {
-            let fileResults: Record<string, string> = {};
-            try {
-              fileResults = JSON.parse(
-                decodeURIComponent(xhr.getResponseHeader("X-File-Results") ?? "%7B%7D"),
-              );
-            } catch {
-              // Malformed header - fall back to empty mapping, all entries marked failed
-            }
-            const zipBlob = xhr.response as Blob;
-            void (async () => {
-              try {
-                if (activeJobIdRef.current !== clientJobId) return;
-                await settleFromZip(zipBlob, fileResults);
-              } catch {
-                if (activeJobIdRef.current !== clientJobId) return;
-                failRun("Batch processing failed");
-              }
-            })();
+            const fileResults = parseFileResultsHeader(xhr.getResponseHeader("X-File-Results"), {
+              status: xhr.status,
+            });
+            void settleOrFail(xhr.response as Blob, fileResults, xhr.status);
             return;
           }
 
