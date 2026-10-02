@@ -77,13 +77,11 @@ export interface Harness {
   /**
    * Tracing harnesses only. POST with analytics switched off in Settings, then
    * switch it back on. Resolves once the SDK has built a transaction for the
-   * request and returns what reached the transport, which must be nothing
-   * (#1898). reportError skips the error event itself while analytics is off.
+   * request and returns the type of every envelope item that reached the
+   * transport meanwhile, whatever its kind (#1898). reportError skips the
+   * error event itself while analytics is off.
    */
-  sendOptedOut(
-    path: string,
-    init: RequestInit,
-  ): Promise<{ events: Payload[]; transactions: Payload[] }>;
+  sendOptedOut(path: string, init: RequestInit): Promise<string[]>;
   /** A plain GET that leaves an http breadcrumb behind; its response is ignored. */
   ping(path: string): Promise<void>;
   close(): Promise<void>;
@@ -106,6 +104,9 @@ export async function startHarness({
   const events: Payload[] = [];
   const transactions: Payload[] = [];
   const rawRequests: Payload[] = [];
+  // Every envelope item type the transport received: events, transactions,
+  // sessions, check-ins, client reports, logs, anything.
+  const itemTypes: string[] = [];
   // Transactions the SDK built and handed to the hook, sent or not.
   let builtTransactions = 0;
   const recordRaw = (event: { request?: unknown }) => {
@@ -135,6 +136,7 @@ export async function startHarness({
         for (const [header, payload] of envelope[1] as unknown as Array<
           [{ type: string }, Payload]
         >) {
+          itemTypes.push(header.type);
           const copy = JSON.parse(JSON.stringify(payload)) as Payload;
           if (header.type === "event") events.push(copy);
           if (header.type === "transaction") transactions.push(copy);
@@ -207,8 +209,9 @@ export async function startHarness({
     async sendOptedOut(path, init) {
       resetThrottleForTests();
       expect(tracing).toBe(true);
-      events.length = 0;
-      transactions.length = 0;
+      // Drain anything an earlier request left queued before the window opens.
+      await Sentry.flush(100);
+      itemTypes.length = 0;
       builtTransactions = 0;
       __setReaderForTests(async () => false);
       await refreshAnalyticsGate();
@@ -221,7 +224,7 @@ export async function startHarness({
         // dropped it, not that nothing was ever sampled.
         expect(builtTransactions).toBeGreaterThan(0);
         await Sentry.flush(100);
-        return { events: [...events], transactions: [...transactions] };
+        return [...itemTypes];
       } finally {
         __setReaderForTests(async () => true);
         await refreshAnalyticsGate();

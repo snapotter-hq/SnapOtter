@@ -101,6 +101,7 @@ describe("instrument.ts Sentry wiring (#1880)", () => {
 
       gate.__setReaderForTests(async () => true);
       await gate.refreshAnalyticsGate();
+      expect(sendError()).not.toBeNull();
       expect(sendTransaction()).not.toBeNull();
     } finally {
       gate.__resetGateForTests();
