@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { appUrl } from "@/lib/app-url";
 import {
   COLLAGE_TEMPLATES,
   type CollageTemplate,
@@ -12,9 +12,17 @@ import {
   getTemplatesForCount,
 } from "@/lib/collage-templates";
 import { format, plural } from "@/lib/format";
+import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { cn } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
+
+interface CollageResult {
+  downloadUrl: string;
+  processedSize: number;
+  originalSize: number;
+  jobId: string;
+}
 
 const ASPECT_RATIOS: AspectRatio[] = ["free", "1:1", "4:3", "3:2", "16:9", "9:16", "4:5"];
 
@@ -72,6 +80,7 @@ export function CollageSettings() {
     store.setProgress(0);
     store.setError(null);
 
+    let result: CollageResult;
     try {
       const formData = new FormData();
       for (let i = 0; i < template.cells.length; i++) {
@@ -101,12 +110,7 @@ export function CollageSettings() {
       );
 
       const startTime = Date.now();
-      const result = await new Promise<{
-        downloadUrl: string;
-        processedSize: number;
-        originalSize: number;
-        jobId: string;
-      }>((resolve, reject) => {
+      result = await new Promise<CollageResult>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", appUrl("/api/v1/tools/image/collage"));
 
@@ -124,10 +128,13 @@ export function CollageSettings() {
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             store.setProgress(100);
+            // Only a body that isn't a result is the server's fault, and it
+            // gets reported (#1740, #1795).
             try {
-              resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
-            } catch {
+              resolve(parseResultBody<CollageResult>(xhr.responseText));
+            } catch (err) {
               reject(new Error(t.errors.invalidResponse));
+              reportMalformedResult(err, { status: xhr.status, toolId: "collage" });
             }
           } else {
             try {
@@ -149,9 +156,23 @@ export function CollageSettings() {
 
       const elapsed = Date.now() - startTime;
       if (elapsed < 800) await new Promise((r) => setTimeout(r, 800 - elapsed));
-      store.setResult(result.downloadUrl, result.processedSize, result.originalSize, result.jobId);
     } catch (err) {
       store.setError(err instanceof Error ? err.message : t.toolSettings.collage.collageFailed);
+      return;
+    }
+
+    // A throw while landing a good result is our own store write failing, not
+    // a bad answer: it ends the run with the tracking message and is rethrown
+    // so it still surfaces (#1795, after #1354).
+    try {
+      store.setResult(result.downloadUrl, result.processedSize, result.originalSize, result.jobId);
+    } catch (err) {
+      try {
+        store.setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+      } catch (teardownErr) {
+        console.error("Ending the run after a result handling error failed", teardownErr);
+      }
+      throw err;
     }
   }, [
     hasImages,

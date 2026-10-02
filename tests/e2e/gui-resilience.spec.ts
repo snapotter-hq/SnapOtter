@@ -2,6 +2,7 @@ import type { Route } from "@playwright/test";
 import {
   expect,
   getE2eRunRoot,
+  getTestImagePath,
   openSettings,
   test,
   uploadTestImage,
@@ -1023,6 +1024,61 @@ test.describe("Server Error Handling", () => {
     await expect(page.getByRole("button", { name: "Resize" })).toBeEnabled();
 
     await page.unroute("**/api/v1/tools/image/resize");
+  });
+
+  // #1795: Stitch, Collage and Barcode Read read their own sync answer. An
+  // object with nothing in it used to land as a finished run with no download
+  // (Stitch, Collage) or take the panel down (Barcode Read).
+  test("stitch fails a 200 with no download URL", async ({ loggedInPage: page }) => {
+    await page.goto("/image/stitch");
+    await page.route("**/api/v1/tools/image/stitch", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("stitch-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("stitch-submit")).toBeEnabled();
+    await expect(page.getByTestId("stitch-download")).toHaveCount(0);
+  });
+
+  test("collage fails a 200 with no download URL", async ({ loggedInPage: page }) => {
+    await page.goto("/image/collage");
+    await page.route("**/api/v1/tools/image/collage", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload images for collage" }).click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("collage-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("collage-submit")).toBeEnabled();
+    await expect(page.getByTestId("collage-download")).toHaveCount(0);
+  });
+
+  test("barcode read fails a 200 with no barcode list", async ({ loggedInPage: page }) => {
+    await page.goto("/image/barcode-read");
+    await page.route("**/api/v1/tools/image/barcode-read", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+    );
+    await uploadTestImage(page);
+
+    await page.getByTestId("barcode-read-submit").click();
+
+    await expect(page.getByText(/: Invalid response$/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("barcode-read-submit")).toBeEnabled();
   });
 });
 

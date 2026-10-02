@@ -7,6 +7,11 @@ import { useTimeouts } from "@/hooks/use-timeouts";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
+import {
+  jobFailureMessage,
+  MalformedResultError,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -65,13 +70,63 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Send one file to the barcode-read API. */
+/** A sync 2xx answer from the barcode-read route. */
+interface BarcodeReadAnswer {
+  filename: string;
+  barcodes: BarcodeResult[];
+  /** The annotated image, or null when nothing was found. */
+  annotatedUrl: string | null;
+}
+
+function isBarcode(value: unknown): value is BarcodeResult {
+  if (value === null || typeof value !== "object") return false;
+  const { type, text } = value as { type?: unknown; text?: unknown };
+  return typeof type === "string" && typeof text === "string";
+}
+
+/**
+ * Parses a sync 2xx barcode-read answer. The route answers with decoded
+ * barcodes and no downloadUrl, so parseResultBody would turn every good answer
+ * away; this checks the fields the panel reads instead and throws a
+ * MalformedResultError otherwise (#1795). Nothing of the body goes into the
+ * error: a JSON SyntaxError quotes it.
+ */
+function parseBarcodeAnswer(text: string): BarcodeReadAnswer {
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new MalformedResultError("notAnObject");
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    throw new MalformedResultError("notAnObject");
+  }
+  const { filename, barcodes, annotatedUrl } = body as Record<string, unknown>;
+  if (
+    typeof filename !== "string" ||
+    !Array.isArray(barcodes) ||
+    !barcodes.every(isBarcode) ||
+    !(annotatedUrl === null || (typeof annotatedUrl === "string" && annotatedUrl))
+  ) {
+    throw new MalformedResultError("notABarcodeResult");
+  }
+  return resolveServerUrls(body as BarcodeReadAnswer);
+}
+
+/**
+ * Send one file to the barcode-read API and hand a good answer to `land`. Only
+ * an answer that isn't one is the server's fault, and it gets reported
+ * (#1740). A throw from `land` is our own store write failing: it fails the
+ * file with the tracking message and is rethrown so it still surfaces (#1795,
+ * after #1354).
+ */
 function scanOneFile(
   file: File,
   tryHarder: boolean,
   onUploadProgress: (pct: number) => void,
+  land: (answer: BarcodeReadAnswer) => void,
   t: TranslationKeys,
-): Promise<{ filename: string; barcodes: BarcodeResult[]; annotatedUrl: string | null }> {
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -86,11 +141,21 @@ function scanOneFile(
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
+        let answer: BarcodeReadAnswer;
         try {
-          resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
-        } catch {
+          answer = parseBarcodeAnswer(xhr.responseText);
+        } catch (err) {
           reject(new Error(t.errors.invalidResponse));
+          reportMalformedResult(err, { status: xhr.status, toolId: "barcode-read" });
+          return;
         }
+        try {
+          land(answer);
+        } catch (err) {
+          reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+          throw err;
+        }
+        resolve();
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
@@ -166,38 +231,40 @@ export function BarcodeReadSettings() {
           `${prefix}${format(t.toolSettings["barcode-read"].scanningFile, { name: file.name })}`,
         );
 
-        const result = await scanOneFile(
+        await scanOneFile(
           file,
           tryHarder,
           (pct) => {
             setProgressPhase("uploading");
             setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
           },
+          (answer) => {
+            setProgressPhase("processing");
+            setProgressPercent(fileBase + fileShare);
+
+            allResults.push({
+              filename: answer.filename,
+              barcodes: answer.barcodes,
+            });
+
+            // Set annotated image as processedUrl for before/after view
+            if (answer.annotatedUrl) {
+              updateEntry(i, {
+                processedUrl: answer.annotatedUrl,
+                processedPreviewUrl: answer.annotatedUrl,
+                processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,
+                status: "completed",
+                processedSize: null,
+              });
+            }
+          },
           t,
         );
-
-        setProgressPhase("processing");
-        setProgressPercent(fileBase + fileShare);
-
-        allResults.push({
-          filename: result.filename,
-          barcodes: result.barcodes,
-        });
-
-        // Set annotated image as processedUrl for before/after view
-        if (result.annotatedUrl) {
-          updateEntry(i, {
-            processedUrl: result.annotatedUrl,
-            processedPreviewUrl: result.annotatedUrl,
-            processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,
-            status: "completed",
-            processedSize: null,
-          });
-        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`${file.name}: ${msg}`);
-        allResults.push({ filename: file.name, barcodes: [] });
+        // A throw while landing comes after this file's barcodes went in.
+        if (allResults.length === i) allResults.push({ filename: file.name, barcodes: [] });
       }
     }
 

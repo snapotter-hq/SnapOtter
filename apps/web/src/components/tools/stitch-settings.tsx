@@ -3,14 +3,22 @@ import { useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatHeaders } from "@/lib/api";
-import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
+import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
 type ResizeMode = "fit" | "original" | "stretch" | "crop";
 type Alignment = "start" | "center" | "end";
 type OutputFormat = "png" | "jpeg" | "webp" | "avif" | "jxl";
+
+interface StitchResult {
+  jobId: string;
+  downloadUrl: string;
+  originalSize: number;
+  processedSize: number;
+}
 
 export function StitchSettings() {
   const { t } = useTranslation();
@@ -59,12 +67,7 @@ export function StitchSettings() {
         }),
       );
 
-      const result = await new Promise<{
-        jobId: string;
-        downloadUrl: string;
-        originalSize: number;
-        processedSize: number;
-      }>((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
 
@@ -81,11 +84,28 @@ export function StitchSettings() {
 
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
+            // Only a body that isn't a result is the server's fault, and it gets
+            // reported (#1740). A throw while landing a good one is our own
+            // store write failing: it fails the run with the tracking message
+            // and is rethrown so it still surfaces (#1795, after #1354).
+            let result: StitchResult;
             try {
-              resolve(resolveServerUrls(JSON.parse(xhr.responseText)));
-            } catch {
+              result = parseResultBody<StitchResult>(xhr.responseText);
+            } catch (err) {
               reject(new Error(t.errors.invalidResponse));
+              reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
+              return;
             }
+            try {
+              setJobId(result.jobId);
+              setProcessedUrl(result.downloadUrl);
+              setDownloadUrl(result.downloadUrl);
+              setSizes(result.originalSize, result.processedSize);
+            } catch (err) {
+              reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+              throw err;
+            }
+            resolve();
           } else {
             try {
               const body = JSON.parse(xhr.responseText);
@@ -103,11 +123,6 @@ export function StitchSettings() {
         xhr.onerror = () => reject(new Error(t.errors.network));
         xhr.send(formData);
       });
-
-      setJobId(result.jobId);
-      setProcessedUrl(result.downloadUrl);
-      setDownloadUrl(result.downloadUrl);
-      setSizes(result.originalSize, result.processedSize);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
     } finally {

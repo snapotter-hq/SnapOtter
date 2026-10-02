@@ -33,6 +33,11 @@ export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this j
 const MALFORMED_RESULT = {
   notAnObject: { type: "ResultNotAnObjectError", message: "Tool result body is not a JSON object" },
   noDownloadUrl: { type: "ResultWithoutDownloadError", message: "Tool result has no download URL" },
+  // Barcode Read answers with decoded barcodes instead of a download (#1795).
+  notABarcodeResult: {
+    type: "NotABarcodeResultError",
+    message: "Tool result is not a barcode read result",
+  },
 } as const;
 
 /** What a caller's catch got when it wasn't a MalformedResultError: our own bug. */
@@ -46,10 +51,12 @@ const RESULT_UNREADABLE = {
  * constant and there is never a cause, because the body may hold user data
  * and a SafeError's cause gets appended to its Sentry message (#1740).
  */
-export class MalformedResultError extends SafeError {
-  readonly reason: keyof typeof MALFORMED_RESULT;
+export type MalformedResultReason = keyof typeof MALFORMED_RESULT;
 
-  constructor(reason: keyof typeof MALFORMED_RESULT) {
+export class MalformedResultError extends SafeError {
+  readonly reason: MalformedResultReason;
+
+  constructor(reason: MalformedResultReason) {
     super(MALFORMED_RESULT[reason].message, { kind: "operational" });
     this.name = "MalformedResultError";
     this.reason = reason;

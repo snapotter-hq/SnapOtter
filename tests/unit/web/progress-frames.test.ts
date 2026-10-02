@@ -192,6 +192,20 @@ describe("reportMalformedResult (#1740)", () => {
     expect(tags).toEqual({ error_class: "operational" });
   });
 
+  it("names a barcode answer that is not one apart from the other two (#1795)", () => {
+    reportMalformedResult(new MalformedResultError("notABarcodeResult"), {
+      status: 200,
+      toolId: "barcode-read",
+    });
+
+    const { error, tags } = reported();
+    expect(isSafeMessageError(error)).toBe(true);
+    expect(error.name).toBe("NotABarcodeResultError");
+    expect(error.message).toBe("Tool result is not a barcode read result");
+    expect(error.cause).toBeUndefined();
+    expect(tags).toEqual({ error_class: "operational", tool_id: "barcode-read" });
+  });
+
   it("never forwards an error it did not make, nor blames the server for it", () => {
     reportMalformedResult(new SyntaxError('Unexpected token "secret-token"'), { status: 200 });
 
