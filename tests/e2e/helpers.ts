@@ -227,6 +227,19 @@ export async function putPreferences(
 }
 
 /**
+ * expectNoPinnedSection() — call right before a home-page screenshot. Every
+ * spec shares one admin, and pinned tools are a server-side preference of that
+ * admin, so a pin left by another spec puts a Pinned section in the shot
+ * (#1706). This names that cause instead of leaving a bare pixel diff.
+ */
+export async function expectNoPinnedSection(page: Page): Promise<void> {
+  await expect(
+    page.getByRole("heading", { name: /^Pinned$/i }),
+    "another spec left a pinned tool on the shared admin (#1706)",
+  ).toHaveCount(0);
+}
+
+/**
  * changePasswordViaApi() — revert a password change without driving the UI.
  * The current session token survives a password change (the API only revokes
  * other sessions), so tests that successfully change the admin password MUST

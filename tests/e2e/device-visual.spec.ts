@@ -8,7 +8,7 @@
  * Tagged @mobile / @tablet so device projects' grep filter picks them up.
  * Matched by DEVICE_SPECS for project routing.
  */
-import { expect, openSettings, test } from "./helpers";
+import { expect, expectNoPinnedSection, openSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Mobile (Pixel 7 -- mobile-chromium)
@@ -18,6 +18,7 @@ test.describe("@mobile @visual Device visual regression", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await expect(page).toHaveScreenshot("device-home-mobile.png", {
       fullPage: false,
@@ -54,6 +55,7 @@ test.describe("@tablet @visual Device visual regression", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await expect(page).toHaveScreenshot("device-home-tablet.png", {
       fullPage: false,

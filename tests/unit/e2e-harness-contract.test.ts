@@ -813,6 +813,49 @@ test("the dedicated width project owns every required browser width", () => {
   expect(output).toContain("Total: 6 tests in 2 files");
 });
 
+// Every project logs in as the same admin, and user preferences (pinned tools)
+// live on the server. A spec that writes them while a screenshot spec runs in
+// the same invocation can put a Pinned section in a home shot (#1706). The
+// serial project runs as its own invocation with its own database in
+// `pnpm test:e2e`, so that is the only place such a spec may be collected.
+test("specs that write user preferences are collected only by the serial project (#1706)", () => {
+  const writers = fs
+    .readdirSync(e2eDir)
+    .filter((file) => file.endsWith(".spec.ts"))
+    .filter((file) => fs.readFileSync(path.join(e2eDir, file), "utf8").includes("putPreferences("));
+  expect(writers).toContain("pin-tools.spec.ts");
+
+  const configPath = path.join(root, "playwright.config.ts");
+  const collectedFiles = (args: string[]) =>
+    new Set(
+      [...collectPlaywright(configPath, args).matchAll(/› ([\w.-]+\.spec\.ts):\d+/g)].map(
+        (match) => match[1],
+      ),
+    );
+  const serial = collectedFiles(["--project=chromium-serial"]);
+  const everyOtherProject = collectedFiles([
+    "--project=chromium",
+    "--project=chromium-visual",
+    "--project=chromium-legacy-visual",
+    "--project=chromium-widths",
+    "--project=firefox",
+    "--project=webkit",
+    "--project=mobile-chromium",
+    "--project=mobile-webkit",
+    "--project=tablet-chromium",
+    "--project=tablet-webkit",
+  ]);
+
+  expect(serial.size).toBeGreaterThan(0);
+  expect(everyOtherProject.size).toBeGreaterThan(0);
+  for (const writer of writers) {
+    expect(serial.has(writer), `${writer} collected by chromium-serial`).toBe(true);
+    expect(everyOtherProject.has(writer), `${writer} collected outside chromium-serial`).toBe(
+      false,
+    );
+  }
+});
+
 test("legacy visual coverage is runnable only through its dedicated collected project", () => {
   const output = execFileSync(
     "pnpm",

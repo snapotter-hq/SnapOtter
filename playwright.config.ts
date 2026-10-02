@@ -96,9 +96,12 @@ const backingState = resolvePlaywrightBackingState({
 
 // Specs that mutate global server state (settings, users, roles, API keys)
 // or assert on global lists/timing. These run in the chromium-serial project
-// with --workers=1; everything else parallelizes safely.
+// with --workers=1; everything else parallelizes safely. The shared admin's
+// preferences count as global state: every project logs in as that admin, so
+// a pin set by pin-tools shows up in other specs' home pages and screenshots
+// (#1706).
 const SERIAL_SPECS =
-  /gui-settings-|settings\.spec|rbac|security|people|api\.spec|state-bleed|full-session|gui-file-carry|library-save-mode|i18n|theme|gui-performance|navigation-guard/;
+  /gui-settings-|settings\.spec|rbac|security|people|api\.spec|state-bleed|full-session|gui-file-carry|library-save-mode|i18n|theme|gui-performance|navigation-guard|pin-tools/;
 
 // Screenshot-comparison specs. Separate project because baselines are
 // platform-specific: they run locally (darwin baselines) and via the

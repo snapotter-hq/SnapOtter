@@ -1,4 +1,4 @@
-import { expect, openSettings, test, uploadTestImage } from "./helpers";
+import { expect, expectNoPinnedSection, openSettings, test, uploadTestImage } from "./helpers";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -123,6 +123,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     // Capture the loaded catalog state.
     await expect(page.locator("[data-search-input]")).toBeVisible();
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "home-uploaded");
   });
@@ -134,6 +135,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.locator("[data-search-input]")).toBeVisible();
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "fullscreen-details-shown");
   });
@@ -150,6 +152,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       .first()
       .click();
     await page.waitForTimeout(300);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "fullscreen-details-hidden");
   });
@@ -449,6 +452,7 @@ test.describe("Visual Desktop (1280x720)", () => {
   test("home page search focused - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     const search = page.locator("[data-search-input]");
 
