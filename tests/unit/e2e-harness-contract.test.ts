@@ -818,41 +818,31 @@ test("the dedicated width project owns every required browser width", () => {
 // the same invocation can put a Pinned section in a home shot (#1706). The
 // serial project runs as its own invocation with its own database in
 // `pnpm test:e2e`, so that is the only place such a spec may be collected.
+// Writers are found by text: the putPreferences helper or the preferences
+// route. A spec that only clicks a pin toggle isn't detected here; the
+// expectNoPinnedSection guard before each home shot is the runtime backstop.
 test("specs that write user preferences are collected only by the serial project (#1706)", () => {
   const writers = fs
     .readdirSync(e2eDir)
     .filter((file) => file.endsWith(".spec.ts"))
-    .filter((file) => fs.readFileSync(path.join(e2eDir, file), "utf8").includes("putPreferences("));
+    .filter((file) => {
+      const source = fs.readFileSync(path.join(e2eDir, file), "utf8");
+      return source.includes("putPreferences(") || source.includes("/v1/preferences");
+    });
   expect(writers).toContain("pin-tools.spec.ts");
 
-  const configPath = path.join(root, "playwright.config.ts");
-  const collectedFiles = (args: string[]) =>
-    new Set(
-      [...collectPlaywright(configPath, args).matchAll(/› ([\w.-]+\.spec\.ts):\d+/g)].map(
-        (match) => match[1],
-      ),
-    );
-  const serial = collectedFiles(["--project=chromium-serial"]);
-  const everyOtherProject = collectedFiles([
-    "--project=chromium",
-    "--project=chromium-visual",
-    "--project=chromium-legacy-visual",
-    "--project=chromium-widths",
-    "--project=firefox",
-    "--project=webkit",
-    "--project=mobile-chromium",
-    "--project=mobile-webkit",
-    "--project=tablet-chromium",
-    "--project=tablet-webkit",
-  ]);
+  // Collect every project at once so a project added later is covered too.
+  const listing = collectPlaywright(path.join(root, "playwright.config.ts"));
+  const projectsByFile = new Map<string, Set<string>>();
+  for (const [, project, file] of listing.matchAll(/\[([\w-]+)\] › ([\w.-]+\.spec\.ts):\d+/g)) {
+    const projects = projectsByFile.get(file) ?? new Set<string>();
+    projects.add(project);
+    projectsByFile.set(file, projects);
+  }
+  expect(projectsByFile.size).toBeGreaterThan(0);
 
-  expect(serial.size).toBeGreaterThan(0);
-  expect(everyOtherProject.size).toBeGreaterThan(0);
   for (const writer of writers) {
-    expect(serial.has(writer), `${writer} collected by chromium-serial`).toBe(true);
-    expect(everyOtherProject.has(writer), `${writer} collected outside chromium-serial`).toBe(
-      false,
-    );
+    expect([...(projectsByFile.get(writer) ?? [])], writer).toEqual(["chromium-serial"]);
   }
 });
 

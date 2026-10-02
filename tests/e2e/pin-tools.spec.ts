@@ -7,7 +7,7 @@ import { expect, putPreferences, test } from "./helpers";
 // section for later specs in the same run.
 test.describe("Pin tools", () => {
   test.afterEach(async ({ page }) => {
-    expect((await putPreferences(page, { pinnedTools: [] })).ok).toBeTruthy();
+    expect((await putPreferences(page, { pinnedTools: [] })).status, "clear pinnedTools").toBe(200);
   });
 
   test("pin a tool, persist across reload, then unpin", async ({ loggedInPage: page }) => {

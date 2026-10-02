@@ -113,6 +113,7 @@ test.describe("Visual Desktop (1280x720)", () => {
   test("home page empty - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     await takeThemedScreenshots(page, "home-empty");
   });
@@ -236,6 +237,7 @@ test.describe("Visual Desktop (1280x720)", () => {
   test("help dialog - light and dark", async ({ loggedInPage: page }) => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
+    await expectNoPinnedSection(page);
 
     // 2.0 moved Help to the top nav bar (the sidebar was removed).
     await page.getByRole("button", { name: "Help", exact: true }).click();

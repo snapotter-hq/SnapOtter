@@ -38,6 +38,7 @@ test.describe("@mobile @visual Device visual regression", () => {
   test("settings dialog", async ({ loggedInPage: page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
+    await expectNoPinnedSection(page);
     await openSettings(page);
     await page.waitForTimeout(500);
 
@@ -75,6 +76,7 @@ test.describe("@tablet @visual Device visual regression", () => {
   test("settings dialog", async ({ loggedInPage: page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
+    await expectNoPinnedSection(page);
     await openSettings(page);
     await page.waitForTimeout(500);
 
