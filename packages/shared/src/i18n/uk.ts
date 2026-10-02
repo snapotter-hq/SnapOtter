@@ -5462,6 +5462,7 @@ export const uk: TranslationKeys = {
     fileCount: "{count} файлів",
     fileCountSingular: "{count} файл",
     noFilesFound: "Файлів не знайдено",
+    loadFailed: "Не вдалося завантажити ваші файли.",
     selectFilePrompt: "Виберіть файл для перегляду деталей",
     openFile: "Відкрити файл",
     selectFile: "Вибрати файл",

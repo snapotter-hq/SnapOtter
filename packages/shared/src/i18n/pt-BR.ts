@@ -5469,6 +5469,7 @@ export const ptBR: TranslationKeys = {
     fileCount: "{count} arquivos",
     fileCountSingular: "{count} arquivo",
     noFilesFound: "Nenhum arquivo encontrado",
+    loadFailed: "Não foi possível carregar seus arquivos.",
     selectFilePrompt: "Selecione um arquivo para ver os detalhes",
     openFile: "Abrir arquivo",
     selectFile: "Selecionar arquivo",

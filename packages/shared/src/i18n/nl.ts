@@ -5474,6 +5474,7 @@ export const nl: TranslationKeys = {
     fileCount: "{count} bestanden",
     fileCountSingular: "{count} bestand",
     noFilesFound: "Geen bestanden gevonden",
+    loadFailed: "Je bestanden laden mislukt.",
     selectFilePrompt: "Selecteer een bestand om details te bekijken",
     openFile: "Bestand openen",
     selectFile: "Bestand selecteren",

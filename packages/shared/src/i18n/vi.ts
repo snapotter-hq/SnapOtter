@@ -5440,6 +5440,7 @@ export const vi: TranslationKeys = {
     fileCount: "{count} tệp",
     fileCountSingular: "{count} tệp",
     noFilesFound: "Không tìm thấy tệp",
+    loadFailed: "Không thể tải tệp của bạn.",
     selectFilePrompt: "Chọn tệp để xem chi tiết",
     openFile: "Mở tệp",
     selectFile: "Chọn tệp",

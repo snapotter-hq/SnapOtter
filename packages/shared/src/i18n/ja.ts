@@ -5401,6 +5401,7 @@ export const ja: TranslationKeys = {
     fileCount: "{count} ファイル",
     fileCountSingular: "{count} ファイル",
     noFilesFound: "ファイルが見つかりません",
+    loadFailed: "ファイルを読み込めませんでした。",
     selectFilePrompt: "ファイルを選択して詳細を表示",
     openFile: "ファイルを開く",
     selectFile: "ファイルを選択",

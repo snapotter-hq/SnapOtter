@@ -5469,6 +5469,7 @@ export const pl: TranslationKeys = {
     fileCount: "{count} plików",
     fileCountSingular: "{count} plik",
     noFilesFound: "Nie znaleziono plików",
+    loadFailed: "Nie udało się wczytać Twoich plików.",
     selectFilePrompt: "Wybierz plik, aby zobaczyć szczegóły",
     openFile: "Otwórz plik",
     selectFile: "Wybierz plik",

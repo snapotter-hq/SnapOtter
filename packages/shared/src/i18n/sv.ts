@@ -5452,6 +5452,7 @@ export const sv: TranslationKeys = {
     fileCount: "{count} filer",
     fileCountSingular: "{count} fil",
     noFilesFound: "Inga filer hittades",
+    loadFailed: "Kunde inte läsa in dina filer.",
     selectFilePrompt: "Välj en fil för att visa detaljer",
     openFile: "Öppna fil",
     selectFile: "Välj fil",

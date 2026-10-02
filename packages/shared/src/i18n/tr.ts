@@ -5462,6 +5462,7 @@ export const tr: TranslationKeys = {
     fileCount: "{count} dosya",
     fileCountSingular: "{count} dosya",
     noFilesFound: "Dosya bulunamadı",
+    loadFailed: "Dosyalarınız yüklenemedi.",
     selectFilePrompt: "Ayrıntıları görmek için bir dosya seçin",
     openFile: "Dosyayı Aç",
     selectFile: "Dosya Seç",

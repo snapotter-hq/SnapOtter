@@ -5152,6 +5152,7 @@ export const zhCN: TranslationKeys = {
     fileCount: "{count} 个文件",
     fileCountSingular: "{count} 个文件",
     noFilesFound: "未找到文件",
+    loadFailed: "无法加载您的文件。",
     selectFilePrompt: "选择文件查看详情",
     openFile: "打开文件",
     selectFile: "选择文件",

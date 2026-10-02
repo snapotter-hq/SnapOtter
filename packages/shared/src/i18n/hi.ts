@@ -5236,6 +5236,7 @@ export const hi: TranslationKeys = {
     fileCount: "{count} फ़ाइलें",
     fileCountSingular: "{count} फ़ाइल",
     noFilesFound: "कोई फ़ाइल नहीं मिली",
+    loadFailed: "आपकी फ़ाइलें लोड नहीं हो सकीं।",
     selectFilePrompt: "विवरण देखने के लिए फ़ाइल चुनें",
     openFile: "फ़ाइल खोलें",
     selectFile: "फ़ाइल चुनें",

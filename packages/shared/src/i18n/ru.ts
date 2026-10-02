@@ -5464,6 +5464,7 @@ export const ru: TranslationKeys = {
     fileCount: "{count} файлов",
     fileCountSingular: "{count} файл",
     noFilesFound: "Файлы не найдены",
+    loadFailed: "Не удалось загрузить ваши файлы.",
     selectFilePrompt: "Выберите файл для просмотра информации",
     openFile: "Открыть файл",
     selectFile: "Выбрать файл",

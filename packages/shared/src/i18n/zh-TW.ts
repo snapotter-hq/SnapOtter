@@ -5152,6 +5152,7 @@ export const zhTW: TranslationKeys = {
     fileCount: "{count} 個檔案",
     fileCountSingular: "{count} 個檔案",
     noFilesFound: "找不到檔案",
+    loadFailed: "無法載入您的檔案。",
     selectFilePrompt: "選取檔案以檢視詳細資訊",
     openFile: "開啟檔案",
     selectFile: "選取檔案",

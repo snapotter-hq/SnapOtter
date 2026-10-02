@@ -5376,6 +5376,7 @@ export const th: TranslationKeys = {
     fileCount: "{count} ไฟล์",
     fileCountSingular: "{count} ไฟล์",
     noFilesFound: "ไม่พบไฟล์",
+    loadFailed: "โหลดไฟล์ของคุณไม่สำเร็จ",
     selectFilePrompt: "เลือกไฟล์เพื่อดูรายละเอียด",
     openFile: "เปิดไฟล์",
     selectFile: "เลือกไฟล์",

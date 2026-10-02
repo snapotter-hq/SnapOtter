@@ -70,20 +70,30 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
   useFocusTrap(dialogRef, open);
   const [files, setFiles] = useState<UserFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [importing, setImporting] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Only the newest list request may write state, so a slow search answering
+  // after a newer request (say, the unfiltered list of a reopen) is dropped.
+  const latestRequestRef = useRef(0);
 
   const fetchFiles = useCallback(async (search?: string) => {
+    const request = ++latestRequestRef.current;
+    const isLatest = () => request === latestRequestRef.current;
     setLoading(true);
+    setLoadFailed(false);
     try {
       const result = await apiListFiles({ search: search || undefined, limit: 200 });
-      setFiles(result.files);
-    } catch {
+      if (isLatest()) setFiles(result.files);
+    } catch (err) {
+      if (!isLatest()) return;
+      console.error("[file-library-modal] failed to load the file library", err);
       setFiles([]);
+      setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
   }, []);
 
@@ -105,6 +115,11 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
     setSearchQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchFiles(val), 300);
+  }
+
+  function retryFetch() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    fetchFiles(searchQuery);
   }
 
   function toggleCheck(id: string) {
@@ -216,7 +231,21 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
               <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           )}
-          {!loading && files.length === 0 && (
+          {!loading && loadFailed && (
+            <div className="flex flex-col items-center justify-center gap-2 h-32">
+              <p role="alert" className="text-sm text-muted-foreground">
+                {t.files.loadFailed}
+              </p>
+              <button
+                type="button"
+                onClick={retryFetch}
+                className="px-3 py-1.5 text-sm rounded-lg border border-border text-foreground hover:bg-muted"
+              >
+                {t.common.retry}
+              </button>
+            </div>
+          )}
+          {!loading && !loadFailed && files.length === 0 && (
             <div className="flex items-center justify-center h-32">
               <p className="text-sm text-muted-foreground">{t.files.noFilesFound}</p>
             </div>

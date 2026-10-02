@@ -5408,6 +5408,7 @@ export const ar: TranslationKeys = {
     fileCount: "{count} ملفات",
     fileCountSingular: "{count} ملف",
     noFilesFound: "لم يتم العثور على ملفات",
+    loadFailed: "تعذّر تحميل ملفاتك.",
     selectFilePrompt: "اختر ملفًا لعرض التفاصيل",
     openFile: "فتح الملف",
     selectFile: "اختيار الملف",

@@ -5379,6 +5379,7 @@ export const en = {
     fileCount: "{count} files",
     fileCountSingular: "{count} file",
     noFilesFound: "No files found",
+    loadFailed: "Couldn't load your files.",
     selectFilePrompt: "Select a file to view details",
     openFile: "Open File",
     selectFile: "Select File",

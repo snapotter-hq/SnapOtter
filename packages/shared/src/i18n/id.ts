@@ -5453,6 +5453,7 @@ export const id: TranslationKeys = {
     fileCount: "{count} file",
     fileCountSingular: "{count} file",
     noFilesFound: "Tidak ada file ditemukan",
+    loadFailed: "Gagal memuat file Anda.",
     selectFilePrompt: "Pilih file untuk melihat detail",
     openFile: "Buka File",
     selectFile: "Pilih File",

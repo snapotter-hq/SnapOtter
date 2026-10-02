@@ -5487,6 +5487,7 @@ export const fr: TranslationKeys = {
     fileCount: "{count} fichiers",
     fileCountSingular: "{count} fichier",
     noFilesFound: "Aucun fichier trouvé",
+    loadFailed: "Impossible de charger vos fichiers.",
     selectFilePrompt: "Sélectionnez un fichier pour voir les détails",
     openFile: "Ouvrir le fichier",
     selectFile: "Sélectionner le fichier",

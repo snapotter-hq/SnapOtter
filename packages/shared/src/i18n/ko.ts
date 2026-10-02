@@ -5369,6 +5369,7 @@ export const ko: TranslationKeys = {
     fileCount: "{count}개 파일",
     fileCountSingular: "{count}개 파일",
     noFilesFound: "파일을 찾을 수 없습니다",
+    loadFailed: "파일을 불러오지 못했습니다.",
     selectFilePrompt: "파일을 선택하여 상세 정보를 확인하세요",
     openFile: "파일 열기",
     selectFile: "파일 선택",
