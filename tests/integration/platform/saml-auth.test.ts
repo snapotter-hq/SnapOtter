@@ -16,6 +16,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
+import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
@@ -57,6 +58,14 @@ vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOrig
       return realResolve(...args);
     },
   };
+});
+
+// reportError is mocked so the #978 test can read exactly what the callback
+// hands Sentry (#1866); every other error-report export stays real.
+const reportErrorSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, reportError: reportErrorSpy };
 });
 
 vi.mock("@node-saml/node-saml", () => ({
@@ -308,7 +317,9 @@ describe("SAML callback", () => {
   it("redirects to saml_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {
     const email = `raced-${randomUUID().slice(0, 8)}@example.com`;
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
-    resolverFailure.next = new UsernameRaceExhaustedError("saml", "raced", 3);
+    const raceErr = new UsernameRaceExhaustedError();
+    resolverFailure.next = raceErr;
+    reportErrorSpy.mockClear();
 
     const res = await postCallback();
 
@@ -325,7 +336,28 @@ describe("SAML callback", () => {
         sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'auto_create_race_exhausted' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
       );
     expect(auditRows).toHaveLength(1);
-    expect(auditRows[0].details).toMatchObject({ attemptedUsername: email.split("@")[0] });
+    const attemptedUsername = email.split("@")[0];
+    expect(auditRows[0].details).toMatchObject({ attemptedUsername });
+
+    // Reported once with route-level context only, and the username the IdP
+    // supplied appears nowhere in it, nor in what beforeSend keeps (#1866).
+    expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+    expect(reportErrorSpy).toHaveBeenCalledWith(raceErr, {
+      source: "http",
+      route: "/api/auth/saml/callback",
+      method: "POST",
+      subsystem: "external-auth",
+    });
+    const reported = reportErrorSpy.mock.calls[0][0] as Error & { cause?: unknown };
+    expect(reported.message).not.toContain(attemptedUsername);
+    expect(String(reported.cause ?? "")).not.toContain(attemptedUsername);
+    expect(JSON.stringify(Object.entries(reported))).not.toContain(attemptedUsername);
+    for (const diagnostic of [false, true]) {
+      const event = { exception: { values: [{ type: reported.name, value: reported.message }] } };
+      const sent = buildBeforeSend(() => true, diagnostic)(event, { originalException: reported });
+      expect(sent).not.toBeNull();
+      expect(JSON.stringify(sent)).not.toContain(attemptedUsername);
+    }
   });
 
   it("still surfaces any other resolver throw as a 500 with no misclassified audit row", async () => {

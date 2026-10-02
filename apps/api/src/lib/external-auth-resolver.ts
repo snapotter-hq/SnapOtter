@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { SafeError } from "@snapotter/shared";
 import { and, asc, eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
@@ -32,10 +33,20 @@ export interface ExternalAuthResult {
  * Auto-create lost the username race on every retry. The SSO callbacks catch
  * this one type and turn it into a login failure (issue #978); any other
  * throw out of the resolver is a fault and keeps surfacing as one.
+ *
+ * The callbacks also report it to Sentry, so the message is a constant and
+ * carries no username (issue #1866): the scrubber only masks long quoted
+ * runs, so a short IdP-supplied name went out verbatim. The callback's route
+ * tag says which provider raced, and the audit row's `attemptedUsername`
+ * keeps the name for an operator. Kind "bug" keeps the class reportError
+ * gave the plain Error this used to be.
  */
-export class UsernameRaceExhaustedError extends Error {
-  constructor(provider: string, username: string, attempts: number) {
-    super(`${provider} auto-create lost the username race ${attempts} times for "${username}"`);
+export class UsernameRaceExhaustedError extends SafeError {
+  constructor() {
+    super("SSO auto-create lost the username race on every retry", {
+      kind: "bug",
+      code: "USERNAME_RACE_EXHAUSTED",
+    });
     this.name = "UsernameRaceExhaustedError";
   }
 }
@@ -303,7 +314,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       // A different user took the name; rescan and retry.
     }
 
-    throw new UsernameRaceExhaustedError(provider, username, MAX_USERNAME_RACE_RETRIES);
+    throw new UsernameRaceExhaustedError();
   }
 
   // 4. Denied: no matching user, auto-link did not match, auto-create disabled
