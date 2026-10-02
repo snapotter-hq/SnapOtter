@@ -94,11 +94,46 @@ async function expectImagesLoaded(images: import("@playwright/test").Locator, co
 }
 
 // ---------------------------------------------------------------------------
-// Helper: what the QR preview is currently drawing. qr-code-styling renders a
-// canvas by default (an svg when configured for it), so read whichever it is.
+// Helper: what the QR preview is currently drawing, or null while it's blank.
+// qr-code-styling swaps in a fresh, empty canvas on every update and paints it
+// a moment later, so a blank canvas means "still drawing", not a result.
 // ---------------------------------------------------------------------------
 async function qrContent(qrCode: import("@playwright/test").Locator) {
-  return qrCode.evaluate((el) => (el instanceof HTMLCanvasElement ? el.toDataURL() : el.outerHTML));
+  return qrCode.evaluate((el) => {
+    if (!(el instanceof HTMLCanvasElement)) return el.outerHTML;
+    const blank = document.createElement("canvas");
+    blank.width = el.width;
+    blank.height = el.height;
+    const drawn = el.toDataURL();
+    return drawn === blank.toDataURL() ? null : drawn;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helper: wait until the QR preview has finished drawing something other than
+// `previous`, and return it. "Finished" means two polls in a row read the same
+// non-blank content.
+// ---------------------------------------------------------------------------
+async function settledQr(
+  qrCode: import("@playwright/test").Locator,
+  previous: string | null,
+  message: string,
+) {
+  let last: string | null = null;
+  let settled: string | null = null;
+  await expect
+    .poll(
+      async () => {
+        const now = await qrContent(qrCode);
+        const ready = now !== null && now !== previous && now === last;
+        last = now;
+        if (ready) settled = now;
+        return ready;
+      },
+      { message, timeout: 10000 },
+    )
+    .toBe(true);
+  return settled as string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +406,16 @@ test.describe("Visual Desktop (1280x720)", () => {
     // does, fail here instead of screenshotting the upload state (#1861).
     const slider = page.getByRole("slider", { name: "Before/after comparison slider" });
     await expect(slider).toBeVisible({ timeout: 15000 });
-    await expectImagesLoaded(slider.locator("img"), 2);
+    const sliderImages = slider.locator("img");
+    await expectImagesLoaded(sliderImages, 2);
+    // Before and after must be different files, or the shot shows the
+    // original twice.
+    const [beforeSrc, afterSrc] = await sliderImages.evaluateAll((els) =>
+      els.map((el) => (el as HTMLImageElement).src),
+    );
+    expect(afterSrc, "the after image is the original, not the compressed result").not.toBe(
+      beforeSrc,
+    );
     await page.waitForTimeout(500);
 
     await takeThemedScreenshots(page, "tool-compress-result");
@@ -406,21 +450,15 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.waitForTimeout(500);
 
     // The preview draws a placeholder QR before any input, so "a QR is
-    // visible" proves nothing. Record the placeholder, enter the URL, and wait
-    // for the preview to redraw with different content (#1861).
+    // visible" proves nothing. Record the finished placeholder, enter the URL,
+    // and wait for the preview to finish drawing something else (#1861).
     const qrCode = page.getByTestId("qr-preview").locator("canvas, svg");
     await expect(qrCode).toBeVisible({ timeout: 10000 });
-    const placeholder = await qrContent(qrCode);
+    const placeholder = await settledQr(qrCode, null, "the placeholder QR never finished drawing");
 
     await page.getByTestId("qr-input-url").fill("https://snapotter.com");
     await expect(page.getByText("Enter content to generate a QR code")).toBeHidden();
-    // Compare inside the poll so a failure doesn't print two full data URLs.
-    await expect
-      .poll(async () => (await qrContent(qrCode)) !== placeholder, {
-        message: "the QR preview never redrew for the entered URL",
-        timeout: 10000,
-      })
-      .toBe(true);
+    await settledQr(qrCode, placeholder, "the QR preview never redrew for the entered URL");
     await page.waitForTimeout(500);
 
     await takeThemedScreenshots(page, "tool-qr-generate-preview");
