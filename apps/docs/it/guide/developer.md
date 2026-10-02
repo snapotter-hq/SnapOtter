@@ -207,6 +207,28 @@ Aggiungi a `packages/shared/src/i18n/en.ts`:
 
 Aggiungi un attributo `data-testid` al tuo pulsante di azione (come mostrato sopra) così i test e2e possono individuarlo in modo affidabile.
 
+### 5. Baseline visive {#_5-visual-baselines}
+
+I test con screenshot non ammettono alcun pixel modificato, e un nuovo strumento cambia ciò che mostrano: i conteggi degli strumenti nella home e nel catalogo, una nuova scheda nella griglia e una pagina tutta sua su cui `tests/e2e/gui-visual-tools.spec.ts` fallisce con "snapshot doesn't exist" finché non ha una baseline. Aggiorna le baseline nella stessa PR dello strumento, così il confronto visivo notturno resta verde.
+
+Le baseline Linux arrivano dalla CI. Fai push del tuo branch, poi avvia l'aggiornamento su di esso:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Il workflow apre una PR in bozza verso `main` con i PNG rigenerati. La sua descrizione contiene un comando `gh run download`; eseguilo dalla radice del tuo checkout per portare i PNG nel tuo branch, fai commit e chiudi la PR in bozza. Usa invece `update_snapshots=all` se `changed` salta uno screenshot che ti aspettavi cambiasse. L'avvio richiede accesso in scrittura al repository, quindi se il tuo branch è su un fork, scrivi nella PR che serve un aggiornamento delle baseline e un maintainer lo avvierà.
+
+Su un Mac, aggiorna anche le baseline darwin:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Se non sei su un Mac, dillo nella PR e un maintainer le aggiungerà. In ogni caso, apri ogni PNG nuovo o modificato prima di fare commit: una baseline registra ciò che è stato renderizzato, rotto o no.
+
+Una release non richiede nulla di tutto questo. La versione dell'app è mascherata in ogni screenshot che la mostra, quindi cambiarla non modifica nessuna baseline.
+
 ## Build Docker {#docker-builds}
 
 Compila l'immagine di produzione completa localmente:

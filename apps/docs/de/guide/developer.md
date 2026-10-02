@@ -207,6 +207,28 @@ Füge zu `packages/shared/src/i18n/en.ts` hinzu:
 
 Füge deinem Aktions-Button ein `data-testid`-Attribut hinzu (wie oben gezeigt), damit e2e-Tests ihn zuverlässig ansteuern können.
 
+### 5. Visuelle Baselines {#_5-visual-baselines}
+
+Die Screenshot-Tests erlauben null geänderte Pixel, und ein neues Tool ändert, was sie rendern: die Tool-Zahlen auf der Startseite und im Katalog, eine neue Karte im Raster und eine eigene Seite, an der `tests/e2e/gui-visual-tools.spec.ts` mit "snapshot doesn't exist" scheitert, bis sie eine Baseline hat. Aktualisiere die Baselines im selben PR wie das Tool, damit der nächtliche visuelle Vergleich grün bleibt.
+
+Linux-Baselines kommen aus der CI. Pushe deinen Branch und starte die Aktualisierung darauf:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Der Workflow öffnet einen Draft-PR gegen `main` mit den neu erzeugten PNGs. In seiner Beschreibung steht ein `gh run download`-Befehl; führe ihn im Wurzelverzeichnis deines Checkouts aus, um die PNGs in deinen Branch zu holen, committe sie und schließe den Draft-PR. Nimm stattdessen `update_snapshots=all`, wenn `changed` einen Screenshot verpasst, der sich deiner Erwartung nach ändern sollte. Zum Starten brauchst du Schreibrechte am Repository; liegt dein Branch in einem Fork, schreib in den PR, dass er eine Baseline-Aktualisierung braucht, und ein Maintainer startet sie.
+
+Auf einem Mac aktualisierst du auch die darwin-Baselines:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Wenn du keinen Mac hast, sag es im PR, und ein Maintainer ergänzt sie. Öffne in jedem Fall jedes neue oder geänderte PNG, bevor du es committest: Eine Baseline hält fest, was gerendert wurde, kaputt oder nicht.
+
+Ein Release braucht nichts davon. Die App-Version ist in jedem Screenshot, der sie zeigt, maskiert, daher ändert ein Versionssprung keine Baseline.
+
 ## Docker-Builds {#docker-builds}
 
 Baue das vollständige Produktions-Image lokal:

@@ -207,6 +207,28 @@ const MyToolSettings = lazy(() =>
 
 为你的操作按钮添加一个 `data-testid` 属性（如上所示），以便 e2e 测试能可靠地定位它。
 
+### 5. 视觉基线 {#_5-visual-baselines}
+
+截图测试不允许任何像素发生变化，而新工具会改变它们渲染的内容：首页和目录中的工具数量、网格中的新卡片，以及工具自己的页面。在该页面有基线之前，`tests/e2e/gui-visual-tools.spec.ts` 会以 "snapshot doesn't exist" 失败。请在添加工具的同一个 PR 中刷新基线，让夜间视觉对比保持绿色。
+
+Linux 基线来自 CI。推送你的分支，然后在该分支上触发刷新：
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+该工作流会针对 `main` 打开一个包含重新生成的 PNG 的草稿 PR。它的描述里有一条 `gh run download` 命令；在你的检出根目录运行它，把 PNG 放进你的分支，提交后关闭该草稿 PR。如果 `changed` 漏掉了你预期会变化的截图，请改用 `update_snapshots=all`。触发工作流需要仓库的写权限，所以如果你的分支在 fork 上，请在 PR 中说明需要刷新基线，维护者会来运行。
+
+在 Mac 上，也要刷新 darwin 基线：
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+如果你没有 Mac，请在 PR 中说明，维护者会补上。无论哪种情况，提交前都要打开每一张新增或改动的 PNG：基线会原样记录渲染出的内容，不管它是否有问题。
+
+发布版本不需要做这些。应用版本号在所有显示它的截图中都被遮罩，所以升级版本不会改变任何基线。
+
 ## Docker 构建 {#docker-builds}
 
 在本地构建完整的生产镜像：
