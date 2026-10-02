@@ -271,6 +271,11 @@ export const test = base.extend<{ loggedInPage: Page }>({
     // invocation owns a fresh database, so this fixture must not mutate shared
     // system settings before every test.
     await page.goto("/");
+    // "load" fires before the lazy home page mounts, and its search box
+    // first renders as "Search 0 tools..." until settings arrive. A fill in
+    // that window was occasionally dropped in macOS WebKit (#1875), so hand
+    // tests a home page whose tool list has loaded.
+    await expect(page.locator("[data-search-input]")).toHaveAttribute("placeholder", /[1-9]/);
     await use(page);
   },
 });
