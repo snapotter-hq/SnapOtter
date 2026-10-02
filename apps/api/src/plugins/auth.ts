@@ -711,7 +711,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             // advertise the endpoint with a query already on it (Azure AD
             // B2C's `?p=<user flow>`), which has to survive. set() also
             // replaces any copy of our two parameters the endpoint carries.
-            // An endpoint that isn't a URL throws into the catch below (#1788).
+            // An endpoint that isn't a URL (a relative path, any garbage) is
+            // an IdP fault like a bad scheme (#1788). Check it first rather
+            // than letting new URL throw: its TypeError carries the raw
+            // endpoint in an enumerable `input` and classifies as a bug. No
+            // `cause`, which would carry it again (#1887). canParse applies
+            // the same whitespace trimming as new URL.
+            if (!URL.canParse(endSessionEndpoint)) {
+              throw new SafeError("OIDC end_session_endpoint is not a valid URL", {
+                code: "OIDC_END_SESSION_INVALID",
+              });
+            }
             const url = new URL(endSessionEndpoint);
             // Discovery takes any string as end_session_endpoint, and the web
             // app navigates to logoutUrl, so a javascript: or data: endpoint
