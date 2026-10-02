@@ -12,6 +12,7 @@ import {
   type UserFile,
   type UserFileDetail,
 } from "@/lib/api";
+import { fileFormatLabel } from "@/lib/file-format-label";
 import { format } from "@/lib/format";
 import { previewFailureEncoder } from "@/lib/preview-error";
 import { cn } from "@/lib/utils";
@@ -362,9 +363,7 @@ export function FilePreview({
   return (
     <div className="w-full h-32 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
       <FileText className="h-8 w-8 text-muted-foreground" />
-      <span className="text-xs text-muted-foreground">
-        {mimeType.split("/").pop()?.toUpperCase()}
-      </span>
+      <span className="text-xs text-muted-foreground">{fileFormatLabel(name, mimeType)}</span>
     </div>
   );
 }
@@ -536,7 +535,7 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
             <DetailRow label={t.files.name} value={details.originalName} />
             <DetailRow
               label={t.files.format}
-              value={details.mimeType.split("/").pop()?.toUpperCase() ?? ""}
+              value={fileFormatLabel(details.originalName, details.mimeType)}
             />
             <DetailRow label={t.files.size} value={formatSize(details.size)} />
             <DetailRow
