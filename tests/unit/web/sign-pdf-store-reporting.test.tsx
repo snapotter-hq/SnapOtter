@@ -725,3 +725,179 @@ describe("the navigation guard sees a sign end to end", () => {
     expect(guardWork()).toBeNull();
   });
 });
+
+const STALL_MS = 5 * 60_000;
+
+/**
+ * Captures the progress stream's stall timer (the one five-minute timeout the
+ * panel arms) so a test can fire the stall without faking every timer, which
+ * would stall Testing Library's own waitFor too.
+ */
+function captureStallTimers() {
+  const realSetTimeout = globalThis.setTimeout;
+  const stalls: (() => void)[] = [];
+  const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: () => void,
+    ms?: number,
+  ) => {
+    if (ms === STALL_MS) stalls.push(handler);
+    return realSetTimeout(ms === STALL_MS ? () => {} : handler, ms === STALL_MS ? 0 : ms);
+  }) as typeof setTimeout);
+  return {
+    /** Fire the most recently armed stall, as five quiet minutes would. */
+    fireLatest() {
+      const stall = stalls.at(-1);
+      if (!stall) throw new Error("no stall timer armed");
+      act(() => stall());
+    },
+    restore() {
+      spy.mockRestore();
+    },
+  };
+}
+
+const FAILED_FRAME = { type: "single", phase: "failed", error: "sidecar died" };
+
+/**
+ * #1958: once the progress stream gives up on a run (a failed frame, or five
+ * quiet minutes), the request behind it has to go too. A fast sign answers
+ * 200, so a request left running could land the signed PDF's link beside the
+ * stall error, and a late network error, timeout, or 4xx would replace it.
+ */
+describe("sign-pdf drops a request the progress stream gave up on", () => {
+  it("aborts the request and keeps the stall message after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      stalls.fireLatest();
+      expect(useFileStore.getState().processing).toBe(false);
+
+      xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+      expect(xhr.aborted).toBe(true);
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+      expect(entry().status).not.toBe("completed");
+      expect(entry().processedUrl).toBeNull();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("aborts the request after a failed frame", async () => {
+    renderPanel();
+    const xhr = await apply();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(xhr.aborted).toBe(true);
+    expect(screen.getByText("sidecar died")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(entry().processedUrl).toBeNull();
+  });
+
+  // abort() stops the load event in a real browser. These call the handlers
+  // directly, as an answer already queued behind the abort would.
+  it("ignores a late 200 that slips past the abort", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      stalls.fireLatest();
+
+      act(() => {
+        xhr.status = 200;
+        xhr.responseText = JSON.stringify({ downloadUrl: DOWNLOAD_URL });
+        xhr.onload?.();
+      });
+
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+      expect(entry().status).not.toBe("completed");
+      expect(entry().processedUrl).toBeNull();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("ignores a late error answer after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      stalls.fireLatest();
+
+      act(() => {
+        xhr.status = 422;
+        xhr.responseText = JSON.stringify({ error: "Processing failed" });
+        xhr.onload?.();
+      });
+
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+      expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("ignores a late network error after a stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      stalls.fireLatest();
+
+      act(() => xhr.onerror?.());
+
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+      expect(screen.queryByText(en.errors.network)).not.toBeInTheDocument();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("ignores a late timeout after a failed frame", async () => {
+    renderPanel();
+    const xhr = await apply();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    act(() => xhr.ontimeout?.());
+
+    expect(screen.getByText("sidecar died")).toBeInTheDocument();
+    expect(screen.queryByText(en.toolSettings["sign-pdf"].timeout)).not.toBeInTheDocument();
+  });
+
+  it("does not abort a request whose run completed on the stream", async () => {
+    renderPanel();
+    const xhr = await apply();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: DOWNLOAD_URL },
+        }),
+      });
+    });
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(xhr.aborted).toBe(false);
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+  });
+
+  it("does not abort a request that answered first", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(xhr.aborted).toBe(false);
+    expect(entry().status).toBe("completed");
+  });
+});

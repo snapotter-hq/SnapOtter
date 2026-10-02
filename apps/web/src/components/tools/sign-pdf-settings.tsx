@@ -323,6 +323,22 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       setDownloadUrl(url);
     };
 
+    // The request outlives a progress stream that gave up on the run (a failed
+    // frame, or the stall timer, which runs from before the upload starts).
+    // Abort it then, and drop whatever it answers after, or a late 200 puts the
+    // signed PDF's link up beside the stall error and a late network error,
+    // timeout, or 4xx replaces that error with its own (#1958).
+    const xhr = new XMLHttpRequest();
+    // Held so the unmount cleanup can abort it. Nothing clears the ref: abort
+    // on a request that is already done does nothing.
+    xhrRef.current = xhr;
+    let abandoned = false;
+    const abandonRequest = () => {
+      settled = true;
+      abandoned = true;
+      xhr.abort();
+    };
+
     const stopProgress = subscribeSignPdfJobProgress(clientJobId, {
       onProgress: (percent) => setProgress(percent),
       onComplete: (r) => {
@@ -330,11 +346,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         finish();
       },
       onFailed: (failure) => {
-        settled = true;
+        abandonRequest();
         setError(jobFailureMessage(failure, t.errors));
         finish();
       },
       onStall: () => {
+        abandonRequest();
         setError(sp.stall);
         finish();
       },
@@ -356,14 +373,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       form.append(`sig${i}`, new File([png], `sig${i}.png`, { type: "image/png" }));
     });
 
-    const xhr = new XMLHttpRequest();
-    // Held so the unmount cleanup can abort it. Nothing clears the ref: abort
-    // on a request that is already done does nothing.
-    xhrRef.current = xhr;
     xhr.timeout = 600_000;
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
-      if (xhr.status === 202) return;
+      if (abandoned || xhr.status === 202) return;
       stopProgress();
       progressCleanupRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -415,12 +428,14 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       endRun();
     };
     xhr.onerror = () => {
+      if (abandoned) return;
       stopProgress();
       progressCleanupRef.current = null;
       setError(t.errors.network);
       endRun();
     };
     xhr.ontimeout = () => {
+      if (abandoned) return;
       stopProgress();
       progressCleanupRef.current = null;
       setError(sp.timeout);
