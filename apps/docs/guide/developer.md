@@ -213,7 +213,7 @@ Linux baselines come from CI. Push your branch, then dispatch the refresh on it:
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-The workflow opens a draft PR against `main` with the regenerated PNGs. Its body has a `gh run download` command; run that from your checkout root to drop the PNGs into your branch, commit them, and close the draft PR. Use `update_snapshots=all` instead if `changed` misses a shot you expected to move.
+The workflow opens a draft PR against `main` with the regenerated PNGs. Its body has a `gh run download` command; run that from your checkout root to drop the PNGs into your branch, commit them, and close the draft PR. Use `update_snapshots=all` instead if `changed` misses a shot you expected to move. Dispatching needs write access to the repository, so if your branch lives on a fork, say in the PR that it needs a baseline refresh and a maintainer will run it.
 
 On a Mac, refresh the darwin baselines too:
 
