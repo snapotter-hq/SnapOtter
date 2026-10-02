@@ -2915,3 +2915,185 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
     });
   });
 });
+/**
+ * #1911: a start that throws before it has claimed the hook's run refs must
+ * leave the run that owns them alone. Before the fix, the kickoff's catch
+ * ended whatever run held the refs: a live run lost its stream, its job and
+ * cancel handle, its processing flag and its entry. The failed start now
+ * settles only the entries it marked processing that the live run doesn't
+ * own, and the live run still lands its result.
+ */
+describe("usePipelineProcessor leaves a live run alone when a later start throws early (#1911)", () => {
+  const START_FAILURE = "Something went wrong while tracking this job. Try again.";
+  let unsubscribe: (() => void) | null = null;
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = null;
+  });
+
+  function photoFiles(count: number) {
+    return Array.from(
+      { length: count },
+      (_, i) => new File([new ArrayBuffer(16)], `photo-${i}.png`, { type: "image/png" }),
+    );
+  }
+
+  // Throws once, from the next store write that matches.
+  function breakNextWrite(
+    matches: (state: ReturnType<typeof useFileStore.getState>) => boolean = () => true,
+  ) {
+    let armed = true;
+    unsubscribe = useFileStore.subscribe((state) => {
+      if (armed && matches(state)) {
+        armed = false;
+        throw new Error("second start broke");
+      }
+    });
+  }
+
+  function stopBreaking() {
+    unsubscribe?.();
+    unsubscribe = null;
+  }
+
+  function startLiveRun(files: File[]) {
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => hook.result.current.processSingle(files[0], STEPS));
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+    expect(useFileStore.getState()).toMatchObject({ processing: true, activeJobId: JOB_ID });
+    return hook;
+  }
+
+  function expectLiveRunIntact() {
+    const state = useFileStore.getState();
+    expect(MockEventSource.instances).toHaveLength(1);
+    expect(MockEventSource.instances[0].close).not.toHaveBeenCalled();
+    expect(state).toMatchObject({ processing: true, error: null, activeJobId: JOB_ID });
+    expect(state.cancelCurrentJob).not.toBeNull();
+    expect(state.entries[0].status).toBe("processing");
+    expect(xhrs).toHaveLength(1);
+  }
+
+  function landLiveRunResult() {
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+      error: null,
+    });
+    expect(useFileStore.getState()).toMatchObject({ processing: false, error: null });
+  }
+
+  it("keeps the live run when a second start on its entry throws on its first write", () => {
+    const files = photoFiles(1);
+    const { result, unmount } = startLiveRun(files);
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processSingle(files[0], STEPS))).toThrow(
+      "second start broke",
+    );
+    stopBreaking();
+
+    expectLiveRunIntact();
+    landLiveRunResult();
+    unmount();
+  });
+
+  it("fails only its own entry when a start on another entry throws", () => {
+    const files = photoFiles(2);
+    const { result, unmount } = startLiveRun(files);
+    act(() => useFileStore.getState().setSelectedIndex(1));
+    breakNextWrite((state) => state.entries[1]?.status === "processing");
+
+    expect(() => act(() => result.current.processSingle(files[1], STEPS))).toThrow(
+      "second start broke",
+    );
+    stopBreaking();
+
+    expectLiveRunIntact();
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: START_FAILURE,
+    });
+    landLiveRunResult();
+    expect(useFileStore.getState().entries[1].status).toBe("failed");
+    unmount();
+  });
+
+  it("fails only the entries a batch start marked before it threw", async () => {
+    const files = photoFiles(3);
+    const { result, unmount } = startLiveRun(files);
+    // The batch reset walks the entries in order; this throws on the third.
+    breakNextWrite((state) => state.entries[2]?.status === "processing");
+
+    let thrown: unknown;
+    await act(async () => {
+      await result.current.processAll(files, STEPS).catch((err: unknown) => {
+        thrown = err;
+      });
+    });
+    expect(() => {
+      throw thrown;
+    }).toThrow("second start broke");
+    stopBreaking();
+
+    expectLiveRunIntact();
+    for (const i of [1, 2]) {
+      expect(useFileStore.getState().entries[i]).toMatchObject({
+        status: "failed",
+        error: START_FAILURE,
+      });
+    }
+    landLiveRunResult();
+    unmount();
+  });
+
+  it("leaves every entry to a live batch when a single start throws on its first write", async () => {
+    const files = photoFiles(2);
+    useFileStore.getState().setFiles(files);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    await act(async () => {
+      await result.current.processAll(files, STEPS);
+    });
+    expect(xhrs).toHaveLength(1);
+    const liveSse = latestSse();
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processSingle(files[0], STEPS))).toThrow(
+      "second start broke",
+    );
+    stopBreaking();
+
+    const state = useFileStore.getState();
+    expect(latestSse()).toBe(liveSse);
+    expect(liveSse.close).not.toHaveBeenCalled();
+    expect(state).toMatchObject({ processing: true, error: null, activeJobId: JOB_ID });
+    expect(state.cancelCurrentJob).not.toBeNull();
+    expect(state.entries.map((e) => e.status)).toEqual(["processing", "processing"]);
+    unmount();
+  });
+
+  it("still ends a start that throws on its first write when no run is live", () => {
+    const files = photoFiles(1);
+    useFileStore.getState().setFiles(files);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processSingle(files[0], STEPS))).toThrow(
+      "second start broke",
+    );
+    stopBreaking();
+
+    const state = useFileStore.getState();
+    expect(state).toMatchObject({ processing: false, error: START_FAILURE, activeJobId: null });
+    expect(xhrs).toHaveLength(0);
+    unmount();
+  });
+});
