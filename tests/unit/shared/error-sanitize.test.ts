@@ -258,6 +258,21 @@ describe("connectivityClass", () => {
     );
     expect(connectivityClass(conn)).toBe("net-unavailable");
   });
+  it.each([
+    ["a connect timeout", "UND_ERR_CONNECT_TIMEOUT", "Connect Timeout Error"],
+    ["a closed socket", "UND_ERR_SOCKET", "other side closed"],
+  ])("classifies an undici fetch failure from %s as net-unavailable (#1908)", (_l, code, msg) => {
+    const err = new TypeError("fetch failed", { cause: Object.assign(new Error(msg), { code }) });
+    expect(connectivityClass(err)).toBe("net-unavailable");
+  });
+  it("leaves undici's other codes (header/body timeouts, aborts) unclassified", () => {
+    for (const code of ["UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT", "UND_ERR_ABORTED"]) {
+      const err = new TypeError("fetch failed", {
+        cause: Object.assign(new Error(code), { code }),
+      });
+      expect(connectivityClass(err)).toBeNull();
+    }
+  });
   it("classifies ioredis connection loss as redis-unavailable", () => {
     const err = Object.assign(new Error("Connection is closed."), {
       name: "MaxRetriesPerRequestError",

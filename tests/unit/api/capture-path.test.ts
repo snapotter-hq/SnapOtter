@@ -167,6 +167,18 @@ describe("capture path", () => {
     expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "some-op");
   });
 
+  it("reports an undici connect timeout as a connectivity warning, not a bug (#1908)", async () => {
+    // A firewall that drops packets: undici's 10s connect timeout fires first.
+    const err = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("Connect Timeout Error"), { code: "UND_ERR_CONNECT_TIMEOUT" }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_class", "operational");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "UND_ERR_CONNECT_TIMEOUT");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+  });
+
   it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {
     const pg = Object.assign(new Error("Failed query: select 1"), {
       cause: Object.assign(new Error("57P01"), { code: "57P01" }),

@@ -34,6 +34,11 @@ const NET_CODES = new Set([
   "EPIPE",
   "EAI_AGAIN",
   "ENOTFOUND",
+  // undici (Node's fetch) reports a connect that never completed and a socket
+  // the far end dropped under its own codes, inside a "fetch failed" TypeError
+  // (#1908). Header and body timeouts stay out: the upstream answered there.
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_SOCKET",
 ]);
 
 function chain(err: unknown, max = 6): ErrLike[] {

@@ -109,6 +109,7 @@ describe("oidcTokenExchangeFaultCode", () => {
     ],
     ["a refused connection", fetchFailed("ECONNREFUSED"), "OIDC_TOKEN_UNREACHABLE"],
     ["an unknown host", fetchFailed("ENOTFOUND"), "OIDC_TOKEN_UNREACHABLE"],
+    ["an IdP that closes the socket", fetchFailed("UND_ERR_SOCKET"), "OIDC_TOKEN_UNREACHABLE"],
     [
       "a 500 with an OAuth error body",
       bodyError(500, { error: "server_error" }),

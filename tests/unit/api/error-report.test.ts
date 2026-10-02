@@ -141,6 +141,19 @@ describe("classifyError", () => {
   });
 });
 
+describe("classifyError undici", () => {
+  // A firewalled upstream that drops packets surfaces through fetch as a
+  // "fetch failed" TypeError whose cause carries undici's connect timeout (#1908).
+  it.each([
+    ["UND_ERR_CONNECT_TIMEOUT", "Connect Timeout Error"],
+    ["UND_ERR_SOCKET", "other side closed"],
+  ])("treats a fetch failure caused by %s as operational on every source", (code, msg) => {
+    const err = new TypeError("fetch failed", { cause: Object.assign(new Error(msg), { code }) });
+    expect(classifyError(err, "worker")).toBe("operational");
+    expect(classifyError(err, "http")).toBe("operational");
+  });
+});
+
 describe("classifyError redis", () => {
   it("classifies a Redis OOM ReplyError as operational", () => {
     const err = Object.assign(new Error("OOM command not allowed"), { name: "ReplyError" });
