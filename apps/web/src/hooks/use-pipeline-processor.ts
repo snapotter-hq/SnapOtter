@@ -12,6 +12,7 @@ import {
   parseResultBody,
   reportMalformedResult,
 } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
@@ -152,16 +153,22 @@ export function usePipelineProcessor() {
   // completion write, #1287 and #1354), and a second throw here must not
   // leave the run stuck at processing with the cancel button still armed.
   // Each entry gets its own try, so one write that throws can't leave a
-  // batch's later entries pulsing (#1779).
+  // batch's later entries pulsing (#1779). Each throw is logged, and the
+  // first is reported, once per settle rather than once per entry (#1812).
   const settleProcessingEntries = useCallback((message: string) => {
     const { entries, updateEntry } = useFileStore.getState();
+    let firstError: { cause: unknown } | null = null;
     for (let i = 0; i < entries.length; i++) {
       if (entries[i]?.status !== "processing") continue;
       try {
         updateEntry(i, { status: "failed", error: message });
       } catch (err) {
         console.error("Failing the run's entry failed", err);
+        firstError ??= { cause: err };
       }
+    }
+    if (firstError) {
+      reportRunEndFailure("Failing a pipeline run's entries failed", firstError.cause);
     }
   }, []);
 
@@ -704,7 +711,10 @@ export function usePipelineProcessor() {
           // its own store write, and each write gets its own guard: a store
           // listener that throws on every write would otherwise stop the
           // teardown at the first one and leave the cancel handle armed.
+          // Only the root cause is rethrown, so the teardown's own first
+          // break is reported here, once for the run (#1812).
           setProgress(IDLE_PROGRESS);
+          let teardownError: { cause: unknown } | null = null;
           for (const step of [
             clearActiveJob,
             () => setError(FRAME_HANDLING_FAILED),
@@ -714,7 +724,14 @@ export function usePipelineProcessor() {
               step();
             } catch (teardownErr) {
               console.error("Ending the run after a result handling error failed", teardownErr);
+              teardownError ??= { cause: teardownErr };
             }
+          }
+          if (teardownError) {
+            reportRunEndFailure(
+              "Ending a pipeline run after a result handling error failed",
+              teardownError.cause,
+            );
           }
           settleProcessingEntries(FRAME_HANDLING_FAILED);
           throw handlingError.cause;

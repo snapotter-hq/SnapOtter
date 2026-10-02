@@ -22,6 +22,7 @@ import {
   reportMalformedResult,
 } from "@/lib/progress-frames";
 import { asNotesMap, parseFileNotesHeader, pickResultNotes } from "@/lib/result-notes";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
 import { generateId } from "@/lib/utils";
@@ -216,18 +217,24 @@ export function useToolProcessor(toolId: string) {
   // throws: it's a store write, and when the store keeps throwing (#1354) a
   // second throw here must not leave the run stuck at processing with the
   // cancel button still armed (#1698, the twin of #1352's pipeline fix).
-  const settleProcessingEntries = useCallback((message: string) => {
-    try {
-      const { entries, updateEntry } = useFileStore.getState();
-      for (let i = 0; i < entries.length; i++) {
-        if (entries[i]?.status === "processing") {
-          updateEntry(i, { status: "failed", error: message });
+  // The throw is reported as well as logged, or it never reaches Sentry
+  // (#1812).
+  const settleProcessingEntries = useCallback(
+    (message: string) => {
+      try {
+        const { entries, updateEntry } = useFileStore.getState();
+        for (let i = 0; i < entries.length; i++) {
+          if (entries[i]?.status === "processing") {
+            updateEntry(i, { status: "failed", error: message });
+          }
         }
+      } catch (err) {
+        console.error("Failing the run's entry failed", err);
+        reportRunEndFailure("Failing a tool run's entries failed", err, toolId);
       }
-    } catch (err) {
-      console.error("Failing the run's entry failed", err);
-    }
-  }, []);
+    },
+    [toolId],
+  );
 
   // Armed only when a dead POST degrades to the async path (#722): heartbeats
   // alone must not keep the client in "processing" forever for a job the
@@ -751,7 +758,8 @@ export function useToolProcessor(toolId: string) {
       // status === "failed", so an unsettled entry pulses on the untouched
       // original forever (#799, the single-file twin of #798's failRun).
       // Like settleProcessingEntries, every exit calls it last, after the
-      // run's teardown, and it logs instead of throwing (#1698).
+      // run's teardown, and it logs and reports instead of throwing (#1698,
+      // #1812).
       const failEntry = (message: string, category?: FeedbackErrorCategory) => {
         try {
           if (useFileStore.getState().entries[capturedIndex]?.status === "processing") {
@@ -763,6 +771,7 @@ export function useToolProcessor(toolId: string) {
           }
         } catch (err) {
           console.error("Failing the run's entry failed", err);
+          reportRunEndFailure("Failing a sync tool run's entry failed", err, toolId);
         }
       };
 
@@ -898,10 +907,18 @@ export function useToolProcessor(toolId: string) {
 
         if (handlingError) {
           // The run is over whatever threw. A second throw from the teardown
-          // must not replace the root cause. A throw after updateEntry
-          // (markClaimed) leaves the entry completed under the error: the
-          // result did land, so failEntry keeps it.
-          endSyncRun({ message: FRAME_HANDLING_FAILED });
+          // must not replace the root cause, so it's reported here instead
+          // (#1812): the other exits rethrow theirs. A throw after
+          // updateEntry (markClaimed) leaves the entry completed under the
+          // error: the result did land, so failEntry keeps it.
+          const teardownError = endSyncRun({ message: FRAME_HANDLING_FAILED });
+          if (teardownError) {
+            reportRunEndFailure(
+              "Ending a sync tool run after a result handling error failed",
+              teardownError.cause,
+              toolId,
+            );
+          }
           throw handlingError.cause;
         }
 
@@ -1085,9 +1102,10 @@ export function useToolProcessor(toolId: string) {
           // settle them, or the result pane keeps pulsing on the stale
           // original because the entry never leaves "processing" (#746).
           //
-          // After the teardown, and logged rather than thrown: it's a store
-          // write, and when it throws (#1354) the throw must not skip the
-          // teardown or the outcome report. The evidence timer and the cancel
+          // After the teardown, and logged and reported (#1812) rather than
+          // thrown: it's a store write, and when it throws (#1354) the throw
+          // must not skip the teardown or the outcome report. The evidence
+          // timer and the cancel
           // 404 end a batch through here, so nothing else would settle the
           // run (#1778, the batch twin of #1698). In a finally so a throwing
           // teardown can't leave the entries pulsing either; that throw still
@@ -1105,6 +1123,7 @@ export function useToolProcessor(toolId: string) {
             }
           } catch (err) {
             console.error("Failing the run's entry failed", err);
+            reportRunEndFailure("Failing a batch run's entries failed", err, toolId);
           }
         }
         // A canceled run reports the cancel, whichever path carried it in.

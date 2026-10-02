@@ -190,6 +190,24 @@ async function settled(check: () => void) {
   await vi.waitFor(check, { timeout: 3_000 });
 }
 
+// #1812: a store write that breaks while a run ends is reported once, as a
+// handled bug with a constant message and fixed tags, so nothing from the
+// entries (names, error text, URLs) rides along. The cause goes along and is
+// redacted by the scrubber (run-end-report.test.ts).
+const PIPELINE_SETTLE_REPORT = "Failing a pipeline run's entries failed";
+const PIPELINE_TEARDOWN_REPORT = "Ending a pipeline run after a result handling error failed";
+
+function expectReportedOnce(message: string, causeMessage = "store broke") {
+  const calls = vi
+    .mocked(captureHandledError)
+    .mock.calls.filter(([error]) => error.message === message);
+  expect(calls).toHaveLength(1);
+  const [error, tags] = calls[0];
+  expect(error).toMatchObject({ name: "SafeError", isSafeMessage: true, kind: "bug" });
+  expect(error.cause).toMatchObject({ message: causeMessage });
+  expect(tags).toEqual({ error_class: "bug" });
+}
+
 /**
  * #766: the pipeline hook gets the #750 treatment. A dead response after the
  * upload finished degrades to the async path; the terminal SSE frame settles
@@ -1097,6 +1115,7 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
         "Failing the run's entry failed",
         expect.objectContaining({ message: "store broke" }),
       );
+      expectReportedOnce(PIPELINE_SETTLE_REPORT);
     } finally {
       spy.mockRestore();
       consoleError.mockRestore();
@@ -1249,15 +1268,24 @@ describe("usePipelineProcessor sync result handling errors (#1354)", () => {
     let writes = 0;
     const unsubscribe = useFileStore.subscribe(() => {
       writes++;
-      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+      throw new Error(writes === 1 ? "root cause" : `teardown broke ${writes}`);
     });
 
     try {
       expect(() => act(() => respond(200, JSON.stringify(SINGLE_RESULT)))).toThrow("root cause");
       expect(consoleError).toHaveBeenCalledWith(
         "Ending the run after a result handling error failed",
-        expect.objectContaining({ message: "teardown broke" }),
+        expect.objectContaining({ message: "teardown broke 2" }),
       );
+      // Only the root cause is rethrown, so the teardown's own break is
+      // reported here, once for the run however many of its writes threw.
+      expect(
+        consoleError.mock.calls.filter(
+          ([log]) => log === "Ending the run after a result handling error failed",
+        ).length,
+      ).toBeGreaterThan(1);
+      // The first break is the one reported.
+      expectReportedOnce(PIPELINE_TEARDOWN_REPORT, "teardown broke 2");
       // Every teardown step still ran: the run is released for good.
       expect(useFileStore.getState().activeJobId).toBeNull();
       expect(useFileStore.getState().cancelCurrentJob).toBeNull();
@@ -1783,8 +1811,8 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
     const realUpdateEntry = useFileStore.getState().updateEntry;
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const { unmount } = startBatchRun();
-    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
-      throw new Error("store broke");
+    const spy = vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation((i) => {
+      throw new Error(i === 0 ? "store broke" : `store broke on entry ${i}`);
     });
 
     try {
@@ -1800,6 +1828,14 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
         "Failing the run's entry failed",
         expect.objectContaining({ message: "store broke" }),
       );
+      // Each entry's write is tried and logged on its own, but the run's
+      // failure reaches Sentry once, not once per entry, with the first
+      // entry's cause.
+      expect(
+        consoleError.mock.calls.filter(([log]) => log === "Failing the run's entry failed"),
+      ).toHaveLength(2);
+      expectReportedOnce(PIPELINE_SETTLE_REPORT);
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
     } finally {
       spy.mockRestore();
       consoleError.mockRestore();

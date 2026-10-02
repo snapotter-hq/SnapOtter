@@ -74,6 +74,25 @@ function latestSse(): MockEventSource {
   return MockEventSource.instances[MockEventSource.instances.length - 1];
 }
 
+// #1812: a store write that breaks while a run ends is reported once, as a
+// handled bug with a constant message and fixed tags, so nothing from the
+// entry (its name, error text or URLs) rides along. The cause goes along and
+// is redacted by the scrubber (run-end-report.test.ts).
+const TOOL_SETTLE_REPORT = "Failing a tool run's entries failed";
+const SYNC_SETTLE_REPORT = "Failing a sync tool run's entry failed";
+const SYNC_TEARDOWN_REPORT = "Ending a sync tool run after a result handling error failed";
+
+function expectReportedOnce(message: string, causeMessage = "store broke") {
+  const calls = vi
+    .mocked(captureHandledError)
+    .mock.calls.filter(([error]) => error.message === message);
+  expect(calls).toHaveLength(1);
+  const [error, tags] = calls[0];
+  expect(error).toMatchObject({ name: "SafeError", isSafeMessage: true, kind: "bug" });
+  expect(error.cause).toMatchObject({ message: causeMessage });
+  expect(tags).toEqual({ error_class: "bug", tool_id: "trim-video" });
+}
+
 function sendSingleFrame(frame: Record<string, unknown>) {
   latestSse().onmessage?.({
     data: JSON.stringify({ type: "single", jobId: JOB_ID, ...frame }),
@@ -653,6 +672,7 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
         "Failing the run's entry failed",
         expect.objectContaining({ message: "store broke" }),
       );
+      expectReportedOnce(SYNC_SETTLE_REPORT);
     } finally {
       consoleError.mockRestore();
       unmount();
@@ -697,6 +717,12 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
         "Ending the run failed",
         expect.objectContaining({ message: "teardown broke" }),
       );
+      // Only the root cause is rethrown, so the teardown's own break is
+      // reported here, once for the run however many of its writes threw.
+      expect(
+        consoleError.mock.calls.filter(([log]) => log === "Ending the run failed").length,
+      ).toBeGreaterThan(1);
+      expectReportedOnce(SYNC_TEARDOWN_REPORT, "teardown broke");
       // Every teardown step still ran: the run is released for good.
       expect(useFileStore.getState().activeJobId).toBeNull();
       expect(useFileStore.getState().cancelCurrentJob).toBeNull();
@@ -1054,16 +1080,18 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
     expect(useFileStore.getState().cancelCurrentJob).not.toBeNull();
   }
 
-  function expectRunEnded(message: string) {
+  function expectRunEnded(message: string, report: string) {
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().activeJobId).toBeNull();
     expect(useFileStore.getState().cancelCurrentJob).toBeNull();
     expect(useFileStore.getState().error).toBe(message);
-    // The failed settle is logged, not lost.
+    // The failed settle is logged, and reported so it reaches Sentry (#1812).
     expect(consoleError).toHaveBeenCalledWith(
       SETTLE_FAILED_LOG,
       expect.objectContaining({ message: "store broke" }),
     );
+    // Filtered by message: a malformed 2xx is reported on its own too (#1740).
+    expectReportedOnce(report);
   }
 
   it.each([
@@ -1090,7 +1118,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       xhrs[0].onload?.();
     });
 
-    expectRunEnded(message);
+    expectRunEnded(message, SYNC_SETTLE_REPORT);
     unmount();
   });
 
@@ -1102,7 +1130,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       xhrs[0].onerror?.();
     });
 
-    expectRunEnded("Processing was interrupted. Retry when reconnected.");
+    expectRunEnded("Processing was interrupted. Retry when reconnected.", SYNC_SETTLE_REPORT);
     unmount();
   });
 
@@ -1114,7 +1142,10 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       xhrs[0].ontimeout?.();
     });
 
-    expectRunEnded("Request timed out - the server may be overloaded. Try again.");
+    expectRunEnded(
+      "Request timed out - the server may be overloaded. Try again.",
+      SYNC_SETTLE_REPORT,
+    );
     unmount();
   });
 
@@ -1128,7 +1159,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
     });
 
     // The server's error, not the generic frame-handling one.
-    expectRunEnded("server said no");
+    expectRunEnded("server said no", TOOL_SETTLE_REPORT);
     unmount();
   });
 
@@ -1150,7 +1181,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       } as MessageEvent);
     });
 
-    expectRunEnded("Processing was interrupted. Retry when reconnected.");
+    expectRunEnded("Processing was interrupted. Retry when reconnected.", TOOL_SETTLE_REPORT);
     unmount();
   });
 
@@ -1165,6 +1196,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
 
     expectRunEnded(
       "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+      TOOL_SETTLE_REPORT,
     );
     unmount();
   });
@@ -1182,7 +1214,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       await useFileStore.getState().cancelCurrentJob?.();
     });
 
-    expectRunEnded("Canceled");
+    expectRunEnded("Canceled", TOOL_SETTLE_REPORT);
     unmount();
   });
 
@@ -1331,8 +1363,14 @@ describe("useToolProcessor ends a sync run whose error write throws (#1791)", ()
       const { result, unmount } = startRun();
       breakErrorWrite();
 
-      // The listener's throw still surfaces, so it reaches Sentry.
+      // The listener's throw still surfaces, so it reaches Sentry through the
+      // global handler, and isn't reported a second time (#1812).
       expect(() => act(fire)).toThrow("error write broke");
+      expect(
+        vi
+          .mocked(captureHandledError)
+          .mock.calls.filter(([error]) => error.message === SYNC_TEARDOWN_REPORT),
+      ).toHaveLength(0);
       // act() skips its flush when the callback throws, so render first.
       act(() => {});
 
@@ -1378,6 +1416,10 @@ describe("useToolProcessor ends a sync run whose error write throws (#1791)", ()
       "Failing the run's entry failed",
       expect.objectContaining({ message: "store broke" }),
     );
+    // The teardown's first error is rethrown, which already reaches Sentry,
+    // so only the failed entry write is reported (#1812).
+    expectReportedOnce(SYNC_SETTLE_REPORT);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
     unsubscribe();
     unsubscribe = null;
     await expectJobReleased(result.current.cancelCurrentJob);

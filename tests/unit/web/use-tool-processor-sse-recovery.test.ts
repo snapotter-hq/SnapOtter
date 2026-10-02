@@ -10,6 +10,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({

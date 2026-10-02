@@ -12,6 +12,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -25,7 +26,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { track } from "@/lib/analytics";
+import { captureHandledError, track } from "@/lib/analytics";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -147,6 +148,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.mocked(track).mockClear();
+  vi.mocked(captureHandledError).mockClear();
 });
 
 function startBatchRun() {
@@ -1261,6 +1263,16 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
       SETTLE_FAILED_LOG,
       expect.objectContaining({ message: "store broke" }),
     );
+    // It reaches Sentry too, once per run, as a constant message with fixed
+    // tags: nothing from the entries rides along (#1812).
+    const reports = vi
+      .mocked(captureHandledError)
+      .mock.calls.filter(([e]) => e.message === "Failing a batch run's entries failed");
+    expect(reports).toHaveLength(1);
+    const [error, tags] = reports[0];
+    expect(error).toMatchObject({ name: "SafeError", isSafeMessage: true, kind: "bug" });
+    expect(error.cause).toMatchObject({ message: "store broke" });
+    expect(tags).toEqual({ error_class: "bug", tool_id: "resize" });
   }
 
   it("ends the run when the server never confirms it and failing the entries throws", () => {

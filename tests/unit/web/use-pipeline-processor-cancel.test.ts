@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
+  captureHandledError: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -26,6 +27,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
+import { captureHandledError } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
@@ -93,6 +95,7 @@ function sendBatchFrame(frame: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  vi.mocked(captureHandledError).mockClear();
   vi.stubGlobal("URL", {
     ...globalThis.URL,
     createObjectURL: vi.fn(() => "blob:fake-url"),
@@ -643,6 +646,13 @@ describe("usePipelineProcessor cancel failures (#1779)", () => {
     for (const entry of entries) {
       expect(entry).toMatchObject({ status: "failed", error: "Canceled" });
     }
+    // Every entry write threw under the listener; the settle reports that
+    // once for the run, not once per entry (#1812).
+    expect(
+      vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(([e]) => e.message === "Failing a pipeline run's entries failed"),
+    ).toHaveLength(1);
     hook.unmount();
   });
 
