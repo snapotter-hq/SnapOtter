@@ -202,8 +202,31 @@ async function discoverForSignIn(
 
 // ── OIDC Routes ───────────────────────────────────────────────────
 
+/**
+ * Log once at boot when the issuer is plain http (#1879). http issuers stay
+ * allowed, since LAN and dev setups rely on them, but the IdP traffic then
+ * runs unencrypted, or, on an https deployment, every sign-in is refused, and
+ * neither used to leave a trace in the log. A warning rather than reportError:
+ * this is configuration, not a fault. An issuer that doesn't parse is skipped
+ * here; discovery reports it on the first login.
+ */
+function warnIfPlainHttpIssuer(app: FastifyInstance): void {
+  let issuer: URL;
+  try {
+    issuer = new URL(env.OIDC_ISSUER_URL);
+  } catch {
+    return;
+  }
+  if (issuer.protocol !== "http:") return;
+  const message = isHttpsUrl(env.EXTERNAL_URL)
+    ? "OIDC_ISSUER_URL is plain http but EXTERNAL_URL is https, so every SSO sign-in is refused. Use an https URL for the identity provider."
+    : "OIDC_ISSUER_URL is plain http: OIDC discovery, the login code exchange, and the tokens SnapOtter receives travel unencrypted and can be read or altered on the network. Use an https URL for the identity provider.";
+  app.log.warn({ issuerHost: issuer.host }, message);
+}
+
 export async function oidcRoutes(app: FastifyInstance): Promise<void> {
   if (!env.OIDC_ENABLED) return;
+  warnIfPlainHttpIssuer(app);
 
   // GET /api/auth/oidc/login
   app.get(
