@@ -6,7 +6,7 @@
  * cheaply, such as a token-endpoint timeout.
  */
 
-import { ClientError, ResponseBodyError } from "openid-client";
+import { ClientError, ResponseBodyError, WWWAuthenticateChallengeError } from "openid-client";
 import { describe, expect, it } from "vitest";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import {
@@ -19,6 +19,15 @@ function bodyError(status: number, body: Record<string, string>): Error {
   return new ResponseBodyError("server responded with an error in the response body", {
     cause: body,
     response: new Response(JSON.stringify(body), { status }),
+  });
+}
+
+// What oauth4webapi throws for any non-200 token answer carrying a
+// WWW-Authenticate header, before it reads the body.
+function challengeError(status: number, parameters: Record<string, string>): Error {
+  return new WWWAuthenticateChallengeError("server responded with a challenge", {
+    cause: [{ scheme: "basic", parameters }],
+    response: new Response("", { status, headers: { "www-authenticate": "Basic" } }),
   });
 }
 
@@ -41,6 +50,13 @@ describe("oidcDiscoveryFault", () => {
       cause,
     });
     expect(classifyError(fault, "http")).toBe("operational");
+  });
+
+  it("treats undici's connect timeout as a timed-out discovery", () => {
+    const cause = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("Connect Timeout Error"), { code: "UND_ERR_CONNECT_TIMEOUT" }),
+    });
+    expect(oidcDiscoveryFault(cause)).toMatchObject({ code: "OIDC_DISCOVERY_TIMEOUT", cause });
   });
 
   it("gives openid-client's timeout its own code", () => {
@@ -80,6 +96,7 @@ describe("oidcTokenExchangeFaultCode", () => {
       bodyError(400, { error: "invalid_grant", error_description: "Code not valid" }),
     ],
     ["access_denied", bodyError(400, { error: "access_denied" })],
+    ["an expired code behind a challenge header", challengeError(400, { error: "invalid_grant" })],
   ])("does not report %s: the user caused it", (_label, err) => {
     expect(oidcTokenExchangeFaultCode(err)).toBeNull();
   });
@@ -113,13 +130,25 @@ describe("oidcTokenExchangeFaultCode", () => {
       bodyError(400, { error: "unauthorized_client" }),
       "OIDC_TOKEN_CLIENT_REJECTED",
     ],
+    ["a bare 401 challenge", challengeError(401, { realm: "idp" }), "OIDC_TOKEN_CLIENT_REJECTED"],
     [
-      "a 401 challenge",
-      Object.assign(new Error("server responded with a challenge"), {
-        code: "OAUTH_WWW_AUTHENTICATE_CHALLENGE",
-        status: 401,
-      }),
+      "a 401 challenge naming invalid_client",
+      challengeError(401, { error: "invalid_client" }),
       "OIDC_TOKEN_CLIENT_REJECTED",
+    ],
+    [
+      "a 400 challenge naming a redirect_uri mismatch",
+      challengeError(400, { error: "invalid_grant", error_description: "Incorrect redirect_uri" }),
+      "OIDC_TOKEN_REDIRECT_URI",
+    ],
+    [
+      "a firewall that drops packets (undici connect timeout)",
+      new TypeError("fetch failed", {
+        cause: Object.assign(new Error("Connect Timeout Error"), {
+          code: "UND_ERR_CONNECT_TIMEOUT",
+        }),
+      }),
+      "OIDC_TOKEN_TIMEOUT",
     ],
     [
       "Keycloak's redirect_uri rejection",

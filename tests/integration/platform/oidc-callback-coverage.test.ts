@@ -202,8 +202,9 @@ describe("OIDC callback discovery failure (cold cache)", () => {
 
     (env as any).OIDC_ENABLED = true;
     // https EXTERNAL_URL makes isSecure() true, so getOrDiscoverConfig() takes
-    // the `execute: undefined` (secure) arm of the discovery ternary. Discovery
-    // still fails because the issuer 404s the discovery document.
+    // the `execute: undefined` (secure) arm of the discovery ternary. With a
+    // plain-http issuer, openid-client refuses before sending any request (the
+    // scheme-mismatch case, pinned in oidc-login-failure-report.test.ts).
     (env as any).EXTERNAL_URL = "https://localhost:9999";
     (env as any).OIDC_ISSUER_URL = `http://localhost:${deadPort}`;
     (env as any).OIDC_CLIENT_ID = "test-client-id";

@@ -53,7 +53,9 @@ const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
 const { buildBeforeSend } = await import("../../../apps/api/src/lib/sentry-scrub.js");
-const { resetOidcDiscoveryCacheForTests } = await import("../../../apps/api/src/plugins/oidc.js");
+const { getOidcEndSessionEndpoint, resetOidcDiscoveryCacheForTests } = await import(
+  "../../../apps/api/src/plugins/oidc.js"
+);
 const { buildTestApp } = await import("../test-server.js");
 
 import type { TestApp } from "../test-server.js";
@@ -63,7 +65,10 @@ const CLIENT_SECRET = "i1869-client-secret";
 const TEST_COOKIE_SECRET = "test-cookie-secret";
 
 // Token-endpoint answers the mock IdP gives under the issuer /t/<kind>.
-const TOKEN_RESPONSES: Record<string, { status: number; body: string; json: boolean }> = {
+const TOKEN_RESPONSES: Record<
+  string,
+  { status: number; body: string; json: boolean; challenge?: string }
+> = {
   "server-error": { status: 500, body: "upstream exploded", json: false },
   "server-error-json": {
     status: 503,
@@ -100,6 +105,21 @@ const TOKEN_RESPONSES: Record<string, { status: number; body: string; json: bool
     status: 400,
     body: JSON.stringify({ error: "redirect_uri_mismatch" }),
     json: true,
+  },
+  // Client authentication refused with a challenge header, which openid-client
+  // throws on before it reads the body.
+  "client-challenge": {
+    status: 401,
+    body: JSON.stringify({ error: "invalid_client" }),
+    json: true,
+    challenge: 'Basic realm="idp", error="invalid_client"',
+  },
+  // An expired code from an IdP that adds a challenge header to every 4xx.
+  "grant-challenge": {
+    status: 400,
+    body: JSON.stringify({ error: "invalid_grant" }),
+    json: true,
+    challenge: 'Basic realm="idp", error="invalid_grant"',
   },
 };
 
@@ -153,6 +173,7 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
       if (answer) {
         res.writeHead(answer.status, {
           "Content-Type": answer.json ? "application/json" : "text/plain",
+          ...(answer.challenge && { "WWW-Authenticate": answer.challenge }),
         });
         res.end(answer.body);
         return;
@@ -400,6 +421,7 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
       ["unauthorized-client", "OIDC_TOKEN_CLIENT_REJECTED"],
       ["redirect-uri", "OIDC_TOKEN_REDIRECT_URI"],
       ["redirect-uri-mismatch", "OIDC_TOKEN_REDIRECT_URI"],
+      ["client-challenge", "OIDC_TOKEN_CLIENT_REJECTED"],
     ])("reports a server-side token-exchange fault (%s) once as %s", async (kind, code) => {
       const { code: authCode, state } = await exchangeAgainst(kind);
 
@@ -407,7 +429,7 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
       expectNoneInSentryView(err, [authCode, state, CLIENT_SECRET]);
     });
 
-    it.each(["invalid-grant", "access-denied"])(
+    it.each(["invalid-grant", "access-denied", "grant-challenge"])(
       "does not report a token exchange the user caused (%s), but still counts and audits it",
       async (kind) => {
         await exchangeAgainst(kind);
@@ -415,5 +437,20 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
         expect(reportErrorSpy).not.toHaveBeenCalled();
       },
     );
+  });
+
+  // Logout shares the discovery classification, so its report names the
+  // scheme mismatch too instead of a generic failed discovery.
+  describe("discovery at logout", () => {
+    it("rejects a cold-cache logout discovery with the scheme-mismatch code", async () => {
+      setIssuer("/t/invalid-grant");
+      mutableEnv.EXTERNAL_URL = "https://snapotter.example.test";
+
+      await expect(getOidcEndSessionEndpoint()).rejects.toMatchObject({
+        name: "SafeError",
+        kind: "operational",
+        code: "OIDC_ISSUER_SCHEME_MISMATCH",
+      });
+    });
   });
 });
