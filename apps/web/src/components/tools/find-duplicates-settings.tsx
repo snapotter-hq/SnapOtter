@@ -109,7 +109,14 @@ export function FindDuplicatesSettings() {
             ),
           );
         } catch {
-          setError(format(t.errors.failedWithStatus, { status: xhr.status }));
+          setError(
+            failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
+            ),
+          );
         }
       }
       setScanning(false);
