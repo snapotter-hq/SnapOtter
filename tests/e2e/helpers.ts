@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // login() — fill the login form and submit (for tests that need fresh login)
@@ -318,6 +318,34 @@ export async function openSettings(page: Page): Promise<void> {
     await page.getByTestId("open-settings").click();
   }
   await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
+}
+
+// ---------------------------------------------------------------------------
+// maskAppVersion() — screenshot options that hide the app version (#1862)
+// ---------------------------------------------------------------------------
+// The version renders in Settings (General and About tabs) and at the foot of
+// the help dialog. It changes with every release and says nothing about
+// layout, so with a zero-pixel budget it would turn those shots red on each
+// version bump. Mask it instead. The visibility check comes first so a renamed
+// or dropped test id fails here rather than quietly masking nothing.
+//
+// A mask covers its element's box, and the inline version spans are as wide
+// as their text, so "2.10.0" would draw a wider mask than "2.2.0" and still
+// change the shot. The injected style pins those spans to one width for the
+// screenshot only. The help dialog's version line is a full-width block
+// already, so the rule skips it.
+const APP_VERSION_STYLE =
+  'span[data-testid="app-version"] { display: inline-block; min-width: 16ch; }';
+
+export async function maskAppVersion(
+  scope: Page | Locator,
+): Promise<{ mask: Locator[]; style: string }> {
+  const version = scope.getByTestId("app-version");
+  await expect(
+    version,
+    'the app version (data-testid="app-version") is missing, so the screenshot can no longer mask it',
+  ).toBeVisible();
+  return { mask: [version], style: APP_VERSION_STYLE };
 }
 
 export { expect };

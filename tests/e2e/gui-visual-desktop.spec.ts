@@ -1,5 +1,12 @@
 import { errors } from "@playwright/test";
-import { expect, expectNoPinnedSection, openSettings, test, uploadTestImage } from "./helpers";
+import {
+  expect,
+  expectNoPinnedSection,
+  maskAppVersion,
+  openSettings,
+  test,
+  uploadTestImage,
+} from "./helpers";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -143,13 +150,15 @@ async function takeThemedScreenshots(
   page: import("@playwright/test").Page,
   baseName: string,
   target?: import("@playwright/test").Locator,
+  extra: { mask?: import("@playwright/test").Locator[]; style?: string } = {},
 ) {
   // When a target locator is given (e.g. the settings dialog), screenshot just
   // that element so the live page behind a modal -- whose catalog/collapse state
   // varies between runs -- does not make the comparison flaky. fullPage only
-  // applies to a full-page screenshot.
+  // applies to a full-page screenshot. `extra` carries masks, such as
+  // maskAppVersion()'s.
   const subject = target ?? page;
-  const opts = target ? {} : { fullPage: false };
+  const opts = target ? { ...extra } : { fullPage: false, ...extra };
 
   // Light theme
   await setTheme(page, "light");
@@ -330,7 +339,8 @@ test.describe("Visual Desktop (1280x720)", () => {
     await openSettings(page);
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-general", page.getByRole("dialog"));
+    const dialog = page.getByRole("dialog");
+    await takeThemedScreenshots(page, "settings-general", dialog, await maskAppVersion(dialog));
   });
 
   // ---- Settings dialog - People tab ----
@@ -352,7 +362,8 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("button", { name: "About" }).click();
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-about", page.getByRole("dialog"));
+    const dialog = page.getByRole("dialog");
+    await takeThemedScreenshots(page, "settings-about", dialog, await maskAppVersion(dialog));
   });
 
   // ---- Help dialog ----
@@ -366,7 +377,14 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "help-dialog");
+    // The version line sits below the fold today; the mask keeps a taller
+    // viewport or a shorter dialog from tying this shot to the release.
+    await takeThemedScreenshots(
+      page,
+      "help-dialog",
+      undefined,
+      await maskAppVersion(page.getByRole("dialog")),
+    );
   });
 
   // ---- Tool page - resize (empty, no file) ----

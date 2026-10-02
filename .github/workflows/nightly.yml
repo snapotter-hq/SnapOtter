@@ -430,7 +430,7 @@ jobs:
             fi
             echo "If the new rendering is intended, refresh the baselines: dispatch [Update Visual Baselines](https://github.com/$REPO/actions/workflows/update-visual-baselines.yml) (\`.github/workflows/update-visual-baselines.yml\`) on main with \`update_snapshots=all\`, i.e. \`gh workflow run update-visual-baselines.yml --ref main -f update_snapshots=all\`. It opens a PR with the regenerated PNGs. If the new rendering isn't intended, the diff is the regression."
             echo
-            echo "Expect this after every release (Settings shows the version string) and every new tool (home-page counts and cards). Whether to mask those or keep refreshing is tracked in #1862."
+            echo "A new tool moves these shots on purpose (home-page counts and cards, plus a baseline for its own page). The tool's PR should refresh them; the steps are in the [Developer Guide](https://docs.snapotter.com/guide/developer#_5-visual-baselines) (\`apps/docs/guide/developer.md\`). A release shouldn't: the app version is masked in every shot that shows it."
           } >> "$GITHUB_STEP_SUMMARY"
 
   docker-e2e:

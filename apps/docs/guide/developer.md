@@ -203,6 +203,28 @@ Add to `packages/shared/src/i18n/en.ts`:
 
 Add a `data-testid` attribute to your action button (as shown above) so e2e tests can target it reliably.
 
+### 5. Visual baselines {#_5-visual-baselines}
+
+The screenshot tests allow zero changed pixels, and a new tool changes what they render: the tool counts on the home page and catalog, a new card in the grid, and a page of its own that `tests/e2e/gui-visual-tools.spec.ts` fails on with "snapshot doesn't exist" until it has a baseline. Refresh the baselines in the same PR as the tool, so the nightly visual comparison stays green.
+
+Linux baselines come from CI. Push your branch, then dispatch the refresh on it:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+The workflow opens a draft PR against `main` with the regenerated PNGs. Its body has a `gh run download` command; run that from your checkout root to drop the PNGs into your branch, commit them, and close the draft PR. Use `update_snapshots=all` instead if `changed` misses a shot you expected to move.
+
+On a Mac, refresh the darwin baselines too:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+If you aren't on a Mac, say so in the PR and a maintainer will add them. Either way, open every new or changed PNG before you commit it: a baseline records whatever rendered, broken or not.
+
+A release needs none of this. The app version is masked in every screenshot that shows it, so bumping it changes no baseline.
+
 ## Docker builds {#docker-builds}
 
 Build the full production image locally:
