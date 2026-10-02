@@ -13,6 +13,9 @@ type ResizeMode = "fit" | "original" | "stretch" | "crop";
 type Alignment = "start" | "center" | "end";
 type OutputFormat = "png" | "jpeg" | "webp" | "avif" | "jxl";
 
+/** What the panel reads off the answer besides its URL. The API always sends them (#1857). */
+const RESULT_FIELDS = ["jobId", "originalSize", "processedSize"] as const;
+
 interface StitchResult {
   jobId: string;
   downloadUrl: string;
@@ -90,7 +93,7 @@ export function StitchSettings() {
             // and is rethrown so it still surfaces (#1795, after #1354).
             let result: StitchResult;
             try {
-              result = parseResultBody<StitchResult>(xhr.responseText);
+              result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
             } catch (err) {
               reject(new Error(t.errors.invalidResponse));
               reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });

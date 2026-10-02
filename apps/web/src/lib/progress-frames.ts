@@ -38,7 +38,19 @@ const MALFORMED_RESULT = {
     type: "NotABarcodeResultError",
     message: "Tool result is not a barcode read result",
   },
+  // A download URL but not a field its caller reads, a job id or a size (#1857).
+  missingResultField: {
+    type: "ResultMissingFieldError",
+    message: "Tool result is missing a field its tool reads",
+  },
 } as const;
+
+/**
+ * Result fields a caller can require on top of `downloadUrl`. The shared hooks
+ * require none, since some routes answer without sizes; a panel that reads its
+ * own answer names what it reads (#1857).
+ */
+export type RequiredResultField = "jobId" | "originalSize" | "processedSize";
 
 /** What a caller's catch got when it wasn't a MalformedResultError: our own bug. */
 const RESULT_UNREADABLE = {
@@ -65,11 +77,15 @@ export class MalformedResultError extends SafeError {
  * Parses a sync 2xx tool response, the step that rejects a malformed body. It
  * throws a MalformedResultError unless the body is a JSON object with a
  * non-empty `downloadUrl` string: every caller lands that URL as the entry's
- * result, and every sync 2xx the API sends carries one (#1740). Callers write
+ * result, and every sync 2xx the API sends carries one (#1740). `required`
+ * names any other field the caller reads (see checkToolResult). Callers write
  * the result outside the try around this, so a throw from their own store
  * writes doesn't read as "Invalid response" (#1354, the sync twin of #1287).
  */
-export function parseResultBody<T extends object>(text: string): T {
+export function parseResultBody<T extends object>(
+  text: string,
+  required: readonly RequiredResultField[] = [],
+): T {
   let body: unknown;
   try {
     body = JSON.parse(text);
@@ -77,24 +93,40 @@ export function parseResultBody<T extends object>(text: string): T {
     // Not rethrown or kept as the cause: a SyntaxError quotes the text.
     throw new MalformedResultError("notAnObject");
   }
-  return resolveServerUrls(checkToolResult<T>(body));
+  return resolveServerUrls(checkToolResult<T>(body, required));
 }
 
 /**
  * Checks that a tool result is one: a JSON object with a non-empty
  * `downloadUrl` string, or it throws a MalformedResultError. parseResultBody
  * runs it on a sync 2xx body, and the processing hooks on a completed progress
- * frame's `result`, which the worker builds the same way (#1794).
+ * frame's `result`, which the worker builds the same way (#1794). Each field
+ * in `required` must be there too: `jobId` a non-empty string, a size a finite
+ * number no less than zero (#1857).
  */
-export function checkToolResult<T extends object>(body: unknown): T {
+export function checkToolResult<T extends object>(
+  body: unknown,
+  required: readonly RequiredResultField[] = [],
+): T {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     throw new MalformedResultError("notAnObject");
   }
-  const { downloadUrl } = body as { downloadUrl?: unknown };
+  const result = body as Record<string, unknown>;
+  const { downloadUrl } = result;
   if (typeof downloadUrl !== "string" || !downloadUrl) {
     throw new MalformedResultError("noDownloadUrl");
   }
+  for (const field of required) {
+    if (!isResultField(field, result[field])) {
+      throw new MalformedResultError("missingResultField");
+    }
+  }
   return body as T;
+}
+
+function isResultField(field: RequiredResultField, value: unknown): boolean {
+  if (field === "jobId") return typeof value === "string" && value !== "";
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 /**

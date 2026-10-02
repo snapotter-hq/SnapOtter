@@ -30,6 +30,31 @@ import { useFileStore } from "@/stores/file-store";
 const NOT_AN_OBJECT = "Tool result body is not a JSON object";
 const NO_DOWNLOAD_URL = "Tool result has no download URL";
 const NOT_A_BARCODE_RESULT = "Tool result is not a barcode read result";
+const MISSING_FIELD = "Tool result is missing a field its tool reads";
+
+/**
+ * Stitch and Collage read the job id and both sizes off the answer as well as
+ * the URL, and the API always sends all four (#1857). Each of these used to
+ * land as a finished run with the size readout gone and nothing reported.
+ */
+function incompleteBodies(good: Record<string, unknown>): Array<[string, string]> {
+  const without = (field: string) => {
+    const body = { ...good };
+    delete body[field];
+    return JSON.stringify(body);
+  };
+  return [
+    ["a download URL alone", JSON.stringify({ downloadUrl: good.downloadUrl })],
+    ["no job id", without("jobId")],
+    ["a blank job id", JSON.stringify({ ...good, jobId: "" })],
+    ["a job id that is not a string", JSON.stringify({ ...good, jobId: 7 })],
+    ["no original size", without("originalSize")],
+    ["no processed size", without("processedSize")],
+    ["a size that is a string", JSON.stringify({ ...good, processedSize: "1500" })],
+    ["a size that is null", JSON.stringify({ ...good, originalSize: null })],
+    ["a negative size", JSON.stringify({ ...good, processedSize: -1 })],
+  ];
+}
 
 class FakeXhr {
   static instances: FakeXhr[] = [];
@@ -172,6 +197,30 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
     expectReported(message, "stitch");
   });
 
+  it.each(incompleteBodies(GOOD_BODY))(
+    "fails as an invalid response, and reports it, for %s (#1857)",
+    async (_label, text) => {
+      render(<StitchSettings />);
+
+      (await submit("stitch-submit")).respondRaw(200, text);
+
+      await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
+      expect(screen.queryByTestId("stitch-download")).not.toBeInTheDocument();
+      expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expectReported(MISSING_FIELD, "stitch");
+    },
+  );
+
+  it("lands a result whose output is empty", async () => {
+    render(<StitchSettings />);
+
+    (await submit("stitch-submit")).respond(200, { ...GOOD_BODY, processedSize: 0 });
+
+    await waitFor(() => expect(screen.getByTestId("stitch-download")).toBeInTheDocument());
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
   it("reports the status the answer came with", async () => {
     render(<StitchSettings />);
 
@@ -258,6 +307,21 @@ describe("collage: a malformed sync answer apart from our own store write", () =
     expect(useCollageStore.getState().phase).toBe("editing");
     expectReported(message, "collage");
   });
+
+  it.each(incompleteBodies(GOOD_BODY))(
+    "fails as an invalid response, and reports it, for %s (#1857)",
+    async (_label, text) => {
+      render(<CollageSettings />);
+
+      (await submit("collage-submit")).respondRaw(200, text);
+
+      await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
+      expect(screen.queryByTestId("collage-download")).not.toBeInTheDocument();
+      expect(useCollageStore.getState().phase).toBe("editing");
+      expect(useCollageStore.getState().resultUrl).toBeNull();
+      expectReported(MISSING_FIELD, "collage");
+    },
+  );
 
   it("reports the status the answer came with", async () => {
     render(<CollageSettings />);

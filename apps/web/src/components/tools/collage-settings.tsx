@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
+/** What the panel reads off the answer besides its URL. The API always sends them (#1857). */
+const RESULT_FIELDS = ["jobId", "originalSize", "processedSize"] as const;
+
 interface CollageResult {
   downloadUrl: string;
   processedSize: number;
@@ -132,7 +135,7 @@ export function CollageSettings() {
             // ends the run as ours, the same as landing the result below.
             let result: CollageResult;
             try {
-              result = parseResultBody<CollageResult>(xhr.responseText);
+              result = parseResultBody<CollageResult>(xhr.responseText, RESULT_FIELDS);
             } catch (err) {
               reject(new Error(t.errors.invalidResponse));
               reportMalformedResult(err, { status: xhr.status, toolId: "collage" });

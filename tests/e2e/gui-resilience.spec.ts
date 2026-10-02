@@ -1068,6 +1068,59 @@ test.describe("Server Error Handling", () => {
     await expect(page.getByTestId("collage-download")).toHaveCount(0);
   });
 
+  // #1857: a download URL with no job id or sizes used to land as a finished
+  // run, with the size readout gone and nothing reported.
+  test("stitch fails a 200 with a download URL but no job id or sizes", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/stitch");
+    await page.route("**/api/v1/tools/image/stitch", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ downloadUrl: "/api/v1/download/x/stitch.png" }),
+      }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("stitch-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("stitch-submit")).toBeEnabled();
+    await expect(page.getByTestId("stitch-download")).toHaveCount(0);
+  });
+
+  test("collage fails a 200 with a download URL but no job id or sizes", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/collage");
+    await page.route("**/api/v1/tools/image/collage", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ downloadUrl: "/api/v1/download/x/collage.png" }),
+      }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload images for collage" }).click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("collage-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("collage-submit")).toBeEnabled();
+    await expect(page.getByTestId("collage-download")).toHaveCount(0);
+  });
+
   test("barcode read fails a 200 with no barcode list", async ({ loggedInPage: page }) => {
     await page.goto("/image/barcode-read");
     await page.route("**/api/v1/tools/image/barcode-read", (route) =>

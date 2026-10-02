@@ -146,6 +146,70 @@ describe("checkToolResult (#1794)", () => {
   });
 });
 
+// #1857: a caller that reads more than the URL names the fields it reads, and a
+// result without one of them is no result for that caller. Callers that name
+// nothing keep the URL-only contract the shared hooks rely on.
+describe("checkToolResult with required fields (#1857)", () => {
+  const FULL = {
+    jobId: "j",
+    downloadUrl: "/api/v1/download/j/out.png",
+    originalSize: 2000,
+    processedSize: 0,
+  };
+  const ALL = ["jobId", "originalSize", "processedSize"] as const;
+
+  it("returns a result that has every field the caller reads", () => {
+    expect(checkToolResult(FULL, ALL)).toBe(FULL);
+  });
+
+  it("still takes a URL-only result when the caller requires nothing", () => {
+    const result = { downloadUrl: "/api/v1/download/j/out.png" };
+    expect(checkToolResult(result)).toBe(result);
+    expect(checkToolResult(result, [])).toBe(result);
+  });
+
+  it("only checks the fields the caller names", () => {
+    const result = { downloadUrl: "/api/v1/download/j/out.png", jobId: "j" };
+    expect(checkToolResult(result, ["jobId"])).toBe(result);
+  });
+
+  it.each([
+    ["a download URL alone", { downloadUrl: "/x" }],
+    ["a blank job id", { ...FULL, jobId: "" }],
+    ["a job id that is a number", { ...FULL, jobId: 7 }],
+    ["a size that is a string", { ...FULL, originalSize: "2000" }],
+    ["a size that is null", { ...FULL, processedSize: null }],
+    ["a size that is not finite", { ...FULL, originalSize: Number.POSITIVE_INFINITY }],
+    ["a size that is NaN", { ...FULL, processedSize: Number.NaN }],
+    ["a negative size", { ...FULL, originalSize: -1 }],
+  ])("rejects %s", (_label, value) => {
+    let thrown: unknown;
+    try {
+      checkToolResult(value, ALL);
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(MalformedResultError);
+    expect((thrown as MalformedResultError).reason).toBe("missingResultField");
+    expect((thrown as Error).cause).toBeUndefined();
+  });
+
+  it("names a missing download URL before a missing field", () => {
+    let thrown: unknown;
+    try {
+      checkToolResult({ jobId: "j" }, ALL);
+    } catch (err) {
+      thrown = err;
+    }
+    expect((thrown as MalformedResultError).reason).toBe("noDownloadUrl");
+  });
+
+  it("applies through parseResultBody", () => {
+    expect(() => parseResultBody('{"downloadUrl":"/x"}', ALL)).toThrow(MalformedResultError);
+    expect(parseResultBody(JSON.stringify(FULL), ALL)).toEqual(FULL);
+  });
+});
+
 /** What parseResultBody throws for a body it rejects. */
 function rejection(text: string): Error {
   try {
@@ -204,6 +268,24 @@ describe("reportMalformedResult (#1740)", () => {
     expect(error.message).toBe("Tool result is not a barcode read result");
     expect(error.cause).toBeUndefined();
     expect(tags).toEqual({ error_class: "operational", tool_id: "barcode-read" });
+  });
+
+  it("names a result missing a field its tool reads apart from the rest (#1857)", () => {
+    let thrown: unknown;
+    try {
+      parseResultBody('{"downloadUrl":"/x","note":"secret-token"}', ["jobId"]);
+    } catch (err) {
+      thrown = err;
+    }
+    reportMalformedResult(thrown, { status: 200, toolId: "stitch" });
+
+    const { error, tags } = reported();
+    expect(isSafeMessageError(error)).toBe(true);
+    expect(error.name).toBe("ResultMissingFieldError");
+    expect(error.message).toBe("Tool result is missing a field its tool reads");
+    expect(error.message).not.toContain("secret-token");
+    expect(error.cause).toBeUndefined();
+    expect(tags).toEqual({ error_class: "operational", tool_id: "stitch" });
   });
 
   it("never forwards an error it did not make, nor blames the server for it", () => {
