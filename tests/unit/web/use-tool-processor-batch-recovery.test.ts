@@ -10,6 +10,21 @@ vi.mock("@/lib/image-preview", () => ({
   fetchDecodedPreview: vi.fn(() => Promise.resolve(null)),
 }));
 
+// Lets a test make the batch's unpack throw instead of answering, the way
+// the fflate chunk failing to load after a deploy does (#1805; batch-zip.test.ts
+// pins that the chunk failure does throw). The real unpack otherwise.
+const batchZipState = vi.hoisted(() => ({ unpackThrows: false }));
+vi.mock("@/lib/batch-zip", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/batch-zip")>();
+  return {
+    ...actual,
+    unpackBatchZip: (...args: Parameters<typeof actual.unpackBatchZip>) =>
+      batchZipState.unpackThrows
+        ? Promise.reject(new Error("chunk failed to load"))
+        : actual.unpackBatchZip(...args),
+  };
+});
+
 vi.mock("@/lib/analytics", () => ({
   track: vi.fn(),
   captureHandledError: vi.fn(async () => null),
@@ -1800,8 +1815,8 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     );
     expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
     const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
-    expect(error).toMatchObject({ name: "ResultUnreadableError", isSafeMessage: true });
-    expect(error.message).toBe("Tool result could not be read");
+    expect(error).toMatchObject({ name: "BatchZipUnreadableError", isSafeMessage: true });
+    expect(error.message).toBe("Batch result ZIP could not be unpacked");
     expect(error.cause).toBeUndefined();
     expect((error as { statusCode?: number }).statusCode).toBe(status);
     expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
@@ -1851,23 +1866,29 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     unmount();
   });
 
-  it("still retries a durable download the network dropped, then settles", async () => {
+  it("still retries a durable download the network dropped, body included, then settles", async () => {
     vi.useFakeTimers();
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError("network down"))
+      // The body breaks mid-transfer: still the network, still retried.
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        blob: () => Promise.reject(new TypeError("body stream broke")),
+      })
       .mockResolvedValue({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) });
     vi.stubGlobal("fetch", fetchMock);
     const { unmount } = startBatchRun();
     degradeAndComplete();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(7_000);
     });
     vi.useRealTimers();
 
     await settled(() => expect(useFileStore.getState().entries[1].status).toBe("completed"));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(useFileStore.getState().error).toBeNull();
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
     unmount();
@@ -1882,10 +1903,17 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     act(() => respond(zipBlob(), header));
 
     await settled(() => expect(useFileStore.getState().processing).toBe(false));
-    expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", header);
+    // Only the length: the header holds file names.
+    expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", {
+      length: header.length,
+    });
     expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
     const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
-    expect(error).toMatchObject({ name: "ResultUnreadableError", statusCode: 200 });
+    expect(error).toMatchObject({
+      name: "FileResultsUnreadableError",
+      message: "Batch result file map could not be read",
+      statusCode: 200,
+    });
     expect(error.cause).toBeUndefined();
     expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
     // No file can be matched to its result, as before.
@@ -1954,7 +1982,8 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
           expect.objectContaining({ message: "teardown broke" }),
         ]),
       );
-      // Not repainted as a failure: every file did complete.
+      // Not repainted as a failure: every file did complete. Whether the
+      // rest of the teardown still runs after such a throw is #1890.
       expect(useFileStore.getState().error).toBeNull();
       expect(useFileStore.getState().entries.map((e) => e.status)).toEqual([
         "completed",
@@ -1967,6 +1996,92 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     } finally {
       unsubscribe();
       unmount();
+    }
+  });
+  it("leaves a run canceled while its ZIP unpacked alone when the ZIP turns out bad", async () => {
+    let resolveBytes: (bytes: ArrayBuffer) => void = () => {};
+    const pendingZip = {
+      arrayBuffer: () =>
+        new Promise<ArrayBuffer>((resolve) => {
+          resolveBytes = resolve;
+        }),
+    } as unknown as Blob;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({ error: "Job not found" }),
+        }),
+      ),
+    );
+    const { result, unmount } = startBatchRun();
+
+    act(() => respond(pendingZip));
+    // The unpack is waiting on the bytes; the cancel finds no job and ends
+    // the run locally.
+    await act(async () => {
+      await result.current.cancelCurrentJob();
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+
+    await act(async () => {
+      resolveBytes(new TextEncoder().encode("not a zip").buffer as ArrayBuffer);
+    });
+    await settled(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+    // The bad ZIP is still reported, but the canceled run keeps its outcome.
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().entries.map((e) => e.error)).toEqual(["Canceled", "Canceled"]);
+    await settled(() =>
+      expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+        ["batch_processed", expect.objectContaining({ status: "canceled" })],
+      ]),
+    );
+    unmount();
+  });
+
+  it("keeps a settled batch's outcome when its teardown throws before the job is cleared", async () => {
+    const { unmount } = startBatchRun();
+    // Every entry settles, then the teardown's first step throws while the
+    // job is still this run's: only the "nothing left at processing" check
+    // stands between that throw and repainting the batch as failed.
+    latestSse().close.mockImplementationOnce(() => {
+      throw new Error("close broke");
+    });
+
+    act(() => respond(zipBlob()));
+
+    await settled(() =>
+      expect(captured.rejections).toEqual([expect.objectContaining({ message: "close broke" })]),
+    );
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries.map((e) => e.status)).toEqual([
+      "completed",
+      "completed",
+    ]);
+    unmount();
+  });
+
+  it("fails the run when the unzip code won't load, without reporting a bad answer", async () => {
+    batchZipState.unpackThrows = true;
+    try {
+      const { unmount } = startBatchRun();
+      act(() => respond(zipBlob()));
+
+      await settled(() =>
+        expect(captured.rejections).toEqual([
+          expect.objectContaining({ message: "chunk failed to load" }),
+        ]),
+      );
+      expectBatchFailed("Batch processing failed", "unzip-failed");
+      // Ours, not the server's: the global handler gets it, not a
+      // malformed-result report.
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+      unmount();
+    } finally {
+      batchZipState.unpackThrows = false;
     }
   });
 });

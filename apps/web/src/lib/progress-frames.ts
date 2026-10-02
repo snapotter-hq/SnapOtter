@@ -43,6 +43,15 @@ const MALFORMED_RESULT = {
     type: "ResultMissingFieldError",
     message: "Tool result is missing a field its tool reads",
   },
+  // A batch answer's ZIP that won't unpack, and its file map (#1805).
+  batchZipUnreadable: {
+    type: "BatchZipUnreadableError",
+    message: "Batch result ZIP could not be unpacked",
+  },
+  fileResultsUnreadable: {
+    type: "FileResultsUnreadableError",
+    message: "Batch result file map could not be read",
+  },
 } as const;
 
 /**

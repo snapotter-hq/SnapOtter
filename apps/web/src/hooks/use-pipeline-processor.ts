@@ -956,6 +956,9 @@ export function usePipelineProcessor() {
           status?: number,
         ) => {
           const extracted = await unpackBatchZip(zipBlob, { status });
+          // The unpack awaits: a cancel or a newer run may have ended this
+          // one meanwhile, and its writes would land on that run's state.
+          if (activeJobIdRef.current !== clientJobId) return;
           if (!extracted) {
             failRun("Batch processing failed");
             return;

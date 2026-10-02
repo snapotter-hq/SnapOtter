@@ -1,5 +1,5 @@
 import type { Unzipped } from "fflate";
-import { reportMalformedResult } from "@/lib/progress-frames";
+import { MalformedResultError, reportMalformedResult } from "@/lib/progress-frames";
 
 interface ReportTags {
   /** HTTP status of a sync answer; a durable download has none to report. */
@@ -21,7 +21,7 @@ export async function unpackBatchZip(zipBlob: Blob, tags: ReportTags): Promise<U
     return unzipSync(new Uint8Array(await zipBlob.arrayBuffer()));
   } catch (err) {
     console.error("Batch result ZIP could not be unpacked", err);
-    reportMalformedResult(err, tags);
+    reportMalformedResult(new MalformedResultError("batchZipUnreadable"), tags);
     return null;
   }
 }
@@ -43,9 +43,12 @@ export function parseFileResultsHeader(
       return parsed as Record<string, string>;
     }
   } catch {
-    // Not kept: a SyntaxError quotes the header, and the report must not.
+    // Not kept: a SyntaxError quotes the header.
   }
-  console.error("Ignoring unreadable X-File-Results", header);
-  reportMalformedResult(undefined, tags);
+  // Only its length: the header holds file names, and a console line rides
+  // along as a breadcrumb on the report below, where the scrubber can't
+  // reliably mask a percent-encoded name.
+  console.error("Ignoring unreadable X-File-Results", { length: header.length });
+  reportMalformedResult(new MalformedResultError("fileResultsUnreadable"), tags);
   return {};
 }
