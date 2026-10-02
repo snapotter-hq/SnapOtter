@@ -221,6 +221,14 @@ export function OcrSettings() {
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Leaving mid-scan stops the elapsed counter; the scan itself still settles.
+  useEffect(
+    () => () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!enhanceManuallySet) setEnhance(ENHANCE_DEFAULTS[quality]);
   }, [enhanceManuallySet, quality]);

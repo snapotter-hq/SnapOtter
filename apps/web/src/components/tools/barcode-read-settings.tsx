@@ -1,6 +1,6 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -205,6 +205,14 @@ export function BarcodeReadSettings() {
   const [progressStage, setProgressStage] = useState<string | undefined>();
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Leaving mid-scan stops the elapsed counter; the scan itself still settles.
+  useEffect(
+    () => () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+    },
+    [],
+  );
 
   const handleProcess = async () => {
     if (files.length === 0) return;

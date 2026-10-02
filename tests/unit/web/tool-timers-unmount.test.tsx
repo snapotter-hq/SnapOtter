@@ -61,6 +61,7 @@ vi.mock("qr-code-styling", () => ({
   },
 }));
 
+import { FileLibraryModal } from "@/components/common/file-library-modal";
 import { ExportDialog } from "@/components/editor/common/export-dialog";
 import { BarcodeReadSettings } from "@/components/tools/barcode-read-settings";
 import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
@@ -744,6 +745,120 @@ describe("Login focus still lands on the MFA field", () => {
       vi.advanceTimersByTime(100);
     });
     expect(code).toHaveFocus();
+  });
+});
+
+/** An XHR that never answers, so a scan stays in flight until the test ends. */
+function stubSilentXhr() {
+  vi.stubGlobal(
+    "XMLHttpRequest",
+    class {
+      status = 0;
+      responseText = "";
+      timeout = 0;
+      upload = {};
+      open() {}
+      setRequestHeader() {}
+      send() {}
+      abort() {}
+    },
+  );
+}
+
+describe("Leaving mid-scan stops the elapsed counter (#1817)", () => {
+  const scans: Flow[] = [
+    [
+      "barcode reader",
+      async () => {
+        useFileStore.setState({ files: [new File(["png"], "code.png", { type: "image/png" })] });
+        stubSilentXhr();
+        render(<BarcodeReadSettings />);
+        fireEvent.click(screen.getByTestId("barcode-read-submit"));
+      },
+    ],
+    [
+      "OCR",
+      async () => {
+        useFeaturesStore.setState({ bundles: [ocrBundle()], loaded: true, loadError: false });
+        useFileStore.setState({ files: [new File(["png"], "scan.png", { type: "image/png" })] });
+        vi.stubGlobal(
+          "EventSource",
+          class {
+            close() {}
+          },
+        );
+        stubSilentXhr();
+        render(<OcrSettings />);
+        fireEvent.click(screen.getByTestId("ocr-submit"));
+      },
+    ],
+  ];
+
+  it.each(scans)("%s", async (_name, run) => {
+    await run();
+    await act(async () => {});
+    // The one-second elapsed interval is ticking while the scan runs...
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    // ...and leaving the page mid-scan stops it.
+    cleanup();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("The library modal drops a pending search when it goes (#1817)", () => {
+  function stubFilesApi() {
+    const fetchMock = vi.fn(
+      async (_url: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ files: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  async function typeSearch(fetchMock: ReturnType<typeof stubFilesApi>) {
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByPlaceholderText(en.files.searchPlaceholder), {
+      target: { value: "otter" },
+    });
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+  }
+
+  it("closing it cancels the debounced search", async () => {
+    const fetchMock = stubFilesApi();
+    const { rerender } = render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    await typeSearch(fetchMock);
+    rerender(<FileLibraryModal open={false} onClose={() => {}} onImport={() => {}} />);
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("unmounting it cancels the debounced search", async () => {
+    const fetchMock = stubFilesApi();
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    await typeSearch(fetchMock);
+    cleanup();
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still searches while it stays open", async () => {
+    const fetchMock = stubFilesApi();
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+    await typeSearch(fetchMock);
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("search=otter");
   });
 });
 

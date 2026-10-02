@@ -93,6 +93,11 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
       setCheckedIds(new Set());
       setSearchQuery("");
     }
+    // Closing (or unmounting) the modal drops a search still waiting on its
+    // debounce, so it never fires against a closed modal.
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [open, fetchFiles]);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
