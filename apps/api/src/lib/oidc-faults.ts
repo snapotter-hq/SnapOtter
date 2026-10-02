@@ -5,8 +5,10 @@
  * error_code on the Sentry event), so the event never carries an issuer URL,
  * an authorization code, a state value, or a token. The original error rides
  * along as `cause` for the local log and the stack. An unreachable IdP
- * (refused connection, unknown host) still groups under reportError's shared
- * connectivity fingerprint rather than its own code.
+ * (refused connection, unknown host, dropped socket, connect timeout) still
+ * groups under reportError's shared connectivity fingerprint rather than its
+ * own code. connectivityClass has no timeout class, so CONNECT_TIMEOUT_CODES
+ * below is what keeps the TIMEOUT codes apart from UNREACHABLE.
  */
 import { connectivityClass, SafeError } from "@snapotter/shared";
 
