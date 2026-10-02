@@ -701,50 +701,84 @@ describe("OCR v3 bundle release workflow", () => {
     expect(requirements).not.toMatch(/^urllib3==2\.7\.0\b/m);
   });
 
-  it("audits the hf CLI lock at release time before installing it (#1838)", () => {
+  it("audits the hf CLI lock at release time, off the token-bearing runner (#1838)", () => {
     // CI's required audit only runs when a PR does. An advisory published
     // against an unchanged lock would otherwise reach a release that installs
-    // it next to the HuggingFace write token. Parsed rather than
-    // substring-matched, so `|| true`, `continue-on-error`, an `if:`, a custom
-    // shell, or a reordering can't turn the audit into a no-op while this stays
+    // it next to the HuggingFace write token. The audit is its own job with no
+    // secrets, because pip-audit is not hash-locked and on the publish runner it
+    // could write $GITHUB_ENV, $GITHUB_PATH or the lock ahead of the token
+    // steps. Parsed rather than substring-matched, so `|| true`,
+    // `continue-on-error`, an `if:`, a custom shell, a dropped `needs` edge or
+    // a redirected install can't turn the guard into a no-op while this stays
     // green.
+    type Step = Record<string, unknown> & { with?: Record<string, unknown> };
+    type Job = Record<string, unknown> & { steps: Step[] };
     const parsed = load(readRequired(bundlesWorkflowPath)) as {
+      env?: unknown;
       defaults?: unknown;
-      jobs: Record<string, Record<string, unknown> & { steps: Record<string, unknown>[] }>;
+      jobs: Record<string, Job>;
     };
+    const auditJob = parsed.jobs["audit-hf-release-lock"];
     const publishJob = parsed.jobs.publish;
+    expect(auditJob, "audit-hf-release-lock job is missing").toBeDefined();
+
+    // Nothing workflow-wide may soften the audit, redirect pip-audit's
+    // vulnerability service or index, or widen the token's scope.
+    expect(parsed.env).toBeUndefined();
     expect(parsed.defaults).toBeUndefined();
-    expect(publishJob.defaults).toBeUndefined();
-    expect(publishJob["continue-on-error"]).toBeUndefined();
+    for (const key of ["defaults", "continue-on-error", "if", "env", "strategy"]) {
+      expect(auditJob[key], `audit job must not set ${key}`).toBeUndefined();
+    }
+    expect(auditJob.needs).toBe("validate-inputs");
+    expect(auditJob.permissions).toEqual({ contents: "read" });
+    expect(JSON.stringify(auditJob)).not.toContain("secrets.");
 
-    const steps = publishJob.steps;
-    const indexOf = (name: string) => {
-      const index = steps.findIndex((step) => step.name === name);
-      expect(index, `publish step "${name}" is missing`).toBeGreaterThanOrEqual(0);
-      return index;
-    };
-    const checkout = indexOf("Check out hash-locked release tooling");
-    const python = indexOf("Set up pinned release Python");
-    const audit = indexOf("Audit hash-locked hf CLI lock");
-    const install = indexOf("Install hash-locked hf CLI");
-    const firstTokenStep = steps.findIndex((step) => JSON.stringify(step).includes("HF_TOKEN"));
-
-    expect(checkout).toBeLessThan(audit);
-    expect(python).toBeLessThan(audit);
-    expect(audit).toBeLessThan(install);
-    expect(firstTokenStep).toBeGreaterThan(install);
-
-    const auditStep = steps[audit];
-    expect(Object.keys(auditStep).sort()).toEqual(["name", "run"]);
-    expect(auditStep.run).toBe(
+    const [checkout, python, audit, ...rest] = auditJob.steps;
+    expect(rest).toEqual([]);
+    expect(checkout.uses).toBe("actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0");
+    expect(checkout.with).toEqual({
+      ref: "${{ inputs.release_commit }}",
+      "persist-credentials": false,
+    });
+    expect(python.uses).toBe("actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1");
+    expect(python.with).toEqual({ "python-version": "3.11.14" });
+    expect(Object.keys(audit).sort()).toEqual(["name", "run"]);
+    expect(audit.run).toBe(
       [
-        "python -m venv /tmp/pip-audit-venv",
-        '/tmp/pip-audit-venv/bin/python -m pip install --disable-pip-version-check "pip-audit==2.10.0"',
-        "/tmp/pip-audit-venv/bin/pip-audit -r docker/hf-release-requirements.txt \\",
-        "  --no-deps --disable-pip --aliases",
+        'python -m pip install --disable-pip-version-check "pip-audit==2.10.0"',
+        "pip-audit -r docker/hf-release-requirements.txt --no-deps --disable-pip --aliases --strict",
         "",
       ].join("\n"),
     );
+
+    // Publish waits on the audit, and a failed audit skips it: no `if:` that
+    // could run it anyway (`always()`, `!cancelled()`).
+    expect(publishJob.needs).toContain("audit-hf-release-lock");
+    expect(publishJob.if).toBeUndefined();
+    expect(publishJob.defaults).toBeUndefined();
+    expect(publishJob["continue-on-error"]).toBeUndefined();
+    expect(publishJob.env).toBeUndefined();
+
+    // The install reads exactly the lock the audit read, and no step before it
+    // sees a secret.
+    const install = publishJob.steps.findIndex(
+      (step) => step.name === "Install hash-locked hf CLI",
+    );
+    expect(install, "publish install step is missing").toBeGreaterThanOrEqual(0);
+    expect(publishJob.steps[install].run).toBe(
+      [
+        "python -m venv /tmp/hf-release-venv",
+        "/tmp/hf-release-venv/bin/python -m pip install \\",
+        "  --disable-pip-version-check --require-hashes --no-deps --only-binary=:all: \\",
+        "  --requirement docker/hf-release-requirements.txt",
+        'echo "/tmp/hf-release-venv/bin" >> "$GITHUB_PATH"',
+        "",
+      ].join("\n"),
+    );
+    const firstSecretStep = publishJob.steps.findIndex((step) =>
+      JSON.stringify(step).includes("secrets."),
+    );
+    expect(firstSecretStep).toBeGreaterThan(install);
   });
 
   it("signs one canonical two-target index and verifies it before upload", () => {
@@ -803,7 +837,9 @@ describe("OCR v3 bundle release workflow", () => {
     expect(verifySignedJob).not.toContain("--entrypoint");
     expect(verifySignedJob).toContain("-e EMBEDDED=0");
     expect(verifySignedJob.match(/-e EMBEDDED=0/g)).toHaveLength(1);
-    expect(publishJob).toContain("needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index]");
+    expect(publishJob).toContain(
+      "needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index, audit-hf-release-lock]",
+    );
     expect(publishJob).toContain('f"ocr-{target}.artifact.json"');
     expect(publishJob).toContain("ocr-runtime-index.json");
     expect(publishJob).toContain("v3.mkdir(parents=True)");
@@ -1047,7 +1083,8 @@ describe("OCR v3 bundle release workflow", () => {
     );
     expect(bundles).toContain("release_commit:");
     expect(bundles).toContain("required: true");
-    expect(bundles.match(/ref: \$\{\{ inputs\.release_commit \}\}/g)).toHaveLength(5);
+    // Build, both verifies, sign, publish, and the hf lock audit (#1838).
+    expect(bundles.match(/ref: \$\{\{ inputs\.release_commit \}\}/g)).toHaveLength(6);
     expect(bundles).toContain('git rev-parse "refs/tags/v${VERSION}^{commit}"');
     expect(bundles).toContain('[[ "$(git rev-parse HEAD)" == "${RELEASE_COMMIT}"');
     expect(bundles).toContain('"${tag_commit}" == "${RELEASE_COMMIT}"');

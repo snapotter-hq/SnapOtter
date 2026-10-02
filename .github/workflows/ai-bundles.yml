@@ -1351,13 +1351,45 @@ jobs:
               process.stdout.write(`PASS: image-baked trust verified ${target} for ${version}\n`);
             '
 
+  audit-hf-release-lock:
+    name: Audit hf CLI release lock
+    # CI's required audit only runs when a PR does, so an advisory published
+    # against an unchanged docker/hf-release-requirements.txt would otherwise
+    # reach a release that installs it in the job holding the HuggingFace write
+    # token (#1838). This is its own job, with no secrets, because pip-audit and
+    # its dependencies are not hash-locked: on the publish runner they could
+    # write $GITHUB_ENV, $GITHUB_PATH or the lock itself ahead of the token
+    # steps. --strict fails the audit on any entry it cannot check (a URL pin,
+    # a package PyPI no longer lists) instead of skipping it.
+    timeout-minutes: 10
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the release lock
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+
+      - name: Set up pinned release Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11.14"
+
+      - name: Audit hash-locked hf CLI lock
+        run: |
+          python -m pip install --disable-pip-version-check "pip-audit==2.10.0"
+          pip-audit -r docker/hf-release-requirements.txt --no-deps --disable-pip --aliases --strict
+
   publish:
     name: Publish verified bundles to HuggingFace
     # Uploads the full v3 set to HuggingFace and then re-downloads and hashes
     # every published object. Untimed, a stalled transfer burns the 360 minute
     # default before anyone notices.
     timeout-minutes: 60
-    needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index]
+    needs: [verify-ocr, sign-ocr-index, verify-signed-ocr-index, audit-hf-release-lock]
     # Hugging Face exposes one repository-wide branch head. Keep expensive
     # builds parallel across releases, then serialize only the short CAS write
     # boundary so two versions cannot race the shared `main` revision.
@@ -1396,18 +1428,6 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: /tmp/artifacts
-
-      # CI's required audit only runs when a PR does, so an advisory published
-      # against this unchanged lock would otherwise reach a release that
-      # installs it beside the HuggingFace write token (#1838). The auditor gets
-      # its own venv so its unhashed dependencies stay out of the interpreter
-      # the later release steps run.
-      - name: Audit hash-locked hf CLI lock
-        run: |
-          python -m venv /tmp/pip-audit-venv
-          /tmp/pip-audit-venv/bin/python -m pip install --disable-pip-version-check "pip-audit==2.10.0"
-          /tmp/pip-audit-venv/bin/pip-audit -r docker/hf-release-requirements.txt \
-            --no-deps --disable-pip --aliases
 
       - name: Install hash-locked hf CLI
         run: |
