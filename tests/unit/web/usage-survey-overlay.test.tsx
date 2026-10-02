@@ -41,7 +41,9 @@ afterEach(() => {
   submitFeedback.mockClear();
   trackFeedbackPromptShown.mockClear();
   trackFeedbackPromptDismissed.mockClear();
-  apiGet.mockClear();
+  // Reset, not clear: answerSettingsLater installs an implementation that a
+  // later test must not inherit.
+  apiGet.mockReset();
   apiPut.mockClear();
   useAuth.mockReset();
 });
