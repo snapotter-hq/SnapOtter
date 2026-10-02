@@ -219,8 +219,10 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
         );
         // request.log has no Sentry bridge, and by catching here the error
         // never reaches the global handler's reportError. Report explicitly
-        // so a database fault denying every SSO login is visible in triage,
-        // under its own subsystem so it never merges with the policy fault.
+        // so a database fault denying every SSO login is visible in triage.
+        // The subsystem tag tells it apart from the MFA-policy fault below:
+        // an operational fault groups by its code, so the two can share an
+        // issue.
         void reportError(err, {
           source: "http",
           route: request.routeOptions?.url,

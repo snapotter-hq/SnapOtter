@@ -1328,8 +1328,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(auditRows).toHaveLength(1);
 
       // The catch keeps the fault from the global error handler, so the
-      // callback reports it itself, exactly once, under its own subsystem so
-      // it never merges with the MFA-policy fault in triage. The exact
+      // callback reports it itself, exactly once, tagged with its own
+      // subsystem so triage can tell it from the MFA-policy fault. The exact
       // context match rules out a user id or username riding along in it.
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
       expect(reportErrorSpy).toHaveBeenCalledWith(enrollmentFault, {

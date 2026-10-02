@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { inspect } from "node:util";
-import { eq, sql } from "drizzle-orm";
+import { DrizzleQueryError, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -399,11 +399,16 @@ describe("SAML callback", () => {
     mfaOutcomeMock.mockReturnValue("proceed");
     reportErrorSpy.mockClear();
 
-    // Shaped like the real failure: the read losing its Postgres connection
-    // (SQLSTATE 57P01, admin_shutdown).
-    const enrollmentFault = Object.assign(
+    // Shaped like the real failure: drizzle wraps the driver's error (a lost
+    // Postgres connection, SQLSTATE 57P01) in a DrizzleQueryError.
+    const pgFault = Object.assign(
       new Error("terminating connection due to administrator command"),
       { code: "57P01" },
+    );
+    const enrollmentFault = new DrizzleQueryError(
+      'select "totp_enabled" from "users" where "users"."id" = $1',
+      ["00000000-0000-0000-0000-000000000000"],
+      pgFault,
     );
     let enrollmentReads = 0;
     const originalSelect = db.select.bind(db);
@@ -445,8 +450,8 @@ describe("SAML callback", () => {
       expect(auditRows).toHaveLength(1);
 
       // The catch keeps the fault from the global error handler, so the
-      // callback reports it itself, exactly once, under its own subsystem so
-      // it never merges with the MFA-policy fault in triage. The exact
+      // callback reports it itself, exactly once, tagged with its own
+      // subsystem so triage can tell it from the MFA-policy fault. The exact
       // context match rules out a user id or email riding along in it.
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
       expect(reportErrorSpy).toHaveBeenCalledWith(enrollmentFault, {
