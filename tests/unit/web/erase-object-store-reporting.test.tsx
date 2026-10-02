@@ -1083,3 +1083,62 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
     }
   });
 });
+
+describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  /** What the tool page does on the way out: a fresh store for the next tool. */
+  function moveToAnotherTool() {
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("next-tool.png")]);
+  }
+
+  it("stops the request and stream in flight and sends no more files", async () => {
+    const { unmount } = renderPanel(2);
+    const first = await submit(1);
+
+    unmount();
+
+    expect(first.aborted).toBe(true);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    // Answered anyway: no second file goes out.
+    first.respond(200, GOOD_BODY);
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(1);
+  });
+
+  it("writes nothing to the store the next tool is using", async () => {
+    const { unmount } = renderPanel(2);
+    const first = await submit(1);
+
+    unmount();
+    moveToAnotherTool();
+    first.respond(200, GOOD_BODY);
+    await act(async () => {});
+
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("keeps a finished file's result and stops the one after it", async () => {
+    const { unmount } = renderPanel(2);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+
+    unmount();
+    second.respond(200, GOOD_BODY);
+    await act(async () => {});
+
+    expect(second.aborted).toBe(true);
+    expect(FakeEventSource.instances[1].readyState).toBe(2);
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(1).processedUrl).toBeNull();
+  });
+});

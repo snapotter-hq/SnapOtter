@@ -199,11 +199,19 @@ export function EraseObjectSettings({
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressCleanupRef = useRef<(() => void) | null>(null);
+  // An Erase All batch outlives the panel unless it's told (#1894): the file
+  // in flight stops through this, and the loop checks unmountedRef before
+  // sending the next one or writing anything to the store.
+  const batchFileStopRef = useRef<(() => void) | null>(null);
+  const unmountedRef = useRef(false);
 
   // Tear down any live progress subscription if the component unmounts mid-job.
   useEffect(() => {
+    unmountedRef.current = false;
     return () => {
+      unmountedRef.current = true;
       progressCleanupRef.current?.();
+      batchFileStopRef.current?.();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
     };
   }, []);
@@ -270,6 +278,13 @@ export function EraseObjectSettings({
         onStall: () =>
           abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
       });
+      // Leaving the page drops this file where it stands. The error only
+      // settles the promise: the loop sees the panel is gone and writes
+      // nothing for it, since the store may already be the next tool's.
+      batchFileStopRef.current = () => {
+        stopProgress();
+        abandon(new Error("Erase Object panel unmounted"));
+      };
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
       const formData = new FormData();
@@ -550,7 +565,7 @@ export function EraseObjectSettings({
     if (!eraserRef.current) return;
 
     const masks = await eraserRef.current.exportAllMasks();
-    if (masks.size === 0) return;
+    if (masks.size === 0 || unmountedRef.current) return;
 
     const { entries: currentEntries } = useFileStore.getState();
 
@@ -587,6 +602,10 @@ export function EraseObjectSettings({
       }, 1000);
 
       for (let wi = 0; wi < work.length; wi++) {
+        // The panel is gone (#1894). Finished files keep their results; the
+        // rest are left as they were, and so is the run's state, which
+        // belongs to whatever replaced this panel now.
+        if (unmountedRef.current) return;
         const { index, file, maskBlob } = work[wi];
         const basePercent = (wi / work.length) * 100;
         const sliceWeight = 100 / work.length;
@@ -607,11 +626,14 @@ export function EraseObjectSettings({
             setProgressPercent(basePercent + (pct / 100) * sliceWeight);
           });
         } catch (err) {
+          if (unmountedRef.current) return;
           useFileStore.getState().updateEntry(index, {
             status: "failed",
             error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
             errorCategory: feedbackCategoryOf(err),
           });
+        } finally {
+          batchFileStopRef.current = null;
         }
       }
     } catch (cause) {
