@@ -97,13 +97,16 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
     useEditorStore.temporal.getState().redo();
   }, []);
 
+  // A row's `shortcut` must name a key use-editor-shortcuts.ts binds to that
+  // same command (#1943). Rows with no binding show no hint: Ctrl+N and Ctrl+W
+  // never reach the page in Chrome anyway, so New and Close couldn't take them.
   return [
     {
       label: m.file.label,
       testId: "file",
       items: [
-        { id: "new", label: m.file.new, shortcut: hint("mod+N"), action: callbacks.onNewDocument },
-        { id: "open", label: m.file.open, shortcut: hint("mod+O"), action: callbacks.onOpenImage },
+        { id: "new", label: m.file.new, action: callbacks.onNewDocument },
+        { id: "open", label: m.file.open, action: callbacks.onOpenImage },
         {
           id: "save",
           label: m.file.save,
@@ -114,19 +117,18 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
         {
           id: "export-as",
           label: m.file.exportAs,
-          shortcut: hint("mod+Shift+E"),
+          // mod+shift+e is Flatten All; export listens on mod+shift+s.
+          shortcut: hint("mod+Shift+S"),
           action: callbacks.onExport,
         },
         {
           id: "quick-export-as-png",
           label: m.file.quickExportPng,
-          shortcut: hint("mod+Shift+P"),
           action: callbacks.onExport,
         },
         {
           id: "close",
           label: m.file.close,
-          shortcut: hint("mod+W"),
           disabled: !hasImage,
           action: () => {
             if (hasImage) {
@@ -211,14 +213,12 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
         {
           id: "image-size",
           label: m.image.imageSize,
-          shortcut: hint("mod+Alt+I"),
           action: callbacks.onImageResize,
           dividerAfter: true,
         },
         {
           id: "canvas-size",
           label: m.image.canvasSize,
-          shortcut: hint("mod+Alt+C"),
           action: callbacks.onCanvasResize,
         },
         {
@@ -329,7 +329,8 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
         {
           id: "all",
           label: m.select.all,
-          shortcut: hint("mod+A"),
+          // No hint: mod+a selects every object, while this row makes a
+          // pixel selection over the canvas.
           action: () =>
             setSelection({
               type: "rect",

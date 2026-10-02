@@ -224,7 +224,8 @@ export function ContextMenu({
       id: "selectAll",
       label: t.editor.ui.contextMenu.selectAll,
       icon: MousePointer,
-      shortcut: hint("mod+a"),
+      // No hint: mod+a selects every object, while this row makes a pixel
+      // selection over the canvas (#1943).
       action: () => {
         setSelection({
           type: "rect",

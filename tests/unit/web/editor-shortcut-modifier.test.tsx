@@ -141,7 +141,8 @@ describe("editor context menu shortcut hints (#1935)", () => {
       duplicate: "",
       delete: "Del",
       canvasPaste: "⌘V",
-      selectAll: "⌘A",
+      // mod+a selects objects; this row makes a pixel selection (#1943).
+      selectAll: "",
     });
   });
 
@@ -154,7 +155,7 @@ describe("editor context menu shortcut hints (#1935)", () => {
       duplicate: "",
       delete: "Del",
       canvasPaste: "Ctrl+V",
-      selectAll: "Ctrl+A",
+      selectAll: "",
     });
   });
 
@@ -162,7 +163,7 @@ describe("editor context menu shortcut hints (#1935)", () => {
     onDevice("iPad", SAFARI_IPAD_MOBILE);
     const hints = contextMenuHints();
     expect(hints.cut).toBe("Ctrl+X");
-    expect(hints.selectAll).toBe("Ctrl+A");
+    expect(hints.canvasPaste).toBe("Ctrl+V");
   });
 });
 
@@ -212,14 +213,16 @@ describe("editor menu bar modifier (#1935)", () => {
   });
 
   it.each([
-    ["Win32", CHROME_WINDOWS, "Ctrl+D", "Ctrl+Alt+I", "Ctrl+=", "Ctrl+-"],
-    ["MacIntel", SAFARI_MAC, "⌘D", "⌘⌥I", "⌘=", "⌘-"],
-  ])("on %s formats Alt and punctuation keys", async (platform, userAgent, ...expected) => {
+    // No menu row carries Alt since #1943 dropped the unbound Image Size and
+    // Canvas Size hints; search-shortcut-hint.test.tsx covers Alt formatting.
+    ["Win32", CHROME_WINDOWS, "Ctrl+D", "Ctrl+Shift+I", "Ctrl+=", "Ctrl+-"],
+    ["MacIntel", SAFARI_MAC, "⌘D", "⌘⇧I", "⌘=", "⌘-"],
+  ])("on %s formats Shift and punctuation keys", async (platform, userAgent, ...expected) => {
     onDevice(platform, userAgent);
     const shown: (string | null | undefined)[] = [];
     for (const [menu, item] of [
       ["select", "deselect"],
-      ["image", "image-size"],
+      ["select", "inverse"],
       ["view", "zoom-in"],
       ["view", "zoom-out"],
     ]) {
