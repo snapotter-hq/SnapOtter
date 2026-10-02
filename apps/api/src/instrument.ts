@@ -6,7 +6,8 @@ import {
   telemetryEnvKilled,
 } from "./lib/analytics-gate.js";
 import { deployMode } from "./lib/deploy-mode.js";
-import { buildBeforeSend } from "./lib/sentry-scrub.js";
+import { buildSentryIntegrations } from "./lib/sentry-integrations.js";
+import { buildBeforeSend, buildBeforeSendTransaction } from "./lib/sentry-scrub.js";
 import { buildTracesSampler } from "./lib/sentry-tracing.js";
 
 // Sentry inits at process load, before the gate cache is primed. Until the
@@ -42,16 +43,9 @@ if (dsn && !telemetryEnvKilled()) {
       release,
       environment: process.env.SNAPOTTER_ENV || "production",
       sendDefaultPii: false,
-      // With tracing on, use the function form to DROP the default Redis
-      // integration (the array form is additive and would keep it). With
-      // tracing off, the array form is fine: no sampler means the defaults
-      // never start a transaction, so they stay inert.
-      integrations: tracingEnabled
-        ? (defaults) =>
-            defaults
-              .filter((i) => i.name !== "Redis")
-              .concat(Sentry.httpIntegration({ trackIncomingRequestsAsSessions: false }))
-        : [Sentry.httpIntegration({ trackIncomingRequestsAsSessions: false })],
+      // Never captures request bodies, cookies, or query strings (#1880); see
+      // sentry-integrations.ts for why each option is there.
+      integrations: buildSentryIntegrations(Sentry, tracingEnabled),
       ...(tracingEnabled
         ? {
             tracesSampler: buildTracesSampler(
@@ -67,6 +61,11 @@ if (dsn && !telemetryEnvKilled()) {
         sentryActive,
         sentryDiagnostic(),
       ) as unknown as SentryOptions["beforeSend"],
+      // Transactions skip beforeSend, so they get their own request and span
+      // scrub (only reachable with SENTRY_TRACES_SAMPLE_RATE set).
+      beforeSendTransaction: buildBeforeSendTransaction(
+        sentryDiagnostic(),
+      ) as unknown as SentryOptions["beforeSendTransaction"],
     });
 
     console.log(

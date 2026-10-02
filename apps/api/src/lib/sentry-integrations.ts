@@ -1,0 +1,39 @@
+/**
+ * The integration list instrument.ts hands to Sentry.init, built from the SDK
+ * module it already loaded so this file never imports @sentry/node at runtime
+ * (the type import is erased). Kept separate so a test can init the real SDK
+ * with exactly the production list.
+ */
+import type * as SentryNode from "@sentry/node";
+
+type SentryModule = typeof SentryNode;
+type SentryIntegrations = NonNullable<Parameters<SentryModule["init"]>[0]>["integrations"];
+
+export function buildSentryIntegrations(
+  Sentry: SentryModule,
+  tracingEnabled: boolean,
+): SentryIntegrations {
+  // Both replace the default instance of the same name (#1880). The http
+  // integration buffers up to 10 KB of every incoming request body by default,
+  // and sendDefaultPii does not gate that, so a login password, a SAML
+  // assertion, or an uploaded file's bytes rode along on events. "none" stops
+  // the buffering at the source. RequestData then never attaches a body,
+  // cookies, the query string, or the client IP to any event (errors and
+  // transactions alike); beforeSend still allowlists what is left.
+  const ours = [
+    Sentry.httpIntegration({
+      trackIncomingRequestsAsSessions: false,
+      maxIncomingRequestBodySize: "none",
+    }),
+    Sentry.requestDataIntegration({
+      include: { cookies: false, data: false, query_string: false, ip: false },
+    }),
+  ];
+  // With tracing on, use the function form to DROP the default Redis
+  // integration (the array form is additive and would keep it). With tracing
+  // off, the array form is fine: no sampler means the defaults never start a
+  // transaction, so they stay inert.
+  return tracingEnabled
+    ? (defaults) => defaults.filter((i) => i.name !== "Redis").concat(ours)
+    : ours;
+}

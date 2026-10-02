@@ -73,6 +73,88 @@ function scrubBreadcrumbs(value: unknown): unknown {
   return undefined;
 }
 
+// Request headers a diagnostic event may keep: they describe the request's
+// shape, never who sent it. Everything else goes, Authorization, Cookie, and
+// the forwarding headers that carry client IPs included (#1880).
+const SAFE_REQUEST_HEADERS = new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "content-length",
+  "content-type",
+  "user-agent",
+]);
+
+/** A url or path with its query string and fragment cut off (tokens live there). */
+function stripQuery(url: string): string {
+  return url.split(/[?#]/, 1)[0] ?? "";
+}
+
+/**
+ * The parts of `event.request` a diagnostic event keeps: method, url without
+ * its query, and allowlisted headers. Never the body, cookies, query string,
+ * or env, whatever the SDK attached (#1880).
+ */
+function scrubRequest(value: unknown): AnyEvent | undefined {
+  const request = asObj(value);
+  if (!request) return undefined;
+  const out: AnyEvent = {};
+  if (typeof request.method === "string") out.method = request.method;
+  if (typeof request.url === "string") out.url = stripQuery(request.url);
+  const headers = asObj(request.headers);
+  if (headers) {
+    const safe: AnyEvent = {};
+    for (const [name, v] of Object.entries(headers)) {
+      if (typeof v === "string" && SAFE_REQUEST_HEADERS.has(name.toLowerCase())) safe[name] = v;
+    }
+    if (Object.keys(safe).length) out.headers = safe;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+// Span and breadcrumb data keys whose value is a url or path that can carry a
+// query string, and the keys that hold only a query string or fragment.
+const URL_DATA_KEYS = new Set(["url", "url.full", "url.path", "http.url", "http.target"]);
+const QUERY_DATA_KEY = /(^|\.)(query|fragment)$/;
+// Headers the SDK may flatten into span attributes; already "[Filtered]" with
+// sendDefaultPii off, dropped here so no SDK default change can put them back.
+const SECRET_HEADER_DATA_KEY =
+  /^http\.(request|response)\.header\.(authorization|proxy_authorization|cookie|set_cookie)/;
+
+/**
+ * A copy of span or breadcrumb `data` without query strings, fragments,
+ * request bodies, or credential headers. Everything else is left as is.
+ */
+function scrubUrlData(value: unknown): unknown {
+  const data = asObj(value);
+  if (!data) return value;
+  const out: AnyEvent = {};
+  for (const [key, v] of Object.entries(data)) {
+    if (QUERY_DATA_KEY.test(key) || SECRET_HEADER_DATA_KEY.test(key)) continue;
+    if (key === "http.request.body.data" || key === "http.response.body.data") continue;
+    out[key] = URL_DATA_KEYS.has(key) && typeof v === "string" ? stripQuery(v) : v;
+  }
+  return out;
+}
+
+/** True for an http span op ("http.server", "http.client", ...). */
+function isHttpOp(op: unknown): boolean {
+  return typeof op === "string" && op.startsWith("http");
+}
+
+/** Diagnostic breadcrumbs keep their data, minus query strings and secrets. */
+function scrubDiagnosticBreadcrumbs(value: unknown): unknown {
+  const scrub = (entry: unknown) => {
+    const b = asObj(entry);
+    if (!b) return entry;
+    return b.data === undefined ? b : { ...b, data: scrubUrlData(b.data) };
+  };
+  if (Array.isArray(value)) return value.map(scrub);
+  const wrapped = asObj(value);
+  if (Array.isArray(wrapped?.values)) return { ...wrapped, values: wrapped.values.map(scrub) };
+  return value;
+}
+
 /**
  * A non-PII type name for grouping a stackless throw. Tolerates non-Error
  * thrown values (a rejected string or plain object), which is exactly the case
@@ -139,9 +221,16 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
     if (++sentInWindow > CEILING_PER_HOUR) return null;
 
     if (diagnostic) {
-      // A consenting instance: keep the raw message, request, and breadcrumb data.
-      // Still drop identity, and cap message length via redactMessage raw mode.
+      // A consenting instance: keep the raw message and breadcrumb data, and
+      // the request's method, path, and harmless headers. Still drop identity,
+      // and anything that carries credentials or content: request bodies,
+      // cookies, auth headers, and query strings never leave (#1880). Cap
+      // message length via redactMessage raw mode.
       event.user = undefined;
+      event.request = scrubRequest(event.request);
+      if (event.breadcrumbs !== undefined) {
+        event.breadcrumbs = scrubDiagnosticBreadcrumbs(event.breadcrumbs);
+      }
       const values = asObj(event.exception)?.values;
       if (Array.isArray(values)) {
         for (const entry of values) {
@@ -238,6 +327,43 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
         event.fingerprint = ["uncaught", name, errorCode(orig), errorDigest(orig)];
         if (!asObj(event.tags)) event.tags = {};
         (event.tags as AnyEvent).error_name = name;
+      }
+    }
+    return event;
+  };
+}
+
+/**
+ * Sentry beforeSendTransaction for the API. Transactions never pass through
+ * beforeSend and only exist with SENTRY_TRACES_SAMPLE_RATE set. The request
+ * gets the same rule as an error event (dropped, or reduced to method, path,
+ * and harmless headers in diagnostic mode), breadcrumbs get the same scrub as
+ * on an error event, and every span's data loses query strings, bodies, and
+ * credential headers (#1880).
+ */
+export function buildBeforeSendTransaction(diagnostic = false) {
+  return function beforeSendTransaction(event: AnyEvent): AnyEvent {
+    event.request = diagnostic ? scrubRequest(event.request) : undefined;
+    // A transaction carries the scope's breadcrumbs too.
+    if (event.breadcrumbs !== undefined) {
+      event.breadcrumbs = diagnostic
+        ? scrubDiagnosticBreadcrumbs(event.breadcrumbs)
+        : scrubBreadcrumbs(event.breadcrumbs);
+    }
+    const trace = asObj(asObj(event.contexts)?.trace);
+    if (trace && trace.data !== undefined) trace.data = scrubUrlData(trace.data);
+    // Only http names are "METHOD url"; a db span's "?" is a placeholder.
+    if (typeof event.transaction === "string" && isHttpOp(trace?.op)) {
+      event.transaction = stripQuery(event.transaction);
+    }
+    if (Array.isArray(event.spans)) {
+      for (const entry of event.spans) {
+        const span = asObj(entry);
+        if (!span) continue;
+        if (span.data !== undefined) span.data = scrubUrlData(span.data);
+        if (typeof span.description === "string" && isHttpOp(span.op)) {
+          span.description = stripQuery(span.description);
+        }
       }
     }
     return event;

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
+import {
+  buildBeforeSend,
+  buildBeforeSendTransaction,
+} from "../../../apps/api/src/lib/sentry-scrub.js";
 
 type AnyEvent = Record<string, any>;
 const evt = (over: AnyEvent = {}): AnyEvent => ({
@@ -225,5 +228,164 @@ describe("buildBeforeSend (api)", () => {
       { stacktrace: { frames: [] } },
     );
     expect(out.fingerprint[0]).toBe("uncaught");
+  });
+});
+// #1880: what a request leaves on an event, whatever the mode.
+const secretRequest = (): AnyEvent => ({
+  method: "POST",
+  url: "https://host/api/auth/login?token=qtok#frag",
+  query_string: "token=qtok",
+  data: '{"password":"hunter2"}',
+  cookies: { snapotter_session: "sess" },
+  env: { REMOTE_ADDR: "10.0.0.9" },
+  headers: {
+    Authorization: "Bearer si_secret",
+    cookie: "snapotter_session=sess",
+    "set-cookie": "a=b",
+    "x-forwarded-for": "10.0.0.9",
+    "User-Agent": "curl/8",
+    "content-type": "application/json",
+    "content-length": "22",
+    accept: ["text/html"], // not a string: dropped
+  },
+});
+
+describe("buildBeforeSend diagnostic request scrub (#1880)", () => {
+  const diag = () => buildBeforeSend(() => true, true);
+
+  it("keeps only method, the url without its query, and allowlisted headers", () => {
+    const out = diag()({ request: secretRequest() } as never, {}) as AnyEvent;
+    expect(out.request).toEqual({
+      method: "POST",
+      url: "https://host/api/auth/login",
+      headers: {
+        "User-Agent": "curl/8",
+        "content-type": "application/json",
+        "content-length": "22",
+      },
+    });
+  });
+  it("drops a request with nothing safe left, and a malformed one", () => {
+    expect(diag()({ request: { data: "x", cookies: {} } } as never, {})?.request).toBeUndefined();
+    expect(diag()({ request: "raw" } as never, {})?.request).toBeUndefined();
+    expect(diag()({ request: ["x"] } as never, {})?.request).toBeUndefined();
+    expect(diag()({ request: { headers: { cookie: "a" } } } as never, {})?.request).toBeUndefined();
+  });
+  it("strips query strings and secrets from breadcrumb data in both shapes", () => {
+    const crumb = {
+      category: "http",
+      message: "kept raw",
+      data: {
+        url: "https://idp/token?code=abc",
+        "http.query": "?code=abc",
+        "http.fragment": "#x",
+        "http.method": "POST",
+        status_code: 200,
+      },
+    };
+    const want = {
+      category: "http",
+      message: "kept raw",
+      data: { url: "https://idp/token", "http.method": "POST", status_code: 200 },
+    };
+    const list = diag()({ breadcrumbs: [crumb, { category: "nodata" }, 7] } as never, {});
+    expect(list?.breadcrumbs).toEqual([want, { category: "nodata" }, 7]);
+    const wrapped = diag()({ breadcrumbs: { values: [crumb] } } as never, {});
+    expect(wrapped?.breadcrumbs).toEqual({ values: [want] });
+    expect(diag()({ breadcrumbs: "odd" } as never, {})?.breadcrumbs).toBe("odd");
+    expect(diag()({} as never, {})).not.toHaveProperty("breadcrumbs");
+  });
+});
+
+describe("buildBeforeSendTransaction (#1880)", () => {
+  const txn = (): AnyEvent => ({
+    transaction: "GET /api/auth/oidc/callback?code=abc",
+    request: secretRequest(),
+    breadcrumbs: [{ category: "http", data: { url: "https://x/y?t=1", method: "GET" } }],
+    contexts: {
+      trace: {
+        op: "http.server",
+        data: {
+          "http.url": "http://h/api/auth/oidc/callback?code=abc",
+          "http.target": "/api/auth/oidc/callback?code=abc",
+          "url.full": "http://h/a?code=abc",
+          "url.path": "/a?code=abc",
+          url: "http://h/a#frag",
+          "http.query": "code=abc",
+          "url.query": "code=abc",
+          "http.request.body.data": "password=x",
+          "http.response.body.data": "{}",
+          "http.request.header.authorization": "[Filtered]",
+          "http.request.header.cookie.snapotter_session": "[Filtered]",
+          "http.response.header.set_cookie": "[Filtered]",
+          "http.request.header.user_agent": "curl/8",
+          "http.route": "/api/auth/oidc/callback",
+        },
+      },
+    },
+    spans: [
+      {
+        op: "http.client",
+        description: "GET https://idp/token?code=abc",
+        data: { "http.query": "x" },
+      },
+      {
+        op: "db",
+        description: "SELECT * FROM users WHERE id = ?",
+        data: { "db.system": "postgresql" },
+      },
+      { description: 42 },
+      null,
+    ],
+  });
+  const scrubbedTraceData = {
+    "http.url": "http://h/api/auth/oidc/callback",
+    "http.target": "/api/auth/oidc/callback",
+    "url.full": "http://h/a",
+    "url.path": "/a",
+    url: "http://h/a",
+    "http.request.header.user_agent": "curl/8",
+    "http.route": "/api/auth/oidc/callback",
+  };
+
+  it("drops the request and strict-scrubs breadcrumbs by default", () => {
+    const out = buildBeforeSendTransaction()(txn());
+    expect(out.request).toBeUndefined();
+    expect(out.breadcrumbs).toEqual([{ category: "http", data: { method: "GET" } }]);
+    expect(out.transaction).toBe("GET /api/auth/oidc/callback");
+    expect(out.contexts.trace.data).toEqual(scrubbedTraceData);
+    expect(out.spans[0]).toEqual({
+      op: "http.client",
+      description: "GET https://idp/token",
+      data: {},
+    });
+    // A db statement's "?" is a placeholder, not a query string.
+    expect(out.spans[1].description).toBe("SELECT * FROM users WHERE id = ?");
+    expect(out.spans[2]).toEqual({ description: 42 });
+    expect(out.spans[3]).toBeNull();
+  });
+  it("keeps the allowlisted request and breadcrumb data in diagnostic mode", () => {
+    const out = buildBeforeSendTransaction(true)(txn());
+    expect(out.request).toEqual({
+      method: "POST",
+      url: "https://host/api/auth/login",
+      headers: {
+        "User-Agent": "curl/8",
+        "content-type": "application/json",
+        "content-length": "22",
+      },
+    });
+    expect(out.breadcrumbs).toEqual([
+      { category: "http", data: { url: "https://x/y", method: "GET" } },
+    ]);
+    expect(out.contexts.trace.data).toEqual(scrubbedTraceData);
+  });
+  it("leaves a non-http transaction name alone and tolerates a bare event", () => {
+    const out = buildBeforeSendTransaction()({
+      transaction: "job resize#2",
+      contexts: { trace: { op: "queue.process" } },
+    });
+    expect(out.transaction).toBe("job resize#2");
+    expect(buildBeforeSendTransaction()({})).toEqual({ request: undefined });
   });
 });
