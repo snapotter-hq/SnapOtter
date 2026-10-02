@@ -12,7 +12,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -930,7 +930,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.details || body?.error || `Effects failed: ${response.status}`);
+        throw new Error(
+          failedAnswerMessage(t, body, response.status, `Effects failed: ${response.status}`),
+        );
       }
 
       const result = resolveServerUrls(await response.json());

@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -229,7 +229,14 @@ export function ImageToPdfSettings() {
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(body.error || format(t.errors.failedWithStatus, { status: xhr.status }));
+          setError(
+            failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
+            ),
+          );
         } catch {
           setError(
             format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, { status: xhr.status }),

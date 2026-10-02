@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -74,7 +74,7 @@ export function InfoSettings() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Failed: ${res.status}`);
+          throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
         }
 
         const data: ImageInfoData = await res.json();

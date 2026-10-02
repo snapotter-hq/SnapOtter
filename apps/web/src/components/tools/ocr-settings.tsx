@@ -1,11 +1,11 @@
-import type { LibrarySaveMode } from "@snapotter/shared";
+import { en, type LibrarySaveMode, type TranslationKeys } from "@snapotter/shared";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import {
@@ -49,6 +49,8 @@ export function ocrOneFile(
     timeout?: string;
     networkError?: string;
     processingFailed?: string;
+    /** The UI locale, for the install message of a FEATURE_NOT_INSTALLED answer. */
+    t?: TranslationKeys;
   } = {},
   // When the file came from the library, forward the save choice so the
   // extracted-text artifact auto-saves (#565). Only sent for single-file runs.
@@ -175,7 +177,11 @@ export function ocrOneFile(
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          rejectOnce(new Error(body.error || body.details || `Failed: ${xhr.status}`));
+          rejectOnce(
+            new Error(
+              failedAnswerMessage(messages.t ?? en, body, xhr.status, `Failed: ${xhr.status}`),
+            ),
+          );
         } catch {
           rejectOnce(new Error(messages.processingFailed ?? `Processing failed: ${xhr.status}`));
         }
@@ -286,6 +292,7 @@ export function OcrSettings() {
             timeout: t.errors.timeout,
             networkError: t.errors.networkError,
             processingFailed: t.errors.processingFailed,
+            t,
           },
           library,
         );

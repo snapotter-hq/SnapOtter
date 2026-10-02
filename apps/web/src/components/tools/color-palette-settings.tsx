@@ -2,7 +2,7 @@ import { Check, ClipboardCopy, Copy, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -42,7 +42,7 @@ export function ColorPaletteSettings() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Failed: ${res.status}`);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
       }
 
       const data = await res.json();

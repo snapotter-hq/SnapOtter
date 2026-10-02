@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
@@ -114,7 +114,12 @@ export function StitchSettings() {
               const body = JSON.parse(xhr.responseText);
               reject(
                 new Error(
-                  body.error || formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+                  failedAnswerMessage(
+                    t,
+                    body,
+                    xhr.status,
+                    formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+                  ),
                 ),
               );
             } catch {

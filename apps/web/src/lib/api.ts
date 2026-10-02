@@ -1,6 +1,7 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
+import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { useConnectionStore } from "@/stores/connection-store";
 
 const API_BASE = appUrl("/api");
@@ -12,9 +13,16 @@ export interface FeatureNotInstalledError {
   estimatedSize: string;
 }
 
+/**
+ * Reads a failed answer's JSON body: `error`, then `details`, then `message`.
+ * Only string `error` and `message` count, so an object-valued one can never
+ * reach the screen as "[object Object]" (#1858). `fallback` is what a body
+ * that names no reason reads as.
+ */
 export function parseApiError(
   body: Record<string, unknown>,
   fallbackStatus: number,
+  fallback = `Processing failed: ${fallbackStatus}`,
 ): string | FeatureNotInstalledError {
   if (body.code === "FEATURE_NOT_INSTALLED") {
     return {
@@ -26,23 +34,44 @@ export function parseApiError(
   }
 
   const error = typeof body.error === "string" ? body.error : "";
+  const message = typeof body.message === "string" ? body.message : "";
   const details = body.details;
-  if (!details) {
-    return error || (body.message as string) || `Processing failed: ${fallbackStatus}`;
-  }
-  let detailsStr: string;
+  let detailsStr = "";
   if (typeof details === "string") {
     detailsStr = details;
   } else if (Array.isArray(details)) {
     detailsStr = details
-      .map((d) =>
-        typeof d === "string" ? d : (d as Record<string, unknown>)?.message || JSON.stringify(d),
-      )
+      .map((d) => {
+        if (typeof d === "string") return d;
+        const itemMessage = (d as Record<string, unknown> | null)?.message;
+        return typeof itemMessage === "string" && itemMessage ? itemMessage : JSON.stringify(d);
+      })
       .join("; ");
-  } else {
+  } else if (details) {
     detailsStr = JSON.stringify(details);
   }
+  // The API's error handler sends a 4xx's message as both fields.
+  if (!detailsStr || detailsStr === error) return error || message || fallback;
   return error ? `${error}: ${detailsStr}` : detailsStr;
+}
+
+/**
+ * The text a tool panel shows for a non-2xx answer it posted for itself
+ * (#1858): parseApiError's reading of the body, the translated install
+ * message for FEATURE_NOT_INSTALLED, or the panel's own `fallback` when the
+ * body is not a JSON object or names no reason. Takes `unknown` because the
+ * body comes straight from JSON.parse or res.json().
+ */
+export function failedAnswerMessage(
+  t: TranslationKeys,
+  body: unknown,
+  status: number,
+  fallback: string,
+  toolName?: string,
+): string {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return fallback;
+  const parsed = parseApiError(body as Record<string, unknown>, status, fallback);
+  return typeof parsed === "string" ? parsed : featureNotInstalledMessage(t, parsed, toolName);
 }
 
 // ── Auth Headers ───────────────────────────────────────────────

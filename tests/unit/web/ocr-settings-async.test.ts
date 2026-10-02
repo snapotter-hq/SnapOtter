@@ -2,7 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/api", () => ({ formatHeaders: () => [] }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  formatHeaders: () => [],
+}));
 vi.mock("@/lib/utils", () => ({
   copyToClipboard: vi.fn(),
   generateId: () => "11111111-1111-4111-8111-111111111111",

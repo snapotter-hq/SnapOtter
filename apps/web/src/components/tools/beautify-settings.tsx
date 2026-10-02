@@ -6,7 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -1402,8 +1402,12 @@ export function BeautifySettings({
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(
-            body.error ||
+            failedAnswerMessage(
+              t,
+              body,
+              res.status,
               format(t.toolSettings.beautify.processingFailedStatus, { status: res.status }),
+            ),
           );
         }
 

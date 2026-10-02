@@ -6,7 +6,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { EXIF_LABELS, exifStr, SKIP_KEYS } from "@/lib/metadata-utils";
@@ -222,7 +222,14 @@ export function EditMetadataSettings() {
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || format(t.errors.failedWithStatus, { status: res.status }));
+          throw new Error(
+            failedAnswerMessage(
+              t,
+              body,
+              res.status,
+              format(t.errors.failedWithStatus, { status: res.status }),
+            ),
+          );
         }
         const data: InspectResult = await res.json();
         setInspectCache((prev) => new Map(prev).set(fileKey, data));

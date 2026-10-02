@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useBase64Store } from "@/stores/base64-store";
@@ -56,7 +56,11 @@ export function ImageToBase64Settings() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          addError({ entryId, filename: file.name, error: body.error || `Failed: ${res.status}` });
+          addError({
+            entryId,
+            filename: file.name,
+            error: failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`),
+          });
           continue;
         }
 

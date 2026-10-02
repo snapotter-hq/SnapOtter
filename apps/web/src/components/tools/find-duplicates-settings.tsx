@@ -1,7 +1,7 @@
 import { Download, FolderArchive, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { format, plural } from "@/lib/format";
@@ -92,7 +92,14 @@ export function FindDuplicatesSettings() {
       } else {
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(body.error || format(t.errors.failedWithStatus, { status: xhr.status }));
+          setError(
+            failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
+            ),
+          );
         } catch {
           setError(format(t.errors.failedWithStatus, { status: xhr.status }));
         }

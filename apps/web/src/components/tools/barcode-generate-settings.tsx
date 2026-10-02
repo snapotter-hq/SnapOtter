@@ -1,7 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 
@@ -50,7 +50,12 @@ export function BarcodeGenerateSettings() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(
-          body.error || format(t.errors.requestFailedWithStatus, { status: res.status }),
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.errors.requestFailedWithStatus, { status: res.status }),
+          ),
         );
       }
 

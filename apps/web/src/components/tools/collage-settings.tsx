@@ -2,7 +2,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useCallback } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import {
   COLLAGE_TEMPLATES,
@@ -152,7 +152,14 @@ export function CollageSettings() {
             try {
               const body = JSON.parse(xhr.responseText);
               reject(
-                new Error(body.error || format(t.errors.failedWithStatus, { status: xhr.status })),
+                new Error(
+                  failedAnswerMessage(
+                    t,
+                    body,
+                    xhr.status,
+                    format(t.errors.failedWithStatus, { status: xhr.status }),
+                  ),
+                ),
               );
             } catch {
               reject(new Error(format(t.errors.failedWithStatus, { status: xhr.status })));

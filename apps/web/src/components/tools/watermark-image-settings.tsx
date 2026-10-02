@@ -2,7 +2,7 @@ import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -46,7 +46,12 @@ export function WatermarkImageSettings() {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(
-            body.error || format(t.errors.processingFailedWithStatus, { status: res.status }),
+            failedAnswerMessage(
+              t,
+              body,
+              res.status,
+              format(t.errors.processingFailedWithStatus, { status: res.status }),
+            ),
           );
         }
 
@@ -84,7 +89,7 @@ export function WatermarkImageSettings() {
               const body = await res.json().catch(() => ({}));
               store.updateEntry(i, {
                 status: "failed",
-                error: body.error || t.errors.processingFailedNoDetail,
+                error: failedAnswerMessage(t, body, res.status, t.errors.processingFailedNoDetail),
               });
               continue;
             }
