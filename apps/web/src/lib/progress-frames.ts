@@ -123,8 +123,11 @@ export function reportMalformedResult(
  * How a job-progress subscriber reports a failed run. Subscribers that live
  * outside a component have no locale, so when there's no server text they hand
  * over a reason and the component translates it with jobFailureMessage (#1593).
+ * `invalidResponse` is a completed frame whose result checkToolResult rejected.
  */
-export type JobFailure = { message: string } | { reason: "noDetail" | "trackingFailed" };
+export type JobFailure =
+  | { message: string }
+  | { reason: "noDetail" | "trackingFailed" | "invalidResponse" };
 
 /**
  * The JobFailure for a failed progress frame's `error`. A blank or missing
@@ -153,8 +156,15 @@ export function failedFrameMessage(frame: ProgressFrame, fallback: string): stri
 /** The text to show for a JobFailure, in the caller's locale. */
 export function jobFailureMessage(
   failure: JobFailure,
-  errors: { processingFailedNoDetail: string; jobTrackingFailed: string },
+  errors: { processingFailedNoDetail: string; jobTrackingFailed: string; invalidResponse: string },
 ): string {
   if ("message" in failure) return failure.message;
-  return failure.reason === "noDetail" ? errors.processingFailedNoDetail : errors.jobTrackingFailed;
+  switch (failure.reason) {
+    case "noDetail":
+      return errors.processingFailedNoDetail;
+    case "invalidResponse":
+      return errors.invalidResponse;
+    case "trackingFailed":
+      return errors.jobTrackingFailed;
+  }
 }

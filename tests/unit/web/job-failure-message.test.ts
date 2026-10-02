@@ -27,6 +27,13 @@ describe("jobFailureMessage", () => {
     expect(de.errors.jobTrackingFailed).not.toBe(en.errors.jobTrackingFailed);
   });
 
+  it("translates a completed run with nothing to download (#1830)", () => {
+    expect(jobFailureMessage({ reason: "invalidResponse" }, de.errors)).toBe(
+      de.errors.invalidResponse,
+    );
+    expect(de.errors.invalidResponse).not.toBe(en.errors.invalidResponse);
+  });
+
   it("keeps the English tracking message in step with the hooks' constant", () => {
     // use-tool-processor and use-pipeline-processor still show FRAME_HANDLING_FAILED,
     // so English users should see the same words from every tool.

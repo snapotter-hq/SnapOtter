@@ -137,7 +137,7 @@ function breakNextEntryWrite() {
     .mockImplementation(realUpdateEntry);
 }
 
-function expectReported(message: string, statusCode: number) {
+function expectReported(message: string, statusCode: number | undefined) {
   expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
   const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
   expect(error.message).toBe(message);
@@ -399,6 +399,120 @@ describe("erase-object single file: every other way the request ends", () => {
 
     expect(entry().processedUrl).toBe(DOWNLOAD_URL);
     expect(useFileStore.getState().processing).toBe(false);
+  });
+});
+
+/** Answer the request with a 202, then send one frame on the progress stream. */
+function goAsyncThenSend(xhr: FakeXhr, frame: unknown, stream = 0) {
+  xhr.respond(202, { jobId: "job-1", async: true });
+  act(() => {
+    FakeEventSource.instances[stream].onmessage?.({ data: JSON.stringify(frame) });
+  });
+}
+
+// A completed frame's result is the worker's buildLegacyResultPayload, which
+// always carries a downloadUrl, so one without it is the server's bug: the
+// stream twin of a sync 200 {} (#1740), closed for the shared hooks in #1794.
+const NOTHING_TO_DOWNLOAD = [
+  ["an empty result", { result: {} }, "Tool result has no download URL"],
+  ["an empty download URL", { result: { downloadUrl: "" } }, "Tool result has no download URL"],
+  ["a null result", { result: null }, "Tool result body is not a JSON object"],
+  ["no result at all", {}, "Tool result body is not a JSON object"],
+] as const;
+
+describe("erase-object single file: a completed frame with nothing to download (#1830)", () => {
+  it.each(NOTHING_TO_DOWNLOAD)(
+    "fails the run, and reports it once, for %s",
+    async (_label, extra, message) => {
+      renderPanel();
+
+      goAsyncThenSend(await submit(), { type: "single", phase: "complete", ...extra });
+
+      expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+      expect(entry().status).not.toBe("completed");
+      expect(entry().processedUrl).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      // A progress frame has no HTTP status to tag.
+      expectReported(message, undefined);
+    },
+  );
+
+  it("keeps the invalid-response error, reported once, when showing it throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        }),
+      ).toThrow("store broke");
+      // zustand sets the state before its listeners run. The server's fault
+      // stays the error: it is not relabelled as our own tracking failure.
+      expect(useFileStore.getState().error).toBe(en.errors.invalidResponse);
+      expectReported("Tool result has no download URL", undefined);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("still reads a throw while landing a good frame as ours", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    breakNextEntryWrite();
+
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
+describe("erase-object batch: a completed frame with nothing to download (#1830)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  it.each(NOTHING_TO_DOWNLOAD)(
+    "fails the file, and reports it once, for %s",
+    async (_label, extra, message) => {
+      renderPanel(2);
+
+      goAsyncThenSend(await submit(1), { type: "single", phase: "complete", ...extra });
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.invalidResponse);
+      expect(entry(0).processedUrl).toBeNull();
+      expect(entry(1).status).toBe("completed");
+      expectReported(message, undefined);
+    },
+  );
+
+  it("lands a good frame on the file", async () => {
+    renderPanel(2);
+
+    goAsyncThenSend(await submit(1), { type: "single", phase: "complete", result: GOOD_BODY });
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 });
 

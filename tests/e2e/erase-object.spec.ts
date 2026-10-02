@@ -276,6 +276,73 @@ test.describe("Erase Object tool", () => {
     await expect(page.getByText("Invalid response", { exact: true })).toHaveCount(0);
   });
 
+  /**
+   * Answer the erase with the 202 the API really sends, then complete the run
+   * on the progress stream with `result`. The frame waits for the POST, as
+   * the worker's would.
+   */
+  async function completeOverStream(
+    page: import("@playwright/test").Page,
+    result: Record<string, unknown>,
+  ) {
+    let accepted: () => void = () => {};
+    const postAnswered = new Promise<void>((resolve) => {
+      accepted = resolve;
+    });
+    await page.route("**/api/v1/jobs/*/progress", async (route) => {
+      await postAnswered;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ type: "single", phase: "complete", percent: 100, result })}\n\n`,
+      });
+    });
+    await page.route("**/api/v1/tools/image/erase-object", async (route) => {
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId: "e2e-1830", async: true }),
+      });
+      accepted();
+    });
+  }
+
+  // #1830: the stream twin of the 200 above. A completed frame with nothing to
+  // download used to land as a finished run with no result behind it.
+  test("a completed stream with no download URL fails the run as an invalid response", async ({
+    loggedInPage: page,
+  }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+    await completeOverStream(page, { jobId: "e2e-1830", originalSize: 1000, processedSize: 900 });
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect(page.getByText("Invalid response", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("erase-object-submit")).toBeEnabled();
+    await expect(page.getByTestId("erase-object-download")).toHaveCount(0);
+  });
+
+  test("a completed stream with a result lands it", async ({ loggedInPage: page }) => {
+    await gotoEraser(page);
+    await uploadFile(page, fixturePath("image/valid/test-200x150.png"));
+    await paintStroke(page);
+    await completeOverStream(page, {
+      jobId: "e2e-1830",
+      downloadUrl: "/api/v1/download/e2e-1830/test-200x150.png",
+      originalSize: 1000,
+      processedSize: 900,
+    });
+
+    await page.getByTestId("erase-object-submit").click();
+
+    await expect(page.getByTestId("erase-object-download")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Invalid response", { exact: true })).toHaveCount(0);
+  });
+
   test("High Quality mode is gated on the inpaint-hq pack and blocks submit until installed", async ({
     loggedInPage: page,
   }) => {

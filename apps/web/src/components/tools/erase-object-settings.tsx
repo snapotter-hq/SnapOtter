@@ -10,6 +10,7 @@ import { bundleName } from "@/lib/bundle-i18n";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
 import {
+  checkToolResult,
   frameFailure,
   type JobFailure,
   jobFailureMessage,
@@ -110,6 +111,22 @@ export function subscribeEraseObjectJobProgress(
       } catch {
         return;
       }
+      // A completed frame with nothing to download is the server's bug, the
+      // twin of a sync 2xx body with no downloadUrl (#1740): the worker builds
+      // every result with one. It ends the run outside the catch below, so a
+      // throw while showing the error can't relabel it as ours (#1830).
+      let completed: Record<string, unknown> | null = null;
+      if (data.type === "single" && data.phase === "complete") {
+        try {
+          completed = checkToolResult<Record<string, unknown>>(data.result);
+        } catch (err) {
+          cleanup();
+          // Reported first: a throw from onFailed's store writes must not lose it.
+          reportMalformedResult(err, { toolId: "erase-object" });
+          handlers.onFailed({ reason: "invalidResponse" });
+          return;
+        }
+      }
       try {
         if (data.type === "heartbeat") {
           resetStall();
@@ -117,9 +134,9 @@ export function subscribeEraseObjectJobProgress(
         }
         if (data.type !== "single") return;
         resetStall();
-        if (data.phase === "complete" && data.result) {
+        if (completed) {
           cleanup();
-          handlers.onComplete(data.result);
+          handlers.onComplete(completed);
           return;
         }
         if (data.phase === "failed") {
