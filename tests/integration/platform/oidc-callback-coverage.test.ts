@@ -14,11 +14,13 @@
  *   - resolveExternalUser "denied" outcomes surfaced by the callback
  *     (oidc.ts:282-288): user_not_authorized and user_limit_reached.
  *   - claims() returning no ID-token claims (oidc.ts:253-258).
- *   - the optional-MFA-plugin catch (oidc.ts:325-327): the MFA policy lookup
- *     throwing must fail *open* (login proceeds) because MFA is an optional
- *     enterprise plugin.
- *   - the resolver's retry-exhaustion throw (#978): caught and turned into a
- *     login failure, while any other resolver throw still surfaces as a 500.
+ *   - the MFA policy lookup throwing (#815): the login fails *closed* with a
+ *     distinct, retryable error, and the swallowed fault reaches reportError
+ *     (#1789).
+ *   - the resolver's retry-exhaustion throw (#978): caught, turned into a
+ *     login failure, and reported (#1789), while any other resolver throw
+ *     still surfaces as a 500 that the callback leaves to the global error
+ *     handler.
  *   - RP-initiated logout (auth.ts POST /api/auth/logout): the logoutUrl built
  *     from the discovery cache the callback warms, including the
  *     post_logout_redirect_uri under a BASE_PATH prefix (#1355), and the
@@ -63,8 +65,9 @@ vi.mock("../../../apps/api/src/lib/analytics.js", async (importOriginal) => {
   return { ...actual, trackEvent: trackEventSpy };
 });
 
-// reportError is mocked so the logout tests can tell a reported fault from an
-// expected local-only logout (#1514); every other error-report export stays real.
+// reportError is mocked so the logout and callback tests can tell a reported
+// fault from an expected outcome (#1514, #1789); every other error-report
+// export stays real.
 const reportErrorSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -831,6 +834,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
     const setCookie = res.headers["set-cookie"];
     expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("derives the username from the configured claim (preferred_username)", async () => {
@@ -849,6 +853,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     const user = await findUserByExternalId(sub);
     expect(user).toBeDefined();
     expect(user?.username).toBe(sanitizeUsername(raw));
+    // A normal SSO login, MFA policy read included, reports nothing.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("falls back to preferred_username when a custom username claim is configured but absent", async () => {
@@ -925,6 +931,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     expect(await findUserByExternalId(sub)).toBeUndefined();
     const setCookie = res.headers["set-cookie"];
     expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
+    // A denial is a login outcome, not a fault.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("redirects to oidc_user_limit_reached when auto-create hits the user cap", async () => {
@@ -951,11 +959,13 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'user_limit_reached' AND ${schema.auditLog.details}->>'externalId' = ${sub}`,
       );
     expect(auditRows).toHaveLength(1);
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("redirects to oidc_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {
     const sub = `sub-raced-${Math.random().toString(36).slice(2, 10)}`;
-    resolverFailure.next = new UsernameRaceExhaustedError("oidc", "raced", 3);
+    const raceErr = new UsernameRaceExhaustedError("oidc", "raced", 3);
+    resolverFailure.next = raceErr;
     const res = await callbackWithClaims({ sub, preferred_username: "raced" });
 
     expect(res.statusCode).toBe(302);
@@ -973,6 +983,20 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       );
     expect(auditRows).toHaveLength(1);
     expect(auditRows[0].details).toMatchObject({ attemptedUsername: "raced" });
+
+    // Caught before the global error handler, so the callback reports it
+    // itself, exactly once, or sustained username contention never reaches
+    // Sentry (#1789).
+    expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+    expect(reportErrorSpy).toHaveBeenCalledWith(raceErr, {
+      source: "http",
+      route: "/api/auth/oidc/callback",
+      method: "GET",
+      subsystem: "external-auth",
+    });
+    // The real reportError drops "expected" errors, which would make this
+    // report a no-op.
+    expect(classifyError(raceErr, "http")).not.toBe("expected");
   });
 
   it("still surfaces any other resolver throw as a 500 with no misclassified audit row", async () => {
@@ -980,7 +1004,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     // signal is a login outcome. A fault (DB down, a leaked constraint error)
     // must keep reaching the global handler instead of being audited as a race.
     const sub = `sub-fault-${Math.random().toString(36).slice(2, 10)}`;
-    resolverFailure.next = new Error("simulated resolver fault");
+    const fault = new Error("simulated resolver fault");
+    resolverFailure.next = fault;
     const res = await callbackWithClaims({ sub, preferred_username: "faulty" });
 
     expect(res.statusCode).toBe(500);
@@ -994,6 +1019,10 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'externalId' = ${sub}`,
       );
     expect(auditRows).toHaveLength(0);
+    // The callback's own catch must not report it as username contention: in
+    // production the global error handler reports the 500. buildTestApp()
+    // doesn't install that handler (#1243), so nothing here reports at all.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("fails closed with a distinct error when the MFA policy lookup throws (#815)", async () => {
@@ -1002,9 +1031,8 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     // policy-read catch. A thrown policy lookup must fail CLOSED for an
     // unenrolled user: the stored policy may well be "required", so the
     // login is denied with a retryable error param instead of a session.
-    const spy = vi
-      .spyOn(mfaModule, "getMfaPolicy")
-      .mockRejectedValue(new Error("simulated MFA policy lookup failure"));
+    const policyFault = new Error("simulated MFA policy lookup failure");
+    const spy = vi.spyOn(mfaModule, "getMfaPolicy").mockRejectedValue(policyFault);
     try {
       const sub = `sub-mfathrow-${Math.random().toString(36).slice(2, 10)}`;
       const res = await callbackWithClaims({
@@ -1029,6 +1057,19 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(session).toBeUndefined();
       expect(trackEventSpy).not.toHaveBeenCalledWith("auth_login", { method: "oidc" });
       expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
+
+      // The catch keeps the fault from the global error handler, so the
+      // callback reports it itself, exactly once: a settings fault denying
+      // every SSO login must show up in triage, not only in the log (#1789).
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(policyFault, {
+        source: "http",
+        route: "/api/auth/oidc/callback",
+        method: "GET",
+        statusCode: 503,
+        subsystem: "mfa-policy",
+      });
+      expect(classifyError(policyFault, "http")).not.toBe("expected");
     } finally {
       spy.mockRestore();
     }
