@@ -48,9 +48,21 @@ const SAMPLED_PARENT = "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-1";
 
 type Payload = Record<string, unknown>;
 
+export interface Sent {
+  /** The error event as the transport received it. */
+  event: Payload;
+  /** Every transaction the transport received for the request. */
+  transactions: Payload[];
+  /**
+   * `request` on each event and transaction as the SDK built it, before our
+   * beforeSend hooks ran: what the integrations alone collected.
+   */
+  rawRequests: Payload[];
+}
+
 export interface Harness {
   /** POST to the server and return the one error event and any transactions sent for it. */
-  send(path: string, init: RequestInit): Promise<{ event: Payload; transactions: Payload[] }>;
+  send(path: string, init: RequestInit): Promise<Sent>;
   close(): Promise<void>;
 }
 
@@ -62,14 +74,26 @@ export async function startHarness({ tracing }: { tracing: boolean }): Promise<H
 
   const events: Payload[] = [];
   const transactions: Payload[] = [];
+  const rawRequests: Payload[] = [];
+  const recordRaw = (event: { request?: unknown }) => {
+    rawRequests.push(JSON.parse(JSON.stringify(event.request ?? {})) as Payload);
+  };
+  const beforeSend = buildBeforeSend(() => true, true);
+  const beforeSendTransaction = buildBeforeSendTransaction(true);
   Sentry.init({
     dsn: "https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/1",
     sendDefaultPii: false,
     integrations: buildSentryIntegrations(Sentry, tracing),
     ...(tracing ? { tracesSampler: buildTracesSampler(1) as never } : {}),
     sendClientReports: false,
-    beforeSend: buildBeforeSend(() => true, true) as never,
-    beforeSendTransaction: buildBeforeSendTransaction(true) as never,
+    beforeSend: ((event: Payload, hint: Parameters<typeof beforeSend>[1]) => {
+      recordRaw(event);
+      return beforeSend(event, hint);
+    }) as never,
+    beforeSendTransaction: ((event: Payload) => {
+      recordRaw(event);
+      return beforeSendTransaction(event);
+    }) as never,
     transport: () => ({
       send: async (envelope) => {
         for (const [header, payload] of envelope[1] as unknown as Array<
@@ -118,6 +142,7 @@ export async function startHarness({ tracing }: { tracing: boolean }): Promise<H
       resetThrottleForTests();
       events.length = 0;
       transactions.length = 0;
+      rawRequests.length = 0;
       // With tracing on, arrive inside a sampled upstream trace: the production
       // sampler follows a parent's decision for any request, so this is how a
       // transaction gets recorded for these routes today.
@@ -137,7 +162,11 @@ export async function startHarness({ tracing }: { tracing: boolean }): Promise<H
       }
       expect(events).toHaveLength(1);
       if (tracing) expect(transactions.length).toBeGreaterThan(0);
-      return { event: events[0] as Payload, transactions: [...transactions] };
+      return {
+        event: events[0] as Payload,
+        transactions: [...transactions],
+        rawRequests: [...rawRequests],
+      };
     },
     async close() {
       await app.close();
@@ -162,6 +191,19 @@ export function expectNoSecrets(payload: Payload, extra: string[]): void {
   const headers = (request?.headers ?? {}) as Payload;
   for (const name of Object.keys(headers)) {
     expect(["authorization", "cookie", "set-cookie"]).not.toContain(name.toLowerCase());
+  }
+}
+
+/**
+ * The SDK itself never collected a body, cookies, or query string, so the
+ * beforeSend hooks are a second line rather than the only one.
+ */
+export function expectNothingCollected(rawRequests: Payload[]): void {
+  expect(rawRequests.length).toBeGreaterThan(0);
+  for (const request of rawRequests) {
+    expect(request.data).toBeUndefined();
+    expect(request.cookies).toBeUndefined();
+    expect(request.query_string).toBeUndefined();
   }
 }
 

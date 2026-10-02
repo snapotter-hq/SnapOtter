@@ -9,7 +9,13 @@
  * header, session cookie, and query string.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { expectNoSecrets, type Harness, REQUESTS, startHarness } from "./sentry-request-harness.js";
+import {
+  expectNoSecrets,
+  expectNothingCollected,
+  type Harness,
+  REQUESTS,
+  startHarness,
+} from "./sentry-request-harness.js";
 
 let harness: Harness;
 beforeAll(async () => {
@@ -21,7 +27,8 @@ afterAll(async () => {
 
 describe("a failing request on a diagnostic instance, tracing off (#1880)", () => {
   it("ships no login password, credentials, or query token", async () => {
-    const { event } = await harness.send(REQUESTS.login.path, REQUESTS.login.init);
+    const { event, rawRequests } = await harness.send(REQUESTS.login.path, REQUESTS.login.init);
+    expectNothingCollected(rawRequests);
     expectNoSecrets(event, REQUESTS.login.secrets);
     // Diagnostic mode still says which request failed, and how.
     const request = event.request as { method?: string; url?: string; headers?: object };
@@ -40,13 +47,15 @@ describe("a failing request on a diagnostic instance, tracing off (#1880)", () =
   });
 
   it("ships no SAMLResponse from a failing SAML callback", async () => {
-    const { event } = await harness.send(REQUESTS.saml.path, REQUESTS.saml.init);
+    const { event, rawRequests } = await harness.send(REQUESTS.saml.path, REQUESTS.saml.init);
+    expectNothingCollected(rawRequests);
     expectNoSecrets(event, REQUESTS.saml.secrets);
     expect((event.request as { url?: string }).url).toMatch(/\/api\/auth\/saml\/callback$/);
   });
 
   it("ships no file bytes or name from a failing multipart tool upload", async () => {
-    const { event } = await harness.send(REQUESTS.upload.path, REQUESTS.upload.init());
+    const { event, rawRequests } = await harness.send(REQUESTS.upload.path, REQUESTS.upload.init());
+    expectNothingCollected(rawRequests);
     expectNoSecrets(event, REQUESTS.upload.secrets);
     expect((event.request as { url?: string }).url).toMatch(/\/api\/v1\/tools\/image\/resize$/);
     // The earlier requests' http breadcrumbs stay, without their query strings.
