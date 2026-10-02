@@ -5385,6 +5385,8 @@ export const pl: TranslationKeys = {
     noSteps: "Plik Pipeline nie zawiera kroków",
     importFailed: "Import nie powiódł się",
     couldNotRead: "Nie udało się odczytać pliku Pipeline",
+    importListRefreshFailed:
+      "Zaimportowano Pipeline, ale lista zapisanych się nie odświeżyła. Odśwież stronę, aby go zobaczyć.",
     fileCount: "{count} plik",
     fileCountPlural: "{count} plików",
     importFromLibrary: "Importuj z biblioteki",

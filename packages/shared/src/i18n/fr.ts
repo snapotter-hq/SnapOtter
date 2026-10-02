@@ -5403,6 +5403,8 @@ export const fr: TranslationKeys = {
     noSteps: "Le fichier Pipeline n'a aucune étape",
     importFailed: "Échec de l'importation",
     couldNotRead: "Impossible de lire le fichier Pipeline",
+    importListRefreshFailed:
+      "Pipeline importé, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour le voir.",
     fileCount: "{count} fichier",
     fileCountPlural: "{count} fichiers",
     importFromLibrary: "Importer depuis la bibliothèque",

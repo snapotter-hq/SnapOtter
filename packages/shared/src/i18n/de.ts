@@ -5408,6 +5408,8 @@ export const de: TranslationKeys = {
     noSteps: "Pipeline-Datei hat keine Schritte",
     importFailed: "Import fehlgeschlagen",
     couldNotRead: "Pipeline-Datei konnte nicht gelesen werden",
+    importListRefreshFailed:
+      "Pipeline importiert, aber die gespeicherte Liste wurde nicht aktualisiert. Laden Sie die Seite neu, um sie zu sehen.",
     fileCount: "{count} Datei",
     fileCountPlural: "{count} Dateien",
     importFromLibrary: "Aus Bibliothek importieren",
