@@ -60,7 +60,13 @@ export function parseApiError(
  * (#1858): parseApiError's reading of the body, the translated install
  * message for FEATURE_NOT_INSTALLED, or the panel's own `fallback` when the
  * body is not a JSON object or names no reason. Takes `unknown` because the
- * body comes straight from JSON.parse or res.json().
+ * body comes straight from JSON.parse or res.json(); pass null when it did not
+ * parse. A 413 reads as the translated file-too-large message whatever the
+ * body: the API's own 413 and a reverse proxy's HTML body-size page mean the
+ * same thing to the user, as they do in useToolProcessor (#1341, #1916). A
+ * caller on a route whose 413 means something else (the storage quota's
+ * STORAGE_QUOTA_EXCEEDED) handles it before calling this, as review-panel.tsx
+ * does.
  */
 export function failedAnswerMessage(
   t: TranslationKeys,
@@ -69,6 +75,7 @@ export function failedAnswerMessage(
   fallback: string,
   toolName?: string,
 ): string {
+  if (status === 413) return t.errors.fileTooLarge;
   if (!body || typeof body !== "object" || Array.isArray(body)) return fallback;
   const parsed = parseApiError(body as Record<string, unknown>, status, fallback);
   return typeof parsed === "string" ? parsed : featureNotInstalledMessage(t, parsed, toolName);
