@@ -1397,6 +1397,18 @@ jobs:
         with:
           path: /tmp/artifacts
 
+      # CI's required audit only runs when a PR does, so an advisory published
+      # against this unchanged lock would otherwise reach a release that
+      # installs it beside the HuggingFace write token (#1838). The auditor gets
+      # its own venv so its unhashed dependencies stay out of the interpreter
+      # the later release steps run.
+      - name: Audit hash-locked hf CLI lock
+        run: |
+          python -m venv /tmp/pip-audit-venv
+          /tmp/pip-audit-venv/bin/python -m pip install --disable-pip-version-check "pip-audit==2.10.0"
+          /tmp/pip-audit-venv/bin/pip-audit -r docker/hf-release-requirements.txt \
+            --no-deps --disable-pip --aliases
+
       - name: Install hash-locked hf CLI
         run: |
           python -m venv /tmp/hf-release-venv

@@ -701,6 +701,52 @@ describe("OCR v3 bundle release workflow", () => {
     expect(requirements).not.toMatch(/^urllib3==2\.7\.0\b/m);
   });
 
+  it("audits the hf CLI lock at release time before installing it (#1838)", () => {
+    // CI's required audit only runs when a PR does. An advisory published
+    // against an unchanged lock would otherwise reach a release that installs
+    // it next to the HuggingFace write token. Parsed rather than
+    // substring-matched, so `|| true`, `continue-on-error`, an `if:`, a custom
+    // shell, or a reordering can't turn the audit into a no-op while this stays
+    // green.
+    const parsed = load(readRequired(bundlesWorkflowPath)) as {
+      defaults?: unknown;
+      jobs: Record<string, Record<string, unknown> & { steps: Record<string, unknown>[] }>;
+    };
+    const publishJob = parsed.jobs.publish;
+    expect(parsed.defaults).toBeUndefined();
+    expect(publishJob.defaults).toBeUndefined();
+    expect(publishJob["continue-on-error"]).toBeUndefined();
+
+    const steps = publishJob.steps;
+    const indexOf = (name: string) => {
+      const index = steps.findIndex((step) => step.name === name);
+      expect(index, `publish step "${name}" is missing`).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const checkout = indexOf("Check out hash-locked release tooling");
+    const python = indexOf("Set up pinned release Python");
+    const audit = indexOf("Audit hash-locked hf CLI lock");
+    const install = indexOf("Install hash-locked hf CLI");
+    const firstTokenStep = steps.findIndex((step) => JSON.stringify(step).includes("HF_TOKEN"));
+
+    expect(checkout).toBeLessThan(audit);
+    expect(python).toBeLessThan(audit);
+    expect(audit).toBeLessThan(install);
+    expect(firstTokenStep).toBeGreaterThan(install);
+
+    const auditStep = steps[audit];
+    expect(Object.keys(auditStep).sort()).toEqual(["name", "run"]);
+    expect(auditStep.run).toBe(
+      [
+        "python -m venv /tmp/pip-audit-venv",
+        '/tmp/pip-audit-venv/bin/python -m pip install --disable-pip-version-check "pip-audit==2.10.0"',
+        "/tmp/pip-audit-venv/bin/pip-audit -r docker/hf-release-requirements.txt \\",
+        "  --no-deps --disable-pip --aliases",
+        "",
+      ].join("\n"),
+    );
+  });
+
   it("signs one canonical two-target index and verifies it before upload", () => {
     const workflow = readRequired(bundlesWorkflowPath);
     const signJob = job(workflow, "sign-ocr-index", "verify-signed-ocr-index");
