@@ -773,6 +773,8 @@ describe("sign-pdf drops a request the progress stream gave up on", () => {
       stalls.fireLatest();
       expect(useFileStore.getState().processing).toBe(false);
 
+      // A no-op once aborted, as in a browser; the guards themselves are
+      // pinned by the tests below that call the handlers directly.
       xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
 
       expect(xhr.aborted).toBe(true);
@@ -819,6 +821,34 @@ describe("sign-pdf drops a request the progress stream gave up on", () => {
       expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
       expect(entry().status).not.toBe("completed");
       expect(entry().processedUrl).toBeNull();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  // The user retries after the stall. A late 200 from the first run must not
+  // end the second one: without the guard in onload, landResult stays quiet
+  // (the run is settled) but endRun still clears the retry's processing flag.
+  it("leaves a retry running when the stalled run answers late", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const first = await apply();
+      stalls.fireLatest();
+
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      expect(useFileStore.getState().processing).toBe(true);
+
+      act(() => {
+        first.status = 200;
+        first.responseText = JSON.stringify({ downloadUrl: DOWNLOAD_URL });
+        first.onload?.();
+      });
+
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(entry().processedUrl).toBeNull();
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
     } finally {
       stalls.restore();
     }
