@@ -18,6 +18,7 @@
  * Container-free: db, config, and audit are mocked; isDisabledRole is the real
  * function (it is pure).
  */
+import { inspect } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mock state ──────────────────────────────────────────────────
@@ -549,11 +550,14 @@ describe("resolveExternalUser: auto-create username race", () => {
     ).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(UsernameRaceExhaustedError);
-    const raced = err as Error & { cause?: unknown };
-    expect(raced.message).not.toContain(username);
-    expect(String(raced.stack)).not.toContain(username);
-    expect(String(raced.cause ?? "")).not.toContain(username);
-    expect(JSON.stringify(Object.entries(raced))).not.toContain(username);
+    const raced = err as Error;
+    // Pinned exactly, so the externalId (a SAML NameID is usually an email),
+    // the email, or anything else interpolated later fails here too.
+    expect(raced.message).toBe("SSO auto-create lost the username race on every retry");
+    // Every property, hidden or not, the stack, and any cause chain.
+    expect(inspect(raced, { showHidden: true, depth: Number.POSITIVE_INFINITY })).not.toContain(
+      username,
+    );
     // A constant, authored message: the scrubber sends SafeError text as is.
     expect(isSafeMessageError(raced)).toBe(true);
 

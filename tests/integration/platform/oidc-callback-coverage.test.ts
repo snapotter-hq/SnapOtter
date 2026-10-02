@@ -46,6 +46,7 @@
  * assertions.
  */
 import { createServer, type Server, type ServerResponse } from "node:http";
+import { inspect } from "node:util";
 import { sign } from "@fastify/cookie";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -126,10 +127,10 @@ function signState(state: string): string {
  * and the diagnostic (raw message) path, must not mention the username.
  */
 function expectNoUsernameInSentryView(reported: unknown, username: string): void {
-  const err = reported as Error & { cause?: unknown };
-  expect(err.message).not.toContain(username);
-  expect(String(err.cause ?? "")).not.toContain(username);
-  expect(JSON.stringify(Object.entries(err))).not.toContain(username);
+  const err = reported as Error;
+  expect(inspect(err, { showHidden: true, depth: Number.POSITIVE_INFINITY })).not.toContain(
+    username,
+  );
   for (const diagnostic of [false, true]) {
     const event = { exception: { values: [{ type: err.name, value: err.message }] } };
     const sent = buildBeforeSend(() => true, diagnostic)(event, { originalException: err });
@@ -1015,8 +1016,11 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     // The real reportError drops "expected" errors, which would make this
     // report a no-op.
     expect(classifyError(raceErr, "http")).not.toBe("expected");
-    // The report carries no username anywhere: not in the error, not in what
-    // beforeSend leaves of it (#1866). The audit row above keeps it instead.
+    // The exact-context match above already rules out a username riding along
+    // in the report context. This guards the callback against wrapping or
+    // annotating the error with it on the way out (#1866); the error's own
+    // contents are pinned at the real throw site in
+    // tests/unit/api/external-auth-resolver-mutation.test.ts.
     expectNoUsernameInSentryView(reportErrorSpy.mock.calls[0][0], "raced");
   });
 

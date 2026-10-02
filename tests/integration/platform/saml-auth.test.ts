@@ -11,6 +11,7 @@
  * tests (#978) use to make one call throw.
  */
 import { randomUUID } from "node:crypto";
+import { inspect } from "node:util";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
@@ -339,8 +340,11 @@ describe("SAML callback", () => {
     const attemptedUsername = email.split("@")[0];
     expect(auditRows[0].details).toMatchObject({ attemptedUsername });
 
-    // Reported once with route-level context only, and the username the IdP
-    // supplied appears nowhere in it, nor in what beforeSend keeps (#1866).
+    // Reported once, the error passed through untouched, with route-level
+    // context only: the exact match rules out a username in the context. The
+    // rest guards the callback against wrapping or annotating the error with
+    // the username on the way out (#1866); the error's own contents are pinned
+    // at the real throw site in tests/unit/api/external-auth-resolver-mutation.test.ts.
     expect(reportErrorSpy).toHaveBeenCalledTimes(1);
     expect(reportErrorSpy).toHaveBeenCalledWith(raceErr, {
       source: "http",
@@ -348,10 +352,10 @@ describe("SAML callback", () => {
       method: "POST",
       subsystem: "external-auth",
     });
-    const reported = reportErrorSpy.mock.calls[0][0] as Error & { cause?: unknown };
-    expect(reported.message).not.toContain(attemptedUsername);
-    expect(String(reported.cause ?? "")).not.toContain(attemptedUsername);
-    expect(JSON.stringify(Object.entries(reported))).not.toContain(attemptedUsername);
+    const reported = reportErrorSpy.mock.calls[0][0] as Error;
+    expect(inspect(reported, { showHidden: true, depth: Number.POSITIVE_INFINITY })).not.toContain(
+      attemptedUsername,
+    );
     for (const diagnostic of [false, true]) {
       const event = { exception: { values: [{ type: reported.name, value: reported.message }] } };
       const sent = buildBeforeSend(() => true, diagnostic)(event, { originalException: reported });
