@@ -13,6 +13,8 @@ export type RunEndFailure =
   | "Failing a pipeline run's entries failed"
   | "Ending a sync tool run after a result handling error failed"
   | "Ending a pipeline run after a result handling error failed"
+  | "Ending a tool run after its start failed"
+  | "Ending a pipeline run after its start failed"
   | "Ending an Erase Object batch after a store error failed";
 
 /**

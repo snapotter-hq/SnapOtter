@@ -1948,3 +1948,193 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
     unmount();
   });
 });
+
+/**
+ * #1821: a store write that throws while a pipeline run starts, before any
+ * XHR handler exists, has no exit to end the run. The kickoff must end it
+ * itself: processing off, the job and its cancel handle released, the
+ * elapsed ticker and the stream stopped, and every entry it reset failed
+ * with a client-side message. The throw still reaches the caller, and
+ * through it Sentry's global handler, so it isn't reported a second time.
+ */
+describe("usePipelineProcessor ends a run whose start throws (#1821)", () => {
+  const START_FAILURE = "Something went wrong while tracking this job. Try again.";
+  const START_TEARDOWN_REPORT = "Ending a pipeline run after its start failed";
+  // JSON.stringify throws on a BigInt, after the ticker and the stream have
+  // both started.
+  const UNSERIALIZABLE_STEPS = [
+    { id: "s1", toolId: "resize", settings: { width: 50n } },
+  ] as unknown as PipelineStep[];
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let unsubscribe: (() => void) | null = null;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchSpy = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = null;
+    consoleError.mockRestore();
+  });
+
+  function photoFiles(count: number) {
+    return Array.from(
+      { length: count },
+      (_, i) => new File([new ArrayBuffer(16)], `photo-${i}.png`, { type: "image/png" }),
+    );
+  }
+
+  // Throws once, from the write that turns processing on.
+  function breakProcessingOn() {
+    unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (!prev.processing && state.processing) throw new Error("kickoff broke");
+    });
+  }
+
+  function expectRunEnded(entryCount: number) {
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe(START_FAILURE);
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    for (let i = 0; i < entryCount; i++) {
+      expect(state.entries[i]).toMatchObject({ status: "failed", error: START_FAILURE });
+    }
+  }
+
+  async function expectJobReleased(cancel: () => Promise<void>) {
+    await act(async () => {
+      await cancel();
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  }
+
+  it("fails the entry when turning processing on throws", async () => {
+    const [file] = photoFiles(1);
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    breakProcessingOn();
+
+    expect(() => act(() => result.current.processSingle(file, STEPS))).toThrow("kickoff broke");
+    act(() => {});
+
+    expectRunEnded(1);
+    expect(result.current.progress.phase).toBe("idle");
+    expect(vi.getTimerCount()).toBe(0);
+    expect(xhrs).toHaveLength(0);
+    // The rethrow is the report; nothing else goes to Sentry.
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    await expectJobReleased(result.current.cancelCurrentJob);
+    unmount();
+  });
+
+  it("stops the ticker and the stream when the steps do not serialize", async () => {
+    const [file] = photoFiles(1);
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+
+    expect(() => act(() => result.current.processSingle(file, UNSERIALIZABLE_STEPS))).toThrow(
+      TypeError,
+    );
+    act(() => {});
+
+    expectRunEnded(1);
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(result.current.progress).toMatchObject({ phase: "idle", elapsed: 0 });
+    expect(xhrs).toHaveLength(0);
+    await expectJobReleased(result.current.cancelCurrentJob);
+    unmount();
+  });
+
+  it("rethrows the root cause and reports a teardown that throws too, once", () => {
+    const [file] = photoFiles(1);
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    // The store breaks for good on the write that turns processing on, with
+    // the entry already at "processing". Zustand commits each write before
+    // its listeners run, so every later write lands and its listener throws.
+    let broken = false;
+    unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (broken) throw new Error("store broke");
+      if (!prev.processing && state.processing) {
+        broken = true;
+        throw new Error("root cause");
+      }
+    });
+
+    expect(() => act(() => result.current.processSingle(file, STEPS))).toThrow("root cause");
+    unsubscribe();
+    unsubscribe = null;
+
+    expectRunEnded(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      "Ending the run failed",
+      expect.objectContaining({ message: "store broke" }),
+    );
+    expectReportedOnce(START_TEARDOWN_REPORT);
+    expectReportedOnce(PIPELINE_SETTLE_REPORT);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it("fails every entry of a batch when turning processing on throws", async () => {
+    const files = photoFiles(2);
+    useFileStore.getState().setFiles(files);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    breakProcessingOn();
+
+    // Caught inside act: an act whose callback rejects leaves the next
+    // test's render uncommitted.
+    let thrown: unknown;
+    await act(async () => {
+      await result.current.processAll(files, STEPS).catch((err: unknown) => {
+        thrown = err;
+      });
+    });
+    expect(() => {
+      throw thrown;
+    }).toThrow("kickoff broke");
+
+    expectRunEnded(2);
+    expect(result.current.progress.phase).toBe("idle");
+    expect(vi.getTimerCount()).toBe(0);
+    expect(xhrs).toHaveLength(0);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    await expectJobReleased(result.current.cancelCurrentJob);
+    unmount();
+  });
+
+  it("stops a batch's stream when its steps do not serialize", async () => {
+    const files = photoFiles(2);
+    useFileStore.getState().setFiles(files);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+
+    // Caught inside act: an act whose callback rejects leaves the next
+    // test's render uncommitted.
+    let thrown: unknown;
+    await act(async () => {
+      await result.current.processAll(files, UNSERIALIZABLE_STEPS).catch((err: unknown) => {
+        thrown = err;
+      });
+    });
+    expect(() => {
+      throw thrown;
+    }).toThrow(TypeError);
+
+    expectRunEnded(2);
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(xhrs).toHaveLength(0);
+    await expectJobReleased(result.current.cancelCurrentJob);
+    unmount();
+  });
+});
