@@ -224,7 +224,14 @@ export async function reportError(err: unknown, ctx: ReportContext): Promise<voi
       if (ctx.jobId) scope.setTag("job_id", ctx.jobId);
       const jobAge = jobAgeBucket(ctx.jobAgeMs);
       if (jobAge) scope.setTag("job_age", jobAge);
-      if (net) {
+      // An operational SafeError that names its own fault (OIDC_DISCOVERY_FAILED,
+      // storage-unavailable, ...) groups under that code even when a network
+      // failure sits underneath. Otherwise "SSO is down" shares one issue with
+      // every other outbound outage, and resolving that issue mutes it (#1907).
+      // extractErrorCode returns a non-bug SafeError's own code (1 to 40 chars)
+      // ahead of the chain, so `code === err.code` means it has a usable one.
+      const ownCode = cls === "operational" && isSafeMessageError(err) && code === err.code;
+      if (net && !ownCode) {
         scope.setFingerprint(["connectivity", net]);
       } else if (cls === "operational") {
         // Collapse an operational class (bad DB creds, full disk, ...) into a

@@ -151,20 +151,112 @@ describe("capture path", () => {
     expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
   });
 
-  it("keeps the connectivity fingerprint for a SafeError that wraps a network failure", async () => {
-    // Connectivity is decided from the whole chain, ahead of the per-code
-    // operational fingerprint, so one outage stays one issue even though the
-    // tag now carries the SafeError's own code.
+  it("groups a coded SafeError wrapping a network failure by its own code, not the shared connectivity issue (#1907)", async () => {
+    // OIDC discovery against an IdP that refuses the connection: openid-client
+    // throws undici's "fetch failed" TypeError with the ECONNREFUSED below it.
+    const refused = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:9"), {
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    });
+    const notFound = Object.assign(new Error("unexpected HTTP response status code"), {
+      name: "ResponseBodyError",
+      status: 404,
+    });
+    const discoveryFault = (cause: unknown) =>
+      new SafeError("OIDC discovery failed", { code: "OIDC_DISCOVERY_FAILED", cause });
+
+    await reportError(discoveryFault(refused), { source: "http", subsystem: "oidc-login" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "OIDC_DISCOVERY_FAILED",
+    ]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "OIDC_DISCOVERY_FAILED");
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+
+    // The same code over a 404 lands in the same issue.
+    resetThrottleForTests();
+    vi.clearAllMocks();
+    await reportError(discoveryFault(notFound), { source: "http", subsystem: "oidc-login" });
+    expect(h.scope.setFingerprint).toHaveBeenCalledTimes(1);
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "OIDC_DISCOVERY_FAILED",
+    ]);
+  });
+
+  it("a coded SafeError wrapping a lost database connection also groups by its own code (#1907)", async () => {
+    const err = new SafeError("Could not discard a staged upload", {
+      kind: "operational",
+      code: "STAGED_DISCARD_FAILED",
+      cause: Object.assign(new Error("Failed query: delete"), {
+        cause: Object.assign(new Error("57P01"), { code: "57P01" }),
+      }),
+    });
+    await reportError(err, { source: "http", subsystem: "upload-storage" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "STAGED_DISCARD_FAILED",
+    ]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "STAGED_DISCARD_FAILED");
+  });
+
+  it("a marker-copied SafeError with a code groups by that code over a network failure (#1907)", async () => {
+    // Copied across a module boundary: the marker survives, kind does not.
+    const err = Object.assign(new Error("OIDC discovery failed"), {
+      isSafeMessage: true,
+      code: "OIDC_DISCOVERY_FAILED",
+      cause: Object.assign(new Error("getaddrinfo ENOTFOUND idp.example"), { code: "ENOTFOUND" }),
+    });
+    await reportError(err, { source: "http", subsystem: "oidc-login" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith([
+      "operational",
+      "OIDC_DISCOVERY_FAILED",
+    ]);
+  });
+
+  it("keeps the connectivity fingerprint when a SafeError's own code is too long to tag", async () => {
+    // extractErrorCode drops a code over 40 characters and tags the errno
+    // instead, so there is no own code to group on.
     const err = new SafeError("upstream down", {
       kind: "operational",
-      code: "some-op",
+      code: "X".repeat(41),
       cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
         code: "ECONNREFUSED",
       }),
     });
     await reportError(err, { source: "worker", pool: "image" });
     expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
-    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "some-op");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "ECONNREFUSED");
+  });
+
+  it("keeps the connectivity fingerprint for a SafeError with no code of its own", async () => {
+    // With no authored code there is nothing better to group on than the
+    // outage itself.
+    const err = new SafeError("upstream down", {
+      kind: "operational",
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "ECONNREFUSED");
+  });
+
+  it("keeps the connectivity fingerprint for a bug-kind SafeError that wraps a network failure", async () => {
+    // A bug-kind code is settings-derived (an output format), not a fault
+    // name, so this change leaves its grouping as it was.
+    const err = new SafeError("Image conversion failed", {
+      kind: "bug",
+      code: "png",
+      cause: Object.assign(new Error("connect ECONNREFUSED 10.0.0.1:443"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
   });
 
   it("reports an undici connect timeout as a connectivity warning, not a bug (#1908)", async () => {
