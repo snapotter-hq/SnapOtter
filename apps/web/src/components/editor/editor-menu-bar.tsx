@@ -3,6 +3,7 @@
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { copyMergedToClipboard } from "@/components/editor/copy-merged";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { hotkeysModIsMeta } from "@/lib/platform";
@@ -161,7 +162,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           id: "copy-merged",
           label: m.edit.copyMerged,
           shortcut: hint("mod+Shift+C"),
-          action: copyObjects,
+          action: () => void copyMergedToClipboard(t.editor.ui.exportDialog.copyFailed),
         },
         { id: "paste", label: m.edit.paste, shortcut: hint("mod+V"), action: pasteObjects },
         {

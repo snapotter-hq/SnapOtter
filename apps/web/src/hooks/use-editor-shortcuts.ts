@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { editorStageRefHolder } from "@/components/editor/editor-canvas";
+import { copyMergedToClipboard } from "@/components/editor/copy-merged";
 import { polygonalLassoRefHolder } from "@/components/editor/tools/selection-tool";
-import { copyImageToClipboard } from "@/lib/utils";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 
@@ -72,6 +72,7 @@ export function useEditorShortcuts(callbacks?: {
 }) {
   const previousToolRef = useRef<ToolType | null>(null);
   const isSpaceHeldRef = useRef(false);
+  const copyFailedMessage = useTranslation().t.editor.ui.exportDialog.copyFailed;
 
   // ---- Tool shortcuts (single key, disabled when input focused) ----
 
@@ -461,32 +462,15 @@ export function useEditorShortcuts(callbacks?: {
     { preventDefault: false },
   );
 
-  // Ctrl+Shift+C / Cmd+Shift+C - Copy merged (use Konva stage ref for proper composite)
+  // Ctrl+Shift+C / Cmd+Shift+C - Copy merged
   useHotkeys(
     "mod+shift+c",
     (e) => {
       e.preventDefault();
-      const stage = editorStageRefHolder.current;
-      if (!stage) return;
-      const { canvasSize } = useEditorStore.getState();
-      const dataUrl = stage.toDataURL({
-        pixelRatio: 1,
-        mimeType: "image/png",
-        x: 0,
-        y: 0,
-        width: canvasSize.width,
-        height: canvasSize.height,
-      });
-      fetch(dataUrl)
-        .then((res) => res.blob())
-        // copyImageToClipboard resolves false (never throws) when the
-        // Clipboard API is unavailable, e.g. on plain-http installs.
-        .then((blob) => copyImageToClipboard(blob))
-        .catch(() => {
-          // Export failed silently
-        });
+      void copyMergedToClipboard(copyFailedMessage);
     },
     { preventDefault: true },
+    [copyFailedMessage],
   );
 
   // Ctrl+Shift+V / Cmd+Shift+V - Paste in place
