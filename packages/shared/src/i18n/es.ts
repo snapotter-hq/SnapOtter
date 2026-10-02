@@ -1975,9 +1975,9 @@ export const es: TranslationKeys = {
       clear: "Limpiar",
       outputFormat: "Formato de salida",
       quality: "Calidad",
-      paintHint: "Pinta sobre los objetos que quieras eliminar. Usa Ctrl+Z para deshacer.",
+      paintHint: "Pinta sobre los objetos que quieras eliminar. Usa {shortcut} para deshacer.",
       lassoHint:
-        "Dibuja un lazo alrededor del objeto que quieras eliminar. Usa Ctrl+Z para deshacer.",
+        "Dibuja un lazo alrededor del objeto que quieras eliminar. Usa {shortcut} para deshacer.",
       submit: "Borrar objeto",
       submitBatch: "Borrar todos ({count})",
       progressLabel: "Borrando objeto",
