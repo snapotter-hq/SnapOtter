@@ -27,7 +27,9 @@
  *     log the user out but reach reportError (#1514). A cold discovery cache
  *     (an API restart, or a second replica) must discover on demand rather
  *     than skip the IdP logout, and a failed or slow discovery there must be
- *     reported while the local logout still goes through (#1787).
+ *     reported while the local logout still goes through (#1787). An
+ *     end_session_endpoint that already has a query string (Azure AD B2C's
+ *     `?p=`) keeps it, with our two parameters set on it (#1788).
  *
  * Like oidc-mfa-callback.test.ts, the cryptographic token exchange is mocked
  * at the `openid-client` boundary (only `authorizationCodeGrant`; discovery,
@@ -260,6 +262,30 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         );
         return;
       }
+      // Providers whose end_session_endpoint already carries a query (#1788):
+      // Azure AD B2C names the user flow in `p`, and /stale advertises the
+      // two parameters the logout route sets itself.
+      const queryIssuer = req.url?.match(
+        /^\/(b2c|stale)\/\.well-known\/openid-configuration$/,
+      )?.[1];
+      if (queryIssuer) {
+        const query =
+          queryIssuer === "b2c"
+            ? "p=B2C_1_signin"
+            : "p=B2C_1_signin&post_logout_redirect_uri=https%3A%2F%2Fold.example%2F&id_token_hint=stale-hint&id_token_hint=again";
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            issuer: `http://localhost:${mockPort}/${queryIssuer}`,
+            authorization_endpoint: `http://localhost:${mockPort}/authorize`,
+            token_endpoint: `http://localhost:${mockPort}/token`,
+            jwks_uri: `http://localhost:${mockPort}/jwks`,
+            response_types_supported: ["code"],
+            end_session_endpoint: `http://localhost:${mockPort}/${queryIssuer}/logout?${query}`,
+          }),
+        );
+        return;
+      }
       if (req.url === "/.well-known/openid-configuration") {
         discoveryRequests++;
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -439,6 +465,11 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(logoutUrl.searchParams.get("id_token_hint")).toBe("fake-id-token");
       expect(logoutUrl.searchParams.get("post_logout_redirect_uri")).toBe(
         `http://localhost:9999${basePath}/login`,
+      );
+      // The whole string, so a change in how the URL is built (#1788) can't
+      // reorder or re-encode it unnoticed.
+      expect(body.logoutUrl).toBe(
+        `http://localhost:${mockPort}/logout?id_token_hint=fake-id-token&post_logout_redirect_uri=${encodeURIComponent(`http://localhost:9999${basePath}/login`)}`,
       );
       expect(res.cookies.find((c) => c.name === "snapotter-session")).toMatchObject({
         path: `${basePath}/`,
@@ -661,6 +692,81 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
       // This discovery succeeded, so the cache now holds the /noend document.
       oidcModule.resetOidcDiscoveryCacheForTests();
+    }
+  });
+
+  // Log out against an issuer whose end_session_endpoint already carries a
+  // query string, discovered on a cold cache like a fresh restart would.
+  async function logoutAgainstIssuer(issuerPath: string) {
+    const sessionToken = await oidcSessionWithWarmCache();
+    oidcModule.resetOidcDiscoveryCacheForTests();
+    (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}${issuerPath}`;
+    try {
+      const res = await logoutWithSession(sessionToken);
+      expect(res.statusCode).toBe(200);
+      await expectSessionGone(sessionToken);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      return res.json() as { ok: boolean; logoutUrl?: string };
+    } finally {
+      (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+      // This discovery succeeded, so the cache now holds that issuer's document.
+      oidcModule.resetOidcDiscoveryCacheForTests();
+    }
+  }
+
+  // Azure AD B2C advertises its logout endpoint with the user flow in `p`.
+  // Appending "?..." to that gave "?p=B2C_1_signin?id_token_hint=...", which
+  // folds the hint into `p` and the IdP rejects the logout (#1788).
+  it("appends to an end_session_endpoint that already has a query string (#1788)", async () => {
+    const body = await logoutAgainstIssuer("/b2c");
+
+    expect(body.logoutUrl).toBe(
+      `http://localhost:${mockPort}/b2c/logout?p=B2C_1_signin&id_token_hint=fake-id-token&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Flogin`,
+    );
+    const logoutUrl = new URL(body.logoutUrl ?? "");
+    expect(logoutUrl.searchParams.get("p")).toBe("B2C_1_signin");
+    expect(logoutUrl.searchParams.get("id_token_hint")).toBe("fake-id-token");
+  });
+
+  // The hint has to be this session's token and the redirect this deployment's
+  // login page, so values the endpoint already carries are replaced, never
+  // sent alongside ours for the IdP to pick between (#1788).
+  it("replaces id_token_hint and post_logout_redirect_uri the endpoint already carries (#1788)", async () => {
+    const body = await logoutAgainstIssuer("/stale");
+
+    expect(body.logoutUrl).toBe(
+      `http://localhost:${mockPort}/stale/logout?p=B2C_1_signin&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Flogin&id_token_hint=fake-id-token`,
+    );
+    const logoutUrl = new URL(body.logoutUrl ?? "");
+    expect(logoutUrl.searchParams.getAll("id_token_hint")).toEqual(["fake-id-token"]);
+    expect(logoutUrl.searchParams.getAll("post_logout_redirect_uri")).toEqual([
+      "http://localhost:9999/login",
+    ]);
+  });
+
+  // An endpoint that isn't a URL used to be glued into a broken redirect and
+  // returned without a trace. Now it's a fault like any other: local logout,
+  // no logoutUrl, and a report (#1788).
+  it("logs out locally and reports when the end_session_endpoint is not a valid URL (#1788)", async () => {
+    const sessionToken = await oidcSessionWithWarmCache();
+    const spy = vi
+      .spyOn(oidcModule, "getOidcEndSessionEndpoint")
+      .mockResolvedValue("not a url?p=B2C_1_signin");
+    try {
+      const res = await logoutWithSession(sessionToken);
+
+      await expectLoggedOutLocally(res, sessionToken);
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      const [err, ctx] = reportErrorSpy.mock.calls[0];
+      expect(err).toBeInstanceOf(TypeError);
+      expect(ctx).toEqual({
+        source: "http",
+        route: "/api/auth/logout",
+        method: "POST",
+        subsystem: "oidc-logout",
+      });
+    } finally {
+      spy.mockRestore();
     }
   });
 

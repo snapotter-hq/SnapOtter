@@ -705,11 +705,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           const { getOidcEndSessionEndpoint } = await import("./oidc.js");
           const endSessionEndpoint = await getOidcEndSessionEndpoint();
           if (endSessionEndpoint) {
-            const params = new URLSearchParams({
-              id_token_hint: session.idToken,
-              post_logout_redirect_uri: `${env.EXTERNAL_URL}/login`,
-            });
-            logoutUrl = `${endSessionEndpoint}?${params.toString()}`;
+            // Set on the parsed URL rather than appending "?...": some IdPs
+            // advertise the endpoint with a query already on it (Azure AD
+            // B2C's `?p=<user flow>`), which has to survive. set() also
+            // replaces any copy of our two parameters the endpoint carries.
+            // An endpoint that isn't a URL throws into the catch below (#1788).
+            const url = new URL(endSessionEndpoint);
+            url.searchParams.set("id_token_hint", session.idToken);
+            url.searchParams.set("post_logout_redirect_uri", `${env.EXTERNAL_URL}/login`);
+            logoutUrl = url.toString();
           }
         } catch (err) {
           request.log.error(
