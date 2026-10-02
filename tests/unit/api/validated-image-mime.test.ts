@@ -84,7 +84,7 @@ describe("validatedImageMime on what validateImageBuffer() found by name", () =>
     },
   );
 
-  it("gives a gzip stream named .svgz no type, since nothing has looked inside it", async () => {
+  it("gives a gzip stream named .svgz no type when no SVG inflates out of it", async () => {
     const gzip = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03]);
     expect(await mimeFor(gzip, "drawing.svgz")).toBeNull();
   });

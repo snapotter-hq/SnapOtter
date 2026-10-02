@@ -192,6 +192,9 @@ const SVG_PROLOG_DOCTYPE = new RegExp(`^${DOCTYPE_SOURCE}\\s*`, "i");
 // (`<svg:svg>`); the trailing `[\s/>]` stops it matching `<svgfoo>`.
 const SVG_ROOT_ELEMENT = /^<(?:[A-Za-z_][\w.-]*:)?svg[\s/>]/i;
 
+/** How far into a buffer isSvgBuffer() looks for the root element. */
+export const SVG_SNIFF_BYTES = 4096;
+
 /**
  * Check whether a buffer looks like SVG content.
  *
@@ -202,7 +205,7 @@ const SVG_ROOT_ELEMENT = /^<(?:[A-Za-z_][\w.-]*:)?svg[\s/>]/i;
  * DOCTYPE and misfire on an HTML document that merely embeds an inline `<svg>`.
  */
 export function isSvgBuffer(buffer: Buffer): boolean {
-  let head = buffer.subarray(0, 4096).toString("utf-8").trim();
+  let head = buffer.subarray(0, SVG_SNIFF_BYTES).toString("utf-8").trim();
   let prev: string;
   do {
     prev = head;

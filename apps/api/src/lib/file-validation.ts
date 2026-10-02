@@ -1,8 +1,9 @@
+import { createGunzip } from "node:zlib";
 import { extToMime, formatToMime } from "@snapotter/image-engine";
 import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../config.js";
-import { isSvgBuffer } from "./svg-sanitize.js";
+import { isSvgBuffer, SVG_SNIFF_BYTES } from "./svg-sanitize.js";
 
 /** Formats we accept as input. */
 export const SUPPORTED_INPUT_FORMATS: ReadonlySet<string> = new Set([
@@ -64,6 +65,13 @@ const MAGIC_BYTES: MagicEntry[] = [
   { bytes: [0x46, 0x4f, 0x56, 0x62], offset: 0, format: "raw" },
   // Minolta MRW: "\x00MRM" at offset 0
   { bytes: [0x00, 0x4d, 0x52, 0x4d], offset: 0, format: "raw" },
+  // Olympus ORF: a TIFF with its own magic, "IIRO" on most bodies, "IIRS" on
+  // some compacts, "MMOR" on the big-endian E-10 and E-20
+  { bytes: [0x49, 0x49, 0x52, 0x4f], offset: 0, format: "raw" },
+  { bytes: [0x49, 0x49, 0x52, 0x53], offset: 0, format: "raw" },
+  { bytes: [0x4d, 0x4d, 0x4f, 0x52], offset: 0, format: "raw" },
+  // Panasonic RW2 and RAW, Leica RWL: "IIU\x00"
+  { bytes: [0x49, 0x49, 0x55, 0x00], offset: 0, format: "raw" },
   // JXL ISOBMFF container
   { bytes: [0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20], offset: 0, format: "jxl" },
   // JXL raw codestream
@@ -74,7 +82,7 @@ const MAGIC_BYTES: MagicEntry[] = [
   { bytes: [0x38, 0x42, 0x50, 0x53], offset: 0, format: "psd" },
   // OpenEXR
   { bytes: [0x76, 0x2f, 0x31, 0x01], offset: 0, format: "exr" },
-  // TGA has no reliable magic bytes — detected by extension only
+  // TGA has no magic bytes: isTgaBuffer() checks its header for a .tga name
   // JPEG 2000 JP2 box signature (NOT ISOBMFF)
   {
     bytes: [0x00, 0x00, 0x00, 0x0c, 0x6a, 0x50, 0x20, 0x20, 0x0d, 0x0a, 0x87, 0x0a],
@@ -125,10 +133,11 @@ export interface ValidationResult {
   height: number;
   /**
    * True when the format came from the filename alone, with nothing in the
-   * bytes to back it and no decode: TGA, a camera RAW without a signature the
-   * table knows (RW2, ORF, PEF, ...), and SVGZ. Such a result is accepted for
-   * processing, where the decoder has the final say, but it is no evidence the
-   * bytes are an image.
+   * bytes to back it and no decode: a .tga whose header and pixel data don't
+   * hold together, a camera RAW extension on bytes with no signature the table
+   * knows, and a gzip stream named .svgz that doesn't inflate to an SVG. Such
+   * a result is accepted for processing, where the decoder has the final say,
+   * but it is no evidence the bytes are an image.
    */
   nameOnly?: true;
 }
@@ -215,7 +224,7 @@ export function validatedImageMime(validation: ValidationResult, filename?: stri
  *
  * @param buffer - The image file buffer
  * @param filename - Optional original filename, used for extension-based
- *   format detection (Camera RAW, TGA)
+ *   format detection (Camera RAW, TGA, SVGZ)
  */
 export async function validateImageBuffer(
   buffer: Buffer,
@@ -244,19 +253,24 @@ export async function validateImageBuffer(
     detectedFormat = "raw";
   }
 
-  // TGA has no magic bytes and its header can match other formats (e.g. CUR)
+  // TGA has no magic bytes, and an uncompressed true-colour header starts
+  // like CUR's signature, so the .tga name picks the reading. A .tga is
+  // accepted either way; only a header that holds together counts as proof.
   let nameOnly = false;
   if (ext === "tga") {
     detectedFormat = "tga";
-    nameOnly = true;
+    nameOnly = !isTgaBuffer(buffer);
   }
 
-  // SVGZ: gzip-compressed SVG, detected by extension + gzip magic.
-  // Return early because Sharp cannot read compressed SVGZ directly;
-  // decompression happens later in the route pipeline.
+  // SVGZ: gzip-compressed SVG, detected by extension + gzip magic, proven by
+  // inflating just enough to find the <svg> root. Return early because Sharp
+  // cannot read compressed SVGZ directly; decompression happens later in the
+  // route pipeline.
   if (!detectedFormat && ext === "svgz") {
     if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
-      return { valid: true, format: "svg", width: 0, height: 0, nameOnly: true };
+      return isSvgBuffer(await gunzipHead(buffer, SVG_SNIFF_BYTES))
+        ? { valid: true, format: "svg", width: 0, height: 0 }
+        : { valid: true, format: "svg", width: 0, height: 0, nameOnly: true };
     }
   }
 
@@ -265,9 +279,8 @@ export async function validateImageBuffer(
     detectedFormat = "png";
   }
 
-  // RAW formats with non-TIFF magic bytes (Panasonic RW2, some Olympus ORF,
-  // Pentax PEF, etc.) are not caught by MAGIC_BYTES.  Fall back to
-  // extension-based detection for known Camera RAW extensions.
+  // A RAW extension on bytes with no signature MAGIC_BYTES knows. Accepted for
+  // the decoder to try, but on the name alone.
   if (!detectedFormat && ext && isRawExtension(ext)) {
     detectedFormat = "raw";
     nameOnly = true;
@@ -398,4 +411,104 @@ function detectHdrText(buffer: Buffer): string | null {
     return "hdr";
   }
   return null;
+}
+const TGA_HEADER_BYTES = 18;
+
+/** Legal pixel depths per TGA image type, by the type's low three bits. */
+const TGA_PIXEL_DEPTHS: Readonly<Record<number, readonly number[]>> = {
+  1: [8, 16], // colour-mapped (indices)
+  2: [15, 16, 24, 32], // true-colour
+  3: [8, 16], // grayscale
+};
+const TGA_IMAGE_TYPES = new Set([1, 2, 3, 9, 10, 11]); // +8 is the RLE variant
+const TGA_COLOR_MAP_DEPTHS = new Set([15, 16, 24, 32]);
+
+/**
+ * Whether the bytes are a TGA: every header field holds a value the format
+ * allows, and the pixel data that follows fills width x height (walking the
+ * packets of an RLE image). TGA has no magic number, so that structure is
+ * the only evidence there is; text and other binaries fail it in the first
+ * few bytes.
+ *
+ * The TGA 2.0 footer ("TRUEVISION-XFILE.") isn't consulted. It is optional,
+ * so most writers (ImageMagick among them) leave it off and requiring it
+ * would leave real files untyped, and on its own it is 18 bytes anyone can
+ * append to anything. A file that carries one passes or fails on its header
+ * like any other: the footer sits after the pixel data, which only has to
+ * fit, not end the file.
+ */
+function isTgaBuffer(buffer: Buffer): boolean {
+  if (buffer.length < TGA_HEADER_BYTES) return false;
+  const idLength = buffer[0];
+  const colorMapType = buffer[1];
+  const imageType = buffer[2];
+  const colorMapLength = buffer.readUInt16LE(5);
+  const colorMapDepth = buffer[7];
+  const width = buffer.readUInt16LE(12);
+  const height = buffer.readUInt16LE(14);
+  const pixelDepth = buffer[16];
+  const descriptor = buffer[17];
+
+  if (!TGA_IMAGE_TYPES.has(imageType)) return false;
+  const isColorMapped = (imageType & 0b111) === 1;
+  if (colorMapType > 1 || (isColorMapped && colorMapType !== 1)) return false;
+  if (colorMapType === 1 && (colorMapLength === 0 || !TGA_COLOR_MAP_DEPTHS.has(colorMapDepth))) {
+    return false;
+  }
+  if (width === 0 || height === 0) return false;
+  if (!TGA_PIXEL_DEPTHS[imageType & 0b111].includes(pixelDepth)) return false;
+  // Bits 6-7 of the image descriptor are reserved and must be zero.
+  if (descriptor & 0b1100_0000) return false;
+
+  const colorMapBytes = colorMapType === 1 ? colorMapLength * Math.ceil(colorMapDepth / 8) : 0;
+  const dataStart = TGA_HEADER_BYTES + idLength + colorMapBytes;
+  const bytesPerPixel = Math.ceil(pixelDepth / 8);
+  const pixels = width * height;
+
+  if (imageType < 8) return buffer.length >= dataStart + pixels * bytesPerPixel;
+
+  // RLE: each packet is a header byte (high bit set: one pixel repeated; clear:
+  // that many literal pixels) and its pixel bytes. Every packet moves at least
+  // two bytes on, so the walk is bounded by the buffer, not by width x height.
+  let offset = dataStart;
+  let remaining = pixels;
+  while (remaining > 0) {
+    if (offset >= buffer.length) return false;
+    const packet = buffer[offset];
+    const count = (packet & 0x7f) + 1;
+    offset += 1 + (packet & 0x80 ? bytesPerPixel : count * bytesPerPixel);
+    remaining -= count;
+  }
+  return offset <= buffer.length;
+}
+
+/**
+ * Inflate the start of a gzip stream, at most `limit` bytes of it, and stop.
+ * Inflating the whole thing to look at its first few KB is what a
+ * decompression bomb counts on; this never holds more than `limit` plus one
+ * zlib output chunk.
+ *
+ * A stream that is corrupt or cut short yields what inflated before the
+ * fault, possibly nothing. That isn't an error to report: the caller only
+ * wants to know whether the bytes prove a format, and too little output just
+ * means they don't.
+ */
+function gunzipHead(buffer: Buffer, limit: number): Promise<Buffer> {
+  return new Promise((resolve) => {
+    const gunzip = createGunzip();
+    const chunks: Buffer[] = [];
+    let inflated = 0;
+    const finish = () => {
+      gunzip.destroy();
+      resolve(Buffer.concat(chunks, Math.min(inflated, limit)));
+    };
+    gunzip.on("data", (chunk: Buffer) => {
+      chunks.push(chunk);
+      inflated += chunk.length;
+      if (inflated >= limit) finish();
+    });
+    gunzip.on("end", finish);
+    gunzip.on("error", finish);
+    gunzip.end(buffer);
+  });
 }
