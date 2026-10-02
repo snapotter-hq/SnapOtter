@@ -323,6 +323,18 @@ describe("collage: a malformed sync answer apart from our own store write", () =
     },
   );
 
+  it("lands a result whose output is empty", async () => {
+    render(<CollageSettings />);
+
+    (await submit("collage-submit")).respond(200, { ...GOOD_BODY, processedSize: 0 });
+
+    await waitFor(() => expect(screen.getByTestId("collage-download")).toBeInTheDocument(), {
+      timeout: 3000,
+    });
+    expect(useCollageStore.getState().resultSize).toBe(0);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
   it("reports the status the answer came with", async () => {
     render(<CollageSettings />);
 
