@@ -258,6 +258,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // the PDF is being signed; a result written to the live selection would
     // land on a bystander entry and the signed file would go unguarded.
     const capturedIndex = useFileStore.getState().selectedIndex;
+    // Which file that index held, so a failure finds its own entry even after
+    // a reorder, and leaves alone a fresh file that took the slot.
+    const capturedEntryId = useFileStore.getState().entries[capturedIndex]?.id;
 
     setError(null);
     setDownloadUrl(null);
@@ -287,24 +290,34 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
     /**
      * Ends a run that failed. Besides the panel's error and endRun, the
-     * failure goes on the entry the run started on, so the thumbnail strip
-     * marks it failed and the page offers its report-issue button (#1969).
-     * `category` is for messages that are translated, which can't be
-     * classified from their text. The entry write goes last and never throws,
-     * like use-tool-processor's failEntry: a store listener that throws there
-     * must not leave the run half-ended. An entry that already holds this
-     * run's result keeps it; only the "pending" the run reset it to is failed.
+     * failure goes on the run's own entry, so the thumbnail strip marks it
+     * failed and the page offers its report-issue button (#1969). `category`
+     * is for messages that are translated, which can't be classified from
+     * their text.
+     *
+     * Like use-tool-processor's endSyncRun, each write is guarded on its own
+     * and the entry write always runs: a store listener that throws while the
+     * run ends must not leave the entry pending. The first teardown error is
+     * rethrown after it, so it still surfaces; the entry write itself logs and
+     * reports instead of throwing. The entry is found by id, so a reorder or a
+     * fresh file in the slot can't redirect the failure, and only the
+     * "pending" the run reset it to is failed: an entry already holding this
+     * run's result keeps it.
      */
     const failRun = (message: string, category?: FeedbackErrorCategory) => {
-      setError(message);
-      endRun();
+      let teardown: { cause: unknown } | null = null;
+      for (const write of [() => setError(message), endRun]) {
+        try {
+          write();
+        } catch (cause) {
+          teardown ??= { cause };
+        }
+      }
       try {
-        if (useFileStore.getState().entries[capturedIndex]?.status === "pending") {
-          useFileStore.getState().updateEntry(capturedIndex, {
-            status: "failed",
-            error: message,
-            errorCategory: category ?? null,
-          });
+        const { entries, updateEntry } = useFileStore.getState();
+        const index = entries.findIndex((e) => e.id === capturedEntryId);
+        if (index !== -1 && entries[index].status === "pending") {
+          updateEntry(index, { status: "failed", error: message, errorCategory: category ?? null });
         }
       } catch (err) {
         console.error("Failing the Sign PDF run's entry failed", err);
@@ -314,6 +327,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           { error_class: "bug", tool_id: "sign-pdf" },
         );
       }
+      if (teardown) throw teardown.cause;
     };
 
     const exported = await canvas.exportPlacements().catch((cause: unknown) => {
@@ -328,7 +342,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       return null;
     });
     if (!exported) {
-      failRun(sp.exportFailed);
+      failRun(sp.exportFailed, "processing_error");
       return;
     }
     const { pngs, placements } = exported;
@@ -393,7 +407,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       onFailed: (failure) => {
         abandonRequest();
         progressCleanupRef.current = null;
-        failRun(jobFailureMessage(failure, t.errors));
+        // A failure with a reason shows one of our translated messages; a
+        // server message is English and classifies from its text.
+        failRun(
+          jobFailureMessage(failure, t.errors),
+          "message" in failure ? undefined : "processing_error",
+        );
       },
       onStall: () => {
         abandonRequest();
@@ -439,7 +458,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         try {
           result = parseResultBody<SignResult>(xhr.responseText);
         } catch (err) {
-          failRun(t.errors.invalidResponse);
+          failRun(t.errors.invalidResponse, "processing_error");
           reportMalformedResult(err, { status: xhr.status, toolId: "sign-pdf" });
           return;
         }
@@ -447,7 +466,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           landResult(result);
         } catch (err) {
           try {
-            failRun(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+            failRun(jobFailureMessage({ reason: "trackingFailed" }, t.errors), "processing_error");
           } catch (teardownErr) {
             console.error("Ending the run after a result handling error failed", teardownErr);
             // The console alone never reaches Sentry (#1882).
@@ -474,7 +493,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       } catch {
         message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
       }
-      failRun(message);
+      // A proxy's 413 has no JSON body, so its message is the translated
+      // status line; the category is what says the upload was too big.
+      failRun(message, xhr.status === 413 ? "upload_error" : undefined);
     };
     xhr.onerror = () => {
       if (abandoned) return;

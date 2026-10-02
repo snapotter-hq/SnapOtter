@@ -372,6 +372,7 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
 
     await waitFor(() => expect(entry().status).toBe("failed"));
     expect(entry().error).toBe(sp.exportFailed);
+    expect(entry().errorCategory).toBe("processing_error");
   });
 
   it("marks it failed when a 200's body does not parse", async () => {
@@ -386,6 +387,24 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
 
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.errors.invalidResponse);
+    // "Invalid response" would read as the user's validation error from its
+    // English text, and as something else in every other locale.
+    expect(entry().errorCategory).toBe("processing_error");
+  });
+
+  it("files a proxy's 413 under upload_error", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    act(() => {
+      xhr.status = 413;
+      xhr.responseText = "<html>413 Request Entity Too Large</html>";
+      xhr.onload?.();
+    });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.processingFailedWithStatus.replace("{status}", "413"));
+    expect(entry().errorCategory).toBe("upload_error");
   });
 
   it("marks it failed when the stream reports a failure", async () => {
@@ -398,6 +417,23 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
 
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe("sidecar died");
+    // The server's own text is English and classifies from its words.
+    expect(entry().errorCategory).toBeNull();
+  });
+
+  it("files a streamed result with no download URL under processing_error", async () => {
+    renderPanel();
+
+    (await apply()).respond(202, { jobId: "job-1", async: true });
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.invalidResponse);
+    expect(entry().errorCategory).toBe("processing_error");
   });
 
   it("marks it failed when the stream stalls", async () => {
@@ -441,6 +477,75 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
     expect(entry().status).toBe("pending");
     expect(entry().error).toBeNull();
     expect(entry().errorCategory).toBeNull();
+  });
+
+  it("keeps a landed result on the entry when the run fails after it", async () => {
+    const realMarkClaimed = useFileStore.getState().markClaimed;
+    try {
+      renderPanel();
+      const xhr = await apply();
+      vi.spyOn(useFileStore.getState(), "markClaimed").mockImplementationOnce(() => {
+        throw new Error("boom");
+      });
+
+      expect(() => xhr.respond(200, { downloadUrl: DOWNLOAD_URL, savedFileId: "file-1" })).toThrow(
+        "boom",
+      );
+      await act(async () => {});
+
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(entry().error).toBeNull();
+    } finally {
+      useFileStore.setState({ markClaimed: realMarkClaimed });
+    }
+  });
+
+  it("follows the run's file when the strip is reordered mid-run", async () => {
+    useFileStore.getState().setFiles([pdf("contract.pdf"), pdf("lease.pdf")]);
+    renderPanel();
+
+    const xhr = await apply();
+    act(() => useFileStore.getState().reorderFiles(0, 1));
+    xhr.respond(422, { error: "Processing failed" });
+
+    expect(entry(1).file.name).toBe("contract.pdf");
+    expect(entry(1).status).toBe("failed");
+    expect(entry(0).file.name).toBe("lease.pdf");
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("still marks the entry failed when ending the run throws", async () => {
+    const realSetProcessing = useFileStore.getState().setProcessing;
+    try {
+      renderPanel();
+      const xhr = await apply();
+      vi.spyOn(useFileStore.getState(), "setProcessing").mockImplementationOnce(() => {
+        throw new Error("boom");
+      });
+
+      expect(() => xhr.respond(422, { error: "Processing failed" })).toThrow("boom");
+
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe("Processing failed");
+    } finally {
+      useFileStore.setState({ setProcessing: realSetProcessing });
+    }
+  });
+
+  it("leaves alone a file that took the run's slot after the files were cleared", async () => {
+    renderPanel();
+
+    const xhr = await apply();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([pdf("lease.pdf")]);
+    });
+    xhr.respond(422, { error: "Processing failed" });
+
+    expect(entry().file.name).toBe("lease.pdf");
+    expect(entry().status).toBe("pending");
+    expect(entry().error).toBeNull();
   });
 
   it("leaves the navigation guard quiet about a failed sign", async () => {
@@ -645,6 +750,9 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
     expect(useFileStore.getState().processing).toBe(false);
+    // Only the landing write broke, so the failure still reaches the entry (#1969).
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.jobTrackingFailed);
   });
 
   it("offers no download link when landing a streamed result throws", async () => {
@@ -669,6 +777,8 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
     expect(useFileStore.getState().processing).toBe(false);
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.jobTrackingFailed);
   });
 
   it("rethrows the root cause when ending the run throws too", async () => {
