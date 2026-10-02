@@ -1133,6 +1133,72 @@ test.describe("Server Error Handling", () => {
     await expect(page.getByText(/: Invalid response$/)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("barcode-read-submit")).toBeEnabled();
   });
+
+  // #1858: panels that post for themselves read a failed answer as
+  // `body.error || fallback`, so an object-valued error showed as
+  // "[object Object]" and a details-only answer lost its reason.
+  test("stitch shows its status line, not [object Object], for an object error", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/stitch");
+    await page.route("**/api/v1/tools/image/stitch", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { reason: "x" } }),
+      }),
+    );
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await fileChooserPromise).setFiles([getTestImagePath(), getTestImagePath()]);
+
+    await page.getByTestId("stitch-submit").click();
+
+    await expect(page.getByText("Failed: 422", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("[object Object]")).toHaveCount(0);
+    await expect(page.getByTestId("stitch-submit")).toBeEnabled();
+  });
+
+  test("color palette shows its status line, not [object Object], for an object error", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/image/color-palette");
+    await page.route("**/api/v1/tools/image/color-palette", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { reason: "x" } }),
+      }),
+    );
+    await uploadTestImage(page);
+
+    await page.getByTestId("color-palette-submit").click();
+
+    await expect(page.getByText("Failed: 422", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("[object Object]")).toHaveCount(0);
+  });
+
+  test("compare shows the reason of a details-only failure", async ({ loggedInPage: page }) => {
+    await page.goto("/image/compare");
+    await page.route("**/api/v1/tools/image/compare", (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ details: "Not enough memory" }),
+      }),
+    );
+    await uploadTestImage(page);
+    await page.locator("#compare-second-image").setInputFiles(getTestImagePath());
+
+    await page.getByTestId("compare-submit").click();
+
+    await expect(page.getByText("Not enough memory", { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
