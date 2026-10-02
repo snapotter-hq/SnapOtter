@@ -57,6 +57,22 @@ describe("a failing request on a diagnostic instance, tracing on (#1880)", () =>
     expectNoSecrets(event, REQUESTS.upload.secrets);
     for (const t of transactions) expectNoSecrets(t, REQUESTS.upload.secrets);
   });
+
+  it("keeps a webhook token in an outgoing url's path out of spans and breadcrumbs (#1899)", async () => {
+    const { event, transactions } = await harness.send(
+      REQUESTS.webhook.path,
+      REQUESTS.webhook.init,
+    );
+    expectNoSecrets(event, REQUESTS.webhook.secrets);
+    for (const t of transactions) expectNoSecrets(t, REQUESTS.webhook.secrets);
+    // The outgoing calls are still in the trace, named by method and host.
+    const spans = transactions.flatMap(
+      (t) => (t.spans ?? []) as Array<{ op?: string; description?: string }>,
+    );
+    const client = spans.filter((s) => s.op === "http.client");
+    expect(client.length).toBeGreaterThanOrEqual(2);
+    for (const s of client) expect(s.description).toMatch(/^POST http:\/\/127\.0\.0\.1:\d+$/);
+  });
 });
 
 describe("a failing request after analytics is switched off, tracing on, diagnostic instance (#1898)", () => {

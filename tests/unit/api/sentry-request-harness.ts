@@ -9,6 +9,8 @@
  * The SDK only sets its http integration up once per process, so each test
  * file starts exactly one harness.
  */
+import http from "node:http";
+import net from "node:net";
 import { parse as parseQs } from "node:querystring";
 import multipart from "@fastify/multipart";
 import * as Sentry from "@sentry/node";
@@ -41,6 +43,8 @@ export const QUERY_TOKEN = "qtok-5d1e8b";
 export const FILE_BYTES = "PRIVATE-FILE-CONTENT-a8c4";
 /** The end user's address as a reverse proxy forwards it (TEST-NET-3). */
 export const CLIENT_IP = "203.0.113.7";
+/** The token a Slack or Discord webhook url carries in its path (#1899). */
+export const WEBHOOK_SECRET = "hooksecret-9b2f4e";
 
 /**
  * Every request carries an API key, a session cookie, a forwarded client IP,
@@ -173,6 +177,33 @@ export async function startHarness({
     expect((await file?.toBuffer())?.toString()).toBe(FILE_BYTES);
     fail("resize");
   });
+  // Stands in for Slack's and Discord's servers. A bare TCP listener, so the
+  // SDK records only our outgoing side of the call, as it would in production.
+  const hooks = net.createServer((socket) => {
+    socket.once("data", () => {
+      socket.end("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    });
+  });
+  await new Promise<void>((resolve) => hooks.listen(0, "127.0.0.1", resolve));
+  const hooksBase = `http://127.0.0.1:${(hooks.address() as net.AddressInfo).port}`;
+  // Webhook delivery posts through node:http(s) for an https url and fetch for
+  // an http one (safeFetch), so make one call each way, then fail.
+  app.post("/api/v1/webhooks/test", async () => {
+    await new Promise<void>((resolve, reject) => {
+      const req = http.request(
+        `${hooksBase}/services/T000/B000/${WEBHOOK_SECRET}`,
+        { method: "POST" },
+        (res) => res.resume().on("end", resolve),
+      );
+      req.on("error", reject);
+      req.end("{}");
+    });
+    await fetch(`${hooksBase}/api/webhooks/123/${WEBHOOK_SECRET}`, {
+      method: "POST",
+      body: "{}",
+    }).then((r) => r.arrayBuffer());
+    fail("webhook test");
+  });
   const base = await app.listen({ port: 0, host: "127.0.0.1" });
 
   return {
@@ -235,6 +266,7 @@ export async function startHarness({
     },
     async close() {
       await app.close();
+      await new Promise((resolve) => hooks.close(resolve));
       await Sentry.close(0);
       __resetGateForTests();
       delete process.env.ANALYTICS_BAKED_OVERRIDE;
@@ -302,5 +334,11 @@ export const REQUESTS = {
       return { headers: SECRET_HEADERS, body: form };
     },
     secrets: [FILE_BYTES, "holiday.png"],
+  },
+  // A request that posts to a webhook before it fails (#1899).
+  webhook: {
+    path: "/api/v1/webhooks/test",
+    init: { headers: SECRET_HEADERS },
+    secrets: [WEBHOOK_SECRET, "/services/T000"],
   },
 };

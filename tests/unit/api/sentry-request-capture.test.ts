@@ -18,6 +18,8 @@ import {
   startHarness,
 } from "./sentry-request-harness.js";
 
+type Payload = Record<string, unknown>;
+
 let harness: Harness;
 beforeAll(async () => {
   harness = await startHarness({ tracing: false });
@@ -62,18 +64,29 @@ describe("a failing request on a diagnostic instance, tracing off (#1880)", () =
     expectNothingCollected(rawRequests);
     expectNoSecrets(event, REQUESTS.upload.secrets);
     expect((event.request as { url?: string }).url).toMatch(/\/api\/v1\/tools\/image\/resize$/);
-    // The earlier requests' http breadcrumbs stay, without their query strings.
+    // The earlier request's http breadcrumb stays (this process made the
+    // call, so it is an outgoing one), cut to the origin of its url (#1899).
     const crumbs = event.breadcrumbs as Array<{
       category?: string;
       data?: Record<string, unknown>;
     }>;
     const http = crumbs.filter((b) => b.category === "http");
-    expect(http.length).toBeGreaterThan(0);
-    expect(http.some((b) => String(b.data?.url).endsWith("/api/v1/health"))).toBe(true);
+    expect(http.some((b) => b.data?.["http.method"] === "GET")).toBe(true);
     for (const b of http) {
       expect(b.data?.["http.query"]).toBeUndefined();
       expect(b.data?.["http.fragment"]).toBeUndefined();
-      expect(String(b.data?.url)).not.toMatch(/[?#]/);
+      expect(String(b.data?.url)).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     }
+  });
+
+  it("ships no webhook token from the path of an outgoing call (#1899)", async () => {
+    const { event } = await harness.send(REQUESTS.webhook.path, REQUESTS.webhook.init);
+    expectNoSecrets(event, REQUESTS.webhook.secrets);
+    // Both webhook calls (node:http and fetch) still show up, by host and status.
+    const http = (event.breadcrumbs as Array<{ category?: string; data?: Payload }>).filter(
+      (b) => b.category === "http",
+    );
+    expect(http.filter((b) => b.data?.status_code === 204).length).toBeGreaterThanOrEqual(2);
+    for (const b of http) expect(String(b.data?.url)).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
   });
 });

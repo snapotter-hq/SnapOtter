@@ -163,12 +163,71 @@ function isHttpOp(op: unknown): boolean {
   return typeof op === "string" && op.startsWith("http");
 }
 
-/** Diagnostic breadcrumbs keep their data, minus query strings and secrets. */
+/**
+ * scheme://host[:port] of an absolute url, or undefined when there is none to
+ * parse. Path, query, fragment, and userinfo all go.
+ */
+function originOf(url: string): string | undefined {
+  try {
+    const origin = new URL(url).origin;
+    return origin === "null" ? undefined : origin;
+  } catch {
+    return undefined;
+  }
+}
+
+// Data keys of an outgoing request that hold its full url, and the ones that
+// hold only its path.
+const OUTGOING_URL_DATA_KEYS = new Set(["url", "url.full", "http.url"]);
+const OUTGOING_PATH_DATA_KEYS = new Set(["url.path", "http.target"]);
+
+/**
+ * Span or breadcrumb data of an outgoing request, scrubbed as scrubUrlData
+ * does and with every url cut to its origin. The url belongs to a third party,
+ * whose path can be the secret itself: a Slack or Discord webhook carries its
+ * token there (#1899). A url that does not parse is dropped.
+ */
+function scrubOutgoingData(value: unknown): unknown {
+  const data = asObj(scrubUrlData(value));
+  if (!data) return value;
+  const out: AnyEvent = {};
+  for (const [key, v] of Object.entries(data)) {
+    if (OUTGOING_PATH_DATA_KEYS.has(key)) continue;
+    if (OUTGOING_URL_DATA_KEYS.has(key) && typeof v === "string") {
+      const origin = originOf(v);
+      if (origin) out[key] = origin;
+      continue;
+    }
+    out[key] = v;
+  }
+  return out;
+}
+
+/** An outgoing span's "METHOD url" name cut to "METHOD origin" (#1899). */
+function outgoingName(name: string): string {
+  const space = name.indexOf(" ");
+  if (space === -1) return originOf(name) ?? "";
+  const origin = originOf(name.slice(space + 1));
+  return origin ? `${name.slice(0, space)} ${origin}` : name.slice(0, space);
+}
+
+/** True for the span op the SDK gives an outgoing http request. */
+function isOutgoingOp(op: unknown): boolean {
+  return op === "http.client";
+}
+
+/**
+ * Diagnostic breadcrumbs keep their data, minus query strings and secrets. An
+ * http breadcrumb is an outgoing request (the Node SDK records none for
+ * incoming ones), so its url keeps only the origin (#1899).
+ */
 function scrubDiagnosticBreadcrumbs(value: unknown): unknown {
   const scrub = (entry: unknown) => {
     const b = asObj(entry);
     if (!b) return entry;
-    return b.data === undefined ? b : { ...b, data: scrubUrlData(b.data) };
+    if (b.data === undefined) return b;
+    const data = b.category === "http" ? scrubOutgoingData(b.data) : scrubUrlData(b.data);
+    return { ...b, data };
   };
   if (Array.isArray(value)) return value.map(scrub);
   const wrapped = asObj(value);
@@ -379,7 +438,9 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
  * (#1898). The request gets the same rule as an error event (dropped, or
  * reduced to method, path, and harmless headers in diagnostic mode),
  * breadcrumbs get the same scrub as on an error event, and every span's data
- * loses query strings, bodies, and credential headers (#1880).
+ * loses query strings, bodies, and credential headers (#1880). An outgoing
+ * (http.client) span keeps only the origin of its url, in its name and its
+ * data (#1899).
  */
 export function buildBeforeSendTransaction(isActive: () => boolean, diagnostic = false) {
   return failClosed(function beforeSendTransaction(event: AnyEvent): AnyEvent | null {
@@ -392,18 +453,30 @@ export function buildBeforeSendTransaction(isActive: () => boolean, diagnostic =
         : scrubBreadcrumbs(event.breadcrumbs);
     }
     const trace = asObj(asObj(event.contexts)?.trace);
-    if (trace && trace.data !== undefined) trace.data = scrubUrlData(trace.data);
+    // An outgoing request's url is a third party's, cut to its origin (#1899);
+    // the API's own server spans keep their path, minus the query.
+    const traceOutgoing = isOutgoingOp(trace?.op);
+    if (trace && trace.data !== undefined) {
+      trace.data = traceOutgoing ? scrubOutgoingData(trace.data) : scrubUrlData(trace.data);
+    }
     // Only http names are "METHOD url"; a db span's "?" is a placeholder.
     if (typeof event.transaction === "string" && isHttpOp(trace?.op)) {
-      event.transaction = stripQuery(event.transaction);
+      event.transaction = traceOutgoing
+        ? outgoingName(event.transaction)
+        : stripQuery(event.transaction);
     }
     if (Array.isArray(event.spans)) {
       for (const entry of event.spans) {
         const span = asObj(entry);
         if (!span) continue;
-        if (span.data !== undefined) span.data = scrubUrlData(span.data);
+        const outgoing = isOutgoingOp(span.op);
+        if (span.data !== undefined) {
+          span.data = outgoing ? scrubOutgoingData(span.data) : scrubUrlData(span.data);
+        }
         if (typeof span.description === "string" && isHttpOp(span.op)) {
-          span.description = stripQuery(span.description);
+          span.description = outgoing
+            ? outgoingName(span.description)
+            : stripQuery(span.description);
         }
       }
     }

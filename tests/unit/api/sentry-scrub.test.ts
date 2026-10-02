@@ -286,7 +286,8 @@ describe("buildBeforeSend diagnostic request scrub (#1880)", () => {
     const want = {
       category: "http",
       message: "kept raw",
-      data: { url: "https://idp/token", "http.method": "POST", status_code: 200 },
+      // An http breadcrumb is an outgoing call: origin only (#1899).
+      data: { url: "https://idp", "http.method": "POST", status_code: 200 },
     };
     const list = diag()({ breadcrumbs: [crumb, { category: "nodata" }, 7] } as never, {});
     expect(list?.breadcrumbs).toEqual([want, { category: "nodata" }, 7]);
@@ -370,7 +371,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
     expect(out.contexts.trace.data).toEqual(scrubbedTraceData);
     expect(out.spans[0]).toEqual({
       op: "http.client",
-      description: "GET https://idp/token",
+      description: "GET https://idp",
       data: {},
     });
     // A db statement's "?" is a placeholder, not a query string.
@@ -390,7 +391,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
       },
     });
     expect(out.breadcrumbs).toEqual([
-      { category: "http", data: { url: "https://x/y", method: "GET" } },
+      { category: "http", data: { url: "https://x", method: "GET" } },
     ]);
     expect(out.contexts.trace.data).toEqual(scrubbedTraceData);
   });
@@ -433,5 +434,136 @@ describe("buildBeforeSendTransaction (#1880)", () => {
     });
     expect(out.transaction).toBe("job resize#2");
     expect(buildBeforeSendTransaction(on)({})).toEqual({ request: undefined });
+  });
+});
+
+// #1899: an outgoing request's path can be the secret itself. Slack and
+// Discord webhook urls carry their token in the path, not the query.
+describe("outgoing request urls (#1899)", () => {
+  const SLACK = "https://hooks.slack.com/services/T000/B000/XXXXslacksecret";
+  const DISCORD = "https://discord.com/api/webhooks/123/discordsecret?wait=true";
+  const SECRETS = ["XXXXslacksecret", "discordsecret", "T000", "/api/webhooks"];
+  const expectClean = (value: unknown) => {
+    const raw = JSON.stringify(value);
+    for (const s of SECRETS) expect(raw).not.toContain(s);
+  };
+  const clientSpan = (url: string, method = "POST"): AnyEvent => {
+    const u = new URL(url);
+    return {
+      op: "http.client",
+      description: `${method} ${url}`,
+      data: {
+        url,
+        "url.full": url,
+        "http.url": url,
+        "url.path": u.pathname,
+        "http.target": u.pathname + u.search,
+        "url.query": u.search,
+        "server.address": u.hostname,
+        "http.method": method,
+        "http.response.status_code": 200,
+      },
+    };
+  };
+  const crumb = (url: string): AnyEvent => ({
+    category: "http",
+    type: "http",
+    data: { url, "http.method": "POST", status_code: 200 },
+  });
+
+  it("reduces a diagnostic error event's http breadcrumb url to its origin", () => {
+    const out = buildBeforeSend(() => true, true)(
+      { breadcrumbs: [crumb(SLACK), crumb(DISCORD)] } as never,
+      {},
+    ) as AnyEvent;
+    expect(out.breadcrumbs).toEqual([
+      {
+        category: "http",
+        type: "http",
+        data: { url: "https://hooks.slack.com", "http.method": "POST", status_code: 200 },
+      },
+      {
+        category: "http",
+        type: "http",
+        data: { url: "https://discord.com", "http.method": "POST", status_code: 200 },
+      },
+    ]);
+  });
+
+  it("reduces http.client spans to method and origin, keeping host, method, and status", () => {
+    for (const diagnostic of [false, true]) {
+      const out = buildBeforeSendTransaction(
+        () => true,
+        diagnostic,
+      )({
+        transaction: "POST /api/v1/settings",
+        contexts: { trace: { op: "http.server", data: { "http.target": "/api/v1/settings" } } },
+        breadcrumbs: [crumb(SLACK)],
+        spans: [clientSpan(SLACK), clientSpan(DISCORD)],
+      });
+      expectClean(out);
+      expect(out.spans[0]).toEqual({
+        op: "http.client",
+        description: "POST https://hooks.slack.com",
+        data: {
+          url: "https://hooks.slack.com",
+          "url.full": "https://hooks.slack.com",
+          "http.url": "https://hooks.slack.com",
+          "server.address": "hooks.slack.com",
+          "http.method": "POST",
+          "http.response.status_code": 200,
+        },
+      });
+      expect(out.spans[1].description).toBe("POST https://discord.com");
+      // The API's own server span keeps its path: that url is ours, not a third party's.
+      expect(out.transaction).toBe("POST /api/v1/settings");
+      expect(out.contexts.trace.data["http.target"]).toBe("/api/v1/settings");
+    }
+  });
+
+  it("reduces an outgoing request that is itself the transaction's root span", () => {
+    const span = clientSpan(SLACK);
+    const out = buildBeforeSendTransaction(() => true)({
+      transaction: span.description,
+      contexts: { trace: { op: "http.client", data: span.data } },
+    });
+    expectClean(out);
+    expect(out.transaction).toBe("POST https://hooks.slack.com");
+    expect(out.contexts.trace.data.url).toBe("https://hooks.slack.com");
+  });
+
+  it("drops userinfo and keeps a non-default port", () => {
+    const out = buildBeforeSendTransaction(() => true)({
+      spans: [clientSpan("http://user:pass@hooks.internal:8080/hook/tok")],
+    });
+    expect(out.spans[0].description).toBe("POST http://hooks.internal:8080");
+    expect(out.spans[0].data.url).toBe("http://hooks.internal:8080");
+    expect(JSON.stringify(out)).not.toContain("pass");
+  });
+
+  it("drops an outgoing url it cannot parse rather than send it whole", () => {
+    const out = buildBeforeSendTransaction(() => true)({
+      spans: [
+        { op: "http.client", description: "GET /relative/tok", data: { url: "/relative/tok" } },
+        { op: "http.client", description: "not a url", data: { "url.full": "::bad::" } },
+      ],
+    });
+    expect(out.spans[0]).toEqual({ op: "http.client", description: "GET", data: {} });
+    expect(out.spans[1]).toEqual({ op: "http.client", description: "not", data: {} });
+    const crumbs = buildBeforeSend(() => true, true)(
+      {
+        breadcrumbs: [{ category: "http", data: { url: "garbage tok", status_code: 0 } }],
+      } as never,
+      {},
+    ) as AnyEvent;
+    expect(crumbs.breadcrumbs).toEqual([{ category: "http", data: { status_code: 0 } }]);
+  });
+
+  it("leaves non-http breadcrumbs' urls with their path", () => {
+    const out = buildBeforeSend(() => true, true)(
+      { breadcrumbs: [{ category: "navigation", data: { url: "https://h/a/b?t=1" } }] } as never,
+      {},
+    ) as AnyEvent;
+    expect(out.breadcrumbs).toEqual([{ category: "navigation", data: { url: "https://h/a/b" } }]);
   });
 });
