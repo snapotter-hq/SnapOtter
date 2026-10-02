@@ -195,6 +195,9 @@ describe("SAML callback", () => {
     const res = await postCallback();
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/login?error=saml_auth_failed");
+    // Anyone can POST a junk assertion here, so a rejected one must never
+    // reach Sentry: unauthenticated traffic would flood it.
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("rejects an assertion with no nameID", async () => {
@@ -202,6 +205,7 @@ describe("SAML callback", () => {
     const res = await postCallback();
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/login?error=saml_auth_failed");
+    expect(reportErrorSpy).not.toHaveBeenCalled();
   });
 
   it("provisions a user, creates a session, and sets the cookie on success", async () => {
@@ -493,11 +497,17 @@ describe("SAML callback", () => {
     // so an unenrolled user is denied with a distinct retryable error param.
     const email = `mfaerr-${randomUUID().slice(0, 8)}@example.com`;
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
-    // Shaped like the real failure: the settings read losing its Postgres
-    // connection (SQLSTATE 57P01, admin_shutdown).
-    const policyFault = Object.assign(
+    // Shaped like the real failure: getMfaPolicy's settings read is a drizzle
+    // select, so a lost Postgres connection (SQLSTATE 57P01) arrives wrapped
+    // in a DrizzleQueryError.
+    const pgFault = Object.assign(
       new Error("terminating connection due to administrator command"),
       { code: "57P01" },
+    );
+    const policyFault = new DrizzleQueryError(
+      'select "value" from "settings" where "settings"."key" = $1 limit $2',
+      ["mfaPolicy", 1],
+      pgFault,
     );
     getMfaPolicyMock.mockRejectedValueOnce(policyFault);
     // Mirror what the real resolver returns for ("unavailable", role, false);
@@ -542,6 +552,7 @@ describe("SAML callback", () => {
       // as a throttled warning rather than being dropped as expected.
       expect(classifyError(policyFault, "http")).toBe("operational");
     } finally {
+      getMfaPolicyMock.mockReset();
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
     }
@@ -588,6 +599,7 @@ describe("SAML callback", () => {
         subsystem: "mfa-policy",
       });
     } finally {
+      getMfaPolicyMock.mockReset();
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
     }
