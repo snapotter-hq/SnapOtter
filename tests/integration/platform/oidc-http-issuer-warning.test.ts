@@ -83,18 +83,23 @@ describe("plain-http OIDC issuer warning", () => {
     },
   );
 
-  it("says sign-in is refused when the deployment itself is https", async () => {
-    const warnings = await registerWith({
-      enabled: true,
-      issuer: "http://keycloak.lan:8080/realms/x",
-      externalUrl: "https://snapotter.example.com",
-    });
-    expect(warnings).toHaveLength(1);
-    const [fields, message] = warnings[0] as [Record<string, unknown>, string];
-    expect(fields).toEqual({ issuerHost: "keycloak.lan:8080" });
-    expect(message).toContain("EXTERNAL_URL is https");
-    expect(message).toContain("refused");
-  });
+  // The uppercase spelling is the #1775 case: the branch has to read the
+  // parsed scheme, the same way discovery decides on allowInsecureRequests.
+  it.each(["https://snapotter.example.com", "HTTPS://snapotter.example.com"])(
+    "says sign-in is refused when EXTERNAL_URL is %s",
+    async (externalUrl) => {
+      const warnings = await registerWith({
+        enabled: true,
+        issuer: "http://keycloak.lan:8080/realms/x",
+        externalUrl,
+      });
+      expect(warnings).toHaveLength(1);
+      const [fields, message] = warnings[0] as [Record<string, unknown>, string];
+      expect(fields).toEqual({ issuerHost: "keycloak.lan:8080" });
+      expect(message).toContain("EXTERNAL_URL is https");
+      expect(message).toContain("refused");
+    },
+  );
 
   it("stays quiet for an https issuer", async () => {
     const warnings = await registerWith({

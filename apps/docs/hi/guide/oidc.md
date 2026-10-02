@@ -1,6 +1,6 @@
 ---
 description: "OpenID Connect के साथ Single Sign-On सेटअप करें। Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta, और अन्य OIDC providers के लिए चरण-दर-चरण गाइड।"
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 02d341718711
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 `NODE_TLS_REJECT_UNAUTHORIZED=0` सेट न करें। यह सभी TLS verification को अक्षम कर देता है और एक सुरक्षा जोखिम है।
 :::
+
+## सादे http वाले issuer {#plain-http-issuers}
+
+SnapOtter `http://` issuer URL तभी स्वीकार करता है जब `EXTERNAL_URL` भी सादा http हो, जो लोकल या LAN टेस्ट सेटअप के लिए ठीक है। ऐसे में discovery, लॉगिन कोड का आदान-प्रदान और टोकन नेटवर्क पर बिना एन्क्रिप्शन के जाते हैं, इसलिए SnapOtter स्टार्टअप पर issuer होस्ट के नाम के साथ एक चेतावनी लॉग करता है। `https://` वाले `EXTERNAL_URL` के साथ, http issuer को साइन-इन के समय अस्वीकार कर दिया जाता है और स्टार्टअप चेतावनी यह बताती है। दोनों ही स्थितियों में समाधान है अपने identity provider को https पर चलाना।
 
 ## Troubleshooting {#troubleshooting}
 

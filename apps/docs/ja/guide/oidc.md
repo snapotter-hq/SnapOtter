@@ -1,6 +1,6 @@
 ---
 description: "OpenID Connect でシングルサインオンをセットアップします。Keycloak、Authentik、Google、Microsoft Entra ID (Azure AD)、Okta、その他の OIDC プロバイダー向けのステップバイステップガイド。"
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: dc7b9859ab34
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 `NODE_TLS_REJECT_UNAUTHORIZED=0` を設定しないでください。これはすべての TLS 検証を無効にし、セキュリティリスクとなります。
 :::
+
+## 暗号化されていない http の発行者 {#plain-http-issuers}
+
+SnapOtter が `http://` の発行者 URL を受け付けるのは、`EXTERNAL_URL` も暗号化されていない http の場合だけです。これはローカルや LAN のテスト環境向けです。この場合、ディスカバリー、ログインコードの交換、トークンはすべて暗号化されずにネットワークを流れるため、SnapOtter は起動時に発行者のホスト名を含む警告をログに記録します。`EXTERNAL_URL` が `https://` の場合、http の発行者はサインイン時に拒否され、起動時の警告にもその旨が表示されます。どちらの場合も、ID プロバイダーを https で提供することが解決策です。
 
 ## トラブルシューティング {#troubleshooting}
 

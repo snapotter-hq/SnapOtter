@@ -1,6 +1,6 @@
 ---
 description: "OpenID Connect ile Çoklu Oturum Açma kurulumu yapın. Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta ve diğer OIDC sağlayıcıları için adım adım kılavuzlar."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: d14739acc1c3
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 `NODE_TLS_REJECT_UNAUTHORIZED=0` ayarlamayın. Bu, tüm TLS doğrulamasını devre dışı bırakır ve bir güvenlik riskidir.
 :::
+
+## Şifrelenmemiş http kullanan yayıncılar {#plain-http-issuers}
+
+SnapOtter, `http://` ile başlayan bir yayıncı URL'sini yalnızca `EXTERNAL_URL` de şifrelenmemiş http olduğunda kabul eder; bu, yerel veya LAN test kurulumlarına uygundur. Bu durumda keşif, oturum açma kodunun takası ve token'lar ağ üzerinden şifrelenmeden iletilir, bu yüzden SnapOtter başlangıçta yayıncının ana bilgisayarını belirten bir uyarı kaydeder. `EXTERNAL_URL` `https://` ise http yayıncısı oturum açmada reddedilir ve başlangıç uyarısı bunu belirtir. Her iki durumda da çözüm, kimlik sağlayıcınızı https üzerinden sunmaktır.
 
 ## Sorun giderme {#troubleshooting}
 

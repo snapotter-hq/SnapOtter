@@ -1,6 +1,6 @@
 ---
 description: "Configurez l'authentification unique avec OpenID Connect. Guides étape par étape pour Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta et d'autres fournisseurs OIDC."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 6a7d713e4701
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 Ne définissez pas `NODE_TLS_REJECT_UNAUTHORIZED=0`. Cela désactive toute vérification TLS et constitue un risque de sécurité.
 :::
+
+## Émetteurs en http non chiffré {#plain-http-issuers}
+
+SnapOtter n'accepte une URL d'émetteur `http://` que si `EXTERNAL_URL` est aussi en http non chiffré, ce qui convient à une configuration de test locale ou sur réseau local. La découverte, l'échange du code de connexion et les jetons transitent alors en clair sur le réseau : SnapOtter consigne donc au démarrage un avertissement qui indique l'hôte de l'émetteur. Avec une `EXTERNAL_URL` en `https://`, un émetteur http est refusé à la connexion et l'avertissement de démarrage le signale. Dans les deux cas, la solution consiste à servir votre fournisseur d'identité en https.
 
 ## Dépannage {#troubleshooting}
 

@@ -1,6 +1,6 @@
 ---
 description: "Siapkan Single Sign-On dengan OpenID Connect. Panduan langkah demi langkah untuk Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta, dan penyedia OIDC lainnya."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 5e6d2a00ca73
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 Jangan setel `NODE_TLS_REJECT_UNAUTHORIZED=0`. Ini menonaktifkan semua verifikasi TLS dan merupakan risiko keamanan.
 :::
+
+## Issuer http tanpa enkripsi {#plain-http-issuers}
+
+SnapOtter hanya menerima URL issuer `http://` jika `EXTERNAL_URL` juga http tanpa enkripsi, yang cocok untuk penyiapan uji lokal atau LAN. Discovery, pertukaran kode login, dan token kemudian melintasi jaringan tanpa enkripsi, sehingga SnapOtter mencatat peringatan saat startup yang menyebutkan host issuer. Dengan `EXTERNAL_URL` `https://`, issuer http ditolak saat login dan peringatan startup menyebutkannya. Dalam kedua kasus, solusinya adalah menyajikan penyedia identitas Anda melalui https.
 
 ## Pemecahan masalah {#troubleshooting}
 

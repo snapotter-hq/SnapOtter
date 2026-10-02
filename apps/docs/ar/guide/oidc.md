@@ -1,6 +1,6 @@
 ---
 description: "أعدّ الدخول الموحّد باستخدام OpenID Connect. أدلة تفصيلية خطوة بخطوة لـ Keycloak وAuthentik وGoogle وMicrosoft Entra ID (Azure AD) وOkta ومزودي OIDC الآخرين."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 3bb7beb03713
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 لا تضبط `NODE_TLS_REJECT_UNAUTHORIZED=0`. يؤدي هذا إلى تعطيل جميع عمليات التحقق من TLS ويشكّل خطرًا أمنيًا.
 :::
+
+## مُصدِرو http غير المشفّر {#plain-http-issuers}
+
+يقبل SnapOtter عنوان مُصدِر يبدأ بـ `http://` فقط عندما يكون `EXTERNAL_URL` أيضًا http غير مشفّر، وهذا يناسب إعداد اختبار محليًا أو على شبكة LAN. عندها تنتقل عملية الاكتشاف وتبادل رمز تسجيل الدخول والرموز المميزة عبر الشبكة دون تشفير، لذلك يسجّل SnapOtter تحذيرًا عند بدء التشغيل يذكر اسم مضيف المُصدِر. ومع `EXTERNAL_URL` يبدأ بـ `https://`، يُرفض المُصدِر الذي يستخدم http عند تسجيل الدخول، ويذكر تحذير بدء التشغيل ذلك. وفي الحالتين، الحل هو تقديم موفّر الهوية عبر https.
 
 ## استكشاف الأخطاء وإصلاحها {#troubleshooting}
 

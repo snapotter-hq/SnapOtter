@@ -1,6 +1,6 @@
 ---
 description: "Skonfiguruj logowanie jednokrotne z OpenID Connect. Przewodniki krok po kroku dla Keycloak, Authentik, Google, Microsoft Entra ID (Azure AD), Okta i innych dostawców OIDC."
-i18n_source_hash: 438fff2ba4c6
+i18n_source_hash: 90f9721cae5c
 i18n_provenance: human
 i18n_output_hash: 0a980a795fc3
 ---
@@ -154,6 +154,10 @@ services:
 ::: danger 
 Nie ustawiaj `NODE_TLS_REJECT_UNAUTHORIZED=0`. Wyłącza to całą weryfikację TLS i stanowi zagrożenie bezpieczeństwa.
 :::
+
+## Wystawcy przez nieszyfrowane http {#plain-http-issuers}
+
+SnapOtter akceptuje adres URL wystawcy `http://` tylko wtedy, gdy `EXTERNAL_URL` również używa nieszyfrowanego http, co pasuje do lokalnego lub sieciowego (LAN) środowiska testowego. Wykrywanie, wymiana kodu logowania i tokeny przechodzą wtedy przez sieć bez szyfrowania, dlatego SnapOtter przy starcie zapisuje w logu ostrzeżenie z nazwą hosta wystawcy. Przy `EXTERNAL_URL` z `https://` wystawca http jest odrzucany przy logowaniu, a ostrzeżenie przy starcie o tym informuje. W obu przypadkach rozwiązaniem jest udostępnienie dostawcy tożsamości przez https.
 
 ## Rozwiązywanie problemów {#troubleshooting}
 
