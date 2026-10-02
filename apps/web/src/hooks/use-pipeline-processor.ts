@@ -186,14 +186,20 @@ export function usePipelineProcessor() {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      clearActiveJob();
       batchRunRef.current = null;
+      setProgress(IDLE_PROGRESS);
       const message =
         "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
-      setError(message);
-      setProcessing(false);
-      setProgress(IDLE_PROGRESS);
+      // Nothing else will end this run, so each write gets its own guard and
+      // the entries settle last (#1890). The first throw goes on to the
+      // global handler once the run is over.
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(message),
+        () => setProcessing(false),
+      ]);
       settleProcessingEntries(message);
+      if (teardownError) throw teardownError.cause;
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
@@ -291,13 +297,22 @@ export function usePipelineProcessor() {
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       xhrRef.current?.abort();
       batchRunRef.current = null;
-      clearActiveJob();
-      setError(FRAME_HANDLING_FAILED);
-      setProcessing(false);
       setProgress(IDLE_PROGRESS);
-      // Last: the store write that threw may throw again, and the run-level
-      // teardown above has to happen regardless. The sweep logs rather than
-      // throws, and the caller rethrows the original error.
+      // The store write that threw may throw again, so each write gets its
+      // own guard (#1890). The caller rethrows the original error, so a
+      // teardown that breaks as well is reported here (#1812).
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(FRAME_HANDLING_FAILED),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a pipeline run after a frame handling error failed",
+          teardownError.cause,
+        );
+      }
+      // Last, and it never throws.
       settleProcessingEntries(FRAME_HANDLING_FAILED);
     },
     [
@@ -421,11 +436,16 @@ export function usePipelineProcessor() {
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
                 const message = "Processing was interrupted. Retry when reconnected.";
-                clearActiveJob();
-                setError(message);
-                setProcessing(false);
                 setProgress(IDLE_PROGRESS);
+                const teardownError = runEndWrites([
+                  clearActiveJob,
+                  () => setError(message),
+                  () => setProcessing(false),
+                ]);
                 settleProcessingEntries(message);
+                // The run has ended, so the catch below leaves it alone and
+                // passes the throw on (#1890).
+                if (teardownError) throw teardownError.cause;
               }
               return;
             }
@@ -444,12 +464,19 @@ export function usePipelineProcessor() {
               es.close();
               eventSourceRef.current = null;
               xhrRef.current?.abort();
-              clearActiveJob();
               batchRunRef.current = null;
-              setError(message);
-              setProcessing(false);
               setProgress(IDLE_PROGRESS);
+              // Each write gets its own guard and the entries settle last, so
+              // a write that throws can't leave the run at processing. The run
+              // has ended by the time the throw reaches the catch below, which
+              // passes it on (#1890).
+              const teardownError = runEndWrites([
+                clearActiveJob,
+                () => setError(message),
+                () => setProcessing(false),
+              ]);
               settleProcessingEntries(message);
+              if (teardownError) throw teardownError.cause;
             };
 
             if (data.phase === "complete") {
@@ -667,6 +694,23 @@ export function usePipelineProcessor() {
           return true;
         };
 
+        // Every sync exit but a result handling error ends the run here, so
+        // none of them can stop halfway (#1890, the pipeline twin of #1791).
+        // clearActiveJob goes first because it nulls the run's refs before its
+        // own store write, each write gets its own guard, and the entry
+        // settles last. Returns the first teardown error, for the caller to
+        // rethrow once the run is over.
+        const endSyncRun = (failure: string | null): { cause: unknown } | null => {
+          setProgress(IDLE_PROGRESS);
+          const teardownError = runEndWrites([
+            clearActiveJob,
+            ...(failure !== null ? [() => setError(failure)] : []),
+            () => setProcessing(false),
+          ]);
+          if (failure !== null) settleProcessingEntries(failure);
+          return teardownError;
+        };
+
         xhr.onload = () => {
           if (activeJobIdRef.current !== clientJobId) return;
 
@@ -787,11 +831,8 @@ export function usePipelineProcessor() {
             throw handlingError.cause;
           }
 
-          if (failure !== null) setError(failure);
-          setProcessing(false);
-          setProgress(IDLE_PROGRESS);
-          clearActiveJob();
-          if (failure !== null) settleProcessingEntries(failure);
+          const teardownError = endSyncRun(failure);
+          if (teardownError) throw teardownError.cause;
         };
 
         xhr.onerror = () => {
@@ -805,12 +846,8 @@ export function usePipelineProcessor() {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
-          const message = "Processing was interrupted. Retry when reconnected.";
-          setError(message);
-          setProcessing(false);
-          setProgress(IDLE_PROGRESS);
-          clearActiveJob();
-          settleProcessingEntries(message);
+          const teardownError = endSyncRun("Processing was interrupted. Retry when reconnected.");
+          if (teardownError) throw teardownError.cause;
         };
 
         xhr.ontimeout = () => {
@@ -822,12 +859,10 @@ export function usePipelineProcessor() {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
-          const message = "Request timed out - the server may be overloaded. Try again.";
-          setError(message);
-          setProcessing(false);
-          setProgress(IDLE_PROGRESS);
-          clearActiveJob();
-          settleProcessingEntries(message);
+          const teardownError = endSyncRun(
+            "Request timed out - the server may be overloaded. Try again.",
+          );
+          if (teardownError) throw teardownError.cause;
         };
 
         xhr.open("POST", appUrl("/api/v1/pipeline/execute"));
@@ -917,9 +952,9 @@ export function usePipelineProcessor() {
         // Arm the ProgressCard cancel button for the whole run (#771).
         setActiveJob(clientJobId, cancelCurrentJob);
 
-        // Tear down the run without touching the outcome state; callers set
-        // the result or error first.
-        const finishRun = () => {
+        // Stops everything that could still act on the run: its timers, its
+        // stream and its batch closure. No store writes.
+        const releaseRun = () => {
           clearJobEvidenceTimer();
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -928,23 +963,32 @@ export function usePipelineProcessor() {
             eventSourceRef.current = null;
           }
           batchRunRef.current = null;
-          clearActiveJob();
-          setProcessing(false);
           setProgress(IDLE_PROGRESS);
         };
 
-        // Last, after the run-level teardown, the entries the ZIP never
-        // settled: the sweep leaves a settled one and its own error alone, and
-        // logs instead of throwing, so a broken store write can't keep the run
-        // at processing (#1699, the batch side of #1352). It runs even when the
-        // teardown throws, and that throw still propagates.
+        // Tear down the run without touching the outcome state; callers set
+        // the result first. Each write gets its own guard, and the first throw
+        // is returned for the caller to rethrow (#1890).
+        const finishRun = () => {
+          releaseRun();
+          return runEndWrites([clearActiveJob, () => setProcessing(false)]);
+        };
+
+        // Each write gets its own guard, so one that throws can't skip the
+        // rest (#1890). Last, after the run-level teardown, the entries the
+        // ZIP never settled: the sweep leaves a settled one and its own error
+        // alone, and logs instead of throwing, so a broken store write can't
+        // keep the run at processing (#1699, the batch side of #1352). The
+        // first throw is rethrown once the run is over.
         const failRun = (message: string) => {
-          try {
-            setError(message);
-            finishRun();
-          } finally {
-            settleProcessingEntries(message);
-          }
+          releaseRun();
+          const teardownError = runEndWrites([
+            clearActiveJob,
+            () => setError(message),
+            () => setProcessing(false),
+          ]);
+          settleProcessingEntries(message);
+          if (teardownError) throw teardownError.cause;
         };
 
         // A ZIP that won't unpack fails the run here, once, logged and
@@ -992,7 +1036,10 @@ export function usePipelineProcessor() {
             }
           }
 
-          finishRun();
+          const teardownError = finishRun();
+          // Every entry has settled, so settleOrFail passes this on to the
+          // global handler instead of failing the run.
+          if (teardownError) throw teardownError.cause;
         };
 
         // A throw while settling is our own code (a store write, the fflate
@@ -1030,21 +1077,19 @@ export function usePipelineProcessor() {
         const downloadAndSettle = async (result: Record<string, unknown>) => {
           const url = serverUrl(String(result.downloadUrl));
           const fileResults = (result.fileResults ?? {}) as Record<string, string>;
+          let refusedStatus: number | null = null;
           let zipBlob: Blob | null = null;
           for (let attempt = 0; attempt < 3 && !zipBlob; attempt++) {
             if (activeJobIdRef.current !== clientJobId) return;
             try {
               const res = await fetch(url, { headers: formatHeaders() });
               // A 4xx is deterministic: retrying cannot help, and the message
-              // must not blame the network.
+              // must not blame the network. It fails the run outside this try,
+              // so a throw from failRun's teardown isn't swallowed as a retry
+              // (#1890, the twin of the tool hook's #1814).
               if (res.status >= 400 && res.status < 500) {
-                if (activeJobIdRef.current !== clientJobId) return;
-                failRun(
-                  res.status === 404
-                    ? "Completed result is no longer available. Run the job again."
-                    : "The finished batch could not be downloaded. Refresh and try again.",
-                );
-                return;
+                refusedStatus = res.status;
+                break;
               }
               if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
               zipBlob = await res.blob();
@@ -1055,6 +1100,14 @@ export function usePipelineProcessor() {
             }
           }
           if (activeJobIdRef.current !== clientJobId) return;
+          if (refusedStatus !== null) {
+            failRun(
+              refusedStatus === 404
+                ? "Completed result is no longer available. Run the job again."
+                : "The finished batch could not be downloaded. Refresh and try again.",
+            );
+            return;
+          }
           if (!zipBlob) {
             failRun("Processing was interrupted. Retry when reconnected.");
             return;

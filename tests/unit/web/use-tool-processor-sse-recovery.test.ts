@@ -24,6 +24,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { captureHandledError } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
@@ -60,6 +61,7 @@ let xhrs: MockXhr[];
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(captureHandledError).mockClear();
   vi.stubGlobal("URL", {
     ...globalThis.URL,
     createObjectURL: vi.fn(() => "blob:fake-url"),
@@ -306,9 +308,22 @@ describe("useToolProcessor SSE recovery", () => {
           }),
         ).toThrow("root cause");
         expect(consoleError).toHaveBeenCalledWith(
-          "SSE teardown after a frame handling error failed",
+          "Ending the run failed",
           expect.objectContaining({ message: "teardown broke" }),
         );
+        // Each teardown write has its own guard, so the run still ends
+        // (#1890), and the teardown's first break is reported once.
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(useFileStore.getState().activeJobId).toBeNull();
+        expect(useFileStore.getState().cancelCurrentJob).toBeNull();
+        expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+        const reports = vi
+          .mocked(captureHandledError)
+          .mock.calls.filter(
+            ([e]) => e.message === "Ending a tool run after a frame handling error failed",
+          );
+        expect(reports).toHaveLength(1);
+        expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
       } finally {
         unsubscribe();
         consoleError.mockRestore();

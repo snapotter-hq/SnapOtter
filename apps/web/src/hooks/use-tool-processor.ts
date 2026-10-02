@@ -265,11 +265,17 @@ export function useToolProcessor(toolId: string) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      clearActiveJob();
-      setError(message);
-      setProcessing(false);
       setProgress(IDLE_PROGRESS);
+      // Nothing else will end this run, so each write gets its own guard and
+      // the entries settle last (#1890). The first throw goes on to the
+      // global handler once the run is over.
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(message),
+        () => setProcessing(false),
+      ]);
       settleProcessingEntries(message);
+      if (teardownError) throw teardownError.cause;
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
@@ -375,16 +381,27 @@ export function useToolProcessor(toolId: string) {
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       xhrRef.current?.abort();
       batchRunRef.current = null;
-      clearActiveJob();
-      setError(FRAME_HANDLING_FAILED);
-      setProcessing(false);
       setProgress(IDLE_PROGRESS);
-      // Last: the store write that threw may throw again, and the run-level
-      // teardown above has to happen regardless. The sweep logs rather than
-      // throws, and the caller rethrows the original error.
+      // The store write that threw may throw again, so each write gets its
+      // own guard (#1890). The caller rethrows the original error, so a
+      // teardown that breaks as well is reported here (#1812).
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(FRAME_HANDLING_FAILED),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after a frame handling error failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+      // Last, and it never throws.
       settleProcessingEntries(FRAME_HANDLING_FAILED);
     },
     [
+      toolId,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -510,11 +527,16 @@ export function useToolProcessor(toolId: string) {
                 clearJobEvidenceTimer();
                 if (elapsedRef.current) clearInterval(elapsedRef.current);
                 const message = "Processing was interrupted. Retry when reconnected.";
-                clearActiveJob();
-                setError(message);
-                setProcessing(false);
                 setProgress(IDLE_PROGRESS);
+                const teardownError = runEndWrites([
+                  clearActiveJob,
+                  () => setError(message),
+                  () => setProcessing(false),
+                ]);
                 settleProcessingEntries(message);
+                // The run has ended, so the catch below leaves it alone and
+                // passes the throw on (#1890).
+                if (teardownError) throw teardownError.cause;
               }
               return;
             }
@@ -535,11 +557,18 @@ export function useToolProcessor(toolId: string) {
               // Settle the still-open POST so its late onerror/ontimeout
               // cannot replace this specific error with a generic one.
               xhrRef.current?.abort();
-              clearActiveJob();
-              setError(message);
-              setProcessing(false);
               setProgress(IDLE_PROGRESS);
+              // Each write gets its own guard and the entries settle last, so
+              // a write that throws can't leave the run at processing. The run
+              // has ended by the time the throw reaches the catch below, which
+              // passes it on (#1890).
+              const teardownError = runEndWrites([
+                clearActiveJob,
+                () => setError(message),
+                () => setProcessing(false),
+              ]);
               settleProcessingEntries(message);
+              if (teardownError) throw teardownError.cause;
             };
 
             if (data.phase === "complete") {
@@ -1158,11 +1187,12 @@ export function useToolProcessor(toolId: string) {
         };
 
         // Tear down the run without touching the outcome state; callers set
-        // the result or error first.
+        // the result or error first. Each write gets its own guard, and the
+        // first throw is returned for the caller to rethrow once the run's
+        // outcome is reported (#1890).
         const finishRun = () => {
           releaseRun();
-          clearActiveJob();
-          setProcessing(false);
+          return runEndWrites([clearActiveJob, () => setProcessing(false)]);
         };
 
         // The evidence timer and the cancel 404 end a batch through here, with
@@ -1300,11 +1330,14 @@ export function useToolProcessor(toolId: string) {
             }
           }
 
-          finishRun();
+          const teardownError = finishRun();
           trackBatch(
             canceledByUser ? "canceled" : "completed",
             canceledByUser ? "canceled" : undefined,
           );
+          // Every entry has settled, so settleOrFail passes this on to the
+          // global handler instead of failing the run.
+          if (teardownError) throw teardownError.cause;
         };
 
         // A throw while settling is our own code (a store write, the fflate

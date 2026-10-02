@@ -2085,3 +2085,143 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     }
   });
 });
+/**
+ * #1890: #1814 guarded each write of a canceled run's teardown and the batch
+ * failRun, but the other exits still ran clearActiveJob, setError and
+ * setProcessing one after another. Zustand commits a write before its
+ * listeners run, so a listener that threw on the job-clearing write hid the
+ * cancel button and skipped the rest: the run sat at processing with nothing
+ * left that could end it, and a batch that settled from its ZIP never
+ * reported batch_processed. Each exit now runs every write in its own guard,
+ * settles the entries last, and still lets the first throw out.
+ */
+describe("useToolProcessor ends a run whose exit writes throw (#1890)", () => {
+  const INTERRUPTED = "Processing was interrupted. Retry when reconnected.";
+  const UNCONFIRMED =
+    "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
+  type FileStoreState = ReturnType<typeof useFileStore.getState>;
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  let unsubscribe: (() => void) | null = null;
+
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = null;
+    consoleError.mockRestore();
+  });
+
+  // Only the write that clears the cancel handle throws, so every write after
+  // it has to run anyway.
+  function breakJobClear() {
+    unsubscribe = useFileStore.subscribe((state: FileStoreState, prev: FileStoreState) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+    });
+  }
+
+  // The upload finished and the socket died: the #722 degrade to async.
+  function degrade() {
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState()).toMatchObject({ processing: true, error: null });
+  }
+
+  function expectRunEnded(message: string | null, entryStatus = "failed") {
+    unsubscribe?.();
+    unsubscribe = null;
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe(message);
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(state.entries.length).toBeGreaterThan(0);
+    for (const entry of state.entries) {
+      expect(entry.status).toBe(entryStatus);
+      if (message !== null) expect(entry.error).toBe(message);
+    }
+    expect(consoleError).toHaveBeenCalledWith(
+      "Ending the run failed",
+      expect.objectContaining({ message: "teardown broke" }),
+    );
+  }
+
+  it("ends a single run when the server never confirms the job", () => {
+    vi.useFakeTimers();
+    const { unmount } = startSingleRun();
+    degrade();
+    breakJobClear();
+
+    expect(() => act(() => vi.advanceTimersByTime(30_001))).toThrow("teardown broke");
+
+    expectRunEnded(UNCONFIRMED);
+    expect(latestSse().close).toHaveBeenCalled();
+    unmount();
+  });
+
+  it("ends a single run on a failed frame and keeps the server's message", () => {
+    const { unmount } = startSingleRun();
+    // A sync single run arms no cancel handle; the degrade does.
+    degrade();
+    breakJobClear();
+
+    // The run ended before the throw reached the frame handler's catch, so
+    // its #1287 fallback leaves the server's message alone.
+    expect(() => act(() => sendSingleFrame({ phase: "failed", error: "server said no" }))).toThrow(
+      "teardown broke",
+    );
+
+    expectRunEnded("server said no");
+    unmount();
+  });
+
+  it("ends a single run on a terminal batch frame it has no closure for", () => {
+    const { unmount } = startSingleRun();
+    degrade();
+    breakJobClear();
+
+    expect(() =>
+      act(() =>
+        sendBatchFrame({ status: "failed", totalFiles: 1, completedFiles: 1, failedFiles: 1 }),
+      ),
+    ).toThrow("teardown broke");
+
+    expectRunEnded(INTERRUPTED);
+    unmount();
+  });
+
+  it("ends a batch that settles from a good ZIP, reports it, and lets the throw out", async () => {
+    const captured = captureRejections();
+    try {
+      const { unmount } = startBatchRun();
+      breakJobClear();
+
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 200;
+        xhrs[0].response = zipBlob();
+        xhrs[0].getResponseHeader = vi.fn((name: string) =>
+          name === "X-File-Results" ? encodedFileResults() : null,
+        );
+        xhrs[0].onload?.();
+      });
+
+      // Every entry settled before the teardown threw, so the throw goes on
+      // to the global handler instead of failing the batch.
+      await settled(() =>
+        expect(captured.rejections).toEqual([
+          expect.objectContaining({ message: "teardown broke" }),
+        ]),
+      );
+      expectRunEnded(null, "completed");
+      const outcomes = vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed");
+      expect(outcomes).toHaveLength(1);
+      expect(outcomes[0][1]).toMatchObject({ status: "completed" });
+      unmount();
+    } finally {
+      captured.restore();
+    }
+  });
+});
