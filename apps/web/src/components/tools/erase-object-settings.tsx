@@ -199,19 +199,11 @@ export function EraseObjectSettings({
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressCleanupRef = useRef<(() => void) | null>(null);
-  // An Erase All batch outlives the panel unless it's told (#1894): the file
-  // in flight stops through this, and the loop checks unmountedRef before
-  // sending the next one or writing anything to the store.
-  const batchFileStopRef = useRef<(() => void) | null>(null);
-  const unmountedRef = useRef(false);
 
   // Tear down any live progress subscription if the component unmounts mid-job.
   useEffect(() => {
-    unmountedRef.current = false;
     return () => {
-      unmountedRef.current = true;
       progressCleanupRef.current?.();
-      batchFileStopRef.current?.();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
     };
   }, []);
@@ -240,6 +232,7 @@ export function EraseObjectSettings({
     file: File,
     maskBlob: Blob,
     onProgress: (percent: number) => void,
+    onStoppable: (stop: () => void) => void,
   ): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const clientJobId = generateId();
@@ -278,13 +271,12 @@ export function EraseObjectSettings({
         onStall: () =>
           abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
       });
-      // Leaving the page drops this file where it stands. The error only
-      // settles the promise: the loop sees the panel is gone and writes
-      // nothing for it, since the store may already be the next tool's.
-      batchFileStopRef.current = () => {
+      // Drops this file where it stands. The error only settles the promise:
+      // the batch has already decided to write nothing more for it.
+      onStoppable(() => {
         stopProgress();
-        abandon(new Error("Erase Object panel unmounted"));
-      };
+        abandon(new Error("Erase Object batch stopped"));
+      });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
       const formData = new FormData();
@@ -565,7 +557,7 @@ export function EraseObjectSettings({
     if (!eraserRef.current) return;
 
     const masks = await eraserRef.current.exportAllMasks();
-    if (masks.size === 0 || unmountedRef.current) return;
+    if (masks.size === 0) return;
 
     const { entries: currentEntries } = useFileStore.getState();
 
@@ -583,6 +575,21 @@ export function EraseObjectSettings({
       }
     }
     if (work.length === 0) return;
+
+    // Leaving for another tool resets the file store, and opening library
+    // files replaces it. Either way the batch's files are gone, so it stops
+    // there: the file in flight is dropped, no more are sent, and nothing is
+    // written to entries that now belong to someone else (#1894). This keys
+    // on the store rather than on unmount because the panel also unmounts
+    // whenever the mobile settings sheet closes, and that must not end the run.
+    const batchFiles = new Set(work.map((w) => w.file));
+    let filesGone = false;
+    let stopInFlight: (() => void) | null = null;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (filesGone || state.entries.some((e) => batchFiles.has(e.file))) return;
+      filesGone = true;
+      stopInFlight?.();
+    });
 
     // A store write that throws anywhere in here (#1354) ends the batch: a
     // store that can't record a file's outcome gets no more files sent to it.
@@ -602,10 +609,7 @@ export function EraseObjectSettings({
       }, 1000);
 
       for (let wi = 0; wi < work.length; wi++) {
-        // The panel is gone (#1894). Finished files keep their results; the
-        // rest are left as they were, and so is the run's state, which
-        // belongs to whatever replaced this panel now.
-        if (unmountedRef.current) return;
+        if (filesGone) break;
         const { index, file, maskBlob } = work[wi];
         const basePercent = (wi / work.length) * 100;
         const sliceWeight = 100 / work.length;
@@ -622,18 +626,26 @@ export function EraseObjectSettings({
         useFileStore.getState().updateEntry(index, { status: "processing", error: null });
 
         try {
-          await processOneFile(index, file, maskBlob, (pct) => {
-            setProgressPercent(basePercent + (pct / 100) * sliceWeight);
-          });
+          await processOneFile(
+            index,
+            file,
+            maskBlob,
+            (pct) => {
+              setProgressPercent(basePercent + (pct / 100) * sliceWeight);
+            },
+            (stop) => {
+              stopInFlight = stop;
+            },
+          );
         } catch (err) {
-          if (unmountedRef.current) return;
+          if (filesGone) break;
           useFileStore.getState().updateEntry(index, {
             status: "failed",
             error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
             errorCategory: feedbackCategoryOf(err),
           });
         } finally {
-          batchFileStopRef.current = null;
+          stopInFlight = null;
         }
       }
     } catch (cause) {
@@ -648,9 +660,12 @@ export function EraseObjectSettings({
     const trackingFailed = jobFailureMessage({ reason: "trackingFailed" }, t.errors);
     let teardownError: { cause: unknown } | null = null;
     for (const teardown of [
+      unsubscribe,
       () => {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
       },
+      // Still ours to clear when the files are gone: a replacing setFiles
+      // leaves it set, and nothing else can have started a run since.
       () => setProcessing(false),
       () => setProgressPhase("idle"),
       () => setProgressStage(null),
