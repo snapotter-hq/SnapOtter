@@ -73,4 +73,37 @@ describe("instrument.ts Sentry wiring (#1880)", () => {
     expect(options.beforeSendTransaction).toBeTypeOf("function");
     expect(options.tracesSampler).toBeTypeOf("function");
   });
+
+  it("hands both hooks the analytics gate, so an opted-out instance sends neither (#1898)", async () => {
+    // NODE_ENV=test lets this force the baked analytics flag on.
+    const options = await loadInstrument({
+      SENTRY_TRACES_SAMPLE_RATE: "1",
+      ANALYTICS_BAKED_OVERRIDE: "on",
+    });
+    type Hook = (event: Record<string, unknown>, hint?: unknown) => unknown;
+    const sendError = () => (options.beforeSend as Hook)({ message: "boom" }, {});
+    const sendTransaction = () =>
+      (options.beforeSendTransaction as Hook)({
+        transaction: "GET /api/v1/settings",
+        contexts: { trace: { op: "http.server" } },
+      });
+    // Same module graph instrument.ts just loaded, so this is the gate it reads.
+    const gate = await import("../../../apps/api/src/lib/analytics-gate.js");
+    try {
+      // Boot window: the setting has never been read.
+      expect(sendError()).toBeNull();
+      expect(sendTransaction()).toBeNull();
+
+      gate.__setReaderForTests(async () => false);
+      await gate.refreshAnalyticsGate();
+      expect(sendError()).toBeNull();
+      expect(sendTransaction()).toBeNull();
+
+      gate.__setReaderForTests(async () => true);
+      await gate.refreshAnalyticsGate();
+      expect(sendTransaction()).not.toBeNull();
+    } finally {
+      gate.__resetGateForTests();
+    }
+  });
 });

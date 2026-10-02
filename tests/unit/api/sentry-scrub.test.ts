@@ -298,6 +298,7 @@ describe("buildBeforeSend diagnostic request scrub (#1880)", () => {
 });
 
 describe("buildBeforeSendTransaction (#1880)", () => {
+  const on = () => true;
   const txn = (): AnyEvent => ({
     transaction: "GET /api/auth/oidc/callback?code=abc",
     request: secretRequest(),
@@ -362,7 +363,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
   };
 
   it("drops the request and strict-scrubs breadcrumbs by default", () => {
-    const out = buildBeforeSendTransaction()(txn());
+    const out = buildBeforeSendTransaction(on)(txn());
     expect(out.request).toBeUndefined();
     expect(out.breadcrumbs).toEqual([{ category: "http", data: { method: "GET" } }]);
     expect(out.transaction).toBe("GET /api/auth/oidc/callback");
@@ -378,7 +379,7 @@ describe("buildBeforeSendTransaction (#1880)", () => {
     expect(out.spans[3]).toBeNull();
   });
   it("keeps the allowlisted request and breadcrumb data in diagnostic mode", () => {
-    const out = buildBeforeSendTransaction(true)(txn());
+    const out = buildBeforeSendTransaction(on, true)(txn());
     expect(out.request).toEqual({
       method: "POST",
       url: "https://host/api/auth/login",
@@ -399,17 +400,38 @@ describe("buildBeforeSendTransaction (#1880)", () => {
         throw new Error("boom");
       },
     };
-    expect(buildBeforeSendTransaction()(hostile as never)).toBeNull();
-    expect(buildBeforeSendTransaction(true)(hostile as never)).toBeNull();
+    expect(buildBeforeSendTransaction(on)(hostile as never)).toBeNull();
+    expect(buildBeforeSendTransaction(on, true)(hostile as never)).toBeNull();
     expect(buildBeforeSend(() => true, true)(hostile as never, {})).toBeNull();
     expect(buildBeforeSend(() => true)(hostile as never, {})).toBeNull();
   });
+  it("drops every transaction while analytics is off, in either mode (#1898)", () => {
+    const off = () => false;
+    expect(buildBeforeSendTransaction(off)(txn())).toBeNull();
+    expect(buildBeforeSendTransaction(off, true)(txn())).toBeNull();
+    expect(buildBeforeSendTransaction(off)({})).toBeNull();
+  });
+  it("reads the gate on every transaction, so a toggle applies without a restart (#1898)", () => {
+    let active = true;
+    const hook = buildBeforeSendTransaction(() => active);
+    expect(hook(txn())).not.toBeNull();
+    active = false;
+    expect(hook(txn())).toBeNull();
+    active = true;
+    expect(hook(txn())).not.toBeNull();
+  });
+  it("drops the transaction when the gate itself throws", () => {
+    const broken = () => {
+      throw new Error("gate read failed");
+    };
+    expect(buildBeforeSendTransaction(broken)(txn())).toBeNull();
+  });
   it("leaves a non-http transaction name alone and tolerates a bare event", () => {
-    const out = buildBeforeSendTransaction()({
+    const out = buildBeforeSendTransaction(on)({
       transaction: "job resize#2",
       contexts: { trace: { op: "queue.process" } },
     });
     expect(out.transaction).toBe("job resize#2");
-    expect(buildBeforeSendTransaction()({})).toEqual({ request: undefined });
+    expect(buildBeforeSendTransaction(on)({})).toEqual({ request: undefined });
   });
 });

@@ -17,7 +17,10 @@ import { expect } from "vitest";
 import {
   __resetGateForTests,
   __setReaderForTests,
+  analyticsEnabled,
+  gatePrimed,
   primeAnalyticsGate,
+  refreshAnalyticsGate,
 } from "../../../apps/api/src/lib/analytics-gate.js";
 import { resetThrottleForTests } from "../../../apps/api/src/lib/error-report.js";
 import { buildSentryIntegrations } from "../../../apps/api/src/lib/sentry-integrations.js";
@@ -71,6 +74,16 @@ export interface Sent {
 export interface Harness {
   /** POST to the server and return the one error event and any transactions sent for it. */
   send(path: string, init: RequestInit): Promise<Sent>;
+  /**
+   * Tracing harnesses only. POST with analytics switched off in Settings, then
+   * switch it back on. Resolves once the SDK has built a transaction for the
+   * request and returns what reached the transport, which must be nothing
+   * (#1898). reportError skips the error event itself while analytics is off.
+   */
+  sendOptedOut(
+    path: string,
+    init: RequestInit,
+  ): Promise<{ events: Payload[]; transactions: Payload[] }>;
   /** A plain GET that leaves an http breadcrumb behind; its response is ignored. */
   ping(path: string): Promise<void>;
   close(): Promise<void>;
@@ -93,11 +106,15 @@ export async function startHarness({
   const events: Payload[] = [];
   const transactions: Payload[] = [];
   const rawRequests: Payload[] = [];
+  // Transactions the SDK built and handed to the hook, sent or not.
+  let builtTransactions = 0;
   const recordRaw = (event: { request?: unknown }) => {
     rawRequests.push(JSON.parse(JSON.stringify(event.request ?? {})) as Payload);
   };
-  const beforeSend = buildBeforeSend(() => true, diagnostic);
-  const beforeSendTransaction = buildBeforeSendTransaction(diagnostic);
+  // The same gate instrument.ts passes: primed and the setting on.
+  const sentryActive = () => gatePrimed() && analyticsEnabled();
+  const beforeSend = buildBeforeSend(sentryActive, diagnostic);
+  const beforeSendTransaction = buildBeforeSendTransaction(sentryActive, diagnostic);
   Sentry.init({
     dsn: "https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/1",
     sendDefaultPii: false,
@@ -109,6 +126,7 @@ export async function startHarness({
       return beforeSend(event, hint);
     }) as never,
     beforeSendTransaction: ((event: Payload) => {
+      builtTransactions++;
       recordRaw(event);
       return beforeSendTransaction(event);
     }) as never,
@@ -185,6 +203,29 @@ export async function startHarness({
         transactions: [...transactions],
         rawRequests: [...rawRequests],
       };
+    },
+    async sendOptedOut(path, init) {
+      resetThrottleForTests();
+      expect(tracing).toBe(true);
+      events.length = 0;
+      transactions.length = 0;
+      builtTransactions = 0;
+      __setReaderForTests(async () => false);
+      await refreshAnalyticsGate();
+      try {
+        const headers = { ...(init.headers as object), "sentry-trace": SAMPLED_PARENT };
+        const res = await fetch(`${base}${path}`, { method: "POST", ...init, headers });
+        expect(res.status).toBe(500);
+        for (let i = 0; i < 50 && builtTransactions === 0; i++) await Sentry.flush(100);
+        // The SDK really did build one, so an empty transport means the gate
+        // dropped it, not that nothing was ever sampled.
+        expect(builtTransactions).toBeGreaterThan(0);
+        await Sentry.flush(100);
+        return { events: [...events], transactions: [...transactions] };
+      } finally {
+        __setReaderForTests(async () => true);
+        await refreshAnalyticsGate();
+      }
     },
     async ping(path) {
       await fetch(`${base}${path}`).then((r) => r.arrayBuffer());

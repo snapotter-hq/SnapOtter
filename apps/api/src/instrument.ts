@@ -61,9 +61,13 @@ if (dsn && !telemetryEnvKilled()) {
         sentryActive,
         sentryDiagnostic(),
       ) as unknown as SentryOptions["beforeSend"],
-      // Transactions skip beforeSend, so they get their own request and span
-      // scrub (only reachable with SENTRY_TRACES_SAMPLE_RATE set).
+      // Transactions skip beforeSend, so they get their own gate check and
+      // request and span scrub (only reachable with SENTRY_TRACES_SAMPLE_RATE
+      // set). The gate sits here, at send time, rather than in tracesSampler,
+      // because a trace whose parent already sampled it can skip the sampler
+      // (#1898).
       beforeSendTransaction: buildBeforeSendTransaction(
+        sentryActive,
         sentryDiagnostic(),
       ) as unknown as SentryOptions["beforeSendTransaction"],
     });

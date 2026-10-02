@@ -374,14 +374,16 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
 
 /**
  * Sentry beforeSendTransaction for the API. Transactions never pass through
- * beforeSend and only exist with SENTRY_TRACES_SAMPLE_RATE set. The request
- * gets the same rule as an error event (dropped, or reduced to method, path,
- * and harmless headers in diagnostic mode), breadcrumbs get the same scrub as
- * on an error event, and every span's data loses query strings, bodies, and
- * credential headers (#1880).
+ * beforeSend and only exist with SENTRY_TRACES_SAMPLE_RATE set. They answer to
+ * the same analytics gate as error events, so an opted-out instance sends none
+ * (#1898). The request gets the same rule as an error event (dropped, or
+ * reduced to method, path, and harmless headers in diagnostic mode),
+ * breadcrumbs get the same scrub as on an error event, and every span's data
+ * loses query strings, bodies, and credential headers (#1880).
  */
-export function buildBeforeSendTransaction(diagnostic = false) {
-  return failClosed(function beforeSendTransaction(event: AnyEvent): AnyEvent {
+export function buildBeforeSendTransaction(isActive: () => boolean, diagnostic = false) {
+  return failClosed(function beforeSendTransaction(event: AnyEvent): AnyEvent | null {
+    if (!isActive()) return null;
     event.request = diagnostic ? scrubRequest(event.request) : undefined;
     // A transaction carries the scope's breadcrumbs too.
     if (event.breadcrumbs !== undefined) {
