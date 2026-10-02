@@ -194,10 +194,13 @@ describe("validateImageBuffer - CLI-decoded magic bytes (exact / flip / truncate
     ["qoi", [0x71, 0x6f, 0x69, 0x66, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0], "qoi", 4],
     ["dds", [0x44, 0x44, 0x53, 0x20, 124, 0, 0, 0], "dds", 4],
     ["cur", [0x00, 0x00, 0x02, 0x00], "cur"],
-    ["dpx SDPX", [0x53, 0x44, 0x50, 0x58, 0, 0, 0, 0, ...ascii("V2.0")], "dpx", 4],
-    ["dpx XPDS", [0x58, 0x50, 0x44, 0x53, 0, 0, 0, 0, ...ascii("V2.0")], "dpx", 4],
+    // Image data at offset 768, the least that clears DPX's generic header,
+    // which the 1024-byte buffers below have room for.
+    ["dpx SDPX", [0x53, 0x44, 0x50, 0x58, 0, 0, 0x03, 0x00], "dpx", 4],
+    ["dpx XPDS", [0x58, 0x50, 0x44, 0x53, 0x00, 0x03, 0, 0], "dpx", 4],
     ["dpx cineon", [0x80, 0x2a, 0x5f, 0xd7], "dpx"],
-    ["fits SIMPLE", ascii(`SIMPLE  = ${" ".repeat(19)}T`), "fits", 6],
+    // A card is space-padded, so the T is followed by a space, not NUL padding.
+    ["fits SIMPLE", ascii(`SIMPLE  = ${" ".repeat(19)}T `), "fits", 6],
     ["eps ascii", [0x25, 0x21, 0x50, 0x53, 0x2d, 0x41, 0x64, 0x6f, 0x62, 0x65], "eps"],
     ["eps binary", [0xc5, 0xd0, 0xd3, 0xc6], "eps"],
     ["pbm P1", ascii("P1\n1 1\n"), "pbm", 2],
@@ -231,13 +234,13 @@ describe("validateImageBuffer - CLI-decoded magic bytes (exact / flip / truncate
     if (!cliDecoded.has(format)) continue;
 
     it(`accepts an exact ${label} signature as ${format}`, async () => {
-      expectValid(await validateImageBuffer(withLeadingBytes(bytes)), format, 0, 0);
+      expectValid(await validateImageBuffer(withLeadingBytes(bytes, 1024)), format, 0, 0);
     });
 
     it(`rejects ${label} with a flipped first signature byte`, async () => {
       const flipped = [...bytes];
       flipped[0] = (flipped[0] ^ 0xff) & 0xff;
-      const result = await validateImageBuffer(withLeadingBytes(flipped));
+      const result = await validateImageBuffer(withLeadingBytes(flipped, 1024));
       expect(result.valid).toBe(false);
     });
 
@@ -245,7 +248,7 @@ describe("validateImageBuffer - CLI-decoded magic bytes (exact / flip / truncate
       const flipped = [...bytes];
       const last = signatureLength - 1;
       flipped[last] = (flipped[last] ^ 0xff) & 0xff;
-      const result = await validateImageBuffer(withLeadingBytes(flipped));
+      const result = await validateImageBuffer(withLeadingBytes(flipped, 1024));
       expect(result.valid).toBe(false);
     });
 

@@ -105,9 +105,9 @@ const MAGIC_BYTES: MagicEntry[] = [
   // CUR: Windows cursor (ICO variant, byte 3 = 0x02 vs ICO's 0x01)
   { bytes: [0x00, 0x00, 0x02, 0x00], offset: 0, format: "cur" },
   // DPX forward: "SDPX"
-  { bytes: [0x53, 0x44, 0x50, 0x58], offset: 0, format: "dpx", check: hasDpxVersion },
+  { bytes: [0x53, 0x44, 0x50, 0x58], offset: 0, format: "dpx", check: hasDpxImageOffset },
   // DPX reverse: "XPDS"
-  { bytes: [0x58, 0x50, 0x44, 0x53], offset: 0, format: "dpx", check: hasDpxVersion },
+  { bytes: [0x58, 0x50, 0x44, 0x53], offset: 0, format: "dpx", check: hasDpxImageOffset },
   // Cineon
   { bytes: [0x80, 0x2a, 0x5f, 0xd7], offset: 0, format: "dpx" },
   // FITS: "SIMPLE" at offset 0
@@ -446,15 +446,15 @@ function hasTiffIfd(buffer: Buffer): boolean {
 }
 
 /**
- * DIB header sizes a BMP may carry at byte 14: OS/2 1.x (12), OS/2 2.x (16,
- * or the full 64), and Windows BITMAPINFOHEADER through BITMAPV5HEADER (40,
- * 52, 56, 108, 124).
+ * Whether "BM" opens a BMP: the DIB header size at byte 14 is 12 (OS/2 1.x)
+ * or 16 to 124, which spans OS/2 2.x (16 to 64, it may be cut short anywhere
+ * in that range) and Windows BITMAPINFOHEADER through BITMAPV5HEADER (40 to
+ * 124). Text there reads as a size in the hundreds of millions.
  */
-const BMP_DIB_HEADER_SIZES = new Set([12, 16, 40, 52, 56, 64, 108, 124]);
-
-/** Whether "BM" opens a BMP: the DIB header size is one the format defines. */
 function hasBmpDibHeader(buffer: Buffer): boolean {
-  return buffer.length >= 18 && BMP_DIB_HEADER_SIZES.has(buffer.readUInt32LE(14));
+  if (buffer.length < 18) return false;
+  const size = buffer.readUInt32LE(14);
+  return size === 12 || (size >= 16 && size <= 124);
 }
 
 /** How far into a Netpbm or PAM file its header is looked for. */
@@ -496,38 +496,41 @@ function hasNetpbmDimensions(buffer: Buffer): boolean {
 /**
  * Whether a P7 magic opens a PAM header: a WIDTH line with a number on it
  * before ENDHDR. PAM names its fields on KEYWORD value lines, so P1-P6's bare
- * dimensions don't apply.
+ * dimensions don't apply. Only the first NETPBM_HEADER_SCAN_BYTES are read.
  */
 function hasPamWidth(buffer: Buffer): boolean {
   const head = buffer.toString("latin1", 0, Math.min(buffer.length, NETPBM_HEADER_SCAN_BYTES));
   const endHdr = head.indexOf("\nENDHDR");
   const header = endHdr === -1 ? head : head.slice(0, endHdr);
-  return /\nWIDTH[ \t]+\d/.test(header);
+  return /\n[ \t]*WIDTH[ \t]+\d/.test(header);
 }
 
 /**
  * Whether "SIMPLE" opens a FITS primary header: its first 80-byte card reads
- * SIMPLE, padded to eight columns, then "= " and the logical value T. The
- * standard puts the T in column 30; a free-format card is taken too.
+ * SIMPLE, padded to eight columns, then "= " and the logical value T, which
+ * ends at a space, a "/" comment or the end of the card. The standard puts
+ * the T in column 30; a free-format card is taken too.
  */
 function hasFitsSimpleCard(buffer: Buffer): boolean {
   if (buffer.length < 11 || buffer.toString("latin1", 0, 10) !== "SIMPLE  = ") return false;
-  return buffer.toString("latin1", 10, Math.min(buffer.length, 80)).trimStart().startsWith("T");
+  const value = buffer.toString("latin1", 10, Math.min(buffer.length, 80)).trimStart();
+  return /^T(?:[ /]|$)/.test(value);
 }
 
+/** The DPX generic file header, the least the image data can sit past. */
+const DPX_GENERIC_HEADER_BYTES = 768;
+
 /**
- * Whether "SDPX" or "XPDS" opens a DPX: the version field at byte 8 holds
- * "V1.x" or "V2.x" (either case of V), NUL-terminated. Text has no NUL.
+ * Whether "SDPX" or "XPDS" opens a DPX: the image data offset at byte 4, in
+ * the byte order the signature names, lands past the generic file header and
+ * inside the buffer. Text there reads as an offset of 538MB or more. The
+ * version string isn't checked: writers disagree on it and ImageMagick
+ * decodes files whatever it says.
  */
-function hasDpxVersion(buffer: Buffer): boolean {
-  if (buffer.length < 13) return false;
-  return (
-    (buffer[8] === 0x56 || buffer[8] === 0x76) &&
-    (buffer[9] === 0x31 || buffer[9] === 0x32) &&
-    buffer[10] === 0x2e &&
-    isAsciiDigit(buffer[11]) &&
-    buffer[12] === 0x00
-  );
+function hasDpxImageOffset(buffer: Buffer): boolean {
+  if (buffer.length < 8) return false;
+  const offset = buffer[0] === 0x53 ? buffer.readUInt32BE(4) : buffer.readUInt32LE(4);
+  return offset >= DPX_GENERIC_HEADER_BYTES && offset <= buffer.length;
 }
 
 /** Whether "DDS " opens a DirectDraw Surface: its header size field says 124. */
@@ -550,13 +553,13 @@ function hasQoiHeader(buffer: Buffer): boolean {
 }
 
 /**
- * Whether "8BPS" opens a Photoshop file: version 1 (PSD) or 2 (PSB), then six
- * reserved bytes that must be zero.
+ * Whether "8BPS" opens a Photoshop file: the big-endian version after it is 1
+ * (PSD) or 2 (PSB). Either way its first byte is a NUL, which text never has.
  */
 function hasPsdHeader(buffer: Buffer): boolean {
-  if (buffer.length < 12) return false;
+  if (buffer.length < 6) return false;
   const version = buffer.readUInt16BE(4);
-  return (version === 1 || version === 2) && buffer.subarray(6, 12).every((byte) => byte === 0);
+  return version === 1 || version === 2;
 }
 
 /**

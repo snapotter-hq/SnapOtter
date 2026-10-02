@@ -377,6 +377,7 @@ describe("SVGZ contents (#1782)", () => {
     });
   });
 });
+
 // Each of these signatures is printable ASCII, so text can open with it, and
 // used to be typed as that image on the signature alone (#1859). Every one
 // now needs a header behind it that text can't spell.
@@ -396,6 +397,7 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
     "FOVbar is a word\n",
     "SIMPLE question: why?\n",
     "SIMPLE  = maybe\n",
+    "SIMPLE  = The plan for Q3\n",
     "SDPX draft, version two\n",
     "XPDS draft, version two\n",
     "DDS notes for the handover\n",
@@ -431,12 +433,16 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
       return buf;
     };
 
-    // OS/2 1.x (12), OS/2 2.x (16 and 64), Windows v3 to v5 (40 to 124).
-    it.each([12, 16, 40, 52, 56, 64, 108, 124])("takes a DIB header of %i bytes", async (size) => {
-      byBytes(await validateImageBuffer(bmp(size), "a.bmp"), "bmp");
-    });
+    // OS/2 1.x (12), OS/2 2.x (16 to 64, cut short anywhere in that range),
+    // Windows v3 to v5 (40, 52, 56, 108, 124).
+    it.each([12, 16, 17, 40, 41, 52, 56, 64, 108, 124])(
+      "takes a DIB header of %i bytes",
+      async (size) => {
+        byBytes(await validateImageBuffer(bmp(size), "a.bmp"), "bmp");
+      },
+    );
 
-    it.each([0, 11, 41, 125, 0x20202020])("rejects a DIB header size of %i", async (size) => {
+    it.each([0, 11, 13, 15, 125, 0x20202020])("rejects a DIB header size of %i", async (size) => {
       expect(await validateImageBuffer(bmp(size), "a.bmp")).toEqual(unrecognized);
     });
 
@@ -456,6 +462,9 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
       ["P6\r\n2\t1\r\n255\r\nabcdef", "ppm"],
       ["P6 # width\n2 # height\n1\n255\nabcdef", "ppm"],
       ["P6#comment right after the magic\n2 1\n255\nabcdef", "ppm"],
+      ["P6 # ended by a CR\r2 1\n255\nabcdef", "ppm"],
+      ["P6\n9 9\n255\n", "ppm"],
+      ["P6\u000b2\u000c1\n255\n", "ppm"],
     ])("takes the header of %j", async (text, format) => {
       byBytes(await validateImageBuffer(Buffer.from(text, "latin1"), "a.pnm"), format);
     });
@@ -486,11 +495,21 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
       byBytes(await validateImageBuffer(Buffer.from(pam), "a.pam"), "ppm");
       const commented = "P7\n# written by hand\nHEIGHT 21\nWIDTH 32\nENDHDR\n";
       byBytes(await validateImageBuffer(Buffer.from(commented), "a.pam"), "ppm");
+      byBytes(await validateImageBuffer(Buffer.from("P7\nWIDTH\t32\n"), "a.pam"), "ppm");
+      byBytes(await validateImageBuffer(Buffer.from("P7\n  WIDTH 32\n"), "a.pam"), "ppm");
+    });
+
+    it("stops looking for a PAM's WIDTH line after the header window", async () => {
+      const padded = `P7\n${"# padding\n".repeat(7000)}WIDTH 1\nENDHDR\n`;
+      expect(await validateImageBuffer(Buffer.from(padded), "a.pam")).toEqual(unrecognized);
+      const short = `P7\n${"# padding\n".repeat(100)}WIDTH 1\nENDHDR\n`;
+      byBytes(await validateImageBuffer(Buffer.from(short), "a.pam"), "ppm");
     });
 
     it.each([
       ["P7\nHEIGHT 21\nENDHDR\nWIDTH 32\n", "a WIDTH line only after ENDHDR"],
       ["P7\nWIDTH\nHEIGHT 21\n", "a WIDTH line with no number"],
+      ["P7\nWIDTH32\n", "no space after WIDTH"],
       ["P7 WIDTH 32\n", "WIDTH on the magic's line"],
     ])("rejects a PAM with %s", async (text) => {
       expect(await validateImageBuffer(Buffer.from(text), "a.pam")).toEqual(unrecognized);
@@ -506,11 +525,17 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
 
     it("takes a free-format SIMPLE = T card", async () => {
       byBytes(await validateImageBuffer(card("T / conforms"), "a.fits"), "fits");
+      byBytes(await validateImageBuffer(card("T/conforms"), "a.fits"), "fits");
+    });
+
+    it("takes a T that ends the buffer", async () => {
+      byBytes(await validateImageBuffer(Buffer.from("SIMPLE  = T"), "a.fits"), "fits");
     });
 
     it.each([
       ["SIMPLE = F", card(`${" ".repeat(19)}F`)],
       ["no value", card("")],
+      ["a word starting with T", card("True story")],
       ["no space before the =", Buffer.from("SIMPLE= T".padEnd(80, " "))],
       ["a T past the first card", Buffer.from(`SIMPLE  = ${" ".repeat(70)}T`)],
     ])("rejects %s", async (_label, bytes) => {
@@ -519,30 +544,44 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
   });
 
   describe("DPX", () => {
-    const dpx = (magic: string, version: string) => {
-      const buf = Buffer.alloc(64);
+    // The image data offset at byte 4, big-endian after SDPX, little-endian
+    // after XPDS. ImageMagick writes 8192, ffmpeg 1664.
+    const dpx = (magic: string, offset: number, length = 8192, order = magic) => {
+      const buf = Buffer.alloc(length);
       buf.write(magic, 0, "latin1");
-      buf.write(version, 8, "latin1");
+      if (order === "SDPX") buf.writeUInt32BE(offset, 4);
+      else buf.writeUInt32LE(offset, 4);
       return buf;
     };
 
-    // ImageMagick writes V2.0 in either byte order, ffmpeg V1.0 little-endian.
     it.each([
-      ["SDPX", "V2.0"],
-      ["SDPX", "V1.0"],
-      ["XPDS", "V2.0"],
-      ["XPDS", "V1.0"],
-      ["SDPX", "v1.0"],
-    ])("takes %s with version %s", async (magic, version) => {
-      byBytes(await validateImageBuffer(dpx(magic, version), "a.dpx"), "dpx");
+      ["SDPX", 8192],
+      ["XPDS", 1664],
+      ["SDPX", 768],
+      ["XPDS", 2048],
+    ])("takes %s with its image data at %i", async (magic, offset) => {
+      byBytes(await validateImageBuffer(dpx(magic, offset), "a.dpx"), "dpx");
+    });
+
+    it("doesn't care what the version string says", async () => {
+      for (const version of ["V3.0", "V1.0    ", "\0\0\0\0\0\0\0\0"]) {
+        const bytes = dpx("SDPX", 2048);
+        bytes.write(version, 8, "latin1");
+        byBytes(await validateImageBuffer(bytes, "a.dpx"), "dpx");
+      }
     });
 
     it.each([
-      ["V3.0", "an unknown major version"],
-      ["V2.0 ", "no NUL after the version"],
-      ["2.0", "no V"],
-    ])("rejects version %j (%s)", async (version) => {
-      expect(await validateImageBuffer(dpx("SDPX", version), "a.dpx")).toEqual(unrecognized);
+      ["data inside the generic header", dpx("SDPX", 767)],
+      ["data past the end of the file", dpx("SDPX", 8193)],
+      ["an offset in the wrong byte order", dpx("SDPX", 2048, 8192, "XPDS")],
+      ["a header cut at 7 bytes", dpx("XPDS", 2048).subarray(0, 7)],
+    ])("rejects %s", async (_label, bytes) => {
+      expect(await validateImageBuffer(bytes, "a.dpx")).toEqual(unrecognized);
+    });
+
+    it("takes data that starts exactly at the end of the buffer", async () => {
+      byBytes(await validateImageBuffer(dpx("XPDS", 1024, 1024), "a.dpx"), "dpx");
     });
 
     it("still takes a Cineon file by its binary signature", async () => {
@@ -566,6 +605,10 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
 
     it.each([0, 123, 125, 0x65746f6e])("rejects a header size of %i", async (size) => {
       expect(await validateImageBuffer(dds(size), "a.dds")).toEqual(unrecognized);
+    });
+
+    it("rejects a header cut at 7 bytes", async () => {
+      expect(await validateImageBuffer(dds(124).subarray(0, 7), "a.dds")).toEqual(unrecognized);
     });
   });
 
@@ -596,6 +639,7 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
       ["five channels", qoi(32, 21, 5, 0)],
       ["colourspace 2", qoi(32, 21, 3, 2)],
       ["a header cut at 13 bytes", qoi(32, 21, 3, 0).subarray(0, 13)],
+      ["a header cut at 12 bytes", qoi(32, 21, 3, 0).subarray(0, 12)],
     ])("rejects %s", async (_label, bytes) => {
       expect(await validateImageBuffer(bytes, "a.qoi")).toEqual(unrecognized);
     });
@@ -616,11 +660,16 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
       byBytes(await validateImageBuffer(psd(version), "a.psd"), "psd");
     });
 
+    // The reserved bytes after the version should be zero, but a decoder
+    // doesn't need them to be and the version's NUL already rules text out.
+    it("takes a header with junk in its reserved bytes", async () => {
+      byBytes(await validateImageBuffer(Buffer.from(psd(1)).fill(7, 6, 12), "a.psd"), "psd");
+    });
+
     it.each([
       ["version 0", psd(0)],
       ["version 3", psd(3)],
-      ["a non-zero reserved byte", Buffer.from(psd(1)).fill(1, 11, 12)],
-      ["a header cut at 11 bytes", psd(1).subarray(0, 11)],
+      ["a header cut at 5 bytes", psd(1).subarray(0, 5)],
     ])("rejects %s", async (_label, bytes) => {
       expect(await validateImageBuffer(bytes, "a.psd")).toEqual(unrecognized);
     });
@@ -636,11 +685,14 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
     };
 
     it.each([
+      [1, 0],
       [2, 0],
       [2, 1],
       [2, 3],
+      [2, 255],
       [3, 0],
       [4, 1],
+      [15, 0],
     ])("takes version %i.%i", async (major, minor) => {
       byBytes(await validateImageBuffer(x3f(major, minor), "a.x3f"), "raw");
       byBytes(await validateImageBuffer(x3f(major, minor), "upload.bin"), "raw");
@@ -650,6 +702,7 @@ describe("ASCII signatures need a header behind them (#1859)", () => {
       ["major version 0", x3f(0, 0)],
       ["major version 16", x3f(16, 0)],
       ["minor version 256", x3f(2, 256)],
+      ["a header cut at 7 bytes", x3f(2, 0).subarray(0, 7)],
     ])("leaves a header with %s to the name", async (_label, bytes) => {
       byNameOnly(await validateImageBuffer(bytes, "a.x3f"), "raw");
       expect(await validateImageBuffer(bytes, "upload.bin")).toEqual(unrecognized);
