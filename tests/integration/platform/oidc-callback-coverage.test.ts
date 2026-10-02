@@ -1019,10 +1019,14 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'externalId' = ${sub}`,
       );
     expect(auditRows).toHaveLength(0);
-    // The callback's own catch must not report it as username contention: in
-    // production the global error handler reports the 500. buildTestApp()
-    // doesn't install that handler (#1243), so nothing here reports at all.
-    expect(reportErrorSpy).not.toHaveBeenCalled();
+    // The callback's own catch must not report it as username contention; the
+    // 500 is the global error handler's to report. buildTestApp() doesn't
+    // install that handler yet (#1243), so this only rules out the callback's
+    // report and holds whether or not the handler is there.
+    expect(reportErrorSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ subsystem: "external-auth" }),
+    );
   });
 
   it("fails closed with a distinct error when the MFA policy lookup throws (#815)", async () => {
@@ -1031,7 +1035,12 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     // policy-read catch. A thrown policy lookup must fail CLOSED for an
     // unenrolled user: the stored policy may well be "required", so the
     // login is denied with a retryable error param instead of a session.
-    const policyFault = new Error("simulated MFA policy lookup failure");
+    // Shaped like the real failure: the settings read losing its Postgres
+    // connection (SQLSTATE 57P01, admin_shutdown).
+    const policyFault = Object.assign(
+      new Error("terminating connection due to administrator command"),
+      { code: "57P01" },
+    );
     const spy = vi.spyOn(mfaModule, "getMfaPolicy").mockRejectedValue(policyFault);
     try {
       const sub = `sub-mfathrow-${Math.random().toString(36).slice(2, 10)}`;
@@ -1069,7 +1078,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
         statusCode: 503,
         subsystem: "mfa-policy",
       });
-      expect(classifyError(policyFault, "http")).not.toBe("expected");
+      // A lost database is the operator's environment, so it reaches Sentry
+      // as a throttled warning rather than being dropped as expected.
+      expect(classifyError(policyFault, "http")).toBe("operational");
     } finally {
       spy.mockRestore();
     }
