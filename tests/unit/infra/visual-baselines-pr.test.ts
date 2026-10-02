@@ -128,6 +128,13 @@ function mainChangesAWorkflow(seed: string): string {
   return git(seed, "rev-parse", "HEAD");
 }
 
+/** What an all-mode run does to a baseline whose render didn't change. */
+function rewriteUntouchedWithSameBytes(ctx: ReturnType<typeof setup>) {
+  write(ctx.work, UNTOUCHED, "crop");
+  const later = new Date(Date.now() + 60_000);
+  utimesSync(join(ctx.work, UNTOUCHED), later, later);
+}
+
 function run(ctx: ReturnType<typeof setup>, args: string[], env: Record<string, string> = {}) {
   const summary = join(ctx.dir, "summary.md");
   const output = join(ctx.dir, "output.txt");
@@ -144,6 +151,8 @@ function run(ctx: ReturnType<typeof setup>, args: string[], env: Record<string, 
       SOURCE_REF: "main",
       RETRY_DELAY: "0",
       ARTIFACT_NAME: ARTIFACT,
+      // The developer's shell must not pick the PR body's mode.
+      UPDATE_SNAPSHOTS: "",
       ...env,
     },
   });
@@ -212,12 +221,11 @@ describe("visual-baselines-pr.sh collect", () => {
   });
 
   it("leaves out a baseline rewritten with the same bytes", () => {
-    // --update-snapshots=all can touch every PNG it renders (#1705). Only
-    // the ones whose contents changed may reach the PR.
+    // --update-snapshots=all refreshes any baseline whose bytes differ
+    // (#1705), so the PR must carry only content changes: a same-bytes
+    // rewrite or a bare timestamp change stays out.
     const ctx = setup();
-    write(ctx.work, UNTOUCHED, "crop");
-    const later = new Date(Date.now() + 60_000);
-    utimesSync(join(ctx.work, UNTOUCHED), later, later);
+    rewriteUntouchedWithSameBytes(ctx);
     const { staging, listed, result } = collect(ctx);
 
     expect(result.status, result.stderr).toBe(0);
@@ -367,6 +375,7 @@ exec "${realGit}" "$@"`,
 
   it("says in the PR body that an all-mode run refreshed every baseline", () => {
     const ctx = setup();
+    rewriteUntouchedWithSameBytes(ctx);
     const { pushed } = collectAndPush(ctx, { UPDATE_SNAPSHOTS: "all" });
 
     expect(pushed.status, pushed.stderr).toBe(0);
@@ -472,15 +481,24 @@ describe("update-visual-baselines.yml", () => {
     expect(input?.options).toEqual(["changed", "all"]);
     expect(input?.default).toBe("changed");
 
-    const mode = expr("inputs.update_snapshots || 'changed'");
-    expect(steps[regenerate].env?.UPDATE_SNAPSHOTS).toBe(mode);
+    // One job-level value feeds both the run and the PR body, so the body
+    // can't name a mode the run didn't use.
+    expect(job.env?.UPDATE_SNAPSHOTS).toBe(expr("inputs.update_snapshots || 'changed'"));
+    expect(steps.filter((step) => step.env?.UPDATE_SNAPSHOTS !== undefined)).toEqual([]);
     expect(steps[regenerate].run).toContain('"--update-snapshots=$UPDATE_SNAPSHOTS"');
     // The input reaches the shell through env, never spliced into the script.
     expect(steps[regenerate].run).not.toContain("inputs.");
     // A bare --update-snapshots means changed, whatever the input says.
     expect(steps[regenerate].run).not.toMatch(/--update-snapshots(?!=)/);
-    // The PR body names the mode the run used.
-    expect(steps[push].env?.UPDATE_SNAPSHOTS).toBe(mode);
+  });
+
+  it("describes every mode the input offers in the PR body", () => {
+    const options = workflow.on.workflow_dispatch?.inputs?.update_snapshots?.options ?? [];
+    const script = readFileSync(SCRIPT, "utf8");
+    for (const option of options) {
+      expect(script).toContain(`    ${option})\n`);
+      expect(script).toContain(`Mode \\\`${option}\\\`:`);
+    }
   });
 
   it("runs exactly the projects that write @visual baselines", () => {

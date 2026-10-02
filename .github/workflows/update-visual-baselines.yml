@@ -7,7 +7,8 @@ on:
         description: >-
           changed rewrites only baselines that fail their comparison. all
           rewrites every baseline whose bytes differ from what renders now,
-          including differences under the maxDiffPixelRatio budget (#1705).
+          including differences under the maxDiffPixelRatio budget, plus a
+          few files of render noise per run (#1705).
         type: choice
         options:
           - changed
@@ -27,6 +28,8 @@ jobs:
       # One name per run attempt, so a re-run never collides with the
       # artifact or branch an earlier attempt left behind.
       ARTIFACT_NAME: visual-baselines-${{ github.run_id }}-${{ github.run_attempt }}
+      # Read by the regenerate step and named in the PR body, from one place.
+      UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots || 'changed' }}
     # The e2e webServer (playwright.config.ts) creates an isolated database via
     # tests/e2e-pg-create-db.cjs, so it needs Postgres + Redis on localhost.
     # Without these services the webServer fails with "failed to create database".
@@ -80,7 +83,6 @@ jobs:
         run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium "--update-snapshots=$UPDATE_SNAPSHOTS"
         env:
           PW_WORKERS: "2"
-          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots || 'changed' }}
       - name: Collect regenerated baselines
         id: collect
         if: always()
@@ -111,7 +113,6 @@ jobs:
           SOURCE_REF: ${{ github.ref_name }}
           SOURCE_SHA: ${{ github.sha }}
           REGENERATE_OUTCOME: ${{ steps.regenerate.outcome }}
-          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots || 'changed' }}
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GIT_AUTHOR_NAME: github-actions[bot]

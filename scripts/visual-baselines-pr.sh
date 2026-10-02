@@ -18,8 +18,8 @@
 #     ends red and names the artifact that holds the PNGs.
 #
 # Env for push: BRANCH (required), BASE_BRANCH, SOURCE_REF, SOURCE_SHA,
-# REGENERATE_OUTCOME, UPDATE_SNAPSHOTS, ARTIFACT_NAME, UPLOAD_OUTCOME, RUN_URL, PUSH_ATTEMPTS,
-# RETRY_DELAY.
+# REGENERATE_OUTCOME, UPDATE_SNAPSHOTS, ARTIFACT_NAME, UPLOAD_OUTCOME,
+# RUN_URL, PUSH_ATTEMPTS, RETRY_DELAY.
 set -euo pipefail
 
 SCREENSHOTS="tests/e2e/__screenshots__"
@@ -83,14 +83,19 @@ pr_body() {
   echo
   echo "Rendered from \`${SOURCE_REF:-unknown}\` at ${SOURCE_SHA}, committed on top of \`${BASE_BRANCH}\`."
   echo
-  if [ "${UPDATE_SNAPSHOTS:-changed}" = "all" ]; then
-    echo "Mode \`all\`: every baseline was rendered again, and each file listed here came out with different"
-    echo "bytes, including changes under the \`maxDiffPixelRatio\` budget that \`changed\` mode lets through."
-  else
-    echo "Mode \`${UPDATE_SNAPSHOTS:-changed}\`: only baselines that failed their comparison were rewritten, so one that's"
-    echo "stale by less than the \`maxDiffPixelRatio\` budget stays as it was. Dispatch with \`update_snapshots: all\`"
-    echo "to refresh those too."
-  fi
+  case "${UPDATE_SNAPSHOTS:-changed}" in
+    all)
+      echo "Mode \`all\`: each file listed here is new or came out with different bytes, including changes"
+      echo "under the \`maxDiffPixelRatio\` budget that \`changed\` mode lets through. Expect a few files that"
+      echo "differ only by render noise of a handful of pixels."
+      ;;
+    changed)
+      echo "Mode \`changed\`: only new baselines and ones that failed their comparison were written, so one"
+      echo "that's stale by less than the \`maxDiffPixelRatio\` budget stays as it was. Dispatch with"
+      echo "\`update_snapshots: all\` to refresh those too."
+      ;;
+    *) echo "Mode \`${UPDATE_SNAPSHOTS}\`." ;;
+  esac
   if [ "${SOURCE_REF:-}" != "$BASE_BRANCH" ]; then
     echo
     echo "These match \`${SOURCE_REF:-unknown}\`, not \`${BASE_BRANCH}\`, which is why this PR is a draft."
