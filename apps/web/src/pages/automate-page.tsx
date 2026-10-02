@@ -342,8 +342,8 @@ export function AutomatePage() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       // Each stage fails on its own and gets its own message (#1956): a file
-      // that won't parse is a bad file, a save that never reached the server
-      // is a network error, and a failed refresh after a good save must say
+      // that won't parse is a bad file, a save request that got no answer is
+      // a network error, and a failed refresh after a good save must say
       // the list is stale rather than leave the new pipeline invisible.
       let data: unknown;
       try {
@@ -410,8 +410,14 @@ export function AutomatePage() {
           setImportError(t.automate.importListRefreshFailed);
           return;
         }
-        const listData = await listRes.json();
-        setSavedPipelines(listData.pipelines || []);
+        const listData: unknown = await listRes.json();
+        const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          // An OK answer without the list (a proxy's `{}`) must not blank it.
+          setImportError(t.automate.importListRefreshFailed);
+          return;
+        }
+        setSavedPipelines(pipelines);
       } catch {
         setImportError(t.automate.importListRefreshFailed);
       }

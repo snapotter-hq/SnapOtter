@@ -82,7 +82,13 @@ beforeEach(() => {
       const url = String(input);
       if (url.includes("/pipeline/list")) {
         listCalls += 1;
-        if (listCalls === 1) return new Response(JSON.stringify({ pipelines: [] }));
+        // The first list call is the page's own load on mount; the import's
+        // refresh is the next one.
+        if (listCalls === 1) {
+          return new Response(
+            JSON.stringify({ pipelines: usePipelineStore.getState().savedPipelines }),
+          );
+        }
         return respond(server.list());
       }
       if (url.includes("/pipeline/save")) return respond(server.save());
@@ -163,6 +169,16 @@ describe("automate pipeline import (#1956)", () => {
     );
   });
 
+  it("keeps the shown list, and says it's stale, when an OK list answer carries no list", async () => {
+    usePipelineStore.setState({ savedPipelines: [{ ...SAVED, id: "old", name: "Old" }] });
+    server = { save: savedOk, list: () => new Response("{}") };
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() =>
+      expect(screen.getByText(en.automate.importListRefreshFailed)).toBeInTheDocument(),
+    );
+    expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["old"]);
+  });
+
   it("shows the imported pipeline and no error when save and refresh both work", async () => {
     server = { save: savedOk, list: listOk };
     await importFile(JSON.stringify(PIPELINE));
@@ -188,5 +204,20 @@ describe("automate pipeline import (#1956)", () => {
     await waitFor(() =>
       expect(screen.getByText(en.automate.invalidPipelineFile)).toBeInTheDocument(),
     );
+  });
+
+  it.each([
+    ["a newer version", { version: 2 }, en.automate.newerVersion],
+    ["a string version", { version: "1" }, en.automate.newerVersion],
+    ["no name", { name: undefined }, en.automate.missingName],
+    ["an empty name", { name: "" }, en.automate.missingName],
+    ["no steps", { steps: [] }, en.automate.noSteps],
+    ["steps that aren't a list", { steps: {} }, en.automate.noSteps],
+  ])("rejects a pipeline with %s before saving it", async (_label, patch, expected) => {
+    server = { save: savedOk, list: listOk };
+    await importFile(JSON.stringify({ ...PIPELINE, ...patch }));
+    await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument());
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.includes("/pipeline/save"))).toBe(false);
   });
 });
