@@ -104,9 +104,9 @@ const SERIAL_SPECS =
   /gui-settings-|settings\.spec|rbac|security|people|api\.spec|state-bleed|full-session|gui-file-carry|library-save-mode|i18n|theme|gui-performance|navigation-guard|pin-tools/;
 
 // Screenshot-comparison specs. Separate project because baselines are
-// platform-specific: they run locally (darwin baselines) and via the
-// update-visual-baselines workflow, but not in the nightly linux run until
-// linux baselines are committed.
+// platform-specific: darwin baselines serve local runs, and the linux set,
+// rendered by the update-visual-baselines workflow, is compared nightly by
+// nightly.yml's e2e-visual job.
 const VISUAL_SPECS = /gui-visual-/;
 const LEGACY_VISUAL_SPECS = /visual-regression\.spec\.ts/;
 

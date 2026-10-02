@@ -27,8 +27,6 @@ const MANUAL_ONLY: Record<string, string> = {
     "In-container browser sweep against a running image at BASE_URL: 1072 tests at workers=1 with 120s timeouts. nightly.yml's docker-e2e job already records in-container browser e2e as a separate follow-up that does not fit its 60-minute budget.",
   "tests/qa/playwright.qa.config.ts":
     "Against-production sweep driven by QA_BASE_URL. CI has no deployed target to point it at, so it stays a manual release-verification lane.",
-  "chromium-visual":
-    "Screenshot baselines are platform-suffixed and only darwin baselines are committed (327 darwin, 0 linux). update-visual-baselines.yml exists to generate the linux set and open a PR; until that lands, a linux lane would fail on every missing snapshot.",
   "chromium-legacy-visual":
     "visual-regression.spec.ts has no maintained baselines on any platform, as playwright.config.ts states. It is kept explicitly runnable rather than silently skipped.",
 };
@@ -36,9 +34,26 @@ const MANUAL_ONLY: Record<string, string> = {
 /** Projects that only exist as a dependency of another project. */
 const DEPENDENCY_PROJECTS = new Set(["setup"]);
 
-interface Workflow {
-  jobs?: Record<string, { steps?: { run?: string }[] }>;
+interface Step {
+  name?: string;
+  id?: string;
+  if?: string;
+  uses?: string;
+  run?: string;
+  env?: Record<string, string>;
+  with?: Record<string, string>;
 }
+
+interface Workflow {
+  jobs?: Record<string, { "runs-on"?: string; steps?: Step[] }>;
+}
+
+/**
+ * A run that rewrites baselines can't fail on a stale one, so it compares
+ * nothing. update-visual-baselines.yml renders every visual project that way,
+ * and that run used to count as covering them (#1507).
+ */
+const UPDATES_SNAPSHOTS = /--update-snapshots(?!=none\b)/;
 
 function rootScripts(): Record<string, string> {
   return (
@@ -60,7 +75,9 @@ function executedCommands(): string {
     const workflow = load(readFileSync(path.join(workflowDir, file), "utf8")) as Workflow;
     for (const job of Object.values(workflow.jobs ?? {})) {
       for (const step of job.steps ?? []) {
-        if (typeof step.run === "string") commands.push(step.run);
+        if (typeof step.run === "string" && !UPDATES_SNAPSHOTS.test(step.run)) {
+          commands.push(step.run);
+        }
       }
     }
   }
@@ -116,18 +133,89 @@ describe("Playwright CI coverage", () => {
   });
 
   it("keeps the manual-only list free of stale entries", () => {
-    const nowWired = Object.keys(MANUAL_ONLY).filter(
-      (surface) =>
-        corpus.includes(surface.endsWith(".ts") ? surface : `--project=${surface}`) &&
-        // update-visual-baselines regenerates baselines; it is not a gate.
-        !corpus.includes("--update-snapshots"),
+    const nowWired = Object.keys(MANUAL_ONLY).filter((surface) =>
+      corpus.includes(surface.endsWith(".ts") ? surface : `--project=${surface}`),
     );
     expect(nowWired).toEqual([]);
+  });
+
+  it("compares every maintained screenshot baseline, not only regenerates it", () => {
+    // The projects that write maintained baselines: VISUAL_SPECS plus the
+    // device projects that keep their @visual shots. A command that names one
+    // of them but grep-inverts @visual compares none of its screenshots.
+    const config = readFileSync(path.join(root, "playwright.config.ts"), "utf8");
+    const visualProjects = config
+      .split(/\n {4}\{\n/)
+      .slice(1)
+      .filter((block) => /testMatch: (VISUAL_SPECS|DEVICE_SPECS),/.test(block))
+      .filter((block) => !/grepInvert: \/@visual\//.test(block))
+      .map((block) => /^ {6}name: "([^"]+)",$/m.exec(block)?.[1]);
+    expect(visualProjects).toEqual(
+      expect.arrayContaining(["chromium-visual", "mobile-chromium", "tablet-chromium"]),
+    );
+    const comparing = corpus
+      .split("\n")
+      .filter(
+        (line) => line.includes("playwright test") && !/--grep-invert[= ]"?@visual/.test(line),
+      );
+    const uncompared = visualProjects.filter(
+      (project) => !comparing.some((line) => line.includes(`--project=${project}`)),
+    );
+    expect(uncompared).toEqual([]);
   });
 
   it("gives every manual-only surface a written reason", () => {
     for (const [surface, reason] of Object.entries(MANUAL_ONLY)) {
       expect(reason.length, `${surface} needs a reason`).toBeGreaterThan(60);
     }
+  });
+});
+
+describe("nightly visual comparison (#1507)", () => {
+  const workflow = load(
+    readFileSync(path.join(root, ".github/workflows/nightly.yml"), "utf8"),
+  ) as Workflow;
+  const job = workflow.jobs?.["e2e-visual"];
+  const steps = job?.steps ?? [];
+  const lanes = steps.filter((step) => step.run?.includes("playwright test"));
+  const upload = steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
+
+  it("runs on the runner image the linux baselines come from", () => {
+    // update-visual-baselines.yml renders on ubuntu-latest. Another Ubuntu
+    // release (the test fleet's, say) renders fonts differently and fails every shot.
+    expect(job?.["runs-on"]).toBe("ubuntu-latest");
+  });
+
+  it("compares desktop and device shots without ever writing a baseline", () => {
+    expect(lanes.map((step) => step.run).join("\n")).toContain("--project=chromium-visual");
+    const device = lanes.find((step) => step.run?.includes("--project=mobile-chromium"));
+    expect(device?.run).toContain("--project=tablet-chromium");
+    expect(device?.run).toMatch(/--grep "?@visual/);
+    // Every lane runs even when an earlier one failed.
+    for (const lane of lanes.slice(1)) expect(lane.if).toContain("!cancelled()");
+    for (const lane of lanes) {
+      // The default, missing, writes an absent baseline and lets the CI retry
+      // pass against it. none fails both attempts instead.
+      expect(lane.run).toContain("--update-snapshots=none");
+      expect(lane.run).not.toContain("--grep-invert");
+    }
+  });
+
+  it("uploads each lane's diff report when a comparison fails", () => {
+    expect(upload?.if).toBe("failure()");
+    // Playwright writes its report under test-results/e2e-runs/<run id>/, so a
+    // fixed run id per lane is what gives the upload a path to find (#1025).
+    for (const lane of lanes) {
+      const runId = lane.env?.PLAYWRIGHT_RUN_ID;
+      expect(runId, `${lane.name} needs a fixed PLAYWRIGHT_RUN_ID`).toBeTruthy();
+      expect(upload?.with?.path).toContain(`test-results/e2e-runs/${runId}/playwright-report/`);
+    }
+    expect(new Set(lanes.map((lane) => lane.env?.PLAYWRIGHT_RUN_ID)).size).toBe(lanes.length);
+  });
+
+  it("points the job summary at the baseline refresh workflow", () => {
+    const summary = steps.find((step) => step.run?.includes("GITHUB_STEP_SUMMARY"));
+    expect(summary?.if).toContain("!cancelled()");
+    expect(summary?.run).toContain("update-visual-baselines.yml");
   });
 });

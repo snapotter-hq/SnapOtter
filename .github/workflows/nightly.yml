@@ -323,6 +323,108 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  # Compares every maintained screenshot against its committed linux baseline.
+  # update-visual-baselines.yml renders the same shots with --update-snapshots,
+  # so it rewrites a stale baseline instead of reporting it, and the device
+  # matrix above grep-inverts @visual: until this job, no workflow ever failed
+  # on a stale or missing baseline (#1507). It runs on ubuntu-latest because
+  # that's where the linux baselines are rendered; another Ubuntu release (the
+  # test fleet's, say) draws fonts differently and fails every shot.
+  e2e-visual:
+    name: E2E Visual Comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ARTIFACT_NAME: e2e-visual-report-${{ github.run_id }}-${{ github.run_attempt }}
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: snapotter
+          POSTGRES_PASSWORD: snapotter
+          POSTGRES_DB: snapotter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U snapotter"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      - name: Install Playwright Chromium
+        uses: ./.github/actions/playwright-install
+      # --update-snapshots=none: the default (missing) writes an absent
+      # baseline on the first attempt, and the CI retry then passes against
+      # the file it just wrote. none fails both attempts instead.
+      # PLAYWRIGHT_RUN_ID is fixed per lane because Playwright writes its report
+      # under test-results/e2e-runs/<run id>/, and the upload needs that path.
+      - name: Compare desktop screenshots
+        id: desktop
+        run: pnpm playwright test --project=chromium-visual --update-snapshots=none
+        env:
+          PW_WORKERS: "2"
+          PLAYWRIGHT_RUN_ID: visual-desktop
+      - name: Compare device screenshots
+        id: device
+        if: ${{ !cancelled() }}
+        run: pnpm playwright test --project=mobile-chromium --project=tablet-chromium --grep @visual --update-snapshots=none
+        env:
+          PW_WORKERS: "2"
+          PLAYWRIGHT_RUN_ID: visual-device
+      # The report holds the expected, actual and diff image for every
+      # failing shot; playwright-output holds the same PNGs as plain files.
+      - name: Upload diff report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: |
+            test-results/e2e-runs/visual-desktop/playwright-report/
+            test-results/e2e-runs/visual-device/playwright-report/
+            test-results/e2e-runs/visual-desktop/playwright-output/
+            test-results/e2e-runs/visual-device/playwright-output/
+          retention-days: 14
+      - name: Summarize
+        if: ${{ !cancelled() }}
+        env:
+          DESKTOP: ${{ steps.desktop.outcome }}
+          DEVICE: ${{ steps.device.outcome }}
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo "## Visual comparison against the linux baselines"
+            echo
+            echo "| Lane | Result |"
+            echo "| --- | --- |"
+            echo "| Desktop (chromium-visual) | $DESKTOP |"
+            echo "| Devices (mobile-chromium, tablet-chromium @visual) | $DEVICE |"
+            echo
+            if [ "$DESKTOP" != success ] || [ "$DEVICE" != success ]; then
+              echo "A screenshot no longer matches its committed linux baseline, or has none. The \`$ARTIFACT_NAME\` artifact holds the Playwright report with the expected, actual and diff image for each failing shot (open it with \`pnpm exec playwright show-report <dir>\`)."
+              echo
+            fi
+            echo "If the new rendering is intended, refresh the baselines with [Update Visual Baselines](https://github.com/$REPO/actions/workflows/update-visual-baselines.yml) (\`.github/workflows/update-visual-baselines.yml\`): run it on main and it opens a PR with the regenerated PNGs. If it isn't intended, the diff is the regression."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   docker-e2e:
     name: Docker Container E2E
     runs-on: ubuntu-latest
