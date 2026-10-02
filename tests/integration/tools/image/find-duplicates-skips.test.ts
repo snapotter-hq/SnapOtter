@@ -85,10 +85,14 @@ const HEIC = readFixture(fixtures.image.base.heic200);
 // A DNG is a TIFF container. Validation routes it to the CLI decoder as "raw",
 // and when that decoder is missing the route falls back to Sharp's TIFF read.
 const DNG = readFixture(fixtures.image.formats("dng"));
-// Photoshop magic plus garbage: validation passes it as a CLI-decoded format
-// without a Sharp read, so it reaches decodeToSharpCompat, and Sharp's own
-// fallback read then fails too.
-const FAKE_PSD = Buffer.concat([Buffer.from("8BPS"), Buffer.alloc(64, 7)]);
+// A Photoshop signature and version, then garbage: validation passes it as a
+// CLI-decoded format without a Sharp read, so it reaches decodeToSharpCompat,
+// and Sharp's own fallback read then fails too.
+const FAKE_PSD = Buffer.concat([
+  Buffer.from("8BPS"),
+  Buffer.from([0, 1, 0, 0, 0, 0, 0, 0]), // version 1, six reserved zero bytes
+  Buffer.alloc(64, 7),
+]);
 // gzip magic plus garbage: validation passes .svgz by extension, decompress throws.
 const FAKE_SVGZ = Buffer.concat([Buffer.from([0x1f, 0x8b]), Buffer.alloc(32, 9)]);
 

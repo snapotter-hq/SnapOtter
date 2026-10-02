@@ -300,7 +300,11 @@ describe("validateImageBuffer", () => {
   });
 
   it("accepts BMP magic (decoded via CLI, not Sharp)", async () => {
-    const fakeBmp = Buffer.from([0x42, 0x4d, 0x00, 0x00]);
+    // "BM" and a 40-byte DIB header size at byte 14: the signature alone is
+    // something text can open with (#1859).
+    const fakeBmp = Buffer.alloc(18);
+    fakeBmp.write("BM", 0, "latin1");
+    fakeBmp.writeUInt32LE(40, 14);
     const result = await validateImageBuffer(fakeBmp);
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -472,6 +476,7 @@ describe("validateImageBuffer", () => {
     psdBuf[1] = 0x42;
     psdBuf[2] = 0x50;
     psdBuf[3] = 0x53;
+    psdBuf.writeUInt16BE(1, 4); // version 1; the six reserved bytes after it stay zero
     const result = await validateImageBuffer(psdBuf);
     expect(result.valid).toBe(true);
     if (result.valid) {

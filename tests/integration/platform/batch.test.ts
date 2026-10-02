@@ -1376,15 +1376,16 @@ describe("Batch where every file fails validation", () => {
 // ── CLI-decode fallback + all-children-failed ───────────────────
 describe("Batch where every worker job fails", () => {
   it("returns 422 with per-file errors when all enqueued children fail", async () => {
-    // A QOI header with impossible channel/colorspace bytes passes magic-byte
-    // ingress validation (CLI-decoded formats skip the Sharp probe), fails
-    // every decoder in the CLI fallback chain, is uploaded raw, and then
-    // fails in the worker. That drives the post-processing "all files
-    // failed" branch, which is unreachable via ingress validation alone.
+    // A well-formed QOI header over far too little pixel data passes ingress
+    // validation (CLI-decoded formats skip the Sharp probe, and the header is
+    // all it checks), fails every decoder in the CLI fallback chain, is
+    // uploaded raw, and then fails in the worker. That drives the
+    // post-processing "all files failed" branch, which is unreachable via
+    // ingress validation alone.
     const garbageQoi = Buffer.concat([
       Buffer.from("qoif"),
-      // width=1, height=1, channels=0xff (invalid), colorspace=0xff (invalid)
-      Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 0xff, 0xff]),
+      // width=1000, height=1000, channels=3, colorspace=0: 64 bytes can't hold it
+      Buffer.from([0, 0, 0x03, 0xe8, 0, 0, 0x03, 0xe8, 3, 0]),
       Buffer.alloc(64, 0xab),
     ]);
 

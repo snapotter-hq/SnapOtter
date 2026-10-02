@@ -271,6 +271,29 @@ describe("library upload MIME type for every accepted image format (#1550)", () 
     },
   );
 
+  // Text that happens to open with an ASCII image signature used to be stored
+  // as that image (#1859). Each signature now needs a header behind it.
+  it.each([
+    "BMW service notes",
+    "P3 meeting agenda",
+    "P5 report",
+    "P7 notes",
+    "FOVbar",
+    "SIMPLE question",
+    "SDPX draft",
+    "DDS notes",
+    "qoif",
+    "8BPS notes",
+  ])("stores text opening %j as application/octet-stream", async (text) => {
+    const { storedMimeType } = await uploadOne({
+      filename: "notes.txt",
+      contentType: "application/octet-stream",
+      content: Buffer.from(`${text}\nmore lines of plain text\n`),
+    });
+
+    expect(storedMimeType).toBe("application/octet-stream");
+  });
+
   // The extension only narrows a family the bytes already proved: it can't
   // turn HEIF bytes into some other format's type.
   it("doesn't take the type from an extension the bytes contradict", async () => {

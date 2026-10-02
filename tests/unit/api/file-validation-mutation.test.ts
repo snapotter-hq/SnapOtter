@@ -170,34 +170,43 @@ describe("validateImageBuffer - empty and null-byte guards", () => {
 // verdict is deterministic { valid, format, 0, 0 } without any real decode.
 // --------------------------------------------------------------------------
 
+/** The bytes of an ASCII string, for headers that spell text out. */
+const ascii = (text: string): number[] => [...Buffer.from(text, "latin1")];
+
+/** A BMP's first 18 bytes: "BM", then zeros up to a 40-byte DIB header size. */
+const BMP_HEAD = [0x42, 0x4d, ...Array(12).fill(0), 40, 0, 0, 0];
+
 describe("validateImageBuffer - CLI-decoded magic bytes (exact / flip / truncate)", () => {
-  // Each row: [label, signature bytes, expected format]
-  const cases: Array<[string, number[], string]> = [
-    ["bmp", [0x42, 0x4d], "bmp"],
+  // Each row: [label, header bytes, expected format, signature length]. An
+  // ASCII signature needs a header behind it (#1859), so those rows carry the
+  // least header that passes; the signature length (default: all of them)
+  // says which leading bytes the flip and truncate cases aim at.
+  const cases: Array<[string, number[], string, number?]> = [
+    ["bmp", BMP_HEAD, "bmp", 2],
     ["tiff II", [0x49, 0x49, 0x2a, 0x00], "tiff"], // tiff is NOT CLI-decoded; asserted separately
     ["ico", [0x00, 0x00, 0x01, 0x00], "ico"],
-    ["psd 8BPS", [0x38, 0x42, 0x50, 0x53], "psd"],
+    ["psd 8BPS", [0x38, 0x42, 0x50, 0x53, 0x00, 0x01], "psd", 4],
     ["exr", [0x76, 0x2f, 0x31, 0x01], "exr"],
     ["jxl codestream", [0xff, 0x0a], "jxl"],
     ["jxl container", [0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20], "jxl"],
     ["jp2 box", [0x00, 0x00, 0x00, 0x0c, 0x6a, 0x50, 0x20, 0x20, 0x0d, 0x0a, 0x87, 0x0a], "jp2"],
     ["jp2 codestream", [0xff, 0x4f, 0xff, 0x51], "jp2"],
-    ["qoi", [0x71, 0x6f, 0x69, 0x66], "qoi"],
-    ["dds", [0x44, 0x44, 0x53, 0x20], "dds"],
+    ["qoi", [0x71, 0x6f, 0x69, 0x66, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0], "qoi", 4],
+    ["dds", [0x44, 0x44, 0x53, 0x20, 124, 0, 0, 0], "dds", 4],
     ["cur", [0x00, 0x00, 0x02, 0x00], "cur"],
-    ["dpx SDPX", [0x53, 0x44, 0x50, 0x58], "dpx"],
-    ["dpx XPDS", [0x58, 0x50, 0x44, 0x53], "dpx"],
+    ["dpx SDPX", [0x53, 0x44, 0x50, 0x58, 0, 0, 0, 0, ...ascii("V2.0")], "dpx", 4],
+    ["dpx XPDS", [0x58, 0x50, 0x44, 0x53, 0, 0, 0, 0, ...ascii("V2.0")], "dpx", 4],
     ["dpx cineon", [0x80, 0x2a, 0x5f, 0xd7], "dpx"],
-    ["fits SIMPLE", [0x53, 0x49, 0x4d, 0x50, 0x4c, 0x45], "fits"],
+    ["fits SIMPLE", ascii(`SIMPLE  = ${" ".repeat(19)}T`), "fits", 6],
     ["eps ascii", [0x25, 0x21, 0x50, 0x53, 0x2d, 0x41, 0x64, 0x6f, 0x62, 0x65], "eps"],
     ["eps binary", [0xc5, 0xd0, 0xd3, 0xc6], "eps"],
-    ["pbm P1", [0x50, 0x31], "pbm"],
-    ["pbm P4", [0x50, 0x34], "pbm"],
-    ["pgm P2", [0x50, 0x32], "pgm"],
-    ["pgm P5", [0x50, 0x35], "pgm"],
-    ["ppm P3", [0x50, 0x33], "ppm"],
-    ["ppm P6", [0x50, 0x36], "ppm"],
-    ["ppm P7", [0x50, 0x37], "ppm"],
+    ["pbm P1", ascii("P1\n1 1\n"), "pbm", 2],
+    ["pbm P4", ascii("P4\n1 1\n"), "pbm", 2],
+    ["pgm P2", ascii("P2\n1 1\n"), "pgm", 2],
+    ["pgm P5", ascii("P5\n1 1\n"), "pgm", 2],
+    ["ppm P3", ascii("P3\n1 1\n"), "ppm", 2],
+    ["ppm P6", ascii("P6\n1 1\n"), "ppm", 2],
+    ["ppm P7", ascii("P7\nWIDTH 1\n"), "ppm", 2],
   ];
 
   const cliDecoded = new Set([
@@ -218,7 +227,7 @@ describe("validateImageBuffer - CLI-decoded magic bytes (exact / flip / truncate
     "ppm",
   ]);
 
-  for (const [label, bytes, format] of cases) {
+  for (const [label, bytes, format, signatureLength = bytes.length] of cases) {
     if (!cliDecoded.has(format)) continue;
 
     it(`accepts an exact ${label} signature as ${format}`, async () => {
@@ -234,16 +243,19 @@ describe("validateImageBuffer - CLI-decoded magic bytes (exact / flip / truncate
 
     it(`rejects ${label} with a flipped last signature byte`, async () => {
       const flipped = [...bytes];
-      const last = flipped.length - 1;
+      const last = signatureLength - 1;
       flipped[last] = (flipped[last] ^ 0xff) & 0xff;
       const result = await validateImageBuffer(withLeadingBytes(flipped));
       expect(result.valid).toBe(false);
     });
 
-    if (bytes.length >= 2) {
+    if (signatureLength >= 2) {
       it(`rejects ${label} truncated below its signature length`, async () => {
         // A buffer shorter than the signature must skip this magic entry.
-        const truncated = withLeadingBytes(bytes.slice(0, bytes.length - 1), bytes.length - 1);
+        const truncated = withLeadingBytes(
+          bytes.slice(0, signatureLength - 1),
+          signatureLength - 1,
+        );
         const result = await validateImageBuffer(truncated);
         expect(result.valid).toBe(false);
       });
@@ -324,12 +336,7 @@ describe("validateImageBuffer - TIFF and RAW-by-extension override", () => {
   it("does NOT reclassify a non-TIFF format even with a RAW extension present", async () => {
     // BMP magic + .dng: the L223 guard requires detectedFormat === "tiff", so a
     // BMP stays bmp (CLI-decoded) rather than becoming raw.
-    expectValid(
-      await validateImageBuffer(withLeadingBytes([0x42, 0x4d]), "weird.dng"),
-      "bmp",
-      0,
-      0,
-    );
+    expectValid(await validateImageBuffer(withLeadingBytes(BMP_HEAD), "weird.dng"), "bmp", 0, 0);
   });
 });
 
@@ -630,12 +637,7 @@ describe("validateImageBuffer - extension-driven detection", () => {
   it("does NOT take the svgz branch when a magic byte already matched", async () => {
     // BMP magic + .svgz extension: detectedFormat is already "bmp" (truthy), so
     // the `!detectedFormat && ext === 'svgz'` guard is skipped and it stays bmp.
-    expectValid(
-      await validateImageBuffer(withLeadingBytes([0x42, 0x4d]), "tricky.svgz"),
-      "bmp",
-      0,
-      0,
-    );
+    expectValid(await validateImageBuffer(withLeadingBytes(BMP_HEAD), "tricky.svgz"), "bmp", 0, 0);
   });
 
   it("accepts an .apng file with no magic as png (goes through sharp)", async () => {

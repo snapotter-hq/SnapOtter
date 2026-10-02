@@ -41,10 +41,12 @@ interface MagicEntry {
   offset: number;
   format: string;
   /**
-   * A TIFF variant whose signature is plain ASCII (ORF's "IIRO"), so text can
-   * start with it: also require a first IFD that sits inside the buffer.
+   * A second check on the header, for a signature text can open with: it is
+   * printable ASCII (ORF's "IIRO", BMP's "BM", Netpbm's "P3"), so the bytes
+   * after it must also hold a structure only the real format has (#1782,
+   * #1859). A buffer that fails is not that format.
    */
-  tiffIfd?: true;
+  check?: (buffer: Buffer) => boolean;
 }
 
 const MAGIC_BYTES: MagicEntry[] = [
@@ -52,7 +54,7 @@ const MAGIC_BYTES: MagicEntry[] = [
   { bytes: [0x89, 0x50, 0x4e, 0x47], offset: 0, format: "png" },
   { bytes: [0x52, 0x49, 0x46, 0x46], offset: 0, format: "webp" }, // RIFF; verified below
   { bytes: [0x47, 0x49, 0x46], offset: 0, format: "gif" },
-  { bytes: [0x42, 0x4d], offset: 0, format: "bmp" },
+  { bytes: [0x42, 0x4d], offset: 0, format: "bmp", check: hasBmpDibHeader },
   { bytes: [0x49, 0x49, 0x2a, 0x00], offset: 0, format: "tiff" },
   { bytes: [0x4d, 0x4d, 0x00, 0x2a], offset: 0, format: "tiff" },
   { bytes: [0x66, 0x74, 0x79, 0x70], offset: 4, format: "avif" }, // ftyp box; verified below
@@ -67,16 +69,16 @@ const MAGIC_BYTES: MagicEntry[] = [
     format: "raw",
   },
   // Sigma X3F: "FOVb" at offset 0
-  { bytes: [0x46, 0x4f, 0x56, 0x62], offset: 0, format: "raw" },
+  { bytes: [0x46, 0x4f, 0x56, 0x62], offset: 0, format: "raw", check: hasX3fVersion },
   // Minolta MRW: "\x00MRM" at offset 0
   { bytes: [0x00, 0x4d, 0x52, 0x4d], offset: 0, format: "raw" },
   // Olympus ORF: a TIFF with its own magic, "IIRO" on most bodies, "IIRS" on
   // some compacts, "MMOR" on the big-endian E-10 and E-20
-  { bytes: [0x49, 0x49, 0x52, 0x4f], offset: 0, format: "raw", tiffIfd: true },
-  { bytes: [0x49, 0x49, 0x52, 0x53], offset: 0, format: "raw", tiffIfd: true },
-  { bytes: [0x4d, 0x4d, 0x4f, 0x52], offset: 0, format: "raw", tiffIfd: true },
+  { bytes: [0x49, 0x49, 0x52, 0x4f], offset: 0, format: "raw", check: hasTiffIfd },
+  { bytes: [0x49, 0x49, 0x52, 0x53], offset: 0, format: "raw", check: hasTiffIfd },
+  { bytes: [0x4d, 0x4d, 0x4f, 0x52], offset: 0, format: "raw", check: hasTiffIfd },
   // Panasonic RW2 and RAW, Leica RWL: "IIU\x00"
-  { bytes: [0x49, 0x49, 0x55, 0x00], offset: 0, format: "raw", tiffIfd: true },
+  { bytes: [0x49, 0x49, 0x55, 0x00], offset: 0, format: "raw", check: hasTiffIfd },
   // JXL ISOBMFF container
   { bytes: [0x00, 0x00, 0x00, 0x0c, 0x4a, 0x58, 0x4c, 0x20], offset: 0, format: "jxl" },
   // JXL raw codestream
@@ -84,7 +86,7 @@ const MAGIC_BYTES: MagicEntry[] = [
   // ICO
   { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0, format: "ico" },
   // PSD ("8BPS")
-  { bytes: [0x38, 0x42, 0x50, 0x53], offset: 0, format: "psd" },
+  { bytes: [0x38, 0x42, 0x50, 0x53], offset: 0, format: "psd", check: hasPsdHeader },
   // OpenEXR
   { bytes: [0x76, 0x2f, 0x31, 0x01], offset: 0, format: "exr" },
   // TGA has no magic bytes: isTgaBuffer() checks its header for a .tga name
@@ -97,19 +99,24 @@ const MAGIC_BYTES: MagicEntry[] = [
   // JPEG 2000 raw codestream (J2K/J2C)
   { bytes: [0xff, 0x4f, 0xff, 0x51], offset: 0, format: "jp2" },
   // QOI: "qoif" at offset 0
-  { bytes: [0x71, 0x6f, 0x69, 0x66], offset: 0, format: "qoi" },
+  { bytes: [0x71, 0x6f, 0x69, 0x66], offset: 0, format: "qoi", check: hasQoiHeader },
   // DDS: "DDS " at offset 0
-  { bytes: [0x44, 0x44, 0x53, 0x20], offset: 0, format: "dds" },
+  { bytes: [0x44, 0x44, 0x53, 0x20], offset: 0, format: "dds", check: hasDdsHeader },
   // CUR: Windows cursor (ICO variant, byte 3 = 0x02 vs ICO's 0x01)
   { bytes: [0x00, 0x00, 0x02, 0x00], offset: 0, format: "cur" },
   // DPX forward: "SDPX"
-  { bytes: [0x53, 0x44, 0x50, 0x58], offset: 0, format: "dpx" },
+  { bytes: [0x53, 0x44, 0x50, 0x58], offset: 0, format: "dpx", check: hasDpxVersion },
   // DPX reverse: "XPDS"
-  { bytes: [0x58, 0x50, 0x44, 0x53], offset: 0, format: "dpx" },
+  { bytes: [0x58, 0x50, 0x44, 0x53], offset: 0, format: "dpx", check: hasDpxVersion },
   // Cineon
   { bytes: [0x80, 0x2a, 0x5f, 0xd7], offset: 0, format: "dpx" },
   // FITS: "SIMPLE" at offset 0
-  { bytes: [0x53, 0x49, 0x4d, 0x50, 0x4c, 0x45], offset: 0, format: "fits" },
+  {
+    bytes: [0x53, 0x49, 0x4d, 0x50, 0x4c, 0x45],
+    offset: 0,
+    format: "fits",
+    check: hasFitsSimpleCard,
+  },
   // EPS ASCII header: "%!PS-Adobe"
   {
     bytes: [0x25, 0x21, 0x50, 0x53, 0x2d, 0x41, 0x64, 0x6f, 0x62, 0x65],
@@ -119,14 +126,15 @@ const MAGIC_BYTES: MagicEntry[] = [
   // EPS binary (DOS EPS)
   { bytes: [0xc5, 0xd0, 0xd3, 0xc6], offset: 0, format: "eps" },
   // Netpbm: P1-P7 headers (these MUST go AFTER the PNG entry to avoid false matches on 0x50)
-  { bytes: [0x50, 0x31], offset: 0, format: "pbm" },
-  { bytes: [0x50, 0x34], offset: 0, format: "pbm" },
-  { bytes: [0x50, 0x32], offset: 0, format: "pgm" },
-  { bytes: [0x50, 0x35], offset: 0, format: "pgm" },
-  { bytes: [0x50, 0x33], offset: 0, format: "ppm" },
-  { bytes: [0x50, 0x36], offset: 0, format: "ppm" },
-  { bytes: [0x50, 0x37], offset: 0, format: "ppm" },
-  // PFM (Portable FloatMap)
+  { bytes: [0x50, 0x31], offset: 0, format: "pbm", check: hasNetpbmDimensions },
+  { bytes: [0x50, 0x34], offset: 0, format: "pbm", check: hasNetpbmDimensions },
+  { bytes: [0x50, 0x32], offset: 0, format: "pgm", check: hasNetpbmDimensions },
+  { bytes: [0x50, 0x35], offset: 0, format: "pgm", check: hasNetpbmDimensions },
+  { bytes: [0x50, 0x33], offset: 0, format: "ppm", check: hasNetpbmDimensions },
+  { bytes: [0x50, 0x36], offset: 0, format: "ppm", check: hasNetpbmDimensions },
+  // PAM spells its header out as KEYWORD value lines
+  { bytes: [0x50, 0x37], offset: 0, format: "ppm", check: hasPamWidth },
+  // PFM (Portable FloatMap): not CLI-decoded, so Sharp's decode below vets it
   { bytes: [0x50, 0x46], offset: 0, format: "pfm" },
   { bytes: [0x50, 0x66], offset: 0, format: "pfm" },
 ];
@@ -371,7 +379,7 @@ function detectMagicBytes(buffer: Buffer): string | null {
     }
 
     if (match) {
-      if (entry.tiffIfd && !hasTiffIfd(buffer)) continue;
+      if (entry.check && !entry.check(buffer)) continue;
       // For RIFF, verify WEBP signature at bytes 8-11
       if (entry.format === "webp") {
         if (buffer.length < 12) continue;
@@ -435,6 +443,133 @@ function hasTiffIfd(buffer: Buffer): boolean {
   if (ifd < 8 || ifd + 2 > buffer.length) return false;
   const entries = littleEndian ? buffer.readUInt16LE(ifd) : buffer.readUInt16BE(ifd);
   return entries >= 1 && entries <= TIFF_MAX_IFD_ENTRIES && ifd + 2 + entries * 12 <= buffer.length;
+}
+
+/**
+ * DIB header sizes a BMP may carry at byte 14: OS/2 1.x (12), OS/2 2.x (16,
+ * or the full 64), and Windows BITMAPINFOHEADER through BITMAPV5HEADER (40,
+ * 52, 56, 108, 124).
+ */
+const BMP_DIB_HEADER_SIZES = new Set([12, 16, 40, 52, 56, 64, 108, 124]);
+
+/** Whether "BM" opens a BMP: the DIB header size is one the format defines. */
+function hasBmpDibHeader(buffer: Buffer): boolean {
+  return buffer.length >= 18 && BMP_DIB_HEADER_SIZES.has(buffer.readUInt32LE(14));
+}
+
+/** How far into a Netpbm or PAM file its header is looked for. */
+const NETPBM_HEADER_SCAN_BYTES = 64 * 1024;
+
+const isAsciiDigit = (byte: number | undefined): boolean =>
+  byte !== undefined && byte >= 0x30 && byte <= 0x39;
+
+/** Netpbm's whitespace: tab, LF, VT, FF, CR and space. */
+const isNetpbmSpace = (byte: number | undefined): boolean =>
+  byte === 0x20 || (byte !== undefined && byte >= 0x09 && byte <= 0x0d);
+
+/**
+ * Whether a P1-P6 magic is followed by a width and a height: unsigned decimal
+ * numbers, each after a separator of whitespace and "#" comments (a comment
+ * runs to the end of its line). "P3 meeting agenda" fails on the letters. The
+ * scan stops NETPBM_HEADER_SCAN_BYTES in, far past any real header.
+ */
+function hasNetpbmDimensions(buffer: Buffer): boolean {
+  const end = Math.min(buffer.length, NETPBM_HEADER_SCAN_BYTES);
+  let i = 2;
+  for (let field = 0; field < 2; field++) {
+    const separatorStart = i;
+    while (i < end) {
+      if (isNetpbmSpace(buffer[i])) {
+        i++;
+      } else if (buffer[i] === 0x23) {
+        while (i < end && buffer[i] !== 0x0a && buffer[i] !== 0x0d) i++;
+      } else {
+        break;
+      }
+    }
+    if (i === separatorStart || i >= end || !isAsciiDigit(buffer[i])) return false;
+    while (i < end && isAsciiDigit(buffer[i])) i++;
+  }
+  return true;
+}
+
+/**
+ * Whether a P7 magic opens a PAM header: a WIDTH line with a number on it
+ * before ENDHDR. PAM names its fields on KEYWORD value lines, so P1-P6's bare
+ * dimensions don't apply.
+ */
+function hasPamWidth(buffer: Buffer): boolean {
+  const head = buffer.toString("latin1", 0, Math.min(buffer.length, NETPBM_HEADER_SCAN_BYTES));
+  const endHdr = head.indexOf("\nENDHDR");
+  const header = endHdr === -1 ? head : head.slice(0, endHdr);
+  return /\nWIDTH[ \t]+\d/.test(header);
+}
+
+/**
+ * Whether "SIMPLE" opens a FITS primary header: its first 80-byte card reads
+ * SIMPLE, padded to eight columns, then "= " and the logical value T. The
+ * standard puts the T in column 30; a free-format card is taken too.
+ */
+function hasFitsSimpleCard(buffer: Buffer): boolean {
+  if (buffer.length < 11 || buffer.toString("latin1", 0, 10) !== "SIMPLE  = ") return false;
+  return buffer.toString("latin1", 10, Math.min(buffer.length, 80)).trimStart().startsWith("T");
+}
+
+/**
+ * Whether "SDPX" or "XPDS" opens a DPX: the version field at byte 8 holds
+ * "V1.x" or "V2.x" (either case of V), NUL-terminated. Text has no NUL.
+ */
+function hasDpxVersion(buffer: Buffer): boolean {
+  if (buffer.length < 13) return false;
+  return (
+    (buffer[8] === 0x56 || buffer[8] === 0x76) &&
+    (buffer[9] === 0x31 || buffer[9] === 0x32) &&
+    buffer[10] === 0x2e &&
+    isAsciiDigit(buffer[11]) &&
+    buffer[12] === 0x00
+  );
+}
+
+/** Whether "DDS " opens a DirectDraw Surface: its header size field says 124. */
+function hasDdsHeader(buffer: Buffer): boolean {
+  return buffer.length >= 8 && buffer.readUInt32LE(4) === 124;
+}
+
+/**
+ * Whether "qoif" opens a QOI: a non-zero width and height, 3 or 4 channels,
+ * and colourspace 0 (sRGB with linear alpha) or 1 (all linear).
+ */
+function hasQoiHeader(buffer: Buffer): boolean {
+  if (buffer.length < 14) return false;
+  return (
+    buffer.readUInt32BE(4) > 0 &&
+    buffer.readUInt32BE(8) > 0 &&
+    (buffer[12] === 3 || buffer[12] === 4) &&
+    (buffer[13] === 0 || buffer[13] === 1)
+  );
+}
+
+/**
+ * Whether "8BPS" opens a Photoshop file: version 1 (PSD) or 2 (PSB), then six
+ * reserved bytes that must be zero.
+ */
+function hasPsdHeader(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  const version = buffer.readUInt16BE(4);
+  return (version === 1 || version === 2) && buffer.subarray(6, 12).every((byte) => byte === 0);
+}
+
+/**
+ * Whether "FOVb" opens a Sigma X3F: a little-endian version word follows,
+ * minor version in its low half and major in its high half (2.x on the SD9
+ * through the Merrills, 3.0 and 4.x on the Quattros). Text in those four
+ * bytes reads as versions in the thousands.
+ */
+function hasX3fVersion(buffer: Buffer): boolean {
+  if (buffer.length < 8) return false;
+  const minor = buffer.readUInt16LE(4);
+  const major = buffer.readUInt16LE(6);
+  return major >= 1 && major <= 15 && minor <= 0xff;
 }
 
 const TGA_HEADER_BYTES = 18;
