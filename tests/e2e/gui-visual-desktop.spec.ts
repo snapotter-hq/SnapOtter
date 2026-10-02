@@ -13,8 +13,8 @@ async function expectTheme(page: import("@playwright/test").Page, theme: "light"
   const html = page.locator("html");
   const message =
     theme === "dark"
-      ? "expected the dark theme (html.dark) before the dark screenshot, but the page is still light"
-      : "expected the light theme (no html.dark) before the light screenshot, but the page is still dark";
+      ? "expected the dark theme (html.dark), but the page is still light, so a dark screenshot would capture the light theme"
+      : "expected the light theme (no html.dark), but the page is still dark, so a light screenshot would capture the dark theme";
   if (theme === "dark") {
     await expect(html, message).toHaveClass(/\bdark\b/);
   } else {
