@@ -28,12 +28,13 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, generateId: () => "33333333-3333-4333-8333-333333333333" };
+  return { ...actual, generateId: vi.fn(() => "33333333-3333-4333-8333-333333333333") };
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
+import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface MockXhr {
@@ -1801,6 +1802,259 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
     });
     expect(useFileStore.getState()).toMatchObject({ processing: false, error: null });
 
+    unmount();
+  });
+});
+/**
+ * #1911: a start that throws before it has claimed the hook's run refs must
+ * leave the run that owns them alone. Before the fix, the kickoff's catch
+ * ended whatever run held the refs: a live run lost its stream, its job and
+ * cancel handle, its processing flag and its entry. The failed start now
+ * settles only the entries it marked processing that the live run doesn't
+ * own, and the live run still lands its result.
+ */
+describe("useToolProcessor leaves a live run alone when a later start throws early (#1911)", () => {
+  const START_FAILURE = "Something went wrong while tracking this job. Try again.";
+  const RESULT_200 = {
+    jobId: "server-job",
+    downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+    originalSize: 64,
+    processedSize: 32,
+  };
+  const SECOND_ID = "55555555-5555-4555-8555-555555555555";
+  let unsubscribe: (() => void) | null = null;
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = null;
+    vi.mocked(generateId).mockImplementation(() => JOB_ID);
+  });
+
+  function clipFile(name = "clip.mp4") {
+    return new File([new ArrayBuffer(64)], name, { type: "video/mp4" });
+  }
+
+  // The live run holds JOB_ID; a start that claims gets its own id, so a
+  // ref the failed start took over can't pass for the live run's.
+  function giveNextStartItsOwnId() {
+    vi.mocked(generateId).mockImplementation(() => SECOND_ID);
+  }
+
+  // Throws once, from the next store write that matches.
+  function breakNextWrite(
+    matches: (state: ReturnType<typeof useFileStore.getState>) => boolean = () => true,
+  ) {
+    let armed = true;
+    unsubscribe = useFileStore.subscribe((state) => {
+      if (armed && matches(state)) {
+        armed = false;
+        throw new Error("second start broke");
+      }
+    });
+  }
+
+  function startLiveRun(files: File[]) {
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("trim-video"));
+    act(() => hook.result.current.processFiles([files[0]], { startS: 0, endS: 2 }));
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    giveNextStartItsOwnId();
+    return hook;
+  }
+
+  function expectLiveRunIntact() {
+    const state = useFileStore.getState();
+    expect(MockEventSource.instances).toHaveLength(1);
+    expect(MockEventSource.instances[0].close).not.toHaveBeenCalled();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.entries[0].status).toBe("processing");
+    expect(xhrs).toHaveLength(1);
+  }
+
+  function landLiveRunResult() {
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(RESULT_200);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT_200.downloadUrl,
+      error: null,
+    });
+    expect(useFileStore.getState()).toMatchObject({ processing: false, error: null });
+  }
+
+  it("keeps the live run when a second start on its entry throws on its first write", () => {
+    const file = clipFile();
+    const { result, unmount } = startLiveRun([file]);
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2 }))).toThrow(
+      "second start broke",
+    );
+    unsubscribe?.();
+    unsubscribe = null;
+
+    expectLiveRunIntact();
+    landLiveRunResult();
+    unmount();
+  });
+
+  it("keeps the live run's job, so its dropped socket still degrades to the async path", () => {
+    const file = clipFile();
+    const { result, unmount } = startLiveRun([file]);
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2 }))).toThrow(
+      "second start broke",
+    );
+    unsubscribe?.();
+    unsubscribe = null;
+
+    // The degrade only acts while the run still owns the job ref.
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState()).toMatchObject({
+      processing: true,
+      error: null,
+      activeJobId: JOB_ID,
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: RESULT_200 });
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT_200.downloadUrl,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    unmount();
+  });
+
+  it("fails only its own entry when a start on another entry throws", () => {
+    const files = [clipFile("a.mp4"), clipFile("b.mp4")];
+    const { result, unmount } = startLiveRun(files);
+    act(() => useFileStore.getState().setSelectedIndex(1));
+    breakNextWrite((state) => state.entries[1]?.status === "processing");
+
+    expect(() => act(() => result.current.processFiles(files, { startS: 0, endS: 2 }))).toThrow(
+      "second start broke",
+    );
+    unsubscribe?.();
+    unsubscribe = null;
+
+    expectLiveRunIntact();
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: START_FAILURE,
+    });
+    landLiveRunResult();
+    expect(useFileStore.getState().entries[1].status).toBe("failed");
+    unmount();
+  });
+
+  it("fails only the entries a batch start marked before it threw", async () => {
+    const files = [clipFile("a.mp4"), clipFile("b.mp4"), clipFile("c.mp4")];
+    const { result, unmount } = startLiveRun(files);
+    // The batch reset walks the entries in order; this throws on the third.
+    breakNextWrite((state) => state.entries[2]?.status === "processing");
+
+    let thrown: unknown;
+    await act(async () => {
+      await result.current.processAllFiles(files, { startS: 0, endS: 2 }).catch((err: unknown) => {
+        thrown = err;
+      });
+    });
+    expect(() => {
+      throw thrown;
+    }).toThrow("second start broke");
+    unsubscribe?.();
+    unsubscribe = null;
+
+    expectLiveRunIntact();
+    for (const i of [1, 2]) {
+      expect(useFileStore.getState().entries[i]).toMatchObject({
+        status: "failed",
+        error: START_FAILURE,
+      });
+    }
+    landLiveRunResult();
+    unmount();
+  });
+
+  it("leaves every entry to a live batch when a single start throws on its first write", async () => {
+    const files = [clipFile("a.mp4"), clipFile("b.mp4")];
+    useFileStore.getState().setFiles(files);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    await act(async () => {
+      await result.current.processAllFiles(files, { startS: 0, endS: 2 });
+    });
+    expect(xhrs).toHaveLength(1);
+    const liveSse = latestSse();
+    giveNextStartItsOwnId();
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processFiles(files, { startS: 0, endS: 2 }))).toThrow(
+      "second start broke",
+    );
+    unsubscribe?.();
+    unsubscribe = null;
+
+    const state = useFileStore.getState();
+    expect(latestSse()).toBe(liveSse);
+    expect(liveSse.close).not.toHaveBeenCalled();
+    expect(state).toMatchObject({ processing: true, error: null, activeJobId: JOB_ID });
+    expect(state.cancelCurrentJob).not.toBeNull();
+    expect(state.entries.map((e) => e.status)).toEqual(["processing", "processing"]);
+    unmount();
+  });
+
+  it("still ends a start that throws on its first write when no run is live", () => {
+    const file = clipFile();
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    breakNextWrite();
+
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2 }))).toThrow(
+      "second start broke",
+    );
+    unsubscribe?.();
+    unsubscribe = null;
+
+    expect(useFileStore.getState()).toMatchObject({
+      processing: false,
+      error: START_FAILURE,
+      activeJobId: null,
+    });
+    expect(xhrs).toHaveLength(0);
+    unmount();
+  });
+
+  // The other half of the claim: once a start has taken the refs over, the
+  // earlier run is superseded and a throw ends the start the #1821 way. (The
+  // earlier run's late 200 is #944's, whose sync onload has no run guard.)
+  it("ends the run it took over when a start throws after its claim", () => {
+    const file = clipFile();
+    const { result, unmount } = startLiveRun([file]);
+
+    // JSON.stringify throws on a BigInt, after the claim and the stream.
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2n }))).toThrow(
+      TypeError,
+    );
+    act(() => {});
+
+    const state = useFileStore.getState();
+    expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(state).toMatchObject({ processing: false, error: START_FAILURE, activeJobId: null });
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(state.entries[0]).toMatchObject({ status: "failed", error: START_FAILURE });
+    expect(xhrs).toHaveLength(1);
     unmount();
   });
 });
