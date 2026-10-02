@@ -196,6 +196,34 @@ describe("offline AI bundle import: a failed answer (#1915)", () => {
   });
 });
 
+describe("offline AI bundle import: a 413 (#1916)", () => {
+  it.each([
+    ["the API's JSON body", { error: "File exceeds the 100 MB upload limit" }],
+    ["a proxy page that is not JSON", null],
+  ])("words %s as the translated size message", async (_label, body) => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 413,
+      json: async () => {
+        if (body === null) throw new SyntaxError("Unexpected token '<'");
+        return body;
+      },
+    });
+    renderSection();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Legacy AI bundle" }));
+    fireEvent.change(screen.getByLabelText("Legacy bundle archive (.tar.gz)"), {
+      target: { files: [new File(["legacy"], "legacy-bundle.tar.gz")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import from file" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      format(en.settings.aiFeatures.importError, { error: en.errors.fileTooLarge }),
+    );
+    expect(screen.queryByText(/File exceeds/)).toBeNull();
+  });
+});
+
 describe("offline AI bundle import: FEATURE_NOT_INSTALLED (#1915)", () => {
   it("words the install message in the viewer's locale", async () => {
     const storage = new Map([["snapotter-locale", "de"]]);

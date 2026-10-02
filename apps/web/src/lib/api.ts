@@ -63,7 +63,10 @@ export function parseApiError(
  * body comes straight from JSON.parse or res.json(); pass null when it did not
  * parse. A 413 reads as the translated file-too-large message whatever the
  * body: the API's own 413 and a reverse proxy's HTML body-size page mean the
- * same thing to the user, as they do in useToolProcessor (#1341, #1916).
+ * same thing to the user, as they do in useToolProcessor (#1341, #1916). A
+ * caller on a route whose 413 means something else (the storage quota's
+ * STORAGE_QUOTA_EXCEEDED) handles it before calling this, as review-panel.tsx
+ * does.
  */
 export function failedAnswerMessage(
   t: TranslationKeys,
