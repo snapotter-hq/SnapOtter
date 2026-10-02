@@ -9,6 +9,9 @@
  * Built from the transport factory instrument.ts passes in, so this file never
  * imports @sentry/node at runtime (the type import is erased) and a test can
  * wrap a recording transport in the same gate.
+ *
+ * The one copy that leaves before the transport, Spotlight's, has its own gate
+ * below (#1966).
  */
 import type * as SentryNode from "@sentry/node";
 
@@ -59,6 +62,10 @@ export function buildGatedSpotlight(
       const inner = makeSpotlight({
         sidecarUrl: typeof spotlight === "string" ? spotlight : undefined,
       });
+      // Only `setup` is forwarded: in @sentry/node 10.66 it is the only hook
+      // the SDK's Spotlight defines. If an upgrade moves its work elsewhere,
+      // Spotlight goes quiet (closed, not open) and the first test in
+      // sentry-spotlight-gate.test.ts goes red.
       inner.setup?.(gateClientHooks(client, isActive));
     },
   };
