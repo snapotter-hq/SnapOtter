@@ -1105,8 +1105,9 @@ export function useToolProcessor(toolId: string) {
       // nothing else left to end it, so a write that throws mustn't skip the
       // rest: the first throw is rethrown once the run is over and reported
       // (#1814). An error write that throws without landing is different:
-      // the run stays live, as before, so a caller with its own failure path
-      // (the SSE handler's, #1287) can still end it with a message.
+      // the run stays live, as before. The SSE handler's own failure path
+      // (#1287) then ends it with a message, and on the other paths the
+      // cancel button stays armed, so a second click can still end it.
       const failRun = (message: string, reason: string, category?: FeedbackErrorCategory) => {
         let teardownError: { cause: unknown } | null = null;
         try {
@@ -1227,22 +1228,18 @@ export function useToolProcessor(toolId: string) {
         const url = serverUrl(String(result.downloadUrl));
         const fileResults = (result.fileResults ?? {}) as Record<string, string>;
         const fileNotes = asNotesMap(result.fileNotes);
+        let refusedStatus: number | null = null;
         for (let attempt = 0; attempt < 3; attempt++) {
           if (activeJobIdRef.current !== clientJobId) return;
           try {
             const res = await fetch(url, { headers: formatHeaders() });
             // A 4xx is deterministic: the result is gone or this session may
             // not read it. Retrying cannot help, and the message must not
-            // blame the network.
+            // blame the network. It fails the run outside this try, so a
+            // throw from failRun's teardown isn't swallowed as a retry (#1814).
             if (res.status >= 400 && res.status < 500) {
-              if (activeJobIdRef.current !== clientJobId) return;
-              failRun(
-                res.status === 404
-                  ? "Completed result is no longer available. Run the job again."
-                  : "The finished batch could not be downloaded. Refresh and try again.",
-                `download-${res.status}`,
-              );
-              return;
+              refusedStatus = res.status;
+              break;
             }
             if (!res.ok) throw new Error(`Batch download failed: ${res.status}`);
             const blob = await res.blob();
@@ -1256,6 +1253,15 @@ export function useToolProcessor(toolId: string) {
           }
         }
         if (activeJobIdRef.current !== clientJobId) return;
+        if (refusedStatus !== null) {
+          failRun(
+            refusedStatus === 404
+              ? "Completed result is no longer available. Run the job again."
+              : "The finished batch could not be downloaded. Refresh and try again.",
+            `download-${refusedStatus}`,
+          );
+          return;
+        }
         failRun("Processing was interrupted. Retry when reconnected.", "download-failed");
       };
 

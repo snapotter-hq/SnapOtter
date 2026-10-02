@@ -1530,3 +1530,185 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
     unmount();
   });
 });
+
+/**
+ * #1814: a failed batch whose teardown writes throw still ends. Zustand
+ * commits a write before its listeners run, so a listener that throws used
+ * to stop failRun right after its error write: the run kept its timers, its
+ * stream and its job handle, and never reached batch_processed. Every exit
+ * through failRun now finishes the run, settles the entries and reports the
+ * outcome before the first throw goes on to its caller.
+ */
+describe("useToolProcessor ends a failed batch whose teardown throws (#1814)", () => {
+  const UNCONFIRMED =
+    "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  let unsubscribe: (() => void) | null = null;
+
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    unsubscribe?.();
+    unsubscribe = null;
+    consoleError.mockRestore();
+  });
+
+  // Every store write throws once it lands.
+  function breakEveryWrite() {
+    unsubscribe = useFileStore.subscribe(() => {
+      throw new Error("teardown broke");
+    });
+  }
+
+  // The upload finished and the socket died: the #750 degrade to async.
+  function degrade() {
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+  }
+
+  function expectRunEnded(message: string, reason: string) {
+    unsubscribe?.();
+    unsubscribe = null;
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe(message);
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(state.entries.map((e) => [e.status, e.error])).toEqual([
+      ["failed", message],
+      ["failed", message],
+    ]);
+    const outcomes = vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed");
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0][1]).toMatchObject({ status: "failed", reason });
+    // Both entry writes threw; the run reports that once (#1812).
+    expect(
+      vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(([e]) => e.message === "Failing a batch run's entries failed"),
+    ).toHaveLength(1);
+  }
+
+  it("ends the run when the server never confirms it", () => {
+    vi.useFakeTimers();
+    const { unmount } = startBatchRun();
+    degrade();
+    breakEveryWrite();
+
+    expect(() =>
+      act(() => {
+        vi.advanceTimersByTime(30_001);
+      }),
+    ).toThrow("teardown broke");
+
+    expectRunEnded(UNCONFIRMED, "unconfirmed");
+    unmount();
+  });
+
+  it("ends the run on a failed terminal frame and keeps the server's message", () => {
+    const { unmount } = startBatchRun();
+    degrade();
+    breakEveryWrite();
+
+    expect(() =>
+      act(() => {
+        sendBatchFrame({
+          status: "failed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 2,
+          errors: [],
+        });
+      }),
+    ).toThrow("teardown broke");
+
+    // The run ended through failRun, so the frame handler's own fallback
+    // (#1287) leaves the real outcome alone.
+    expectRunEnded("All files failed processing", "all-files-failed");
+    unmount();
+  });
+
+  it("ends the run when the durable ZIP is gone, and lets the throw out", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    // The download settles in a promise nobody awaits, so its throw is an
+    // unhandled rejection. Take vitest's listener over for the test.
+    const saved = process.listeners("unhandledRejection");
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => {
+      rejections.push(reason);
+    };
+    process.removeAllListeners("unhandledRejection");
+    process.on("unhandledRejection", onRejection);
+    try {
+      const { unmount } = startBatchRun();
+      degrade();
+      breakEveryWrite();
+
+      act(() => {
+        sendBatchFrame(completedTerminalFrame());
+      });
+
+      // The throw must not be swallowed as a failed download attempt: one
+      // request, and the throw reaches the global handler.
+      await settled(() => {
+        expect(rejections).toEqual([expect.objectContaining({ message: "teardown broke" })]);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expectRunEnded("Completed result is no longer available. Run the job again.", "download-404");
+      unmount();
+    } finally {
+      process.off("unhandledRejection", onRejection);
+      for (const listener of saved) process.on("unhandledRejection", listener);
+    }
+  });
+
+  it("leaves a cancel live for another click when its error write throws without landing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const realSetError = useFileStore.getState().setError;
+    let broken = true;
+    // The hook holds the setError it rendered with, so the spy goes in first.
+    // The first "Canceled" write throws before it writes anything.
+    vi.spyOn(useFileStore.getState(), "setError").mockImplementation((value) => {
+      if (broken && value === "Canceled") {
+        broken = false;
+        throw new Error("store broke");
+      }
+      realSetError(value);
+    });
+    try {
+      const { result, unmount } = startBatchRun();
+
+      await act(async () => {
+        await expect(result.current.cancelCurrentJob()).rejects.toThrow("store broke");
+      });
+
+      // Nothing was written, so the run is still live and still cancelable.
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(useFileStore.getState().cancelCurrentJob).not.toBeNull();
+
+      await act(async () => {
+        await useFileStore.getState().cancelCurrentJob?.();
+      });
+
+      const state = useFileStore.getState();
+      expect(state.processing).toBe(false);
+      expect(state.error).toBe("Canceled");
+      expect(state.activeJobId).toBeNull();
+      expect(state.entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+      unmount();
+    } finally {
+      useFileStore.setState({ setError: realSetError });
+    }
+  });
+});
