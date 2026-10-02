@@ -414,12 +414,13 @@ test.describe("Visual Desktop (1280x720)", () => {
 
     await page.getByTestId("qr-input-url").fill("https://snapotter.com");
     await expect(page.getByText("Enter content to generate a QR code")).toBeHidden();
+    // Compare inside the poll so a failure doesn't print two full data URLs.
     await expect
-      .poll(() => qrContent(qrCode), {
+      .poll(async () => (await qrContent(qrCode)) !== placeholder, {
         message: "the QR preview never redrew for the entered URL",
         timeout: 10000,
       })
-      .not.toBe(placeholder);
+      .toBe(true);
     await page.waitForTimeout(500);
 
     await takeThemedScreenshots(page, "tool-qr-generate-preview");
