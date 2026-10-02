@@ -1988,9 +1988,9 @@ export const nl: TranslationKeys = {
       outputFormat: "Uitvoerformaat",
       quality: "Kwaliteit",
       paintHint:
-        "Verf over de objecten die je wilt verwijderen. Gebruik Ctrl+Z om ongedaan te maken.",
+        "Verf over de objecten die je wilt verwijderen. Gebruik {shortcut} om ongedaan te maken.",
       lassoHint:
-        "Teken een lus rond het object dat je wilt verwijderen. Gebruik Ctrl+Z om ongedaan te maken.",
+        "Teken een lus rond het object dat je wilt verwijderen. Gebruik {shortcut} om ongedaan te maken.",
       submit: "Object verwijderen",
       submitBatch: "Alles verwijderen ({count})",
       progressLabel: "Object verwijderen",

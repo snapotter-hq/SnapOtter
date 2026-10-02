@@ -4,6 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
@@ -923,9 +924,13 @@ export function EraseObjectSettings({
       {/* Hint */}
       {hasFile && !hasStrokes && (
         <p className="text-[10px] text-muted-foreground">
-          {mode === "lasso"
-            ? t.toolSettings["erase-object"].lassoHint
-            : t.toolSettings["erase-object"].paintHint}
+          {format(
+            mode === "lasso"
+              ? t.toolSettings["erase-object"].lassoHint
+              : t.toolSettings["erase-object"].paintHint,
+            // The canvas undoes on Cmd+Z and Ctrl+Z alike, so the OS rule picks the name.
+            { shortcut: formatShortcut("mod+z") },
+          )}
         </p>
       )}
 

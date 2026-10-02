@@ -1985,8 +1985,9 @@ export const pl: TranslationKeys = {
       clear: "Wyczyść",
       outputFormat: "Format wyjściowy",
       quality: "Jakość",
-      paintHint: "Zamaluj obiekty, które chcesz usunąć. Naciśnij Ctrl+Z, aby cofnąć.",
-      lassoHint: "Narysuj pętlę wokół obiektu, który chcesz usunąć. Naciśnij Ctrl+Z, aby cofnąć.",
+      paintHint: "Zamaluj obiekty, które chcesz usunąć. Naciśnij {shortcut}, aby cofnąć.",
+      lassoHint:
+        "Narysuj pętlę wokół obiektu, który chcesz usunąć. Naciśnij {shortcut}, aby cofnąć.",
       submit: "Usuń obiekt",
       submitBatch: "Usuń wszystko ({count})",
       progressLabel: "Usuwanie obiektu",

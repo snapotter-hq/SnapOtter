@@ -1979,9 +1979,9 @@ export const id: TranslationKeys = {
       clear: "Hapus",
       outputFormat: "Format Output",
       quality: "Kualitas",
-      paintHint: "Cat di atas objek yang ingin Anda hapus. Gunakan Ctrl+Z untuk undo.",
+      paintHint: "Cat di atas objek yang ingin Anda hapus. Gunakan {shortcut} untuk undo.",
       lassoHint:
-        "Gambar lingkaran di sekeliling objek yang ingin Anda hapus. Gunakan Ctrl+Z untuk undo.",
+        "Gambar lingkaran di sekeliling objek yang ingin Anda hapus. Gunakan {shortcut} untuk undo.",
       submit: "Hapus Objek",
       submitBatch: "Hapus Semua ({count})",
       progressLabel: "Menghapus objek",
