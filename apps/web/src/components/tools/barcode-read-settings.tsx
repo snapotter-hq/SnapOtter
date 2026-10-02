@@ -1,5 +1,5 @@
 import type { TranslationKeys } from "@snapotter/shared";
-import { Check, Copy, Download, Search } from "lucide-react";
+import { Check, Copy, Download, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -197,8 +197,8 @@ export function BarcodeReadSettings() {
 
   const [tryHarder, setTryHarder] = useState(false);
   const [results, setResults] = useState<FileResult[]>([]);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [copiedAll, setCopiedAll] = useState(false);
+  const [rowCopy, setRowCopy] = useState<{ idx: number; ok: boolean } | null>(null);
+  const [allCopy, setAllCopy] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
@@ -301,10 +301,8 @@ export function BarcodeReadSettings() {
 
   const handleCopyOne = async (text: string, globalIdx: number) => {
     const ok = await copyToClipboard(text);
-    if (ok) {
-      setCopiedIndex(globalIdx);
-      later(() => setCopiedIndex(null), 1500, "copiedIndex");
-    }
+    setRowCopy({ idx: globalIdx, ok });
+    later(() => setRowCopy(null), 1500, "rowCopy");
   };
 
   const handleCopyAll = async () => {
@@ -312,10 +310,8 @@ export function BarcodeReadSettings() {
       .flatMap((r) => r.barcodes.map((b) => `${FORMAT_LABELS[b.type] ?? b.type}: ${b.text}`))
       .join("\n");
     const ok = await copyToClipboard(allText);
-    if (ok) {
-      setCopiedAll(true);
-      later(() => setCopiedAll(false), 2000, "copiedAll");
-    }
+    setAllCopy(ok ? "copied" : "failed");
+    later(() => setAllCopy(null), 2000, "allCopy");
   };
 
   const handleExportCsv = () => {
@@ -428,10 +424,16 @@ export function BarcodeReadSettings() {
                   onClick={handleCopyAll}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {copiedAll ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copiedAll
+                  {allCopy === "copied" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  {allCopy === "copied"
                     ? t.toolSettings["barcode-read"].copied
-                    : t.toolSettings["barcode-read"].copyAll}
+                    : allCopy === "failed"
+                      ? t.common.copyFailed
+                      : t.toolSettings["barcode-read"].copyAll}
                 </button>
               </div>
             )}
@@ -475,12 +477,18 @@ export function BarcodeReadSettings() {
                         type="button"
                         onClick={() => handleCopyOne(barcode.text, idx)}
                         className="shrink-0 p-1 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity"
-                        title={t.toolSettings["barcode-read"].copyValue}
+                        title={
+                          rowCopy?.idx === idx && !rowCopy.ok
+                            ? t.common.copyFailed
+                            : t.toolSettings["barcode-read"].copyValue
+                        }
                       >
-                        {copiedIndex === idx ? (
+                        {rowCopy?.idx !== idx ? (
+                          <Copy className="h-3.5 w-3.5" />
+                        ) : rowCopy.ok ? (
                           <Check className="h-3.5 w-3.5 text-success-ink" />
                         ) : (
-                          <Copy className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5 text-destructive" />
                         )}
                       </button>
                     </div>

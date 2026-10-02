@@ -31,6 +31,7 @@ export const de: TranslationKeys = {
     clear: "Leeren",
     copy: "Kopieren",
     copied: "Kopiert!",
+    copyFailed: "Kopieren fehlgeschlagen",
     noResults: "Keine Ergebnisse gefunden",
     showLess: "Weniger anzeigen",
     showMore: "{count} weitere anzeigen",

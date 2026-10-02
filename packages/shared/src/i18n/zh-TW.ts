@@ -30,6 +30,7 @@ export const zhTW: TranslationKeys = {
     clear: "清除",
     copy: "複製",
     copied: "已複製！",
+    copyFailed: "複製失敗",
     noResults: "找不到結果",
     showLess: "收合",
     showMore: "展開{count}項",

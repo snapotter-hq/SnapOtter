@@ -30,6 +30,7 @@ export const id: TranslationKeys = {
     clear: "Hapus",
     copy: "Salin",
     copied: "Disalin!",
+    copyFailed: "Gagal menyalin",
     noResults: "Tidak ada hasil",
     showLess: "Tampilkan lebih sedikit",
     showMore: "Tampilkan {count} lainnya",

@@ -31,6 +31,7 @@ export const uk: TranslationKeys = {
     clear: "Очистити",
     copy: "Копіювати",
     copied: "Скопійовано!",
+    copyFailed: "Не вдалося скопіювати",
     noResults: "Нічого не знайдено",
     showLess: "Показати менше",
     showMore: "Показати ще {count}",

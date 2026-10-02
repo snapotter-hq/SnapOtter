@@ -1473,7 +1473,7 @@ export function PeopleSection() {
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [showGeneratedPw, setShowGeneratedPw] = useState(false);
-  const [pwCopied, setPwCopied] = useState(false);
+  const [pwCopy, setPwCopy] = useState<"copied" | "failed" | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserEntry | null>(null);
   const [editRole, setEditRole] = useState("");
@@ -1570,7 +1570,7 @@ export function PeopleSection() {
         setNewTeam("Default");
         setShowAddForm(false);
         setShowGeneratedPw(false);
-        setPwCopied(false);
+        setPwCopy(null);
         setActionMsg({ type: "success", text: t.settings.people.createSuccess });
         await loadUsers();
       } catch (err) {
@@ -1811,7 +1811,7 @@ export function PeopleSection() {
                 onChange={(e) => {
                   setNewPassword(e.target.value);
                   setShowGeneratedPw(false);
-                  setPwCopied(false);
+                  setPwCopy(null);
                 }}
                 placeholder={t.auth.password}
                 required
@@ -1826,24 +1826,30 @@ export function PeopleSection() {
                   type="button"
                   onClick={async () => {
                     const ok = await copyToClipboard(newPassword);
-                    if (ok) {
-                      setPwCopied(true);
-                      later(() => setPwCopied(false), 2000, "pwCopied");
-                    }
+                    setPwCopy(ok ? "copied" : "failed");
+                    later(() => setPwCopy(null), 2000, "pwCopy");
                   }}
                   className={cn(
                     "shrink-0 p-2 rounded-lg border border-border transition-colors",
-                    pwCopied
+                    pwCopy === "copied"
                       ? "text-success-ink bg-green-500/10"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                   title={
-                    pwCopied
+                    pwCopy === "copied"
                       ? t.settings.people.passwordCopied
-                      : t.settings.people.copyPasswordButton
+                      : pwCopy === "failed"
+                        ? t.common.copyFailed
+                        : t.settings.people.copyPasswordButton
                   }
                 >
-                  {pwCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {pwCopy === "copied" ? (
+                    <Check className="h-4 w-4" />
+                  ) : pwCopy === "failed" ? (
+                    <X className="h-4 w-4 text-destructive" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </button>
               )}
             </div>
@@ -1897,7 +1903,7 @@ export function PeopleSection() {
                 const pw = generatePassword();
                 setNewPassword(pw);
                 setShowGeneratedPw(true);
-                setPwCopied(false);
+                setPwCopy(null);
               }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary-ink hover:bg-primary/20 font-medium transition-colors"
             >
@@ -1910,7 +1916,7 @@ export function PeopleSection() {
               onClick={() => {
                 setShowAddForm(false);
                 setShowGeneratedPw(false);
-                setPwCopied(false);
+                setPwCopy(null);
                 // Reset the field values too, so re-opening the form is clean.
                 setNewUsername("");
                 setNewPassword("");
@@ -1921,7 +1927,7 @@ export function PeopleSection() {
               {t.common.cancel}
             </button>
           </div>
-          {showGeneratedPw && !pwCopied && (
+          {showGeneratedPw && pwCopy !== "copied" && (
             <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
               <Key className="h-3.5 w-3.5 shrink-0" />
               {t.settings.people.copyPasswordWarning}
@@ -2226,7 +2232,7 @@ export function ApiKeysSection() {
   const [keys, setKeys] = useState<ApiKeyEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKey, setNewKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const [generating, setGenerating] = useState(false);
   const [keyName, setKeyName] = useState("");
   const [showScoping, setShowScoping] = useState(false);
@@ -2282,10 +2288,8 @@ export function ApiKeysSection() {
   const copyKey = useCallback(
     async (key: string) => {
       const ok = await copyToClipboard(key);
-      if (ok) {
-        setCopied(true);
-        later(() => setCopied(false), 2000, "copied");
-      }
+      setCopyStatus(ok ? "copied" : "failed");
+      later(() => setCopyStatus(null), 2000, "copyStatus");
     },
     [later],
   );
@@ -2419,11 +2423,13 @@ export function ApiKeysSection() {
               type="button"
               onClick={() => copyKey(newKey)}
               className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground shrink-0"
-              title={t.common.copy}
-              aria-label={t.common.copy}
+              title={copyStatus === "failed" ? t.common.copyFailed : t.common.copy}
+              aria-label={copyStatus === "failed" ? t.common.copyFailed : t.common.copy}
             >
-              {copied ? (
+              {copyStatus === "copied" ? (
                 <Check className="h-4 w-4 text-success-ink" />
+              ) : copyStatus === "failed" ? (
+                <X className="h-4 w-4 text-destructive" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}

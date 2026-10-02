@@ -30,6 +30,7 @@ export const ptBR: TranslationKeys = {
     clear: "Limpar",
     copy: "Copiar",
     copied: "Copiado!",
+    copyFailed: "Falha ao copiar",
     noResults: "Nenhum resultado encontrado",
     showLess: "Mostrar menos",
     showMore: "Mostrar mais {count}",

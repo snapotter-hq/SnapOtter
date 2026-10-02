@@ -433,6 +433,8 @@ export function LoginPage() {
     if (ok) {
       setEnrollmentCodesCopied(true);
       later(() => setEnrollmentCodesCopied(false), 2000, "enrollmentCodesCopied");
+    } else {
+      setError(t.settings.security.twoFactorCopyFailed);
     }
   };
 

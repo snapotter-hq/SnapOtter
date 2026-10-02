@@ -30,6 +30,7 @@ export const tr: TranslationKeys = {
     clear: "Temizle",
     copy: "Kopyala",
     copied: "Kopyalandı!",
+    copyFailed: "Kopyalama başarısız",
     noResults: "Sonuç bulunamadı",
     showLess: "Daha az göster",
     showMore: "{count} tane daha göster",

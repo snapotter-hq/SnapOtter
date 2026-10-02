@@ -30,6 +30,7 @@ export const hi: TranslationKeys = {
     clear: "साफ करें",
     copy: "कॉपी करें",
     copied: "कॉपी हो गया!",
+    copyFailed: "कॉपी विफल हुई",
     noResults: "कोई परिणाम नहीं मिला",
     showLess: "कम दिखाएं",
     showMore: "{count} और दिखाएं",

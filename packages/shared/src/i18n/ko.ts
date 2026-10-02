@@ -30,6 +30,7 @@ export const ko: TranslationKeys = {
     clear: "지우기",
     copy: "복사",
     copied: "복사되었습니다!",
+    copyFailed: "복사 실패",
     noResults: "결과를 찾을 수 없습니다",
     showLess: "접기",
     showMore: "{count}개 더 보기",

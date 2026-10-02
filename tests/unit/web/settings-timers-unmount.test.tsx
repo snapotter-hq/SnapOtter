@@ -388,7 +388,7 @@ const races: Race[] = [
   (() => {
     let copy: HTMLElement;
     return {
-      name: "People: pwCopied",
+      name: "People: pwCopy",
       ms: 2000,
       first: async () => {
         renderDe(<PeopleSection />);
@@ -406,7 +406,7 @@ const races: Race[] = [
   (() => {
     let copy: HTMLElement;
     return {
-      name: "API keys: copied",
+      name: "API keys: copyStatus",
       ms: 2000,
       first: async () => {
         apiPost.mockResolvedValueOnce({ key: "si_secret" });
@@ -496,6 +496,79 @@ describe("A second message inside the fade window gets its full time (#1798)", (
       vi.advanceTimersByTime(race.ms);
     });
     expect(race.shown()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("A failed copy says so, and a good copy after it still gets its time (#1827)", () => {
+  type Failing = {
+    name: string;
+    ms: number;
+    /** Renders the screen and returns its copy control. */
+    mount: () => Promise<HTMLElement>;
+    lit: (button: HTMLElement) => boolean;
+    failed: (button: HTMLElement) => boolean;
+  };
+
+  const crossed = (button: HTMLElement) => button.querySelector(".text-destructive") !== null;
+
+  const failing: Failing[] = [
+    {
+      name: "People: generated password",
+      ms: 2000,
+      mount: async () => {
+        renderDe(<PeopleSection />);
+        fireEvent.click(await screen.findByRole("button", { name: s.people.addMembersButton }));
+        fireEvent.click(screen.getByRole("button", { name: de.changePassword.generateButton }));
+        const row = screen.getByPlaceholderText(de.auth.password).parentElement as HTMLElement;
+        return within(row).getByRole("button");
+      },
+      lit: (copy) => copy.title === s.people.passwordCopied,
+      failed: (copy) => crossed(copy) && copy.title === de.common.copyFailed,
+    },
+    {
+      name: "API keys: new key",
+      ms: 2000,
+      mount: async () => {
+        apiPost.mockResolvedValueOnce({ key: "si_secret" });
+        renderDe(<ApiKeysSection />);
+        fireEvent.click(await screen.findByRole("button", { name: s.apiKeys.generateButton }));
+        await screen.findByText("si_secret");
+        return screen.getByRole("button", { name: de.common.copy });
+      },
+      lit: (copy) => copy.querySelector(".text-success-ink") !== null,
+      failed: (copy) =>
+        crossed(copy) &&
+        copy.title === de.common.copyFailed &&
+        copy.getAttribute("aria-label") === de.common.copyFailed,
+    },
+  ];
+
+  it.each(failing.map((c) => [c.name, c] as const))("%s", async (_name, c) => {
+    const copy = await c.mount();
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(copy);
+    expect(c.failed(copy)).toBe(true);
+    expect(c.lit(copy)).toBe(false);
+
+    await act(async () => {
+      vi.advanceTimersByTime(c.ms - 500);
+    });
+    await copyAgain(copy);
+    expect(c.lit(copy)).toBe(true);
+    expect(c.failed(copy)).toBe(false);
+
+    // The failure's reset is due now and must leave the good copy up.
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(c.lit(copy)).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(c.ms);
+    });
+    expect(c.lit(copy)).toBe(false);
+    expect(c.failed(copy)).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

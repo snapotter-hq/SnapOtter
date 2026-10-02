@@ -30,6 +30,7 @@ export const sv: TranslationKeys = {
     clear: "Rensa",
     copy: "Kopiera",
     copied: "Kopierat!",
+    copyFailed: "Kopiering misslyckades",
     noResults: "Inga resultat hittades",
     showLess: "Visa mindre",
     showMore: "Visa {count} till",

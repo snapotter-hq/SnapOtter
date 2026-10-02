@@ -28,6 +28,7 @@ export const en = {
     clear: "Clear",
     copy: "Copy",
     copied: "Copied!",
+    copyFailed: "Copy failed",
     noResults: "No results found",
     showLess: "Show less",
     showMore: "Show {count} more",

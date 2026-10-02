@@ -31,6 +31,7 @@ export const ru: TranslationKeys = {
     clear: "Очистить",
     copy: "Копировать",
     copied: "Скопировано!",
+    copyFailed: "Не удалось скопировать",
     noResults: "Ничего не найдено",
     showLess: "Показать меньше",
     showMore: "Показать ещё {count}",

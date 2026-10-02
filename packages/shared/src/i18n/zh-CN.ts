@@ -29,6 +29,7 @@ export const zhCN: TranslationKeys = {
     clear: "清除",
     copy: "复制",
     copied: "已复制！",
+    copyFailed: "复制失败",
     noResults: "未找到结果",
     showLess: "收起",
     showMore: "展开 {count} 项",

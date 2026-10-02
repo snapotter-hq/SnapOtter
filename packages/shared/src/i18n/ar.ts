@@ -30,6 +30,7 @@ export const ar: TranslationKeys = {
     clear: "مسح",
     copy: "نسخ",
     copied: "تم النسخ!",
+    copyFailed: "فشل النسخ",
     noResults: "لا توجد نتائج",
     showLess: "عرض أقل",
     showMore: "عرض {count} إضافي",

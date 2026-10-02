@@ -30,6 +30,7 @@ export const it: TranslationKeys = {
     clear: "Cancella",
     copy: "Copia",
     copied: "Copiato!",
+    copyFailed: "Copia non riuscita",
     noResults: "Nessun risultato trovato",
     showLess: "Mostra meno",
     showMore: "Mostra altri {count}",

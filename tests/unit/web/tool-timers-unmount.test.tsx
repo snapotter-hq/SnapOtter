@@ -424,6 +424,7 @@ async function copyAgain(button: HTMLElement) {
 }
 
 const ticked = (button: HTMLElement) => button.querySelector(".text-success-ink") !== null;
+const crossed = (button: HTMLElement) => button.querySelector(".text-destructive") !== null;
 const says = (text: string) => (button: HTMLElement) => button.textContent?.includes(text) ?? false;
 
 type Race = {
@@ -434,6 +435,8 @@ type Race = {
   mount: () => Promise<[HTMLElement, HTMLElement]>;
   /** Whether a control shows its Copied state. */
   lit: (button: HTMLElement) => boolean;
+  /** Whether a control shows its Copy failed state. */
+  failed?: (button: HTMLElement) => boolean;
 };
 
 const barcodes = async () => {
@@ -467,7 +470,7 @@ const palette = async () => {
 
 const races: Race[] = [
   {
-    name: "color palette: copiedIdx",
+    name: "color palette: swatchCopy",
     ms: 1500,
     mount: async () => {
       await palette();
@@ -475,9 +478,10 @@ const races: Race[] = [
       return [swatch("#ff0000"), swatch("#00ff00")];
     },
     lit: ticked,
+    failed: crossed,
   },
   {
-    name: "color palette: copiedExport",
+    name: "color palette: exportCopy",
     ms: 1500,
     mount: async () => {
       await palette();
@@ -487,9 +491,10 @@ const races: Race[] = [
       ];
     },
     lit: ticked,
+    failed: crossed,
   },
   {
-    name: "sprite sheet: copiedExport",
+    name: "sprite sheet: exportCopy",
     ms: 1500,
     mount: async () => {
       toolPayload.current = {
@@ -508,9 +513,10 @@ const races: Race[] = [
       ];
     },
     lit: ticked,
+    failed: crossed,
   },
   {
-    name: "LQIP placeholder: copied",
+    name: "LQIP placeholder: copyResult",
     ms: 1500,
     mount: async () => {
       toolPayload.current = {
@@ -524,9 +530,10 @@ const races: Race[] = [
       return [dataUri, html];
     },
     lit: ticked,
+    failed: crossed,
   },
   {
-    name: "OCR PDF view: copied",
+    name: "OCR PDF view: copyStatus",
     ms: 1500,
     mount: async () => {
       vi.stubGlobal(
@@ -542,9 +549,10 @@ const races: Race[] = [
       return [copy, copy];
     },
     lit: says(ts["ocr-pdf-view"].copied),
+    failed: says(en.common.copyFailed),
   },
   {
-    name: "barcode reader: copiedIndex",
+    name: "barcode reader: rowCopy",
     ms: 1500,
     mount: async () => {
       await barcodes();
@@ -552,9 +560,10 @@ const races: Race[] = [
       return [hi, yo];
     },
     lit: ticked,
+    failed: crossed,
   },
   {
-    name: "barcode reader: copiedAll",
+    name: "barcode reader: allCopy",
     ms: 2000,
     mount: async () => {
       await barcodes();
@@ -562,9 +571,10 @@ const races: Race[] = [
       return [all, all];
     },
     lit: says(ts["barcode-read"].copied),
+    failed: says(en.common.copyFailed),
   },
   {
-    name: "OCR: copied",
+    name: "OCR: copyStatus",
     ms: 2000,
     mount: async () => {
       useFeaturesStore.setState({ bundles: [ocrBundle()], loaded: true, loadError: false });
@@ -583,6 +593,7 @@ const races: Race[] = [
       return [copy, copy];
     },
     lit: says(ts.ocr.copied),
+    failed: says(en.common.copyFailed),
   },
   {
     name: "image to Base64: status",
@@ -614,6 +625,7 @@ const races: Race[] = [
       return [copy, copy];
     },
     lit: says(en.common.copied),
+    failed: says(ts["image-to-base64-results"].copyFailed),
   },
   {
     name: "editor export dialog: copyStatus",
@@ -713,6 +725,90 @@ describe("A failed copy then a good one share the slot (#1798)", () => {
     });
     expect(copy).not.toHaveTextContent(en.editor.ui.exportDialog.copied);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("A failed copy says so, and a good copy after it still gets its time (#1827)", () => {
+  // The clipboard write fails (plain-http install, permission denied). The
+  // control has to say so instead of doing nothing, the message clears on the
+  // same timer as Copied, and its reset must not take down a good copy made
+  // inside its window.
+  const failing = races.flatMap((race) =>
+    race.failed ? [[race.name, race, race.failed] as const] : [],
+  );
+
+  it.each(failing)("%s", async (_name, race, failed) => {
+    const [first, second] = await race.mount();
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(first);
+    expect(failed(first)).toBe(true);
+    expect(race.lit(first)).toBe(false);
+
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms - 500);
+    });
+    await copyAgain(second);
+    expect(race.lit(second)).toBe(true);
+    expect(failed(first)).toBe(false);
+    expect(failed(second)).toBe(false);
+
+    // The failure's reset is due now and must leave the good copy up.
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(race.lit(second)).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms);
+    });
+    expect(race.lit(second)).toBe(false);
+    expect(failed(first)).toBe(false);
+    expect(failed(second)).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a failed copy that is never retried clears on its own", async () => {
+    toolPayload.current = { dataUri: "data:image/webp;base64,AA==", width: 16, height: 9 };
+    render(<LqipPlaceholderSettings />);
+    const copy = screen.getAllByRole("button", { name: en.common.copy })[0];
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(copy);
+    expect(crossed(copy)).toBe(true);
+    expect(copy).toHaveAttribute("title", en.common.copyFailed);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+    });
+    expect(crossed(copy)).toBe(false);
+    expect(copy).not.toHaveAttribute("title");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("login: a failed copy of the enrollment recovery codes says to copy them by hand", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          requiresMfaEnrollment: true,
+          enrollmentToken: "enroll-token-1",
+          uri: "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&issuer=SnapOtter",
+          recoveryCodes: ["AAAA-1111"],
+        }),
+      })),
+    );
+    renderLogin();
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "pw" } });
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+    const copy = await screen.findByRole("button", {
+      name: en.settings.security.twoFactorCopyRecoveryCodes,
+    });
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(copy);
+    expect(screen.getByText(en.settings.security.twoFactorCopyFailed)).toBeInTheDocument();
+    expect(copy).not.toHaveTextContent(en.settings.security.twoFactorCodesCopied);
   });
 });
 

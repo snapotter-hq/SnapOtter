@@ -30,6 +30,7 @@ export const vi: TranslationKeys = {
     clear: "Xóa",
     copy: "Sao chép",
     copied: "Đã sao chép!",
+    copyFailed: "Sao chép thất bại",
     noResults: "Không tìm thấy kết quả",
     showLess: "Thu gọn",
     showMore: "Hiển thị thêm {count}",

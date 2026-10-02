@@ -31,6 +31,7 @@ export const nl: TranslationKeys = {
     clear: "Wissen",
     copy: "Kopiëren",
     copied: "Gekopieerd!",
+    copyFailed: "Kopiëren mislukt",
     noResults: "Geen resultaten gevonden",
     showLess: "Minder tonen",
     showMore: "{count} meer tonen",

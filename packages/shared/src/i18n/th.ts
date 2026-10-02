@@ -30,6 +30,7 @@ export const th: TranslationKeys = {
     clear: "ล้าง",
     copy: "คัดลอก",
     copied: "คัดลอกแล้ว!",
+    copyFailed: "คัดลอกไม่สำเร็จ",
     noResults: "ไม่พบผลลัพธ์",
     showLess: "แสดงน้อยลง",
     showMore: "แสดงอีก {count} รายการ",

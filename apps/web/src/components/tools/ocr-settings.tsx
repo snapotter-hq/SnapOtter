@@ -213,7 +213,7 @@ export function OcrSettings() {
   // the library only). OCR renders its own text result, not the shared
   // ReviewPanel, so it surfaces the "saved to Files" confirmation inline (#565).
   const [savedLibraryFileId, setSavedLibraryFileId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
@@ -341,10 +341,8 @@ export function OcrSettings() {
   const handleCopy = async () => {
     if (text !== null) {
       const ok = await copyToClipboard(text);
-      if (ok) {
-        setCopied(true);
-        later(() => setCopied(false), 2000, "copied");
-      }
+      setCopyStatus(ok ? "copied" : "failed");
+      later(() => setCopyStatus(null), 2000, "copyStatus");
     }
   };
 
@@ -481,8 +479,16 @@ export function OcrSettings() {
                 onClick={handleCopy}
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                {copied ? t.toolSettings.ocr.copied : t.common.copy}
+                {copyStatus === "copied" ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+                {copyStatus === "copied"
+                  ? t.toolSettings.ocr.copied
+                  : copyStatus === "failed"
+                    ? t.common.copyFailed
+                    : t.common.copy}
               </button>
             </div>
           </div>

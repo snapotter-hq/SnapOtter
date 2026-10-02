@@ -31,6 +31,7 @@ export const ja: TranslationKeys = {
     clear: "クリア",
     copy: "コピー",
     copied: "コピーしました！",
+    copyFailed: "コピーに失敗しました",
     noResults: "結果が見つかりません",
     showLess: "折りたたむ",
     showMore: "あと{count}件を表示",

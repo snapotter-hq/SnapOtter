@@ -1,5 +1,5 @@
-import { Check, ClipboardCopy, Copy, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Check, ClipboardCopy, Copy, Loader2, X } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
@@ -17,8 +17,8 @@ export function ColorPaletteSettings() {
   const [format, setFormat] = useState<ColorFormat>("hex");
   const [colors, setColors] = useState<string[]>([]);
   const [hexColors, setHexColors] = useState<string[]>([]);
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [copiedExport, setCopiedExport] = useState<"css" | "json" | null>(null);
+  const [swatchCopy, setSwatchCopy] = useState<{ idx: number; ok: boolean } | null>(null);
+  const [exportCopy, setExportCopy] = useState<{ kind: "css" | "json"; ok: boolean } | null>(null);
   const later = useTimeouts();
 
   const handleProcess = async () => {
@@ -57,29 +57,32 @@ export function ColorPaletteSettings() {
 
   const copyColor = async (color: string, idx: number) => {
     const ok = await copyToClipboard(color);
-    if (ok) {
-      setCopiedIdx(idx);
-      later(() => setCopiedIdx(null), 1500, "copiedIdx");
-    }
+    setSwatchCopy({ idx, ok });
+    later(() => setSwatchCopy(null), 1500, "swatchCopy");
   };
 
-  const copyCss = async () => {
+  const copyExport = async (kind: "css" | "json", text: string) => {
+    const ok = await copyToClipboard(text);
+    setExportCopy({ kind, ok });
+    later(() => setExportCopy(null), 1500, "exportCopy");
+  };
+
+  const copyCss = () => {
     const vars = hexColors.map((c, i) => `  --color-${i + 1}: ${c};`).join("\n");
-    const css = `:root {\n${vars}\n}`;
-    const ok = await copyToClipboard(css);
-    if (ok) {
-      setCopiedExport("css");
-      later(() => setCopiedExport(null), 1500, "copiedExport");
-    }
+    return copyExport("css", `:root {\n${vars}\n}`);
   };
 
-  const copyJson = async () => {
-    const ok = await copyToClipboard(JSON.stringify(colors));
-    if (ok) {
-      setCopiedExport("json");
-      later(() => setCopiedExport(null), 1500, "copiedExport");
-    }
-  };
+  const copyJson = () => copyExport("json", JSON.stringify(colors));
+
+  /** The tick, the cross, or the idle icon for one copy control. */
+  const copyIcon = (result: { ok: boolean } | null, idle: ReactNode) =>
+    result === null ? (
+      idle
+    ) : result.ok ? (
+      <Check className="h-3 w-3 text-success-ink shrink-0" />
+    ) : (
+      <X className="h-3 w-3 text-destructive shrink-0" />
+    );
 
   const hasFile = files.length > 0;
 
@@ -158,11 +161,13 @@ export function ColorPaletteSettings() {
                 onClick={copyCss}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
                 data-testid="color-palette-copy-css"
+                title={
+                  exportCopy?.kind === "css" && !exportCopy.ok ? t.common.copyFailed : undefined
+                }
               >
-                {copiedExport === "css" ? (
-                  <Check className="h-3 w-3 text-success-ink" />
-                ) : (
-                  <ClipboardCopy className="h-3 w-3" />
+                {copyIcon(
+                  exportCopy?.kind === "css" ? exportCopy : null,
+                  <ClipboardCopy className="h-3 w-3" />,
                 )}
                 CSS
               </button>
@@ -171,11 +176,13 @@ export function ColorPaletteSettings() {
                 onClick={copyJson}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-muted transition-colors"
                 data-testid="color-palette-copy-json"
+                title={
+                  exportCopy?.kind === "json" && !exportCopy.ok ? t.common.copyFailed : undefined
+                }
               >
-                {copiedExport === "json" ? (
-                  <Check className="h-3 w-3 text-success-ink" />
-                ) : (
-                  <ClipboardCopy className="h-3 w-3" />
+                {copyIcon(
+                  exportCopy?.kind === "json" ? exportCopy : null,
+                  <ClipboardCopy className="h-3 w-3" />,
                 )}
                 JSON
               </button>
@@ -190,6 +197,7 @@ export function ColorPaletteSettings() {
                 key={hexColors[i]}
                 onClick={() => copyColor(color, i)}
                 className="flex items-center gap-2 p-1.5 rounded border border-border hover:bg-muted transition-colors"
+                title={swatchCopy?.idx === i && !swatchCopy.ok ? t.common.copyFailed : undefined}
               >
                 <div
                   className="w-6 h-6 rounded border border-border shrink-0"
@@ -198,10 +206,9 @@ export function ColorPaletteSettings() {
                 <span className="text-xs font-mono text-foreground flex-1 text-start truncate">
                   {color}
                 </span>
-                {copiedIdx === i ? (
-                  <Check className="h-3 w-3 text-success-ink shrink-0" />
-                ) : (
-                  <Copy className="h-3 w-3 text-muted-foreground shrink-0" />
+                {copyIcon(
+                  swatchCopy?.idx === i ? swatchCopy : null,
+                  <Copy className="h-3 w-3 text-muted-foreground shrink-0" />,
                 )}
               </button>
             ))}
