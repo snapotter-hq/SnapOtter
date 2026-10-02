@@ -18,6 +18,11 @@ import {
   UsernameRaceExhaustedError,
 } from "../lib/external-auth-resolver.js";
 import { authAttempts } from "../lib/metrics.js";
+import {
+  oidcDiscoveryFault,
+  oidcTokenExchangeFault,
+  oidcTokenExchangeFaultCode,
+} from "../lib/oidc-faults.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
 import { createSessionToken } from "./auth.js";
 import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
@@ -91,7 +96,7 @@ async function discoverForLogout(): Promise<oidc.Configuration> {
     );
   });
   const discovery = getOrDiscoverConfig().catch((cause: unknown) => {
-    throw new SafeError("OIDC discovery failed", { code: "OIDC_DISCOVERY_FAILED", cause });
+    throw oidcDiscoveryFault(cause);
   });
   try {
     return await Promise.race([discovery, timeout]);
@@ -164,6 +169,37 @@ function recordOidcFailure(): void {
   void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "oidc" });
 }
 
+/**
+ * Discovery for the login and callback routes. A failure is logged, with a
+ * message that names an http issuer on an https deployment rather than
+ * calling the IdP unreachable (#1775), and reported once as an operational
+ * SafeError (#1869): request.log has no Sentry bridge, and the caller turns
+ * the failure into a redirect, so the global handler never sees it. Returns
+ * the fault for the caller's redirect and audit row.
+ */
+async function discoverForSignIn(
+  request: FastifyRequest,
+): Promise<{ config: oidc.Configuration } | { fault: SafeError }> {
+  try {
+    return { config: await getOrDiscoverConfig() };
+  } catch (err) {
+    const fault = oidcDiscoveryFault(err);
+    request.log.error(
+      { err, code: fault.code },
+      fault.code === "OIDC_ISSUER_SCHEME_MISMATCH"
+        ? "OIDC discovery refused: OIDC_ISSUER_URL is http but EXTERNAL_URL is https, and openid-client refuses plain-http issuers for an https deployment"
+        : "OIDC discovery failed",
+    );
+    void reportError(fault, {
+      source: "http",
+      route: request.routeOptions?.url,
+      method: request.method,
+      subsystem: "oidc-login",
+    });
+    return { fault };
+  }
+}
+
 // ── OIDC Routes ───────────────────────────────────────────────────
 
 export async function oidcRoutes(app: FastifyInstance): Promise<void> {
@@ -174,13 +210,9 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
     "/api/auth/oidc/login",
     { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let config: oidc.Configuration;
-      try {
-        config = await getOrDiscoverConfig();
-      } catch (err) {
-        request.log.error({ err }, "OIDC discovery failed");
-        return redirectToLogin(reply, "oidc_provider_unreachable");
-      }
+      const discovered = await discoverForSignIn(request);
+      if ("fault" in discovered) return redirectToLogin(reply, "oidc_provider_unreachable");
+      const { config } = discovered;
 
       const state = oidc.randomState();
       const nonce = oidc.randomNonce();
@@ -272,13 +304,21 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // 2. Exchange authorization code for tokens
-      let config: oidc.Configuration;
-      try {
-        config = await getOrDiscoverConfig();
-      } catch (err) {
-        request.log.error({ err }, "OIDC discovery failed during callback");
+      const discovered = await discoverForSignIn(request);
+      if ("fault" in discovered) {
+        // Same trail as every other failed callback: the metric, the
+        // analytics event, and an audit row whose reason tells an admin which
+        // way discovery failed (discovery_failed, discovery_timeout, or
+        // issuer_scheme_mismatch).
+        recordOidcFailure();
+        await audit("OIDC_LOGIN_FAILED", {
+          reason: String(discovered.fault.code)
+            .replace(/^OIDC_/, "")
+            .toLowerCase(),
+        });
         return redirectToLogin(reply, "oidc_provider_unreachable");
       }
+      const { config } = discovered;
 
       let tokenResponse: Awaited<ReturnType<typeof oidc.authorizationCodeGrant>>;
       try {
@@ -295,6 +335,21 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
         });
       } catch (err) {
         request.log.error({ err }, "OIDC token exchange failed");
+        // An expired or replayed code (invalid_grant) or access_denied is the
+        // user's doing and stays out of Sentry. Anything else, an IdP that is
+        // down or answers 5xx, rejected client credentials, a redirect_uri the
+        // IdP doesn't accept, fails every SSO login and is reported once,
+        // under a constant message, so no code, state, or token reaches the
+        // event (#1869).
+        const faultCode = oidcTokenExchangeFaultCode(err);
+        if (faultCode) {
+          void reportError(oidcTokenExchangeFault(faultCode, err), {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            subsystem: "oidc-login",
+          });
+        }
         recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", { reason: "token_exchange_failed" });
         return redirectToLogin(reply, "oidc_auth_failed");
