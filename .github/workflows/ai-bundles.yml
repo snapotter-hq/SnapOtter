@@ -822,26 +822,51 @@ jobs:
           name: digests-linux-arm64
           path: /tmp/image-digests/linux-arm64
 
-      - name: Download both verified OCR artifact sets
+      # Exact artifact names, never a pattern (#1950). Every job in the run
+      # can upload an artifact, including the audit jobs running unhashed
+      # pip-audit, and a pattern with merge-multiple would let a planted
+      # artifact overwrite a real report before this job signs its hash.
+      - name: Download verified artifact ocr-linux-amd64-cpu-py312
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: ocr-linux-*-cpu-py*
+          name: ocr-linux-amd64-cpu-py312
           path: /tmp/ocr-artifacts
-          merge-multiple: true
 
-      - name: Download OCR security attestations
+      - name: Download verified artifact ocr-linux-arm64-cpu-py311
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: ocr-security-*
-          path: /tmp/ocr-attestations
-          merge-multiple: true
+          name: ocr-linux-arm64-cpu-py311
+          path: /tmp/ocr-artifacts
 
-      - name: Download OCR quality and resource attestations
+      - name: Download verified artifact ocr-security-linux-amd64-cpu-py312
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: ocr-quality-*
+          name: ocr-security-linux-amd64-cpu-py312
           path: /tmp/ocr-attestations
-          merge-multiple: true
+
+      - name: Download verified artifact ocr-security-linux-arm64-cpu-py311
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-security-linux-arm64-cpu-py311
+          path: /tmp/ocr-attestations
+
+      - name: Download verified artifact ocr-quality-linux-amd64-cpu-py312
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312
+          path: /tmp/ocr-attestations
+
+      - name: Download verified artifact ocr-quality-linux-arm64-cpu-py311
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-quality-linux-arm64-cpu-py311
+          path: /tmp/ocr-attestations
+
+      - name: Download verified artifact ocr-quality-linux-amd64-cpu-py312-nvidia
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ocr-quality-linux-amd64-cpu-py312-nvidia
+          path: /tmp/ocr-attestations
 
       - name: Create canonical unsigned index and validate its archives
         env:
@@ -1442,8 +1467,8 @@ jobs:
       # One exact artifact per step, never the whole run (#1950). Every job in
       # the run holds ACTIONS_RUNTIME_TOKEN and can upload an artifact, and the
       # audit jobs run unhashed pip-audit, so an unscoped download would pull in
-      # anything they planted. The closure check below would still reject it;
-      # naming each artifact keeps it from reaching this runner at all.
+      # anything they planted. The closure check below would ignore or reject
+      # it; naming each artifact keeps it from reaching this runner at all.
       - name: Download verified artifact ocr-linux-amd64-cpu-py312
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

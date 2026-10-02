@@ -874,35 +874,60 @@ describe("OCR v3 bundle release workflow", () => {
     expect(JSON.stringify(buildJob)).not.toContain("pip install");
   });
 
-  it("downloads only the named OCR release artifacts into the publish job (#1950)", () => {
+  it("downloads only named OCR artifacts into the signing and publish jobs (#1950)", () => {
     // Every job in the run can upload an artifact with ACTIONS_RUNTIME_TOKEN,
     // including the audit jobs running unhashed pip-audit. An unscoped or
     // pattern download would pull whatever they planted onto the runner that
-    // holds the HuggingFace token, so each download names one exact artifact.
+    // holds the signing key or the HuggingFace token (and with merge-multiple,
+    // let it overwrite a real report), so each download names one artifact.
     type Step = Record<string, unknown> & { with?: Record<string, unknown> };
     const parsed = load(readRequired(bundlesWorkflowPath)) as {
       jobs: Record<string, { steps: Step[] }>;
     };
-    const downloads = parsed.jobs.publish.steps.filter((step) =>
-      String(step.uses ?? "").startsWith("actions/download-artifact@"),
-    );
+    const downloadsOf = (jobName: string) =>
+      parsed.jobs[jobName].steps.filter((step) =>
+        String(step.uses ?? "").startsWith("actions/download-artifact@"),
+      );
     const targets = ["linux-amd64-cpu-py312", "linux-arm64-cpu-py311"];
-    const expected = [
-      ...targets.map((target) => `ocr-${target}`),
+    const builds = targets.map((target) => `ocr-${target}`);
+    const reports = [
       ...targets.map((target) => `ocr-security-${target}`),
       ...targets.map((target) => `ocr-quality-${target}`),
       "ocr-quality-linux-amd64-cpu-py312-nvidia",
-      "ocr-runtime-metadata",
     ];
 
-    expect(downloads.map((step) => step.with?.name).sort()).toEqual([...expected].sort());
-    for (const step of downloads) {
-      expect(Object.keys(step).sort()).toEqual(["name", "uses", "with"]);
-      expect(step.with).toEqual({
-        name: step.with?.name,
-        path: `/tmp/artifacts/${String(step.with?.name)}`,
-      });
-    }
+    // Each step is exactly {name, path}: no pattern, merge-multiple or run-id.
+    const pathsByName = (steps: Step[]) =>
+      Object.fromEntries(
+        steps.map((step) => {
+          expect(Object.keys(step).sort()).toEqual(["name", "uses", "with"]);
+          expect(Object.keys(step.with ?? {}).sort()).toEqual(["name", "path"]);
+          return [String(step.with?.name), step.with?.path];
+        }),
+      );
+
+    const publishDownloads = downloadsOf("publish");
+    const expectedPublish = [...builds, ...reports, "ocr-runtime-metadata"];
+    expect(publishDownloads).toHaveLength(expectedPublish.length);
+    expect(pathsByName(publishDownloads)).toEqual(
+      Object.fromEntries(expectedPublish.map((name) => [name, `/tmp/artifacts/${name}`])),
+    );
+    // Nothing else in publish writes into the closure's source directory.
+    const artifactSteps = parsed.jobs.publish.steps.filter((step) =>
+      JSON.stringify(step).includes("/tmp/artifacts"),
+    );
+    expect(
+      artifactSteps.filter((step) => !publishDownloads.includes(step)).map((s) => s.name),
+    ).toEqual(["Organize and verify the exact signed OCR release closure"]);
+
+    const signDownloads = downloadsOf("sign-ocr-index").filter(
+      (step) => !String(step.with?.name).startsWith("digests-"),
+    );
+    expect(signDownloads).toHaveLength(builds.length + reports.length);
+    expect(pathsByName(signDownloads)).toEqual({
+      ...Object.fromEntries(builds.map((name) => [name, "/tmp/ocr-artifacts"])),
+      ...Object.fromEntries(reports.map((name) => [name, "/tmp/ocr-attestations"])),
+    });
   });
 
   it("signs one canonical two-target index and verifies it before upload", () => {
@@ -928,8 +953,6 @@ describe("OCR v3 bundle release workflow", () => {
     expect(signJob).toContain("openssl pkeyutl -verify -rawin");
     expect(signJob).toContain("ocr-runtime-index.json");
     expect(signJob).toContain("ocr-runtime-trusted-keys.json");
-    expect(signJob).toContain("pattern: ocr-security-*");
-    expect(signJob).toContain("pattern: ocr-quality-*");
     expect(signJob).toContain('"attestations": attestations');
     expect(signJob).toContain('"publicKey": (root / "trusted-public.pem").read_text()');
     expect(signJob).toContain(
