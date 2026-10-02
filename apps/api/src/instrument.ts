@@ -9,6 +9,7 @@ import { deployMode } from "./lib/deploy-mode.js";
 import { buildSentryIntegrations } from "./lib/sentry-integrations.js";
 import { buildBeforeSend, buildBeforeSendTransaction } from "./lib/sentry-scrub.js";
 import { buildTracesSampler } from "./lib/sentry-tracing.js";
+import { buildGatedTransport } from "./lib/sentry-transport.js";
 
 // Sentry inits at process load, before the gate cache is primed. Until the
 // first successful read, stay silent rather than emit on the default-ON cache,
@@ -71,6 +72,12 @@ if (dsn && !telemetryEnvKilled()) {
         sentryActive,
         sentryDiagnostic(),
       ) as unknown as SentryOptions["beforeSendTransaction"],
+      // The gate that covers everything else. Sessions (the process session
+      // ends on API stop), cron check-ins, and the SDK's internal error events
+      // never pass through either hook above, so the transport drops every
+      // envelope while analytics is off; the hooks stay as a second line for
+      // events and transactions (#1919).
+      transport: buildGatedTransport(sentryActive, Sentry.makeNodeTransport),
     });
 
     console.log(
