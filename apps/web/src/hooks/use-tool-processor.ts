@@ -223,13 +223,14 @@ export function useToolProcessor(toolId: string) {
   // The throw is reported as well as logged, or it never reaches Sentry
   // (#1812). Each entry gets its own try, so one write that throws can't
   // leave a batch's later entries pulsing (#1821, the twin of the pipeline's
-  // #1779), and the settle reports once, not once per entry.
+  // #1779), and the settle reports once, not once per entry. `spare` is an
+  // entry a still-live run owns, left processing (#1911).
   const settleProcessingEntries = useCallback(
-    (message: string) => {
+    (message: string, spare?: number) => {
       const { entries, updateEntry } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
       for (let i = 0; i < entries.length; i++) {
-        if (entries[i]?.status !== "processing") continue;
+        if (i === spare || entries[i]?.status !== "processing") continue;
         try {
           updateEntry(i, { status: "failed", error: message });
         } catch (err) {
@@ -448,6 +449,25 @@ export function useToolProcessor(toolId: string) {
     setError,
     setProcessing,
   ]);
+
+  // Ends a kickoff that threw before it claimed the run refs (#1911). They
+  // still belong to the run that holds them, so endRunAtStart would end
+  // that run instead. Only claimed refs are a failed start's to tear down;
+  // with no live run there is nothing to spare. Behind a live run the
+  // kickoff has only reset outcome state and marked entries processing, so
+  // it fails those entries and leaves the run, its processing flag and its
+  // error slot alone. A batch run owns every entry, so behind one there is
+  // nothing to fail. The caller rethrows, so the start's throw is still
+  // reported.
+  const endStartBeforeClaim = useCallback(() => {
+    if (!activeJobIdRef.current) {
+      endRunAtStart();
+      return;
+    }
+    const liveEntry = activeEntryIndexRef.current;
+    if (liveEntry === null) return;
+    settleProcessingEntries(FRAME_HANDLING_FAILED, liveEntry);
+  }, [endRunAtStart, settleProcessingEntries]);
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -790,7 +810,9 @@ export function useToolProcessor(toolId: string) {
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
-      // has no exit to end the run but this one (#1821).
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
       try {
         setError(null);
         setWarning(null);
@@ -804,6 +826,13 @@ export function useToolProcessor(toolId: string) {
           status: "processing",
           error: null,
         });
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIndexRef.current = capturedIndex;
+        asyncModeRef.current = false;
+
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
@@ -818,11 +847,6 @@ export function useToolProcessor(toolId: string) {
             elapsed: Math.floor((Date.now() - startTime) / 1000),
           }));
         }, 1000);
-
-        const clientJobId = generateId();
-        activeJobIdRef.current = clientJobId;
-        activeEntryIndexRef.current = capturedIndex;
-        asyncModeRef.current = false;
 
         // Open SSE for real-time progress from the server (all tools)
         reconnectSSE(true);
@@ -1116,7 +1140,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        endRunAtStart();
+        if (claimed) endRunAtStart();
+        else endStartBeforeClaim();
         throw cause;
       }
     },
@@ -1124,6 +1149,7 @@ export function useToolProcessor(toolId: string) {
       toolId,
       isAiTool,
       endRunAtStart,
+      endStartBeforeClaim,
       setProcessing,
       setError,
       setActiveJob,
@@ -1185,7 +1211,9 @@ export function useToolProcessor(toolId: string) {
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
-      // has no exit to end the run but this one (#1821).
+      // has no exit to end the run but this one (#1821). Until the claim,
+      // the run refs belong to whichever run holds them (#1911).
+      let claimed = false;
       try {
         setError(null);
         // A batch's per-file notes land on each entry (#1292), not in the
@@ -1213,6 +1241,13 @@ export function useToolProcessor(toolId: string) {
             error: null,
           });
         }
+
+        const clientJobId = generateId();
+        activeJobIdRef.current = clientJobId;
+        claimed = true;
+        activeEntryIndexRef.current = null;
+        asyncModeRef.current = false;
+
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
@@ -1227,11 +1262,6 @@ export function useToolProcessor(toolId: string) {
             elapsed: Math.floor((Date.now() - startTime) / 1000),
           }));
         }, 1000);
-
-        const clientJobId = generateId();
-        activeJobIdRef.current = clientJobId;
-        activeEntryIndexRef.current = null;
-        asyncModeRef.current = false;
         // The cancel button lives behind the store's activeJob handle. Batch
         // runs arm it for the whole run, sync wait included: since #750 the
         // HTTP response is only an observer, so without this the only exit
@@ -1740,7 +1770,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        endRunAtStart();
+        if (claimed) endRunAtStart();
+        else endStartBeforeClaim();
         throw cause;
       }
     },
@@ -1748,6 +1779,7 @@ export function useToolProcessor(toolId: string) {
       toolId,
       processFiles,
       endRunAtStart,
+      endStartBeforeClaim,
       setProcessing,
       setError,
       setActiveJob,
