@@ -767,7 +767,22 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("a failed copy that is never retried clears on its own", async () => {
+  // The retry above replaces the failure, so on its own it can't tell whether
+  // the failure ever schedules a reset. Leave it alone and watch it clear.
+  it.each(failing)("%s: a failure left alone clears on its own", async (_name, race, failed) => {
+    const [first] = await race.mount();
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(first);
+    expect(failed(first)).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(race.ms);
+    });
+    expect(failed(first)).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("LQIP: the failure is the button's tooltip until it clears", async () => {
     toolPayload.current = { dataUri: "data:image/webp;base64,AA==", width: 16, height: 9 };
     render(<LqipPlaceholderSettings />);
     const copy = screen.getAllByRole("button", { name: en.common.copy })[0];
@@ -809,6 +824,11 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     await copyAgain(copy);
     expect(screen.getByText(en.settings.security.twoFactorCopyFailed)).toBeInTheDocument();
     expect(copy).not.toHaveTextContent(en.settings.security.twoFactorCodesCopied);
+
+    // A retry that works takes the failure message down with it.
+    await copyAgain(copy);
+    expect(copy).toHaveTextContent(en.settings.security.twoFactorCodesCopied);
+    expect(screen.queryByText(en.settings.security.twoFactorCopyFailed)).toBeNull();
   });
 });
 

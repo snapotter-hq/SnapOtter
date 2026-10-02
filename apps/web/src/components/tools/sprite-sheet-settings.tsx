@@ -34,7 +34,7 @@ export function SpriteSheetSettings() {
   const [format, setFormat] = useState<OutputFormat>("png");
   const [quality, setQuality] = useState(90);
   const [exportCopy, setExportCopy] = useState<ExportCopy | null>(null);
-  // The flag lives here, so its reset does too: a re-run unmounts SpriteOutput
+  // The copy state lives here, so its reset does too: a re-run unmounts SpriteOutput
   // but not this panel, and a reset owned by the child would leave it stuck.
   const later = useTimeouts();
   const flashCopy = (kind: ExportKind, ok: boolean) => {

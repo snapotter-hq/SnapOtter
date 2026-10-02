@@ -2273,6 +2273,8 @@ export function ApiKeysSection() {
       }
       const data = await apiPost<{ key: string }>("/v1/api-keys", payload);
       setNewKey(data.key);
+      // The last key's Copied or Copy failed is not this key's.
+      setCopyStatus(null);
       setKeyName("");
       setScopedPerms([]);
       setShowScoping(false);

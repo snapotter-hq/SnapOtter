@@ -431,6 +431,8 @@ export function LoginPage() {
     if (enrollmentRecoveryCodes.length === 0) return;
     const ok = await copyToClipboard(enrollmentRecoveryCodes.join("\n"));
     if (ok) {
+      // A retry that works takes down the earlier copy failure, not other errors.
+      setError((e) => (e === t.settings.security.twoFactorCopyFailed ? "" : e));
       setEnrollmentCodesCopied(true);
       later(() => setEnrollmentCodesCopied(false), 2000, "enrollmentCodesCopied");
     } else {

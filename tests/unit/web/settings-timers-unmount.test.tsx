@@ -571,6 +571,46 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     expect(c.failed(copy)).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it.each(failing.map((c) => [c.name, c] as const))(
+    "%s: a failure left alone clears on its own",
+    async (_name, c) => {
+      const copy = await c.mount();
+      copyToClipboard.mockResolvedValueOnce(false);
+      await copyAgain(copy);
+      expect(c.failed(copy)).toBe(true);
+
+      await act(async () => {
+        vi.advanceTimersByTime(c.ms);
+      });
+      expect(c.failed(copy)).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it("People: the copy-this-password warning stays up after a failed copy", async () => {
+    const copy = await failing[0].mount();
+    expect(screen.getByText(s.people.copyPasswordWarning)).toBeInTheDocument();
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(copy);
+    expect(screen.getByText(s.people.copyPasswordWarning)).toBeInTheDocument();
+
+    await copyAgain(copy);
+    expect(screen.queryByText(s.people.copyPasswordWarning)).toBeNull();
+  });
+
+  it("API keys: a new key does not inherit the last key's failure", async () => {
+    const copy = await failing[1].mount();
+    copyToClipboard.mockResolvedValueOnce(false);
+    await copyAgain(copy);
+    expect(failing[1].failed(copy)).toBe(true);
+
+    apiPost.mockResolvedValueOnce({ key: "si_second" });
+    fireEvent.click(screen.getByRole("button", { name: s.apiKeys.generateButton }));
+    await screen.findByText("si_second");
+    const fresh = screen.getByRole("button", { name: de.common.copy });
+    expect(fresh.querySelector(".text-destructive")).toBeNull();
+  });
 });
 
 describe("Settings components schedule no raw timers", () => {

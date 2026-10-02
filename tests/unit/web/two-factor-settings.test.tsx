@@ -275,6 +275,22 @@ describe("TwoFactorSettings", () => {
     expect(screen.queryByRole("button", { name: /^copied$/i })).not.toBeInTheDocument();
   });
 
+  it("drops the copy-failed message once a retry copies the codes (#1827)", async () => {
+    useAuth.mockReturnValue({ totpEnabled: false });
+    respondToEnroll();
+    copyToClipboard.mockResolvedValueOnce(false);
+
+    render(<TwoFactorSettings />);
+    await startEnrollment();
+
+    fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
+    expect(await screen.findByText(/couldn't copy automatically/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
+    expect(await screen.findByRole("button", { name: /^copied$/i })).toBeInTheDocument();
+    expect(screen.queryByText(/couldn't copy automatically/i)).not.toBeInTheDocument();
+  });
+
   it("strips non-digit characters from the verify code as the user types", async () => {
     useAuth.mockReturnValue({ totpEnabled: false });
     respondToEnroll();

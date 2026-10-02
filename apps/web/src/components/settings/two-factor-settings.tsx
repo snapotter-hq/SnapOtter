@@ -158,6 +158,8 @@ export function TwoFactorSettings() {
     if (!enrollment) return;
     const ok = await copyToClipboard(enrollment.recoveryCodes.join("\n"));
     if (ok) {
+      // A retry that works takes down the earlier copy failure, not other messages.
+      setMessage((m) => (m?.text === t.settings.security.twoFactorCopyFailed ? null : m));
       setCodesCopied(true);
       later(() => setCodesCopied(false), 2000, "codesCopied");
     } else {
