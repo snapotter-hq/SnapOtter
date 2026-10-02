@@ -1015,7 +1015,7 @@ export const zhTW: TranslationKeys = {
     pipeline: { name: "Pipeline建構器", description: "將多個工具串聯為工作流程" },
     processing: {
       canceled: "處理已取消",
-      cancelTooLate: "已來不及取消，處理即將完成。",
+      cancelUnavailable: "此處理現在無法取消，仍在進行。",
       cancelNotAllowed: "無法取消：您已登出，或無權停止此處理。處理仍在進行。",
       cancelFailed: "無法取消處理。處理仍在進行，請重試。",
     },

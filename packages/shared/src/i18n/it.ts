@@ -1248,7 +1248,7 @@ export const it: TranslationKeys = {
     },
     processing: {
       canceled: "Elaborazione annullata",
-      cancelTooLate: "Troppo tardi per annullare. L'elaborazione sta già terminando.",
+      cancelUnavailable: "Questa elaborazione non può essere annullata ora. È ancora in corso.",
       cancelNotAllowed:
         "Impossibile annullare: sei disconnesso o non hai il permesso di fermare questa elaborazione. È ancora in corso.",
       cancelFailed: "Impossibile annullare l'elaborazione. È ancora in corso, riprova.",

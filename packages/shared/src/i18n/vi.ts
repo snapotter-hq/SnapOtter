@@ -1246,7 +1246,7 @@ export const vi: TranslationKeys = {
     },
     processing: {
       canceled: "Đã hủy xử lý",
-      cancelTooLate: "Đã quá muộn để hủy. Quá trình xử lý sắp hoàn tất.",
+      cancelUnavailable: "Không thể hủy quá trình này lúc này. Quá trình vẫn đang chạy.",
       cancelNotAllowed:
         "Không thể hủy: bạn đã đăng xuất hoặc không có quyền dừng quá trình này. Quá trình vẫn đang chạy.",
       cancelFailed: "Không thể hủy quá trình xử lý. Quá trình vẫn đang chạy, hãy thử lại.",

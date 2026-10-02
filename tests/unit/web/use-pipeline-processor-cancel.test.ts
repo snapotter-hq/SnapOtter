@@ -130,6 +130,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  // Console spies must not outlive a test that failed partway.
+  vi.restoreAllMocks();
 });
 
 function startSingleRun() {
@@ -384,8 +386,13 @@ describe("usePipelineProcessor cancel (#771)", () => {
       xhrs[0].onload?.();
     });
 
+    // The server's "can't cancel this now" is told to the user (#1815).
+    vi.spyOn(console, "info").mockImplementation(() => {});
     await act(async () => {
-      await useFileStore.getState().cancelCurrentJob?.();
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "notCancellable",
+      });
     });
 
     // The refused click must not repaint a genuine lookup failure.
@@ -687,6 +694,7 @@ describe("usePipelineProcessor cancel failures (#1779)", () => {
   });
 
   it("keeps a run going when an acknowledged cancel's body is unreadable", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -699,13 +707,29 @@ describe("usePipelineProcessor cancel failures (#1779)", () => {
     );
     const hook = startSingleRun();
 
+    // Whether the server canceled is unknown; the stream settles that. The
+    // answer broke the route's contract, so it's said and reported (#1815).
     await act(async () => {
-      await expect(useFileStore.getState().cancelCurrentJob?.()).resolves.toBeUndefined();
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+        status: 200,
+      });
     });
 
     expect(useFileStore.getState().processing).toBe(true);
     expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
     expect(useFileStore.getState().error).toBeNull();
+    expect(consoleWarn).toHaveBeenCalledWith("Cancel answer unreadable", 200);
+    const reports = vi.mocked(captureHandledError).mock.calls;
+    expect(reports).toHaveLength(1);
+    const [report, tags] = reports[0] as unknown as [
+      Error & { statusCode?: number },
+      Record<string, string>,
+    ];
+    expect(report.message).toBe("A cancel answer was unreadable");
+    expect(report.statusCode).toBe(200);
+    expect(tags).toEqual({ error_class: "operational", status_code: "200" });
 
     hook.unmount();
   });
@@ -787,16 +811,94 @@ describe("usePipelineProcessor ends a canceled run whose teardown throws (#1814)
  */
 describe("usePipelineProcessor refused cancel (#1815)", () => {
   const REFUSED = [
-    // Too late: the run is already finishing. Expected, so info only.
+    // Can't be canceled now. Expected, so info only.
     [409, "notCancellable", "info", false],
-    // Signed out or not allowed: the user's to fix, not a bug.
+    // Signed out, not allowed, or rate limited: the user's, not a bug.
     [401, "notAllowed", "warn", false],
     [403, "notAllowed", "warn", false],
+    [429, "failed", "warn", false],
     // Faults.
     [500, "failed", "warn", true],
     [503, "failed", "warn", true],
-    [429, "failed", "warn", true],
   ] as const;
+
+  // The route's own refusal: a 200 that says it canceled nothing.
+  it.each([
+    ["single", startSingleRun],
+    ["batch", startBatchRun],
+  ] as const)("tells a %s run's user when the server can't cancel it now", async (_kind, start) => {
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ canceled: false }),
+        } as unknown as Response),
+      ),
+    );
+    const hook = start();
+
+    await act(async () => {
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "notCancellable",
+      });
+    });
+
+    expect(consoleInfo).toHaveBeenCalledWith(
+      "Cancel refused: the server can't cancel this run now",
+    );
+    expect(captureHandledError).not.toHaveBeenCalled();
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.activeJobId).toBe(JOB_ID);
+    expect(state.error).toBeNull();
+    hook.unmount();
+  });
+
+  it("says nothing when the run ended while a declined cancel was out", async () => {
+    let answer: (res: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      ),
+    );
+    const hook = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    const cancel = useFileStore.getState().cancelCurrentJob;
+
+    let pending: Promise<void> | undefined;
+    act(() => {
+      pending = cancel?.();
+    });
+    // The run finishes on its own before the server answers.
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "Processing failed" });
+    });
+    await settled(() => expect(useFileStore.getState().activeJobId).toBeNull());
+
+    await act(async () => {
+      answer({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ canceled: false }),
+      } as unknown as Response);
+      await expect(pending).resolves.toBeUndefined();
+    });
+    expect(useFileStore.getState().error).toBe("Processing failed");
+    hook.unmount();
+  });
 
   it.each(
     REFUSED.flatMap(([status, reason, level, reported]) =>

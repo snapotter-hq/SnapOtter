@@ -414,22 +414,29 @@ test.describe("Automate Page", () => {
   });
 
   // #1815: a cancel the server refuses used to look like nothing happened.
-  for (const [status, message] of [
-    [409, "Too late to cancel. The run is already finishing."],
-    [403, "Couldn't cancel: you're signed out or not allowed to stop this run. It's still going."],
-    [500, "Couldn't cancel the run. It's still going, so try again."],
+  // The route's own refusal is a 200 that says it canceled nothing.
+  for (const [label, status, body, message] of [
+    [
+      "200 canceled:false",
+      200,
+      { canceled: false },
+      "This run can't be canceled now. It's still going.",
+    ],
+    [
+      "403",
+      403,
+      { error: "refused" },
+      "Couldn't cancel: you're signed out or not allowed to stop this run. It's still going.",
+    ],
+    ["500", 500, { error: "refused" }, "Couldn't cancel the run. It's still going, so try again."],
   ] as const) {
-    test(`a cancel refused with ${status} says so and leaves the run going`, async ({
+    test(`a cancel refused with ${label} says so and leaves the run going`, async ({
       loggedInPage: page,
     }) => {
       const pageErrors: string[] = [];
       page.on("pageerror", (err) => pageErrors.push(err.message));
       await page.route("**/api/v1/jobs/*/cancel", (route) =>
-        route.fulfill({
-          status,
-          contentType: "application/json",
-          body: JSON.stringify({ error: "refused" }),
-        }),
+        route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }),
       );
       const cancel = await startHeldRun(page);
 

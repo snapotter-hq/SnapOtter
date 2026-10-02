@@ -1244,7 +1244,8 @@ export const id: TranslationKeys = {
     },
     processing: {
       canceled: "Pemrosesan dibatalkan",
-      cancelTooLate: "Terlambat untuk membatalkan. Pemrosesan sudah hampir selesai.",
+      cancelUnavailable:
+        "Pemrosesan ini tidak bisa dibatalkan sekarang. Pemrosesan masih berjalan.",
       cancelNotAllowed:
         "Tidak bisa membatalkan: Anda sudah keluar atau tidak diizinkan menghentikan pemrosesan ini. Pemrosesan masih berjalan.",
       cancelFailed: "Gagal membatalkan pemrosesan. Pemrosesan masih berjalan, coba lagi.",

@@ -166,6 +166,11 @@ interface FileState {
   processing: boolean;
   error: string | null;
   activeJobId: string | null;
+  /**
+   * Rejects with a CancelRefusedError when the server won't cancel or never
+   * answered (#1815), and with the hook's own error when its teardown breaks
+   * (#1779). Every caller must catch.
+   */
   cancelCurrentJob: (() => Promise<void>) | null;
   /** How library-sourced results are saved (#495): "new" keeps the original. */
   librarySaveMode: LibrarySaveMode;

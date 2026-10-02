@@ -1243,7 +1243,7 @@ export const sv: TranslationKeys = {
     },
     processing: {
       canceled: "Bearbetningen avbruten",
-      cancelTooLate: "För sent att avbryta. Bearbetningen håller redan på att bli klar.",
+      cancelUnavailable: "Den här bearbetningen kan inte avbrytas just nu. Den fortsätter.",
       cancelNotAllowed:
         "Det gick inte att avbryta: du är utloggad eller får inte stoppa den här bearbetningen. Den fortsätter.",
       cancelFailed: "Det gick inte att avbryta bearbetningen. Den fortsätter, försök igen.",

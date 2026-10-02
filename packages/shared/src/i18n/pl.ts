@@ -1246,7 +1246,7 @@ export const pl: TranslationKeys = {
     },
     processing: {
       canceled: "Przetwarzanie anulowane",
-      cancelTooLate: "Za późno na anulowanie. Przetwarzanie właśnie się kończy.",
+      cancelUnavailable: "Tego przetwarzania nie można teraz anulować. Nadal trwa.",
       cancelNotAllowed:
         "Nie można anulować: wylogowano cię lub nie masz uprawnień, by zatrzymać to przetwarzanie. Nadal trwa.",
       cancelFailed: "Nie udało się anulować przetwarzania. Nadal trwa, spróbuj ponownie.",

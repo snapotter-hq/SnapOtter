@@ -13,7 +13,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { failedCancelRequest, refusedCancel } from "@/lib/cancel-refusal";
+import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import {
   checkToolResult,
   FRAME_HANDLING_FAILED,
@@ -290,24 +290,21 @@ export function useToolProcessor(toolId: string) {
     } catch (cause) {
       throw failedCancelRequest(cause, toolId);
     }
-    // Record intent only once the server acknowledged the cancel: a failed
-    // or refused POST must not repaint the run's real outcome as canceled
-    // (#767). The ack always precedes the terminal frame (the finalize
-    // still has children to drain), so labeling cannot race it.
-    if (res.ok) {
-      const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
-      if (body?.canceled === true && activeJobIdRef.current === jobId) {
-        batchRunRef.current?.markCanceled();
-      }
+    // A refused cancel throws here and the run carries on: it must not be
+    // repainted as canceled (#767), but the button says why (#1815).
+    const answer = await readCancelAnswer(res, () => activeJobIdRef.current === jobId, toolId);
+    // Record intent only once the server acknowledged the cancel. The ack
+    // always precedes the terminal frame (the finalize still has children
+    // to drain), so labeling cannot race it.
+    if (answer === "acknowledged") {
+      batchRunRef.current?.markCanceled();
       return;
     }
-    // Refused: the run carries on, and the button says why (#1815).
-    if (res.status !== 404) throw refusedCancel(res.status, toolId);
-    // 404 means no job exists server-side (possible in the degraded #722
+    // A 404 means no job exists server-side (possible in the degraded #722
     // state when the request tail never arrived). Nothing will ever emit a
     // frame, so settle locally as canceled instead of blaming the network
     // 30 seconds later.
-    if (res.status === 404 && activeJobIdRef.current === jobId) {
+    if (answer === "missing") {
       // A batch upload may still be in flight; its settle path also has to
       // abort the XHR and tear down the run's own state (#767). A refusal
       // means the closure belongs to an earlier run: fall through and

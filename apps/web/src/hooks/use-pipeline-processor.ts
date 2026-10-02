@@ -5,7 +5,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { failedCancelRequest, refusedCancel } from "@/lib/cancel-refusal";
+import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import {
   checkToolResult,
   FRAME_HANDLING_FAILED,
@@ -224,21 +224,18 @@ export function usePipelineProcessor() {
     } catch (cause) {
       throw failedCancelRequest(cause);
     }
-    // Record intent only on an acknowledged cancel: a failed or refused
-    // POST must not repaint the run's real outcome as canceled (#767).
-    if (res.ok) {
-      const body = (await res.json().catch(() => null)) as { canceled?: boolean } | null;
-      if (body?.canceled === true && activeJobIdRef.current === jobId) {
-        canceledByUserRef.current = true;
-      }
+    // A refused cancel throws here and the run carries on: it must not be
+    // repainted as canceled (#767), but the button says why (#1815).
+    const answer = await readCancelAnswer(res, () => activeJobIdRef.current === jobId);
+    // Record intent only on an acknowledged cancel.
+    if (answer === "acknowledged") {
+      canceledByUserRef.current = true;
       return;
     }
-    // Refused: the run carries on, and the button says why (#1815).
-    if (res.status !== 404) throw refusedCancel(res.status);
-    // 404 means no job exists server-side. Nothing will ever emit a
+    // A 404 means no job exists server-side. Nothing will ever emit a
     // frame, so settle locally as canceled instead of blaming the network
     // 30 seconds later.
-    if (res.status === 404 && activeJobIdRef.current === jobId) {
+    if (answer === "missing") {
       // The stream closes here, so nothing else will ever end this run:
       // each write gets its own guard, or one that throws would leave the
       // run spinning with its cancel button already gone (#1814).

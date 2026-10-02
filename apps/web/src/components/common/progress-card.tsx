@@ -38,7 +38,7 @@ export function ProgressCard({ active, phase, label, stage, percent, elapsed }: 
   const sublabel = [stage, `${elapsed}s`].filter(Boolean).join(" · ");
 
   const refusalMessages: Record<CancelRefusalReason, string> = {
-    notCancellable: t.tools.processing.cancelTooLate,
+    notCancellable: t.tools.processing.cancelUnavailable,
     notAllowed: t.tools.processing.cancelNotAllowed,
     failed: t.tools.processing.cancelFailed,
   };

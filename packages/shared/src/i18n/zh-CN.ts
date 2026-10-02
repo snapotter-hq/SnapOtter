@@ -1015,7 +1015,7 @@ export const zhCN: TranslationKeys = {
     pipeline: { name: "Pipeline 构建器", description: "将多个工具串联为工作流" },
     processing: {
       canceled: "处理已取消",
-      cancelTooLate: "已来不及取消，处理即将完成。",
+      cancelUnavailable: "此处理现在无法取消，仍在进行。",
       cancelNotAllowed: "无法取消：您已退出登录，或无权停止此处理。处理仍在进行。",
       cancelFailed: "无法取消处理。处理仍在进行，请重试。",
     },

@@ -1246,7 +1246,7 @@ export const tr: TranslationKeys = {
     },
     processing: {
       canceled: "İşlem iptal edildi",
-      cancelTooLate: "İptal etmek için çok geç. İşlem zaten bitmek üzere.",
+      cancelUnavailable: "Bu işlem şu anda iptal edilemez. Hâlâ sürüyor.",
       cancelNotAllowed:
         "İptal edilemedi: oturumunuz kapalı ya da bu işlemi durdurma izniniz yok. İşlem sürüyor.",
       cancelFailed: "İşlem iptal edilemedi. Hâlâ sürüyor, tekrar deneyin.",

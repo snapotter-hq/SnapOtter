@@ -1196,7 +1196,7 @@ export const en = {
     pipeline: { name: "Pipeline Builder", description: "Chain multiple tools into a workflow" },
     processing: {
       canceled: "Processing canceled",
-      cancelTooLate: "Too late to cancel. The run is already finishing.",
+      cancelUnavailable: "This run can't be canceled now. It's still going.",
       cancelNotAllowed:
         "Couldn't cancel: you're signed out or not allowed to stop this run. It's still going.",
       cancelFailed: "Couldn't cancel the run. It's still going, so try again.",

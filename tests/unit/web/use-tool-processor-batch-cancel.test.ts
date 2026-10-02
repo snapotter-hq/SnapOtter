@@ -159,6 +159,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.mocked(track).mockClear();
+  // Console spies must not outlive a test that failed partway.
+  vi.restoreAllMocks();
 });
 
 function startBatchRun() {
@@ -451,9 +453,17 @@ describe("useToolProcessor batch cancel (#767)", () => {
       xhrs[0].onload?.();
     });
 
+    // The server's "can't cancel this now" is told to the user (#1815).
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
     await act(async () => {
-      await hook.result.current.cancelCurrentJob();
+      await expect(hook.result.current.cancelCurrentJob()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "notCancellable",
+      });
     });
+    expect(consoleInfo).toHaveBeenCalledWith(
+      "Cancel refused: the server can't cancel this run now",
+    );
 
     act(() => {
       sendBatchFrame({
@@ -657,6 +667,7 @@ describe("useToolProcessor refused cancel (#1815)", () => {
     [409, "notCancellable", "info", false],
     [401, "notAllowed", "warn", false],
     [403, "notAllowed", "warn", false],
+    [429, "failed", "warn", false],
     [500, "failed", "warn", true],
   ] as const)(
     "keeps the batch going on a %i and rejects with %s",
@@ -769,6 +780,32 @@ describe("useToolProcessor refused cancel (#1815)", () => {
     expect(xhrs[0].abort).not.toHaveBeenCalled();
 
     consoleWarn.mockRestore();
+    hook.unmount();
+  });
+
+  it("reports a cancel request that failed for any other reason under the tool's id", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(captureHandledError).mockClear();
+    const failure = new Error("headers broke");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(failure)),
+    );
+    const hook = startBatchRun();
+
+    await act(async () => {
+      await expect(hook.result.current.cancelCurrentJob()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+      });
+    });
+
+    const reports = vi.mocked(captureHandledError).mock.calls;
+    expect(reports).toHaveLength(1);
+    const [report, tags] = reports[0] as unknown as [Error, Record<string, string>];
+    expect(report.message).toBe("A cancel request never reached the server");
+    expect(report.cause).toBe(failure);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
     hook.unmount();
   });
 });

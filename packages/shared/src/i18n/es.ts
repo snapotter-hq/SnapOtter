@@ -1232,7 +1232,7 @@ export const es: TranslationKeys = {
     },
     processing: {
       canceled: "Procesamiento cancelado",
-      cancelTooLate: "Demasiado tarde para cancelar. El proceso ya está terminando.",
+      cancelUnavailable: "Este proceso no se puede cancelar ahora. Sigue en curso.",
       cancelNotAllowed:
         "No se pudo cancelar: has cerrado sesión o no tienes permiso para detener este proceso. Sigue en curso.",
       cancelFailed: "No se pudo cancelar el proceso. Sigue en curso, inténtalo de nuevo.",

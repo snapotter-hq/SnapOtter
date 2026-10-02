@@ -1249,7 +1249,7 @@ export const de: TranslationKeys = {
     },
     processing: {
       canceled: "Verarbeitung abgebrochen",
-      cancelTooLate: "Zu spät zum Abbrechen. Der Vorgang wird bereits abgeschlossen.",
+      cancelUnavailable: "Dieser Vorgang kann jetzt nicht abgebrochen werden. Er läuft weiter.",
       cancelNotAllowed:
         "Abbrechen nicht möglich: Sie sind abgemeldet oder dürfen diesen Vorgang nicht stoppen. Er läuft weiter.",
       cancelFailed:

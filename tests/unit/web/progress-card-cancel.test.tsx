@@ -112,7 +112,7 @@ describe("ProgressCard cancel (#1779)", () => {
  */
 describe("ProgressCard refused cancel (#1815)", () => {
   it.each([
-    ["notCancellable", en.tools.processing.cancelTooLate],
+    ["notCancellable", en.tools.processing.cancelUnavailable],
     ["notAllowed", en.tools.processing.cancelNotAllowed],
     ["failed", en.tools.processing.cancelFailed],
   ] as const)("says why a %s cancel didn't go through", async (reason, message) => {
@@ -138,7 +138,7 @@ describe("ProgressCard refused cancel (#1815)", () => {
     );
     useFileStore.getState().setActiveJob("job-1", cancel);
     renderCard();
-    const message = en.tools.processing.cancelTooLate;
+    const message = en.tools.processing.cancelUnavailable;
 
     fireEvent.click(cancelButton());
     expect(await screen.findByText(message)).toBeInTheDocument();
@@ -156,5 +156,29 @@ describe("ProgressCard refused cancel (#1815)", () => {
       useFileStore.getState().setActiveJob("job-2", cancel);
     });
     expect(screen.queryByText(message)).not.toBeInTheDocument();
+  });
+
+  it("keeps a refusal that lands after the run changed off the new run", async () => {
+    let refuse: (err: Error) => void = () => {};
+    const cancel = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          refuse = reject;
+        }),
+    );
+    useFileStore.getState().setActiveJob("job-1", cancel);
+    renderCard();
+
+    fireEvent.click(cancelButton());
+    await waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
+    act(() => {
+      useFileStore.getState().setActiveJob("job-2", cancel);
+    });
+    await act(async () => {
+      refuse(new CancelRefusedError("failed", 500));
+    });
+
+    await waitFor(() => expect(cancelButton()).toBeEnabled());
+    expect(screen.queryByText(en.tools.processing.cancelFailed)).not.toBeInTheDocument();
   });
 });

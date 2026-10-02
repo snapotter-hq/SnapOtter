@@ -1253,7 +1253,7 @@ export const fr: TranslationKeys = {
     },
     processing: {
       canceled: "Traitement annulé",
-      cancelTooLate: "Trop tard pour annuler. Le traitement est en train de se terminer.",
+      cancelUnavailable: "Ce traitement ne peut pas être annulé pour l'instant. Il continue.",
       cancelNotAllowed:
         "Annulation impossible : vous êtes déconnecté ou n'êtes pas autorisé à arrêter ce traitement. Il continue.",
       cancelFailed: "Impossible d'annuler le traitement. Il continue, réessayez.",

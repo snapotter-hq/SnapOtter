@@ -1204,7 +1204,7 @@ export const ja: TranslationKeys = {
     pipeline: { name: "Pipelineビルダー", description: "複数のツールをワークフローに連結" },
     processing: {
       canceled: "処理がキャンセルされました",
-      cancelTooLate: "キャンセルするには遅すぎます。処理はすでに完了しつつあります。",
+      cancelUnavailable: "この処理は現在キャンセルできません。処理は続行中です。",
       cancelNotAllowed:
         "キャンセルできません。サインアウトしているか、この処理を停止する権限がありません。処理は続行中です。",
       cancelFailed: "処理をキャンセルできませんでした。処理は続行中です。もう一度お試しください。",

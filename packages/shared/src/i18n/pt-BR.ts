@@ -1247,7 +1247,7 @@ export const ptBR: TranslationKeys = {
     },
     processing: {
       canceled: "Processamento cancelado",
-      cancelTooLate: "Tarde demais para cancelar. O processamento já está terminando.",
+      cancelUnavailable: "Este processamento não pode ser cancelado agora. Ele continua.",
       cancelNotAllowed:
         "Não foi possível cancelar: você saiu da conta ou não tem permissão para parar este processamento. Ele continua.",
       cancelFailed: "Não foi possível cancelar o processamento. Ele continua, tente novamente.",
