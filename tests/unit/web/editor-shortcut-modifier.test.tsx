@@ -124,9 +124,6 @@ beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "en");
   useEditorStore.setState(INITIAL_STATE, true);
-  // Paste is only enabled with something on the internal clipboard; the hint
-  // shows either way, but keep the row in its normal state.
-  useEditorStore.setState({ clipboard: [] });
 });
 
 afterEach(() => {
@@ -179,17 +176,25 @@ describe("editor toolbar Transform tooltip (#1935)", () => {
     expect(transformTitle()).toBe(`${en.editor.menu.edit.freeTransform} (${shortcut})`);
   });
 
-  it("leaves single-key tool shortcuts alone", () => {
-    onDevice("Win32", CHROME_WINDOWS);
-    render(
-      <I18nProvider>
-        <EditorToolbar />
-      </I18nProvider>,
-    );
-    expect(screen.getByTestId("tool-move").getAttribute("title")).toBe(
-      `${en.editor.toolbar.move} (V)`,
-    );
-  });
+  it.each([
+    ["Win32", CHROME_WINDOWS, "Shift+G"],
+    ["MacIntel", SAFARI_MAC, "⇧G"],
+  ])(
+    "on %s renders the other tool shortcuts in the same style",
+    (platform, userAgent, gradient) => {
+      onDevice(platform, userAgent);
+      render(
+        <I18nProvider>
+          <EditorToolbar />
+        </I18nProvider>,
+      );
+      const title = (tool: string) => screen.getByTestId(`tool-${tool}`).getAttribute("title");
+      expect(title("move")).toBe(`${en.editor.toolbar.move} (V)`);
+      expect(title("gradient")).toBe(`${en.editor.toolbar.gradient} (${gradient})`);
+      // No shortcut means no parentheses at all.
+      expect(title("blur-brush")).toBe(en.editor.options.pixelBrush.blur);
+    },
+  );
 });
 
 describe("editor menu bar modifier (#1935)", () => {
@@ -204,5 +209,23 @@ describe("editor menu bar modifier (#1935)", () => {
     expect(await menuBarShortcut("edit", "undo")).toBe(undo);
     cleanup();
     expect(await menuBarShortcut("edit", "redo")).toBe(redo);
+  });
+
+  it.each([
+    ["Win32", CHROME_WINDOWS, "Ctrl+D", "Ctrl+Alt+I", "Ctrl+=", "Ctrl+-"],
+    ["MacIntel", SAFARI_MAC, "⌘D", "⌘⌥I", "⌘=", "⌘-"],
+  ])("on %s formats Alt and punctuation keys", async (platform, userAgent, ...expected) => {
+    onDevice(platform, userAgent);
+    const shown: (string | null | undefined)[] = [];
+    for (const [menu, item] of [
+      ["select", "deselect"],
+      ["image", "image-size"],
+      ["view", "zoom-in"],
+      ["view", "zoom-out"],
+    ]) {
+      shown.push(await menuBarShortcut(menu, item));
+      cleanup();
+    }
+    expect(shown).toEqual(expected);
   });
 });
