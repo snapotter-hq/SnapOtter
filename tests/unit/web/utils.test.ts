@@ -22,6 +22,7 @@ describe("copyToClipboard", () => {
     Object.assign(navigator, { clipboard: originalClipboard });
     document.execCommand = originalExecCommand;
     vi.restoreAllMocks();
+    for (const leftover of document.body.querySelectorAll("textarea")) leftover.remove();
   });
 
   it("returns true when clipboard API succeeds", async () => {
@@ -45,6 +46,49 @@ describe("copyToClipboard", () => {
       throw new Error("not supported");
     });
     expect(await copyToClipboard("hello")).toBe(false);
+  });
+
+  // #1937: the fallback textarea holds the copied text (often an API key or
+  // recovery codes), so it must leave the DOM on every path, throws included.
+  const leftoverTextareas = () => document.body.querySelectorAll("textarea").length;
+
+  it("copies the text through a temporary textarea and removes it afterwards", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    let seen: string | undefined;
+    document.execCommand = vi.fn().mockImplementation(() => {
+      seen = document.body.querySelector("textarea")?.value;
+      return true;
+    });
+    expect(await copyToClipboard("si_secret")).toBe(true);
+    expect(seen).toBe("si_secret");
+    expect(leftoverTextareas()).toBe(0);
+  });
+
+  it("removes the textarea when execCommand returns false", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    document.execCommand = vi.fn().mockReturnValue(false);
+    expect(await copyToClipboard("si_secret")).toBe(false);
+    expect(leftoverTextareas()).toBe(0);
+  });
+
+  it("removes the textarea when execCommand throws", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    document.execCommand = vi.fn().mockImplementation(() => {
+      throw new Error("not supported");
+    });
+    expect(await copyToClipboard("si_secret")).toBe(false);
+    expect(leftoverTextareas()).toBe(0);
+  });
+
+  it("removes the textarea when select() throws", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    document.execCommand = vi.fn().mockReturnValue(true);
+    vi.spyOn(HTMLTextAreaElement.prototype, "select").mockImplementation(() => {
+      throw new Error("select blocked");
+    });
+    expect(await copyToClipboard("si_secret")).toBe(false);
+    expect(document.execCommand).not.toHaveBeenCalled();
+    expect(leftoverTextareas()).toBe(0);
   });
 });
 
