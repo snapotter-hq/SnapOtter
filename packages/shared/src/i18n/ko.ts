@@ -1186,7 +1186,13 @@ export const ko: TranslationKeys = {
         "ZIP 아카이브에서 폭탄 방지 기능으로 안전하게 파일 추출. 단일 파일 아카이브는 파일을 직접 반환합니다.",
     },
     pipeline: { name: "Pipeline 빌더", description: "여러 도구를 워크플로로 연결" },
-    processing: { canceled: "처리가 취소되었습니다" },
+    processing: {
+      canceled: "처리가 취소되었습니다",
+      cancelTooLate: "취소하기에는 너무 늦었습니다. 처리가 이미 마무리되고 있습니다.",
+      cancelNotAllowed:
+        "취소할 수 없습니다. 로그아웃되었거나 이 처리를 중지할 권한이 없습니다. 처리는 계속 진행 중입니다.",
+      cancelFailed: "처리를 취소하지 못했습니다. 처리는 계속 진행 중이니 다시 시도하세요.",
+    },
     mediaPlayer: {
       unsupported: "브라우저가 이 미디어 형식을 지원하지 않습니다.",
     },

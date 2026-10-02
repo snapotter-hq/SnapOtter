@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { en } from "@snapotter/shared/i18n/en.js";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const captureHandledError = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 vi.mock("@/lib/analytics", () => ({ captureHandledError }));
 
 import { ProgressCard } from "@/components/common/progress-card";
+import { CancelRefusedError } from "@/lib/cancel-refusal";
 import { useFileStore } from "@/stores/file-store";
 
 function renderCard() {
@@ -100,5 +102,59 @@ describe("ProgressCard cancel (#1779)", () => {
     await waitFor(() => expect(cancelButton()).toBeDisabled());
     finish();
     await waitFor(() => expect(cancelButton()).toBeEnabled());
+  });
+});
+/**
+ * #1815: a refused cancel used to look like nothing happened. The hooks now
+ * reject it with a CancelRefusedError (and have already logged and, for a
+ * fault, reported it); the card says why the run is still going, and doesn't
+ * report it a second time as a teardown bug.
+ */
+describe("ProgressCard refused cancel (#1815)", () => {
+  it.each([
+    ["notCancellable", en.tools.processing.cancelTooLate],
+    ["notAllowed", en.tools.processing.cancelNotAllowed],
+    ["failed", en.tools.processing.cancelFailed],
+  ] as const)("says why a %s cancel didn't go through", async (reason, message) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cancel = vi.fn(() => Promise.reject(new CancelRefusedError(reason, 500)));
+    useFileStore.getState().setActiveJob("job-1", cancel);
+    renderCard();
+
+    fireEvent.click(cancelButton());
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    await waitFor(() => expect(cancelButton()).toBeEnabled());
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(unhandled).toEqual([]);
+  });
+
+  it("clears the message on the next click and once the run changes", async () => {
+    let refuse = true;
+    const cancel = vi.fn(() =>
+      refuse ? Promise.reject(new CancelRefusedError("notCancellable", 409)) : Promise.resolve(),
+    );
+    useFileStore.getState().setActiveJob("job-1", cancel);
+    renderCard();
+    const message = en.tools.processing.cancelTooLate;
+
+    fireEvent.click(cancelButton());
+    expect(await screen.findByText(message)).toBeInTheDocument();
+
+    // Another click that goes through takes the stale refusal away.
+    refuse = false;
+    fireEvent.click(cancelButton());
+    await waitFor(() => expect(screen.queryByText(message)).not.toBeInTheDocument());
+
+    // A refusal belongs to its run: a new run starts with a clean card.
+    refuse = true;
+    fireEvent.click(cancelButton());
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    act(() => {
+      useFileStore.getState().setActiveJob("job-2", cancel);
+    });
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
   });
 });

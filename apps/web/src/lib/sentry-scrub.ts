@@ -30,6 +30,22 @@ export const IGNORE_ERRORS: (string | RegExp)[] = [
 ];
 
 /**
+ * Whether Sentry would drop this error under IGNORE_ERRORS: fetch() rejecting
+ * because the browser is offline or the connection dropped, and the like.
+ * Wrapping one in a SafeError would carry it past that filter, so a caller
+ * that reports a request failure under its own message checks this first.
+ */
+export function isIgnoredError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const texts = [err.message, `${err.name}: ${err.message}`];
+  return IGNORE_ERRORS.some((pattern) =>
+    texts.some((text) =>
+      typeof pattern === "string" ? text.includes(pattern) : pattern.test(text),
+    ),
+  );
+}
+
+/**
  * No production build of ours serves anything under /node_modules/.vite/deps/;
  * only `vite dev` does. Events with such frames come from a fork or modified
  * build running a dev server against our baked DSN (WEB-V/W/Y/Z), and they

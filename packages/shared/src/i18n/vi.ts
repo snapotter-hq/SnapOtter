@@ -1244,7 +1244,13 @@ export const vi: TranslationKeys = {
       name: "Trình xây dựng Pipeline",
       description: "Kết nối nhiều công cụ thành một quy trình làm việc",
     },
-    processing: { canceled: "Đã hủy xử lý" },
+    processing: {
+      canceled: "Đã hủy xử lý",
+      cancelTooLate: "Đã quá muộn để hủy. Quá trình xử lý sắp hoàn tất.",
+      cancelNotAllowed:
+        "Không thể hủy: bạn đã đăng xuất hoặc không có quyền dừng quá trình này. Quá trình vẫn đang chạy.",
+      cancelFailed: "Không thể hủy quá trình xử lý. Quá trình vẫn đang chạy, hãy thử lại.",
+    },
     mediaPlayer: {
       unsupported: "Trình duyệt của bạn không hỗ trợ định dạng media này.",
     },

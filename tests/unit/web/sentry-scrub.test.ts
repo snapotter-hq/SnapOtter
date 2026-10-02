@@ -1,6 +1,6 @@
 import { httpStatusTag, SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
-import { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS } from "@/lib/sentry-scrub";
+import { buildWebBeforeSend, DENY_URLS, IGNORE_ERRORS, isIgnoredError } from "@/lib/sentry-scrub";
 
 describe("static filter lists", () => {
   it("deny extension frames and ignore noisy network errors", () => {
@@ -8,6 +8,19 @@ describe("static filter lists", () => {
     expect(DENY_URLS.some((re) => re.test("moz-extension://abcdef/content.js"))).toBe(true);
     expect(IGNORE_ERRORS).toContain("Failed to fetch");
     expect(IGNORE_ERRORS).toContain("Load failed");
+  });
+
+  // Callers that wrap a request failure in their own SafeError check this
+  // first, or the wrapper carries an ignored error past the filter (#1815).
+  it("matches an error the way Sentry's ignore list does", () => {
+    expect(isIgnoredError(new TypeError("Failed to fetch"))).toBe(true);
+    expect(isIgnoredError(new TypeError("Load failed"))).toBe(true);
+    expect(isIgnoredError(new DOMException("The user aborted a request.", "AbortError"))).toBe(
+      true,
+    );
+    expect(isIgnoredError(new Error("headers broke"))).toBe(false);
+    expect(isIgnoredError("Failed to fetch")).toBe(false);
+    expect(isIgnoredError(null)).toBe(false);
   });
 });
 

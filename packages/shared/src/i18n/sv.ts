@@ -1241,7 +1241,13 @@ export const sv: TranslationKeys = {
       name: "Pipeline-byggare",
       description: "Kedja samman flera verktyg till ett arbetsflöde",
     },
-    processing: { canceled: "Bearbetningen avbruten" },
+    processing: {
+      canceled: "Bearbetningen avbruten",
+      cancelTooLate: "För sent att avbryta. Bearbetningen håller redan på att bli klar.",
+      cancelNotAllowed:
+        "Det gick inte att avbryta: du är utloggad eller får inte stoppa den här bearbetningen. Den fortsätter.",
+      cancelFailed: "Det gick inte att avbryta bearbetningen. Den fortsätter, försök igen.",
+    },
     mediaPlayer: {
       unsupported: "Din webbläsare stöder inte detta medieformat.",
     },

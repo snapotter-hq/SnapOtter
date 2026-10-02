@@ -1202,7 +1202,13 @@ export const ja: TranslationKeys = {
         "爆弾保護付きで ZIP アーカイブからファイルを安全に展開。単一ファイルのアーカイブはそのまま返します。",
     },
     pipeline: { name: "Pipelineビルダー", description: "複数のツールをワークフローに連結" },
-    processing: { canceled: "処理がキャンセルされました" },
+    processing: {
+      canceled: "処理がキャンセルされました",
+      cancelTooLate: "キャンセルするには遅すぎます。処理はすでに完了しつつあります。",
+      cancelNotAllowed:
+        "キャンセルできません。サインアウトしているか、この処理を停止する権限がありません。処理は続行中です。",
+      cancelFailed: "処理をキャンセルできませんでした。処理は続行中です。もう一度お試しください。",
+    },
     mediaPlayer: {
       unsupported: "お使いのブラウザはこのメディア形式に対応していません。",
     },

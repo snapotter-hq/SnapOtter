@@ -1247,7 +1247,13 @@ export const nl: TranslationKeys = {
       name: "Pipeline-builder",
       description: "Meerdere tools koppelen tot een workflow",
     },
-    processing: { canceled: "Verwerking geannuleerd" },
+    processing: {
+      canceled: "Verwerking geannuleerd",
+      cancelTooLate: "Te laat om te annuleren. De verwerking wordt al afgerond.",
+      cancelNotAllowed:
+        "Annuleren lukt niet: je bent afgemeld of mag deze verwerking niet stoppen. Hij loopt nog.",
+      cancelFailed: "Annuleren is mislukt. De verwerking loopt nog, probeer het opnieuw.",
+    },
     mediaPlayer: {
       unsupported: "Je browser ondersteunt dit mediaformaat niet.",
     },

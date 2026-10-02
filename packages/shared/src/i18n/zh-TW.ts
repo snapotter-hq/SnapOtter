@@ -1013,7 +1013,12 @@ export const zhTW: TranslationKeys = {
       description: "安全解壓縮 ZIP 檔案並具備壓縮炸彈防護。單檔壓縮檔直接回傳該檔案。",
     },
     pipeline: { name: "Pipeline建構器", description: "將多個工具串聯為工作流程" },
-    processing: { canceled: "處理已取消" },
+    processing: {
+      canceled: "處理已取消",
+      cancelTooLate: "已來不及取消，處理即將完成。",
+      cancelNotAllowed: "無法取消：您已登出，或無權停止此處理。處理仍在進行。",
+      cancelFailed: "無法取消處理。處理仍在進行，請重試。",
+    },
     mediaPlayer: {
       unsupported: "您的瀏覽器不支援此媒體格式。",
     },

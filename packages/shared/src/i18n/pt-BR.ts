@@ -1245,7 +1245,13 @@ export const ptBR: TranslationKeys = {
       name: "Construtor de Pipeline",
       description: "Encadeie várias ferramentas em um fluxo de trabalho",
     },
-    processing: { canceled: "Processamento cancelado" },
+    processing: {
+      canceled: "Processamento cancelado",
+      cancelTooLate: "Tarde demais para cancelar. O processamento já está terminando.",
+      cancelNotAllowed:
+        "Não foi possível cancelar: você saiu da conta ou não tem permissão para parar este processamento. Ele continua.",
+      cancelFailed: "Não foi possível cancelar o processamento. Ele continua, tente novamente.",
+    },
     mediaPlayer: {
       unsupported: "Seu navegador não suporta este formato de mídia.",
     },

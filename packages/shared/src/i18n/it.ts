@@ -1246,7 +1246,13 @@ export const it: TranslationKeys = {
       name: "Costruttore di Pipeline",
       description: "Concatena più strumenti in un flusso di lavoro",
     },
-    processing: { canceled: "Elaborazione annullata" },
+    processing: {
+      canceled: "Elaborazione annullata",
+      cancelTooLate: "Troppo tardi per annullare. L'elaborazione sta già terminando.",
+      cancelNotAllowed:
+        "Impossibile annullare: sei disconnesso o non hai il permesso di fermare questa elaborazione. È ancora in corso.",
+      cancelFailed: "Impossibile annullare l'elaborazione. È ancora in corso, riprova.",
+    },
     mediaPlayer: {
       unsupported: "Il tuo browser non supporta questo formato multimediale.",
     },

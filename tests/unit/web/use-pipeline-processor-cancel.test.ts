@@ -660,15 +660,21 @@ describe("usePipelineProcessor cancel failures (#1779)", () => {
     ["single", startSingleRun],
     ["batch", startBatchRun],
   ])("keeps a %s run going when the cancel request itself fails", async (_kind, start) => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
     );
     const hook = start();
 
+    // The run is left alone, but the click is answered (#1815).
     await act(async () => {
-      await expect(useFileStore.getState().cancelCurrentJob?.()).resolves.toBeUndefined();
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+      });
     });
+    consoleWarn.mockRestore();
 
     // The progress stream still owns settling the run.
     expect(useFileStore.getState().processing).toBe(true);
@@ -769,6 +775,183 @@ describe("usePipelineProcessor ends a canceled run whose teardown throws (#1814)
     for (const entry of state.entries) {
       expect(entry).toMatchObject({ status: "failed", error: "Canceled" });
     }
+    hook.unmount();
+  });
+});
+/**
+ * #1815: a cancel the server refuses used to vanish. The run must keep going
+ * (only the server can stop it, #767), but the click gets an answer: the
+ * cancel rejects with the refusal's reason for the button to show, the
+ * refusal is logged, and only a fault on our side reaches Sentry, under a
+ * constant message with the status as its tag.
+ */
+describe("usePipelineProcessor refused cancel (#1815)", () => {
+  const REFUSED = [
+    // Too late: the run is already finishing. Expected, so info only.
+    [409, "notCancellable", "info", false],
+    // Signed out or not allowed: the user's to fix, not a bug.
+    [401, "notAllowed", "warn", false],
+    [403, "notAllowed", "warn", false],
+    // Faults.
+    [500, "failed", "warn", true],
+    [503, "failed", "warn", true],
+    [429, "failed", "warn", true],
+  ] as const;
+
+  it.each(
+    REFUSED.flatMap(([status, reason, level, reported]) =>
+      (["single", "batch"] as const).map(
+        (kind) => [kind, status, reason, level, reported] as const,
+      ),
+    ),
+  )(
+    "keeps a %s run going on a %i and rejects with %s",
+    async (kind, status, reason, level, reported) => {
+      const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+      const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            ok: false,
+            status,
+            json: () => Promise.resolve({ error: "secret server detail" }),
+          } as unknown as Response),
+        ),
+      );
+      const hook = kind === "single" ? startSingleRun() : startBatchRun();
+
+      await act(async () => {
+        await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+          name: "CancelRefusedError",
+          reason,
+          status,
+        });
+      });
+
+      // The server said no, so the run is still the server's to finish.
+      const state = useFileStore.getState();
+      expect(state.processing).toBe(true);
+      expect(state.activeJobId).toBe(JOB_ID);
+      expect(state.cancelCurrentJob).not.toBeNull();
+      expect(state.error).toBeNull();
+      expect(xhrs[0].abort).not.toHaveBeenCalled();
+      expect(latestSse().close).not.toHaveBeenCalled();
+      expect(state.entries.every((e) => e.status === "processing")).toBe(true);
+
+      const logged = level === "info" ? consoleInfo : consoleWarn;
+      const quiet = level === "info" ? consoleWarn : consoleInfo;
+      expect(logged).toHaveBeenCalledWith("Cancel refused", status);
+      expect(quiet).not.toHaveBeenCalled();
+
+      const reports = vi.mocked(captureHandledError).mock.calls;
+      if (reported) {
+        expect(reports).toHaveLength(1);
+        const [report, tags] = reports[0] as unknown as [
+          Error & { isSafeMessage?: boolean; statusCode?: number; kind?: string },
+          Record<string, string>,
+        ];
+        expect(report.message).toBe("The server refused a cancel");
+        expect(report.isSafeMessage).toBe(true);
+        expect(report.kind).toBe("operational");
+        expect(report.statusCode).toBe(status);
+        expect(report.cause).toBeUndefined();
+        expect(tags).toEqual({ error_class: "operational", status_code: String(status) });
+        expect(JSON.stringify(reports)).not.toContain("secret server detail");
+      } else {
+        expect(reports).toHaveLength(0);
+      }
+
+      consoleInfo.mockRestore();
+      consoleWarn.mockRestore();
+      hook.unmount();
+    },
+  );
+
+  it("logs a cancel request that never reached the server without reporting a dropped connection", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failure = new TypeError("Failed to fetch");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(failure)),
+    );
+    const hook = startSingleRun();
+
+    await act(async () => {
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+        status: undefined,
+      });
+    });
+
+    expect(consoleWarn).toHaveBeenCalledWith("Cancel request failed", failure);
+    // Sentry's IGNORE_ERRORS drops a browser's own offline rejection; a
+    // constant-message wrapper must not carry it past that filter.
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    consoleWarn.mockRestore();
+    hook.unmount();
+  });
+
+  it("reports a cancel request that failed for any other reason", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failure = new Error("headers broke");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(failure)),
+    );
+    const hook = startSingleRun();
+
+    await act(async () => {
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+      });
+    });
+
+    expect(consoleWarn).toHaveBeenCalledWith("Cancel request failed", failure);
+    const reports = vi.mocked(captureHandledError).mock.calls;
+    expect(reports).toHaveLength(1);
+    const [report, tags] = reports[0] as unknown as [
+      Error & { kind?: string },
+      Record<string, string>,
+    ];
+    expect(report.message).toBe("A cancel request never reached the server");
+    expect(report.kind).toBe("operational");
+    expect(report.cause).toBe(failure);
+    expect(tags).toEqual({ error_class: "operational" });
+
+    consoleWarn.mockRestore();
+    hook.unmount();
+  });
+
+  it("stays quiet on a cancel the server acknowledged", async () => {
+    const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ canceled: true }),
+        } as unknown as Response),
+      ),
+    );
+    const hook = startSingleRun();
+
+    await act(async () => {
+      await expect(useFileStore.getState().cancelCurrentJob?.()).resolves.toBeUndefined();
+    });
+
+    expect(consoleInfo).not.toHaveBeenCalled();
+    expect(consoleWarn).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+
+    consoleInfo.mockRestore();
+    consoleWarn.mockRestore();
     hook.unmount();
   });
 });

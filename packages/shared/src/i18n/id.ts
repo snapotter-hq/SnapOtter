@@ -1242,7 +1242,13 @@ export const id: TranslationKeys = {
       name: "Pembuat Pipeline",
       description: "Rangkai beberapa alat menjadi alur kerja",
     },
-    processing: { canceled: "Pemrosesan dibatalkan" },
+    processing: {
+      canceled: "Pemrosesan dibatalkan",
+      cancelTooLate: "Terlambat untuk membatalkan. Pemrosesan sudah hampir selesai.",
+      cancelNotAllowed:
+        "Tidak bisa membatalkan: Anda sudah keluar atau tidak diizinkan menghentikan pemrosesan ini. Pemrosesan masih berjalan.",
+      cancelFailed: "Gagal membatalkan pemrosesan. Pemrosesan masih berjalan, coba lagi.",
+    },
     mediaPlayer: {
       unsupported: "Browser Anda tidak mendukung format media ini.",
     },

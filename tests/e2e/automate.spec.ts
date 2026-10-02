@@ -401,12 +401,46 @@ test.describe("Automate Page", () => {
     await cancel.click();
 
     // The run is still the server's to settle: the card stays, and the
-    // button comes back for another try.
+    // button comes back for another try, with a line saying why (#1815).
     await expect.poll(() => cancelAttempts).toBe(1);
     await expect(cancel).toBeEnabled();
+    await expect(
+      page
+        .getByRole("status")
+        .getByText("Couldn't cancel the run. It's still going, so try again."),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Process", exact: true })).toBeDisabled();
     expect(pageErrors).toEqual([]);
   });
+
+  // #1815: a cancel the server refuses used to look like nothing happened.
+  for (const [status, message] of [
+    [409, "Too late to cancel. The run is already finishing."],
+    [403, "Couldn't cancel: you're signed out or not allowed to stop this run. It's still going."],
+    [500, "Couldn't cancel the run. It's still going, so try again."],
+  ] as const) {
+    test(`a cancel refused with ${status} says so and leaves the run going`, async ({
+      loggedInPage: page,
+    }) => {
+      const pageErrors: string[] = [];
+      page.on("pageerror", (err) => pageErrors.push(err.message));
+      await page.route("**/api/v1/jobs/*/cancel", (route) =>
+        route.fulfill({
+          status,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "refused" }),
+        }),
+      );
+      const cancel = await startHeldRun(page);
+
+      await cancel.click();
+
+      await expect(page.getByRole("status").getByText(message, { exact: true })).toBeVisible();
+      await expect(cancel).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Process", exact: true })).toBeDisabled();
+      expect(pageErrors).toEqual([]);
+    });
+  }
 
   test("a 200 with no download URL shows the failure card", async ({ loggedInPage: page }) => {
     // #1740: an object with nothing to download used to land as a completed

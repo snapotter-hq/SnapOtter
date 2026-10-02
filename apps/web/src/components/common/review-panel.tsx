@@ -9,7 +9,7 @@ import { appUrl } from "@/lib/app-url";
 import { formatFileSize, triggerDownload } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
-import { IGNORE_ERRORS } from "@/lib/sentry-scrub";
+import { isIgnoredError } from "@/lib/sentry-scrub";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type SaveFailure, useSaveToFilesStore } from "@/stores/save-to-files-store";
@@ -46,21 +46,6 @@ const MULTI_OUTPUT_TOOLS = new Set([
  * quota). The panel still shows them; there's nothing in them to fix.
  */
 const UNREPORTED_SAVE_STATUSES = new Set([401, 403, 413]);
-
-/**
- * fetch() rejects without a response when the browser is offline or the
- * connection drops. Sentry's IGNORE_ERRORS already drops those; wrapping one
- * in a SafeError would carry it past that filter, so match it here first.
- */
-function isIgnoredNetworkError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const texts = [err.message, `${err.name}: ${err.message}`];
-  return IGNORE_ERRORS.some((pattern) =>
-    texts.some((text) =>
-      typeof pattern === "string" ? text.includes(pattern) : pattern.test(text),
-    ),
-  );
-}
 
 /** What a failed library upload was about. Only 413s have a reason to show. */
 async function uploadFailure(res: Response): Promise<SaveFailure> {
@@ -185,7 +170,7 @@ export function ReviewPanel({
       console.error("Save to Files failed", err);
       const reportable = isSafeMessageError(err)
         ? !UNREPORTED_SAVE_STATUSES.has(err.statusCode ?? 0)
-        : !isIgnoredNetworkError(err);
+        : !isIgnoredError(err);
       if (reportable) {
         void captureHandledError(
           isSafeMessageError(err)

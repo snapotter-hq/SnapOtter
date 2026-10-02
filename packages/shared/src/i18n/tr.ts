@@ -1244,7 +1244,13 @@ export const tr: TranslationKeys = {
       name: "Pipeline Oluşturucu",
       description: "Birden fazla aracı bir iş akışında zincirleyin",
     },
-    processing: { canceled: "İşlem iptal edildi" },
+    processing: {
+      canceled: "İşlem iptal edildi",
+      cancelTooLate: "İptal etmek için çok geç. İşlem zaten bitmek üzere.",
+      cancelNotAllowed:
+        "İptal edilemedi: oturumunuz kapalı ya da bu işlemi durdurma izniniz yok. İşlem sürüyor.",
+      cancelFailed: "İşlem iptal edilemedi. Hâlâ sürüyor, tekrar deneyin.",
+    },
     mediaPlayer: {
       unsupported: "Tarayıcınız bu medya formatını desteklemiyor.",
     },

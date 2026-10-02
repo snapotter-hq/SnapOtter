@@ -1296,12 +1296,18 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       "fetch",
       vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
     );
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { unmount } = startRun();
     degrade();
 
+    // The click is answered (#1815), but the run is left alone.
     await act(async () => {
-      await useFileStore.getState().cancelCurrentJob?.();
+      await expect(useFileStore.getState().cancelCurrentJob?.()).rejects.toMatchObject({
+        name: "CancelRefusedError",
+        reason: "failed",
+      });
     });
+    consoleWarn.mockRestore();
 
     // A cancel that never reached the server says nothing about the job;
     // the progress stream still owns settling it.

@@ -13,6 +13,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { failedCancelRequest, refusedCancel } from "@/lib/cancel-refusal";
 import {
   checkToolResult,
   FRAME_HANDLING_FAILED,
@@ -276,18 +277,18 @@ export function useToolProcessor(toolId: string) {
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
     if (!jobId) return;
-    // Only the request may fail quietly: a cancel that never reached the
-    // server says nothing about the job, and the progress stream still owns
-    // settling it. A throw from the teardown below is ours and must reach
-    // the caller instead of vanishing (#1698).
+    // A cancel that never reached the server says nothing about the job, so
+    // the run is left to the progress stream, but the click still gets an
+    // answer: the rejection is the cancel button's to show (#1815). A throw
+    // from the teardown below is ours and must reach the caller too (#1698).
     let res: Response;
     try {
       res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
         method: "POST",
         headers: formatHeaders(),
       });
-    } catch {
-      return;
+    } catch (cause) {
+      throw failedCancelRequest(cause, toolId);
     }
     // Record intent only once the server acknowledged the cancel: a failed
     // or refused POST must not repaint the run's real outcome as canceled
@@ -298,7 +299,10 @@ export function useToolProcessor(toolId: string) {
       if (body?.canceled === true && activeJobIdRef.current === jobId) {
         batchRunRef.current?.markCanceled();
       }
+      return;
     }
+    // Refused: the run carries on, and the button says why (#1815).
+    if (res.status !== 404) throw refusedCancel(res.status, toolId);
     // 404 means no job exists server-side (possible in the degraded #722
     // state when the request tail never arrived). Nothing will ever emit a
     // frame, so settle locally as canceled instead of blaming the network
@@ -337,6 +341,7 @@ export function useToolProcessor(toolId: string) {
       if (teardownError) throw teardownError.cause;
     }
   }, [
+    toolId,
     clearJobEvidenceTimer,
     clearStallTimer,
     clearActiveJob,

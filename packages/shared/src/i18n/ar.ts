@@ -1231,7 +1231,13 @@ export const ar: TranslationKeys = {
       name: "منشئ Pipeline",
       description: "ربط عدة أدوات في سير عمل واحد",
     },
-    processing: { canceled: "تم إلغاء المعالجة" },
+    processing: {
+      canceled: "تم إلغاء المعالجة",
+      cancelTooLate: "فات أوان الإلغاء. المعالجة على وشك الانتهاء.",
+      cancelNotAllowed:
+        "تعذّر الإلغاء: سجّلت الخروج أو لا تملك صلاحية إيقاف هذه المعالجة. لا تزال مستمرة.",
+      cancelFailed: "تعذّر إلغاء المعالجة. لا تزال مستمرة، حاول مرة أخرى.",
+    },
     mediaPlayer: {
       unsupported: "متصفحك لا يدعم صيغة الوسائط هذه.",
     },

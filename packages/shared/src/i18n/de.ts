@@ -1247,7 +1247,14 @@ export const de: TranslationKeys = {
       name: "Pipeline-Builder",
       description: "Mehrere Werkzeuge zu einem Workflow verketten",
     },
-    processing: { canceled: "Verarbeitung abgebrochen" },
+    processing: {
+      canceled: "Verarbeitung abgebrochen",
+      cancelTooLate: "Zu spät zum Abbrechen. Der Vorgang wird bereits abgeschlossen.",
+      cancelNotAllowed:
+        "Abbrechen nicht möglich: Sie sind abgemeldet oder dürfen diesen Vorgang nicht stoppen. Er läuft weiter.",
+      cancelFailed:
+        "Der Vorgang konnte nicht abgebrochen werden. Er läuft weiter, versuchen Sie es erneut.",
+    },
     mediaPlayer: {
       unsupported: "Ihr Browser unterstützt dieses Medienformat nicht.",
     },

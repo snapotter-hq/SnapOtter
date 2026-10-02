@@ -1194,7 +1194,13 @@ export const en = {
         "Safely extract files from a ZIP archive with bomb protection. Single-file archives return the file directly.",
     },
     pipeline: { name: "Pipeline Builder", description: "Chain multiple tools into a workflow" },
-    processing: { canceled: "Processing canceled" },
+    processing: {
+      canceled: "Processing canceled",
+      cancelTooLate: "Too late to cancel. The run is already finishing.",
+      cancelNotAllowed:
+        "Couldn't cancel: you're signed out or not allowed to stop this run. It's still going.",
+      cancelFailed: "Couldn't cancel the run. It's still going, so try again.",
+    },
     mediaPlayer: {
       unsupported: "Your browser does not support this media format.",
     },

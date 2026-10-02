@@ -1013,7 +1013,12 @@ export const zhCN: TranslationKeys = {
       description: "安全解压 ZIP 文件并防御压缩炸弹。单文件压缩包直接返回文件。",
     },
     pipeline: { name: "Pipeline 构建器", description: "将多个工具串联为工作流" },
-    processing: { canceled: "处理已取消" },
+    processing: {
+      canceled: "处理已取消",
+      cancelTooLate: "已来不及取消，处理即将完成。",
+      cancelNotAllowed: "无法取消：您已退出登录，或无权停止此处理。处理仍在进行。",
+      cancelFailed: "无法取消处理。处理仍在进行，请重试。",
+    },
     mediaPlayer: {
       unsupported: "您的浏览器不支持此媒体格式。",
     },
