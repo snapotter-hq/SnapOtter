@@ -550,6 +550,19 @@ describe("outgoing request urls (#1899)", () => {
     });
     expect(out.spans[0]).toEqual({ op: "http.client", description: "GET", data: {} });
     expect(out.spans[1]).toEqual({ op: "http.client", description: "not", data: {} });
+    const odd = buildBeforeSendTransaction(() => true)({
+      spans: [
+        { op: "http.client", description: "POST", data: { "url.full": [SLACK] } },
+        { op: "http.client", description: SLACK, data: { url: 42 } },
+      ],
+    });
+    expectClean(odd);
+    expect(odd.spans[0]).toEqual({ op: "http.client", description: "POST", data: {} });
+    expect(odd.spans[1]).toEqual({
+      op: "http.client",
+      description: "https://hooks.slack.com",
+      data: {},
+    });
     const crumbs = buildBeforeSend(() => true, true)(
       {
         breadcrumbs: [{ category: "http", data: { url: "garbage tok", status_code: 0 } }],

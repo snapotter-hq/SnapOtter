@@ -193,8 +193,9 @@ function scrubOutgoingData(value: unknown): unknown {
   const out: AnyEvent = {};
   for (const [key, v] of Object.entries(data)) {
     if (OUTGOING_PATH_DATA_KEYS.has(key)) continue;
-    if (OUTGOING_URL_DATA_KEYS.has(key) && typeof v === "string") {
-      const origin = originOf(v);
+    if (OUTGOING_URL_DATA_KEYS.has(key)) {
+      // Anything but a parseable string (an attribute array, say) goes too.
+      const origin = typeof v === "string" ? originOf(v) : undefined;
       if (origin) out[key] = origin;
       continue;
     }
@@ -206,7 +207,8 @@ function scrubOutgoingData(value: unknown): unknown {
 /** An outgoing span's "METHOD url" name cut to "METHOD origin" (#1899). */
 function outgoingName(name: string): string {
   const space = name.indexOf(" ");
-  if (space === -1) return originOf(name) ?? "";
+  // A bare "POST" stays; a bare url keeps only its origin.
+  if (space === -1) return /^[A-Z]+$/.test(name) ? name : (originOf(name) ?? "");
   const origin = originOf(name.slice(space + 1));
   return origin ? `${name.slice(0, space)} ${origin}` : name.slice(0, space);
 }

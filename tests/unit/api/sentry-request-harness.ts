@@ -180,6 +180,7 @@ export async function startHarness({
   // Stands in for Slack's and Discord's servers. A bare TCP listener, so the
   // SDK records only our outgoing side of the call, as it would in production.
   const hooks = net.createServer((socket) => {
+    socket.on("error", () => {}); // a reset client must not crash the fork
     socket.once("data", () => {
       socket.end("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     });
@@ -339,6 +340,8 @@ export const REQUESTS = {
   webhook: {
     path: "/api/v1/webhooks/test",
     init: { headers: SECRET_HEADERS },
-    secrets: [WEBHOOK_SECRET, "/services/T000"],
+    // Path segments are not listed: the event's stack frames quote this file's
+    // source (pre_context), which spells them out.
+    secrets: [WEBHOOK_SECRET],
   },
 };
