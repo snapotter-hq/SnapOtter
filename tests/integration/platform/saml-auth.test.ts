@@ -16,6 +16,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
 import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
@@ -387,21 +388,30 @@ describe("SAML callback", () => {
     expect(auditRows).toHaveLength(0);
   });
 
-  it("fails the login closed when the MFA enrollment-status read throws", async () => {
-    // The users read that decides whether MFA is checked is intentionally
-    // unguarded in saml.ts: a DB error there must fail the login, never
-    // silently skip MFA for an enrolled user. Spy only the totpEnabled select
+  it("fails the login closed and reports the fault once when the MFA enrollment-status read throws (#1867)", async () => {
+    // The users read that decides whether MFA is checked sits in its own catch
+    // in saml.ts: a DB error there must fail the login, never silently skip
+    // MFA for an enrolled user. Spy only the single-column totpEnabled select
     // (the same shape saml.ts issues) so provisioning/session selects still hit
     // the real DB. Mirrors the OIDC-callback fail-closed test.
     const email = `dberr-${randomUUID().slice(0, 8)}@example.com`;
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
     mfaOutcomeMock.mockReturnValue("proceed");
+    reportErrorSpy.mockClear();
 
+    // Shaped like the real failure: the read losing its Postgres connection
+    // (SQLSTATE 57P01, admin_shutdown).
+    const enrollmentFault = Object.assign(
+      new Error("terminating connection due to administrator command"),
+      { code: "57P01" },
+    );
+    let enrollmentReads = 0;
     const originalSelect = db.select.bind(db);
     const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
       const selection = args[0] as Record<string, unknown> | undefined;
-      if (selection && "totpEnabled" in selection) {
-        throw new Error("simulated DB failure");
+      if (selection && Object.keys(selection).join() === "totpEnabled") {
+        enrollmentReads++;
+        throw enrollmentFault;
       }
       // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
       return (originalSelect as any)(...args);
@@ -412,6 +422,7 @@ describe("SAML callback", () => {
 
       // Must NOT proceed to a session and must NOT issue an MFA challenge:
       // a broken enrollment-status read means the login fails, full stop.
+      expect(enrollmentReads).toBe(1);
       expect(res.statusCode).toBe(302);
       expect(res.headers.location).toBe("/login?error=saml_auth_failed");
       const setCookie = res.headers["set-cookie"];
@@ -425,6 +436,29 @@ describe("SAML callback", () => {
         .from(schema.sessions)
         .where(eq(schema.sessions.userId, user?.id as string));
       expect(sessions.length).toBe(0);
+      const auditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'mfa_check_error' AND ${schema.auditLog.details}->>'userId' = ${user?.id as string}`,
+        );
+      expect(auditRows).toHaveLength(1);
+
+      // The catch keeps the fault from the global error handler, so the
+      // callback reports it itself, exactly once, under its own subsystem so
+      // it never merges with the MFA-policy fault in triage. The exact
+      // context match rules out a user id or email riding along in it.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(enrollmentFault, {
+        source: "http",
+        route: "/api/auth/saml/callback",
+        method: "POST",
+        statusCode: 503,
+        subsystem: "mfa-enrollment",
+      });
+      // The real reportError drops "expected" errors; a lost database is the
+      // operator's environment, so it goes out as a throttled warning.
+      expect(classifyError(enrollmentFault, "http")).toBe("operational");
     } finally {
       selectSpy.mockRestore();
     }

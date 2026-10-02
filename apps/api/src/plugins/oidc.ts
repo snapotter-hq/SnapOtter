@@ -370,10 +370,8 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
 
       const resolvedUser = result.user;
 
-      // Unguarded on purpose: this read decides whether MFA gets checked at
-      // all, so a DB error here must fail the login, not silently skip MFA
-      // for an enrolled user. The try/catch below is scoped only to the
-      // optional MFA plugin/policy lookup, same as it always was.
+      // This read decides whether MFA gets checked at all, so a DB error here
+      // must fail the login, never silently skip MFA for an enrolled user.
       let dbUser: { totpEnabled: boolean } | undefined;
       try {
         [dbUser] = await db
@@ -385,6 +383,17 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           { err, userId: resolvedUser.id },
           "OIDC callback: failed to read MFA enrollment status",
         );
+        // request.log has no Sentry bridge, and by catching here the error
+        // never reaches the global handler's reportError. Report explicitly
+        // so a database fault denying every SSO login is visible in triage,
+        // under its own subsystem so it never merges with the policy fault.
+        void reportError(err, {
+          source: "http",
+          route: request.routeOptions?.url,
+          method: request.method,
+          statusCode: 503,
+          subsystem: "mfa-enrollment",
+        });
         recordOidcFailure();
         await audit("OIDC_LOGIN_FAILED", {
           userId: resolvedUser.id,

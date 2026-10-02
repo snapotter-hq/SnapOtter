@@ -51,7 +51,7 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { inspect } from "node:util";
 import { sign } from "@fastify/cookie";
-import { and, eq, sql } from "drizzle-orm";
+import { and, DrizzleQueryError, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authorizationCodeGrantMock = vi.hoisted(() => vi.fn());
@@ -1262,6 +1262,97 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       expect(classifyError(policyFault, "http")).toBe("operational");
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it("fails closed and reports the fault once when the MFA enrollment read throws (#1867)", async () => {
+    // A first login provisions the user, so the second one below takes the
+    // existing-user path and the fault can carry the real user id.
+    const sub = `sub-enrollread-${Math.random().toString(36).slice(2, 10)}`;
+    const username = `enrollread-${Math.random().toString(36).slice(2, 8)}`;
+    expect((await callbackWithClaims({ sub, preferred_username: username })).statusCode).toBe(302);
+    const user = await findUserByExternalId(sub);
+    expect(user).toBeDefined();
+    const userId = user?.id ?? "";
+    await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
+    reportErrorSpy.mockClear();
+    trackEventSpy.mockClear();
+
+    // Shaped like the real failure: drizzle wraps the driver's error (a lost
+    // Postgres connection, SQLSTATE 57P01) in a DrizzleQueryError whose
+    // message carries the query params, the user's id among them.
+    const pgFault = Object.assign(
+      new Error("terminating connection due to administrator command"),
+      { code: "57P01" },
+    );
+    const enrollmentFault = new DrizzleQueryError(
+      'select "totp_enabled" from "users" where "users"."id" = $1',
+      [userId],
+      pgFault,
+    );
+    // Only the callback's single-column enrollment read fails; provisioning,
+    // session, and audit queries still hit the real database.
+    let enrollmentReads = 0;
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && Object.keys(selection).join() === "totpEnabled") {
+        enrollmentReads++;
+        throw enrollmentFault;
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+    try {
+      const res = await callbackWithClaims({ sub, preferred_username: username });
+
+      // Fails closed: no way of knowing whether the user is enrolled, so no
+      // session and no challenge, only the generic retryable SSO failure.
+      expect(enrollmentReads).toBe(1);
+      expect(res.statusCode).toBe(302);
+      expect(res.headers.location).toBe("/login?error=oidc_auth_failed");
+      expect(String(res.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      const sessions = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId));
+      expect(sessions).toHaveLength(0);
+      expect(trackEventSpy).not.toHaveBeenCalledWith("auth_login", { method: "oidc" });
+      expect(trackEventSpy).toHaveBeenCalledWith("auth_login_failed", { method: "oidc" });
+      const auditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          sql`${schema.auditLog.action} = 'OIDC_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'mfa_check_error' AND ${schema.auditLog.details}->>'userId' = ${userId}`,
+        );
+      expect(auditRows).toHaveLength(1);
+
+      // The catch keeps the fault from the global error handler, so the
+      // callback reports it itself, exactly once, under its own subsystem so
+      // it never merges with the MFA-policy fault in triage. The exact
+      // context match rules out a user id or username riding along in it.
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      expect(reportErrorSpy).toHaveBeenCalledWith(enrollmentFault, {
+        source: "http",
+        route: "/api/auth/oidc/callback",
+        method: "GET",
+        statusCode: 503,
+        subsystem: "mfa-enrollment",
+      });
+      // The real reportError drops "expected" errors; a lost database is the
+      // operator's environment, so it goes out as a throttled warning.
+      expect(classifyError(enrollmentFault, "http")).toBe("operational");
+      // On the default (non-diagnostic) path Sentry gets a safe summary of a
+      // database error, never drizzle's message with its params.
+      const event = {
+        exception: { values: [{ type: enrollmentFault.name, value: enrollmentFault.message }] },
+      };
+      const sent = buildBeforeSend(() => true)(event, { originalException: enrollmentFault });
+      expect(sent).not.toBeNull();
+      expect(JSON.stringify(sent)).not.toContain(userId);
+      expect(JSON.stringify(sent)).not.toContain(username);
+    } finally {
+      selectSpy.mockRestore();
     }
   });
 });
