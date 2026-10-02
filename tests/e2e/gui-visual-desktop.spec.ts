@@ -1,5 +1,6 @@
 import { errors } from "@playwright/test";
 import {
+  type AppVersionMask,
   expect,
   expectNoPinnedSection,
   maskAppVersion,
@@ -150,7 +151,7 @@ async function takeThemedScreenshots(
   page: import("@playwright/test").Page,
   baseName: string,
   target?: import("@playwright/test").Locator,
-  extra: { mask?: import("@playwright/test").Locator[]; style?: string } = {},
+  extra: AppVersionMask = {},
 ) {
   // When a target locator is given (e.g. the settings dialog), screenshot just
   // that element so the live page behind a modal -- whose catalog/collapse state
@@ -377,14 +378,7 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 });
     await page.waitForTimeout(500);
 
-    // The version line sits below the fold today; the mask keeps a taller
-    // viewport or a shorter dialog from tying this shot to the release.
-    await takeThemedScreenshots(
-      page,
-      "help-dialog",
-      undefined,
-      await maskAppVersion(page.getByRole("dialog")),
-    );
+    await takeThemedScreenshots(page, "help-dialog");
   });
 
   // ---- Tool page - resize (empty, no file) ----

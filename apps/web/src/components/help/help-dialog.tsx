@@ -160,10 +160,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
           </section>
 
           {/* Version */}
-          <div
-            data-testid="app-version"
-            className="text-xs text-muted-foreground pt-2 border-t border-border"
-          >
+          <div className="text-xs text-muted-foreground pt-2 border-t border-border">
             {format(t.help.versionLabel, { version: APP_VERSION })}
           </div>
         </div>
