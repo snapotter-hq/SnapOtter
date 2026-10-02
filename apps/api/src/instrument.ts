@@ -43,8 +43,8 @@ if (dsn && !telemetryEnvKilled()) {
       release,
       environment: process.env.SNAPOTTER_ENV || "production",
       sendDefaultPii: false,
-      // Never captures request bodies, cookies, or query strings (#1880); see
-      // sentry-integrations.ts for why each option is there.
+      // No request bodies or cookies collected (#1880); the beforeSend hooks
+      // below strip query strings and auth headers. See sentry-integrations.ts.
       integrations: buildSentryIntegrations(Sentry, tracingEnabled),
       ...(tracingEnabled
         ? {
@@ -73,7 +73,9 @@ if (dsn && !telemetryEnvKilled()) {
         ? `[sentry] initialized (errors + traces @ ${tracesSampleRate}), release: ${release}`
         : `[sentry] initialized (errors only), release: ${release}`,
     );
-  } catch {
-    // @sentry/node not available
+  } catch (err) {
+    // Fails closed (nothing is sent), but say so: a bad option here would
+    // otherwise switch error reporting off without a trace.
+    console.error("[sentry] init failed, error reporting is off:", err);
   }
 }

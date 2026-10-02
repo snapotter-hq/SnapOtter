@@ -318,6 +318,17 @@ describe("buildBeforeSendTransaction (#1880)", () => {
           "http.request.header.authorization": "[Filtered]",
           "http.request.header.cookie.snapotter_session": "[Filtered]",
           "http.response.header.set_cookie": "[Filtered]",
+          "http.request.header.proxy_authorization": "[Filtered]",
+          "http.response.header.cookie": "[Filtered]",
+          "http.request.header.x_forwarded_for": "[Filtered]",
+          "http.request.header.referer": "http://h/login?mfaToken=abc#x",
+          "url.fragment": "x",
+          "http.client_ip": "203.0.113.7",
+          "net.peer.ip": "10.0.0.9",
+          "net.host.ip": "10.0.0.1",
+          "client.address": "203.0.113.7",
+          "network.peer.address": "10.0.0.9",
+          "net.host.port": 13490,
           "http.request.header.user_agent": "curl/8",
           "http.route": "/api/auth/oidc/callback",
         },
@@ -344,6 +355,8 @@ describe("buildBeforeSendTransaction (#1880)", () => {
     "url.full": "http://h/a",
     "url.path": "/a",
     url: "http://h/a",
+    "http.request.header.referer": "http://h/login",
+    "net.host.port": 13490,
     "http.request.header.user_agent": "curl/8",
     "http.route": "/api/auth/oidc/callback",
   };
@@ -379,6 +392,17 @@ describe("buildBeforeSendTransaction (#1880)", () => {
       { category: "http", data: { url: "https://x/y", method: "GET" } },
     ]);
     expect(out.contexts.trace.data).toEqual(scrubbedTraceData);
+  });
+  it("drops the event when the scrub throws instead of letting the SDK resend it raw", () => {
+    const hostile = {
+      get request(): never {
+        throw new Error("boom");
+      },
+    };
+    expect(buildBeforeSendTransaction()(hostile as never)).toBeNull();
+    expect(buildBeforeSendTransaction(true)(hostile as never)).toBeNull();
+    expect(buildBeforeSend(() => true, true)(hostile as never, {})).toBeNull();
+    expect(buildBeforeSend(() => true)(hostile as never, {})).toBeNull();
   });
   it("leaves a non-http transaction name alone and tolerates a bare event", () => {
     const out = buildBeforeSendTransaction()({

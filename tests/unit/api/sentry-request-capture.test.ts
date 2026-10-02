@@ -13,6 +13,7 @@ import {
   expectNoSecrets,
   expectNothingCollected,
   type Harness,
+  QUERY_TOKEN,
   REQUESTS,
   startHarness,
 } from "./sentry-request-harness.js";
@@ -54,6 +55,9 @@ describe("a failing request on a diagnostic instance, tracing off (#1880)", () =
   });
 
   it("ships no file bytes or name from a failing multipart tool upload", async () => {
+    // An earlier request in the same process, so the event has an http
+    // breadcrumb whose url carried a token.
+    await harness.ping(`/api/v1/health?token=${QUERY_TOKEN}#frag`);
     const { event, rawRequests } = await harness.send(REQUESTS.upload.path, REQUESTS.upload.init());
     expectNothingCollected(rawRequests);
     expectNoSecrets(event, REQUESTS.upload.secrets);
@@ -65,6 +69,11 @@ describe("a failing request on a diagnostic instance, tracing off (#1880)", () =
     }>;
     const http = crumbs.filter((b) => b.category === "http");
     expect(http.length).toBeGreaterThan(0);
-    for (const b of http) expect(b.data?.["http.query"]).toBeUndefined();
+    expect(http.some((b) => String(b.data?.url).endsWith("/api/v1/health"))).toBe(true);
+    for (const b of http) {
+      expect(b.data?.["http.query"]).toBeUndefined();
+      expect(b.data?.["http.fragment"]).toBeUndefined();
+      expect(String(b.data?.url)).not.toMatch(/[?#]/);
+    }
   });
 });

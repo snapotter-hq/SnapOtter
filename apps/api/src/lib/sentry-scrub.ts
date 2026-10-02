@@ -113,17 +113,37 @@ function scrubRequest(value: unknown): AnyEvent | undefined {
 }
 
 // Span and breadcrumb data keys whose value is a url or path that can carry a
-// query string, and the keys that hold only a query string or fragment.
-const URL_DATA_KEYS = new Set(["url", "url.full", "url.path", "http.url", "http.target"]);
+// query string, and the keys that hold only a query string or fragment. The
+// Referer can be a page url with a token still in it (/login?mfaToken=...).
+const URL_DATA_KEYS = new Set([
+  "url",
+  "url.full",
+  "url.path",
+  "http.url",
+  "http.target",
+  "http.request.header.referer",
+]);
 const QUERY_DATA_KEY = /(^|\.)(query|fragment)$/;
 // Headers the SDK may flatten into span attributes; already "[Filtered]" with
 // sendDefaultPii off, dropped here so no SDK default change can put them back.
 const SECRET_HEADER_DATA_KEY =
-  /^http\.(request|response)\.header\.(authorization|proxy_authorization|cookie|set_cookie)/;
+  /^http\.(request|response)\.header\.(authorization|proxy_authorization|cookie|set_cookie|x_forwarded_for|x_real_ip|forwarded|cf_connecting_ip|true_client_ip)/;
+// The http server span records the caller's address under these, whatever
+// sendDefaultPii says (http.client_ip is the first X-Forwarded-For hop).
+const CLIENT_IP_DATA_KEYS = new Set([
+  "http.client_ip",
+  "net.peer.ip",
+  "net.host.ip",
+  "client.address",
+  "network.peer.address",
+  "network.local.address",
+  "user.ip_address",
+]);
 
 /**
  * A copy of span or breadcrumb `data` without query strings, fragments,
- * request bodies, or credential headers. Everything else is left as is.
+ * request bodies, credential headers, or client IPs. Everything else is left
+ * as is.
  */
 function scrubUrlData(value: unknown): unknown {
   const data = asObj(value);
@@ -131,6 +151,7 @@ function scrubUrlData(value: unknown): unknown {
   const out: AnyEvent = {};
   for (const [key, v] of Object.entries(data)) {
     if (QUERY_DATA_KEY.test(key) || SECRET_HEADER_DATA_KEY.test(key)) continue;
+    if (CLIENT_IP_DATA_KEYS.has(key)) continue;
     if (key === "http.request.body.data" || key === "http.response.body.data") continue;
     out[key] = URL_DATA_KEYS.has(key) && typeof v === "string" ? stripQuery(v) : v;
   }
@@ -206,11 +227,29 @@ function errorDigest(err: unknown): string {
   return (h >>> 0).toString(16);
 }
 
+/**
+ * Run a scrub and drop the event if it throws. When a beforeSend hook throws,
+ * the SDK discards the event and reports the throw as a new internal event
+ * that skips beforeSend entirely, request headers and all. Dropping is the
+ * only safe answer.
+ */
+function failClosed<A extends unknown[]>(
+  scrub: (event: AnyEvent, ...rest: A) => AnyEvent | null,
+): (event: AnyEvent, ...rest: A) => AnyEvent | null {
+  return (event, ...rest) => {
+    try {
+      return scrub(event, ...rest);
+    } catch {
+      return null;
+    }
+  };
+}
+
 export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
   let windowStart = 0;
   let sentInWindow = 0;
 
-  return function beforeSend(event: AnyEvent, hint: AnyHint): AnyEvent | null {
+  return failClosed(function beforeSend(event: AnyEvent, hint: AnyHint): AnyEvent | null {
     if (!isActive()) return null;
 
     const now = Date.now();
@@ -330,7 +369,7 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
       }
     }
     return event;
-  };
+  });
 }
 
 /**
@@ -342,7 +381,7 @@ export function buildBeforeSend(isActive: () => boolean, diagnostic = false) {
  * credential headers (#1880).
  */
 export function buildBeforeSendTransaction(diagnostic = false) {
-  return function beforeSendTransaction(event: AnyEvent): AnyEvent {
+  return failClosed(function beforeSendTransaction(event: AnyEvent): AnyEvent {
     event.request = diagnostic ? scrubRequest(event.request) : undefined;
     // A transaction carries the scope's breadcrumbs too.
     if (event.breadcrumbs !== undefined) {
@@ -367,5 +406,5 @@ export function buildBeforeSendTransaction(diagnostic = false) {
       }
     }
     return event;
-  };
+  });
 }

@@ -1,7 +1,8 @@
 /**
  * Shared harness for the #1880 request-capture tests: the REAL @sentry/node SDK
- * initialised with instrument.ts's integration list and scrubbers in diagnostic
- * mode (SNAPOTTER_SENTRY_DIAGNOSTIC=1, the mode that keeps the most), plus a
+ * initialised with instrument.ts's integration list and scrubbers, in
+ * diagnostic mode (SNAPOTTER_SENTRY_DIAGNOSTIC=1, the mode that keeps the most)
+ * unless a test asks for the default, plus a
  * Fastify server with the real error handler. Every route fails with a 5xx so
  * reportError captures it, and the transport records what would have been sent.
  *
@@ -35,11 +36,18 @@ export const API_KEY = "si_0123456789abcdef0123456789abcdef";
 export const SESSION = "sess-7f3a9c2e";
 export const QUERY_TOKEN = "qtok-5d1e8b";
 export const FILE_BYTES = "PRIVATE-FILE-CONTENT-a8c4";
+/** The end user's address as a reverse proxy forwards it (TEST-NET-3). */
+export const CLIENT_IP = "203.0.113.7";
 
-/** Every request carries an API key, a session cookie, and a harmless user agent. */
+/**
+ * Every request carries an API key, a session cookie, a forwarded client IP,
+ * a Referer still holding a token, and a harmless user agent.
+ */
 export const SECRET_HEADERS = {
   authorization: `Bearer ${API_KEY}`,
   cookie: `snapotter_session=${SESSION}`,
+  "x-forwarded-for": CLIENT_IP,
+  referer: `http://snapotter.local/login?mfaToken=${QUERY_TOKEN}`,
   "user-agent": "sentry-capture-test",
 };
 
@@ -63,12 +71,22 @@ export interface Sent {
 export interface Harness {
   /** POST to the server and return the one error event and any transactions sent for it. */
   send(path: string, init: RequestInit): Promise<Sent>;
+  /** A plain GET that leaves an http breadcrumb behind; its response is ignored. */
+  ping(path: string): Promise<void>;
   close(): Promise<void>;
 }
 
-export async function startHarness({ tracing }: { tracing: boolean }): Promise<Harness> {
+export async function startHarness({
+  tracing,
+  diagnostic = true,
+}: {
+  tracing: boolean;
+  diagnostic?: boolean;
+}): Promise<Harness> {
   process.env.ANALYTICS_BAKED_OVERRIDE = "on"; // NODE_ENV=test lets the gate turn on
-  process.env.SNAPOTTER_SENTRY_DIAGNOSTIC = "1"; // reportError skips its throttle
+  // reportError reads this too (diagnostic skips its throttle, which send()
+  // resets anyway).
+  if (diagnostic) process.env.SNAPOTTER_SENTRY_DIAGNOSTIC = "1";
   __setReaderForTests(async () => true);
   await primeAnalyticsGate();
 
@@ -78,8 +96,8 @@ export async function startHarness({ tracing }: { tracing: boolean }): Promise<H
   const recordRaw = (event: { request?: unknown }) => {
     rawRequests.push(JSON.parse(JSON.stringify(event.request ?? {})) as Payload);
   };
-  const beforeSend = buildBeforeSend(() => true, true);
-  const beforeSendTransaction = buildBeforeSendTransaction(true);
+  const beforeSend = buildBeforeSend(() => true, diagnostic);
+  const beforeSendTransaction = buildBeforeSendTransaction(diagnostic);
   Sentry.init({
     dsn: "https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/1",
     sendDefaultPii: false,
@@ -168,6 +186,9 @@ export async function startHarness({ tracing }: { tracing: boolean }): Promise<H
         rawRequests: [...rawRequests],
       };
     },
+    async ping(path) {
+      await fetch(`${base}${path}`).then((r) => r.arrayBuffer());
+    },
     async close() {
       await app.close();
       await Sentry.close(0);
@@ -181,7 +202,7 @@ export async function startHarness({ tracing }: { tracing: boolean }): Promise<H
 /** Assert a sent payload carries none of the secrets and no body, cookies, or query. */
 export function expectNoSecrets(payload: Payload, extra: string[]): void {
   const raw = JSON.stringify(payload);
-  for (const secret of [API_KEY, SESSION, QUERY_TOKEN, ...extra]) {
+  for (const secret of [API_KEY, SESSION, QUERY_TOKEN, CLIENT_IP, ...extra]) {
     expect(raw).not.toContain(secret);
   }
   const request = payload.request as Payload | undefined;
@@ -195,8 +216,10 @@ export function expectNoSecrets(payload: Payload, extra: string[]): void {
 }
 
 /**
- * The SDK itself never collected a body, cookies, or query string, so the
- * beforeSend hooks are a second line rather than the only one.
+ * The SDK itself never collected a body, cookies, or the separate
+ * query_string, so the beforeSend hooks are a second line for those rather
+ * than the only one. (The url's query and the Authorization header are still
+ * collected; only the hooks remove them, which expectNoSecrets checks.)
  */
 export function expectNothingCollected(rawRequests: Payload[]): void {
   expect(rawRequests.length).toBeGreaterThan(0);

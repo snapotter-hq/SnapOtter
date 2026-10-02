@@ -18,8 +18,10 @@ export function buildSentryIntegrations(
   // and sendDefaultPii does not gate that, so a login password, a SAML
   // assertion, or an uploaded file's bytes rode along on events. "none" stops
   // the buffering at the source. RequestData then never attaches a body,
-  // cookies, the query string, or the client IP to any event (errors and
-  // transactions alike); beforeSend still allowlists what is left.
+  // cookies, the separate query_string, or a client IP to `event.request`.
+  // It still attaches the full url (query included) and the raw headers
+  // (Authorization included): beforeSend and beforeSendTransaction in
+  // sentry-scrub.ts remove those, and span attributes, on the way out.
   const ours = [
     Sentry.httpIntegration({
       trackIncomingRequestsAsSessions: false,
