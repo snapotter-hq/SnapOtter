@@ -586,6 +586,7 @@ export function EraseObjectSettings({
     // Sentry's global handler picks it up. A teardown throw behind a batch
     // error would be lost to that rethrow, so it's reported here instead,
     // once (#1812).
+    const trackingFailed = jobFailureMessage({ reason: "trackingFailed" }, t.errors);
     let teardownError: { cause: unknown } | null = null;
     for (const teardown of [
       () => {
@@ -594,6 +595,24 @@ export function EraseObjectSettings({
       () => setProcessing(false),
       () => setProgressPhase("idle"),
       () => setProgressStage(null),
+      // A batch that stopped early says so, as the single-file run does.
+      () => {
+        if (batchError) setError(trackingFailed);
+      },
+      // Last, after the run has ended (#1781): a file the stopped batch left
+      // at "processing" would pulse for good. Fails only this batch's files.
+      () => {
+        if (!batchError) return;
+        for (const { index } of work) {
+          if (useFileStore.getState().entries[index]?.status === "processing") {
+            useFileStore.getState().updateEntry(index, {
+              status: "failed",
+              error: trackingFailed,
+              errorCategory: null,
+            });
+          }
+        }
+      },
     ]) {
       try {
         teardown();
