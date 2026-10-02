@@ -116,9 +116,9 @@ describe("result URL convention", () => {
   });
 
   // A web file that parses an API response and reads a result URL out of it
-  // must resolve it (resolveServerUrls/serverUrl), or the link 404s only under
-  // a subpath. Heuristic by design: a new false positive goes in the allowlist
-  // with a reason.
+  // must resolve it (resolveServerUrls/serverUrl, or parseResultBody, which
+  // resolves what it returns), or the link 404s only under a subpath. Heuristic
+  // by design: a new false positive goes in the allowlist with a reason.
   it("resolves result URLs wherever the web app parses a response", () => {
     const offenders = sourceFiles(join(root, "apps/web/src"))
       .map((file) => relative(root, file))
@@ -128,7 +128,7 @@ describe("result URL convention", () => {
         return (
           /\b(downloadUrl|previewUrl|maskUrl|originalUrl|zipUrl|printDownloadUrl)\b/.test(source) &&
           /JSON\.parse\(|\.json\(\)/.test(source) &&
-          !/\b(resolveServerUrls|serverUrl)\(/.test(source)
+          !/\b(resolveServerUrls|serverUrl|parseResultBody)(<[^>]*>)?\(/.test(source)
         );
       });
     expect(offenders).toEqual([]);
