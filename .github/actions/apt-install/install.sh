@@ -80,7 +80,7 @@ lock_wait_left() {
 # runners name `mirror+file:/etc/apt/apt-mirrors.txt` there, and apt reports
 # failures under that URI. Failures from the runner's third-party sources
 # (Microsoft's, say) don't count.
-read -r -a ubuntu_sources <<< "${UBUNTU_SOURCES:-/etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources}"
+read -r -a ubuntu_sources <<< "${UBUNTU_SOURCES:-$apt_etc/sources.list $apt_etc/sources.list.d/ubuntu.sources}"
 ubuntu_unreachable=false
 apt_update() {
   local out rc=0 uri failed
@@ -211,26 +211,33 @@ finish() {
 # When the swap was written (#877) the runners named the Azure host in
 # sources.list or a .sources file. GitHub's ubuntu-24.04 and ubuntu-22.04
 # runners now name mirror+file:/etc/apt/apt-mirrors.txt there instead, and
-# the host is a line in that list, which apt walks top to bottom (#1808). Rewriting the host in place keeps each
-# entry's position and metadata, and keeps the mirror+file URI that apt's
-# index files are named after.
+# the host is a line in that list, which apt walks top to bottom (#1808).
+# Rewriting the host in place keeps each entry's position and metadata, and
+# keeps the mirror+file URI that apt's index files are named after. Sets
+# relabel_lists when a sources file itself was rewritten: only those leave
+# index files named after the Azure host.
+relabel_lists=false
 swap_to_archive() {
   local f new swapped=()
   for f in "$apt_etc/sources.list" "$apt_etc"/sources.list.d/* "$apt_etc/apt-mirrors.txt"; do
     [ -f "$f" ] || continue
-    grep -q 'azure\.archive\.ubuntu\.com' "$f" || continue
-    new="$(sed 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' "$f")"
+    sudo grep -q 'azure\.archive\.ubuntu\.com' "$f" || continue
+    if ! new="$(sudo sed 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' "$f")"; then
+      echo "::warning::could not read $f"
+      continue
+    fi
     # tee rewrites the file in place, so its owner and mode stay as they were.
     if printf '%s\n' "$new" | sudo tee "$f" >/dev/null; then
       swapped+=("$f")
+      [ "$f" = "$apt_etc/apt-mirrors.txt" ] || relabel_lists=true
     else
-      echo "::warning::could not rewrite $f"
+      echo "::warning::could not rewrite $f; it may be left truncated"
     fi
   done
   if [ "${#swapped[@]}" -gt 0 ]; then
     echo "apt sources: replaced azure.archive.ubuntu.com with archive.ubuntu.com in ${swapped[*]}"
   else
-    echo "::warning::no apt source or mirror list names azure.archive.ubuntu.com, so the re-rolls use the sources as they are"
+    echo "::warning::no apt source or mirror list names azure.archive.ubuntu.com, so apt keeps the sources it has"
   fi
 }
 
@@ -264,11 +271,11 @@ recover_dpkg
 swap_to_archive
 
 if $azure_lists_ok; then
-  # Only sources that name the host directly leave index files named after
-  # it; mirror-list runners have none to relabel.
-  for f in "$apt_lists"/azure.archive.ubuntu.com_*; do
-    sudo mv "$f" "${f/azure.archive.ubuntu.com/archive.ubuntu.com}"
-  done
+  if $relabel_lists; then
+    for f in "$apt_lists"/azure.archive.ubuntu.com_*; do
+      sudo mv "$f" "${f/azure.archive.ubuntu.com/archive.ubuntu.com}"
+    done
+  fi
 else
   # A second, equally patient try when the first errored or couldn't reach
   # the archive (apt reports the latter with exit 0).

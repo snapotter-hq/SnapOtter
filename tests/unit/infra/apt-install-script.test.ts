@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -306,8 +307,9 @@ done`,
   return { dir, archives, calls, ...aptDirs(dir) };
 }
 
-function runCached(mirror: Mirror, cached: Record<string, string> = {}) {
+function runCached(mirror: Mirror, cached: Record<string, string> = {}, layout?: AptLayout) {
   const stub = cacheStubDir(mirror, cached);
+  layout?.(stub.etc, stub.lists);
   const output = join(stub.dir, "github_output");
   writeFileSync(output, "");
   const res = spawnSync("bash", [SCRIPT], {
@@ -334,6 +336,7 @@ function runCached(mirror: Mirror, cached: Record<string, string> = {}) {
     archives: readdirSync(stub.archives).sort(),
     archive: (name: string) => read(join(stub.archives, name)),
     githubOutput: read(output),
+    etc: stub.etc,
   };
 }
 
@@ -469,11 +472,15 @@ const mirrorListRunner: AptLayout = (etc) => {
   writeFileSync(join(etc, "sources.list"), "# Ubuntu sources have moved to ubuntu.sources\n");
 };
 
+// Both source formats naming the host: classic sources.list and a deb822
+// file in sources.list.d.
+const DEB822_AZURE = `Types: deb\nURIs: ${AZURE}\nSuites: noble-backports\nComponents: main\n`;
 const hostInSources: AptLayout = (etc, lists) => {
   writeFileSync(
     join(etc, "sources.list"),
     `deb ${AZURE} jammy main restricted\ndeb ${AZURE} jammy-updates main restricted\n`,
   );
+  writeFileSync(join(etc, "sources.list.d", "backports.sources"), DEB822_AZURE);
   writeFileSync(join(etc, "sources.list.d", "microsoft-prod.list"), MICROSOFT);
   writeFileSync(join(lists, "azure.archive.ubuntu.com_ubuntu_dists_jammy_InRelease"), "index");
 };
@@ -500,18 +507,60 @@ describe.skipIf(process.platform === "win32")("apt-install mirror swap (#1808)",
     );
   });
 
-  it("still repoints sources.list and relabels its index files where the host is named directly", () => {
-    const run = runScript("times-out-leaving-dpkg", {}, {}, hostInSources);
+  it("still repoints sources files and relabels their index files where the host is named directly", () => {
+    const run = runScript("times-out-leaving-dpkg", {}, {}, (etc, lists) => {
+      hostInSources(etc, lists);
+      chmodSync(join(etc, "sources.list"), 0o640);
+    });
     expect(run.status, run.output).toBe(0);
     const sources = readFileSync(join(run.etc, "sources.list"), "utf8");
     expect(sources).not.toContain("azure.archive.ubuntu.com");
     expect(sources).toContain(
       "deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted",
     );
+    // Rewritten in place, so the file keeps its mode.
+    expect(statSync(join(run.etc, "sources.list")).mode & 0o777).toBe(0o640);
+    expect(readFileSync(join(run.etc, "sources.list.d", "backports.sources"), "utf8")).toBe(
+      DEB822_AZURE.replace("azure.archive.ubuntu.com", "archive.ubuntu.com"),
+    );
+    expect(run.output).toContain("backports.sources");
     expect(readdirSync(run.lists)).toEqual(["archive.ubuntu.com_ubuntu_dists_jammy_InRelease"]);
     expect(readFileSync(join(run.etc, "sources.list.d", "microsoft-prod.list"), "utf8")).toBe(
       MICROSOFT,
     );
+  });
+
+  // Root ignores file modes, so the unwritable file only fails the rewrite
+  // for an ordinary user.
+  it.skipIf(process.getuid?.() === 0)(
+    "warns about a sources file it can't rewrite and leaves its index files named for it",
+    () => {
+      const run = runScript("times-out-leaving-dpkg", {}, {}, (etc, lists) => {
+        hostInSources(etc, lists);
+        chmodSync(join(etc, "sources.list"), 0o444);
+        chmodSync(join(etc, "sources.list.d", "backports.sources"), 0o444);
+      });
+      expect(run.status, run.output).toBe(0);
+      expect(run.output).toContain("could not rewrite");
+      expect(run.output).toContain("no apt source or mirror list names azure.archive.ubuntu.com");
+      expect(readFileSync(join(run.etc, "sources.list"), "utf8")).toContain(
+        "azure.archive.ubuntu.com",
+      );
+      // The sources still name the Azure host, so its index files must keep its name.
+      expect(readdirSync(run.lists)).toEqual([
+        "azure.archive.ubuntu.com_ubuntu_dists_jammy_InRelease",
+      ]);
+    },
+  );
+
+  it("swaps the mirror list before the index refresh that follows an offline install", () => {
+    const run = runCached("down", WARM, mirrorListRunner);
+    expect(run.status, run.output).toBe(0);
+    expect(run.calls).toContain("offline qpdf");
+    expect(readFileSync(join(run.etc, "apt-mirrors.txt"), "utf8")).not.toContain(
+      "azure.archive.ubuntu.com",
+    );
+    expect(run.output).toContain("replaced azure.archive.ubuntu.com with archive.ubuntu.com in");
   });
 
   it("says so, instead of claiming a swap, when nothing names the Azure mirror", () => {
