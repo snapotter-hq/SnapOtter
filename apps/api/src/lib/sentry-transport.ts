@@ -7,8 +7,8 @@
  * straight to the transport, so without this they leave an opted-out instance.
  *
  * Built from the transport factory instrument.ts passes in, so this file never
- * imports @sentry/node at runtime (the type import is erased) and the
- * request-capture harness can wrap its recording transport in the same gate.
+ * imports @sentry/node at runtime (the type import is erased) and a test can
+ * wrap a recording transport in the same gate.
  */
 import type * as SentryNode from "@sentry/node";
 
