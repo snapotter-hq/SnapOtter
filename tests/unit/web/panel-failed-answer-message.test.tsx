@@ -3,12 +3,32 @@ import "@testing-library/jest-dom/vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { en } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/analytics", async () => {
   const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
   return analyticsModuleMock();
+});
+
+// The panels render in German, so every fallback check proves which key the
+// panel used: in English "Failed: 422" reads the same from the translated key
+// and from a hard-coded literal, and "Processing failed: 422" is also
+// parseApiError's own default.
+vi.mock("@/contexts/i18n-context", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/contexts/i18n-context")>();
+  const { de: german } = await import("@snapotter/shared/i18n/de.js");
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: german,
+      locale: "de",
+      dir: "ltr",
+      setLocale: () => {},
+      supportedLocales: [],
+    }),
+  };
 });
 
 import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
@@ -162,6 +182,9 @@ function chooseFile(container: HTMLElement, file: File) {
   fireEvent.change(input, { target: { files: [file] } });
 }
 
+/** A proxy's error page: res.json() rejects on it. */
+const NOT_JSON = Symbol("not JSON");
+
 let answer: { status: number; body: unknown };
 
 function stubFetch() {
@@ -170,8 +193,10 @@ function stubFetch() {
     vi.fn(async () => ({
       ok: false,
       status: answer.status,
-      json: async () => answer.body,
-      text: async () => JSON.stringify(answer.body),
+      json: async () => {
+        if (answer.body === NOT_JSON) throw new SyntaxError("Unexpected token '<'");
+        return answer.body;
+      },
     })),
   );
 }
@@ -188,8 +213,8 @@ interface PanelRow {
   framed?: (message: string) => string;
 }
 
-const failedWithStatus = format(en.errors.failedWithStatus, { status: STATUS });
-const processingFailedWithStatus = format(en.errors.processingFailedWithStatus, {
+const failedWithStatus = format(de.errors.failedWithStatus, { status: STATUS });
+const processingFailedWithStatus = format(de.errors.processingFailedWithStatus, {
   status: STATUS,
 });
 
@@ -228,11 +253,11 @@ const PANELS: PanelRow[] = [
   {
     panel: "beautify (image background)",
     transport: "fetch",
-    fallback: format(en.toolSettings.beautify.processingFailedStatus, { status: STATUS }),
+    fallback: format(de.toolSettings.beautify.processingFailedStatus, { status: STATUS }),
     start: () => {
       useFileStore.getState().setFiles([image("shot.png")]);
       const { container } = render(<BeautifySettings />);
-      fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
+      fireEvent.click(screen.getByRole("button", { name: de.toolSettings.beautify.bgImage }));
       chooseFile(container, image("bg.png"));
       fireEvent.click(screen.getByTestId("beautify-submit"));
     },
@@ -270,7 +295,7 @@ const PANELS: PanelRow[] = [
   {
     panel: "watermark-image (several files)",
     transport: "fetch",
-    fallback: en.errors.processingFailedNoDetail,
+    fallback: de.errors.processingFailedNoDetail,
     start: () => {
       useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
       const { container } = render(<WatermarkImageSettings />);
@@ -314,7 +339,7 @@ const PANELS: PanelRow[] = [
   {
     panel: "barcode-generate",
     transport: "fetch",
-    fallback: format(en.errors.requestFailedWithStatus, { status: STATUS }),
+    fallback: format(de.errors.requestFailedWithStatus, { status: STATUS }),
     start: () => {
       render(<BarcodeGenerateSettings />);
       fireEvent.change(screen.getByTestId("barcode-input-text"), { target: { value: "12345" } });
@@ -391,7 +416,13 @@ afterEach(() => {
 });
 
 describe.each(PANELS)("$panel: a failed answer", (row) => {
-  it.each(answers(row.fallback))("shows %s as readable text", async (_label, body, message) => {
+  // An XHR panel's unparseable body takes its own catch branch, unchanged here.
+  const shapes: Array<[string, unknown, string]> =
+    row.transport === "fetch"
+      ? [...answers(row.fallback), ["a body that is not JSON", NOT_JSON, row.fallback]]
+      : answers(row.fallback);
+
+  it.each(shapes)("shows %s as readable text", async (_label, body, message) => {
     const expected = row.framed ? row.framed(message) : message;
     answer = { status: STATUS, body };
     await row.start();
@@ -427,6 +458,35 @@ describe("ocr: a failed answer", () => {
       await expect(run).rejects.toThrow(expected);
     },
   );
+
+  it("rejects FEATURE_NOT_INSTALLED with the install message in the locale it was given", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "best", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(501, {
+      error: "Feature not installed",
+      code: "FEATURE_NOT_INSTALLED",
+      feature: "ocr",
+      featureName: "OCR",
+      estimatedSize: "1 GB",
+    });
+
+    await expect(run).rejects.toThrow(
+      format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name }),
+    );
+  });
+
+  it("is handed the panel's locale", () => {
+    const source = readFileSync(
+      resolve(__dirname, "../../../apps/web/src/components/tools/ocr-settings.tsx"),
+      "utf8",
+    );
+    expect(source).toMatch(/processingFailed: t\.errors\.processingFailed,\s*t,/);
+  });
 });
 
 describe("no panel reads a failed answer's body by hand", () => {
