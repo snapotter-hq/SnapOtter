@@ -5378,6 +5378,8 @@ export const tr: TranslationKeys = {
     noSteps: "Pipeline dosyasında adım yok",
     importFailed: "İçe aktarma başarısız",
     couldNotRead: "Pipeline dosyası okunamadı",
+    importListRefreshFailed:
+      "Pipeline içe aktarıldı ancak kayıtlı liste yenilenmedi. Görmek için sayfayı yenileyin.",
     fileCount: "{count} dosya",
     fileCountPlural: "{count} dosya",
     importFromLibrary: "Kitaplıktan İçe Aktar",

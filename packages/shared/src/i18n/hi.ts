@@ -5152,6 +5152,8 @@ export const hi: TranslationKeys = {
     noSteps: "Pipeline फाइल में कोई स्टेप नहीं है",
     importFailed: "इम्पोर्ट विफल",
     couldNotRead: "Pipeline फाइल नहीं पढ़ी जा सकी",
+    importListRefreshFailed:
+      "Pipeline इम्पोर्ट हो गया, लेकिन सहेजी गई सूची रीफ्रेश नहीं हुई। देखने के लिए पेज रीलोड करें।",
     fileCount: "{count} फाइल",
     fileCountPlural: "{count} फाइलें",
     importFromLibrary: "लाइब्रेरी से इम्पोर्ट करें",

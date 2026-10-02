@@ -5390,6 +5390,8 @@ export const nl: TranslationKeys = {
     noSteps: "Pipelinebestand heeft geen stappen",
     importFailed: "Importeren mislukt",
     couldNotRead: "Pipelinebestand kon niet worden gelezen",
+    importListRefreshFailed:
+      "Pipeline geïmporteerd, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om hem te zien.",
     fileCount: "{count} bestand",
     fileCountPlural: "{count} bestanden",
     importFromLibrary: "Importeren uit bibliotheek",

@@ -5369,6 +5369,8 @@ export const id: TranslationKeys = {
     noSteps: "File Pipeline tidak memiliki langkah",
     importFailed: "Impor gagal",
     couldNotRead: "Tidak dapat membaca file Pipeline",
+    importListRefreshFailed:
+      "Pipeline berhasil diimpor, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihatnya.",
     fileCount: "{count} file",
     fileCountPlural: "{count} file",
     importFromLibrary: "Impor dari Perpustakaan",

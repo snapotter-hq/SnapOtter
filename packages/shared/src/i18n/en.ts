@@ -5295,6 +5295,8 @@ export const en = {
     noSteps: "Pipeline file has no steps",
     importFailed: "Import failed",
     couldNotRead: "Could not read pipeline file",
+    importListRefreshFailed:
+      "Pipeline imported, but the saved list didn't refresh. Reload the page to see it.",
     fileCount: "{count} file",
     fileCountPlural: "{count} files",
     importFromLibrary: "Import from Library",

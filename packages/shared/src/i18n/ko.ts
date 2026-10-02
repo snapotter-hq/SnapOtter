@@ -5285,6 +5285,8 @@ export const ko: TranslationKeys = {
     noSteps: "Pipeline 파일에 단계가 없습니다",
     importFailed: "가져오기 실패",
     couldNotRead: "Pipeline 파일을 읽을 수 없습니다",
+    importListRefreshFailed:
+      "Pipeline을 가져왔지만 저장된 목록이 새로고침되지 않았습니다. 페이지를 새로고침하면 표시됩니다.",
     fileCount: "{count}개 파일",
     fileCountPlural: "{count}개 파일",
     importFromLibrary: "라이브러리에서 가져오기",
