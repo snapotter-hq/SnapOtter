@@ -241,6 +241,10 @@ describe("erase-object single file: its own failures apart from a bad response",
       expect(clearIntervalSpy).toHaveBeenCalled();
       // Both teardown writes threw; the run reports once, with the first
       // (#1882). The root cause is rethrown, so it isn't reported here.
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a result handling error failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
       const reports = vi
         .mocked(captureHandledError)
         .mock.calls.filter(
