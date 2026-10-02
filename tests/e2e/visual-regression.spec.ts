@@ -43,10 +43,12 @@ test.describe("Visual regression: Login page", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
+    // The hero phrase rotates on a 3s timer; see gui-visual-desktop.spec.ts.
+    const phrase = page.getByTestId("login-rotating-phrase");
+    await expect(phrase).toBeVisible();
     await expect(page).toHaveScreenshot("login-desktop.png", {
       fullPage: false,
-      // The hero phrase rotates on a 3s timer; see gui-visual-desktop.spec.ts.
-      mask: [page.getByTestId("login-rotating-phrase")],
+      mask: [phrase],
     });
   });
 
@@ -56,10 +58,10 @@ test.describe("Visual regression: Login page", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 
+    // The rotating hero phrase is hidden below lg, so there is nothing to mask.
+    await expect(page.getByTestId("login-rotating-phrase")).toBeHidden();
     await expect(page).toHaveScreenshot("login-mobile.png", {
       fullPage: false,
-      // The hero phrase rotates on a 3s timer; see gui-visual-desktop.spec.ts.
-      mask: [page.getByTestId("login-rotating-phrase")],
     });
   });
 });
