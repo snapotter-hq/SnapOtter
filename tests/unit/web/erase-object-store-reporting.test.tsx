@@ -562,3 +562,194 @@ describe("erase-object batch: every other way a file's request ends", () => {
     expect(entry(0).errorCategory).toBe("timeout");
   });
 });
+
+/**
+ * A batch leaves its click handler as a rejection when a store write keeps
+ * throwing. Takes that over from vitest until `restore`, so a test can assert
+ * on it instead of failing the run (the same takeover as the Collage tests in
+ * own-parse-tools-result-reporting). Call `restore` in a finally that starts
+ * right after this, or vitest's listener stays gone.
+ */
+function takeOverUnhandledRejections() {
+  const saved = process.listeners("unhandledRejection");
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => {
+    rejections.push(reason);
+  };
+  process.removeAllListeners("unhandledRejection");
+  process.on("unhandledRejection", onRejection);
+  return {
+    rejections,
+    restore() {
+      process.off("unhandledRejection", onRejection);
+      for (const listener of saved) process.on("unhandledRejection", listener);
+    },
+  };
+}
+
+describe("erase-object batch: a store that keeps throwing (#1810)", () => {
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+  });
+
+  it("ends the batch when failing a file's entry throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // Every entry write from here on throws before it lands: landing the
+      // result, then failing the entry in handleProcessAll's catch.
+      let writes = 0;
+      vi.spyOn(useFileStore.getState(), "updateEntry").mockImplementation(() => {
+        writes++;
+        throw new Error(`entry write ${writes}`);
+      });
+
+      expect(() => first.respond(200, GOOD_BODY)).toThrow("entry write 1");
+      await act(async () => {});
+
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      // A store that can't record a failure gets no more files sent to it.
+      expect(FakeXhr.instances).toHaveLength(1);
+      // The failed write still surfaces, as the batch's one rejection.
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "entry write 2" });
+      // Nothing in the teardown broke, so the rethrow is the only report.
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("rethrows the root cause and reports the teardown's own throw once", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // A store listener that breaks on every write. zustand sets the state
+      // before its listeners run, so each write lands and then throws.
+      let writes = 0;
+      unsubscribe = useFileStore.subscribe(() => {
+        writes++;
+        throw new Error(`listener ${writes}`);
+      });
+
+      expect(() => first.respond(200, GOOD_BODY)).toThrow("listener 1");
+      await act(async () => {});
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      // Failing the entry in the catch is the root cause; the teardown's
+      // setProcessing(false) threw after it and must not replace it.
+      expect(unhandled.rejections[0]).toMatchObject({ message: "listener 2" });
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending an Erase Object batch failed",
+        expect.objectContaining({ message: "listener 3" }),
+      );
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending an Erase Object batch after a store error failed");
+      expect(error.cause).toMatchObject({ message: "listener 3" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      unsubscribe();
+      clearIntervalSpy.mockRestore();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("rethrows a teardown throw, unreported, when every file went through", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      (await submit(1)).respond(200, GOOD_BODY);
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      // Only ending the run breaks: the write that clears processing throws.
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        if (prev.processing && !state.processing) throw new Error("teardown broke");
+      });
+
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "teardown broke" });
+      expect(entry(0).status).toBe("completed");
+      expect(entry(1).status).toBe("completed");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+      // Sentry's global handler gets the rethrow, so no second report.
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("ends the batch when marking the next file as processing throws", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      // The first file lands; the next entry write, marking file two as
+      // processing, throws before it lands.
+      vi.spyOn(useFileStore.getState(), "updateEntry")
+        .mockImplementationOnce(realUpdateEntry)
+        .mockImplementationOnce(() => {
+          throw new Error("marking broke");
+        })
+        .mockImplementation(realUpdateEntry);
+
+      first.respond(200, GOOD_BODY);
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "marking broke" });
+      expect(entry(0).status).toBe("completed");
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unhandled.restore();
+    }
+  });
+
+  it("ends the batch when starting it throws", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      renderPanel(2);
+      // setProcessing(true) lands, then a listener throws: nothing may be left
+      // at processing with no request ever sent.
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        if (!prev.processing && state.processing) throw new Error("start broke");
+      });
+
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+      expect(unhandled.rejections[0]).toMatchObject({ message: "start broke" });
+      expect(FakeXhr.instances).toHaveLength(0);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("erase-object-submit")).toBeEnabled();
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+    }
+  });
+});

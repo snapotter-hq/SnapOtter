@@ -18,6 +18,7 @@ import {
   parseResultBody,
   reportMalformedResult,
 } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
@@ -531,50 +532,87 @@ export function EraseObjectSettings({
     }
     if (work.length === 0) return;
 
-    setError(null);
-    setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setElapsed(0);
+    // A store write that throws anywhere in here (#1354) ends the batch: a
+    // store that can't record a file's outcome gets no more files sent to it.
+    // The teardown below runs whatever threw, so the run can't stay at
+    // processing with its elapsed counter ticking (#1810).
+    let batchError: { cause: unknown } | null = null;
+    try {
+      setError(null);
+      setProcessing(true);
+      setProgressPhase("uploading");
+      setProgressPercent(0);
+      setElapsed(0);
 
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+      const startTime = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
 
-    for (let wi = 0; wi < work.length; wi++) {
-      const { index, file, maskBlob } = work[wi];
-      const basePercent = (wi / work.length) * 100;
-      const sliceWeight = 100 / work.length;
+      for (let wi = 0; wi < work.length; wi++) {
+        const { index, file, maskBlob } = work[wi];
+        const basePercent = (wi / work.length) * 100;
+        const sliceWeight = 100 / work.length;
 
-      setProgressPhase("processing");
-      setProgressPercent(basePercent);
-      setProgressStage(
-        format(t.toolSettings["erase-object"].erasingProgress, {
-          current: wi + 1,
-          total: work.length,
-        }),
-      );
+        setProgressPhase("processing");
+        setProgressPercent(basePercent);
+        setProgressStage(
+          format(t.toolSettings["erase-object"].erasingProgress, {
+            current: wi + 1,
+            total: work.length,
+          }),
+        );
 
-      useFileStore.getState().updateEntry(index, { status: "processing", error: null });
+        useFileStore.getState().updateEntry(index, { status: "processing", error: null });
 
-      try {
-        await processOneFile(index, file, maskBlob, (pct) => {
-          setProgressPercent(basePercent + (pct / 100) * sliceWeight);
-        });
-      } catch (err) {
-        useFileStore.getState().updateEntry(index, {
-          status: "failed",
-          error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
-          errorCategory: feedbackCategoryOf(err),
-        });
+        try {
+          await processOneFile(index, file, maskBlob, (pct) => {
+            setProgressPercent(basePercent + (pct / 100) * sliceWeight);
+          });
+        } catch (err) {
+          useFileStore.getState().updateEntry(index, {
+            status: "failed",
+            error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+            errorCategory: feedbackCategoryOf(err),
+          });
+        }
       }
+    } catch (cause) {
+      batchError = { cause };
     }
 
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
-    setProcessing(false);
-    setProgressPhase("idle");
-    setProgressStage(null);
+    // Each teardown write in its own guard, so one that throws can't skip
+    // the rest. The first error is rethrown once the run is over, where
+    // Sentry's global handler picks it up. A teardown throw behind a batch
+    // error would be lost to that rethrow, so it's reported here instead,
+    // once (#1812).
+    let teardownError: { cause: unknown } | null = null;
+    for (const teardown of [
+      () => {
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
+      },
+      () => setProcessing(false),
+      () => setProgressPhase("idle"),
+      () => setProgressStage(null),
+    ]) {
+      try {
+        teardown();
+      } catch (err) {
+        console.error("Ending an Erase Object batch failed", err);
+        teardownError ??= { cause: err };
+      }
+    }
+    if (batchError) {
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending an Erase Object batch after a store error failed",
+          teardownError.cause,
+          "erase-object",
+        );
+      }
+      throw batchError.cause;
+    }
+    if (teardownError) throw teardownError.cause;
   };
 
   const hasFile = files.length > 0;
