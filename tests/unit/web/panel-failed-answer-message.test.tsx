@@ -454,7 +454,7 @@ describe.each(PANELS)("$panel: a failed answer", (row) => {
 });
 
 // Barcode Read's catch branch for a body that is not JSON still builds its
-// own status line, so its proxy-page row waits on the issue that tracks it.
+// own status line (as does OCR's, below), tracked in #1996.
 const PROXY_413_PENDING = new Set(["barcode-read"]);
 
 describe.each(PANELS)("$panel: a 413", (row) => {
