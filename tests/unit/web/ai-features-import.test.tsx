@@ -196,6 +196,47 @@ describe("offline AI bundle import: a failed answer (#1915)", () => {
   });
 });
 
+describe("offline AI bundle import: FEATURE_NOT_INSTALLED (#1915)", () => {
+  it("words the install message in the viewer's locale", async () => {
+    const storage = new Map([["snapotter-locale", "de"]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => void storage.set(k, v),
+      removeItem: (k: string) => void storage.delete(k),
+      clear: () => storage.clear(),
+    });
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 501,
+      json: async () => ({
+        error: "Feature not installed",
+        code: "FEATURE_NOT_INSTALLED",
+        feature: "ocr",
+        featureName: "OCR",
+        estimatedSize: "1 GB",
+      }),
+    });
+    useFeaturesStore.setState({ bundles: [], loaded: true, fetch: vi.fn(async () => {}) });
+    render(
+      <I18nProvider>
+        <AiFeaturesSection />
+      </I18nProvider>,
+    );
+
+    const ai = de.settings.aiFeatures;
+    fireEvent.click(await screen.findByRole("radio", { name: ai.importLegacy }));
+    fireEvent.change(screen.getByLabelText(ai.importLegacyArchive), {
+      target: { files: [new File(["legacy"], "legacy-bundle.tar.gz")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: ai.importButton }));
+
+    const install = format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      format(ai.importError, { error: install }),
+    );
+  });
+});
+
 describe("AI environment reset", () => {
   it("tells the admin when the reset left the shared venv in place", async () => {
     renderSection({ resetVenvKept: true });

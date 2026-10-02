@@ -27,6 +27,8 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
+import { PdfToImageSettings } from "@/components/tools/pdf-to-image-settings";
+import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
 import { useUrlImport } from "@/hooks/use-url-import";
 import { format } from "@/lib/format";
 import { AutomatePage } from "@/pages/automate-page";
@@ -67,6 +69,11 @@ function answers(fallback: string): Array<[string, unknown, string]> {
       "the error handler's echo of one message",
       { error: "Bad file", details: "Bad file" },
       "Bad file",
+    ],
+    [
+      "an error with different details",
+      { error: "Invalid settings", details: "x: too big" },
+      "Invalid settings: x: too big",
     ],
     ["a body that is not JSON", NOT_JSON, fallback],
   ];
@@ -195,17 +202,58 @@ describe.each(STORES.filter((row) => row.site !== "url import"))(
   },
 );
 
+const GERMAN_INSTALL_MESSAGE = format(de.errors.featureNotInstalled, {
+  feature: de.featureBundles.ocr.name,
+});
+
+/** Renders under the provider with German chosen, the way a viewer would. */
+function inGerman({ children }: { children: React.ReactNode }) {
+  return <I18nProvider>{children}</I18nProvider>;
+}
+
 describe("url import: FEATURE_NOT_INSTALLED", () => {
-  it("ends on the translated install message", async () => {
+  it("ends on the install message in the viewer's locale", async () => {
+    storageMap.set("snapotter-locale", "de");
     answer = { status: 501, body: FEATURE_NOT_INSTALLED };
-    expect(await STORES[4].run(en)).toBe(
-      format(en.errors.featureNotInstalled, { feature: en.featureBundles.ocr.name }),
+    const { result } = renderHook(() => ({ hook: useUrlImport(), t: useTranslation().t }), {
+      wrapper: inGerman,
+    });
+    await waitFor(() => expect(result.current.t).toBe(de));
+
+    await act(() => result.current.hook.importUrls(["https://example.com/a.png"]));
+    expect(result.current.hook.entries[0]?.error).toBe(GERMAN_INSTALL_MESSAGE);
+  });
+});
+
+describe("pdf-to-image panel: FEATURE_NOT_INSTALLED", () => {
+  // The preview answers fine here: a failed preview makes the panel ask for it
+  // again on every render, which is its own bug and not this test's subject.
+  it("hands the store the viewer's locale", async () => {
+    storageMap.set("snapotter-locale", "de");
+    answer = { status: 501, body: FEATURE_NOT_INSTALLED };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("/preview")
+          ? new Response(JSON.stringify({ pageCount: 1, thumbnails: [] }))
+          : failedResponse(),
+      ),
     );
+    useFileStore.getState().setFiles([pdf()]);
+    render(<PdfToImageSettings />, { wrapper: inGerman });
+
+    const submit = await screen.findByTestId("pdf-to-image-submit");
+    await waitFor(() => expect(submit).toBeEnabled());
+    await waitFor(() => expect(usePdfToImageStore.getState().pageCount).toBe(1));
+    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
+    fireEvent.click(submit);
+
+    expect(await screen.findByText(GERMAN_INSTALL_MESSAGE)).toBeInTheDocument();
   });
 });
 
 describe("html-to-image capture: a failed answer that is not JSON", () => {
-  it("leaves the capture finished instead of stuck", async () => {
+  it("ends on the fallback, not a JSON parse error", async () => {
     answer = { status: 502, body: NOT_JSON };
     useHtmlToImageStore.getState().setUrl("https://example.com");
     await useHtmlToImageStore.getState().capture(en);
@@ -223,7 +271,8 @@ const PIPELINE_FILE = JSON.stringify({
   steps: [{ toolId: "resize", settings: {} }],
 });
 
-function importPipeline(): void {
+/** Lands on /automate in the viewer's locale and picks a pipeline file to import. */
+async function importPipeline(t: typeof en): Promise<void> {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -245,11 +294,13 @@ function importPipeline(): void {
   }) as typeof document.createElement);
 
   render(
-    <MemoryRouter initialEntries={["/automate"]}>
-      <AutomatePage />
-    </MemoryRouter>,
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/automate"]}>
+        <AutomatePage />
+      </MemoryRouter>
+    </I18nProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: en.automate.importButton }));
+  fireEvent.click(await screen.findByRole("button", { name: t.automate.importButton }));
   const input = created.at(-1);
   if (!input) throw new Error("import created no file input");
   const file = new File([PIPELINE_FILE], "p.snapotter.json", { type: "application/json" });
@@ -262,11 +313,18 @@ describe("automate pipeline import: a failed answer", () => {
     "shows %s as readable text",
     async (_label, body, expected) => {
       answer = { status: STATUS, body };
-      importPipeline();
+      await importPipeline(en);
       await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument());
       expect(document.body.textContent).not.toContain("[object Object]");
     },
   );
+
+  it("shows FEATURE_NOT_INSTALLED in the viewer's locale", async () => {
+    storageMap.set("snapotter-locale", "de");
+    answer = { status: 501, body: FEATURE_NOT_INSTALLED };
+    await importPipeline(de);
+    await waitFor(() => expect(screen.getByText(GERMAN_INSTALL_MESSAGE)).toBeInTheDocument());
+  });
 });
 
 // ── Source guard ───────────────────────────────────────────────
