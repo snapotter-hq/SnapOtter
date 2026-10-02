@@ -1169,15 +1169,56 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(entry(2).status).toBe("completed");
   });
 
-  it("keeps going when one of its files is removed", async () => {
+  it("keeps going when more files are added mid-batch", async () => {
     renderPanel(3);
     const first = await submit(1);
 
-    act(() => useFileStore.getState().removeFile(2));
+    act(() => useFileStore.getState().addFiles([image("four.png")]));
     first.respond(200, GOOD_BODY);
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
 
     expect(first.aborted).toBe(false);
-    expect(entry(0).status).toBe("completed");
+    expect(entry(2).status).toBe("completed");
+    expect(entry(3).status).toBe("pending");
+  });
+
+  it("reports a throw while stopping instead of breaking the reset that caused it", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw new Error("abort blew up");
+    });
+
+    expect(() => moveToAnotherTool()).not.toThrow();
+    await act(async () => {});
+
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Stopping an Erase Object batch whose files left failed");
+    expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+
+  it("sends nothing more when the files go just as a file finishes", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+
+    // Same tick: the loop only learns of it before the next file.
+    act(() => {
+      first.status = 200;
+      first.responseText = JSON.stringify(GOOD_BODY);
+      first.onload?.();
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+    await act(async () => {});
+
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
   });
 });

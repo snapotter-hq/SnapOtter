@@ -588,7 +588,17 @@ export function EraseObjectSettings({
     const unsubscribe = useFileStore.subscribe((state) => {
       if (filesGone || state.entries.some((e) => batchFiles.has(e.file))) return;
       filesGone = true;
-      stopInFlight?.();
+      // This runs inside whoever replaced the files (the tool page's reset,
+      // the library's setFiles): a throw here must not break their update.
+      try {
+        stopInFlight?.();
+      } catch (err) {
+        reportRunEndFailure(
+          "Stopping an Erase Object batch whose files left failed",
+          err,
+          "erase-object",
+        );
+      }
     });
 
     // A store write that throws anywhere in here (#1354) ends the batch: a

@@ -20,6 +20,7 @@ export type RunEndFailure =
   | "Failing a tool batch after a settle error failed"
   | "Failing a pipeline batch after a settle error failed"
   | "Ending an Erase Object batch after a store error failed"
+  | "Stopping an Erase Object batch whose files left failed"
   | "Ending a Collage run after a result handling error failed"
   | "Ending a Sign PDF run after a result handling error failed"
   | "Ending an Erase Object run after a result handling error failed";
