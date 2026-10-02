@@ -31,7 +31,10 @@
  *     than skip the IdP logout, and a failed or slow discovery there must be
  *     reported while the local logout still goes through (#1787). An
  *     end_session_endpoint that already has a query string (Azure AD B2C's
- *     `?p=`) keeps it, with our two parameters set on it (#1788).
+ *     `?p=`) keeps it, with our two parameters set on it (#1788). Only an
+ *     http(s) end_session_endpoint becomes a logoutUrl (https only on an https
+ *     deployment); anything else, javascript: and data: included, is a
+ *     reported local-only logout (#1855).
  *
  * Like oidc-mfa-callback.test.ts, the cryptographic token exchange is mocked
  * at the `openid-client` boundary (only `authorizationCodeGrant`; discovery,
@@ -124,7 +127,8 @@ function signState(state: string): string {
 
 /**
  * The reported error, and what Sentry's beforeSend keeps of it on the default
- * and the diagnostic (raw message) path, must not mention the username.
+ * and the diagnostic (raw message) path, must not mention the username (or
+ * any other string a test passes, such as an IdP's endpoint).
  */
 function expectNoUsernameInSentryView(reported: unknown, username: string): void {
   const err = reported as Error;
@@ -138,6 +142,21 @@ function expectNoUsernameInSentryView(reported: unknown, username: string): void
     expect(JSON.stringify(sent)).not.toContain(username);
   }
 }
+
+// end_session_endpoint values the mock IdP advertises under /scheme/<key>
+// (#1855). Each hostile one carries SCHEME_MARKER so a test can prove none of
+// it reaches the report.
+const SCHEME_MARKER = "i1855marker";
+const SCHEME_ENDPOINTS: Record<string, (port: number) => string> = {
+  javascript: () => `javascript:alert("${SCHEME_MARKER}")`,
+  javascriptUpper: () => `JavaScript:alert("${SCHEME_MARKER}")`,
+  data: () => `data:text/html,<script>alert("${SCHEME_MARKER}")</script>`,
+  vbscript: () => `vbscript:msgbox("${SCHEME_MARKER}")`,
+  file: () => `file:///etc/${SCHEME_MARKER}`,
+  relative: () => `/${SCHEME_MARKER}/logout`,
+  http: (port) => `http://localhost:${port}/scheme/http/logout`,
+  https: () => "https://idp.example.test/oidc/logout",
+};
 
 async function findUserByExternalId(externalId: string) {
   const [row] = await db
@@ -304,6 +323,26 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
             jwks_uri: `http://localhost:${mockPort}/jwks`,
             response_types_supported: ["code"],
             end_session_endpoint: `http://localhost:${mockPort}/${queryIssuer}/logout?${query}`,
+          }),
+        );
+        return;
+      }
+      // Providers whose end_session_endpoint is whatever SCHEME_ENDPOINTS
+      // names, javascript: and data: included: openid-client's discovery
+      // takes any string there (#1855).
+      const schemeIssuer = req.url?.match(
+        /^\/scheme\/(\w+)\/\.well-known\/openid-configuration$/,
+      )?.[1];
+      if (schemeIssuer && schemeIssuer in SCHEME_ENDPOINTS) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            issuer: `http://localhost:${mockPort}/scheme/${schemeIssuer}`,
+            authorization_endpoint: `http://localhost:${mockPort}/authorize`,
+            token_endpoint: `http://localhost:${mockPort}/token`,
+            jwks_uri: `http://localhost:${mockPort}/jwks`,
+            response_types_supported: ["code"],
+            end_session_endpoint: SCHEME_ENDPOINTS[schemeIssuer](mockPort),
           }),
         );
         return;
@@ -790,6 +829,113 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  // Log out against /scheme/<key>, whose end_session_endpoint is
+  // SCHEME_ENDPOINTS[key]. With the default http EXTERNAL_URL the route runs
+  // the discovery itself on a cold cache. An https EXTERNAL_URL turns off
+  // plain-http discovery, which the mock IdP needs, so that case discovers
+  // first under http and switches EXTERNAL_URL just for the logout.
+  async function logoutWithEndSessionEndpoint(key: string, externalUrl = "http://localhost:9999") {
+    const sessionToken = await oidcSessionWithWarmCache();
+    oidcModule.resetOidcDiscoveryCacheForTests();
+    (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/scheme/${key}`;
+    try {
+      if (externalUrl !== env.EXTERNAL_URL) {
+        expect(await getOidcEndSessionEndpoint()).toBe(SCHEME_ENDPOINTS[key](mockPort));
+        (env as any).EXTERNAL_URL = externalUrl;
+      }
+      const res = await logoutWithSession(sessionToken);
+      return { res, sessionToken };
+    } finally {
+      (env as any).EXTERNAL_URL = "http://localhost:9999";
+      (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+      // This discovery succeeded, so the cache now holds that issuer's document.
+      oidcModule.resetOidcDiscoveryCacheForTests();
+    }
+  }
+
+  function expectReportedSchemeFault() {
+    expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+    const [err, ctx] = reportErrorSpy.mock.calls[0];
+    expect(ctx).toEqual({
+      source: "http",
+      route: "/api/auth/logout",
+      method: "POST",
+      subsystem: "oidc-logout",
+    });
+    // A constant message: the endpoint itself (script source, a data: page)
+    // stays out of the event entirely.
+    expect(err).toMatchObject({
+      name: "SafeError",
+      message: "OIDC end_session_endpoint has an unsupported scheme",
+      kind: "operational",
+      code: "OIDC_END_SESSION_SCHEME",
+    });
+    expect((err as Error).cause).toBeUndefined();
+    expectNoUsernameInSentryView(err, SCHEME_MARKER);
+    // A misconfigured IdP is an environment problem: a throttled warning.
+    expect(classifyError(err, "http")).toBe("operational");
+  }
+
+  // openid-client's discovery accepts any string as end_session_endpoint and
+  // serverMetadata() hands it back untouched, so before #1855 a javascript:
+  // or data: endpoint went out as logoutUrl and the web app assigned it to
+  // window.location.href, running it in SnapOtter's origin.
+  it.each(["javascript", "javascriptUpper", "data", "vbscript", "file"])(
+    "omits logoutUrl, logs out locally, and reports when the end_session_endpoint is a %s: URL (#1855)",
+    async (key) => {
+      const { res, sessionToken } = await logoutWithEndSessionEndpoint(key);
+
+      await expectLoggedOutLocally(res, sessionToken);
+      expect(res.body).not.toContain(SCHEME_MARKER);
+      expectReportedSchemeFault();
+    },
+  );
+
+  // new URL() without a base rejects a relative endpoint: the #1788 path.
+  it("omits logoutUrl, logs out locally, and reports when the end_session_endpoint is relative (#1855)", async () => {
+    const { res, sessionToken } = await logoutWithEndSessionEndpoint("relative");
+
+    await expectLoggedOutLocally(res, sessionToken);
+    expect(res.body).not.toContain(SCHEME_MARKER);
+    expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+    expect(reportErrorSpy.mock.calls[0][0]).toBeInstanceOf(TypeError);
+  });
+
+  it.each([
+    ["http", "http://localhost:9999"],
+    ["https", "http://localhost:9999"],
+    ["https", "https://snapotter.example.test"],
+  ])(
+    "returns logoutUrl for a %s end_session_endpoint with EXTERNAL_URL %s (#1855)",
+    async (key, externalUrl) => {
+      const { res, sessionToken } = await logoutWithEndSessionEndpoint(key, externalUrl);
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { ok: boolean; logoutUrl?: string };
+      expect(body.ok).toBe(true);
+      const logoutUrl = new URL(body.logoutUrl ?? "");
+      expect(`${logoutUrl.origin}${logoutUrl.pathname}`).toBe(SCHEME_ENDPOINTS[key](mockPort));
+      expect(logoutUrl.searchParams.get("id_token_hint")).toBe("fake-id-token");
+      expect(logoutUrl.searchParams.get("post_logout_redirect_uri")).toBe(`${externalUrl}/login`);
+      await expectSessionGone(sessionToken);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  // An https deployment already refuses plain-http discovery, so a plain-http
+  // logout endpoint (which would carry the ID token in the clear) gets the
+  // same answer. A local-dev IdP on http needs an http EXTERNAL_URL to be
+  // discovered at all, so it keeps working (the case above).
+  it("omits logoutUrl and reports an http end_session_endpoint when EXTERNAL_URL is https (#1855)", async () => {
+    const { res, sessionToken } = await logoutWithEndSessionEndpoint(
+      "http",
+      "https://snapotter.example.test",
+    );
+
+    await expectLoggedOutLocally(res, sessionToken);
+    expectReportedSchemeFault();
   });
 
   // Only an ID-token session with OIDC on needs the IdP. Any other logout on a

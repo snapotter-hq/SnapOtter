@@ -4,6 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { clearToken } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { logoutDestination } from "@/lib/logout-destination";
 import { cn } from "@/lib/utils";
 
 interface AvatarDropdownProps {
@@ -42,11 +43,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
       const data = await res.json().catch(() => ({}));
       clearToken();
       localStorage.removeItem("snapotter-username");
-      if (data.logoutUrl) {
-        window.location.href = data.logoutUrl;
-      } else {
-        window.location.href = appUrl("/login");
-      }
+      window.location.href = logoutDestination(data.logoutUrl);
     } catch {
       clearToken();
       localStorage.removeItem("snapotter-username");

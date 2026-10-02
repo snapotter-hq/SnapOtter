@@ -56,6 +56,7 @@ import {
 import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
+import { logoutDestination } from "@/lib/logout-destination";
 import { passwordErrorMessage } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
@@ -418,11 +419,7 @@ function GeneralSection() {
       const data = await res.json().catch(() => ({}));
       clearToken();
       localStorage.removeItem("snapotter-username");
-      if (data.logoutUrl) {
-        window.location.href = data.logoutUrl;
-      } else {
-        window.location.href = appUrl("/login");
-      }
+      window.location.href = logoutDestination(data.logoutUrl);
     } catch {
       clearToken();
       localStorage.removeItem("snapotter-username");
