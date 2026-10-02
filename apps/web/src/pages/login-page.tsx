@@ -729,7 +729,7 @@ export function LoginPage() {
         <div className="max-w-lg space-y-4 text-center">
           <h2 className="text-4xl font-extrabold tracking-tight">{t.auth.heroTitle}</h2>
           <p className="text-lg text-primary-foreground">{t.auth.heroSubtitle}</p>
-          <p className="text-xl font-medium h-8">
+          <p className="text-xl font-medium h-8" data-testid="login-rotating-phrase">
             <RotatingPhrase />
           </p>
         </div>

@@ -25,6 +25,17 @@ async function setTheme(page: import("@playwright/test").Page, theme: "light" | 
 }
 
 // ---------------------------------------------------------------------------
+// Helper: the login hero's rotating phrase changes every 3s on a timer, so
+// whichever phrase (or the blank fade between two) is up when the shot is
+// taken depends on timing. Mask it so the login shots compare everything else.
+// ---------------------------------------------------------------------------
+async function rotatingPhraseMask(page: import("@playwright/test").Page) {
+  const phrase = page.getByTestId("login-rotating-phrase");
+  await expect(phrase).toBeVisible();
+  return [phrase];
+}
+
+// ---------------------------------------------------------------------------
 // Helper: take a themed screenshot pair (light + dark) for a given page state
 // ---------------------------------------------------------------------------
 async function takeThemedScreenshots(
@@ -65,10 +76,12 @@ test.describe("Visual Desktop (1280x720)", () => {
       await page.goto("/login");
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(500);
+      const mask = await rotatingPhraseMask(page);
 
       // Light screenshot
       await expect(page).toHaveScreenshot("desktop-login-empty-light.png", {
         fullPage: false,
+        mask,
       });
 
       // Toggle to dark via keyboard shortcut (login page may lack footer toggle)
@@ -77,6 +90,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
       await expect(page).toHaveScreenshot("desktop-login-empty-dark.png", {
         fullPage: false,
+        mask,
       });
     });
 
@@ -84,6 +98,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       await page.goto("/login");
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(500);
+      const mask = await rotatingPhraseMask(page);
 
       // Fill in invalid credentials and submit
       await page.getByLabel("Username").fill("wronguser");
@@ -97,6 +112,7 @@ test.describe("Visual Desktop (1280x720)", () => {
       // Light screenshot with error
       await expect(page).toHaveScreenshot("desktop-login-error-light.png", {
         fullPage: false,
+        mask,
       });
 
       // Toggle to dark
@@ -105,6 +121,7 @@ test.describe("Visual Desktop (1280x720)", () => {
 
       await expect(page).toHaveScreenshot("desktop-login-error-dark.png", {
         fullPage: false,
+        mask,
       });
     });
   });
@@ -469,8 +486,8 @@ test.describe("Visual Desktop (1280x720)", () => {
 
     // Dark theme: setTheme clicks the nav toggle, which takes focus, so focus
     // the search bar again after the switch. Without this the dark shot shows
-    // the search box unfocused (#1527). The focus ring is under the 1% pixel
-    // tolerance, so the screenshot alone would not notice. setTheme's shortcut
+    // the search box unfocused (#1527). The focus ring was under the old 1%
+    // pixel tolerance, so the screenshot alone did not notice. setTheme's shortcut
     // fallback is ignored while the input has focus, so check the theme too.
     await setTheme(page, "dark");
     await expect(page.locator("html")).toHaveClass(/\bdark\b/);

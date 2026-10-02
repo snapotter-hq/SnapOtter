@@ -130,8 +130,13 @@ export default defineConfig({
   timeout: 30_000,
   expect: {
     timeout: 10_000,
+    // Zero changed pixels allowed. `threshold` is what absorbs rendering
+    // noise: same-commit renders on four ubuntu-latest runners and two Macs
+    // differed by 0 pixels at 0.05, so 0.2 has room to spare. The old 1%
+    // ratio hid whole tool cards and tool-count changes (#1704).
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.01,
+      maxDiffPixels: 0,
+      threshold: 0.2,
       animations: "disabled",
       caret: "hide",
     },

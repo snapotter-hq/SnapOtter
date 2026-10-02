@@ -9,7 +9,6 @@ test.describe("Visual regression: Home page", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("home-desktop.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -21,7 +20,6 @@ test.describe("Visual regression: Home page", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("home-tablet.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -33,7 +31,6 @@ test.describe("Visual regression: Home page", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("home-mobile.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -47,8 +44,9 @@ test.describe("Visual regression: Login page", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("login-desktop.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
+      // The hero phrase rotates on a 3s timer; see gui-visual-desktop.spec.ts.
+      mask: [page.getByTestId("login-rotating-phrase")],
     });
   });
 
@@ -59,8 +57,9 @@ test.describe("Visual regression: Login page", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("login-mobile.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
+      // The hero phrase rotates on a 3s timer; see gui-visual-desktop.spec.ts.
+      mask: [page.getByTestId("login-rotating-phrase")],
     });
   });
 });
@@ -73,7 +72,6 @@ test.describe("Visual regression: Tool pages", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("resize-empty-desktop.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -84,10 +82,7 @@ test.describe("Visual regression: Tool pages", () => {
     await uploadTestImage(page);
     await page.waitForTimeout(500);
 
-    // Mask the image viewer area since the test image may render slightly
-    // differently across runs; we care about the settings panel layout.
     await expect(page).toHaveScreenshot("resize-uploaded-desktop.png", {
-      maxDiffPixelRatio: 0.02,
       fullPage: false,
     });
   });
@@ -99,7 +94,6 @@ test.describe("Visual regression: Tool pages", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("resize-empty-mobile.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -111,7 +105,6 @@ test.describe("Visual regression: Tool pages", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("compress-empty-desktop.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -123,7 +116,6 @@ test.describe("Visual regression: Tool pages", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("convert-empty-desktop.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -141,7 +133,6 @@ test.describe("Visual regression: Fullscreen grid", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("fullscreen-grid-desktop.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -154,7 +145,6 @@ test.describe("Visual regression: Fullscreen grid", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("fullscreen-grid-tablet.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -167,7 +157,6 @@ test.describe("Visual regression: Fullscreen grid", () => {
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot("fullscreen-grid-mobile.png", {
-      maxDiffPixelRatio: 0.01,
       fullPage: false,
     });
   });
@@ -185,8 +174,6 @@ test.describe("Visual regression: Sidebar", () => {
     const nav = page.getByRole("banner").first();
     await expect(nav).toBeVisible();
 
-    await expect(nav).toHaveScreenshot("sidebar-desktop.png", {
-      maxDiffPixelRatio: 0.01,
-    });
+    await expect(nav).toHaveScreenshot("sidebar-desktop.png");
   });
 });
