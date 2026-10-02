@@ -808,25 +808,48 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
   // An endpoint that isn't a URL used to be glued into a broken redirect and
   // returned without a trace. Now it's a fault like any other: local logout,
-  // no logoutUrl, and a report (#1788).
-  it("logs out locally and reports when the end_session_endpoint is not a valid URL (#1788)", async () => {
+  // no logoutUrl, and a report (#1788). The report is a constant-message IdP
+  // fault: Node's own TypeError carried the raw endpoint in an enumerable
+  // `input` property and classified as a SnapOtter bug (#1887).
+  it.each([
+    `not a url ${SCHEME_MARKER}?p=B2C_1_signin`,
+    `<script>alert("${SCHEME_MARKER}")</script>`,
+  ])(
+    "logs out locally and reports when the end_session_endpoint is not a valid URL: %s (#1788, #1887)",
+    async (endpoint) => {
+      const sessionToken = await oidcSessionWithWarmCache();
+      const spy = vi.spyOn(oidcModule, "getOidcEndSessionEndpoint").mockResolvedValue(endpoint);
+      try {
+        const res = await logoutWithSession(sessionToken);
+
+        await expectLoggedOutLocally(res, sessionToken);
+        expect(res.body).not.toContain(SCHEME_MARKER);
+        expectReportedInvalidEndpointFault();
+      } finally {
+        spy.mockRestore();
+      }
+    },
+  );
+
+  // new URL() trims surrounding whitespace before parsing, and the validity
+  // check has to agree with it, so a padded endpoint still yields a logout URL
+  // (#1887).
+  it("still builds logoutUrl for an end_session_endpoint with surrounding whitespace (#1887)", async () => {
     const sessionToken = await oidcSessionWithWarmCache();
     const spy = vi
       .spyOn(oidcModule, "getOidcEndSessionEndpoint")
-      .mockResolvedValue("not a url?p=B2C_1_signin");
+      .mockResolvedValue(" https://idp.example.test/oidc/logout\n");
     try {
       const res = await logoutWithSession(sessionToken);
 
-      await expectLoggedOutLocally(res, sessionToken);
-      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
-      const [err, ctx] = reportErrorSpy.mock.calls[0];
-      expect(err).toBeInstanceOf(TypeError);
-      expect(ctx).toEqual({
-        source: "http",
-        route: "/api/auth/logout",
-        method: "POST",
-        subsystem: "oidc-logout",
-      });
+      expect(res.statusCode).toBe(200);
+      const logoutUrl = new URL((res.json() as { logoutUrl?: string }).logoutUrl ?? "");
+      expect(`${logoutUrl.origin}${logoutUrl.pathname}`).toBe(
+        "https://idp.example.test/oidc/logout",
+      );
+      expect(logoutUrl.searchParams.get("id_token_hint")).toBe("fake-id-token");
+      await expectSessionGone(sessionToken);
+      expect(reportErrorSpy).not.toHaveBeenCalled();
     } finally {
       spy.mockRestore();
     }
@@ -859,7 +882,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     }
   }
 
-  function expectReportedSchemeFault() {
+  function expectReportedEndpointFault(message: string, code: string) {
     expect(reportErrorSpy).toHaveBeenCalledTimes(1);
     const [err, ctx] = reportErrorSpy.mock.calls[0];
     expect(ctx).toEqual({
@@ -870,16 +893,25 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     });
     // A constant message: the endpoint itself (script source, a data: page)
     // stays out of the event entirely.
-    expect(err).toMatchObject({
-      name: "SafeError",
-      message: "OIDC end_session_endpoint has an unsupported scheme",
-      kind: "operational",
-      code: "OIDC_END_SESSION_SCHEME",
-    });
+    expect(err).toMatchObject({ name: "SafeError", message, kind: "operational", code });
     expect((err as Error).cause).toBeUndefined();
     expectNoUsernameInSentryView(err, SCHEME_MARKER);
     // A misconfigured IdP is an environment problem: a throttled warning.
     expect(classifyError(err, "http")).toBe("operational");
+  }
+
+  function expectReportedSchemeFault() {
+    expectReportedEndpointFault(
+      "OIDC end_session_endpoint has an unsupported scheme",
+      "OIDC_END_SESSION_SCHEME",
+    );
+  }
+
+  function expectReportedInvalidEndpointFault() {
+    expectReportedEndpointFault(
+      "OIDC end_session_endpoint is not a valid URL",
+      "OIDC_END_SESSION_INVALID",
+    );
   }
 
   // openid-client's discovery accepts any string as end_session_endpoint and
@@ -897,14 +929,14 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     },
   );
 
-  // new URL() without a base rejects a relative endpoint: the #1788 path.
-  it("omits logoutUrl, logs out locally, and reports when the end_session_endpoint is relative (#1855)", async () => {
+  // A relative endpoint has no scheme to check: it fails the URL parse, the
+  // #1788 path, and gets that path's constant-message fault (#1887).
+  it("omits logoutUrl, logs out locally, and reports when the end_session_endpoint is relative (#1855, #1887)", async () => {
     const { res, sessionToken } = await logoutWithEndSessionEndpoint("relative");
 
     await expectLoggedOutLocally(res, sessionToken);
     expect(res.body).not.toContain(SCHEME_MARKER);
-    expect(reportErrorSpy).toHaveBeenCalledTimes(1);
-    expect(reportErrorSpy.mock.calls[0][0]).toBeInstanceOf(TypeError);
+    expectReportedInvalidEndpointFault();
   });
 
   it.each([
