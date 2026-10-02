@@ -16,8 +16,7 @@ import { useFilesPageStore } from "@/stores/files-page-store";
 /**
  * #1783: since #1784 the library stores real MIME types for PSD, RAW, SVG,
  * EPS and friends, and the details panel showed the upper-cased MIME subtype
- * as the format: VND.ADOBE.PHOTOSHOP, X-DCRAW, SVG+XML, X-EPS. The label a
- * person recognises is the file's extension.
+ * as the format: VND.ADOBE.PHOTOSHOP, X-DCRAW, SVG+XML, X-EPS.
  */
 
 function entry(originalName: string, mimeType: string): UserFileDetail {
@@ -44,9 +43,9 @@ async function formatShownFor(file: UserFileDetail): Promise<string> {
     </MemoryRouter>,
   );
   const label = await screen.findByText("Format");
-  const row = label.parentElement;
-  if (!row) throw new Error("format row has no parent");
-  return (row.textContent ?? "").replace("Format", "").trim();
+  const value = label.nextElementSibling;
+  if (!value) throw new Error("format row has no value");
+  return value.textContent ?? "";
 }
 
 beforeEach(() => {
@@ -79,12 +78,19 @@ describe("file details format row (#1783)", () => {
       "DOCX",
     ],
     ["clip.mkv", "video/x-matroska", "MKV"],
+    // The library typed these from their bytes, which the name contradicts.
+    ["photo.jpg", "image/webp", "WEBP"],
+    ["holiday.png", "image/heif", "HEIF"],
   ])("shows %s (%s) as %s", async (name, mime, expected) => {
     expect(await formatShownFor(entry(name, mime))).toBe(expected);
   });
 
-  it("falls back to a cleaned MIME subtype when the name has no extension", async () => {
-    expect(await formatShownFor(entry("scan", "image/svg+xml"))).toBe("SVG");
+  it("names the format from the type when the name has no extension", async () => {
+    expect(await formatShownFor(entry("layered", "image/vnd.adobe.photoshop"))).toBe("PSD");
+  });
+
+  it("shows a dash when neither the name nor the type names a format", async () => {
+    expect(await formatShownFor(entry("mystery", ""))).toBe("—");
   });
 });
 
@@ -101,18 +107,25 @@ describe("file details preview placeholder (#1783)", () => {
 describe("fileFormatLabel", () => {
   it.each([
     // One MIME type, several formats: the name tells them apart.
-    ["poster.ps", "application/postscript", "PS"],
     ["art.ai", "application/postscript", "AI"],
     ["pointer.cur", "image/x-icon", "CUR"],
     ["icons.svgz", "image/svg+xml", "SVGZ"],
     ["photo.JPEG", "image/jpeg", "JPEG"],
+    ["scan.tif", "image/tiff", "TIF"],
     ["backup.tar.gz", "application/gzip", "GZ"],
+    // Types the browser guessed from the name: the name is the better source.
+    ["poster.ps", "application/postscript", "PS"],
+    ["report.pdf", "application/octet-stream", "PDF"],
+    // Image types with no single format defer to the name.
+    ["raw-photo.nef", "image/x-dcraw", "NEF"],
+    ["print.epsf", "image/x-eps", "EPSF"],
   ])("labels %s (%s) as %s", (name, mime, expected) => {
     expect(fileFormatLabel(name, mime)).toBe(expected);
   });
 
   it.each([
-    ["layered", "image/vnd.adobe.photoshop", "PHOTOSHOP"],
+    ["layered", "image/vnd.adobe.photoshop", "PSD"],
+    ["Camera Import", "IMAGE/X-CANON-CR2", "CR2"],
     ["print", "image/x-eps", "EPS"],
     ["raw", "image/x-dcraw", "DCRAW"],
     ["notes", "text/plain; charset=utf-8", "PLAIN"],
@@ -120,7 +133,7 @@ describe("fileFormatLabel", () => {
     ["book", "application/epub+zip", "EPUB"],
     ["sheet", "application/vnd.ms-excel", "MS-EXCEL"],
     ["mystery", "", ""],
-  ])("falls back to the cleaned subtype for %s (%s): %s", (name, mime, expected) => {
+  ])("labels extensionless %j (%s) as %s", (name, mime, expected) => {
     expect(fileFormatLabel(name, mime)).toBe(expected);
   });
 
@@ -131,6 +144,9 @@ describe("fileFormatLabel", () => {
     ["draft.", "text/plain", "PLAIN"],
     ["Meeting notes v2.final copy", "text/plain", "PLAIN"],
     ["weird.ext-ension", "text/plain", "PLAIN"],
+    // Numbers alone are a version or a time, not an extension.
+    ["Report v1.2", "application/pdf", "PDF"],
+    ["Scan 2026.10.02", "image/png", "PNG"],
   ])("ignores what isn't an extension in %j", (name, mime, expected) => {
     expect(fileFormatLabel(name, mime)).toBe(expected);
   });

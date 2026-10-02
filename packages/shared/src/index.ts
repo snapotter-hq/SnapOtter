@@ -14,6 +14,7 @@ export * from "./constants.js";
 export * from "./conversion-presets.js";
 export * from "./features.js";
 export * from "./i18n/index.js";
+export * from "./image-mime.js";
 export * from "./library-save.js";
 export * from "./modality.js";
 export * from "./password-policy.js";
