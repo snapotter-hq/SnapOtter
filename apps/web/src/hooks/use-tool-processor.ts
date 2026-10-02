@@ -988,8 +988,11 @@ export function useToolProcessor(toolId: string) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
+          // A drop after the upload finished degraded to async above, so this
+          // one cut the upload short (#1822).
           const teardownError = endSyncRun({
             message: "Processing was interrupted. Retry when reconnected.",
+            category: "upload_error",
           });
           if (teardownError) throw teardownError.cause;
         };
@@ -1005,6 +1008,7 @@ export function useToolProcessor(toolId: string) {
           }
           const teardownError = endSyncRun({
             message: "Request timed out - the server may be overloaded. Try again.",
+            category: "timeout",
           });
           if (teardownError) throw teardownError.cause;
         };

@@ -251,6 +251,9 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Processing was interrupted. Retry when reconnected.",
+      // Only a drop before the upload finished lands here (a later one
+      // degrades to async), so it's an upload failure (#1822).
+      errorCategory: "upload_error",
     });
     expect(useFileStore.getState().processing).toBe(false);
 
@@ -267,6 +270,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Request timed out - the server may be overloaded. Try again.",
+      errorCategory: "timeout",
     });
     expect(useFileStore.getState().processing).toBe(false);
 
@@ -1411,8 +1415,8 @@ describe("useToolProcessor ends a sync run whose error write throws (#1791)", ()
       "Processing failed: 502",
       null,
     ],
-    ["the socket dying mid-upload", () => xhrs[0].onerror?.(), INTERRUPTED, null],
-    ["a client timeout mid-upload", () => xhrs[0].ontimeout?.(), TIMED_OUT, null],
+    ["the socket dying mid-upload", () => xhrs[0].onerror?.(), INTERRUPTED, "upload_error"],
+    ["a client timeout mid-upload", () => xhrs[0].ontimeout?.(), TIMED_OUT, "timeout"],
   ])(
     "fails the entry on %s when the error write throws",
     async (_label, fire, message, category) => {
