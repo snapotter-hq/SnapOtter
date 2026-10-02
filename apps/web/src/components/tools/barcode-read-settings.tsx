@@ -190,8 +190,8 @@ function scanOneFile(
     };
     xhr.onerror = () => reject(new Error(t.errors.network));
     xhr.ontimeout = () => reject(new Error(t.errors.requestTimedOut));
-    // The error only settles the promise: the scan has already decided to
-    // write nothing more for this file.
+    // The error only settles the promise and never reaches the UI: the scan
+    // has already decided to write nothing more for this file.
     onStoppable(() => {
       stopped = true;
       reject(new Error("Barcode scan stopped"));
@@ -273,63 +273,65 @@ export function BarcodeReadSettings() {
       }
     });
 
-    for (let i = 0; i < total; i++) {
-      if (filesGone) break;
-      const file = files[i];
-      const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
-      const fileBase = (i / total) * 100;
-      const fileShare = 100 / total;
-
-      try {
-        setProgressStage(
-          `${prefix}${format(t.toolSettings["barcode-read"].scanningFile, { name: file.name })}`,
-        );
-
-        await scanOneFile(
-          file,
-          tryHarder,
-          (pct) => {
-            setProgressPhase("uploading");
-            setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
-          },
-          (answer) => {
-            setProgressPhase("processing");
-            setProgressPercent(fileBase + fileShare);
-
-            allResults.push({
-              filename: answer.filename,
-              barcodes: answer.barcodes,
-            });
-
-            // Set annotated image as processedUrl for before/after view
-            if (answer.annotatedUrl) {
-              updateEntry(i, {
-                processedUrl: answer.annotatedUrl,
-                processedPreviewUrl: answer.annotatedUrl,
-                processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,
-                status: "completed",
-                processedSize: null,
-              });
-            }
-          },
-          (stop) => {
-            stopInFlight = stop;
-          },
-          t,
-        );
-      } catch (err) {
+    try {
+      for (let i = 0; i < total; i++) {
         if (filesGone) break;
-        const msg = err instanceof Error ? err.message : String(err);
-        errors.push(`${file.name}: ${msg}`);
-        // A throw while landing comes after this file's barcodes went in.
-        if (allResults.length === i) allResults.push({ filename: file.name, barcodes: [] });
-      } finally {
-        stopInFlight = null;
-      }
-    }
+        const file = files[i];
+        const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
+        const fileBase = (i / total) * 100;
+        const fileShare = 100 / total;
 
-    unsubscribe();
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
+        try {
+          setProgressStage(
+            `${prefix}${format(t.toolSettings["barcode-read"].scanningFile, { name: file.name })}`,
+          );
+
+          await scanOneFile(
+            file,
+            tryHarder,
+            (pct) => {
+              setProgressPhase("uploading");
+              setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
+            },
+            (answer) => {
+              setProgressPhase("processing");
+              setProgressPercent(fileBase + fileShare);
+
+              allResults.push({
+                filename: answer.filename,
+                barcodes: answer.barcodes,
+              });
+
+              // Set annotated image as processedUrl for before/after view
+              if (answer.annotatedUrl) {
+                updateEntry(i, {
+                  processedUrl: answer.annotatedUrl,
+                  processedPreviewUrl: answer.annotatedUrl,
+                  processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,
+                  status: "completed",
+                  processedSize: null,
+                });
+              }
+            },
+            (stop) => {
+              stopInFlight = stop;
+            },
+            t,
+          );
+        } catch (err) {
+          if (filesGone) break;
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${file.name}: ${msg}`);
+          // A throw while landing comes after this file's barcodes went in.
+          if (allResults.length === i) allResults.push({ filename: file.name, barcodes: [] });
+        } finally {
+          stopInFlight = null;
+        }
+      }
+    } finally {
+      unsubscribe();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+    }
 
     // The results and errors belong to files that are no longer there. The
     // processing flag is still ours to clear: a replacing setFiles leaves it
