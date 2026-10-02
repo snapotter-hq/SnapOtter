@@ -124,6 +124,9 @@ const initialState = {
   zipSize: null as number | null,
 };
 
+/** Counts loadPreview calls so only the newest one writes its outcome. */
+let latestPreviewRequest = 0;
+
 export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   ...initialState,
 
@@ -188,6 +191,10 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   loadPreview: async (file, t = en) => {
+    const request = ++latestPreviewRequest;
+    // A slower answer for a file the viewer has since moved off must not
+    // overwrite the newer request's pages, error, or spinner.
+    const isLatest = () => request === latestPreviewRequest;
     set({ loadingPreview: true, error: null });
     try {
       const formData = new FormData();
@@ -202,20 +209,24 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
       }
       const data = resolveServerUrls(await res.json());
+      if (!isLatest()) return;
       set({
         pageCount: data.pageCount,
         thumbnails: data.thumbnails,
         selectedPages: new Set(Array.from({ length: data.pageCount }, (_, i) => i + 1)),
       });
     } catch (err) {
+      if (!isLatest()) return;
+      // `file` stays: the panel asks for a preview whenever the selected file
+      // differs from it, so clearing it here asked again on every render
+      // (#1954). A null pageCount keeps Convert disabled.
       set({
         error: err instanceof Error ? err.message : "Failed to read PDF",
-        file: null,
         pageCount: null,
         thumbnails: [],
       });
     } finally {
-      set({ loadingPreview: false });
+      if (isLatest()) set({ loadingPreview: false });
     }
   },
 

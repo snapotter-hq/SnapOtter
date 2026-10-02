@@ -226,8 +226,8 @@ describe("url import: FEATURE_NOT_INSTALLED", () => {
 });
 
 describe("pdf-to-image panel: FEATURE_NOT_INSTALLED", () => {
-  // The preview answers fine here: a failed preview makes the panel ask for it
-  // again on every render, which is its own bug and not this test's subject.
+  // The preview answers fine here so the convert button enables; a failed
+  // preview has its own test in pdf-to-image-preview-failure.test.tsx (#1954).
   it("hands the store the viewer's locale", async () => {
     storageMap.set("snapotter-locale", "de");
     answer = { status: 501, body: FEATURE_NOT_INSTALLED };
