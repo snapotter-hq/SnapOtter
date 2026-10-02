@@ -2,6 +2,17 @@ name: Update Visual Baselines
 
 on:
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: >-
+          changed rewrites only baselines that fail their comparison. all
+          rewrites every baseline whose bytes differ from what renders now,
+          including differences under the maxDiffPixelRatio budget (#1705).
+        type: choice
+        options:
+          - changed
+          - all
+        default: changed
 
 permissions:
   contents: write
@@ -66,9 +77,10 @@ jobs:
         # failure while there's still job time left to do that.
         continue-on-error: true
         timeout-minutes: 100
-        run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots
+        run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium "--update-snapshots=$UPDATE_SNAPSHOTS"
         env:
           PW_WORKERS: "2"
+          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots || 'changed' }}
       - name: Collect regenerated baselines
         id: collect
         if: always()
@@ -99,6 +111,7 @@ jobs:
           SOURCE_REF: ${{ github.ref_name }}
           SOURCE_SHA: ${{ github.sha }}
           REGENERATE_OUTCOME: ${{ steps.regenerate.outcome }}
+          UPDATE_SNAPSHOTS: ${{ inputs.update_snapshots || 'changed' }}
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GIT_AUTHOR_NAME: github-actions[bot]

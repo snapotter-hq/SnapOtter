@@ -18,7 +18,7 @@
 #     ends red and names the artifact that holds the PNGs.
 #
 # Env for push: BRANCH (required), BASE_BRANCH, SOURCE_REF, SOURCE_SHA,
-# REGENERATE_OUTCOME, ARTIFACT_NAME, UPLOAD_OUTCOME, RUN_URL, PUSH_ATTEMPTS,
+# REGENERATE_OUTCOME, UPDATE_SNAPSHOTS, ARTIFACT_NAME, UPLOAD_OUTCOME, RUN_URL, PUSH_ATTEMPTS,
 # RETRY_DELAY.
 set -euo pipefail
 
@@ -43,7 +43,9 @@ collect() {
   # layout-*.png) that a new baseline name could match, and a skipped file
   # here is a lost one. -z keeps non-ASCII names unquoted. --modified also
   # reports deletions; --update-snapshots never deletes, so a listed path
-  # that isn't on disk is reported and left out.
+  # that isn't on disk is reported and left out. --modified compares
+  # contents, not timestamps, so a file rewritten with the same bytes isn't
+  # listed (#1705: --update-snapshots=all must not churn untouched PNGs).
   local file raw
   raw="$(mktemp)"
   git ls-files -z --modified --others -- "$SCREENSHOTS" > "$raw"
@@ -80,6 +82,15 @@ pr_body() {
   echo "Automated baseline refresh from the update-visual-baselines workflow${RUN_URL:+ ($RUN_URL)}."
   echo
   echo "Rendered from \`${SOURCE_REF:-unknown}\` at ${SOURCE_SHA}, committed on top of \`${BASE_BRANCH}\`."
+  echo
+  if [ "${UPDATE_SNAPSHOTS:-changed}" = "all" ]; then
+    echo "Mode \`all\`: every baseline was rendered again, and each file listed here came out with different"
+    echo "bytes, including changes under the \`maxDiffPixelRatio\` budget that \`changed\` mode lets through."
+  else
+    echo "Mode \`${UPDATE_SNAPSHOTS:-changed}\`: only baselines that failed their comparison were rewritten, so one that's"
+    echo "stale by less than the \`maxDiffPixelRatio\` budget stays as it was. Dispatch with \`update_snapshots: all\`"
+    echo "to refresh those too."
+  fi
   if [ "${SOURCE_REF:-}" != "$BASE_BRANCH" ]; then
     echo
     echo "These match \`${SOURCE_REF:-unknown}\`, not \`${BASE_BRANCH}\`, which is why this PR is a draft."
