@@ -2572,6 +2572,20 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
     });
   }
 
+  // Only the error write throws, so the writes after it have to run anyway.
+  function breakErrorWrite() {
+    unsubscribe = useFileStore.subscribe((state: FileStoreState, prev: FileStoreState) => {
+      if (!prev.error && state.error) throw new Error("teardown broke");
+    });
+  }
+
+  // Only the write that turns processing off throws.
+  function breakProcessingOff() {
+    unsubscribe = useFileStore.subscribe((state: FileStoreState, prev: FileStoreState) => {
+      if (prev.processing && !state.processing) throw new Error("teardown broke");
+    });
+  }
+
   // The upload finished and the socket died: the #766 degrade to async.
   function degrade() {
     act(() => {
@@ -2601,15 +2615,21 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
   }
 
   describe("a single run", () => {
-    it("ends when the server never confirms the job", () => {
+    it.each([
+      ["the cancel-handle write", () => breakJobClear()],
+      ["the error write", () => breakErrorWrite()],
+    ])("ends when the server never confirms the job and %s throws", (_label, breakWrite) => {
       vi.useFakeTimers();
-      const { unmount } = startSingleRun();
+      const { result, unmount } = startSingleRun();
       degrade();
-      breakJobClear();
+      breakWrite();
 
       expect(() => act(() => vi.advanceTimersByTime(30_001))).toThrow("teardown broke");
 
       expectRunEnded(UNCONFIRMED);
+      // The throw left act before React committed the progress reset.
+      act(() => {});
+      expect(result.current.progress.phase).toBe("idle");
       expect(latestSse().close).toHaveBeenCalled();
       unmount();
     });
@@ -2675,7 +2695,9 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
 
     it("ends on a good answer and keeps its result", () => {
       const { unmount } = startSingleRun();
-      breakJobClear();
+      // Before #1890 the job was cleared last, so this throw left the cancel
+      // handle armed on a finished run.
+      breakProcessingOff();
 
       expect(() =>
         act(() => {
@@ -2733,15 +2755,21 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
       unmount();
     });
 
-    it("ends on a socket that dies before the upload finished", () => {
-      const { unmount } = startBatchRun();
-      breakJobClear();
+    it.each([
+      ["the cancel-handle write", () => breakJobClear()],
+      ["the error write", () => breakErrorWrite()],
+    ])(
+      "ends on a socket that dies before the upload finished when %s throws",
+      (_label, breakWrite) => {
+        const { unmount } = startBatchRun();
+        breakWrite();
 
-      expect(() => act(() => xhrs[0].onerror?.())).toThrow("teardown broke");
+        expect(() => act(() => xhrs[0].onerror?.())).toThrow("teardown broke");
 
-      expectRunEnded(INTERRUPTED);
-      unmount();
-    });
+        expectRunEnded(INTERRUPTED);
+        unmount();
+      },
+    );
 
     it("ends on a failed terminal frame", () => {
       const { unmount } = startBatchRun();
@@ -2758,31 +2786,64 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
       unmount();
     });
 
-    it("ends when the durable ZIP is gone, without retrying the throw as a download", async () => {
-      const fetchMock = vi.fn(() =>
-        Promise.resolve({ ok: false, status: 404, blob: () => Promise.resolve(new Blob()) }),
-      );
-      vi.stubGlobal("fetch", fetchMock);
+    it("ends on a canceled answer once, keeping the cancel", async () => {
       const captured = captureRejections();
       try {
         const { unmount } = startBatchRun();
-        degrade();
         breakJobClear();
 
-        act(() => sendBatchFrame(completedBatchTerminal()));
+        act(() => {
+          xhrs[0].upload.onload?.();
+          xhrs[0].status = 409;
+          xhrs[0].response = new Blob([JSON.stringify({ canceled: true, errors: [] })]);
+          xhrs[0].onload?.();
+        });
 
+        // The teardown's throw must not land in the body-parse catch and fail
+        // the run a second time as "Batch processing failed: 409".
         await settled(() =>
           expect(captured.rejections).toEqual([
             expect.objectContaining({ message: "teardown broke" }),
           ]),
         );
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        expectRunEnded("Completed result is no longer available. Run the job again.");
+        expectRunEnded("Canceled");
         unmount();
       } finally {
         captured.restore();
       }
     });
+
+    it.each([
+      [404, "Completed result is no longer available. Run the job again."],
+      [403, "The finished batch could not be downloaded. Refresh and try again."],
+    ])(
+      "ends on a %i for the durable ZIP, without retrying the throw as a download",
+      async (status, message) => {
+        const fetchMock = vi.fn(() =>
+          Promise.resolve({ ok: false, status, blob: () => Promise.resolve(new Blob()) }),
+        );
+        vi.stubGlobal("fetch", fetchMock);
+        const captured = captureRejections();
+        try {
+          const { unmount } = startBatchRun();
+          degrade();
+          breakJobClear();
+
+          act(() => sendBatchFrame(completedBatchTerminal()));
+
+          await settled(() =>
+            expect(captured.rejections).toEqual([
+              expect.objectContaining({ message: "teardown broke" }),
+            ]),
+          );
+          expect(fetchMock).toHaveBeenCalledTimes(1);
+          expectRunEnded(message);
+          unmount();
+        } finally {
+          captured.restore();
+        }
+      },
+    );
 
     it("ends on a good ZIP and keeps its results", async () => {
       const captured = captureRejections();
@@ -2810,6 +2871,45 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
         expectRunEnded(null, "completed");
         unmount();
       } finally {
+        captured.restore();
+      }
+    });
+    it("reports a failed batch teardown after a settle error, and rethrows the root cause", async () => {
+      batchZipState.unpackThrows = true;
+      const captured = captureRejections();
+      try {
+        const { unmount } = startBatchRun();
+        breakJobClear();
+
+        act(() => {
+          xhrs[0].upload.onload?.();
+          xhrs[0].status = 200;
+          xhrs[0].response = zipBlob();
+          xhrs[0].getResponseHeader = vi.fn((name: string) =>
+            name === "X-File-Results" ? encodedFileResults() : null,
+          );
+          xhrs[0].onload?.();
+        });
+
+        // The settle error is the one rethrown; failRun's own break is
+        // reported, since nothing else would carry it to Sentry (#1812).
+        await settled(() =>
+          expect(captured.rejections).toEqual([
+            expect.objectContaining({ message: "chunk failed to load" }),
+          ]),
+        );
+        expectRunEnded("Batch processing failed");
+        const reports = vi
+          .mocked(captureHandledError)
+          .mock.calls.filter(
+            ([e]) => e.message === "Failing a pipeline batch after a settle error failed",
+          );
+        expect(reports).toHaveLength(1);
+        expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+        expect(reports[0][1]).toEqual({ error_class: "bug" });
+        unmount();
+      } finally {
+        batchZipState.unpackThrows = false;
         captured.restore();
       }
     });

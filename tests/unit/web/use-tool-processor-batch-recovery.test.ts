@@ -2120,6 +2120,13 @@ describe("useToolProcessor ends a run whose exit writes throw (#1890)", () => {
     });
   }
 
+  // Only the error write throws, so the writes after it have to run anyway.
+  function breakErrorWrite() {
+    unsubscribe = useFileStore.subscribe((state: FileStoreState, prev: FileStoreState) => {
+      if (!prev.error && state.error) throw new Error("teardown broke");
+    });
+  }
+
   // The upload finished and the socket died: the #722 degrade to async.
   function degrade() {
     act(() => {
@@ -2148,18 +2155,27 @@ describe("useToolProcessor ends a run whose exit writes throw (#1890)", () => {
     );
   }
 
-  it("ends a single run when the server never confirms the job", () => {
-    vi.useFakeTimers();
-    const { unmount } = startSingleRun();
-    degrade();
-    breakJobClear();
+  it.each([
+    ["the cancel-handle write", () => breakJobClear()],
+    ["the error write", () => breakErrorWrite()],
+  ])(
+    "ends a single run when the server never confirms the job and %s throws",
+    (_label, breakWrite) => {
+      vi.useFakeTimers();
+      const { result, unmount } = startSingleRun();
+      degrade();
+      breakWrite();
 
-    expect(() => act(() => vi.advanceTimersByTime(30_001))).toThrow("teardown broke");
+      expect(() => act(() => vi.advanceTimersByTime(30_001))).toThrow("teardown broke");
 
-    expectRunEnded(UNCONFIRMED);
-    expect(latestSse().close).toHaveBeenCalled();
-    unmount();
-  });
+      expectRunEnded(UNCONFIRMED);
+      // The throw left act before React committed the progress reset.
+      act(() => {});
+      expect(result.current.progress.phase).toBe("idle");
+      expect(latestSse().close).toHaveBeenCalled();
+      unmount();
+    },
+  );
 
   it("ends a single run on a failed frame and keeps the server's message", () => {
     const { unmount } = startSingleRun();
@@ -2221,6 +2237,45 @@ describe("useToolProcessor ends a run whose exit writes throw (#1890)", () => {
       expect(outcomes[0][1]).toMatchObject({ status: "completed" });
       unmount();
     } finally {
+      captured.restore();
+    }
+  });
+  it("reports a failed batch teardown after a settle error, and rethrows the root cause", async () => {
+    batchZipState.unpackThrows = true;
+    const captured = captureRejections();
+    try {
+      const { unmount } = startBatchRun();
+      breakJobClear();
+
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 200;
+        xhrs[0].response = zipBlob();
+        xhrs[0].getResponseHeader = vi.fn((name: string) =>
+          name === "X-File-Results" ? encodedFileResults() : null,
+        );
+        xhrs[0].onload?.();
+      });
+
+      // The settle error is the one rethrown; failRun's own break is
+      // reported, since nothing else would carry it to Sentry (#1812).
+      await settled(() =>
+        expect(captured.rejections).toEqual([
+          expect.objectContaining({ message: "chunk failed to load" }),
+        ]),
+      );
+      expectRunEnded("Batch processing failed");
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Failing a tool batch after a settle error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "resize" });
+      unmount();
+    } finally {
+      batchZipState.unpackThrows = false;
       captured.restore();
     }
   });

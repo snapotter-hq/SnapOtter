@@ -1062,7 +1062,13 @@ export function usePipelineProcessor() {
               try {
                 failRun("Batch processing failed");
               } catch (teardownErr) {
+                // Only the root cause is rethrown, so this one is reported
+                // here (#1812).
                 console.error("Failing the batch after a settle error failed", teardownErr);
+                reportRunEndFailure(
+                  "Failing a pipeline batch after a settle error failed",
+                  teardownErr,
+                );
               }
             }
             throw cause;
@@ -1226,19 +1232,25 @@ export function usePipelineProcessor() {
             }
             if (activeJobIdRef.current !== clientJobId) return;
             let errorMsg: string;
+            // Only the parse sits in this try: failRun runs after it, so a
+            // throw from its teardown can't land in the catch and fail the
+            // run a second time (#1890).
             try {
               const body = JSON.parse(text);
               // The route marks a canceled batch structurally (#771); the
               // per-file error list would otherwise read as a failure report.
-              if ((body as { canceled?: boolean } | null)?.canceled === true) {
-                failRun("Canceled");
-                return;
-              }
               // A body with its own code (ENGINE_UNAVAILABLE when every file
               // failed on a missing engine) carries the batch's reason and hint;
               // the per-file list would hide the hint behind a count (#1432).
               const coded = typeof body.code === "string" && body.code.length > 0;
-              if (!coded && body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
+              if ((body as { canceled?: boolean } | null)?.canceled === true) {
+                errorMsg = "Canceled";
+              } else if (
+                !coded &&
+                body.errors &&
+                Array.isArray(body.errors) &&
+                body.errors.length > 0
+              ) {
                 // Show the first file's step-level error (all files typically fail at the same step)
                 const first = body.errors[0];
                 errorMsg = first.error;

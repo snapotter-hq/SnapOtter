@@ -1187,7 +1187,7 @@ export function useToolProcessor(toolId: string) {
         };
 
         // Tear down the run without touching the outcome state; callers set
-        // the result or error first. Each write gets its own guard, and the
+        // the result first. Each write gets its own guard, and the
         // first throw is returned for the caller to rethrow once the run's
         // outcome is reported (#1890).
         const finishRun = () => {
@@ -1356,7 +1356,14 @@ export function useToolProcessor(toolId: string) {
               try {
                 failRun("Batch processing failed", settle.reason);
               } catch (teardownErr) {
+                // Only the root cause is rethrown, so this one is reported
+                // here (#1812).
                 console.error("Failing the batch after a settle error failed", teardownErr);
+                reportRunEndFailure(
+                  "Failing a tool batch after a settle error failed",
+                  teardownErr,
+                  toolId,
+                );
               }
             }
             throw cause;
