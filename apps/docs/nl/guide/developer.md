@@ -207,6 +207,28 @@ Voeg toe aan `packages/shared/src/i18n/en.ts`:
 
 Voeg een `data-testid`-attribuut toe aan je actieknop (zoals hierboven getoond) zodat e2e-tests het betrouwbaar kunnen aanspreken.
 
+### 5. Visuele baselines {#_5-visual-baselines}
+
+De screenshottests staan nul gewijzigde pixels toe, en een nieuwe tool verandert wat ze renderen: het aantal tools op de startpagina en in de catalogus, een nieuwe kaart in het raster en een eigen pagina waarop `tests/e2e/gui-visual-tools.spec.ts` faalt met "snapshot doesn't exist" totdat die een baseline heeft. Werk de baselines bij in dezelfde PR als de tool, zodat de nachtelijke visuele vergelijking groen blijft.
+
+Linux-baselines komen uit CI. Push je branch en start daarop de update:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+De workflow opent een concept-PR tegen `main` met de opnieuw gegenereerde PNG's. In de beschrijving staat een `gh run download`-opdracht; voer die uit vanuit de root van je checkout om de PNG's in je branch te zetten, commit ze en sluit de concept-PR. Gebruik `update_snapshots=all` als `changed` een screenshot mist waarvan je verwachtte dat die zou veranderen. Starten vereist schrijfrechten op de repository, dus als je branch op een fork staat, zet dan in de PR dat er een baseline-update nodig is en een maintainer start die.
+
+Werk op een Mac ook de darwin-baselines bij:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Werk je niet op een Mac, zeg dat dan in de PR en een maintainer voegt ze toe. Open in elk geval elke nieuwe of gewijzigde PNG voordat je hem commit: een baseline legt vast wat er gerenderd werd, kapot of niet.
+
+Een release heeft hier niets van nodig. De appversie is gemaskeerd in elke screenshot die hem toont, dus een nieuwe versie verandert geen enkele baseline.
+
 ## Docker-builds {#docker-builds}
 
 Bouw de volledige productie-image lokaal:

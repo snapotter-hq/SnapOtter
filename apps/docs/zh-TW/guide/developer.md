@@ -207,6 +207,28 @@ const MyToolSettings = lazy(() =>
 
 為你的動作按鈕新增一個 `data-testid` 屬性（如上所示），這樣 e2e 測試就能可靠地鎖定它。
 
+### 5. 視覺基準圖 {#_5-visual-baselines}
+
+截圖測試不允許任何像素改變，而新工具會改變它們渲染的內容：首頁和目錄中的工具數量、網格中的新卡片，以及工具本身的頁面。在該頁面有基準圖之前，`tests/e2e/gui-visual-tools.spec.ts` 會以 "snapshot doesn't exist" 失敗。請在新增工具的同一個 PR 中更新基準圖，讓夜間視覺比對維持綠燈。
+
+Linux 基準圖來自 CI。推送你的分支，然後在該分支上觸發更新：
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+該工作流程會針對 `main` 開啟一個包含重新產生之 PNG 的草稿 PR。其描述中有一行 `gh run download` 指令；在你的 checkout 根目錄執行它，把 PNG 放進你的分支，提交後關閉該草稿 PR。如果 `changed` 漏掉了你預期會改變的截圖，請改用 `update_snapshots=all`。觸發工作流程需要儲存庫的寫入權限，所以如果你的分支在 fork 上，請在 PR 中說明需要更新基準圖，維護者會來執行。
+
+在 Mac 上，也要更新 darwin 基準圖：
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+如果你沒有 Mac，請在 PR 中說明，維護者會補上。無論如何，提交前都要打開每一張新增或變更的 PNG：基準圖會原樣記錄渲染出的內容，不論是否有問題。
+
+發布版本不需要做這些。應用程式版本號在所有顯示它的截圖中都被遮罩，所以升級版本不會改變任何基準圖。
+
 ## Docker 建置 {#docker-builds}
 
 在本機建置完整的生產映像檔：

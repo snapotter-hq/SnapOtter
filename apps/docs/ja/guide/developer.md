@@ -207,6 +207,28 @@ const MyToolSettings = lazy(() =>
 
 e2e テストが確実に対象にできるよう、アクションボタンに `data-testid` 属性を追加します（上記のとおり）。
 
+### 5. ビジュアルベースライン {#_5-visual-baselines}
+
+スクリーンショットテストは変化したピクセルを 1 つも許容しません。新しいツールを追加すると描画内容が変わります。ホームページとカタログのツール数、グリッドの新しいカード、そしてベースラインができるまで `tests/e2e/gui-visual-tools.spec.ts` が "snapshot doesn't exist" で失敗するツール自身のページです。夜間のビジュアル比較をグリーンに保つため、ベースラインはツールと同じ PR で更新してください。
+
+Linux のベースラインは CI で生成します。ブランチをプッシュし、そのブランチで更新を実行します：
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+ワークフローは再生成した PNG を含むドラフト PR を `main` 向けに作成します。その本文に `gh run download` コマンドがあるので、チェックアウトのルートで実行して PNG をブランチに取り込み、コミットしてからドラフト PR をクローズしてください。変わるはずのスクリーンショットを `changed` が拾わない場合は、代わりに `update_snapshots=all` を使います。実行にはリポジトリへの書き込み権限が必要です。ブランチがフォークにある場合は、ベースラインの更新が必要だと PR に書いてください。メンテナーが実行します。
+
+Mac では darwin のベースラインも更新します：
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Mac がない場合は PR にそう書いてください。メンテナーが追加します。いずれの場合も、コミットする前に新規または変更された PNG をすべて開いて確認してください。ベースラインは、壊れていてもいなくても、描画された内容をそのまま記録します。
+
+リリースではこの作業は不要です。アプリのバージョンは表示されるすべてのスクリーンショットでマスクされるため、バージョンを上げてもベースラインは変わりません。
+
 ## Docker ビルド {#docker-builds}
 
 完全な本番イメージをローカルでビルドします。

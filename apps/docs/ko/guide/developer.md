@@ -207,6 +207,28 @@ const MyToolSettings = lazy(() =>
 
 e2e 테스트가 안정적으로 대상을 지정할 수 있도록 액션 버튼에 `data-testid` 속성을 추가하세요(위에서 보인 대로).
 
+### 5. 시각적 베이스라인 {#_5-visual-baselines}
+
+스크린샷 테스트는 변경된 픽셀을 하나도 허용하지 않으며, 새 도구는 테스트가 렌더링하는 내용을 바꿉니다. 홈 페이지와 카탈로그의 도구 수, 그리드의 새 카드, 그리고 베이스라인이 생길 때까지 `tests/e2e/gui-visual-tools.spec.ts`가 "snapshot doesn't exist"로 실패하는 도구 자체 페이지가 그렇습니다. 야간 시각 비교가 계속 통과하도록 도구와 같은 PR에서 베이스라인을 갱신하세요.
+
+Linux 베이스라인은 CI에서 만듭니다. 브랜치를 푸시한 다음 해당 브랜치에서 갱신을 실행하세요:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+워크플로는 다시 생성된 PNG로 `main` 대상 초안 PR을 엽니다. 본문에 `gh run download` 명령이 있으니 체크아웃 루트에서 실행해 PNG를 브랜치로 가져오고, 커밋한 뒤 초안 PR을 닫으세요. 바뀔 것으로 예상한 스크린샷을 `changed`가 놓치면 대신 `update_snapshots=all`을 사용하세요. 실행하려면 저장소 쓰기 권한이 필요하므로, 브랜치가 포크에 있다면 PR에 베이스라인 갱신이 필요하다고 적어 주세요. 메인테이너가 실행합니다.
+
+Mac에서는 darwin 베이스라인도 갱신하세요:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Mac을 쓰지 않는다면 PR에 그렇게 적어 주세요. 메인테이너가 추가합니다. 어느 경우든 커밋하기 전에 새로 생기거나 바뀐 PNG를 모두 열어 확인하세요. 베이스라인은 깨졌든 아니든 렌더링된 그대로를 기록합니다.
+
+릴리스에는 이 작업이 필요 없습니다. 앱 버전은 버전이 보이는 모든 스크린샷에서 마스킹되므로 버전을 올려도 베이스라인은 바뀌지 않습니다.
+
 ## Docker 빌드 {#docker-builds}
 
 전체 프로덕션 이미지를 로컬에서 빌드하세요:
