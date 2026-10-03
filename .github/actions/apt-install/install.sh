@@ -17,7 +17,9 @@
 #   key them by the list instead, so their swap invalidates nothing.) Only
 #   when the Azure update itself failed is a real post-swap refresh needed,
 #   with patience instead of re-rolls (120s and 360s post-swap updates both
-#   died on a real degraded day).
+#   died on a real degraded day). When both post-swap refreshes fail anyway,
+#   the installs still run against whatever index apt has left, so the job
+#   ends on the re-rolls' own verdict rather than on set -e (#1971).
 #
 # Re-rolls can't make a mirror that trickles to everyone at ~40 kB/s deliver
 # 154 MB, so when APT_ARCHIVE_DIR is set (action.yml restores it from
@@ -280,7 +282,16 @@ else
   # A second, equally patient try when the first errored or couldn't reach
   # the archive (apt reports the latter with exit 0).
   if ! apt_update "$((update_budget * 3))" || $ubuntu_unreachable; then
-    apt_update "$((update_budget * 3))"
+    # This one used to be bare, so a timeout here ended the whole script on
+    # its exit code and the re-rolls below never ran (#1971). Keep going
+    # instead: the runner image ships an index, so install against whatever
+    # apt has. An index too old to resolve the packages fails the re-rolls
+    # the same way it would have anyway, and the script still exits 1. The
+    # check matches the branch above because apt-get update exits 0 when it
+    # only couldn't reach a mirror, which the exit code alone would miss.
+    if ! apt_update "$((update_budget * 3))" || $ubuntu_unreachable || ! index_ready; then
+      echo "::warning::no usable apt index after the mirror swap; installing against whatever apt has, which may leave the packages unresolved"
+    fi
   fi
   verify_cached_debs
 fi

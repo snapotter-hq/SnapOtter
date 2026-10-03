@@ -29,6 +29,14 @@ interface StubOpts {
   noFuser?: boolean;
   /** Something else (unattended-upgrades on a fresh runner) holds the dpkg lock for this long when the job starts. */
   lockedAtStartSeconds?: number;
+  /** Every `apt-get update` exits with this code (124: timeout killed it). */
+  updateExit?: number;
+  /** Exit code per `apt-get update` call in order; the last one repeats. */
+  updateExitSeq?: number[];
+  /** Every update after the first exits 0 but reports the mirror unreachable, as real apt does. */
+  updateUnreachableAfterFirst?: boolean;
+  /** `apt-cache` can't resolve the requested packages, as after an index that never arrived. */
+  indexUnready?: boolean;
 }
 
 /**
@@ -63,14 +71,20 @@ function stubDir(first: FirstInstall, opts: StubOpts = {}) {
     // timeout -k <grace> <budget> cmd...: run cmd as-is; the stubs decide its outcome.
     timeout: 'shift 3; exec "$@"',
     sleep: "exec /bin/sleep 0.05",
-    // The index knows every requested package.
-    "apt-cache": "exit 0",
+    // The index knows every requested package, unless the test says otherwise.
+    "apt-cache": opts.indexUnready ? "exit 1" : "exit 0",
     // Without fuser (exit 127), recover_dpkg can't wait and apt's own lock timeout must.
     fuser: opts.noFuser ? "exit 127" : `[ -e "${lock}" ]`,
     dpkg: `echo "dpkg $*" >> "${calls}"
 if [ -e "${lock}" ]; then echo "dpkg: error: dpkg database lock was locked by another process" >&2; exit 2; fi`,
     "apt-get": `echo "apt-get $*" >> "${calls}"
-case " $* " in *" update "*) exit 0 ;; esac
+case " $* " in *" update "*)
+  u=$(grep -c ' update ' "${calls}")
+  ${opts.updateUnreachableAfterFirst ? `[ "$u" -gt 1 ] && echo "W: Failed to fetch mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/InRelease  Could not connect to archive.ubuntu.com:80 (10.255.255.1), connection timed out" >&2` : ":"}
+  code=${opts.updateExit ?? 0}
+  ${(opts.updateExitSeq ?? []).map((c, i) => `[ "$u" -eq ${i + 1} ] && code=${c}`).join("; ") || ":"}
+  exit "$code" ;;
+esac
 n=$(grep -c "^apt-get .*install" "${calls}")
 if [ "${first}" = every-attempt-times-out-leaving-dpkg ]; then
   # Each attempt's orphan holds the lock a bit under half the budget.
@@ -190,6 +204,64 @@ describe.skipIf(process.platform === "win32")("apt-install action script (#1786)
     expect(run.output).toContain("re-roll 3/3");
   });
 });
+
+/** The warning install.sh prints when the post-swap refresh leaves no usable index (#1971). */
+const NO_USABLE_INDEX = "no usable apt index after the mirror swap";
+
+describe.skipIf(process.platform === "win32")(
+  "apt-install when every index refresh fails (#1971)",
+  () => {
+    it("still installs when both post-swap updates time out", () => {
+      // On main, set -e ended the script on the second post-swap update's 124,
+      // so no install ran after the swap.
+      const run = runScript("succeeds", {}, { updateExit: 124 });
+      expect(run.status, run.output).toBe(0);
+      expect(run.installed).toBe(true);
+      expect(run.output).toContain(NO_USABLE_INDEX);
+    });
+
+    it("warns when both post-swap updates exit 0 without reaching the mirror", () => {
+      // apt-get update exits 0 when it only couldn't reach a mirror (#1801),
+      // so the exit code alone can't tell this apart from a good refresh.
+      const run = runScript(
+        "succeeds",
+        {},
+        { updateExitSeq: [124, 0, 0], updateUnreachableAfterFirst: true },
+        (etc) => {
+          writeFileSync(
+            join(etc, "sources.list.d", "ubuntu.sources"),
+            "# Ubuntu sources\nTypes: deb\nURIs: mirror+file:/etc/apt/apt-mirrors.txt\n",
+          );
+        },
+      );
+      expect(run.status, run.output).toBe(0);
+      expect(run.installed).toBe(true);
+      expect(run.output).toContain(NO_USABLE_INDEX);
+    });
+
+    it("warns when the refreshes leave an index that can't resolve the packages", () => {
+      // The second refresh answered, so only the index itself says no. The
+      // re-rolls would otherwise fail with no hint that downloads aren't the
+      // problem.
+      const run = runScript("succeeds", {}, { updateExitSeq: [0, 124, 0], indexUnready: true });
+      expect(run.status, run.output).toBe(0);
+      expect(run.installed).toBe(true);
+      expect(run.output).toContain(NO_USABLE_INDEX);
+    });
+
+    it("exits 1 after three re-rolls, not 124, when the installs fail too", () => {
+      const run = runScript(
+        "times-out-leaving-hung-dpkg",
+        { DPKG_LOCK_WAIT: "1" },
+        { updateExit: 124 },
+      );
+      expect(run.status, run.output).toBe(1);
+      expect(run.installed).toBe(false);
+      expect(run.output).toContain("re-roll 1/3");
+      expect(run.output).toContain("re-roll 3/3");
+    });
+  },
+);
 
 // The .deb archive cache (#1801). A stub mirror serves an index of
 // `name version sha` lines; a stub .deb's "SHA256" is simply its content, so
@@ -433,6 +505,19 @@ describe.skipIf(process.platform === "win32")("apt-install .deb archive cache (#
     expect(run.output).toContain("apt via the Azure mirror stalled or failed");
     expect(run.calls).not.toContain("sha-tampered");
     expect(run.archive(QPDF)).toBe("sha-qpdf-new");
+  });
+
+  it("checks the cache against a stale index when both post-swap refreshes find nothing", () => {
+    // Every job has an archive dir (#1801), and since #1971 the re-rolls and
+    // verify_cached_debs run even when the swap bought no index at all. The
+    // tampered archive must still be dropped rather than installed.
+    const run = runCached("down", { [QPDF]: "sha-tampered", [GS]: "sha-gs" });
+    expect(run.status, run.output).toBe(1);
+    expect(run.output).toContain("installing from the cached archives failed");
+    expect(run.output).toContain(NO_USABLE_INDEX);
+    expect(run.output).toContain("re-roll 3/3");
+    expect(run.calls).not.toContain("sha-tampered");
+    expect(run.archive(QPDF)).toBe("");
   });
 
   it("still fails, bounded, when the mirror is down and nothing is cached", () => {
