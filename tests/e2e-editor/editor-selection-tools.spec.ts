@@ -165,36 +165,43 @@ test.describe("Editor Selection Tools", () => {
   test("polygonal lasso closes on Enter and cancels on Escape", async ({ editorPage: page }) => {
     test.slow();
 
-    await selectTool(page, "lasso-poly");
+    // The toolbar's lasso button is the freehand tool. The polygonal variant is a
+    // sub-type reached with Shift+L, not a button of its own, so there is no
+    // [data-tool="lasso-poly"] to click.
+    await selectTool(page, "lasso-free");
+    await page.keyboard.press("Shift+L");
+    await page.waitForTimeout(300);
 
     const canvas = page.locator("canvas").first();
     const box = await canvas.boundingBox();
     if (!box) throw new Error("Canvas not found");
 
-    // Click 3 vertices to start drawing a polygon
+    // Three vertices leave an unclosed polygon on the canvas: the rubber band
+    // and the close target on the first vertex.
     await page.mouse.click(box.x + 100, box.y + 100);
     await page.waitForTimeout(100);
     await page.mouse.click(box.x + 200, box.y + 100);
     await page.waitForTimeout(100);
     await page.mouse.click(box.x + 150, box.y + 200);
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(200);
 
-    // Escape cancels the in-progress polygon
+    const drawn = await canvas.screenshot();
+
+    // Escape has to change something, which also proves the three clicks above
+    // really put a polygon on the canvas. Without that, both screenshots below
+    // would be of an empty canvas and the Enter assertion would pass vacuously.
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
+    const afterEscape = await canvas.screenshot();
+    expect(Buffer.compare(drawn, afterEscape)).not.toBe(0);
 
-    // After cancel, clicking 3 vertices and pressing Enter creates the selection
-    await page.mouse.click(box.x + 100, box.y + 100);
-    await page.waitForTimeout(100);
-    await page.mouse.click(box.x + 200, box.y + 100);
-    await page.waitForTimeout(100);
-    await page.mouse.click(box.x + 150, box.y + 200);
-    await page.waitForTimeout(100);
-
-    const before = await canvas.screenshot();
+    // Nothing is left to close, so Enter has to be inert. This is what makes the
+    // test discriminating: without the cancel, Escape falls through to deselect
+    // and the stranded polygon still holds its three vertices, so Enter closes it
+    // into a selection and the canvas changes.
     await page.keyboard.press("Enter");
     await page.waitForTimeout(500);
-    const after = await canvas.screenshot();
-    expect(Buffer.compare(before, after)).not.toBe(0);
+    const afterEnter = await canvas.screenshot();
+    expect(Buffer.compare(afterEscape, afterEnter)).toBe(0);
   });
 });
