@@ -3,7 +3,7 @@
  *
  * GET    /api/v1/teams      — List all teams with member count
  * POST   /api/v1/teams      — Create team (admin only)
- * PUT    /api/v1/teams/:id  — Rename team (admin only)
+ * PUT    /api/v1/teams/:id  — Update team (admin only)
  * DELETE /api/v1/teams/:id  — Delete team (admin only)
  */
 

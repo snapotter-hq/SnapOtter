@@ -529,7 +529,7 @@ To auto-save a tool result to the library, include `fileId` as a multipart form 
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | List teams |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Create team |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Rename team |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Update team (at least one field required) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Delete team (cannot delete default team or teams with members) |
 
 ## Settings {#settings}
