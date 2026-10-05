@@ -32,11 +32,22 @@ const createTeamSchema = z.object({
   retentionHours: z.number().int().positive().nullable().optional(),
 });
 
-const updateTeamSchema = z.object({
-  name: teamNameField.optional(),
-  storageQuota: z.number().int().positive().nullable().optional(),
-  retentionHours: z.number().int().positive().nullable().optional(),
-});
+const updateTeamSchema = z
+  .object({
+    name: teamNameField.optional(),
+    storageQuota: z.number().int().positive().nullable().optional(),
+    retentionHours: z.number().int().positive().nullable().optional(),
+  })
+  // Strict because Zod strips unknown keys before any refine runs: without it a
+  // body misspelling storagequota alongside a valid name would parse, rename the
+  // team, drop the quota and still answer 200 (#2005).
+  .strict()
+  .refine(
+    (s) => s.name !== undefined || s.storageQuota !== undefined || s.retentionHours !== undefined,
+    {
+      message: "At least one of name, storageQuota, or retentionHours is required",
+    },
+  );
 
 export async function teamsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/teams — List all teams with member count (admin only)
@@ -158,6 +169,9 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
       if (storageQuota !== undefined) updateFields.storageQuota = storageQuota;
       if (retentionHours !== undefined) updateFields.retentionHours = retentionHours;
 
+      // Unreachable through this route now that the schema refines on at least
+      // one field. Kept as the backstop for a field added to updateTeamSchema
+      // without a line here, which would emit an empty SET clause and 500.
       if (Object.keys(updateFields).length > 0) {
         // The pre-check above can't close the race: two concurrent renames
         // onto the same name both pass it before either UPDATE commits

@@ -394,6 +394,43 @@ describe("PUT /api/v1/teams/:id", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects an empty body instead of reporting a no-op save", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects a misspelled field and names it", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { storagequota: 5_000_000 },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("storagequota");
+  });
+
+  it("rejects a misspelled field even when a valid one is present", async () => {
+    // Zod strips unknown keys before any refine runs, so without .strict() this
+    // body would rename the team, drop the quota and answer 200 (#2005).
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: "Renamed Anyway", storagequota: 5_000_000 },
+    });
+    expect(res.statusCode).toBe(400);
+
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(team?.name).toBe("OldName");
+  });
+
   it("updates storage quota alone and reads the value back", async () => {
     const quotaBytes = 100 * 1024 * 1024; // 100 MB
     const res = await app.inject({
