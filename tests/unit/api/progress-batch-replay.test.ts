@@ -6,7 +6,7 @@
  * ZIP result, so a client that degraded a dead batch POST to the async
  * path can settle from SSE replay alone.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dbMocks = vi.hoisted(() => ({
   failure: null as Error | null,
@@ -417,6 +417,14 @@ describe("buildBatchReplayEvent", () => {
 });
 
 describe("terminal batch writers", () => {
+  // Each test starts from a quiet writer: no rows changed, nothing published.
+  beforeEach(() => {
+    dbMocks.failure = null;
+    dbMocks.rowCount = 0;
+    dbMocks.lastSet = null;
+    redisMocks.published.length = 0;
+  });
+
   it("completeBatchJob resolves after the durable write settles", async () => {
     dbMocks.failure = null;
     await expect(
@@ -466,8 +474,6 @@ describe("terminal batch writers", () => {
     it("announces the code and hint on the terminal frame and stores both on the row", async () => {
       dbMocks.failure = null;
       dbMocks.rowCount = 1;
-      redisMocks.published.length = 0;
-      dbMocks.lastSet = null;
 
       await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
       await publishedFrames();
@@ -489,8 +495,6 @@ describe("terminal batch writers", () => {
     it("a frame announced live and one replayed from the row say the same thing", async () => {
       dbMocks.failure = null;
       dbMocks.rowCount = 1;
-      redisMocks.published.length = 0;
-      dbMocks.lastSet = null;
 
       await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
       await publishedFrames();
@@ -508,8 +512,6 @@ describe("terminal batch writers", () => {
     it("leaves code and details off a frame that had neither", async () => {
       dbMocks.failure = null;
       dbMocks.rowCount = 1;
-      redisMocks.published.length = 0;
-      dbMocks.lastSet = null;
 
       await failBatchJob({ ...base, message: "All files failed processing" });
       await publishedFrames();
@@ -523,7 +525,6 @@ describe("terminal batch writers", () => {
     it("announces nothing when the guarded write changed no row", async () => {
       dbMocks.failure = null;
       dbMocks.rowCount = 0;
-      redisMocks.published.length = 0;
 
       await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
       await publishedFrames();

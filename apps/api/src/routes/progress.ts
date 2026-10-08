@@ -36,7 +36,11 @@ export interface JobProgress {
    * (#2178). Absent when the failure had no single cause.
    */
   code?: string;
-  /** Operator hint that goes with `code` ("Check QPDF_PATH ..."). */
+  /**
+   * Operator hint that goes with `code` ("Check QPDF_PATH ..."). The blank-name
+   * `errors` entry already reads "<message>: <hint>", so a client shows that
+   * entry or the hint beside the message, not both.
+   */
   details?: string;
   /** Current file being processed (if any). */
   currentFile?: string;
