@@ -223,3 +223,55 @@ describe("a refused change stays on the page", () => {
     expect(screen.getByRole("button", { name: en.changePassword.changeButton })).toBeEnabled();
   });
 });
+
+// The page can't read passwordMinLength before the user has a usable password,
+// so Generate starts at the default length and learns the minimum from the
+// server's 400 (#2027).
+describe("Generate sizes the password to the policy", () => {
+  const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+  async function renderWithCurrentPassword() {
+    render(
+      <I18nProvider>
+        <ChangePasswordPage />
+      </I18nProvider>,
+    );
+    fireEvent.change(await screen.findByLabelText(en.changePassword.currentPasswordLabel), {
+      target: { value: "old-Password1" },
+    });
+  }
+
+  it("starts at the default, then meets the minimum the server named", async () => {
+    answer(400, {
+      code: "VALIDATION_ERROR",
+      rule: "minLength",
+      rules: ["minLength"],
+      minLength: 24,
+    });
+    await renderWithCurrentPassword();
+
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
+
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
+    expect(
+      await screen.findByText(format(en.errors.passwordTooShort, { minLength: 24 })),
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    const generated = field(en.changePassword.newPasswordLabel).value;
+    expect(generated).toHaveLength(24);
+    expect(field(en.changePassword.confirmPasswordLabel).value).toBe(generated);
+  });
+
+  it("stays at the default when the refusal names no minimum", async () => {
+    answer(400, { code: "VALIDATION_ERROR", rule: "digit", rules: ["digit"] });
+    await renderWithCurrentPassword();
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
+    expect(await screen.findByText(en.errors.passwordNeedsDigit)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
+    expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
+  });
+});

@@ -7,8 +7,19 @@ const SPECIAL = "!@#$%&*()-_=+";
 const ALL = UPPER + LOWER + DIGITS + SPECIAL;
 
 // 20 clears the default minimum with room to spare. The forced change-password
-// page can't read passwordMinLength (the user has no access to /v1/settings yet).
+// page can't read passwordMinLength (the user has no access to /v1/settings yet),
+// so it starts here and learns the minimum from the server's refusal (#2027).
 const DEFAULT_LENGTH = 20;
+
+/**
+ * How long a generated password must be to meet a server minimum, which the
+ * admin can set anywhere from 1 to 128. Never shorter than the default, and
+ * the default when the minimum is unknown or unreadable.
+ */
+export function passwordLengthFor(minLength: unknown): number {
+  const min = Number(minLength);
+  return Number.isFinite(min) ? Math.max(DEFAULT_LENGTH, Math.ceil(min)) : DEFAULT_LENGTH;
+}
 
 function secureRandom(max: number): number {
   const array = new Uint32Array(1);

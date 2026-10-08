@@ -55,7 +55,7 @@ import {
 import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
-import { generatePassword } from "@/lib/generate-password";
+import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { logout } from "@/lib/logout";
 import { passwordErrorMessage } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
@@ -1918,9 +1918,17 @@ export function PeopleSection() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                const pw = generatePassword();
-                setNewPassword(pw);
+              onClick={async () => {
+                // Meet the server's minimum length, which can exceed the default
+                // (#2027). An admin without settings access gets the default.
+                let minLength: unknown;
+                try {
+                  const data = await apiGet<{ settings: Record<string, string> }>("/v1/settings");
+                  minLength = data.settings.passwordMinLength;
+                } catch {
+                  // Unreadable policy: the default length applies.
+                }
+                setNewPassword(generatePassword(passwordLengthFor(minLength)));
                 setShowGeneratedPw(true);
                 setPwCopy(null);
               }}

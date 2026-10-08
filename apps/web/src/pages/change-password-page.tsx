@@ -3,7 +3,7 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { generatePassword } from "@/lib/generate-password";
+import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { passwordErrorMessages } from "@/lib/password-errors";
 
 /**
@@ -84,9 +84,13 @@ export function ChangePasswordPage() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showGenerated, setShowGenerated] = useState(false);
+  // The minimum length from the server's last refusal. This page can't read the
+  // policy, so Generate starts at the default and meets the minimum once the
+  // server has named it (#2027).
+  const [minLength, setMinLength] = useState<number | null>(null);
 
   const handleGenerate = () => {
-    const pw = generatePassword();
+    const pw = generatePassword(passwordLengthFor(minLength));
     setNewPassword(pw);
     setConfirmPassword(pw);
     setShowGenerated(true);
@@ -120,6 +124,7 @@ export function ChangePasswordPage() {
           setSessionEnded(true);
           return;
         }
+        if (typeof data.minLength === "number") setMinLength(data.minLength);
         const messages = passwordErrorMessages(t, res.status, data);
         if (messages.length === 0) {
           console.warn("Password change failed", { status: res.status, code: data.code });
