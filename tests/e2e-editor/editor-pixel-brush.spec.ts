@@ -18,13 +18,16 @@ type Rgba = { r: number; g: number; b: number; a: number };
 
 type StageView = {
   Konva?: {
-    Layer?: { prototype: { batchDraw(...args: unknown[]): unknown } };
     stages: Array<{
       x(): number;
       y(): number;
       scaleX(): number;
       find(selector: string): Array<{
         id(): string;
+        getLayer(): {
+          getNativeCanvasElement(): HTMLCanvasElement;
+          getCanvas(): { getPixelRatio(): number };
+        } | null;
         image(): CanvasImageSource | undefined;
         width(): number;
         height(): number;
@@ -74,6 +77,26 @@ function readStrokeObjectPixel(page: Page, x: number, y: number): Promise<Rgba |
       if (!ctx) return null;
       ctx.drawImage(source, 0, 0);
       const d = ctx.getImageData(x, y, 1, 1).data;
+      return { r: d[0], g: d[1], b: d[2], a: d[3] };
+    },
+    { x, y },
+  );
+}
+
+// One document pixel as the editor's main layer has actually painted it, which is
+// what the user sees. Reads the layer's canvas without asking Konva to redraw.
+function readLayerPixel(page: Page, x: number, y: number): Promise<Rgba | null> {
+  return page.evaluate(
+    ({ x, y }) => {
+      const stage = (window as unknown as StageView).Konva?.stages[0];
+      const layer = stage?.find("Image")[0]?.getLayer();
+      if (!stage || !layer) return null;
+      const ratio = layer.getCanvas().getPixelRatio();
+      const ctx = layer.getNativeCanvasElement().getContext("2d");
+      if (!ctx) return null;
+      const px = Math.round((stage.x() + (x + 0.5) * stage.scaleX()) * ratio);
+      const py = Math.round((stage.y() + (y + 0.5) * stage.scaleY()) * ratio);
+      const d = ctx.getImageData(px, py, 1, 1).data;
       return { r: d[0], g: d[1], b: d[2], a: d[3] };
     },
     { x, y },
@@ -257,29 +280,19 @@ for (const tool of ["blur-brush", "sharpen-brush", "smudge", "dodge", "burn", "s
       await page.mouse.down();
       await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
 
-      // The live canvas is repainted in place, which Konva can't see, so the layer
-      // has to be told to redraw on each move.
-      await page.evaluate(() => {
-        const w = window as unknown as { __batchDraws?: number } & StageView;
-        w.__batchDraws = 0;
-        const proto = w.Konva?.Layer?.prototype;
-        if (!proto) return;
-        const original = proto.batchDraw;
-        proto.batchDraw = function (this: unknown, ...args: unknown[]) {
-          w.__batchDraws = (w.__batchDraws ?? 0) + 1;
-          return original.apply(this, args);
-        };
-      });
       await page.mouse.move(end.x, end.y, { steps: 8 });
 
       // Button still held: no mouse-up has swapped in a fresh data URL yet.
       await expect
         .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
         .toBe(255);
-      const draws = await page.evaluate(
-        () => (window as unknown as { __batchDraws?: number }).__batchDraws ?? 0,
-      );
-      expect(draws).toBeGreaterThanOrEqual(4);
+      // Dodge and burn change the colour, so the painted layer shows whether the
+      // stroke reached the screen. The fixture is flat rgb(255,100,50).
+      if (tool === "dodge" || tool === "burn") {
+        await expect
+          .poll(async () => (await readLayerPixel(page, 140, 75))?.g, { timeout: 10_000 })
+          .not.toBe(ORANGE.g);
+      }
 
       await page.mouse.up();
 

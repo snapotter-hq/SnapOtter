@@ -355,7 +355,6 @@ function ImageObject({
 }) {
   const a = obj.attrs as ImageAttrs;
   const [loaded] = useImage(a.src);
-  const nodeRef = useRef<Konva.Image>(null);
   // A pixel brush mid-stroke hands over its canvas, which it keeps painting into.
   // Only a real canvas counts: a serialised one comes back as `{}`, which Konva
   // would throw on at every draw.
@@ -365,16 +364,11 @@ function ImageObject({
   const lastLiveRef = useRef<HTMLCanvasElement | undefined>(undefined);
   if (liveImage) lastLiveRef.current = liveImage;
   else if (loaded) lastLiveRef.current = undefined;
-  // Konva can't see changes inside the same canvas element, so redraw on every update.
-  useEffect(() => {
-    if (a.image) nodeRef.current?.getLayer()?.batchDraw();
-  }, [a]);
   const image = liveImage ?? loaded ?? lastLiveRef.current;
   if (!image) return null;
 
   return (
     <KonvaImage
-      ref={nodeRef}
       id={obj.id}
       image={image}
       x={a.x}
