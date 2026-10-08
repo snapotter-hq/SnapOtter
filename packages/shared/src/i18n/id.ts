@@ -1904,6 +1904,8 @@ export const id: TranslationKeys = {
         lavender: "Lavender",
       },
       effectsProcessingFailed: "Pemrosesan efek gagal",
+      effectsExpired:
+        "Penghapusan latar belakang sebelumnya sudah kedaluwarsa, jadi sedang dijalankan ulang. Terapkan efek setelah selesai.",
     },
     "remove-gif-background": {
       quality: "Kualitas",

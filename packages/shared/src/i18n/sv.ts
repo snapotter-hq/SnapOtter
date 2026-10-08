@@ -1903,6 +1903,8 @@ export const sv: TranslationKeys = {
         lavender: "Lavendel",
       },
       effectsProcessingFailed: "Bearbetningen av effekter misslyckades",
+      effectsExpired:
+        "Den tidigare bakgrundsborttagningen har gått ut, så den körs igen. Tillämpa effekterna när den är klar.",
     },
     "remove-gif-background": {
       quality: "Kvalitet",

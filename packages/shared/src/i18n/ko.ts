@@ -1844,6 +1844,8 @@ export const ko: TranslationKeys = {
         lavender: "라벤더",
       },
       effectsProcessingFailed: "효과 처리에 실패했습니다",
+      effectsExpired:
+        "이전 배경 제거가 만료되어 다시 실행하고 있습니다. 완료되면 효과를 적용하세요.",
     },
     "remove-gif-background": {
       quality: "품질",

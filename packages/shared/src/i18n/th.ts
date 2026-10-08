@@ -1879,6 +1879,7 @@ export const th: TranslationKeys = {
         lavender: "ลาเวนเดอร์",
       },
       effectsProcessingFailed: "ประมวลผลเอฟเฟกต์ล้มเหลว",
+      effectsExpired: "การลบพื้นหลังก่อนหน้าหมดอายุแล้ว จึงกำลังลบใหม่ ใช้เอฟเฟกต์ได้เมื่อเสร็จ",
     },
     "remove-gif-background": {
       quality: "คุณภาพ",

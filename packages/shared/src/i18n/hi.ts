@@ -1719,6 +1719,8 @@ export const hi: TranslationKeys = {
         lavender: "लैवेंडर",
       },
       effectsProcessingFailed: "इफेक्ट्स प्रोसेसिंग विफल",
+      effectsExpired:
+        "पिछली बैकग्राउंड हटाने की प्रक्रिया की अवधि समाप्त हो गई, इसलिए उसे फिर से चलाया जा रहा है। पूरा होने के बाद इफेक्ट्स लागू करें।",
     },
     "remove-gif-background": {
       quality: "क्वालिटी",

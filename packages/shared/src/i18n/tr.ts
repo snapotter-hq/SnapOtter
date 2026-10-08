@@ -1909,6 +1909,8 @@ export const tr: TranslationKeys = {
         lavender: "Lavanta",
       },
       effectsProcessingFailed: "Efekt işleme başarısız oldu",
+      effectsExpired:
+        "Önceki arka plan kaldırma işleminin süresi doldu, bu yüzden yeniden çalıştırılıyor. Bittiğinde efektleri uygulayın.",
     },
     "remove-gif-background": {
       quality: "Kalite",

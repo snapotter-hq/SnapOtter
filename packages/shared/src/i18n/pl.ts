@@ -1910,6 +1910,8 @@ export const pl: TranslationKeys = {
         lavender: "Lawendowy",
       },
       effectsProcessingFailed: "Przetwarzanie efektów nie powiodło się",
+      effectsExpired:
+        "Poprzednie usuwanie tła wygasło, więc jest uruchamiane ponownie. Zastosuj efekty, gdy się zakończy.",
     },
     "remove-gif-background": {
       quality: "Jakość",

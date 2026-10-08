@@ -1863,6 +1863,8 @@ export const ja: TranslationKeys = {
         lavender: "ラベンダー",
       },
       effectsProcessingFailed: "エフェクトの処理に失敗しました",
+      effectsExpired:
+        "以前の背景削除の有効期限が切れたため、再実行しています。完了したらエフェクトを適用してください。",
     },
     "remove-gif-background": {
       quality: "品質",

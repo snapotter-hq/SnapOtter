@@ -1889,6 +1889,8 @@ export const ar: TranslationKeys = {
         lavender: "خزامى",
       },
       effectsProcessingFailed: "فشلت معالجة التأثيرات",
+      effectsExpired:
+        "انتهت صلاحية إزالة الخلفية السابقة، لذا يُعاد تشغيلها الآن. طبّق التأثيرات بعد اكتمالها.",
     },
     "remove-gif-background": {
       quality: "الجودة",

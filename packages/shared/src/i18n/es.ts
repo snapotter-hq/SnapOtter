@@ -1896,6 +1896,8 @@ export const es: TranslationKeys = {
         lavender: "Lavanda",
       },
       effectsProcessingFailed: "Error al procesar los efectos",
+      effectsExpired:
+        "La eliminación de fondo anterior caducó, así que se está ejecutando de nuevo. Aplica los efectos cuando termine.",
     },
     "remove-gif-background": {
       quality: "Calidad",

@@ -1909,6 +1909,8 @@ export const it: TranslationKeys = {
         lavender: "Lavanda",
       },
       effectsProcessingFailed: "Elaborazione degli effetti non riuscita",
+      effectsExpired:
+        "La rimozione dello sfondo precedente è scaduta, quindi viene eseguita di nuovo. Applica gli effetti quando ha finito.",
     },
     "remove-gif-background": {
       quality: "Qualità",

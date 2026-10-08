@@ -1666,6 +1666,7 @@ export const zhCN: TranslationKeys = {
         lavender: "薰衣草",
       },
       effectsProcessingFailed: "效果处理失败",
+      effectsExpired: "之前的背景移除已过期，正在重新运行。完成后再应用效果。",
     },
     "remove-gif-background": {
       quality: "质量",

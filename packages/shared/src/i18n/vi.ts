@@ -1906,6 +1906,8 @@ export const vi: TranslationKeys = {
         lavender: "Oải hương",
       },
       effectsProcessingFailed: "Xử lý hiệu ứng thất bại",
+      effectsExpired:
+        "Lần xóa nền trước đã hết hạn nên đang được chạy lại. Hãy áp dụng hiệu ứng khi xong.",
     },
     "remove-gif-background": {
       quality: "Chất lượng",

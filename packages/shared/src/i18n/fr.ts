@@ -1916,6 +1916,8 @@ export const fr: TranslationKeys = {
         lavender: "Lavande",
       },
       effectsProcessingFailed: "Échec du traitement des effets",
+      effectsExpired:
+        "La suppression d'arrière-plan précédente a expiré, elle est donc relancée. Appliquez les effets une fois qu'elle est terminée.",
     },
     "remove-gif-background": {
       quality: "Qualité",

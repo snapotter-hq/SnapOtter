@@ -1910,6 +1910,8 @@ export const ptBR: TranslationKeys = {
         lavender: "Lavanda",
       },
       effectsProcessingFailed: "Falha no processamento dos efeitos",
+      effectsExpired:
+        "A remoção de fundo anterior expirou, então está sendo executada de novo. Aplique os efeitos quando terminar.",
     },
     "remove-gif-background": {
       quality: "Qualidade",

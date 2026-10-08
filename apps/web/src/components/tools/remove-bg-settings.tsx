@@ -895,6 +895,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     const filename = decodeURIComponent(match[2]);
     if (jobId && filename) {
       setBgJobId(jobId);
+      // A fresh removal settles any "expired, running again" note (#2119).
+      setEffectsError(null);
       // Derive the cached filenames from the mask filename
       const baseName = filename.replace(/_mask\.png$|_nobg\.png$/, "");
       setBgFilename(baseName || filename.replace(/\.[^.]+$/, ""));
@@ -953,6 +955,14 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
+        // The server no longer holds the earlier removal's mask or original
+        // (#2119). Remove the background again so effects have something to
+        // read; the note holds until that run's result arrives.
+        if (body?.code === "BACKGROUND_REMOVAL_EXPIRED") {
+          setEffectsError(t.toolSettings["remove-background"].effectsExpired);
+          handleRemoveBg();
+          return;
+        }
         throw new Error(
           failedAnswerMessage(t, body, response.status, `Effects failed: ${response.status}`),
         );

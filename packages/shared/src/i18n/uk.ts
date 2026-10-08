@@ -1912,6 +1912,8 @@ export const uk: TranslationKeys = {
         lavender: "Лаванда",
       },
       effectsProcessingFailed: "Не вдалося застосувати ефекти",
+      effectsExpired:
+        "Термін попереднього видалення тла минув, тому його запущено знову. Застосуйте ефекти, коли воно завершиться.",
     },
     "remove-gif-background": {
       quality: "Якість",

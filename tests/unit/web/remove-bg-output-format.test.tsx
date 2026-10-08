@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared/i18n/en.js";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -140,5 +141,48 @@ describe("remove-background output format routing (#720)", () => {
 
     expect(await screen.findByTestId("remove-background-submit")).toBeInTheDocument();
     expect(screen.queryByTestId("remove-background-download")).not.toBeInTheDocument();
+  });
+});
+
+// The effects request reads the mask and original an earlier removal stored.
+// When the server no longer holds them it answers 410 BACKGROUND_REMOVAL_EXPIRED
+// and the panel removes the background again instead of leaving a download
+// button that can never work (#2119).
+describe("remove-background effects after the stored cutout expired (#2119)", () => {
+  async function applyEffects(answer: { status: number; body: unknown }) {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: answer.status,
+      json: async () => answer.body,
+    });
+    vi.stubGlobal("fetch", fetch);
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+  }
+
+  it("removes the background again and says why", async () => {
+    await applyEffects({
+      status: 410,
+      body: { error: "expired", code: "BACKGROUND_REMOVAL_EXPIRED" },
+    });
+
+    expect(
+      await screen.findByText(en.toolSettings["remove-background"].effectsExpired),
+    ).toBeVisible();
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [files, , options] = deployment.processFiles.mock.calls[0];
+    expect(files).toHaveLength(1);
+    expect(options).toEqual({ skipLibrarySave: true });
+  });
+
+  it("shows any other failure as before, without running the removal again", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+    expect(screen.queryByText(en.toolSettings["remove-background"].effectsExpired)).toBeNull();
+    expect(deployment.processFiles).not.toHaveBeenCalled();
   });
 });

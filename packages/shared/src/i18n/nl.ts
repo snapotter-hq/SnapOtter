@@ -1912,6 +1912,8 @@ export const nl: TranslationKeys = {
         lavender: "Lavendel",
       },
       effectsProcessingFailed: "Effecten verwerken mislukt",
+      effectsExpired:
+        "De eerdere achtergrondverwijdering is verlopen, dus die wordt opnieuw uitgevoerd. Pas de effecten toe zodra dat klaar is.",
     },
     "remove-gif-background": {
       quality: "Kwaliteit",

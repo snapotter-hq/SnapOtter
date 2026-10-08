@@ -1852,6 +1852,8 @@ export const en = {
         lavender: "Lavender",
       },
       effectsProcessingFailed: "Effects processing failed",
+      effectsExpired:
+        "The earlier background removal expired, so it is being run again. Apply the effects once it's done.",
     },
     "remove-gif-background": {
       quality: "Quality",
