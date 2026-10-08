@@ -680,9 +680,11 @@ function CanvasObjectRenderer({
   }
 }
 
-// Tools whose stroke state lives from mousedown to mouseup. Konva only hears a
-// release over its own canvas, so these also listen on the document (#1041).
-const STROKE_TOOLS = new Set<ToolType>([
+// Tools whose drag state lives from mousedown to mouseup. Konva only hears a
+// release over its own canvas, so these also listen on the document (#1041,
+// #2154). The click-driven polygonal lasso is left out: its vertices come from
+// presses, not from a drag.
+const DRAG_TOOLS = new Set<ToolType>([
   "brush",
   "pencil",
   "eraser",
@@ -693,6 +695,16 @@ const STROKE_TOOLS = new Set<ToolType>([
   "blur-brush",
   "sharpen-brush",
   "smudge",
+  "shape-rect",
+  "shape-ellipse",
+  "shape-line",
+  "shape-arrow",
+  "shape-polygon",
+  "shape-star",
+  "gradient",
+  "marquee-rect",
+  "marquee-ellipse",
+  "lasso-free",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -867,8 +879,8 @@ export function EditorCanvas({
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionLayerRef = useRef<Konva.Layer>(null);
-  // The open stroke, if any: `finish` runs the tool that started it, `cancel` just disarms.
-  const openStrokeRef = useRef<{ finish: () => void; cancel: () => void } | null>(null);
+  // The open drag, if any: `finish` runs the tool that started it, `cancel` just disarms.
+  const openDragRef = useRef<{ finish: () => void; cancel: () => void } | null>(null);
   const { stageRef, handleWheel, fitToScreen, handleTouchMove, handleTouchEnd } = useCanvasZoom();
 
   const zoom = useEditorStore((s) => s.zoom);
@@ -893,6 +905,12 @@ export function EditorCanvas({
   const contextMenu = useContextMenu();
 
   const { handlers, moveTool, selectionTool, transformTool } = useActiveToolHandlers(stageRef);
+
+  // The handlers of the current render. A tool whose release reads React state
+  // (the marquee and lasso read their points) must end with these, not with the
+  // copy from the render its drag started in, which has none of the points yet.
+  const latestToolRef = useRef({ handlers, activeTool });
+  latestToolRef.current = { handlers, activeTool };
 
   const [stageWidth, setStageWidth] = useState(800);
   const [stageHeight, setStageHeight] = useState(600);
@@ -964,9 +982,9 @@ export function EditorCanvas({
 
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      // A stroke whose release never arrived (focus lost mid-drag) ends before the
+      // A drag whose release never arrived (focus lost mid-drag) ends before the
       // tool starts a new one, or its object is stranded half-written.
-      openStrokeRef.current?.finish();
+      openDragRef.current?.finish();
 
       // For move tool, handle stage click to deselect
       if (activeTool === "move") {
@@ -975,32 +993,35 @@ export function EditorCanvas({
 
       if (!handlers) return;
       handlers.handleMouseDown(e);
-      if (!STROKE_TOOLS.has(activeTool)) return;
+      if (!DRAG_TOOLS.has(activeTool)) return;
 
       // Konva only hears a release over its own canvas. Letting go over the toolbar,
-      // a panel or outside the window must end the stroke too, and losing the window
-      // mid-drag sends no mouseup at all (#1041).
+      // a panel or outside the window must end the drag too, and losing the window
+      // mid-drag sends no mouseup at all (#1041, #2154).
       const cancel = () => {
-        openStrokeRef.current = null;
+        openDragRef.current = null;
         document.removeEventListener("mouseup", finish);
         window.removeEventListener("blur", finish);
       };
-      // The tool that started the stroke ends it, even if a shortcut switched
-      // activeTool mid-drag and `handlers` now points somewhere else.
+      // The tool that started the drag ends it, even if a shortcut switched
+      // activeTool mid-drag and the current handlers now point somewhere else.
+      // While the tool is unchanged the current render's handlers end it, since a
+      // release that reads React state would otherwise see the state from mousedown.
       const finish = () => {
         cancel();
-        handlers.handleMouseUp(e);
+        const current = latestToolRef.current;
+        (current.activeTool === activeTool ? current.handlers : handlers)?.handleMouseUp(e);
       };
       document.addEventListener("mouseup", finish);
       window.addEventListener("blur", finish);
-      openStrokeRef.current = { finish, cancel };
+      openDragRef.current = { finish, cancel };
     },
     [handlers, activeTool, moveTool],
   );
 
   const handleMouseUp = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      const open = openStrokeRef.current;
+      const open = openDragRef.current;
       if (open) {
         open.finish();
         return;
@@ -1012,8 +1033,8 @@ export function EditorCanvas({
     [handlers],
   );
 
-  // A stroke that is still open when the canvas goes away has nothing to finish.
-  useEffect(() => () => openStrokeRef.current?.cancel(), []);
+  // A drag that is still open when the canvas goes away has nothing to finish.
+  useEffect(() => () => openDragRef.current?.cancel(), []);
 
   // Issue #5: Track screen-space cursor for brush overlay
   const handleContainerMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

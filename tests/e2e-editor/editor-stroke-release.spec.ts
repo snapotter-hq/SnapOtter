@@ -12,6 +12,7 @@ type KonvaNode = {
   width(): number;
   height(): number;
   points?(): number[];
+  getAttr(name: string): unknown;
 };
 
 type StageView = {
@@ -20,7 +21,7 @@ type StageView = {
       x(): number;
       y(): number;
       scaleX(): number;
-      find(selector: string): KonvaNode[];
+      find(selector: string | ((node: KonvaNode) => boolean)): KonvaNode[];
     }>;
   };
 };
@@ -81,6 +82,52 @@ function newestLinePointCount(page: Page): Promise<number | null> {
     const lines = stage?.find("Line").filter((node) => node.id()) ?? [];
     const line = lines[lines.length - 1];
     return line?.points ? line.points().length : null;
+  });
+}
+
+// The orange dashed outline a marquee or lasso draws while it is being dragged
+// (ActiveSelectionPreview). A committed selection is drawn black and white instead.
+const DRAG_PREVIEW_STROKE = "#E07832";
+
+function dragPreviewCount(page: Page): Promise<number> {
+  return page.evaluate((stroke) => {
+    const stage = (window as unknown as StageView).Konva?.stages[0];
+    return stage?.find((node) => node.getAttr("stroke") === stroke).length ?? 0;
+  }, DRAG_PREVIEW_STROKE);
+}
+
+// Nodes of one Konva class that carry a stroke of the given colour.
+function strokedCount(page: Page, className: string, stroke: string): Promise<number> {
+  return page.evaluate(
+    ({ className, stroke }) => {
+      const stage = (window as unknown as StageView).Konva?.stages[0];
+      return (
+        stage?.find(
+          (node) =>
+            (node as unknown as { className: string }).className === className &&
+            node.getAttr("stroke") === stroke,
+        ).length ?? 0
+      );
+    },
+    { className, stroke },
+  );
+}
+
+// Width of the newest shape object (a Rect that carries an object id).
+function newestRectWidth(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    const stage = (window as unknown as StageView).Konva?.stages[0];
+    const rects = stage?.find("Rect").filter((node) => node.id()) ?? [];
+    const rect = rects[rects.length - 1];
+    return rect ? rect.width() : null;
+  });
+}
+
+// Image objects the user has drawn (the source image has no id).
+function imageObjectCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const stage = (window as unknown as StageView).Konva?.stages[0];
+    return stage?.find("Image").filter((node) => node.id()).length ?? 0;
   });
 }
 
@@ -189,5 +236,96 @@ test.describe("A stroke still ends when the release never reaches the canvas (is
 
     await expect.poll(() => strokeAlphaAt(page, 60, 75), { timeout: 10_000 }).toBe(255);
     expect(await strokeAlphaAt(page, 150, 75)).toBe(0);
+  });
+});
+
+// Issue #2154: the same release over the panel left shape, gradient and selection
+// drags live, because their handlers were not among the tools #1041 armed.
+test.describe("A drag ends when the button is released off the canvas (issue #2154)", () => {
+  test.beforeEach(async ({ editorPage: page }) => {
+    await loadTestImage(page);
+    await waitForSourceImage(page);
+  });
+
+  // Press on the image, drag past the canvas edge and release over the panel.
+  async function dragOutAndRelease(page: Page): Promise<void> {
+    const start = await documentPoint(page, 60, 75);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 40, start.y + 20, { steps: 4 });
+    await page.mouse.move(OVER_THE_PANEL.x, OVER_THE_PANEL.y, { steps: 6 });
+    await page.mouse.up();
+  }
+
+  // Back over the canvas with no button held.
+  async function wanderBack(page: Page): Promise<void> {
+    const back = await documentPoint(page, 150, 120);
+    await page.mouse.move(back.x, back.y, { steps: 6 });
+    await page.mouse.move(back.x + 10, back.y + 5, { steps: 3 });
+  }
+
+  test("a rectangle stops resizing after a release over the panel", async ({
+    editorPage: page,
+  }) => {
+    await selectTool(page, "shape-rect");
+    await dragOutAndRelease(page);
+
+    const atRelease = await newestRectWidth(page);
+    expect(atRelease).not.toBeNull();
+
+    await wanderBack(page);
+
+    expect(await newestRectWidth(page)).toBe(atRelease);
+  });
+
+  for (const tool of ["marquee-rect", "marquee-ellipse"] as const) {
+    test(`${tool} commits at the release and stops rubber-banding`, async ({
+      editorPage: page,
+    }) => {
+      // The ellipse sits behind the rectangle in the toolbar; "m" cycles to it.
+      await selectTool(page, "marquee-rect");
+      if (tool === "marquee-ellipse") await page.keyboard.press("m");
+      await dragOutAndRelease(page);
+
+      // The drag ended: no orange outline left, and the selection is drawn.
+      await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
+      const shape = tool === "marquee-rect" ? "Rect" : "Ellipse";
+      expect(await strokedCount(page, shape, "#000000")).toBeGreaterThan(0);
+
+      await wanderBack(page);
+      expect(await dragPreviewCount(page)).toBe(0);
+    });
+  }
+
+  test("a freehand lasso commits at the release and stops rubber-banding", async ({
+    editorPage: page,
+  }) => {
+    await selectTool(page, "lasso-free");
+    const start = await documentPoint(page, 60, 75);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 40, start.y, { steps: 3 });
+    await page.mouse.move(start.x + 40, start.y + 30, { steps: 3 });
+    await page.mouse.move(OVER_THE_PANEL.x, OVER_THE_PANEL.y, { steps: 6 });
+    await page.mouse.up();
+
+    await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
+    expect(await strokedCount(page, "Line", "#000000")).toBeGreaterThan(0);
+
+    await wanderBack(page);
+    expect(await dragPreviewCount(page)).toBe(0);
+  });
+
+  test("a gradient commits at the release, not at the next click", async ({ editorPage: page }) => {
+    await selectTool(page, "gradient");
+    const before = await imageObjectCount(page);
+
+    await dragOutAndRelease(page);
+
+    await expect.poll(() => imageObjectCount(page), { timeout: 5_000 }).toBe(before + 1);
+
+    // Wandering back without pressing must not add or change anything.
+    await wanderBack(page);
+    expect(await imageObjectCount(page)).toBe(before + 1);
   });
 });

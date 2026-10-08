@@ -9,6 +9,9 @@ import type { CanvasObject } from "@/types/editor";
 interface DragState {
   startX: number;
   startY: number;
+  /** Where the preview last ended, for a release that has no stage pointer (#2154). */
+  endX: number;
+  endY: number;
 }
 
 export interface GradientPreview {
@@ -37,7 +40,7 @@ export function useGradientTool() {
     const x = (pointer.x - panOffset.x) / zoom;
     const y = (pointer.y - panOffset.y) / zoom;
 
-    dragRef.current = { startX: x, startY: y };
+    dragRef.current = { startX: x, startY: y, endX: x, endY: y };
 
     const { gradientType } = useEditorStore.getState();
     setPreview({ startX: x, startY: y, endX: x, endY: y, gradientType });
@@ -57,6 +60,7 @@ export function useGradientTool() {
     const endX = (pointer.x - panOffset.x) / zoom;
     const endY = (pointer.y - panOffset.y) / zoom;
     const { startX, startY } = dragRef.current;
+    dragRef.current = { startX, startY, endX, endY };
 
     setPreview({ startX, startY, endX, endY, gradientType });
   }, []);
@@ -77,15 +81,12 @@ export function useGradientTool() {
       panOffset,
     } = useEditorStore.getState();
 
-    const stage = e.target.getStage();
-    if (!stage) return;
-
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
-    const endX = (pointer.x - panOffset.x) / zoom;
-    const endY = (pointer.y - panOffset.y) / zoom;
+    // Konva drops the pointer position once the pointer leaves the stage, so a
+    // release over a panel falls back to where the preview last ended.
+    const pointer = e.target.getStage()?.getPointerPosition();
     const { startX, startY } = dragRef.current;
+    const endX = pointer ? (pointer.x - panOffset.x) / zoom : dragRef.current.endX;
+    const endY = pointer ? (pointer.y - panOffset.y) / zoom : dragRef.current.endY;
 
     const dx = endX - startX;
     const dy = endY - startY;
