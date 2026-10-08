@@ -1,12 +1,15 @@
+import { SafeError } from "@snapotter/shared";
 import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
+import { CancelRefusedError, failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
 import {
@@ -185,6 +188,65 @@ export function subscribeEraseObjectJobProgress(
   return { stop: cleanup, touch: resetStall };
 }
 
+/**
+ * Asks the server to stop the job of a run the client gave up on because its
+ * own handling broke (#1960). Best effort: the run has already failed in the
+ * UI, so an answer changes nothing there. `canceled: false` means the job had
+ * already finished, which is what a throw after a terminal frame gets. Refusals
+ * and a request that never arrived are logged and reported by the cancel
+ * helpers; a 404 (no such job for this caller) is reported here, since nothing
+ * else would trace it. Never rejects.
+ */
+async function cancelAbandonedJob(clientJobId: string): Promise<void> {
+  try {
+    let res: Response;
+    try {
+      res = await fetch(appUrl(`/api/v1/jobs/${clientJobId}/cancel`), {
+        method: "POST",
+        headers: formatHeaders(),
+        keepalive: true,
+      });
+    } catch (cause) {
+      throw failedCancelRequest(cause, "erase-object");
+    }
+    const answer = await readCancelAnswer(res, () => true, "erase-object");
+    if (answer === "missing") {
+      console.warn("Cancel for an abandoned Erase Object job found no job");
+      void captureHandledError(
+        new SafeError("Cancel for an abandoned Erase Object job found no job", {
+          kind: "operational",
+          statusCode: 404,
+        }),
+        { error_class: "operational", tool_id: "erase-object", status_code: "404" },
+      );
+    }
+  } catch (err) {
+    if (err instanceof CancelRefusedError) return;
+    console.error("Canceling an abandoned Erase Object job failed", err);
+    void captureHandledError(
+      new SafeError("Canceling an abandoned Erase Object job failed", {
+        kind: "bug",
+        cause: err,
+      }),
+      { error_class: "bug", tool_id: "erase-object" },
+    );
+  }
+}
+
+/**
+ * Cancels the job when the stream failed because handling a frame threw. A
+ * failed frame, a completed frame with no result and a stall don't cancel: the
+ * first two arrive with the server done with the job, and a stall's copy tells
+ * the user the result may have saved. (A failed frame whose display throws is
+ * relabelled trackingFailed by the stream and cancels too; the server answers
+ * `canceled: false`.)
+ */
+function cancelIfHandlingFailed(failure: JobFailure, clientJobId: string) {
+  if ("reason" in failure && failure.reason === "trackingFailed") {
+    void cancelAbandonedJob(clientJobId);
+  }
+}
+
 interface EraseObjectSettingsProps {
   eraserRef: React.RefObject<EraserCanvasRef | null>;
   hasStrokes: boolean;
@@ -283,7 +345,10 @@ export function EraseObjectSettings({
           applyResult(r);
           resolve();
         },
-        onFailed: (failure) => abandon(new Error(jobFailureMessage(failure, t.errors))),
+        onFailed: (failure) => {
+          cancelIfHandlingFailed(failure, clientJobId);
+          abandon(new Error(jobFailureMessage(failure, t.errors)));
+        },
         onStall: () =>
           abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
       });
@@ -448,6 +513,7 @@ export function EraseObjectSettings({
       onFailed: (failure) => {
         progressCleanupRef.current = null;
         abandonRequest();
+        cancelIfHandlingFailed(failure, clientJobId);
         // setError is a store write, and the stream has already let go of the
         // run: a throw from it must not skip finishUi and leave the run at
         // processing for good (#1830). It still surfaces, after the teardown.

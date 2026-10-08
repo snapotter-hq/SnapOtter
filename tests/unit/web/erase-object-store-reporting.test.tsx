@@ -75,7 +75,10 @@ class FakeXhr {
 
   setRequestHeader(_key: string, _value: string) {}
 
-  send(_body: FormData) {
+  body: FormData | null = null;
+
+  send(body: FormData) {
+    this.body = body;
     this.uploadHandlerAtSend = this.upload.onprogress !== null;
   }
 
@@ -176,6 +179,11 @@ beforeEach(() => {
   FakeEventSource.instances = [];
   vi.stubGlobal("XMLHttpRequest", FakeXhr);
   vi.stubGlobal("EventSource", FakeEventSource);
+  // A run that fails on our side posts a cancel (#1960); nothing here talks to a server.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
   vi.mocked(captureHandledError).mockClear();
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([image("photo.png")]);
@@ -1199,6 +1207,142 @@ describe("erase-object counts upload progress as a sign of life (#1959)", () => 
     } finally {
       stalls.restore();
     }
+  });
+});
+
+/**
+ * #1960: when the client gives up on a run because its own handling broke, the
+ * job still runs on the server and can still save. Those failures cancel it.
+ * A stall doesn't: its copy promises the result may have saved.
+ */
+describe("erase-object cancels a job the client gave up on (#1960)", () => {
+  const cancelUrl = (xhr: FakeXhr) =>
+    `/api/v1/jobs/${xhr.body?.get("clientJobId") as string}/cancel`;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  /** The 202 is answered and the stream's complete frame then breaks landing. */
+  async function breakLandingStreamResult(xhr: FakeXhr) {
+    xhr.respond(202, { jobId: "job-1", async: true });
+    breakNextEntryWrite();
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+  }
+
+  it("single file: posts a cancel when handling the stream breaks", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(cancelUrl(xhr));
+    expect(init.method).toBe("POST");
+  });
+
+  it("batch: posts a cancel for the file whose handling broke", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+    const first = await submit(1);
+
+    await breakLandingStreamResult(first);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+  });
+
+  it("does not cancel a job the server itself reported as failed", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not cancel on a stall, whose copy says the result may have saved", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      await submit();
+      stalls.fireLatest();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("leaves the failure alone, and reports it, when the cancel never reaches the server", async () => {
+    // Not the browser's own offline rejection: the scrubber ignores that one.
+    fetchMock.mockRejectedValue(new Error("proxy reset the connection"));
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+      "A cancel request never reached the server",
+    );
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("treats a job that already finished (canceled: false) as expected, not as a fault", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ canceled: false })));
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+  });
+
+  it("reports a cancel that finds no job, since nothing else would trace it", async () => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 404 }));
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+      "Cancel for an abandoned Erase Object job found no job",
+    );
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+  });
+
+  it("does not report a cancel the server acknowledged", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    await breakLandingStreamResult(xhr);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 });
 
