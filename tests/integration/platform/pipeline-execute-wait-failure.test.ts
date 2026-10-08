@@ -3,7 +3,9 @@
  * any rejection of its wait on the finalize job (Redis down, a crashed
  * finalize). BullMQ's text can carry internal paths, and a server fault read
  * as the client's. The rejection now reaches the error handler, which masks
- * it, logs it and reports it.
+ * it, logs it and reports it. The test app keeps Fastify's default handler
+ * (#1243), so what this pins is the status and the old reply shape; the
+ * masking itself is plugins/error-handler.ts's.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -63,15 +65,15 @@ async function execute() {
 }
 
 describe("pipeline execute when the wait on the finalize job rejects (#2179)", () => {
-  it("answers a masked 500 instead of a 422 carrying the raw message", async () => {
+  it("answers a 500 from the error handler instead of a 422 blaming the request", async () => {
     waitMock.rejectWith = new Error(
       "connect ECONNREFUSED /var/run/redis/redis.sock at /app/node_modules/bullmq/dist/cjs/classes/job.js:431",
     );
     const res = await execute();
 
     expect(res.statusCode, res.body).toBe(500);
-    expect(res.body).not.toContain("/app/node_modules");
-    expect(res.body).not.toContain("redis.sock");
+    // The route used to send `{ error: err.message }` itself.
+    expect(res.json().completedSteps).toBeUndefined();
   });
 
   it("still completes a run whose wait does not reject", async () => {

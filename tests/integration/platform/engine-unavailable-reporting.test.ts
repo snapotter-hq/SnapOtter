@@ -537,15 +537,15 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
   });
 
   it("pipeline execute keeps the completed steps when a later step hits the fault (#2179)", async () => {
-    failInWorker("sharpen", engineDown());
+    failInWorker("resize", engineDown());
     const res = await post("/api/v1/pipeline/execute", [
       pngPart("one.png"),
       {
         name: "pipeline",
         content: JSON.stringify({
           steps: [
+            { toolId: "rotate", settings: { angle: 90 } },
             { toolId: "resize", settings: { width: 50 } },
-            { toolId: "sharpen", settings: {} },
           ],
         }),
       },
