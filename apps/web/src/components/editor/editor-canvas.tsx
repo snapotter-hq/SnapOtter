@@ -354,11 +354,21 @@ function ImageObject({
   draggable: boolean;
 }) {
   const a = obj.attrs as ImageAttrs;
-  const [image] = useImage(a.src);
+  const [loaded] = useImage(a.src);
+  const nodeRef = useRef<Konva.Image>(null);
+  // A pixel brush mid-stroke hands over its canvas, which it keeps painting into.
+  // Konva can't see changes inside the same element, so redraw on every update.
+  const liveImage = a.image;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `a` is replaced on every updateObject, which is the redraw trigger
+  useEffect(() => {
+    if (liveImage) nodeRef.current?.getLayer()?.batchDraw();
+  }, [a, liveImage]);
+  const image = liveImage ?? loaded;
   if (!image) return null;
 
   return (
     <KonvaImage
+      ref={nodeRef}
       id={obj.id}
       image={image}
       x={a.x}
