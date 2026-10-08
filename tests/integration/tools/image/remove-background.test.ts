@@ -251,6 +251,23 @@ describe("Remove Background", () => {
     expect(result.error).toMatch(/no settings/i);
   });
 
+  it("effects route answers a malformed body with the shared multipart 400 (#1660)", async () => {
+    // A boundary that never appears in the body: the read fails, and the
+    // client can tell this from an over-limit upload, which gets 413.
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "multipart/form-data; boundary=never-sent",
+      },
+      body: '--other\r\nContent-Disposition: form-data; name="settings"\r\n\r\n{}\r\n',
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe("Failed to parse multipart request");
+  });
+
   it("effects route rejects invalid settings JSON", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "settings", content: "not json{{" },
