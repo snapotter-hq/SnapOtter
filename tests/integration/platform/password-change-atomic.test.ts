@@ -153,11 +153,11 @@ describe("change-password is all-or-nothing (#2089)", () => {
         payload: { currentPassword: "Userpass1", newPassword: "NewValid1" },
       });
       expect(retry.statusCode).toBe(200);
-      expect(await loginAgain(username, "NewValid1")).toBeTruthy();
-      expect(await loginAgain(username, "Userpass1")).toBeUndefined();
       expect(await passwordHash(userId)).not.toBe(hashBefore);
       expect(await liveSessionCount(userId)).toBe(1);
       expect(await apiKeyCount(userId)).toBe(0);
+      expect(await loginAgain(username, "NewValid1")).toBeTruthy();
+      expect(await loginAgain(username, "Userpass1")).toBeUndefined();
     },
   );
 });
@@ -197,11 +197,11 @@ describe("admin reset-password is all-or-nothing (#2089)", () => {
         payload: { newPassword: "ResetPass1" },
       });
       expect(retry.statusCode).toBe(200);
-      expect(await loginAgain(username, "ResetPass1")).toBeTruthy();
-      expect(await loginAgain(username, "Userpass1")).toBeUndefined();
       expect(await passwordHash(userId)).not.toBe(hashBefore);
       expect(await liveSessionCount(userId)).toBe(0);
       expect(await apiKeyCount(userId)).toBe(0);
+      expect(await loginAgain(username, "ResetPass1")).toBeTruthy();
+      expect(await loginAgain(username, "Userpass1")).toBeUndefined();
     },
   );
 });
