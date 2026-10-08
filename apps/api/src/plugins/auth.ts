@@ -430,6 +430,34 @@ async function getLoginThrottleConfig(): Promise<LoginThrottleConfig> {
   };
 }
 
+/**
+ * Reads a setting and lets a database fault throw. getSettingString answers
+ * its default on any error, which for the SSO gate would turn enforcement off
+ * during a Postgres blip; the global error handler answers 500 and reports
+ * instead, and no session is written (the MFA policy read is fail-closed for
+ * the same reason, #815).
+ */
+async function readSettingStrict(key: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ value: schema.settings.value })
+    .from(schema.settings)
+    .where(eq(schema.settings.key, key))
+    .limit(1);
+  return row?.value;
+}
+
+/**
+ * True when SSO enforcement is on (and licensed) and `username` is not the
+ * break-glass account, so a local password login must not produce a session.
+ */
+async function isLocalLoginRefusedBySso(username: string): Promise<boolean> {
+  // The licence first: it needs no database read, so an unlicensed instance
+  // never touches the settings table here.
+  if (!(await isEnterpriseFeatureEnabled("sso_enforcement"))) return false;
+  if ((await readSettingStrict("ssoEnforcement")) !== "true") return false;
+  return username !== ((await readSettingStrict("ssoBreakGlassUsername")) ?? "");
+}
+
 // ── Auth routes ────────────────────────────────────────────────────
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -440,24 +468,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!env.AUTH_ENABLED) {
         return reply.status(403).send({ error: "Authentication is disabled" });
-      }
-
-      // SSO enforcement check
-      const ssoEnforced = await getSettingString("ssoEnforcement", "false");
-      if (ssoEnforced === "true") {
-        const isEnabled = await isEnterpriseFeatureEnabled("sso_enforcement");
-
-        if (isEnabled) {
-          const breakGlassUsername = await getSettingString("ssoBreakGlassUsername", "");
-          const { username } = loginSchema.parse(request.body);
-
-          if (username !== breakGlassUsername) {
-            return reply.status(403).send({
-              error: "Local password login is disabled. Please use SSO.",
-              code: "SSO_ENFORCED",
-            });
-          }
-        }
       }
 
       const parsed = loginSchema.safeParse(request.body);
@@ -511,7 +521,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .from(schema.users)
         .where(eq(schema.users.username, body.username));
 
-      if (!user?.passwordHash) {
+      // With SSO enforced, a local password login for any account but the
+      // break-glass one is refused the way a wrong password is: same cost,
+      // same throttle, same 401, whether or not the password was right. Any
+      // other answer would let a caller tell the accounts apart, or test a
+      // password that SSO is meant to have replaced.
+      const ssoRefused = await isLocalLoginRefusedBySso(body.username);
+
+      if (ssoRefused || !user?.passwordHash) {
         // Pay the same scrypt cost a real password check would take, so
         // response timing doesn't reveal whether the username exists.
         await verifyPassword(body.password, await getDummyHash());
@@ -519,10 +536,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
+          ...(ssoRefused && user && { userId: user.id }),
           // An SSO-provisioned account that was later disabled has no local
           // hash and lands here too; keep the precise audit reason while the
           // response stays the generic 401.
-          reason: user && isDisabledRole(user.role) ? "disabled_user" : "unknown_user",
+          reason: ssoRefused
+            ? "sso_enforced"
+            : user && isDisabledRole(user.role)
+              ? "disabled_user"
+              : "unknown_user",
         });
         await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
