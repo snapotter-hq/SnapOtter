@@ -4999,6 +4999,8 @@ export const zhCN: TranslationKeys = {
     verifying: "验证中...",
     mfaInvalidCode: "验证码无效，请重试。",
     mfaExpired: "验证会话已过期，请重新登录。",
+    mfaEnrollmentExpired:
+      "设置会话已过期。请重新登录以获取新的二维码和新的恢复码，之前显示的将无法使用。",
     mfaEnrollmentHeading: "请设置双重身份验证以继续",
     mfaEnrollmentRequired: "您的组织要求启用多因素认证。请在账户设置中设置 MFA。",
     mfaPolicyUnavailable: "无法检查 MFA 策略。请稍后重试。",

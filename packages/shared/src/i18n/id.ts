@@ -5295,6 +5295,8 @@ export const id: TranslationKeys = {
     verifying: "Memverifikasi...",
     mfaInvalidCode: "Kode tidak valid. Silakan coba lagi.",
     mfaExpired: "Sesi verifikasi Anda telah berakhir. Silakan masuk lagi.",
+    mfaEnrollmentExpired:
+      "Sesi penyiapan Anda telah berakhir. Masuk lagi untuk mendapatkan kode QR dan kode pemulihan baru; kode yang ditampilkan sebelumnya tidak akan berfungsi.",
     mfaEnrollmentHeading: "Siapkan autentikasi dua faktor untuk melanjutkan",
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",

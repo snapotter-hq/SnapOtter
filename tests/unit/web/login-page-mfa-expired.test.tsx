@@ -20,6 +20,8 @@ afterEach(() => {
 const ENROLLMENT_URI = "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&issuer=SnapOtter";
 
 const EXPIRED_MESSAGE = "Your verification session expired. Please log in again.";
+const ENROLLMENT_EXPIRED_MESSAGE =
+  "Your setup session expired. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.";
 
 function renderLoginPage() {
   useAuth.mockReturnValue({
@@ -115,6 +117,7 @@ describe("LoginPage MFA challenge expiry (#1234)", () => {
       expect(screen.getByText(/invalid code/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(codeInput).toBeInTheDocument();
     expect(codeInput.value).toBe("");
   });
 
@@ -129,10 +132,37 @@ describe("LoginPage MFA challenge expiry (#1234)", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(EXPIRED_MESSAGE)).toBeInTheDocument();
+      expect(screen.getByText(ENROLLMENT_EXPIRED_MESSAGE)).toBeInTheDocument();
     });
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("starts the next prompt with an empty code field after a restart", async () => {
+    const fetchMock = stubTotpFlow(
+      failedResponse(401, { error: "MFA session expired", code: "MFA_EXPIRED" }),
+    );
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-2" }),
+    });
+
+    renderLoginPage();
+    await submitLogin();
+
+    const firstInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(firstInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+    await waitFor(() => {
+      expect(screen.getByText(EXPIRED_MESSAGE)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    const secondInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+    expect(secondInput.value).toBe("");
+    expect(screen.queryByText(EXPIRED_MESSAGE)).not.toBeInTheDocument();
   });
 });

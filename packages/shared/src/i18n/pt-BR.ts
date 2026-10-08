@@ -5311,6 +5311,8 @@ export const ptBR: TranslationKeys = {
     verifying: "Verificando...",
     mfaInvalidCode: "Código inválido. Tente novamente.",
     mfaExpired: "Sua sessão de verificação expirou. Faça login novamente.",
+    mfaEnrollmentExpired:
+      "Sua sessão de configuração expirou. Faça login novamente para obter um novo QR code e novos códigos de recuperação; os exibidos antes não vão funcionar.",
     mfaEnrollmentHeading: "Configure a autenticação de dois fatores para continuar",
     mfaEnrollmentRequired:
       "Sua organização exige autenticação multifator. Configure o MFA nas configurações da sua conta.",

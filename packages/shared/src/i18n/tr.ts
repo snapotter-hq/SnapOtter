@@ -5304,6 +5304,8 @@ export const tr: TranslationKeys = {
     verifying: "Doğrulanıyor...",
     mfaInvalidCode: "Geçersiz kod. Lütfen tekrar deneyin.",
     mfaExpired: "Doğrulama oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
+    mfaEnrollmentExpired:
+      "Kurulum oturumunuzun süresi doldu. Yeni bir QR kodu ve yeni kurtarma kodları almak için tekrar giriş yapın; daha önce gösterilenler çalışmayacak.",
     mfaEnrollmentHeading: "Devam etmek için iki faktörlü kimlik doğrulamayı ayarlayın",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",

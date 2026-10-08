@@ -5223,6 +5223,8 @@ export const en = {
     verifying: "Verifying...",
     mfaInvalidCode: "Invalid code. Please try again.",
     mfaExpired: "Your verification session expired. Please log in again.",
+    mfaEnrollmentExpired:
+      "Your setup session expired. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.",
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Your organization requires multi-factor authentication. Please set up MFA in your account settings.",

@@ -376,6 +376,8 @@ export function LoginPage() {
     setEnrollmentRecoveryCodes([]);
     setEnrollmentCode("");
     setError(message);
+    // The focused code input is about to unmount; don't let focus fall to <body>.
+    later(() => document.getElementById("username")?.focus(), 100);
   };
 
   const handleMfaComplete = async () => {
@@ -438,7 +440,9 @@ export function LoginPage() {
           t,
         );
         if (restart) {
-          restartLogin(message);
+          // A fresh login mints a new secret and new recovery codes, so the QR
+          // the user may already have scanned and the codes they saved are dead.
+          restartLogin(t.auth.mfaEnrollmentExpired);
           return;
         }
         setError(message);
@@ -592,7 +596,8 @@ export function LoginPage() {
                   value={enrollmentCode}
                   onChange={(e) => setEnrollmentCode(e.target.value.replace(/[^0-9]/g, ""))}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && enrollmentCode.length >= 6) handleEnrollComplete();
+                    if (e.key === "Enter" && !enrollmentLoading && enrollmentCode.length >= 6)
+                      handleEnrollComplete();
                   }}
                   className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -644,7 +649,7 @@ export function LoginPage() {
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, ""))}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && mfaCode.length >= 6) handleMfaComplete();
+                  if (e.key === "Enter" && !mfaLoading && mfaCode.length >= 6) handleMfaComplete();
                 }}
                 className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />
