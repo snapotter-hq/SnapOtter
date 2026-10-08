@@ -10,6 +10,7 @@
  * consumer pacing.
  */
 
+import { once } from "node:events";
 import { PassThrough } from "node:stream";
 import { SafeError } from "@snapotter/shared";
 import type { FastifyRequest } from "fastify";
@@ -93,6 +94,105 @@ describe("multipartParts", () => {
     ]);
     expect(sizes.file).toBe(256 * 1024);
     expect(sizes.mask).toBe(8 * 1024);
+  });
+
+  // #2156: a route that only reads some file parts (the effects route reads
+  // `backgroundImage` and nothing else) moves past the others. Busboy emits
+  // "finish" only after every file stream has ended, so an unread part left
+  // the iterator, and the request behind it, waiting forever.
+  describe("a file part the consumer doesn't read (#2156)", () => {
+    const HUNG = Symbol("hung");
+
+    /** Collect every part, or report HUNG if the iterator never finishes. */
+    async function collect(
+      request: FastifyRequest,
+      onFile: (part: { fieldname: string; file: NodeJS.ReadableStream }) => Promise<void>,
+      limits?: { fileSize?: number },
+    ): Promise<string[] | typeof HUNG> {
+      const seen: string[] = [];
+      const run = (async () => {
+        for await (const part of multipartParts(request, limits)) {
+          if (part.type === "file") {
+            seen.push(`file:${part.fieldname}`);
+            await onFile(part);
+          } else {
+            seen.push(`field:${part.fieldname}=${part.value}`);
+          }
+        }
+        return seen;
+      })();
+      const timeout = new Promise<typeof HUNG>((resolve) => setTimeout(() => resolve(HUNG), 2000));
+      return Promise.race([run, timeout]);
+    }
+
+    it("finishes when a stray file part is followed by a field", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "stray.png", content: Buffer.alloc(4 * 1024, 1) },
+        { name: "settings", content: "{}" },
+      ]);
+
+      const seen = await collect(fakeRequest(body), async () => {});
+
+      expect(seen).toEqual(["file:file", "field:settings={}"]);
+    });
+
+    it("finishes when the stray file part is empty", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "empty.png", content: "" },
+        { name: "settings", content: "{}" },
+      ]);
+
+      expect(await collect(fakeRequest(body), async () => {})).toEqual([
+        "file:file",
+        "field:settings={}",
+      ]);
+    });
+
+    it("finishes when a part was only partly read", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "big.bin", content: Buffer.alloc(512 * 1024, 2) },
+        { name: "settings", content: "{}" },
+      ]);
+
+      const seen = await collect(fakeRequest(body), async (part) => {
+        // Take the first chunk and leave the stream paused with the rest
+        // unread, as a reader that stopped early would.
+        await once(part.file, "readable");
+        part.file.read(1);
+        part.file.pause();
+      });
+
+      expect(seen).toEqual(["file:file", "field:settings={}"]);
+    });
+
+    it("still delivers a part that was read, byte for byte", async () => {
+      const body = multipartBody([
+        { name: "skipped", filename: "a.bin", content: Buffer.alloc(1024, 3) },
+        { name: "wanted", filename: "b.bin", content: Buffer.alloc(2048, 4) },
+      ]);
+      let wanted = 0;
+
+      const seen = await collect(fakeRequest(body), async (part) => {
+        if (part.fieldname === "wanted") wanted = (await drain(part.file)).length;
+      });
+
+      expect(seen).toEqual(["file:skipped", "file:wanted"]);
+      expect(wanted).toBe(2048);
+    });
+
+    it("answers 413 for an unread part that is over the size limit instead of hanging", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "huge.bin", content: Buffer.alloc(64 * 1024, 5) },
+        { name: "settings", content: "{}" },
+      ]);
+
+      const outcome = await collect(fakeRequest(body), async () => {}, { fileSize: 1024 }).catch(
+        (err: unknown) => err,
+      );
+
+      expect(outcome).not.toBe(HUNG);
+      expect(multipartFailure(outcome).status).toBe(413);
+    });
   });
 
   it("propagates malformed multipart as an error", async () => {

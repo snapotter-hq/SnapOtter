@@ -314,6 +314,34 @@ describe("Remove Background", () => {
     expect(result.error).toMatch(/invalid settings/i);
   });
 
+  // #2156: the route only reads a file part named backgroundImage. A part under
+  // any other name (the background image sent as `file`, the name every other
+  // tool uses) was skipped without being drained, and the request never ended.
+  it("effects route ignores a file part it doesn't read instead of hanging (#2156)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "background.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ filename: "test.png" }) },
+    ]);
+
+    const request = app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+    const hung = new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 10_000));
+    const res = await Promise.race([request, hung]);
+
+    expect(res).not.toBe("hung");
+    // Answered by the route's own settings check, so the settings field behind
+    // the stray part was read.
+    expect((res as Awaited<typeof request>).statusCode).toBe(400);
+    expect(JSON.parse((res as Awaited<typeof request>).body).error).toMatch(/invalid settings/i);
+  }, 20_000);
+
   // The route used to answer 422 for every failure to read the stored mask and
   // original, a missing object and a storage fault alike (#2119).
   async function effectsFor(settings: Record<string, unknown>) {
