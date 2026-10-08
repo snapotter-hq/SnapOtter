@@ -148,6 +148,28 @@ function rebakeSourceIntoCanvas(
   });
 }
 
+// Rebake for actions that commit the new canvas first and swap the bitmap in when it
+// is ready (trim, crop). A failure can't undo the canvas change, so say so loudly:
+// the console alone never reaches Sentry.
+function rebakeThenSetSource(
+  label: string,
+  rebake: Promise<string>,
+  set: (partial: { sourceImageUrl: string }) => void,
+): void {
+  rebake.then(
+    (newUrl) => set({ sourceImageUrl: newUrl }),
+    (err) => {
+      console.error(`${label} could not update the source image`, err);
+      void import("@/lib/analytics").then(({ captureHandledError }) =>
+        captureHandledError(
+          new Error(`${label} could not update the source image`, { cause: err }),
+          { error_class: "bug" },
+        ),
+      );
+    },
+  );
+}
+
 // Extended store state with additional fields/methods not yet in the shared interface
 interface EditorStateExtensions {
   canvasBackground: string;
@@ -724,7 +746,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       trimCanvas: () => {
-        const { objects, canvasSize } = get();
+        const { objects, canvasSize, sourceImageUrl } = get();
         if (objects.length === 0) return;
         let minX = canvasSize.width;
         let minY = canvasSize.height;
@@ -789,6 +811,23 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           minY === 0
         )
           return;
+        // The bitmap is drawn at canvas size, so it has to be cropped to the trimmed
+        // bounds too or it would squash into them (#2069).
+        if (sourceImageUrl) {
+          rebakeThenSetSource(
+            "Trim",
+            rebakeSourceIntoCanvas(
+              sourceImageUrl,
+              canvasSize.width,
+              canvasSize.height,
+              newWidth,
+              newHeight,
+              -minX,
+              -minY,
+            ),
+            set,
+          );
+        }
         set({
           canvasSize: { width: newWidth, height: newHeight },
           sourceImageSize: { width: newWidth, height: newHeight },
@@ -1291,26 +1330,27 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       setCropState: (state) => set({ cropState: state, isCropping: state !== null }),
 
       applyCrop: () => {
-        const { cropState, objects, sourceImageUrl } = get();
+        const { cropState, objects, sourceImageUrl, canvasSize } = get();
         if (!cropState) return;
 
-        // Crop the source image via an offscreen canvas
+        // Crop the source image via an offscreen canvas. The bitmap is drawn at canvas
+        // size (Image Size doesn't resample it), so draw it that big, not at natural size.
+        // Keep the pre-crop blob URL alive: it's in undo history and revoking it would
+        // break undo.
         if (sourceImageUrl) {
-          const img = new Image();
-          img.onload = () => {
-            const offscreen = document.createElement("canvas");
-            offscreen.width = cropState.width;
-            offscreen.height = cropState.height;
-            const ctx = offscreen.getContext("2d");
-            if (ctx) {
-              ctx.drawImage(img, -cropState.x, -cropState.y);
-              const croppedUrl = offscreen.toDataURL("image/png");
-              // Keep the pre-crop blob URL alive -- it's in undo history and revoking it
-              // would break undo (the restored source would fail to reload).
-              set({ sourceImageUrl: croppedUrl });
-            }
-          };
-          img.src = sourceImageUrl;
+          rebakeThenSetSource(
+            "Crop",
+            rebakeSourceIntoCanvas(
+              sourceImageUrl,
+              canvasSize.width,
+              canvasSize.height,
+              cropState.width,
+              cropState.height,
+              -cropState.x,
+              -cropState.y,
+            ),
+            set,
+          );
         }
 
         set({
