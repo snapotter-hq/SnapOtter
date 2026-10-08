@@ -86,6 +86,30 @@ describe("a successful change is never reported as a failure", () => {
     expect(screen.queryByText(en.changePassword.failedError)).toBeNull();
   });
 
+  it("offers the browser the stored username even when the welcome flag cannot be written", async () => {
+    storageFails.set = true;
+    storage.set("snapotter-username", "alice");
+    let offered = "";
+    submitSpy.mockImplementation(function (this: HTMLFormElement) {
+      offered = this.querySelector<HTMLInputElement>("input[name=username]")?.value ?? "";
+    });
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
+    expect(offered).toBe("alice");
+  });
+
+  it("keeps the button disabled once the change succeeded, so a second click cannot resend", async () => {
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: en.changePassword.changingButton })).toBeDisabled();
+  });
+
   it("falls back to a plain navigation when the save-password form cannot be submitted", async () => {
     answer(200, {});
     submitSpy.mockImplementation(() => {
@@ -129,6 +153,8 @@ describe("every broken rule is listed at once", () => {
     await fillAndSubmit("short");
 
     const alert = await screen.findByRole("alert");
+    // The list sits inside the alert region, not on it, so the items keep list semantics.
+    expect(alert.tagName).not.toBe("UL");
     const lines = Array.from(alert.querySelectorAll("li")).map((li) => li.textContent);
     expect(lines).toEqual([
       "Password must be at least 12 characters.",
