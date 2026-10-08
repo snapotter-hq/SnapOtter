@@ -1217,8 +1217,8 @@ describe("Admin user-management guards", () => {
     }
   });
 
-  // The strength rules mean "has an uppercase / lowercase letter / digit / non-alphanumeric
-  // character" in any script, not just ASCII (#1568).
+  // The strength rules count an uppercase or lowercase letter, a digit, or a character
+  // that isn't a letter, mark or number, in any script (#1568).
   it.each([
     ["a Cyrillic password with both cases", "Пароль-пароль1"],
     ["an Eastern Arabic digit", "Пароль\u0661\u0662\u0663"],
