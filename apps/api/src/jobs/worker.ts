@@ -96,7 +96,7 @@ import {
   runAiToolJob,
 } from "./ai-handlers.js";
 import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-progress.js";
-import { registerCancelable, unregisterCancelable } from "./cancel.js";
+import { registerCancelable, unregisterCancelable, wasUserCanceled } from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
@@ -547,9 +547,9 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       // A handler that never reads the signal can still finish after a user cancel
       // landed. Settle it as canceled before anything is written (#2092). A timeout
-      // abort is left alone: that result is finished and good, and throwing here
+      // abort alone is left be: that result is finished and good, and throwing here
       // would retry the whole job.
-      if (signal.aborted && signal.reason !== "timeout") throw new Error("Canceled");
+      if (wasUserCanceled(jobId)) throw new Error("Canceled");
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
@@ -598,7 +598,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         // Re-check just before the library overwrite, the one write a cancel is
         // most costly to lose to. A cancel landing during the save itself is not
         // covered (#2092).
-        if (signal.aborted && signal.reason !== "timeout") throw new Error("Canceled");
+        if (wasUserCanceled(jobId)) throw new Error("Canceled");
         savedFileId = await autoSaveToLibrary({
           fileId: data.fileId,
           saveMode: data.saveMode,
@@ -691,8 +691,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       return jobResult;
     } catch (err) {
       const durationMs = Date.now() - startTime;
-      const isTimeout = signal.aborted && signal.reason === "timeout";
-      const isCanceled = signal.aborted && !isTimeout;
+      // A user cancel wins over a deadline that fired first: abort() on an already
+      // aborted controller leaves the reason as "timeout".
+      const isCanceled = wasUserCanceled(jobId) || (signal.aborted && signal.reason !== "timeout");
+      const isTimeout = !isCanceled && signal.aborted && signal.reason === "timeout";
       const errorMessage = err instanceof Error ? err.message : String(err);
       const finalError = isCanceled
         ? "Canceled"

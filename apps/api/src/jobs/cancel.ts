@@ -34,6 +34,11 @@ import { bullPrefix, POOLS } from "./types.js";
 
 const cancelables = new Map<string, AbortController>();
 
+// Jobs a user asked to cancel. The abort signal can't carry this alone: once the
+// worker timeout has aborted the controller, a later cancel's abort() is a no-op
+// and the reason stays "timeout" (#2092).
+const userCanceled = new Set<string>();
+
 export function registerCancelable(jobId: string): AbortController {
   const ac = new AbortController();
   cancelables.set(jobId, ac);
@@ -42,6 +47,12 @@ export function registerCancelable(jobId: string): AbortController {
 
 export function unregisterCancelable(jobId: string): void {
   cancelables.delete(jobId);
+  userCanceled.delete(jobId);
+}
+
+/** True once a user cancel reached this worker for the job, whatever else aborted it. */
+export function wasUserCanceled(jobId: string): boolean {
+  return userCanceled.has(jobId);
 }
 
 // ── Pub/sub listener ────────────────────────────────────────────
@@ -59,6 +70,7 @@ export async function startCancelListener(): Promise<void> {
   subscriber.on("message", (_channel: string, message: string) => {
     const ac = cancelables.get(message);
     if (ac) {
+      userCanceled.add(message);
       ac.abort();
       cancelables.delete(message);
     }
