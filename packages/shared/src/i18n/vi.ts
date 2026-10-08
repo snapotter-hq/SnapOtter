@@ -2395,6 +2395,8 @@ export const vi: TranslationKeys = {
       faceAnalysisFailed: "Phân tích khuôn mặt thất bại",
       generationFailedWithStatus: "Tạo ảnh thất bại: {status}",
       photoGenerationFailed: "Tạo ảnh thất bại",
+      analysisExpired:
+        "Phân tích đã hết hạn nên ảnh đang được phân tích lại. Hãy tạo ảnh khi xong.",
     },
     "transcribe-audio": {
       language: "Ngôn ngữ",

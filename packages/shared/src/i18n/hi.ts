@@ -2205,6 +2205,8 @@ export const hi: TranslationKeys = {
       faceAnalysisFailed: "चेहरे का विश्लेषण विफल",
       generationFailedWithStatus: "जनरेशन विफल: {status}",
       photoGenerationFailed: "फोटो बनाना विफल",
+      analysisExpired:
+        "विश्लेषण की अवधि समाप्त हो गई, इसलिए फोटो का फिर से विश्लेषण हो रहा है। पूरा होने के बाद बनाएं।",
     },
     "transcribe-audio": {
       language: "भाषा",

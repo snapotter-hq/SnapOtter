@@ -2403,6 +2403,8 @@ export const ru: TranslationKeys = {
       faceAnalysisFailed: "Ошибка анализа лица",
       generationFailedWithStatus: "Ошибка создания: {status}",
       photoGenerationFailed: "Ошибка создания фото",
+      analysisExpired:
+        "Срок анализа истёк, поэтому фото анализируется заново. Создайте его, когда анализ завершится.",
     },
     "transcribe-audio": {
       language: "Язык",

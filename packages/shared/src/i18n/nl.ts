@@ -2409,6 +2409,8 @@ export const nl: TranslationKeys = {
       faceAnalysisFailed: "Gezichtsanalyse mislukt",
       generationFailedWithStatus: "Genereren mislukt: {status}",
       photoGenerationFailed: "Foto genereren mislukt",
+      analysisExpired:
+        "De analyse is verlopen, dus de foto wordt opnieuw geanalyseerd. Genereer zodra dat klaar is.",
     },
     "transcribe-audio": {
       language: "Taal",

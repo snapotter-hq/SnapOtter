@@ -2395,6 +2395,8 @@ export const id: TranslationKeys = {
       faceAnalysisFailed: "Analisis wajah gagal",
       generationFailedWithStatus: "Pembuatan gagal: {status}",
       photoGenerationFailed: "Pembuatan foto gagal",
+      analysisExpired:
+        "Analisis sudah kedaluwarsa, jadi foto sedang dianalisis ulang. Buat setelah selesai.",
     },
     "transcribe-audio": {
       language: "Bahasa",

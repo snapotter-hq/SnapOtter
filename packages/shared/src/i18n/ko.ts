@@ -2331,6 +2331,7 @@ export const ko: TranslationKeys = {
       faceAnalysisFailed: "얼굴 분석에 실패했습니다",
       generationFailedWithStatus: "생성에 실패했습니다: {status}",
       photoGenerationFailed: "사진 생성에 실패했습니다",
+      analysisExpired: "분석이 만료되어 사진을 다시 분석하고 있습니다. 완료되면 생성하세요.",
     },
     "transcribe-audio": {
       language: "언어",

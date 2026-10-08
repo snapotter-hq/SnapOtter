@@ -2139,6 +2139,7 @@ export const zhCN: TranslationKeys = {
       faceAnalysisFailed: "人脸分析失败",
       generationFailedWithStatus: "生成失败：{status}",
       photoGenerationFailed: "照片生成失败",
+      analysisExpired: "分析已过期，正在重新分析照片。完成后再生成。",
     },
     "transcribe-audio": {
       language: "语言",

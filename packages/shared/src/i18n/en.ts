@@ -2340,6 +2340,8 @@ export const en = {
       faceAnalysisFailed: "Face analysis failed",
       generationFailedWithStatus: "Generation failed: {status}",
       photoGenerationFailed: "Photo generation failed",
+      analysisExpired:
+        "The analysis expired, so the photo is being analyzed again. Generate once it's done.",
     },
     "transcribe-audio": {
       language: "Language",

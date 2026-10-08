@@ -28,7 +28,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { getObjectBuffer, isMissingObjectError, putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
@@ -432,11 +432,23 @@ export function registerPassportPhoto(app: FastifyInstance) {
         dpi: userDpi,
       };
 
+      // Read analyze's stored output outside the processing catch below, which
+      // answers 422 for anything. A missing object means the analysis expired
+      // and the client must re-run it (#1674); any other read failure is a
+      // storage fault and belongs to the error handler and Sentry.
+      const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+      let bgRemovedBuffer: Buffer;
       try {
-        const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+        bgRemovedBuffer = await getObjectBuffer(`outputs/${jobId}/${bgRemovedFilename}`);
+      } catch (err) {
+        if (!isMissingObjectError(err)) throw err;
+        return reply.status(410).send({
+          error: "This photo's analysis has expired. Analyze it again, then generate.",
+          code: "ANALYSIS_EXPIRED",
+        });
+      }
 
-        const bgRemovedBuffer = await getObjectBuffer(`outputs/${jobId}/${bgRemovedFilename}`);
-
+      try {
         // Use actual bg-removed image dimensions for crop (may differ from
         // the original image dimensions reported by the analyze endpoint).
         const bgMeta = await sharp(bgRemovedBuffer).metadata();

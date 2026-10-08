@@ -2396,6 +2396,7 @@ export const sv: TranslationKeys = {
       faceAnalysisFailed: "Ansiktsanalysen misslyckades",
       generationFailedWithStatus: "Genereringen misslyckades: {status}",
       photoGenerationFailed: "Fotogenereringen misslyckades",
+      analysisExpired: "Analysen har gått ut, så fotot analyseras igen. Generera när den är klar.",
     },
     "transcribe-audio": {
       language: "Språk",

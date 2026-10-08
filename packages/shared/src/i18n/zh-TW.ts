@@ -2138,6 +2138,7 @@ export const zhTW: TranslationKeys = {
       faceAnalysisFailed: "臉部分析失敗",
       generationFailedWithStatus: "產生失敗：{status}",
       photoGenerationFailed: "相片產生失敗",
+      analysisExpired: "分析已過期，正在重新分析相片。完成後再產生。",
     },
     "transcribe-audio": {
       language: "語言",

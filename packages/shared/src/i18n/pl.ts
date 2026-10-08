@@ -2403,6 +2403,8 @@ export const pl: TranslationKeys = {
       faceAnalysisFailed: "Analiza twarzy nie powiodła się",
       generationFailedWithStatus: "Generowanie nie powiodło się: {status}",
       photoGenerationFailed: "Generowanie zdjęcia nie powiodło się",
+      analysisExpired:
+        "Analiza wygasła, więc zdjęcie jest analizowane ponownie. Wygeneruj je, gdy się zakończy.",
     },
     "transcribe-audio": {
       language: "Język",

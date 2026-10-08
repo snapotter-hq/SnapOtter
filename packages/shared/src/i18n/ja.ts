@@ -2354,6 +2354,8 @@ export const ja: TranslationKeys = {
       faceAnalysisFailed: "顔の分析に失敗しました",
       generationFailedWithStatus: "生成に失敗しました：{status}",
       photoGenerationFailed: "写真の生成に失敗しました",
+      analysisExpired:
+        "解析の有効期限が切れたため、写真を再解析しています。完了したら生成してください。",
     },
     "transcribe-audio": {
       language: "言語",

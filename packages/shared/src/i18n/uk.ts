@@ -2404,6 +2404,8 @@ export const uk: TranslationKeys = {
       faceAnalysisFailed: "Аналіз обличчя не вдався",
       generationFailedWithStatus: "Створення не вдалося: {status}",
       photoGenerationFailed: "Не вдалося створити фото",
+      analysisExpired:
+        "Термін аналізу минув, тому фото аналізується знову. Створіть його, коли аналіз завершиться.",
     },
     "transcribe-audio": {
       language: "Мова",

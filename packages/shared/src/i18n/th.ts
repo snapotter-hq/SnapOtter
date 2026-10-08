@@ -2357,6 +2357,7 @@ export const th: TranslationKeys = {
       faceAnalysisFailed: "วิเคราะห์ใบหน้าล้มเหลว",
       generationFailedWithStatus: "สร้างล้มเหลว: {status}",
       photoGenerationFailed: "สร้างรูปถ่ายล้มเหลว",
+      analysisExpired: "การวิเคราะห์หมดอายุแล้ว จึงกำลังวิเคราะห์รูปถ่ายใหม่ สร้างได้เมื่อเสร็จ",
     },
     "transcribe-audio": {
       language: "ภาษา",

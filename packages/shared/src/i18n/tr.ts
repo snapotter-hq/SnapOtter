@@ -2402,6 +2402,8 @@ export const tr: TranslationKeys = {
       faceAnalysisFailed: "Yüz analizi başarısız oldu",
       generationFailedWithStatus: "Oluşturma başarısız oldu: {status}",
       photoGenerationFailed: "Fotoğraf oluşturma başarısız oldu",
+      analysisExpired:
+        "Analizin süresi doldu, bu yüzden fotoğraf yeniden analiz ediliyor. Bittiğinde oluşturun.",
     },
     "transcribe-audio": {
       language: "Dil",

@@ -2404,6 +2404,8 @@ export const ptBR: TranslationKeys = {
       faceAnalysisFailed: "Falha na análise facial",
       generationFailedWithStatus: "Falha na geração: {status}",
       photoGenerationFailed: "Falha ao gerar a foto",
+      analysisExpired:
+        "A análise expirou, então a foto está sendo analisada de novo. Gere quando terminar.",
     },
     "transcribe-audio": {
       language: "Idioma",

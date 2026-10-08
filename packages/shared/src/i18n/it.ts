@@ -2404,6 +2404,8 @@ export const it: TranslationKeys = {
       faceAnalysisFailed: "Analisi del volto non riuscita",
       generationFailedWithStatus: "Generazione non riuscita: {status}",
       photoGenerationFailed: "Generazione della foto non riuscita",
+      analysisExpired:
+        "L'analisi è scaduta, quindi la foto viene analizzata di nuovo. Generala quando ha finito.",
     },
     "transcribe-audio": {
       language: "Lingua",

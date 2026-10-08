@@ -2413,6 +2413,8 @@ export const de: TranslationKeys = {
       faceAnalysisFailed: "Gesichtsanalyse fehlgeschlagen",
       generationFailedWithStatus: "Erstellung fehlgeschlagen: {status}",
       photoGenerationFailed: "Fotoerstellung fehlgeschlagen",
+      analysisExpired:
+        "Die Analyse ist abgelaufen, daher wird das Foto erneut analysiert. Erstelle es, sobald das erledigt ist.",
     },
     "transcribe-audio": {
       language: "Sprache",

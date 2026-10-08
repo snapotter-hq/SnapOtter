@@ -2392,6 +2392,8 @@ export const es: TranslationKeys = {
       faceAnalysisFailed: "Error en el análisis facial",
       generationFailedWithStatus: "Error en la generación: {status}",
       photoGenerationFailed: "Error al generar la foto",
+      analysisExpired:
+        "El análisis caducó, así que la foto se está analizando de nuevo. Genérala cuando termine.",
     },
     "transcribe-audio": {
       language: "Idioma",

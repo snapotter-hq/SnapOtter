@@ -2375,6 +2375,7 @@ export const ar: TranslationKeys = {
       faceAnalysisFailed: "فشل تحليل الوجه",
       generationFailedWithStatus: "فشل الإنشاء: {status}",
       photoGenerationFailed: "فشل إنشاء الصورة",
+      analysisExpired: "انتهت صلاحية التحليل، لذا يُعاد تحليل الصورة الآن. أنشئ الصورة بعد اكتماله.",
     },
     "transcribe-audio": {
       language: "اللغة",
