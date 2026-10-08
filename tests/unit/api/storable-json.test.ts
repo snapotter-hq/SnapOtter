@@ -68,7 +68,19 @@ describe("toStorableJson", () => {
 
     expect(Object.keys(out).sort()).toEqual(["__proto__", "scale"]);
     expect(out.polluted).toBeUndefined();
-    expect(Object.getPrototypeOf(out)).toBeNull();
+    // A normal object: drizzle reads .constructor on what it serializes.
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(JSON.parse(JSON.stringify(out))).toEqual({
+      ["__proto__"]: { polluted: true },
+      scale: "log",
+    });
+  });
+
+  it("returns objects that read .constructor like any other", () => {
+    const out = toStorableJson({ a: { b: 1 } });
+
+    expect(out.constructor).toBe(Object);
+    expect(out.a.constructor).toBe(Object);
   });
 
   it("keeps the last value when keys collapse to the same text", () => {

@@ -20,9 +20,18 @@ export function toStorableJson<T>(value: T): T {
   if (typeof value === "string") return toStorableString(value) as T;
   if (Array.isArray(value)) return value.map(toStorableJson) as T;
   if (value && typeof value === "object") {
-    // No prototype, so a "__proto__" key is stored as a key, not set as one.
-    const out: Record<string, unknown> = Object.create(null);
-    for (const [k, v] of Object.entries(value)) out[toStorableString(k)] = toStorableJson(v);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      // defineProperty, not assignment, so a "__proto__" key is stored as a key
+      // instead of setting the copy's prototype. The object keeps Object.prototype:
+      // drizzle reads .constructor on what it serializes.
+      Object.defineProperty(out, toStorableString(k), {
+        value: toStorableJson(v),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
     return out as T;
   }
   return value;
