@@ -6,6 +6,13 @@ import type { CategoryInfo, SocialMediaPreset, Tool } from "./types.js";
 
 export const PDF_MULTI_TOOL_LIMITS = { documents: 20, outputPages: 1200 } as const;
 
+/**
+ * Largest width or height, in pixels, the resize-style tools accept. The API schemas
+ * enforce it (through image-engine, which re-exports it) and the settings panels
+ * bound their inputs with it, so a panel can't offer a value the server rejects.
+ */
+export const MAX_RESIZE_OUTPUT_DIMENSION = 16383;
+
 export const CATEGORIES: CategoryInfo[] = [
   // Image
   { id: "essentials", name: "Essentials", icon: "Layers", color: "#3B82F6" },

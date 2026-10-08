@@ -1,3 +1,4 @@
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -25,6 +26,15 @@ const FORMAT_LABELS: Record<WebFormat, string> = {
   png: "PNG",
   jxl: "JXL",
 };
+
+// The API rejects a max width or height above the ceiling (#1185), so stop the value at
+// the input. An empty or partly typed box is left alone.
+function clampDimension(raw: string): string {
+  const value = Number(raw);
+  return raw !== "" && value > MAX_RESIZE_OUTPUT_DIMENSION
+    ? String(MAX_RESIZE_OUTPUT_DIMENSION)
+    : raw;
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -275,8 +285,9 @@ export function OptimizeForWebSettings() {
                 id="max-width"
                 type="number"
                 value={maxWidth}
-                onChange={(e) => setMaxWidth(e.target.value)}
+                onChange={(e) => setMaxWidth(clampDimension(e.target.value))}
                 min={1}
+                max={MAX_RESIZE_OUTPUT_DIMENSION}
                 placeholder="px"
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
@@ -289,8 +300,9 @@ export function OptimizeForWebSettings() {
                 id="max-height"
                 type="number"
                 value={maxHeight}
-                onChange={(e) => setMaxHeight(e.target.value)}
+                onChange={(e) => setMaxHeight(clampDimension(e.target.value))}
                 min={1}
+                max={MAX_RESIZE_OUTPUT_DIMENSION}
                 placeholder="px"
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
