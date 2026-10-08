@@ -17,6 +17,8 @@ const getObjectBuffer = vi.fn();
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
   putObject: (...args: unknown[]) => putObject(...args),
   getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
+  // The local-backend rule; the integration suite exercises the real one.
+  isMissingObjectError: (err: unknown) => (err as NodeJS.ErrnoException)?.code === "ENOENT",
 }));
 
 vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
@@ -258,6 +260,42 @@ describe("json-bodied routes", () => {
       expect(c.fail).toHaveBeenCalled();
     });
   }
+
+  // #1674: the read of analyze's stored output used to sit in the same 422
+  // catch-all, and storage clients throw raw errors with no statusCode.
+  it("passport-photo generate lets a raw storage error on its read reach the error handler", async () => {
+    getObjectBuffer.mockImplementation(async () => {
+      throw Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+        name: "TimeoutError",
+      });
+    });
+    app = await buildApp(registerPassportPhoto);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+    });
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error).toBe("Internal server error");
+    expect(putObject).not.toHaveBeenCalled();
+  });
+
+  it("passport-photo generate answers 410 ANALYSIS_EXPIRED when the stored output is missing", async () => {
+    getObjectBuffer.mockImplementation(async () => {
+      throw Object.assign(new Error("ENOENT: no such file or directory, open '/data/x'"), {
+        code: "ENOENT",
+      });
+    });
+    app = await buildApp(registerPassportPhoto);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+    });
+    expect(res.statusCode).toBe(410);
+    expect(res.json().code).toBe("ANALYSIS_EXPIRED");
+    expect(res.body).not.toContain("/data/x");
+  });
 
   it("html-to-image answers a storage fault that mentions a timeout as storage, not a slow page", async () => {
     putObject.mockImplementation(async () => {
