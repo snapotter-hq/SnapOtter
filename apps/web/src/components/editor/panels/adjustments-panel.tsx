@@ -4,9 +4,8 @@ import { Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasCurvesAdjustments, hasLevelsAdjustments } from "@/components/editor/adjustment-lut";
 import { SliderRow } from "@/components/editor/common/slider-row";
-import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { HistogramPanel } from "@/components/editor/panels/histogram-panel";
-import { captureDocumentCanvas } from "@/components/editor/stage-capture";
+import { useDocumentHistogram } from "@/components/editor/panels/use-document-histogram";
 import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
@@ -1039,35 +1038,8 @@ export function AdjustmentsPanel() {
   const adjustments = useEditorStore((s) => s.adjustments);
   const filters = useEditorStore((s) => s.filters);
   const resetAdjustments = useEditorStore((s) => s.resetAdjustments);
-  const canvasSize = useEditorStore((s) => s.canvasSize);
-  // Recompute the histogram whenever the committed document changes (paint, delete,
-  // adjustments, filters, levels, curves all bump this) so it never shows stale data.
-  const historyVersion = useEditorStore((s) => s._historyVersion);
-
-  // Capture imageData from the Konva stage for the histogram
-  const [histogramData, setHistogramData] = useState<ImageData | null>(null);
-
-  // historyVersion is an intentional dep: it changes on every committed edit and forces a
-  // fresh capture of the rendered stage even though the effect body doesn't read it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: see note above
-  useEffect(() => {
-    function captureImageData() {
-      const stage = editorStageRefHolder.current;
-      if (!stage) return;
-      try {
-        const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        setHistogramData(data);
-      } catch {
-        // Stage may not be ready yet
-      }
-    }
-
-    const timer = setTimeout(captureImageData, 100);
-    return () => clearTimeout(timer);
-  }, [canvasSize, historyVersion]);
+  // The rendered document's pixels for the histogram, recaptured after every edit.
+  const { imageData: histogramData, unavailable: histogramUnavailable } = useDocumentHistogram();
 
   const levels = useEditorStore((s) => s.levels);
   const curves = useEditorStore((s) => s.curves);
@@ -1104,6 +1076,13 @@ export function AdjustmentsPanel() {
     <div className="flex flex-col gap-2 text-sm">
       {/* Histogram */}
       <HistogramPanel imageData={histogramData} />
+      {histogramUnavailable && (
+        <p role="status" className="text-xs text-muted-foreground">
+          {histogramUnavailable === "tainted"
+            ? t.editor.ui.captureFailure.crossOriginBlocked
+            : t.editor.ui.captureFailure.noCanvasMemory}
+        </p>
+      )}
 
       {/* Auto Adjustments */}
       <SectionHeader title={t.editor.panels.adjustments.auto} />

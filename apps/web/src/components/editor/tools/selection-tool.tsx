@@ -1,9 +1,10 @@
 import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Circle, Ellipse, Group, Line, Rect, Shape } from "react-konva";
+import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import type { SelectionMode, SelectionState } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import { captureDocumentContext, readDocumentPixels, reportCaptureFailure } from "../stage-capture";
 
 type SelectionType = "rect" | "ellipse" | "lasso";
 
@@ -340,6 +341,7 @@ export function useSelectionTool(): SelectionToolApi {
 
   const activeTool = useEditorStore((s) => s.activeTool);
   const selectionMode = useEditorStore((s) => s.selectionMode);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const setSelection = useEditorStore((s) => s.setSelection);
   const canvasSize = useEditorStore((s) => s.canvasSize);
@@ -702,11 +704,20 @@ export function useSelectionTool(): SelectionToolApi {
 
   const magicWandSelect = useCallback(
     (stage: Konva.Stage, x: number, y: number, tolerance: number, contiguous: boolean) => {
-      // Capture the document at document resolution, ignoring zoom/pan.
-      const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const imageData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+      // Capture the document at document resolution, ignoring zoom/pan. A capture
+      // that can't be read selects nothing and says why, rather than flood-filling
+      // the zeros of a dead canvas into a whole-document selection (#2139).
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
+      const pixels = readDocumentPixels(capture.ctx, canvasSize.width, canvasSize.height);
+      if (!pixels.ok) {
+        reportCaptureFailure(pixels.reason, captureMessages);
+        return;
+      }
+      const imageData = pixels.imageData;
       const mask = floodFillMask(imageData, x, y, tolerance, contiguous);
       const bounds = maskToBounds(mask);
       if (!bounds) return;
@@ -721,7 +732,7 @@ export function useSelectionTool(): SelectionToolApi {
 
       mergeSelection({ type: "wand", points: [], bounds, mask: flatMask }, selectionMode);
     },
-    [selectionMode, mergeSelection, canvasSize],
+    [selectionMode, mergeSelection, canvasSize, captureMessages],
   );
 
   return {

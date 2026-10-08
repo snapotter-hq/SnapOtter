@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { captureDocumentContext } from "../../../apps/web/src/components/editor/stage-capture";
+import {
+  captureDocumentContext,
+  readDocumentPixels,
+} from "../../../apps/web/src/components/editor/stage-capture";
 
 type Stage = Parameters<typeof captureDocumentContext>[0];
 
@@ -109,5 +112,47 @@ describe("captureDocumentContext", () => {
     expect(() => captureDocumentContext(stage, 200, 150)).toThrow();
     expect(stage.size).toHaveBeenLastCalledWith({ width: 800, height: 600 });
     expect(stage.position).toHaveBeenLastCalledWith({ x: 10, y: 20 });
+  });
+});
+
+describe("readDocumentPixels", () => {
+  const ctxOf = (getImageData: () => unknown) =>
+    ({ getImageData }) as unknown as CanvasRenderingContext2D;
+
+  it("hands back the whole document's pixels", () => {
+    const imageData = { data: new Uint8ClampedArray(16) };
+    const result = readDocumentPixels(
+      ctxOf(() => imageData),
+      2,
+      2,
+    );
+    expect(result).toEqual({ ok: true, imageData });
+  });
+
+  it.each([
+    ["a RangeError", new RangeError("Out of memory at ImageData creation")],
+    ["IndexSizeError", new DOMException("empty", "IndexSizeError")],
+    ["NS_ERROR_FAILURE", new Error("NS_ERROR_FAILURE")],
+  ])("reports no-context when the full read fails with %s", (_label, error) => {
+    const result = readDocumentPixels(
+      ctxOf(() => {
+        throw error;
+      }),
+      2,
+      2,
+    );
+    expect(result).toEqual({ ok: false, reason: "no-context" });
+  });
+
+  it("lets an error that isn't about canvas size propagate", () => {
+    expect(() =>
+      readDocumentPixels(
+        ctxOf(() => {
+          throw new TypeError("not a size problem");
+        }),
+        2,
+        2,
+      ),
+    ).toThrow("not a size problem");
   });
 });

@@ -100,6 +100,29 @@ function isCanvasSizeError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("NS_ERROR_FAILURE");
 }
 
+export type DocumentPixels =
+  | { ok: true; imageData: ImageData }
+  | { ok: false; reason: CaptureFailure };
+
+/**
+ * Read the whole captured document, or say why not. captureDocumentContext only
+ * probes one pixel, so a canvas the browser backed but can't read back at full
+ * size (a RangeError, or NS_ERROR_FAILURE in Firefox) passes it and fails here.
+ * That is a size failure like any other: `no-context`. Anything else propagates.
+ */
+export function readDocumentPixels(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): DocumentPixels {
+  try {
+    return { ok: true, imageData: ctx.getImageData(0, 0, width, height) };
+  } catch (err) {
+    if (isCanvasSizeError(err)) return { ok: false, reason: "no-context" };
+    throw err;
+  }
+}
+
 /**
  * Capture the document and hand back a 2D context whose pixels the caller may
  * read, or say why not. The pixel tools used to bail out of the mouse handler on a
