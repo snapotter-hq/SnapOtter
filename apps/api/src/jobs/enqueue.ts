@@ -12,6 +12,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { toStorableJson } from "../lib/storable-json.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -19,23 +20,6 @@ import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } fro
 // ── QueueEvents (one per pool, lazy) ────────────────────────────
 
 const queueEventsMap = new Map<Pool, QueueEvents>();
-
-/**
- * Recursively strip NUL (U+0000) bytes from a value. Postgres rejects NUL in
- * text/jsonb ("invalid byte sequence for encoding UTF8: 0x00"), so a tool whose
- * settings contain a NUL (e.g. a fuzzed string field) would 500 on the jobs
- * insert. NUL is never meaningful in tool settings, so drop it.
- */
-function stripNulBytes<T>(value: T): T {
-  if (typeof value === "string") return value.replace(/\0/g, "") as T;
-  if (Array.isArray(value)) return value.map(stripNulBytes) as T;
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = stripNulBytes(v);
-    return out as T;
-  }
-  return value;
-}
 
 /** Delay before a stopped consumer loop is started again. */
 const QUEUE_EVENTS_RESTART_DELAY_MS = 1000;
@@ -276,7 +260,7 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
     type: data.kind,
     status: "queued",
     inputRefs: data.inputRefs,
-    settings: stripNulBytes((data.dbSettings ?? data.settings) as Record<string, unknown>),
+    settings: toStorableJson((data.dbSettings ?? data.settings) as Record<string, unknown>),
   });
 
   // Client-facing SSE alias row (#808), re-stamped here as the catch-all
