@@ -44,6 +44,8 @@ vi.mock("qr-code-styling", () => ({
 
 import { PeopleSection } from "@/components/settings/settings-dialog";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { ApiError } from "@/lib/api";
+import { format } from "@/lib/format";
 
 let settingsRead: () => Promise<{ settings: Record<string, string> }>;
 
@@ -73,7 +75,7 @@ afterEach(() => {
   for (const mock of [apiGet, apiPost, apiPut, apiDelete, useAuth]) mock.mockReset();
 });
 
-async function generate() {
+async function openAddForm() {
   render(
     <I18nProvider>
       <PeopleSection />
@@ -82,9 +84,15 @@ async function generate() {
   fireEvent.click(await screen.findByRole("button", { name: en.settings.people.addMembersButton }));
   // Let the policy read that ran on mount settle before Generate uses it.
   await act(async () => {});
-  fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
-  const input = screen.getByPlaceholderText(en.auth.password) as HTMLInputElement;
-  return { input };
+}
+
+const generateButton = () => screen.getByRole("button", { name: en.changePassword.generateButton });
+const passwordInput = () => screen.getByPlaceholderText(en.auth.password) as HTMLInputElement;
+
+async function generate() {
+  await openAddForm();
+  fireEvent.click(generateButton());
+  return { input: passwordInput() };
 }
 
 describe("Add user: Generate password", () => {
@@ -101,10 +109,67 @@ describe("Add user: Generate password", () => {
   });
 
   it("falls back to the default length when the policy cannot be read", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     settingsRead = async () => {
-      throw new Error("403");
+      throw new Error("503");
     };
     const { input } = await generate();
     await waitFor(() => expect(input.value).toHaveLength(20));
+  });
+
+  it("falls back to the default length when the settings map leaves the key out", async () => {
+    // An admin with settings:read but not security:manage gets a 200 without it.
+    settingsRead = async () => ({ settings: { maxUsers: "5" } });
+    const { input } = await generate();
+    await waitFor(() => expect(input.value).toHaveLength(20));
+  });
+
+  it("learns the minimum from the server's refusal when the policy read gave nothing", async () => {
+    settingsRead = async () => ({ settings: {} });
+    apiPost.mockRejectedValueOnce(
+      new ApiError("refused", 400, "VALIDATION_ERROR", {
+        code: "VALIDATION_ERROR",
+        rule: "minLength",
+        rules: ["minLength"],
+        minLength: 24,
+      }),
+    );
+    await openAddForm();
+    fireEvent.change(screen.getByPlaceholderText(en.settings.people.usernamePlaceholder), {
+      target: { value: "grace" },
+    });
+    fireEvent.click(generateButton());
+    expect(passwordInput().value).toHaveLength(20);
+
+    fireEvent.click(screen.getByRole("button", { name: en.common.create }));
+    expect(
+      await screen.findByText(format(en.errors.passwordTooShort, { minLength: 24 })),
+    ).toBeInTheDocument();
+
+    fireEvent.click(generateButton());
+    expect(passwordInput().value).toHaveLength(24);
+  });
+});
+
+describe("Add user: a failed policy read", () => {
+  const policyWarning = "Password policy read failed; Generate uses the default length";
+
+  it("is quiet for a 403, the expected answer without access", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    settingsRead = async () => {
+      throw new ApiError("forbidden", 403, "FORBIDDEN", { code: "FORBIDDEN" });
+    };
+    await openAddForm();
+    expect(warn).not.toHaveBeenCalledWith(policyWarning, expect.anything());
+  });
+
+  it("is logged for anything else", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failure = new ApiError("down", 500, undefined, { error: "down" });
+    settingsRead = async () => {
+      throw failure;
+    };
+    await openAddForm();
+    expect(warn).toHaveBeenCalledWith(policyWarning, failure);
   });
 });

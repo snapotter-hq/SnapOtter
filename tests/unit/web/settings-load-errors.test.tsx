@@ -236,7 +236,7 @@ describe("People (#1447)", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("reloads the pickers too on Retry", async () => {
+  it("reloads the pickers and the password policy too on Retry", async () => {
     serve(cases[0].data, ["/auth/users", "/v1/teams", "/v1/roles"]);
     render(<PeopleSection />);
     const retry = await screen.findByRole("button", { name: en.common.retry });
@@ -246,7 +246,9 @@ describe("People (#1447)", () => {
     await screen.findByText("ada");
 
     const paths = apiGet.mock.calls.map(([path]) => path as string);
-    for (const endpoint of ["/auth/users", "/v1/teams", "/v1/roles"]) {
+    // /v1/settings feeds Generate's minimum length (#2027); the helper has no
+    // answer for it, which the section tolerates.
+    for (const endpoint of ["/auth/users", "/v1/teams", "/v1/roles", "/v1/settings"]) {
       expect(paths.filter((p) => p.startsWith(endpoint)).length, endpoint).toBe(2);
     }
   });
