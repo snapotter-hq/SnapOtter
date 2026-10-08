@@ -4729,6 +4729,14 @@ export const sv: TranslationKeys = {
         original: "Original: {width} x {height} px",
         note: "Skalar alla objekt proportionellt till de nya måtten.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Den här bilden är för stor för att webbläsaren ska kunna redigera den med det här verktyget. Prova en mindre dukstorlek.",
+        crossOriginBlocked:
+          "Redigeraren kan inte läsa pixlarna i en bild som lästs in från en annan webbplats. Ladda ned bilden och öppna filen.",
+        sourceImageFailed:
+          "Det gick inte att läsa in bilden. Om den ligger på en annan webbplats måste den webbplatsen tillåta åtkomst mellan ursprung.",
+      },
       exportDialog: {
         heading: "Exportera bild",
         previewAlt: "Förhandsvisning av export",

@@ -4736,6 +4736,14 @@ export const tr: TranslationKeys = {
         original: "Orijinal: {width} x {height} px",
         note: "Tüm nesneleri yeni boyutlara orantılı olarak ölçekler.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Bu görsel, tarayıcının bu araçla düzenleyemeyeceği kadar büyük. Daha küçük bir tuval boyutu deneyin.",
+        crossOriginBlocked:
+          "Düzenleyici, başka bir siteden yüklenen görselin piksellerini okuyamıyor. Görseli indirip dosyayı açın.",
+        sourceImageFailed:
+          "Görsel yüklenemedi. Başka bir sitede barındırılıyorsa o sitenin çapraz kaynak erişimine izin vermesi gerekir.",
+      },
       exportDialog: {
         heading: "Görüntüyü Dışa Aktar",
         previewAlt: "Dışa aktarma önizlemesi",

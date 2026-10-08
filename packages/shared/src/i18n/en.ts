@@ -4666,6 +4666,14 @@ export const en = {
         original: "Original: {width} x {height} px",
         note: "Scales all objects proportionally to the new dimensions.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "This image is too big for your browser to edit with this tool. Try a smaller canvas size.",
+        crossOriginBlocked:
+          "The editor can't read pixels from an image loaded from another site. Download it and open the file instead.",
+        sourceImageFailed:
+          "Couldn't load the image. If it's hosted on another site, that site needs to allow cross-origin access.",
+      },
       exportDialog: {
         heading: "Export Image",
         previewAlt: "Export preview",

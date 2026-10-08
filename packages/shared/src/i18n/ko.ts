@@ -4660,6 +4660,14 @@ export const ko: TranslationKeys = {
         original: "원본: {width} x {height} px",
         note: "모든 객체를 새 크기에 맞춰 비율대로 조정합니다.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "이 이미지는 너무 커서 브라우저에서 이 도구로 편집할 수 없습니다. 캔버스 크기를 줄여 보세요.",
+        crossOriginBlocked:
+          "편집기가 다른 사이트에서 불러온 이미지의 픽셀을 읽을 수 없습니다. 이미지를 내려받아 파일을 여세요.",
+        sourceImageFailed:
+          "이미지를 불러오지 못했습니다. 다른 사이트에 호스팅된 이미지라면 그 사이트가 교차 출처 접근을 허용해야 합니다.",
+      },
       exportDialog: {
         heading: "이미지 내보내기",
         previewAlt: "내보내기 미리보기",

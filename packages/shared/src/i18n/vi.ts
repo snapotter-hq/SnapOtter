@@ -4725,6 +4725,14 @@ export const vi: TranslationKeys = {
         original: "Gốc: {width} x {height} px",
         note: "Thu phóng mọi đối tượng theo tỷ lệ với kích thước mới.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Ảnh này quá lớn để trình duyệt chỉnh sửa bằng công cụ này. Hãy thử kích thước khung vẽ nhỏ hơn.",
+        crossOriginBlocked:
+          "Trình chỉnh sửa không đọc được điểm ảnh của ảnh tải từ trang web khác. Hãy tải ảnh xuống rồi mở tệp.",
+        sourceImageFailed:
+          "Không thể tải ảnh. Nếu ảnh được lưu trữ trên trang web khác, trang đó phải cho phép truy cập chéo nguồn gốc.",
+      },
       exportDialog: {
         heading: "Xuất hình ảnh",
         previewAlt: "Xem trước bản xuất",

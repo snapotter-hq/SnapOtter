@@ -4756,6 +4756,14 @@ export const de: TranslationKeys = {
         original: "Original: {width} x {height} px",
         note: "Skaliert alle Objekte proportional auf die neuen Abmessungen.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Dieses Bild ist zu groß, um es im Browser mit diesem Werkzeug zu bearbeiten. Eine kleinere Leinwandgröße könnte helfen.",
+        crossOriginBlocked:
+          "Der Editor kann die Pixel eines Bilds von einer anderen Website nicht lesen. Das Bild herunterladen und stattdessen die Datei öffnen.",
+        sourceImageFailed:
+          "Das Bild konnte nicht geladen werden. Liegt es auf einer anderen Website, muss diese den Zugriff von anderen Ursprüngen erlauben.",
+      },
       exportDialog: {
         heading: "Bild exportieren",
         previewAlt: "Exportvorschau",

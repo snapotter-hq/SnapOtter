@@ -4730,6 +4730,14 @@ export const id: TranslationKeys = {
         original: "Asli: {width} x {height} px",
         note: "Menskalakan semua objek secara proporsional ke dimensi baru.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Gambar ini terlalu besar untuk diedit di browser dengan alat ini. Coba ukuran kanvas yang lebih kecil.",
+        crossOriginBlocked:
+          "Editor tidak dapat membaca piksel dari gambar yang dimuat dari situs lain. Unduh gambarnya, lalu buka filenya.",
+        sourceImageFailed:
+          "Gambar tidak dapat dimuat. Jika gambar dihosting di situs lain, situs itu harus mengizinkan akses lintas asal.",
+      },
       exportDialog: {
         heading: "Ekspor Gambar",
         previewAlt: "Pratinjau ekspor",

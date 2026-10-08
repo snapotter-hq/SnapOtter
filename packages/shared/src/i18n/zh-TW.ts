@@ -4455,6 +4455,12 @@ export const zhTW: TranslationKeys = {
         original: "原始：{width} x {height} px",
         note: "所有物件都會依比例縮放至新的尺寸。",
       },
+      captureFailure: {
+        noCanvasMemory: "這張圖片太大，瀏覽器無法用此工具編輯。請嘗試較小的畫布大小。",
+        crossOriginBlocked:
+          "編輯器無法讀取從其他網站載入的圖片的像素。請先下載圖片，再開啟該檔案。",
+        sourceImageFailed: "無法載入圖片。如果圖片託管在其他網站，該網站需要允許跨來源存取。",
+      },
       exportDialog: {
         heading: "匯出影像",
         previewAlt: "匯出預覽",

@@ -4738,6 +4738,14 @@ export const pl: TranslationKeys = {
         original: "Oryginał: {width} x {height} px",
         note: "Skaluje wszystkie obiekty proporcjonalnie do nowych wymiarów.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Ten obraz jest zbyt duży, aby przeglądarka mogła go edytować tym narzędziem. Spróbuj użyć mniejszego rozmiaru płótna.",
+        crossOriginBlocked:
+          "Edytor nie może odczytać pikseli obrazu załadowanego z innej witryny. Pobierz obraz i otwórz plik.",
+        sourceImageFailed:
+          "Nie udało się wczytać obrazu. Jeśli jest hostowany w innej witrynie, ta witryna musi zezwalać na dostęp między źródłami.",
+      },
       exportDialog: {
         heading: "Eksportuj obraz",
         previewAlt: "Podgląd eksportu",

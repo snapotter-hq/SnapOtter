@@ -2,10 +2,11 @@
 
 import type Konva from "konva";
 import { useCallback, useRef } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, ToolType } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import { captureDocumentContext, reportCaptureFailure } from "../stage-capture";
 
 const DODGE_BURN_TOOLS = new Set<ToolType>(["dodge", "burn", "sponge"]);
 
@@ -96,6 +97,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) {
   const strokeRef = useRef<StrokeState | null>(null);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const handleMouseDown = useCallback(
     (_e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -115,12 +117,12 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
 
       // Snapshot the document pixels at document resolution. The capture is the
       // working buffer: each dab reads from it and writes its result back into it.
-      const workingCtx = captureDocumentCanvas(
-        stage,
-        canvasSize.width,
-        canvasSize.height,
-      ).getContext("2d");
-      if (!workingCtx) return;
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
+      const workingCtx = capture.ctx;
 
       // The stroke object starts fully transparent and only receives the pixels the
       // brush touches. Seeding it with the whole snapshot stacked an opaque copy of
@@ -129,7 +131,10 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
       canvas.width = canvasSize.width;
       canvas.height = canvasSize.height;
       const strokeCtx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!strokeCtx) return;
+      if (!strokeCtx) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       applyBrushDab(workingCtx, strokeCtx, x, y, canvasSize);
 
@@ -154,7 +159,7 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
       useEditorStore.getState().addObject(obj);
       strokeRef.current = { objectId: id, canvas, strokeCtx, workingCtx };
     },
-    [stageRef],
+    [stageRef, captureMessages],
   );
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {

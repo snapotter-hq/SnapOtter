@@ -1,5 +1,6 @@
 // apps/web/src/components/editor/stage-capture.ts
 import type Konva from "konva";
+import { toast } from "sonner";
 
 /**
  * Capture the editor document as a flat HTMLCanvasElement at document-pixel
@@ -44,5 +45,55 @@ export function captureDocumentCanvas(
     stage.scale({ x: prev.scaleX, y: prev.scaleY });
     stage.position({ x: prev.x, y: prev.y });
     stage.draw();
+  }
+}
+
+/** Why a pixel tool couldn't read the document. */
+export type CaptureFailure = "no-context" | "tainted";
+
+export type DocumentContext =
+  | { ok: true; ctx: CanvasRenderingContext2D }
+  | { ok: false; reason: CaptureFailure };
+
+/** The user-facing text for each way a capture can fail (`editor.ui.captureFailure`). */
+export interface CaptureFailureMessages {
+  noCanvasMemory: string;
+  crossOriginBlocked: string;
+}
+
+/** Tell the user why a pixel tool did nothing, instead of leaving the click silent. */
+export function reportCaptureFailure(
+  reason: CaptureFailure,
+  messages: CaptureFailureMessages,
+): void {
+  toast.error(reason === "tainted" ? messages.crossOriginBlocked : messages.noCanvasMemory);
+}
+
+/**
+ * Capture the document and hand back a 2D context whose pixels the caller may
+ * read, or say why not. The pixel tools used to bail out of the mouse handler on a
+ * null context and let a tainted canvas's SecurityError escape it, so a click did
+ * nothing and nobody was told (issue #1040).
+ *
+ * `no-context` is the browser refusing to allocate another document-sized canvas.
+ * `tainted` is a cross-origin image loaded without CORS: drawing it is allowed,
+ * reading it back throws, and one 1px read is enough to find out.
+ */
+export function captureDocumentContext(
+  stage: Konva.Stage,
+  width: number,
+  height: number,
+): DocumentContext {
+  try {
+    const ctx = captureDocumentCanvas(stage, width, height).getContext("2d");
+    if (!ctx) return { ok: false, reason: "no-context" };
+    ctx.getImageData(0, 0, 1, 1);
+    return { ok: true, ctx };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "SecurityError") {
+      return { ok: false, reason: "tainted" };
+    }
+    console.error("Capturing the editor document failed:", err);
+    return { ok: false, reason: "no-context" };
   }
 }

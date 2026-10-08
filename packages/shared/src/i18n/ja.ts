@@ -4685,6 +4685,14 @@ export const ja: TranslationKeys = {
         original: "元のサイズ：{width} x {height} px",
         note: "すべてのオブジェクトを新しいサイズに合わせて比例拡大・縮小します。",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "この画像は大きすぎて、ブラウザーでこのツールを使って編集できません。キャンバスサイズを小さくしてみてください。",
+        crossOriginBlocked:
+          "エディターは、別のサイトから読み込んだ画像のピクセルを読み取れません。画像をダウンロードして、そのファイルを開いてください。",
+        sourceImageFailed:
+          "画像を読み込めませんでした。別のサイトでホストされている場合は、そのサイト側でクロスオリジンアクセスを許可する必要があります。",
+      },
       exportDialog: {
         heading: "画像を書き出し",
         previewAlt: "書き出しプレビュー",

@@ -4456,6 +4456,12 @@ export const zhCN: TranslationKeys = {
         original: "原始：{width} x {height} px",
         note: "所有对象都会按比例缩放到新尺寸。",
       },
+      captureFailure: {
+        noCanvasMemory: "这张图片太大，浏览器无法用此工具编辑。请尝试更小的画布大小。",
+        crossOriginBlocked:
+          "编辑器无法读取从其他网站加载的图片的像素。请先下载图片，再打开该文件。",
+        sourceImageFailed: "无法加载图片。如果图片托管在其他网站，该网站需要允许跨源访问。",
+      },
       exportDialog: {
         heading: "导出图片",
         previewAlt: "导出预览",

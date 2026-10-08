@@ -2,10 +2,11 @@
 
 import type Konva from "konva";
 import { useCallback, useRef } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, ToolType } from "@/types/editor";
-import { captureDocumentCanvas } from "../stage-capture";
+import { captureDocumentContext, reportCaptureFailure } from "../stage-capture";
 
 const PIXEL_BRUSH_TOOLS = new Set<ToolType>(["blur-brush", "sharpen-brush", "smudge"]);
 
@@ -25,6 +26,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>) {
   const strokeRef = useRef<StrokeState | null>(null);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const handleMouseDown = useCallback(
     (_e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -44,12 +46,12 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
 
       // Snapshot the document pixels at document resolution. The capture doubles as
       // the working buffer: the brush reads from it and writes each pass back into it.
-      const workingCtx = captureDocumentCanvas(
-        stage,
-        canvasSize.width,
-        canvasSize.height,
-      ).getContext("2d");
-      if (!workingCtx) return;
+      const capture = captureDocumentContext(stage, canvasSize.width, canvasSize.height);
+      if (!capture.ok) {
+        reportCaptureFailure(capture.reason, captureMessages);
+        return;
+      }
+      const workingCtx = capture.ctx;
 
       const sourceSnapshot = workingCtx.getImageData(0, 0, canvasSize.width, canvasSize.height);
 
@@ -60,7 +62,10 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
       canvas.width = canvasSize.width;
       canvas.height = canvasSize.height;
       const strokeCtx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!strokeCtx) return;
+      if (!strokeCtx) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       applyPixelBrush(workingCtx, strokeCtx, sourceSnapshot, x, y, canvasSize);
 
@@ -93,7 +98,7 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
         lastY: y,
       };
     },
-    [stageRef],
+    [stageRef, captureMessages],
   );
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {

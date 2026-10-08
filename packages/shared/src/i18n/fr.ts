@@ -4753,6 +4753,14 @@ export const fr: TranslationKeys = {
         original: "Taille d'origine : {width} x {height} px",
         note: "Met à l'échelle tous les objets proportionnellement aux nouvelles dimensions.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Cette image est trop grande pour que le navigateur la modifie avec cet outil. Essayez une taille de canevas plus petite.",
+        crossOriginBlocked:
+          "L'éditeur ne peut pas lire les pixels d'une image chargée depuis un autre site. Téléchargez-la, puis ouvrez le fichier.",
+        sourceImageFailed:
+          "Impossible de charger l'image. Si elle est hébergée sur un autre site, celui-ci doit autoriser l'accès entre origines.",
+      },
       exportDialog: {
         heading: "Exporter l'image",
         previewAlt: "Aperçu de l'export",

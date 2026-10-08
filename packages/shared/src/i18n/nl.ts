@@ -4748,6 +4748,14 @@ export const nl: TranslationKeys = {
         original: "Origineel: {width} x {height} px",
         note: "Schaalt alle objecten evenredig mee naar de nieuwe afmetingen.",
       },
+      captureFailure: {
+        noCanvasMemory:
+          "Deze afbeelding is te groot om in de browser met dit gereedschap te bewerken. Probeer een kleiner canvasformaat.",
+        crossOriginBlocked:
+          "De editor kan de pixels van een afbeelding van een andere site niet lezen. Download de afbeelding en open het bestand.",
+        sourceImageFailed:
+          "De afbeelding kon niet worden geladen. Staat ze op een andere site, dan moet die site toegang vanaf andere oorsprongen toestaan.",
+      },
       exportDialog: {
         heading: "Afbeelding exporteren",
         previewAlt: "Exportvoorbeeld",
