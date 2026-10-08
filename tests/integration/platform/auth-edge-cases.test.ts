@@ -1217,6 +1217,58 @@ describe("Admin user-management guards", () => {
     }
   });
 
+  // The Security tab shows a default-on rule as on for any stored value except
+  // "false", so enforcement has to agree: a row such as "TRUE" or "1" (a hand
+  // edit, or one written before settings were validated in #618) can't show a
+  // switch that's on while enforcing nothing (#2026).
+  it.each([
+    ["passwordRequireUppercase", "TRUE", "alllower1", "uppercase"],
+    ["passwordRequireDigit", "FALSE", "NoDigitsHere", "digit"],
+    ["passwordRequireLowercase", "1", "ALLUPPER1", "lowercase"],
+    ["passwordRequireDigit", "yes", "NoDigitsHere", "digit"],
+    ["passwordRequireUppercase", "", "alllower1", "uppercase"],
+  ])("enforces %s when its stored value is %j", async (key, stored, newPassword, rule) => {
+    const user = await loggedInUser();
+    await setSetting(key, stored);
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule });
+    } finally {
+      await clearSetting(key);
+    }
+  });
+
+  it.each([
+    ["passwordRequireUppercase", "false", "alllower1"],
+    ["passwordRequireLowercase", "false", "ALLUPPER1"],
+    ["passwordRequireDigit", "false", "NoDigitsHere"],
+  ])("does not enforce %s when its stored value is %j", async (key, stored, newPassword) => {
+    const user = await loggedInUser();
+    await setSetting(key, stored);
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode, res.body).toBe(200);
+    } finally {
+      await clearSetting(key);
+    }
+  });
+
+  it("leaves the special-character rule off unless its stored value is exactly true", async () => {
+    // The Security tab shows this one as on only for "true", and it defaults off.
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "1");
+    try {
+      const res = await sendChangePassword(user, "NoSpecial9");
+
+      expect(res.statusCode, res.body).toBe(200);
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
   it("change-password echoes the configured minimum length, not the default", async () => {
     const user = await loggedInUser();
     await setSetting("passwordMinLength", "12");
