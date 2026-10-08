@@ -65,6 +65,18 @@ export function sendInputValidationError(
   });
 }
 
+/**
+ * One file's failure as a batch weighs it: the message plus, when the failure
+ * carried them, its HTTP status, code and operator hint. A pre-failure and a
+ * worker-side failure both reduce to this, so they can be judged together.
+ */
+export interface BatchFault {
+  error: string;
+  statusCode?: number;
+  code?: string;
+  details?: string;
+}
+
 /** What a batch keeps about a file that failed input preparation, besides its message. */
 export function preFailureFaultFields(err: InputValidationError): {
   statusCode: number;
@@ -85,7 +97,7 @@ export function preFailureFaultFields(err: InputValidationError): {
  * generic 422 (#1432). Anything mixed, or any 4xx, returns null.
  */
 export function sharedServerFault(
-  failures: Array<{ error: string; statusCode?: number; code?: string; details?: string }>,
+  failures: BatchFault[],
 ): { statusCode: number; code: string; error: string; details?: string } | null {
   const first = failures[0];
   if (!first?.code || first.statusCode === undefined || first.statusCode < 500) return null;

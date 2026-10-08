@@ -31,6 +31,7 @@ import { autoOrient } from "../lib/auto-orient.js";
 import { type BatchFileNotes, compactFileNotes } from "../lib/batch-file-notes.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import {
+  type BatchFault,
   preFailureFaultFields,
   reportEngineUnavailable,
   sharedServerFault,
@@ -639,7 +640,20 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               totalFiles: files.length,
               inputRefs: [],
               filename: "",
-              settings: { flowChildCount: flowChildren.length, fileIndexMap },
+              settings: {
+                flowChildCount: flowChildren.length,
+                fileIndexMap,
+                // So the finalize weighs every file when deciding whether one
+                // engine fault failed them all (#1627).
+                preFailureFaults: preFailures.map(
+                  ({ error, statusCode, code, details }): BatchFault => ({
+                    error,
+                    ...(statusCode !== undefined && { statusCode }),
+                    ...(code && { code }),
+                    ...(details && { details }),
+                  }),
+                ),
+              },
               analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
             } satisfies ToolJobData,
             opts: { jobId: parentId, attempts: 1 },
@@ -697,8 +711,10 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   filename: string;
                   outputRef?: string;
                   error?: string;
+                  code?: string;
                 }>;
                 canceled?: boolean;
+                fault?: { statusCode: number; code: string; error: string; details?: string };
                 zip?: {
                   key: string;
                   filename: string;
@@ -717,12 +733,29 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // honest for API consumers that never see the SSE (#767).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
             const errors = [
-              ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
+              ...preFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error,
+                ...(f.code && { code: f.code }),
+              })),
               ...manifestFailures.map((f) => ({
                 filename: f.filename,
                 error: f.error ?? "Failed",
+                ...(f.code && { code: f.code }),
               })),
             ];
+            // One engine fault behind every file, wherever it struck, answers
+            // with its status, code and hint, as the upload-time path does
+            // (#1432, #1627). The finalize decided it with every file in view.
+            const fault = payload?.canceled ? undefined : payload?.fault;
+            if (fault) {
+              return reply.status(fault.statusCode).send({
+                error: fault.error,
+                code: fault.code,
+                ...(fault.details && { details: fault.details }),
+                errors,
+              });
+            }
             // When every file failed for the same reason (the workspace cap
             // tripping on the children's output writes), that reason is the
             // batch's error; the generic summary would hide the one thing

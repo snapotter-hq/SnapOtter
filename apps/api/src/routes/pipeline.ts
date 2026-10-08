@@ -28,11 +28,12 @@ import {
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
 import {
+  type BatchFault,
   preFailureFaultFields,
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
-import { formatZodErrors, stripInternalPaths } from "../lib/errors.js";
+import { formatZodErrors, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
@@ -1479,7 +1480,19 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               totalFiles: files.length,
               inputRefs: [],
               filename: "",
-              settings: { flowChildCount: perFileChildren.length, fileIndexMap },
+              settings: {
+                flowChildCount: perFileChildren.length,
+                fileIndexMap,
+                // Every file's fault, for the finalize's all-failed verdict (#1627).
+                preFailureFaults: preFailures.map(
+                  ({ error, statusCode, code, details }): BatchFault => ({
+                    error,
+                    ...(statusCode !== undefined && { statusCode }),
+                    ...(code && { code }),
+                    ...(details && { details }),
+                  }),
+                ),
+              },
               analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
             } satisfies ToolJobData,
             opts: { jobId: parentId, attempts: 1 },
@@ -1521,8 +1534,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   filename: string;
                   outputRef?: string;
                   error?: string;
+                  code?: string;
                 }>;
                 canceled?: boolean;
+                fault?: { statusCode: number; code: string; error: string; details?: string };
                 zip?: {
                   key: string;
                   filename: string;
@@ -1541,15 +1556,35 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // client settles on instead of string-matching (#771, mirroring
             // batch.ts).
             const manifestFailures = (payload?.manifest ?? []).filter((m) => !m.outputRef);
+            const errors = [
+              ...preFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error,
+                ...(f.code && { code: f.code }),
+              })),
+              ...manifestFailures.map((f) => ({
+                filename: f.filename,
+                error: f.error ?? "Failed",
+                ...(f.code && { code: f.code }),
+              })),
+            ];
+            // As in batch.ts: one engine fault behind every file answers with
+            // its status, code and hint, and one shared reason names the
+            // failure instead of the generic summary (#1627).
+            const fault = payload?.canceled ? undefined : payload?.fault;
+            if (fault) {
+              return reply.status(fault.statusCode).send({
+                error: fault.error,
+                code: fault.code,
+                ...(fault.details && { details: fault.details }),
+                errors,
+              });
+            }
             return reply.status(422).send({
-              error: payload?.canceled ? "Batch canceled" : "All files failed processing",
-              errors: [
-                ...preFailures.map((f) => ({ filename: f.filename, error: f.error })),
-                ...manifestFailures.map((f) => ({
-                  filename: f.filename,
-                  error: f.error ?? "Failed",
-                })),
-              ],
+              error: payload?.canceled
+                ? "Batch canceled"
+                : (sharedFailureReason(errors) ?? "All files failed processing"),
+              errors,
               ...(payload?.canceled ? { canceled: true } : {}),
             });
           }
