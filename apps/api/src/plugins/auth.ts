@@ -139,7 +139,10 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
   // enforcing nothing (#2026). Special defaults off, so it stays on only for
   // "true", matching its switch.
   const broken: { rule: PasswordRule; message: string }[] = [];
-  if (password.length < minLength)
+  // Characters, not UTF-16 code units: an astral character is two units, so four
+  // of them used to meet a minimum of 8 (#2057). Code points are what NIST SP
+  // 800-63B counts. It only runs when a password is set, so it locks nobody out.
+  if ([...password].length < minLength)
     broken.push({
       rule: "minLength",
       message: `Password must be at least ${minLength} characters`,
