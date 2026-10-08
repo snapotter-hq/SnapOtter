@@ -208,7 +208,7 @@ export function ocrOneFile(
       const cancelJob = asyncMode && !settled;
       rejectOnce(new Error("OCR scan stopped"));
       xhr.abort();
-      if (cancelJob) void cancelAbandonedJob(clientJobId, "ocr", "OCR");
+      if (cancelJob) void cancelAbandonedJob(clientJobId, "ocr");
     });
     xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
     for (const [key, value] of formatHeaders()) {

@@ -1,11 +1,9 @@
-import { SafeError } from "@snapotter/shared";
 import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
@@ -198,7 +196,7 @@ export function subscribeEraseObjectJobProgress(
  */
 function cancelIfHandlingFailed(failure: JobFailure, clientJobId: string) {
   if ("reason" in failure && failure.reason === "trackingFailed") {
-    void cancelAbandonedJob(clientJobId, "erase-object", "Erase Object");
+    void cancelAbandonedJob(clientJobId, "erase-object");
   }
 }
 
@@ -315,7 +313,7 @@ export function EraseObjectSettings({
       onStoppable(() => {
         stopProgress();
         abandon(new Error("Erase Object batch stopped"));
-        if (accepted) void cancelAbandonedJob(clientJobId, "erase-object", "Erase Object");
+        if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -468,6 +466,9 @@ export function EraseObjectSettings({
     // its request, and anything the request answers after that is dropped.
     const xhr = new XMLHttpRequest();
     let abandoned = false;
+    // See the batch path: once the server has answered 202 a job exists, and
+    // a library run's job would still save over or beside the original (#2093).
+    let accepted = false;
     const abandonRequest = () => {
       abandoned = true;
       xhr.abort();
@@ -524,6 +525,9 @@ export function EraseObjectSettings({
       let stopError: { cause: unknown } | null = null;
       for (const step of [
         abandonRequest,
+        () => {
+          if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
+        },
         stopProgress,
         () => {
           progressCleanupRef.current = null;
@@ -575,6 +579,7 @@ export function EraseObjectSettings({
     };
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
+      if (xhr.status === 202) accepted = true;
       if (abandoned || xhr.status === 202) return;
 
       endWatch();

@@ -1596,6 +1596,33 @@ describe("erase-object single file: leaving the page mid-run (#1975)", () => {
     expect(useFileStore.getState().error).toBeNull();
   });
 
+  it("cancels the queued job of a 202 run when the files go (#2093)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    moveToAnotherTool();
+
+    const clientJobId = xhr.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no cancel when the files go before the server has answered (#2093)", async () => {
+    renderPanel();
+    await submit();
+
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
   it("replacing the files from the library ends the run and clears processing", async () => {
     renderPanel();
     const xhr = await submit();

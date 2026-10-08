@@ -333,4 +333,22 @@ describe("OCR stopping a file (#2093)", () => {
 
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
+
+  it("sends no cancel for a queued file whose result already arrived", async () => {
+    const { promise, stop } = stoppableRun();
+    const xhr = xhrs[0];
+    xhr.status = 202;
+    xhr.responseText = JSON.stringify({ jobId: "job-1", status: "queued" });
+    xhr.onload?.();
+    MockEventSource.instances[0].emit({
+      type: "single",
+      phase: "complete",
+      result: { text: "done", actualQuality: "fast" },
+    });
+    await expect(promise).resolves.toMatchObject({ text: "done" });
+
+    stop();
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
 });
