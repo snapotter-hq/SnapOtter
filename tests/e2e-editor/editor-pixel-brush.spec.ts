@@ -206,5 +206,30 @@ for (const tool of ["dodge", "burn", "sponge"] as const) {
       const corner = await readStrokeObjectPixel(page, 2, 2);
       expect(corner?.a).toBe(0);
     });
+
+    // A dab centred outside the document has no pixels to read. It used to throw
+    // from getImageData and, further out, write transparent black into the
+    // stroke (issue #2071). Dabs off the edge are skipped instead.
+    test(`a ${tool} drag past the left edge and back does not throw or erase the stroke`, async ({
+      editorPage: page,
+    }) => {
+      const pageErrors: string[] = [];
+      page.on("pageerror", (err) => pageErrors.push(err.message));
+
+      const start = await screenPointForDocumentPixel(page, 30, 75);
+      const beyondEdge = await screenPointForDocumentPixel(page, -50, 75);
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(beyondEdge.x, beyondEdge.y, { steps: 40 });
+      await page.mouse.move(start.x, start.y, { steps: 40 });
+      await page.mouse.up();
+
+      await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
+      // The brush crossed x = 2 on the way out and back, so it stays painted.
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 2, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+      expect(pageErrors).toEqual([]);
+    });
   });
 }

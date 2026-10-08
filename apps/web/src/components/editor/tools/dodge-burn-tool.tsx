@@ -218,12 +218,13 @@ function applyBrushDab(
 
   const startPx = Math.max(0, centerX - halfSize);
   const startPy = Math.max(0, centerY - halfSize);
-  const imageData = workingCtx.getImageData(
-    startPx,
-    startPy,
-    Math.min(canvasSize.width, centerX + halfSize + 1) - startPx,
-    Math.min(canvasSize.height, centerY + halfSize + 1) - startPy,
-  );
+  const width = Math.min(canvasSize.width, centerX + halfSize + 1) - startPx;
+  const height = Math.min(canvasSize.height, centerY + halfSize + 1) - startPy;
+  // A dab centred beyond the document edge has no pixels to read. Without this,
+  // getImageData throws on an empty rect and, further out, flips it and reads
+  // transparent black (#2071).
+  if (width <= 0 || height <= 0) return;
+  const imageData = workingCtx.getImageData(startPx, startPy, width, height);
   const patch = strokeCtx.getImageData(startPx, startPy, imageData.width, imageData.height);
 
   for (let py = 0; py < imageData.height; py++) {
