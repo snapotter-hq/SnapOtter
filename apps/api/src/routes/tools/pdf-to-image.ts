@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath, isSafeMessageError } from "@snapotter/shared";
+import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import * as mupdf from "mupdf";
@@ -268,6 +268,20 @@ async function renderPdfPages(
 }
 
 /**
+ * Read back an output this route wrote a moment ago. A failure here is never
+ * the client's: an error without a 5xx status is tagged 500 so it reaches the
+ * error handler instead of the route's 422 catch-all (#2120).
+ */
+async function readOwnOutput(key: string): Promise<Buffer> {
+  try {
+    return await getObjectBuffer(key);
+  } catch (err) {
+    if (hasServerErrorStatus(err)) throw err;
+    throw Object.assign(err instanceof Error ? err : new Error(String(err)), { statusCode: 500 });
+  }
+}
+
+/**
  * Zip one job's already-stored page images, reading a single entry at a time.
  * The finished archive is materialized in memory, so peak cost is one whole
  * document's worth of encoded pages.
@@ -281,7 +295,7 @@ async function buildPagesZip(jobId: string, filenames: string[]): Promise<Buffer
     archive.on("error", reject);
   });
   for (const filename of filenames) {
-    archive.append(await getObjectBuffer(`outputs/${jobId}/${filename}`), { name: filename });
+    archive.append(await readOwnOutput(`outputs/${jobId}/${filename}`), { name: filename });
   }
   await archive.finalize();
   await done;
@@ -767,6 +781,8 @@ export function registerPdfToImageRoute(
       if (err instanceof PdfInputError) {
         return reply.status(400).send({ error: err.message });
       }
+      if (hasServerErrorStatus(err)) throw err;
+      request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");
       return reply.status(422).send({
         error: "PDF conversion failed",
         details: err instanceof Error ? err.message : "Unknown error",
