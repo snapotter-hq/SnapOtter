@@ -52,6 +52,11 @@ test.describe("Copy Merged", () => {
     await expect(page.locator("[data-sonner-toast]").getByText(COPY_FAILED)).toBeVisible();
   });
 
+  // The app reads `mod` from navigator.userAgent, and Playwright's "Desktop
+  // Chrome" device reports a Windows one on every host. So the shortcut is Ctrl
+  // here even on a Mac, and pressing ControlOrMeta (which follows the host OS)
+  // sent Cmd to an app expecting Ctrl (#2149). The other editor specs that use
+  // a modifier press Control too.
   test("Ctrl+Shift+C says so too", async ({ editorPage: page }) => {
     await page.addInitScript(() => {
       // biome-ignore lint/suspicious/noExplicitAny: removing a global the page would otherwise see
@@ -60,7 +65,26 @@ test.describe("Copy Merged", () => {
     await loadTestImage(page);
     await page.locator("canvas").first().click();
 
-    await page.keyboard.press("ControlOrMeta+Shift+C");
+    await page.keyboard.press("Control+Shift+C");
     await expect(page.locator("[data-sonner-toast]").getByText(COPY_FAILED)).toBeVisible();
+  });
+
+  test.describe("with a macOS user agent", () => {
+    test.use({
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    });
+
+    test("Cmd+Shift+C says so too", async ({ editorPage: page }) => {
+      await page.addInitScript(() => {
+        // biome-ignore lint/suspicious/noExplicitAny: removing a global the page would otherwise see
+        delete (window as any).ClipboardItem;
+      });
+      await loadTestImage(page);
+      await page.locator("canvas").first().click();
+
+      await page.keyboard.press("Meta+Shift+C");
+      await expect(page.locator("[data-sonner-toast]").getByText(COPY_FAILED)).toBeVisible();
+    });
   });
 });
