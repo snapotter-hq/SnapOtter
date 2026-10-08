@@ -77,6 +77,24 @@ export interface BatchFault {
   details?: string;
 }
 
+/**
+ * The batch finalize's verdict when no file succeeded: the shared server
+ * fault across the files that failed before the flow and the ones that
+ * failed in it (#1627). The pre-failures come from the route through job
+ * data; when that list doesn't account for every file that never reached
+ * the flow (a job queued by an older build), there's no verdict rather than
+ * one formed without every file in view.
+ */
+export function allFailedFault(
+  preFailureFaults: unknown,
+  preFailedCount: number,
+  childFaults: BatchFault[],
+): ReturnType<typeof sharedServerFault> {
+  const pre = Array.isArray(preFailureFaults) ? (preFailureFaults as BatchFault[]) : [];
+  if (pre.length !== preFailedCount) return null;
+  return sharedServerFault([...pre, ...childFaults]);
+}
+
 /** What a batch keeps about a file that failed input preparation, besides its message. */
 export function preFailureFaultFields(err: InputValidationError): {
   statusCode: number;

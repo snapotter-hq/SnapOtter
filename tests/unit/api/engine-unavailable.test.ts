@@ -170,3 +170,56 @@ describe("sharedServerFault (#1432)", () => {
     expect(preFailureFaultFields(new InputValidationError("bad"))).toEqual({ statusCode: 400 });
   });
 });
+
+describe("allFailedFault (#1627)", () => {
+  async function helpers() {
+    return await import("../../../apps/api/src/lib/engine-unavailable.js");
+  }
+  const down = {
+    error: "engine down",
+    statusCode: 503,
+    code: "ENGINE_UNAVAILABLE",
+    details: "check the engine",
+  };
+
+  it("finds one fault across pre-failures and worker failures", async () => {
+    const { allFailedFault } = await helpers();
+    expect(allFailedFault([down], 1, [down])).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+
+  it("judges worker failures alone when nothing failed before the flow", async () => {
+    const { allFailedFault } = await helpers();
+    expect(allFailedFault([], 0, [down, down])).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    // A job queued before the field existed carries none at all.
+    expect(allFailedFault(undefined, 0, [down, down])).toMatchObject({
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+
+  it("gives no verdict when the pre-failures don't account for every file", async () => {
+    const { allFailedFault } = await helpers();
+    // An older build sent none, though one file failed before the flow.
+    expect(allFailedFault(undefined, 1, [down])).toBeNull();
+    expect(allFailedFault([down], 2, [down])).toBeNull();
+    expect(allFailedFault("not a list", 0, [down])).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+  });
+
+  it("keeps the generic answer when one file failed differently", async () => {
+    const { allFailedFault } = await helpers();
+    expect(allFailedFault([], 0, [down, { error: "Child job row not found" }])).toBeNull();
+    expect(allFailedFault([{ error: "corrupt", statusCode: 400 }], 1, [down])).toBeNull();
+  });
+
+  it("carries a fault without a hint", async () => {
+    const { allFailedFault } = await helpers();
+    const bare = { error: "engine down", statusCode: 503, code: "ENGINE_UNAVAILABLE" };
+    expect(allFailedFault([], 0, [bare, bare])).toEqual({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      error: "engine down",
+    });
+  });
+});
