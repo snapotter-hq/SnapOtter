@@ -1256,7 +1256,7 @@ describe("Barcode Read server-side failures", () => {
 
   // chmod means nothing to root, and S3 storage never touches WORKSPACE_PATH.
   it.skipIf(process.getuid?.() === 0 || process.env.STORAGE_MODE === "s3")(
-    "answers 500, not 422, when the result can't be stored",
+    "answers 503, not 422, when the result can't be stored",
     async () => {
       // Local storage writes under WORKSPACE_PATH/uploads; make it read-only.
       const uploads = path.join(process.env.WORKSPACE_PATH as string, "uploads");
@@ -1264,11 +1264,12 @@ describe("Barcode Read server-side failures", () => {
       const mode = statSync(uploads).mode & 0o777;
       chmodSync(uploads, 0o500);
       try {
-        // The error now propagates instead of being caught as a 422. The test
-        // app keeps Fastify's default handler (#1243); in production
+        // The error now propagates instead of being caught as a 422. putObject
+        // names a read-only volume as a 503 "storage not writable" (#2120). The
+        // test app keeps Fastify's default handler (#1243); in production
         // apps/api/src/plugins/error-handler.ts masks it and reports it.
         const res = await readQr();
-        expect(res.statusCode).toBe(500);
+        expect(res.statusCode).toBe(503);
       } finally {
         chmodSync(uploads, mode);
       }
