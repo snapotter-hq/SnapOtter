@@ -496,7 +496,7 @@ test.describe("Settings People Tab - Team assignment", () => {
     await expect(generateBtn).toBeVisible();
     await generateBtn.click();
 
-    // The password field should now have a value (16 chars generated password).
+    // The password field should now have a value (20 chars generated password).
     // After generating, the password input flips to type="text", so a generic
     // form input[type='text'] selector would also match the (empty) username
     // field. Target the password input by its id instead.
