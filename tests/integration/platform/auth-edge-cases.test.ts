@@ -1217,6 +1217,61 @@ describe("Admin user-management guards", () => {
     }
   });
 
+  // The strength rules mean "has an uppercase / lowercase letter / digit / non-alphanumeric
+  // character" in any script, not just ASCII (#1568).
+  it.each([
+    ["a Cyrillic password with both cases", "Пароль-пароль1"],
+    ["an Eastern Arabic digit", "Пароль\u0661\u0662\u0663"],
+  ])("change-password accepts %s under the default rules", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it.each([
+    ["a space", "Abc defg1"],
+    ["a euro sign", "Abcdefg1\u20ac"],
+    ["a pound sign", "Abcdefg1\u00a3"],
+    ["a tilde", "Abcdefg1~"],
+  ])("change-password counts %s as a special character", async (_label, newPassword) => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode).toBe(200);
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  it.each([
+    ["only uppercase Cyrillic letters", "ПАРОЛЬ123", "lowercase"],
+    ["only lowercase Cyrillic letters", "пароль123", "uppercase"],
+    ["no digit in any script", "Парольпароль", "digit"],
+  ])("change-password still rejects %s", async (_label, newPassword, rule) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ code: "VALIDATION_ERROR", rule });
+  });
+
+  it.each([
+    ["letters and digits of any script", "Пароль\u0661\u0662\u0663д"],
+    ["combining marks that belong to a letter", "Abcdefg1e\u0301"],
+  ])("does not count %s as special", async (_label, newPassword) => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, newPassword);
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ rule: "special" });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
   // The Security tab shows a default-on rule as on for any stored value except
   // "false", so enforcement has to agree: a row such as "TRUE" or "1" (a hand
   // edit, or one written before settings were validated in #618) can't show a
