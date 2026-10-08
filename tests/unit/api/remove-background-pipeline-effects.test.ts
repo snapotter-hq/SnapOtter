@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerRemoveBackground } from "../../../apps/api/src/routes/tools/remove-background.js";
 
 const aiMocks = vi.hoisted(() => ({ removeBackground: vi.fn() }));
@@ -86,6 +87,29 @@ describe("remove-background AI handler in pipelines and batches (#1047)", () => 
     expect(out.filename).toBe("photo_nobg.webp");
     expect(out.contentType).toBe("image/webp");
     expect((await sharp(out.buffer).metadata()).format).toBe("webp");
+  });
+
+  it("blurs the original behind the subject for a pipeline step", async () => {
+    const out = await runAiToolJob(
+      job("pipeline-step", { backgroundType: "blur", blurEnabled: true, blurIntensity: 20 }),
+      original,
+      ctx,
+    );
+
+    // The original is solid blue, so the blurred layer stays blue and opaque
+    // (blur edges can shave a few levels off the channel).
+    const [r, g, b, a] = await cornerPixel(out.buffer);
+    expect([r, g, a]).toEqual([0, 0, 255]);
+    expect(b).toBeGreaterThan(240);
+  });
+
+  it("rejects the image background type for pipelines and batches", () => {
+    const schema = getToolConfig("remove-background")?.settingsSchema;
+
+    expect(schema?.safeParse({ backgroundType: "image" }).success).toBe(false);
+    expect(schema?.safeParse({ backgroundType: "color", backgroundColor: "#FF0000" }).success).toBe(
+      true,
+    );
   });
 
   it("keeps a transparent cutout named photo_nobg.png when no background is asked for", async () => {

@@ -61,6 +61,13 @@ const settingsSchema = z.object({
 
 type RemoveBgSettings = z.infer<typeof settingsSchema>;
 
+// Pipelines and batches carry settings as JSON, so an uploaded background image
+// can't reach the worker. Reject the type up front instead of returning a
+// cutout with the background silently dropped (#1047).
+const pipelineSettingsSchema = settingsSchema.extend({
+  backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional(),
+});
+
 /**
  * Composite the cutout over the requested background and name the result.
  * Shared by the pipeline/batch path of the AI handler and the registry process
@@ -454,7 +461,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
   // ── Pipeline/batch registry ──────────────────────────────────────
   registerToolProcessFn({
     toolId: "remove-background",
-    settingsSchema,
+    settingsSchema: pipelineSettingsSchema,
     process: async (inputBuffer, settings, filename, ctx) => {
       const s = settings as z.infer<typeof settingsSchema>;
       const orientedBuffer = await autoOrient(inputBuffer);
