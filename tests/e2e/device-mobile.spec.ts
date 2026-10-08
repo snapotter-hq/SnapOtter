@@ -55,6 +55,45 @@ test.describe("@mobile Core flow", () => {
 });
 
 // ---------------------------------------------------------------------------
+// #1974: the run lives in the settings panel, so closing the sheet mid-run used
+// to unmount the panel, abort the request, and leave the page at processing.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Settings sheet during a run", () => {
+  test("closing the sheet mid-run lets the run finish", async ({ loggedInPage: page }) => {
+    // Hold the answer back so the sheet can be closed while the request is out.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/v1/tools/image/resize", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+    await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+    const requestSent = page.waitForRequest("**/api/v1/tools/image/resize");
+    await page
+      .getByRole("button", { name: /^resize$/i })
+      .last()
+      .click();
+    await requestSent;
+
+    await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    release();
+
+    // The run finished behind the closed sheet: reopening shows its result
+    // rather than a panel stuck at processing.
+    await peekBar.click();
+    await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Responsive chrome: mobile-bottom-nav, hamburger, tool-grid, footer hidden
 // ---------------------------------------------------------------------------
 test.describe("@mobile Responsive chrome", () => {
