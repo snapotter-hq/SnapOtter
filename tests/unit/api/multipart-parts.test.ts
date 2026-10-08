@@ -121,8 +121,15 @@ describe("multipartParts", () => {
         }
         return seen;
       })();
-      const timeout = new Promise<typeof HUNG>((resolve) => setTimeout(() => resolve(HUNG), 2000));
-      return Promise.race([run, timeout]);
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<typeof HUNG>((resolve) => {
+        timer = setTimeout(() => resolve(HUNG), 2000);
+      });
+      try {
+        return await Promise.race([run, timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
     }
 
     it("finishes when a stray file part is followed by a field", async () => {

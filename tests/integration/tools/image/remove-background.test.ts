@@ -332,8 +332,11 @@ describe("Remove Background", () => {
       },
       body,
     });
-    const hung = new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 10_000));
-    const res = await Promise.race([request, hung]);
+    let timer: NodeJS.Timeout | undefined;
+    const hung = new Promise<"hung">((resolve) => {
+      timer = setTimeout(() => resolve("hung"), 10_000);
+    });
+    const res = await Promise.race([request, hung]).finally(() => clearTimeout(timer));
 
     expect(res).not.toBe("hung");
     // Answered by the route's own settings check, so the settings field behind

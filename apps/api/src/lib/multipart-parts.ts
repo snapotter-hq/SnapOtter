@@ -236,9 +236,9 @@ export async function* multipartParts(
   // without reading (a route that takes one named file and ignores the rest)
   // would hold the iterator, and the request, open forever (#2156). Asking for
   // the next part is the consumer saying it is done with this one, so drain
-  // what is left of it, as @fastify/multipart does. A part the size limit
-  // already destroyed never emits "end", so busboy would wait for it forever:
-  // report its error (the 413) to the consumer instead of hanging.
+  // what is left of it (sign-pdf already does this by hand). A part the size
+  // limit already destroyed never emits "end", so busboy would wait for it
+  // forever: report its error (the 413) to the consumer instead of hanging.
   let previousFile: Readable | null = null;
 
   try {
