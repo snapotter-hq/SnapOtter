@@ -1436,6 +1436,34 @@ describe("Admin user-management guards", () => {
     }
   });
 
+  // The minimum counts characters, not UTF-16 code units: an astral character is
+  // one character but two units, so counting units let four of them meet a
+  // minimum of 8 (#2057). Mathematical bold letters and digits satisfy the
+  // uppercase, lowercase and digit rules since #1568.
+  it("change-password counts a character outside the BMP once toward the minimum (#2057)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "𝐀𝐚𝟏𝐛");
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "minLength",
+      rules: ["minLength"],
+      minLength: 8,
+    });
+  });
+
+  it("change-password accepts a password of exactly the minimum in characters, astral or not (#2057)", async () => {
+    // Eight characters, sixteen UTF-16 code units, and one of each required class.
+    const res = await sendChangePassword(await loggedInUser(), "𝐀𝐚𝟏𝐛𝐜𝐝𝐞𝐟");
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
+  it("change-password counts the same for a password of plain characters at the minimum (#2057)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "Abcdef12");
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
   it("an admin can switch every password rule off and register a one-character password with no letters (#1028)", async () => {
     const policy = {
       passwordMinLength: "1",
