@@ -126,6 +126,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
     registerCancelable: vi.fn(() => new AbortController()),
     unregisterCancelable: vi.fn(),
+    wasUserCanceled: vi.fn(() => false),
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/connection.js", () => ({

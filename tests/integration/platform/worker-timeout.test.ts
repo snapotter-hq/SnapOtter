@@ -16,14 +16,14 @@ process.env.JOB_TIMEOUT_FAST_S = "1";
 // Dynamic imports so config.ts picks up the 1-second timeout.
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
-const { startCancelListener, stopCancelListener } = await import(
+const { requestCancel, startCancelListener, stopCancelListener } = await import(
   "../../../apps/api/src/jobs/cancel.js"
 );
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
-const { putObject } = await import("../../../apps/api/src/lib/object-storage.js");
+const { listObjects, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
 const { env } = await import("../../../apps/api/src/config.js");
 
@@ -177,5 +177,43 @@ describe("Worker timeout classification", () => {
 
     expect(finalRow?.status).toBe("completed");
     expect(finalRow?.attempts).toBe(1);
+  }, 25_000);
+
+  it("still settles canceled when the user cancel lands after the deadline fired (#2092)", async () => {
+    // The deadline aborted the controller at 1s, so the cancel's own abort() is
+    // a no-op and the signal reason stays "timeout". The user asked for a cancel
+    // and was told true; the late result must not be saved or retried.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-ignores-signal",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    // Past the 1s deadline, before the handler's 2.5s are up.
+    await new Promise((r) => setTimeout(r, 1_700));
+    expect(await requestCancel(jobId)).toBe(true);
+
+    let finalRow: Record<string, unknown> | undefined;
+    for (let i = 0; i < 100; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalRow = row as Record<string, unknown>;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    expect(finalRow?.status).toBe("canceled");
+    expect(finalRow?.attempts).toBe(1);
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
   }, 25_000);
 });

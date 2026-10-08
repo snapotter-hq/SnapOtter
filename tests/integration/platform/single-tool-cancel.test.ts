@@ -22,6 +22,30 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // every other test runs against the real implementation.
 const guardedWriteFault = vi.hoisted(() => ({ target: null as string | null }));
 
+// Runs once right after the real write of an output under `prefix`, standing in
+// for a cancel that arrives while the worker is already past the handler.
+const outputWriteHook = vi.hoisted(() => ({
+  prefix: null as string | null,
+  after: null as (() => Promise<void>) | null,
+}));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      await actual.putObject(key, data);
+      if (outputWriteHook.prefix && key.startsWith(outputWriteHook.prefix)) {
+        const run = outputWriteHook.after;
+        outputWriteHook.prefix = null;
+        outputWriteHook.after = null;
+        await run?.();
+      }
+    },
+  };
+});
+
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
   return {
@@ -41,6 +65,7 @@ import {
   requestCancel,
   startCancelListener,
   stopCancelListener,
+  wasUserCanceled,
 } from "../../../apps/api/src/jobs/cancel.js";
 import {
   createRedisSubscriberConnection,
@@ -406,6 +431,22 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
     expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("settles canceled when the cancel lands while the output is being written (#2092)", async () => {
+    // Past the first guard, so only the re-check before the library auto-save
+    // can stop this one.
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      expect(await requestCancel(clientJobId)).toBe(true);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    await enqueueSingleRun({ mode: "fast", tag: "cancel-mid-write", clientJobId, jobId });
+
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
   });
 
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
