@@ -338,7 +338,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       version: 1,
       canvasSize: state.canvasSize,
       layers: state.layers,
-      objects: state.objects,
+      objects: state.objects.map(withoutLiveStroke),
       adjustments: state.adjustments,
       filters: state.filters,
       guides: state.guides,
@@ -696,6 +696,14 @@ interface AutosaveData {
  * Convert a blob: URL to a data: URL. Returns the original string
  * if it is not a blob URL or if the fetch fails.
  */
+// The canvas a brush paints into mid-stroke lives in attrs.image. It serialises as
+// `{}`, which a restored object would then try to draw.
+function withoutLiveStroke(obj: CanvasObject): CanvasObject {
+  if (obj.type !== "image" || !obj.attrs.image) return obj;
+  const { image: _liveCanvas, ...attrs } = obj.attrs;
+  return { ...obj, attrs };
+}
+
 async function blobUrlToDataUrl(url: string): Promise<string> {
   if (!url.startsWith("blob:")) return url;
   try {
@@ -722,10 +730,14 @@ export async function saveEditorState(): Promise<void> {
     // Also convert blob URLs inside image-type canvas objects
     const objects = await Promise.all(
       s.objects.map(async (obj) => {
-        if (obj.type === "image" && obj.attrs.src?.startsWith("blob:")) {
-          return { ...obj, attrs: { ...obj.attrs, src: await blobUrlToDataUrl(obj.attrs.src) } };
+        const saved = withoutLiveStroke(obj);
+        if (saved.type === "image" && saved.attrs.src?.startsWith("blob:")) {
+          return {
+            ...saved,
+            attrs: { ...saved.attrs, src: await blobUrlToDataUrl(saved.attrs.src) },
+          };
         }
-        return obj;
+        return saved;
       }),
     );
 

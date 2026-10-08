@@ -357,13 +357,19 @@ function ImageObject({
   const [loaded] = useImage(a.src);
   const nodeRef = useRef<Konva.Image>(null);
   // A pixel brush mid-stroke hands over its canvas, which it keeps painting into.
-  // Konva can't see changes inside the same element, so redraw on every update.
-  const liveImage = a.image;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `a` is replaced on every updateObject, which is the redraw trigger
+  // Only a real canvas counts: a serialised one comes back as `{}`, which Konva
+  // would throw on at every draw.
+  const liveImage = a.image instanceof HTMLCanvasElement ? a.image : undefined;
+  // Mouse up swaps the canvas for a data URL that takes a few frames to decode.
+  // Keep showing the canvas (same pixels) until it has, or the stroke blinks out.
+  const lastLiveRef = useRef<HTMLCanvasElement | undefined>(undefined);
+  if (liveImage) lastLiveRef.current = liveImage;
+  else if (loaded) lastLiveRef.current = undefined;
+  // Konva can't see changes inside the same canvas element, so redraw on every update.
   useEffect(() => {
-    if (liveImage) nodeRef.current?.getLayer()?.batchDraw();
-  }, [a, liveImage]);
-  const image = liveImage ?? loaded;
+    if (a.image) nodeRef.current?.getLayer()?.batchDraw();
+  }, [a]);
+  const image = liveImage ?? loaded ?? lastLiveRef.current;
   if (!image) return null;
 
   return (

@@ -18,6 +18,7 @@ type Rgba = { r: number; g: number; b: number; a: number };
 
 type StageView = {
   Konva?: {
+    Layer?: { prototype: { batchDraw(...args: unknown[]): unknown } };
     stages: Array<{
       x(): number;
       y(): number;
@@ -254,14 +255,37 @@ for (const tool of ["blur-brush", "sharpen-brush", "smudge", "dodge", "burn", "s
       const end = await screenPointForDocumentPixel(page, 140, 75);
       await page.mouse.move(start.x, start.y);
       await page.mouse.down();
+      await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
+
+      // The live canvas is repainted in place, which Konva can't see, so the layer
+      // has to be told to redraw on each move.
+      await page.evaluate(() => {
+        const w = window as unknown as { __batchDraws?: number } & StageView;
+        w.__batchDraws = 0;
+        const proto = w.Konva?.Layer?.prototype;
+        if (!proto) return;
+        const original = proto.batchDraw;
+        proto.batchDraw = function (this: unknown, ...args: unknown[]) {
+          w.__batchDraws = (w.__batchDraws ?? 0) + 1;
+          return original.apply(this, args);
+        };
+      });
       await page.mouse.move(end.x, end.y, { steps: 8 });
 
       // Button still held: no mouse-up has swapped in a fresh data URL yet.
       await expect
         .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
         .toBe(255);
+      const draws = await page.evaluate(
+        () => (window as unknown as { __batchDraws?: number }).__batchDraws ?? 0,
+      );
+      expect(draws).toBeGreaterThanOrEqual(4);
 
       await page.mouse.up();
+
+      // The stroke must not blink out while the finished data URL decodes: read
+      // once, straight after release, with no polling.
+      expect(await readStrokeObjectPixel(page, 140, 75)).not.toBeNull();
 
       // The finished stroke keeps its pixels and stays confined to the brush path.
       await expect
