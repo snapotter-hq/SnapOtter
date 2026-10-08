@@ -26,6 +26,7 @@ import { logger } from "../../../apps/api/src/lib/logger.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { DocumentInputHandler } from "../../../apps/api/src/modality/document-input.js";
 import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -336,6 +337,97 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
       });
     } finally {
       errorSpy.mockRestore();
+    }
+  });
+});
+
+// #1432 gave the upload-time failure its status and code; the same missing
+// engine one step later, inside the worker, still answered a bare 422 (#1627).
+describe("a batch whose files all fail in the worker on one engine fault (#1627)", () => {
+  const PNG = readFixture(fixtures.image.base.png200);
+  const pngPart = (filename: string) => ({
+    name: "file",
+    filename,
+    contentType: "image/png",
+    content: PNG,
+  });
+
+  function engineDown(): InputValidationError {
+    return new InputValidationError(
+      "Image processing is unavailable on this server because its engine could not start.",
+      503,
+      "Check the container's image libraries.",
+      "ENGINE_UNAVAILABLE",
+    );
+  }
+
+  /** Make the worker's run of `toolId` fail with each error in turn. */
+  function failInWorker(toolId: string, ...errors: Error[]): () => void {
+    const config = getToolConfig(toolId);
+    if (!config?.processV2) throw new Error(`${toolId} has no processV2`);
+    const real = config.processV2;
+    let call = 0;
+    config.processV2 = async () => {
+      throw errors[Math.min(call++, errors.length - 1)];
+    };
+    return () => {
+      config.processV2 = real;
+    };
+  }
+
+  it("answers the shared status, code and hint, with each file's code", async () => {
+    const restore = failInWorker("resize", engineDown());
+    try {
+      const res = await post("/api/v1/tools/image/resize/batch", [
+        pngPart("a.png"),
+        pngPart("b.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check the container's image libraries.",
+        errors: [{ code: "ENGINE_UNAVAILABLE" }, { code: "ENGINE_UNAVAILABLE" }],
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  it("keeps the generic 422 when the files failed for different reasons", async () => {
+    const restore = failInWorker(
+      "resize",
+      engineDown(),
+      new InputValidationError("This image is too small to resize.", 400),
+    );
+    try {
+      const res = await post("/api/v1/tools/image/resize/batch", [
+        pngPart("a.png"),
+        pngPart("b.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+      expect(res.statusCode, res.body).toBe(422);
+      expect(res.json().code).toBeUndefined();
+    } finally {
+      restore();
+    }
+  });
+
+  it("pipeline batch names the shared reason instead of the generic summary", async () => {
+    const restore = failInWorker("resize", engineDown());
+    try {
+      const res = await post("/api/v1/pipeline/batch", [
+        pngPart("one.png"),
+        pngPart("two.png"),
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+        },
+      ]);
+      expect(res.statusCode, res.body).toBe(422);
+      expect(res.json().error).toContain("Image processing is unavailable");
+    } finally {
+      restore();
     }
   });
 });
