@@ -132,11 +132,14 @@ describe("Pipeline batch ZIP delivery", () => {
     // The finalize failed before the route committed anything to the wire,
     // so the client gets a real error status and JSON body, not a destroyed
     // 200 stream (#750 moved packaging ahead of the response).
-    expect(res.statusCode).toBeGreaterThanOrEqual(500);
+    expect(res.statusCode).toBe(500);
     expect(res.headers["content-type"]).toContain("application/json");
     expect(res.rawPayload.includes(ZIP_EOCD)).toBe(false);
-    // The settled reason, not the error handler's mask (#2180).
-    expect(JSON.parse(res.body).error).toBe("Failed to package batch results");
+    // The settled reason, not the error handler's mask, and no storage code:
+    // only a storage fault answers 503 (#2180).
+    const failure = JSON.parse(res.body);
+    expect(failure.error).toBe("Failed to package batch results");
+    expect(failure.code).toBeUndefined();
 
     // The failure is durable: the parent row replays a terminal failed frame,
     // which is what settles a client that degraded to the SSE path.
@@ -173,6 +176,7 @@ describe("Pipeline batch ZIP delivery", () => {
       error: "Injected cap at packaging",
       code: "workspace-cap",
     });
+    expect(res.rawPayload.includes(ZIP_EOCD)).toBe(false);
   }, 30_000);
 
   it("keeps original-index alignment in fileResults across a pre-failed upload", async () => {

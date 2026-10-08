@@ -1529,7 +1529,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // As in batch.ts: a failed finalize settles the parent row with
             // its reason, which the sync client must see instead of the
             // masked rejection (#2180).
-            const failure = await settledFailureResponse(parentId);
+            const failure = await settledFailureResponse(parentId, request.log);
             if (!failure) throw err;
             return reply.status(failure.status).send(failure.body);
           }
