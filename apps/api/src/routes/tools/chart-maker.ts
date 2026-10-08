@@ -86,13 +86,14 @@ const CURRENCY_SYMBOLS = "$€£¥₹₩₽₺฿₫₪₴₦";
  * readGrouped decides whether its separators make sense.
  */
 const DECORATED = new RegExp(
-  `^(\\()?\\s*([-+−])?\\s*(?:[A-Za-z]{0,3}[${CURRENCY_SYMBOLS}])?\\s*([-+−])?\\s*` +
-    `([.,]?\\d(?:[\\d.,\\s']*\\d)?)\\s*(?:%|[${CURRENCY_SYMBOLS}])?\\s*(\\))?$`,
+  `^(\\()?\\s*([-+−])?\\s*(?:[A-Z]{0,2}[${CURRENCY_SYMBOLS}])?\\s*([-+−])?\\s*` +
+    `([.,]?\\d(?:[\\d.,\\s']*\\d)?[.,]?)\\s*(?:%|[${CURRENCY_SYMBOLS}])?\\s*(\\))?$`,
 );
+const MAX_CELL_LENGTH = 64;
 /** Spreadsheet exports write 1E+05; keep reading it the way Number() does. */
 const SCIENTIFIC = /^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$/;
 /** A space or apostrophe between digit groups ("1 200", "1'200") only ever groups thousands. */
-const SPACE_GROUP = /(?<=\d)[\s'](?=\d{3}(?!\d))/g;
+const SPACE_GROUP = /(?<=(?<!\d)\d{1,3})[\s'](?=\d{3}(?!\d))/g;
 const GROUPED_DOT_DECIMAL = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?$|^\.\d+$/;
 const GROUPED_COMMA_DECIMAL = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d*)?$|^,\d+$/;
 
@@ -102,6 +103,10 @@ function isMinus(sign: string | undefined): boolean {
 
 /** Strip the decoration off a cell, leaving digits and "." / "," separators. */
 function undecorate(text: string): { core: string; negative: boolean } | null {
+  // The pattern has adjacent optional whitespace runs, so a long run of spaces
+  // that then fails to match backtracks quadratically. No displayed number is
+  // this long, and Number() was linear.
+  if (text.length > MAX_CELL_LENGTH) return null;
   const match = DECORATED.exec(text);
   if (!match) return null;
   const [, open, sign, signAfterSymbol, digits, close] = match;

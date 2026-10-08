@@ -57,6 +57,22 @@ describe("chart-maker numbers written the way a spreadsheet shows them (#1198)",
     );
   });
 
+  it("still reads a trailing dot the way Number() does", () => {
+    expect(values("k,v\na,5.\nb,6.\n")).toEqual([5, 6]);
+  });
+
+  it("only groups thousands after a group of one to three digits", () => {
+    expect(() => parse("k,v\na,12345 678\nb,2026 100\n")).toThrow(ToolInputError);
+    expect(() => parse("k,v\na,abc$5\nb,foo$6\n")).toThrow(ToolInputError);
+  });
+
+  it("rejects a long whitespace cell without backtracking", () => {
+    const hostile = `k,v\na,1${" ".repeat(100_000)}x\nb,2${" ".repeat(100_000)}x\n`;
+    const started = performance.now();
+    expect(() => parse(hostile)).toThrow(ToolInputError);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("applies the same reading to JSON string values", () => {
     const json = JSON.stringify([
       { name: "A", total: "$1,200" },
