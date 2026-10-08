@@ -1,6 +1,6 @@
 // apps/web/src/stores/editor-store.ts
 
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, SafeError } from "@snapotter/shared";
 import { temporal } from "zundo";
 import { create } from "zustand";
 import {
@@ -126,6 +126,9 @@ function rebakeSourceIntoCanvas(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    // Same as the ?url= loader: without it a cross-origin photo taints the canvas and
+    // toDataURL throws. Harmless for blob: and data: sources.
+    img.crossOrigin = "anonymous";
     img.onerror = () => reject(new Error("Could not reload the source image"));
     img.onload = () => {
       try {
@@ -162,7 +165,7 @@ function rebakeThenSetSource(
       console.error(`${label} could not update the source image`, err);
       void import("@/lib/analytics").then(({ captureHandledError }) =>
         captureHandledError(
-          new Error(`${label} could not update the source image`, { cause: err }),
+          new SafeError(`${label} could not update the source image`, { kind: "bug", cause: err }),
           { error_class: "bug" },
         ),
       );

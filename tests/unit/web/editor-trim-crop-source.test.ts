@@ -6,6 +6,13 @@ vi.mock("zustand/middleware", async (importOriginal) => {
   return { ...actual, persist: (config: unknown) => config };
 });
 
+const analytics = vi.hoisted(() => ({
+  captureHandledError: vi.fn(async () => null),
+  track: vi.fn(),
+  getDistinctId: vi.fn(() => "test"),
+}));
+vi.mock("@/lib/analytics", () => analytics);
+
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
 
@@ -109,6 +116,17 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
     expect(logged).toHaveBeenCalledWith(
       "Crop could not update the source image",
       expect.any(Error),
+    );
+    // The console alone never reaches Sentry; the report must carry the root cause.
+    await vi.waitFor(() =>
+      expect(analytics.captureHandledError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Crop could not update the source image",
+          isSafeMessage: true,
+          cause: expect.any(Error),
+        }),
+        { error_class: "bug" },
+      ),
     );
     // The canvas change already committed, so the original bitmap stays as is.
     expect(useEditorStore.getState().canvasSize).toEqual({ width: 200, height: 100 });
