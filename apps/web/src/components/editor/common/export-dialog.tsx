@@ -1,7 +1,7 @@
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 // apps/web/src/components/editor/common/export-dialog.tsx
 
-import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, apiToolPath, SafeError } from "@snapotter/shared";
 import {
   Check,
   ClipboardCopy,
@@ -61,6 +61,13 @@ const FORMAT_OPTIONS: {
   { value: "jxl", label: "JXL", supportsTransparency: true, needsServerConvert: true },
 ];
 
+// A capture whose width or height rounds to 0 px throws InvalidStateError (typing
+// "1" into the width of a wide image does exactly that). Never ask for less than
+// 1 px on the shorter side.
+function atLeastOnePixel(ratio: number, width: number, height: number): number {
+  return Math.max(ratio, 1 / Math.min(width, height));
+}
+
 function getMimeType(format: ExportFormat): string {
   const mimes: Record<ExportFormat, string> = {
     png: "image/png",
@@ -101,7 +108,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     if (!stage) return;
 
     const maxPreview = 200;
-    const scale = Math.min(maxPreview / canvasSize.width, maxPreview / canvasSize.height);
+    const scale = atLeastOnePixel(
+      Math.min(maxPreview / canvasSize.width, maxPreview / canvasSize.height),
+      canvasSize.width,
+      canvasSize.height,
+    );
 
     // For server-convert formats the Canvas API cannot produce a preview,
     // so fall back to PNG for the thumbnail.
@@ -118,7 +129,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         previewMime,
         settings.quality / 100,
       );
-      const pixelRatio = settings.width / canvasSize.width;
+      const pixelRatio = atLeastOnePixel(
+        settings.width / canvasSize.width,
+        canvasSize.width,
+        canvasSize.height,
+      );
       fullUrl = captureDocumentCanvas(
         stage,
         canvasSize.width,
@@ -126,7 +141,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         pixelRatio,
       ).toDataURL(previewMime, settings.quality / 100);
     } catch (err) {
-      if (!classifyCaptureError(err)) throw err;
+      // Never rethrow from here: a thumbnail isn't worth the editor. Known capture
+      // failures are explained by Export and Copy; anything else is reported.
+      if (!classifyCaptureError(err)) {
+        console.error("Export preview failed:", err);
+        void import("@/lib/analytics").then(({ captureHandledError }) =>
+          captureHandledError(
+            new SafeError("Could not render the export preview", { kind: "bug", cause: err }),
+            { error_class: "bug", tool_id: "editor-export" },
+          ),
+        );
+      }
       setPreviewUrl(null);
       setEstimatedSize(null);
       return;
@@ -223,7 +248,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     if (!stage) return;
 
     guardCapture(() => {
-      const pixelRatio = settings.width / canvasSize.width;
+      const pixelRatio = atLeastOnePixel(
+        settings.width / canvasSize.width,
+        canvasSize.width,
+        canvasSize.height,
+      );
 
       // Server-side convert for formats the Canvas API cannot produce
       const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
@@ -235,7 +264,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           exportCanvas.width = raw.width;
           exportCanvas.height = raw.height;
           const ctx = exportCanvas.getContext("2d");
-          if (!ctx) return;
+          if (!ctx) {
+            reportEmptyExport();
+            return;
+          }
           ctx.fillStyle = "#ffffff";
           ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
           ctx.drawImage(raw, 0, 0);
@@ -297,7 +329,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         exportCanvas.width = stageCanvas.width;
         exportCanvas.height = stageCanvas.height;
         const ctx = exportCanvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {
+          reportEmptyExport();
+          return;
+        }
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
         ctx.drawImage(stageCanvas, 0, 0);
@@ -382,7 +417,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const stage = editorStageRefHolder.current;
     if (!stage) return;
 
-    const pixelRatio = settings.width / canvasSize.width;
+    const pixelRatio = atLeastOnePixel(
+      settings.width / canvasSize.width,
+      canvasSize.width,
+      canvasSize.height,
+    );
     let dataUrl = "";
     const captured = guardCapture(() => {
       dataUrl = captureDocumentCanvas(

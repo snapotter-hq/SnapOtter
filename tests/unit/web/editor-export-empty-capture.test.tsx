@@ -21,6 +21,7 @@ const capture = vi.hoisted(() => ({
   dataUrl: "data:image/png;base64,AA==",
   blob: new Blob(["x"]) as Blob | null,
   throwOnEncode: null as Error | null,
+  ratios: [] as number[],
 }));
 
 // By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
@@ -34,18 +35,25 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 vi.mock("@/components/editor/editor-canvas", () => ({ editorStageRefHolder: { current: {} } }));
 vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/editor/stage-capture")>()),
-  captureDocumentCanvas: () => ({
-    width: 10,
-    height: 10,
-    toDataURL: () => {
-      if (capture.throwOnEncode) throw capture.throwOnEncode;
-      return capture.dataUrl;
-    },
-    toBlob: (cb: (blob: Blob | null) => void) => {
-      if (capture.throwOnEncode) throw capture.throwOnEncode;
-      cb(capture.blob);
-    },
-  }),
+  captureDocumentCanvas: (_stage: unknown, w: number, h: number, ratio = 1) => {
+    capture.ratios.push(ratio);
+    // Konva's drawImage of a layer canvas with a 0 px side throws InvalidStateError.
+    if (Math.floor(w * ratio) < 1 || Math.floor(h * ratio) < 1) {
+      throw new DOMException("The object is in an invalid state.", "InvalidStateError");
+    }
+    return {
+      width: 10,
+      height: 10,
+      toDataURL: () => {
+        if (capture.throwOnEncode) throw capture.throwOnEncode;
+        return capture.dataUrl;
+      },
+      toBlob: (cb: (blob: Blob | null) => void) => {
+        if (capture.throwOnEncode) throw capture.throwOnEncode;
+        cb(capture.blob);
+      },
+    };
+  },
 }));
 
 import { ExportDialog } from "@/components/editor/common/export-dialog";
@@ -62,7 +70,8 @@ beforeEach(() => {
   capture.dataUrl = "data:image/png;base64,AA==";
   capture.blob = new Blob(["x"]);
   capture.throwOnEncode = null;
-  useEditorStore.setState({ markClean, isDirty: true });
+  capture.ratios = [];
+  useEditorStore.setState({ markClean, isDirty: true, canvasSize: { width: 1920, height: 1080 } });
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => ({
@@ -194,5 +203,56 @@ describe("copy of a canvas that can't be encoded (#2140)", () => {
     clickCopy();
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(TAINTED, expect.anything()));
     expect(copyImageToClipboard).not.toHaveBeenCalled();
+  });
+});
+
+describe("a size that rounds to 0 px (#2140)", () => {
+  // Typing "1" into the width of a wide image commits width 1 on the first
+  // keystroke; the height rounds to 0 and Konva throws InvalidStateError. That
+  // used to escape the preview effect and replace the editor with the crash screen.
+  it("keeps the dialog open and captures at least 1 px on every side", async () => {
+    useEditorStore.setState({ canvasSize: { width: 800, height: 200 } });
+    render(<ExportDialog onClose={() => {}} />);
+    fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "1" } });
+    expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+    for (const ratio of capture.ratios) {
+      expect(Math.floor(800 * ratio)).toBeGreaterThanOrEqual(1);
+      expect(Math.floor(200 * ratio)).toBeGreaterThanOrEqual(1);
+    }
+    clickExport();
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("opens on a document far wider than the 200 px thumbnail is tall", () => {
+    useEditorStore.setState({ canvasSize: { width: 40000, height: 100 } });
+    render(<ExportDialog onClose={() => {}} />);
+    expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+  });
+
+  it("blanks the preview instead of crashing on an error that is not a known capture failure", () => {
+    capture.throwOnEncode = new TypeError("something unexpected");
+    render(<ExportDialog onClose={() => {}} />);
+    expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+  });
+});
+
+describe("a 2D context the browser won't give (#2140)", () => {
+  // jsdom's canvas has no 2D context, which is the same branch a browser at its limit takes.
+  it("reports the white-background JPEG path instead of returning silently", async () => {
+    render(<ExportDialog onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "JPEG" }));
+    clickExport();
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(TOO_LARGE, expect.anything()));
+    expect(markClean).not.toHaveBeenCalled();
+  });
+
+  it("reports the server-convert path with a solid background too", async () => {
+    render(<ExportDialog onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "AVIF" }));
+    fireEvent.click(screen.getByText(en.editor.ui.exportDialog.transparentBackground));
+    clickExport();
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(TOO_LARGE, expect.anything()));
+    expect(markClean).not.toHaveBeenCalled();
   });
 });

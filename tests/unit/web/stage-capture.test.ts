@@ -171,6 +171,13 @@ describe("classifyCaptureError", () => {
     expect(classifyCaptureError(err)).toBe("no-context");
   });
 
+  it("calls an InvalidStateError a canvas the browser could not back", () => {
+    // Firefox past its limit: "CanvasRenderingContext2D.scale: Canvas exceeds max size."
+    expect(
+      classifyCaptureError(new DOMException("Canvas exceeds max size.", "InvalidStateError")),
+    ).toBe("no-context");
+  });
+
   it("leaves a bug alone", () => {
     expect(classifyCaptureError(new TypeError("Cannot read properties of null"))).toBeNull();
     expect(classifyCaptureError("not even an error")).toBeNull();
