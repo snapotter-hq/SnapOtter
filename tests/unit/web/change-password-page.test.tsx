@@ -104,6 +104,22 @@ describe("a successful change is never reported as a failure", () => {
     expect(offered).toBe("alice");
   });
 
+  it("submits a POST form to the app root, which the API answers with a redirect (#2088)", async () => {
+    let method = "";
+    let path = "";
+    submitSpy.mockImplementation(function (this: HTMLFormElement) {
+      method = this.method;
+      path = new URL(this.action).pathname;
+    });
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
+    expect(method).toBe("post");
+    expect(path).toBe("/");
+  });
+
   it("keeps the button disabled once the change succeeded, so a second click cannot resend", async () => {
     answer(200, {});
 

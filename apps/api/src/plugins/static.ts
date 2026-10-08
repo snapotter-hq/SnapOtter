@@ -51,8 +51,8 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
     warnUndeclaredPrefix(app, path, warnedUndeclaredPrefixes);
     // The forced change-password page submits a real form POST to the app root so
     // the browser offers to save the new password. Send the browser on to the app
-    // (303 turns it into a GET); the form body, which carries the password, is
-    // never read or echoed (#2088).
+    // (303 turns it into a GET). This handler never reads or echoes the form body,
+    // which carries the password (#2088).
     if (request.method === "POST" && path === "/") {
       reply.redirect(`${env.BASE_PATH}/`, 303);
       return;

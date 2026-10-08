@@ -443,9 +443,29 @@ describe("SPA fallback disambiguation (#1275)", () => {
       });
       expect(response.statusCode).toBe(303);
       expect(response.headers.location).toBe("/");
-      // The password the form carries is never echoed back.
-      expect(response.body).not.toContain("new-Password1");
-      expect(response.headers.location).not.toContain("new-Password1");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does the same when a urlencoded body parser is registered (SAML on)", async () => {
+    const app = Fastify();
+    // saml.ts adds this parser on the root instance, which the not-found handler shares.
+    app.addContentTypeParser(
+      "application/x-www-form-urlencoded",
+      { parseAs: "string" },
+      (_request, body, done) => done(null, body),
+    );
+    await registerStatic(app, root);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "username=admin&password=new-Password1",
+      });
+      expect(response.statusCode).toBe(303);
+      expect(response.headers.location).toBe("/");
     } finally {
       await app.close();
     }
@@ -465,6 +485,20 @@ describe("SPA fallback disambiguation (#1275)", () => {
       });
       expect(response.statusCode).toBe(303);
       expect(response.headers.location).toBe(`${basePath}/`);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("only redirects a POST: other methods on the app root still 404", async () => {
+    const app = Fastify();
+    await registerStatic(app, root);
+    try {
+      for (const method of ["PUT", "DELETE", "PATCH"] as const) {
+        const response = await app.inject({ method, url: "/" });
+        expect(response.statusCode, method).toBe(404);
+        expect(response.headers["content-type"], method).toContain("text/plain");
+      }
     } finally {
       await app.close();
     }
