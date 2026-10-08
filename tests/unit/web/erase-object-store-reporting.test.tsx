@@ -1484,3 +1484,170 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(entry(0).status).toBe("pending");
   });
 });
+
+describe("erase-object single file: leaving the page mid-run (#1975)", () => {
+  /** What the tool page does on the way out: a fresh store for the next tool. */
+  function moveToAnotherTool() {
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+  }
+
+  it("leaving for another tool aborts the request and drops its answer", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+
+    unmount();
+    moveToAnotherTool();
+
+    expect(xhr.aborted).toBe(true);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    xhr.respond(200, GOOD_BODY);
+    await act(async () => {});
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("leaving drops an error answer too, so the next tool shows no error", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+
+    unmount();
+    moveToAnotherTool();
+    xhr.respond(422, { error: "Object erasing failed" });
+    await act(async () => {});
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("closes the progress stream of a 202 run when the files go", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    moveToAnotherTool();
+
+    // A closed EventSource delivers no more frames, so nothing can land.
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(xhr.aborted).toBe(true);
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("replacing the files from the library ends the run and clears processing", async () => {
+    renderPanel();
+    const xhr = await submit();
+
+    act(() => {
+      useFileStore.getState().setFiles([image("from-library.png")]);
+    });
+
+    expect(xhr.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    xhr.respond(200, GOOD_BODY);
+    expect(entry(0).processedUrl).toBeNull();
+  });
+
+  it("a bare unmount (the mobile settings sheet closing) leaves the request running", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+
+    unmount();
+
+    expect(xhr.aborted).toBe(false);
+    xhr.respond(200, GOOD_BODY);
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+  });
+
+  it("does not touch the request of a run that already finished", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    xhr.respond(200, GOOD_BODY);
+
+    unmount();
+    moveToAnotherTool();
+
+    expect(xhr.aborted).toBe(false);
+  });
+
+  it("sends nothing when the files are replaced while the mask is still exporting", async () => {
+    let finishExport: (blob: Blob) => void = () => {};
+    const eraser = fakeEraser();
+    eraser.exportMask = () =>
+      new Promise<Blob | null>((resolve) => {
+        finishExport = resolve;
+      });
+    render(
+      <EraseObjectSettings
+        eraserRef={{ current: eraser }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={1}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+    moveToAnotherTool();
+    await act(async () => {
+      finishExport(new Blob(["mask"], { type: "image/png" }));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it.each([
+    ["a network error", (xhr: FakeXhr) => xhr.onerror?.()],
+    ["a request timeout", (xhr: FakeXhr) => xhr.ontimeout?.()],
+  ])("ends the watch on %s even when showing the error throws", async (_label, end) => {
+    // The panel reads setError off the store when it renders, so the break goes
+    // in first. Only a message throws: the run's own setError(null) must work.
+    const realSetError = useFileStore.getState().setError;
+    vi.spyOn(useFileStore.getState(), "setError").mockImplementation((message) => {
+      if (message !== null) throw new Error("boom");
+      realSetError(message);
+    });
+    try {
+      renderPanel();
+      const xhr = await submit();
+
+      expect(() => act(() => end(xhr))).toThrow("boom");
+      await act(async () => {});
+      moveToAnotherTool();
+
+      // The run was over before the files left: nothing is left to abort.
+      expect(xhr.aborted).toBe(false);
+    } finally {
+      useFileStore.setState({ setError: realSetError });
+    }
+  });
+
+  it("reports a stop that throws without breaking the update that replaced the files", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    unmount();
+    vi.spyOn(xhr, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() => moveToAnotherTool()).not.toThrow();
+    await act(async () => {});
+
+    expect(entry(0).file.name).toBe("next-tool.png");
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Stopping an Erase Object run whose file left failed");
+    expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+});

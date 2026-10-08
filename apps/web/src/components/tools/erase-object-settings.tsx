@@ -269,8 +269,7 @@ export function EraseObjectSettings({
   maskedFileCount,
 }: EraseObjectSettingsProps) {
   const { t } = useTranslation();
-  const { files, entries, processing, error, setProcessing, setError, currentEntry } =
-    useFileStore();
+  const { files, processing, error, setProcessing, setError, currentEntry } = useFileStore();
   const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStage, setProgressStage] = useState<string | null>(null);
@@ -439,11 +438,16 @@ export function EraseObjectSettings({
     // Library file this single-file run derives from (#565). Batch runs
     // (handleProcessAll) never auto-save, matching the standard processor.
     const capturedEntry = useFileStore.getState().entries[capturedIndex];
+    const runFile = capturedEntry.file;
     const saveMode = useFileStore.getState().librarySaveMode;
     useFileStore.getState().setLastSavedLibraryFileId(null);
 
     const maskBlob = await eraserRef.current.exportMask();
     if (!maskBlob) return;
+    // The store may have been replaced while the mask exported, and the watch
+    // below only sees writes made after it subscribes: starting now would send
+    // a file nobody is looking at and land its answer on the next tool's (#1975).
+    if (!useFileStore.getState().entries.some((e) => e.file === runFile)) return;
 
     // Record where the user painted so the comparison slider starts at that location
     const maskCenter = eraserRef.current.getMaskCenter();
@@ -484,7 +488,16 @@ export function EraseObjectSettings({
       if (r.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
     };
 
+    // The store watch below ends with the run. Every terminal handler calls
+    // endWatch first, before any store write that could throw, so a failing
+    // write can't leave a dead run's watch behind to abort someone else's.
+    let unwatchFiles: (() => void) | null = null;
+    const endWatch = () => {
+      unwatchFiles?.();
+      unwatchFiles = null;
+    };
     const finishUi = () => {
+      endWatch();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       setProcessing(false);
       setProgressPhase("idle");
@@ -506,11 +519,13 @@ export function EraseObjectSettings({
         setProgressPercent(15 + (percent / 100) * 85);
       },
       onComplete: (r) => {
+        endWatch();
         progressCleanupRef.current = null;
         applyResult(r);
         finishUi();
       },
       onFailed: (failure) => {
+        endWatch();
         progressCleanupRef.current = null;
         abandonRequest();
         cancelIfHandlingFailed(failure, clientJobId);
@@ -524,6 +539,7 @@ export function EraseObjectSettings({
         }
       },
       onStall: () => {
+        endWatch();
         progressCleanupRef.current = null;
         abandonRequest();
         setError(t.toolSettings["erase-object"].stall);
@@ -533,10 +549,47 @@ export function EraseObjectSettings({
     const stopProgress = subscription.stop;
     progressCleanupRef.current = stopProgress;
 
+    // Leaving for another tool resets the file store, and opening library
+    // files replaces it. Either way this run's file is gone and its answer
+    // would land on entries that belong to someone else, so the request is
+    // dropped, as the batch does (#1894). This keys on the store rather than
+    // on unmount because the panel also unmounts whenever the mobile settings
+    // sheet closes, and that must not end the run (#1974).
+    unwatchFiles = useFileStore.subscribe((state) => {
+      if (abandoned || state.entries.some((e) => e.file === runFile)) return;
+      // This runs inside whoever replaced the files (the tool page's reset,
+      // the library's setFiles): a throw here must not break their update, and
+      // each step gets its own guard so one that throws can't leave the run at
+      // processing. The first error is reported once.
+      let stopError: { cause: unknown } | null = null;
+      for (const step of [
+        abandonRequest,
+        stopProgress,
+        () => {
+          progressCleanupRef.current = null;
+        },
+        finishUi,
+      ]) {
+        try {
+          step();
+        } catch (err) {
+          console.error("Stopping an Erase Object run whose file left failed", err);
+          stopError ??= { cause: err };
+        }
+      }
+      if (stopError) {
+        reportRunEndFailure(
+          "Stopping an Erase Object run whose file left failed",
+          stopError.cause,
+          "erase-object",
+        );
+      }
+    });
+
     const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
 
     const formData = new FormData();
-    formData.append("file", entries[capturedIndex].file);
+    formData.append("file", runFile);
     formData.append("mask", maskFile);
     formData.append("clientJobId", clientJobId);
     formData.append("format", outputFormat);
@@ -564,6 +617,7 @@ export function EraseObjectSettings({
       // 202 = async: the progress subscription drives completion via SSE.
       if (abandoned || xhr.status === 202) return;
 
+      endWatch();
       stopProgress();
       progressCleanupRef.current = null;
 
@@ -625,6 +679,7 @@ export function EraseObjectSettings({
     };
     xhr.onerror = () => {
       if (abandoned) return;
+      endWatch();
       stopProgress();
       progressCleanupRef.current = null;
       setError(t.errors.network);
@@ -632,6 +687,7 @@ export function EraseObjectSettings({
     };
     xhr.ontimeout = () => {
       if (abandoned) return;
+      endWatch();
       stopProgress();
       progressCleanupRef.current = null;
       setError(t.toolSettings["erase-object"].timeoutOverloaded);
