@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -160,6 +161,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     [settings.lockAspect, aspectRatio],
   );
 
+  // Past the browser's canvas limit Chromium and WebKit still hand out a canvas,
+  // but toDataURL() answers "data:," and toBlob() answers null or an empty blob.
+  // Saying so beats downloading an empty file and marking the document saved (#2140).
+  const reportEmptyExport = useCallback(() => {
+    toast.error(t.editor.ui.captureFailure.noCanvasMemory);
+  }, [t]);
+
   // Issue #6: Export using Konva stage.toDataURL for correct output
   const handleExport = useCallback(() => {
     import("@/lib/analytics").then(({ track }) =>
@@ -190,7 +198,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       }
 
       stageCanvas.toBlob(async (blob) => {
-        if (!blob) return;
+        if (!blob || blob.size === 0) {
+          reportEmptyExport();
+          return;
+        }
         const formData = new FormData();
         formData.append("file", blob, "export.png");
         formData.append(
@@ -254,6 +265,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       );
     }
 
+    if (dataUrl === "data:,") {
+      reportEmptyExport();
+      return;
+    }
+
     const formatOpt = FORMAT_OPTIONS.find((f) => f.value === settings.format);
     if (formatOpt?.needsServerConvert) {
       fetch(dataUrl)
@@ -288,6 +304,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       fetch(dataUrl)
         .then((res) => res.blob())
         .then((blob) => {
+          if (blob.size === 0) {
+            reportEmptyExport();
+            return;
+          }
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
@@ -302,7 +322,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           console.error("Export failed:", err);
         });
     }
-  }, [settings, canvasSize, markClean]);
+  }, [settings, canvasSize, markClean, reportEmptyExport]);
 
   // Issue #6: Copy to clipboard using Konva stage
   const handleCopyToClipboard = useCallback(async () => {
