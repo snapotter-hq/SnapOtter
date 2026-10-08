@@ -93,9 +93,33 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(first.name).toBe("alpha");
   }, 30_000);
 
-  it("rejects non-array JSON input for JSON-to-CSV", async () => {
-    const obj = Buffer.from(JSON.stringify({ key: "value" }));
+  it("unwraps a single-key {data: [...]} wrapper for JSON-to-CSV (#1159)", async () => {
+    const wrapped = Buffer.from(JSON.stringify({ data: [{ name: "Ada", age: 36 }] }));
+    const res = await runTool("wrapped.json", wrapped);
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.payload).toContain("name,age");
+    expect(dl.payload).toContain("Ada,36");
+  }, 30_000);
+
+  it("emits key/value rows for a flat object of scalars (#1159)", async () => {
+    const obj = Buffer.from(JSON.stringify({ key1: "value" }));
     const res = await runTool("obj.json", obj);
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.payload).toContain("key,value");
+    expect(dl.payload).toContain("key1,value");
+  }, 30_000);
+
+  it("rejects ambiguous JSON input for JSON-to-CSV", async () => {
+    const obj = Buffer.from(JSON.stringify({ users: [{ id: 1 }], meta: { total: 1 } }));
+    const res = await runTool("ambiguous.json", obj);
     expect(res.statusCode).toBe(400);
   }, 30_000);
 });
