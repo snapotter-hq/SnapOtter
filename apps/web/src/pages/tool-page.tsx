@@ -436,8 +436,8 @@ export function ToolPage() {
     setEraserBrushSize(30);
     setEraserSliderInitPos(null);
     setMobileSettingsOpen(false);
-    // Settings unmount whenever the mobile sheet closes; the editor session
-    // belongs to the tool route and must survive those panel unmounts.
+    // The editor session belongs to the tool route, not to the settings panel.
+    // (The mobile sheet keeps the panel mounted while closed, #1974.)
     return () => useMultiToolStore.getState().clear();
   }, [toolId]);
 
@@ -1410,6 +1410,9 @@ export function ToolPage() {
             open={mobileSettingsOpen}
             onClose={() => setMobileSettingsOpen(false)}
             title={t.common.settings}
+            // A run's request, progress stream and timers live in the settings
+            // panel, so closing the sheet mid-run must not unmount it (#1974).
+            keepMounted
           >
             <div className="settings-container space-y-3">{renderSettingsContent()}</div>
           </BottomSheet>
