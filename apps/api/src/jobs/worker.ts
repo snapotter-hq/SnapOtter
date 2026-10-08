@@ -1661,6 +1661,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       settings.preFailureFaults,
       totalFiles - flowChildCount,
       childFaults,
+      flowChildCount,
     );
     // Otherwise one shared reason (the workspace cap on every output write)
     // becomes the batch's own message and a blank-name entry the client reads

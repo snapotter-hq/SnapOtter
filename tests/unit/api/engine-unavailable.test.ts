@@ -184,7 +184,7 @@ describe("allFailedFault (#1627)", () => {
 
   it("finds one fault across pre-failures and worker failures", async () => {
     const { allFailedFault } = await helpers();
-    expect(allFailedFault([down], 1, [down])).toMatchObject({
+    expect(allFailedFault([down], 1, [down], 1)).toMatchObject({
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
     });
@@ -192,9 +192,9 @@ describe("allFailedFault (#1627)", () => {
 
   it("judges worker failures alone when nothing failed before the flow", async () => {
     const { allFailedFault } = await helpers();
-    expect(allFailedFault([], 0, [down, down])).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    expect(allFailedFault([], 0, [down, down], 2)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
     // A job queued before the field existed carries none at all.
-    expect(allFailedFault(undefined, 0, [down, down])).toMatchObject({
+    expect(allFailedFault(undefined, 0, [down, down], 2)).toMatchObject({
       code: "ENGINE_UNAVAILABLE",
     });
   });
@@ -202,21 +202,25 @@ describe("allFailedFault (#1627)", () => {
   it("gives no verdict when the pre-failures don't account for every file", async () => {
     const { allFailedFault } = await helpers();
     // An older build sent none, though one file failed before the flow.
-    expect(allFailedFault(undefined, 1, [down])).toBeNull();
-    expect(allFailedFault([down], 2, [down])).toBeNull();
-    expect(allFailedFault("not a list", 0, [down])).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    expect(allFailedFault(undefined, 1, [down], 1)).toBeNull();
+    expect(allFailedFault([down], 2, [down], 1)).toBeNull();
+    // A flow child with no fault recorded is a file nobody judged.
+    expect(allFailedFault([], 0, [down], 2)).toBeNull();
+    expect(allFailedFault("not a list", 0, [down], 1)).toMatchObject({
+      code: "ENGINE_UNAVAILABLE",
+    });
   });
 
   it("keeps the generic answer when one file failed differently", async () => {
     const { allFailedFault } = await helpers();
-    expect(allFailedFault([], 0, [down, { error: "Child job row not found" }])).toBeNull();
-    expect(allFailedFault([{ error: "corrupt", statusCode: 400 }], 1, [down])).toBeNull();
+    expect(allFailedFault([], 0, [down, { error: "Child job row not found" }], 2)).toBeNull();
+    expect(allFailedFault([{ error: "corrupt", statusCode: 400 }], 1, [down], 1)).toBeNull();
   });
 
   it("carries a fault without a hint", async () => {
     const { allFailedFault } = await helpers();
     const bare = { error: "engine down", statusCode: 503, code: "ENGINE_UNAVAILABLE" };
-    expect(allFailedFault([], 0, [bare, bare])).toEqual({
+    expect(allFailedFault([], 0, [bare, bare], 2)).toEqual({
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
       error: "engine down",

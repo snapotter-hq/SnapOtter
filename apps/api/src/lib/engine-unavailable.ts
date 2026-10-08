@@ -82,16 +82,18 @@ export interface BatchFault {
  * fault across the files that failed before the flow and the ones that
  * failed in it (#1627). The pre-failures come from the route through job
  * data; when that list doesn't account for every file that never reached
- * the flow (a job queued by an older build), there's no verdict rather than
- * one formed without every file in view.
+ * the flow (a job queued by an older build), or the child faults don't
+ * account for every flow child, there's no verdict rather than one formed
+ * without every file in view.
  */
 export function allFailedFault(
   preFailureFaults: unknown,
   preFailedCount: number,
   childFaults: BatchFault[],
+  flowChildCount: number,
 ): ReturnType<typeof sharedServerFault> {
   const pre = Array.isArray(preFailureFaults) ? (preFailureFaults as BatchFault[]) : [];
-  if (pre.length !== preFailedCount) return null;
+  if (pre.length !== preFailedCount || childFaults.length !== flowChildCount) return null;
   return sharedServerFault([...pre, ...childFaults]);
 }
 
