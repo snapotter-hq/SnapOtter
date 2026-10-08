@@ -55,6 +55,17 @@ registerToolProcessFn({
   },
 });
 
+// A tool that never reads the signal and finishes after the timeout fired, like
+// pdf-to-word's own longer budget inside the docs pool's 120s job timeout.
+registerToolProcessFn({
+  toolId: "timeout-ignores-signal",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async (inputBuffer: Buffer, _settings: unknown, filename: string) => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    return { buffer: inputBuffer, filename, contentType: "image/png" };
+  },
+});
+
 // Ensure workspace dir exists (test-server.ts normally does this, but
 // we bypass it to avoid loading the full app).
 const { mkdirSync } = await import("node:fs");
@@ -134,5 +145,37 @@ describe("Worker timeout classification", () => {
     // Must NOT say "Canceled"
     expect(parsed.error).not.toBe("Canceled");
     expect(parsed.jobId).toBe(jobId);
+  }, 25_000);
+
+  it("keeps the result of a handler that ignores the signal and finishes after the timeout (#2092)", async () => {
+    // The post-handler cancel guard is for user cancels. A timeout abort must
+    // not make it discard a finished result and rerun the whole job.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-ignores-signal",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    let finalRow: Record<string, unknown> | undefined;
+    for (let i = 0; i < 100; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalRow = row as Record<string, unknown>;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    expect(finalRow?.status).toBe("completed");
+    expect(finalRow?.attempts).toBe(1);
   }, 25_000);
 });

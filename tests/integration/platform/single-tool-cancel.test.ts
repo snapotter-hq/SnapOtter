@@ -56,7 +56,7 @@ import {
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
-import { objectExists, putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory.js";
@@ -113,7 +113,17 @@ registerToolProcessFn({
       if (!signal) throw new Error("wt-single-cancel requires an abort signal");
       if (!signal.aborted) {
         await new Promise<void>((resolve) => {
-          signal.addEventListener("abort", () => resolve(), { once: true });
+          // Bounded like the slow mode, so a lost cancel fails this test instead of
+          // hanging the shard until the job timeout.
+          const timer = setTimeout(resolve, 20_000);
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
         });
       }
       await delay(200);
@@ -395,7 +405,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const frame = await terminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
-    expect(await objectExists(`outputs/${jobId}/input.png`)).toBe(false);
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
   });
 
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
