@@ -91,6 +91,9 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
       // Compute offset from source to destination
       let offsetX: number;
       let offsetY: number;
+      // Kept only once the first dab is on the canvas: an aborted click must not
+      // leave a later one cloning from the wrong place (#2141).
+      let newAlignedOffset: { x: number; y: number } | null = null;
 
       if (cloneAligned && initialOffsetRef.current) {
         offsetX = initialOffsetRef.current.x;
@@ -98,9 +101,7 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
       } else {
         offsetX = cloneSource.x - x;
         offsetY = cloneSource.y - y;
-        if (cloneAligned) {
-          initialOffsetRef.current = { x: offsetX, y: offsetY };
-        }
+        if (cloneAligned) newAlignedOffset = { x: offsetX, y: offsetY };
       }
 
       // Paint the first dab
@@ -112,6 +113,7 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
         reportCaptureFailure("no-context", captureMessages);
         return;
       }
+      if (newAlignedOffset) initialOffsetRef.current = newAlignedOffset;
 
       const obj: CanvasObject = {
         id,

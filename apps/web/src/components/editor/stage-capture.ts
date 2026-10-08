@@ -93,14 +93,19 @@ function canvasIsDead(ctx: CanvasRenderingContext2D): boolean {
 }
 
 // What a browser throws when a canvas is too big to read back: RangeError from the
-// pixel buffer in Chromium and WebKit, IndexSizeError for an empty source,
-// InvalidStateError from Firefox past its limit ("Canvas exceeds max size"), and
-// NS_ERROR_FAILURE in Firefox. Anything else is a bug and is left to propagate.
+// pixel buffer in Chromium, IndexSizeError for an empty source, InvalidStateError
+// from WebKit (a live canvas whose buffer can't be allocated) and from Firefox past
+// its limit ("Canvas exceeds max size"), and in Firefox an exception that is not an
+// Error at all, with the code in `name` and an empty message (NS_ERROR_FAILURE from
+// the probe, NS_ERROR_OUT_OF_MEMORY from a full read). Anything else is a bug and is
+// left to propagate.
 function isCanvasSizeError(err: unknown): boolean {
   if (err instanceof RangeError) return true;
   if (err instanceof DOMException) {
     return err.name === "IndexSizeError" || err.name === "InvalidStateError";
   }
+  const name = (err as { name?: unknown } | null)?.name;
+  if (name === "NS_ERROR_FAILURE" || name === "NS_ERROR_OUT_OF_MEMORY") return true;
   return err instanceof Error && err.message.includes("NS_ERROR_FAILURE");
 }
 

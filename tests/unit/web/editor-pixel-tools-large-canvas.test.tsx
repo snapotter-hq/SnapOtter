@@ -22,7 +22,12 @@ const DOC_AREA = DOC.width * DOC.height;
 
 // A 2D context that reads back zeros but refuses a whole-document read while
 // `bigReadsFail` is set, the way a huge canvas does.
-const state = { bigReadsFail: false, dataUrl: "data:image/png;base64,AAAA" };
+const state = {
+  bigReadsFail: false,
+  dataUrl: "data:image/png;base64,AAAA",
+  pointer: { x: 50, y: 50 },
+  fills: 0,
+};
 function fakeContext() {
   return {
     getImageData: vi.fn((_x: number, _y: number, w: number, h: number) => {
@@ -32,7 +37,9 @@ function fakeContext() {
       return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
     }),
     putImageData: vi.fn(),
-    fillRect: vi.fn(),
+    fillRect: vi.fn(() => {
+      state.fills++;
+    }),
     globalAlpha: 1,
     fillStyle: "",
     canvas: { toDataURL: () => state.dataUrl },
@@ -50,7 +57,7 @@ import { useFillTool } from "@/components/editor/tools/fill-tool";
 import { usePixelBrushTool } from "@/components/editor/tools/pixel-brush-tool";
 import { useEditorStore } from "@/stores/editor-store";
 
-const stage = { getPointerPosition: () => ({ x: 50, y: 50 }), getStage: () => stage };
+const stage = { getPointerPosition: () => state.pointer, getStage: () => stage };
 const stageRef = { current: stage as unknown as Konva.Stage };
 const event = {
   target: stage,
@@ -62,6 +69,8 @@ const objects = () => useEditorStore.getState().objects;
 beforeEach(() => {
   state.bigReadsFail = false;
   state.dataUrl = "data:image/png;base64,AAAA";
+  state.pointer = { x: 50, y: 50 };
+  state.fills = 0;
   toastError.mockClear();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
     () => fakeContext() as unknown as CanvasRenderingContext2D,
@@ -119,6 +128,31 @@ describe("a stroke canvas too big to encode (toDataURL gives back data:,)", () =
 
     expectOneMemoryToast();
     expect(objects()).toHaveLength(0);
+  });
+});
+
+describe("clone stamp: an aborted first click", () => {
+  it("does not keep its aligned offset for the next click", () => {
+    useEditorStore.setState({
+      activeTool: "clone-stamp",
+      cloneAligned: true,
+      cloneSource: { x: 100, y: 100, aligned: true },
+    });
+    const { result } = renderHook(() => useCloneStampTool(stageRef));
+
+    // Aligned offset from this click would be (-90, -90): a source off the document.
+    state.pointer = { x: 190, y: 190 };
+    state.dataUrl = "data:,";
+    result.current.handleMouseDown(event);
+    expect(objects()).toHaveLength(0);
+
+    // The next click sets its own offset, (50, 50), and clones from inside the document.
+    state.pointer = { x: 50, y: 50 };
+    state.dataUrl = "data:image/png;base64,AAAA";
+    state.fills = 0;
+    result.current.handleMouseDown(event);
+    expect(objects()).toHaveLength(1);
+    expect(state.fills).toBeGreaterThan(0);
   });
 });
 
