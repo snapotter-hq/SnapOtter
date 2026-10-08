@@ -371,8 +371,9 @@ describe("passport-photo/generate", () => {
 
     const res = await generateFor(jobId);
 
+    // Status only: the test server skips the production error handler
+    // (#1243), so the body is Fastify's default. The unit suite pins ours.
     expect(res.statusCode).toBe(500);
-    expect(JSON.parse(res.body).error).toBe("Internal server error");
   });
 });
 
