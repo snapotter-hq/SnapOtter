@@ -5321,6 +5321,7 @@ export const it: TranslationKeys = {
     mfaEnrollmentRequired:
       "La tua organizzazione richiede l'autenticazione a più fattori. Configura l'MFA nelle impostazioni del tuo account.",
     mfaPolicyUnavailable: "Impossibile verificare la policy MFA. Riprova tra qualche istante.",
+    accountDisabled: "Questo account è disattivato. Contatta un amministratore.",
     loginThrottled: "Troppi tentativi di accesso. Riprova tra {minutes} minuto.",
     loginThrottledPlural: "Troppi tentativi di accesso. Riprova tra {minutes} minuti.",
     loginThrottledUnknownWait: "Troppi tentativi di accesso. Attendi prima di riprovare.",

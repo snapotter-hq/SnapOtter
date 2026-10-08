@@ -61,6 +61,25 @@ describe("LoginPage error messages", () => {
     expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
   });
 
+  it("says the account is disabled when the API returns USER_DISABLED (#2021)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "User is disabled", code: "USER_DISABLED" }),
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    await waitFor(() => {
+      expect(screen.getByText(/account is disabled/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
+  });
+
   it("shows the retryable policy message when the API returns MFA_POLICY_UNAVAILABLE", async () => {
     vi.stubGlobal(
       "fetch",

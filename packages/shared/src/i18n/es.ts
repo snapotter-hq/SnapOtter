@@ -5313,6 +5313,7 @@ export const es: TranslationKeys = {
       "Tu organización requiere autenticación multifactor. Configura MFA en los ajustes de tu cuenta.",
     mfaPolicyUnavailable:
       "No se pudo comprobar la política de MFA. Inténtalo de nuevo en un momento.",
+    accountDisabled: "Esta cuenta está desactivada. Ponte en contacto con un administrador.",
     loginThrottled:
       "Demasiados intentos de inicio de sesión. Inténtalo de nuevo en {minutes} minuto.",
     loginThrottledPlural:

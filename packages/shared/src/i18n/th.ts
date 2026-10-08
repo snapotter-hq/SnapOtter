@@ -5229,6 +5229,7 @@ export const th: TranslationKeys = {
     mfaEnrollmentHeading: "ตั้งค่าการยืนยันตัวตนสองปัจจัยเพื่อดำเนินการต่อ",
     mfaEnrollmentRequired: "องค์กรของคุณกำหนดให้ใช้การยืนยันตัวตนหลายปัจจัย กรุณาตั้งค่า MFA ในการตั้งค่าบัญชี",
     mfaPolicyUnavailable: "ไม่สามารถตรวจสอบนโยบาย MFA ได้ กรุณาลองอีกครั้งในอีกสักครู่",
+    accountDisabled: "บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
     loginThrottled: "มีการพยายามเข้าสู่ระบบมากเกินไป ลองอีกครั้งใน {minutes} นาที",
     loginThrottledPlural: "มีการพยายามเข้าสู่ระบบมากเกินไป ลองอีกครั้งใน {minutes} นาที",
     loginThrottledUnknownWait: "มีการพยายามเข้าสู่ระบบมากเกินไป กรุณารอก่อนลองอีกครั้ง",

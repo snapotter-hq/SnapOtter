@@ -306,6 +306,10 @@ export function LoginPage() {
           setError(t.auth.mfaEnrollmentRequired);
         } else if (failure?.code === "MFA_POLICY_UNAVAILABLE") {
           setError(t.auth.mfaPolicyUnavailable);
+        } else if (failure?.code === "USER_DISABLED") {
+          // The 403 only goes to a caller who proved the password (#818), so
+          // saying so tells the account owner the truth without leaking it.
+          setError(t.auth.accountDisabled);
         } else if (res.status === 429) {
           // Every 429 this route can produce (the per-username throttle from
           // #820, the per-IP limiter, a proxy in front of us) is a "come back

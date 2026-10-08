@@ -5303,6 +5303,7 @@ export const id: TranslationKeys = {
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",
     mfaPolicyUnavailable: "Kebijakan MFA tidak dapat diperiksa. Silakan coba lagi sebentar lagi.",
+    accountDisabled: "Akun ini dinonaktifkan. Hubungi administrator.",
     loginThrottled: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
     loginThrottledPlural: "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
     loginThrottledUnknownWait:

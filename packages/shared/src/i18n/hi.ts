@@ -5088,6 +5088,7 @@ export const hi: TranslationKeys = {
     mfaEnrollmentRequired:
       "आपके संगठन को मल्टी-फ़ैक्टर प्रमाणीकरण आवश्यक है। कृपया अपनी खाता सेटिंग्स में MFA सेट अप करें।",
     mfaPolicyUnavailable: "MFA नीति की जाँच नहीं हो सकी। कृपया थोड़ी देर बाद फिर से प्रयास करें।",
+    accountDisabled: "यह खाता अक्षम है। किसी व्यवस्थापक से संपर्क करें।",
     loginThrottled: "बहुत सारे लॉगिन प्रयास। {minutes} मिनट बाद फिर से प्रयास करें।",
     loginThrottledPlural: "बहुत सारे लॉगिन प्रयास। {minutes} मिनट बाद फिर से प्रयास करें।",
     loginThrottledUnknownWait: "बहुत सारे लॉगिन प्रयास। कृपया फिर से प्रयास करने से पहले प्रतीक्षा करें।",

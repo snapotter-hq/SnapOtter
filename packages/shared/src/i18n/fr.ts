@@ -5336,6 +5336,7 @@ export const fr: TranslationKeys = {
       "Votre organisation exige l'authentification multifacteur. Veuillez configurer le MFA dans les paramètres de votre compte.",
     mfaPolicyUnavailable:
       "Impossible de vérifier la politique MFA. Veuillez réessayer dans un instant.",
+    accountDisabled: "Ce compte est désactivé. Contactez un administrateur.",
     loginThrottled: "Trop de tentatives de connexion. Réessayez dans {minutes} minute.",
     loginThrottledPlural: "Trop de tentatives de connexion. Réessayez dans {minutes} minutes.",
     loginThrottledUnknownWait:

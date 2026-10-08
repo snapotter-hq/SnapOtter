@@ -5251,6 +5251,7 @@ export const ja: TranslationKeys = {
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
     mfaPolicyUnavailable:
       "MFA ポリシーを確認できませんでした。しばらくしてからもう一度お試しください。",
+    accountDisabled: "このアカウントは無効化されています。管理者にお問い合わせください。",
     loginThrottled: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledPlural: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledUnknownWait:

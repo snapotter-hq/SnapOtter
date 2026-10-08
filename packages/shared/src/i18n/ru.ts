@@ -5314,6 +5314,7 @@ export const ru: TranslationKeys = {
     mfaEnrollmentRequired:
       "Ваша организация требует многофакторную аутентификацию. Настройте MFA в параметрах учётной записи.",
     mfaPolicyUnavailable: "Не удалось проверить политику MFA. Повторите попытку чуть позже.",
+    accountDisabled: "Эта учётная запись отключена. Обратитесь к администратору.",
     loginThrottled: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
     loginThrottledPlural: "Слишком много попыток входа. Повторите попытку через {minutes} мин.",
     loginThrottledUnknownWait:

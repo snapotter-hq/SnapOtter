@@ -5006,6 +5006,7 @@ export const zhTW: TranslationKeys = {
     mfaEnrollmentHeading: "請設定兩步驟驗證以繼續",
     mfaEnrollmentRequired: "您的組織要求啟用多因素驗證。請在帳戶設定中設定 MFA。",
     mfaPolicyUnavailable: "無法檢查 MFA 政策。請稍後再試。",
+    accountDisabled: "此帳號已被停用。請聯絡管理員。",
     loginThrottled: "登入嘗試次數過多。請在{minutes}分鐘後重試。",
     loginThrottledPlural: "登入嘗試次數過多。請在{minutes}分鐘後重試。",
     loginThrottledUnknownWait: "登入嘗試次數過多。請稍後重試。",

@@ -5221,6 +5221,7 @@ export const ko: TranslationKeys = {
     mfaEnrollmentHeading: "계속하려면 2단계 인증을 설정하세요",
     mfaEnrollmentRequired: "조직에서 다단계 인증을 요구합니다. 계정 설정에서 MFA를 설정해 주세요.",
     mfaPolicyUnavailable: "MFA 정책을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    accountDisabled: "이 계정은 비활성화되었습니다. 관리자에게 문의해 주세요.",
     loginThrottled: "로그인 시도 횟수가 너무 많습니다. {minutes}분 후에 다시 시도해 주세요.",
     loginThrottledPlural: "로그인 시도 횟수가 너무 많습니다. {minutes}분 후에 다시 시도해 주세요.",
     loginThrottledUnknownWait: "로그인 시도 횟수가 너무 많습니다. 잠시 후 다시 시도해 주세요.",

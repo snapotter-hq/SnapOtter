@@ -5312,6 +5312,7 @@ export const tr: TranslationKeys = {
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",
     mfaPolicyUnavailable: "MFA politikası kontrol edilemedi. Lütfen birazdan tekrar deneyin.",
+    accountDisabled: "Bu hesap devre dışı bırakıldı. Bir yönetici ile iletişime geçin.",
     loginThrottled: "Çok fazla giriş denemesi. {minutes} dakika sonra tekrar deneyin.",
     loginThrottledPlural: "Çok fazla giriş denemesi. {minutes} dakika sonra tekrar deneyin.",
     loginThrottledUnknownWait: "Çok fazla giriş denemesi. Lütfen tekrar denemeden önce bekleyin.",

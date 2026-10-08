@@ -5292,6 +5292,7 @@ export const vi: TranslationKeys = {
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",
     mfaPolicyUnavailable: "Không thể kiểm tra chính sách MFA. Vui lòng thử lại sau giây lát.",
+    accountDisabled: "Tài khoản này đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.",
     loginThrottled: "Quá nhiều lần đăng nhập. Vui lòng thử lại sau {minutes} phút.",
     loginThrottledPlural: "Quá nhiều lần đăng nhập. Vui lòng thử lại sau {minutes} phút.",
     loginThrottledUnknownWait: "Quá nhiều lần đăng nhập. Vui lòng đợi trước khi thử lại.",

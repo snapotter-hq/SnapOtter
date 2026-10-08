@@ -5303,6 +5303,7 @@ export const sv: TranslationKeys = {
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
     mfaPolicyUnavailable: "MFA-policyn kunde inte kontrolleras. Försök igen om en stund.",
+    accountDisabled: "Det här kontot är inaktiverat. Kontakta en administratör.",
     loginThrottled: "För många inloggningsförsök. Försök igen om {minutes} minut.",
     loginThrottledPlural: "För många inloggningsförsök. Försök igen om {minutes} minuter.",
     loginThrottledUnknownWait:

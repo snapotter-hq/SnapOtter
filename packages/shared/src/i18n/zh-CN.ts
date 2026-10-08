@@ -5006,6 +5006,7 @@ export const zhCN: TranslationKeys = {
     mfaEnrollmentHeading: "请设置双重身份验证以继续",
     mfaEnrollmentRequired: "您的组织要求启用多因素认证。请在账户设置中设置 MFA。",
     mfaPolicyUnavailable: "无法检查 MFA 策略。请稍后重试。",
+    accountDisabled: "此账户已被禁用。请联系管理员。",
     loginThrottled: "登录尝试次数过多。请在 {minutes} 分钟后重试。",
     loginThrottledPlural: "登录尝试次数过多。请在 {minutes} 分钟后重试。",
     loginThrottledUnknownWait: "登录尝试次数过多。请稍后重试。",
