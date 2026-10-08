@@ -2,13 +2,15 @@
 
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const processor = vi.hoisted(() => ({ processAllFiles: vi.fn() }));
 
 vi.mock("@/hooks/use-tool-processor", () => ({
   useToolProcessor: () => ({
     processFiles: vi.fn(),
-    processAllFiles: vi.fn(),
+    processAllFiles: processor.processAllFiles,
     processing: false,
     error: null,
     downloadUrl: null,
@@ -18,6 +20,7 @@ vi.mock("@/hooks/use-tool-processor", () => ({
   }),
 }));
 
+import { PipelineStepSettings } from "@/components/tools/pipeline-step-settings";
 import {
   RemoveBgControls,
   RemoveBgPipelineControls,
@@ -31,6 +34,7 @@ const png = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type
 beforeEach(() => {
   URL.createObjectURL = vi.fn(() => "blob:mock");
   URL.revokeObjectURL = vi.fn();
+  processor.processAllFiles.mockClear();
 });
 
 afterEach(() => {
@@ -81,5 +85,36 @@ describe("remove-background image background option (#2074)", () => {
     useFileStore.getState().setFiles([png("a.png"), png("b.png")]);
     render(<RemoveBgSettings />);
     expect(screen.queryByRole("button", { name: imageLabel })).not.toBeInTheDocument();
+  });
+
+  it("registers the pipeline step with the controls that hide it", async () => {
+    const onChange = vi.fn();
+    render(
+      <PipelineStepSettings
+        toolId="remove-background"
+        settings={{ backgroundType: "image" }}
+        onChange={onChange}
+      />,
+    );
+    await screen.findByRole("button", { name: en.toolSettings["remove-bg"].color });
+    expect(screen.queryByRole("button", { name: imageLabel })).not.toBeInTheDocument();
+    const last = onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(last.backgroundType).toBe("transparent");
+  });
+
+  it("follows the file count on a mounted page and never sends image for several files", () => {
+    useFileStore.getState().setFiles([png("a.png")]);
+    render(<RemoveBgSettings />);
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+
+    act(() => useFileStore.getState().setFiles([png("a.png"), png("b.png")]));
+    expect(screen.queryByRole("button", { name: imageLabel })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    const sent = processor.processAllFiles.mock.calls[0][1] as Record<string, unknown>;
+    expect(sent.backgroundType).toBe("transparent");
+    expect(sent._bgImageFile).toBeUndefined();
+
+    act(() => useFileStore.getState().setFiles([png("a.png")]));
+    expect(screen.getByRole("button", { name: imageLabel })).toBeInTheDocument();
   });
 });
