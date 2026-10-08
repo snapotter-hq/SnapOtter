@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { generatePassword } from "../../../apps/web/src/lib/generate-password.js";
 
 // The server's special-character rule in apps/api/src/plugins/auth.ts (#1568).
-const SERVER_SPECIAL = /[^\p{L}\p{M}\p{N}]/u;
+const SERVER_SPECIAL = /[\p{P}\p{S}\p{Zs}]/u;
 const ALPHABET = /^[A-Za-z0-9!@#$%&*()\-_=+]+$/;
 
 afterEach(() => {

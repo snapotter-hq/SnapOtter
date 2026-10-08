@@ -121,10 +121,12 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
   const requireDigit = await getSettingString("passwordRequireDigit", "true");
   const requireSpecial = await getSettingString("passwordRequireSpecial", "false");
 
-  // The rules mean "has an uppercase / lowercase letter / digit / character that
-  // is not a letter, mark or number" in any script (marks are the vowel signs and
-  // accents that belong to a letter, not symbols), so a Russian or Arabic
-  // password isn't rejected for a rule it visibly meets (#1568).
+  // The rules mean "has an uppercase letter / a lowercase letter / a digit /
+  // punctuation, a symbol or a space" in any script, so a Russian or Arabic
+  // password isn't rejected for a rule it visibly meets (#1568). Special is an
+  // allowlist of those three classes rather than "not a letter or number", which
+  // would also pass invisible and control characters (a zero-width space, a tab,
+  // NUL) that nobody can see or that the login page can't send.
   // The three default-on rules are off only when stored as exactly "false",
   // which is how the Security tab reads them. Anything else a row might hold
   // ("TRUE", "1", a value an API client wrote before settings were validated in
@@ -137,7 +139,7 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
     return { message: "Password must contain a lowercase letter", rule: "lowercase" };
   if (requireDigit !== "false" && !/\p{Nd}/u.test(password))
     return { message: "Password must contain a digit", rule: "digit" };
-  if (requireSpecial === "true" && !/[^\p{L}\p{M}\p{N}]/u.test(password))
+  if (requireSpecial === "true" && !/[\p{P}\p{S}\p{Zs}]/u.test(password))
     return { message: "Password must contain a special character", rule: "special" };
 
   return null;

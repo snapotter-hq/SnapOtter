@@ -1233,6 +1233,8 @@ describe("Admin user-management guards", () => {
     ["a euro sign", "Abcdefg1\u20ac"],
     ["a pound sign", "Abcdefg1\u00a3"],
     ["a tilde", "Abcdefg1~"],
+    ["a backtick", "Abcdefg1`"],
+    ["ASCII punctuation", "Abcdefg1!"],
   ])("change-password counts %s as a special character", async (_label, newPassword) => {
     const user = await loggedInUser();
     await setSetting("passwordRequireSpecial", "true");
@@ -1243,6 +1245,21 @@ describe("Admin user-management guards", () => {
     } finally {
       await clearSetting("passwordRequireSpecial");
     }
+  });
+
+  it("lets a user sign in with the non-Latin password they just set", async () => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+    const newPassword = "Пароль-пароль1";
+    const change = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { currentPassword: password, newPassword },
+    });
+    expect(change.statusCode).toBe(200);
+
+    await expect(loginAs(username, newPassword)).resolves.toEqual(expect.any(String));
   });
 
   it.each([
@@ -1259,6 +1276,9 @@ describe("Admin user-management guards", () => {
   it.each([
     ["letters and digits of any script", "Пароль\u0661\u0662\u0663д"],
     ["combining marks that belong to a letter", "Abcdefg1e\u0301"],
+    ["a zero-width space", "Abcdefg1\u200b"],
+    ["a tab", "Abcdefg1\t"],
+    ["a NUL, which login refuses", "Abcdefg1\u0000"],
   ])("does not count %s as special", async (_label, newPassword) => {
     const user = await loggedInUser();
     await setSetting("passwordRequireSpecial", "true");
