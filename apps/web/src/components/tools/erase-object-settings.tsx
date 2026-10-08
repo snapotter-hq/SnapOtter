@@ -9,7 +9,7 @@ import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
-import { CancelRefusedError, failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
+import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
 import {
@@ -189,51 +189,6 @@ export function subscribeEraseObjectJobProgress(
 }
 
 /**
- * Asks the server to stop the job of a run the client gave up on because its
- * own handling broke (#1960). Best effort: the run has already failed in the
- * UI, so an answer changes nothing there. `canceled: false` means the job had
- * already finished, which is what a throw after a terminal frame gets. Refusals
- * and a request that never arrived are logged and reported by the cancel
- * helpers; a 404 (no such job for this caller) is reported here, since nothing
- * else would trace it. Never rejects.
- */
-async function cancelAbandonedJob(clientJobId: string): Promise<void> {
-  try {
-    let res: Response;
-    try {
-      res = await fetch(appUrl(`/api/v1/jobs/${clientJobId}/cancel`), {
-        method: "POST",
-        headers: formatHeaders(),
-        keepalive: true,
-      });
-    } catch (cause) {
-      throw failedCancelRequest(cause, "erase-object");
-    }
-    const answer = await readCancelAnswer(res, () => true, "erase-object");
-    if (answer === "missing") {
-      console.warn("Cancel for an abandoned Erase Object job found no job");
-      void captureHandledError(
-        new SafeError("Cancel for an abandoned Erase Object job found no job", {
-          kind: "operational",
-          statusCode: 404,
-        }),
-        { error_class: "operational", tool_id: "erase-object", status_code: "404" },
-      );
-    }
-  } catch (err) {
-    if (err instanceof CancelRefusedError) return;
-    console.error("Canceling an abandoned Erase Object job failed", err);
-    void captureHandledError(
-      new SafeError("Canceling an abandoned Erase Object job failed", {
-        kind: "bug",
-        cause: err,
-      }),
-      { error_class: "bug", tool_id: "erase-object" },
-    );
-  }
-}
-
-/**
  * Cancels the job when the stream failed because handling a frame threw. A
  * failed frame, a completed frame with no result and a stall don't cancel: the
  * first two arrive with the server done with the job, and a stall's copy tells
@@ -243,7 +198,7 @@ async function cancelAbandonedJob(clientJobId: string): Promise<void> {
  */
 function cancelIfHandlingFailed(failure: JobFailure, clientJobId: string) {
   if ("reason" in failure && failure.reason === "trackingFailed") {
-    void cancelAbandonedJob(clientJobId);
+    void cancelAbandonedJob(clientJobId, "erase-object", "Erase Object");
   }
 }
 
@@ -332,6 +287,9 @@ export function EraseObjectSettings({
       // (#1893).
       const xhr = new XMLHttpRequest();
       let abandoned = false;
+      // Set once the server has answered 202: from then on a job exists for
+      // this file, and dropping the file has to cancel it (#2093).
+      let accepted = false;
       const abandon = (err: Error) => {
         abandoned = true;
         xhr.abort();
@@ -357,6 +315,7 @@ export function EraseObjectSettings({
       onStoppable(() => {
         stopProgress();
         abandon(new Error("Erase Object batch stopped"));
+        if (accepted) void cancelAbandonedJob(clientJobId, "erase-object", "Erase Object");
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -374,6 +333,7 @@ export function EraseObjectSettings({
       // uploading (#1959). xhr.timeout still bounds the request as a whole.
       xhr.upload.onprogress = () => subscription.touch();
       xhr.onload = () => {
+        if (xhr.status === 202) accepted = true;
         if (abandoned || xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {

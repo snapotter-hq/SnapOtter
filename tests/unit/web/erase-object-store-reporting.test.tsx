@@ -1405,6 +1405,35 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(useFileStore.getState().error).toBeNull();
   });
 
+  it("cancels the job the server already queued for the file it drops (#2093)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.respond(202, { jobId: "queued", async: true });
+
+    unmount();
+    moveToAnotherTool();
+
+    const clientJobId = first.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no cancel for a file the server never answered (#2093)", async () => {
+    const { unmount } = renderPanel(3);
+    await submit(1);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
   it("stops at the file in flight when the files go after one has finished", async () => {
     renderPanel(3);
     const first = await submit(1);

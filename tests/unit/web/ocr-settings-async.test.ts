@@ -21,6 +21,7 @@ interface MockXhr {
   onerror?: () => void;
   open: ReturnType<typeof vi.fn>;
   send: ReturnType<typeof vi.fn>;
+  abort: ReturnType<typeof vi.fn>;
   setRequestHeader: ReturnType<typeof vi.fn>;
 }
 
@@ -54,6 +55,7 @@ beforeEach(() => {
         upload: {},
         open: vi.fn(),
         send: vi.fn(),
+        abort: vi.fn(),
         setRequestHeader: vi.fn(),
       };
       xhrs.push(xhr);
@@ -67,11 +69,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function runOcr() {
+function runOcr(onStoppable?: (stop: () => void) => void) {
   return ocrOneFile(
     new File(["image"], "scan.png", { type: "image/png" }),
     { quality: "fast", language: "en", enhance: false },
-    { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+    { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn(), onStoppable },
   );
 }
 
@@ -269,5 +271,66 @@ describe("OCR async response handling", () => {
 
     events.emit({ type: "single", phase: "complete", result: { text: "after the noise" } });
     await expect(promise).resolves.toMatchObject({ text: "after the noise" });
+  });
+});
+
+describe("OCR stopping a file (#2093)", () => {
+  const CANCEL_URL = "/api/v1/jobs/11111111-1111-4111-8111-111111111111/cancel";
+
+  function stoppableRun() {
+    let stop: () => void = () => {};
+    const promise = runOcr((s) => {
+      stop = s;
+    });
+    promise.catch(() => {});
+    return { promise, stop: () => stop() };
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+    );
+  });
+
+  it("cancels the job the server queued for the file it drops", async () => {
+    const { promise, stop } = stoppableRun();
+    const xhr = xhrs[0];
+    xhr.status = 202;
+    xhr.responseText = JSON.stringify({ jobId: "job-1", status: "queued" });
+    xhr.onload?.();
+
+    stop();
+
+    await expect(promise).rejects.toThrow("OCR scan stopped");
+    expect(xhr.abort).toHaveBeenCalled();
+    expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      CANCEL_URL,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("sends no cancel before the server has answered", async () => {
+    const { promise, stop } = stoppableRun();
+
+    stop();
+
+    await expect(promise).rejects.toThrow("OCR scan stopped");
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("sends no cancel for a file that already finished", async () => {
+    const { promise, stop } = stoppableRun();
+    const xhr = xhrs[0];
+    xhr.status = 200;
+    xhr.responseText = JSON.stringify({ text: "done" });
+    xhr.onload?.();
+    await expect(promise).resolves.toMatchObject({ text: "done" });
+
+    stop();
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 });
