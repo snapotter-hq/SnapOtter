@@ -3,7 +3,7 @@ const LOWER = "abcdefghijklmnopqrstuvwxyz";
 const DIGITS = "0123456789";
 // The server policy can require a special character (passwordRequireSpecial), so
 // always include one. These all satisfy its check in apps/api/src/plugins/auth.ts.
-const SPECIAL = "!@#$%^&*()-_=+";
+const SPECIAL = "!@#$%&*()-_=+";
 const ALL = UPPER + LOWER + DIGITS + SPECIAL;
 
 // 20 clears the default minimum with room to spare. The forced change-password

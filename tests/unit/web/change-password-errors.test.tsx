@@ -160,3 +160,26 @@ describe("change-password errors are translated (#1446)", () => {
     expect(await screen.findByText(de.changePassword.failedError)).toBeVisible();
   });
 });
+
+describe("Generate fills a password the policy accepts (#1567)", () => {
+  it("puts the same special-character password in both fields and posts it", async () => {
+    answer(200, {});
+    render(
+      <I18nProvider>
+        <ChangePasswordPage />
+      </I18nProvider>,
+    );
+    fireEvent.change(await screen.findByLabelText(de.changePassword.currentPasswordLabel), {
+      target: { value: "old-Password1" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: new RegExp(de.changePassword.generateButton) }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: de.changePassword.changeButton }));
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const { newPassword } = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(newPassword).toHaveLength(20);
+    expect(newPassword).toMatch(/[!@#$%&*()\-_=+]/);
+  });
+});
