@@ -61,12 +61,43 @@ export interface CaptureFailureMessages {
   crossOriginBlocked: string;
 }
 
-/** Tell the user why a pixel tool did nothing, instead of leaving the click silent. */
+/**
+ * Tell the user why a pixel tool did nothing, instead of leaving the click silent.
+ * The fixed ids keep ten clone-stamp dabs from queuing ten identical toasts.
+ */
 export function reportCaptureFailure(
   reason: CaptureFailure,
   messages: CaptureFailureMessages,
 ): void {
-  toast.error(reason === "tainted" ? messages.crossOriginBlocked : messages.noCanvasMemory);
+  if (reason === "tainted") {
+    toast.error(messages.crossOriginBlocked, { id: "editor-capture-tainted" });
+  } else {
+    toast.error(messages.noCanvasMemory, { id: "editor-capture-no-context" });
+  }
+}
+
+// Past the browser's canvas limits, Chromium and WebKit still return a context.
+// It draws nothing and reads back zeros, so the only way to tell is to write a
+// pixel and read it back. The pixel is put back afterwards; the canvas is the
+// throwaway capture, and an opaque or fully transparent pixel survives the trip
+// exactly.
+function canvasIsDead(ctx: CanvasRenderingContext2D): boolean {
+  const original = ctx.getImageData(0, 0, 1, 1);
+  const probe = ctx.createImageData(1, 1);
+  probe.data.set([255, 0, 255, 255]);
+  ctx.putImageData(probe, 0, 0);
+  const alpha = ctx.getImageData(0, 0, 1, 1).data[3];
+  ctx.putImageData(original, 0, 0);
+  return alpha !== 255;
+}
+
+// What a browser throws when a canvas is too big to read back: RangeError from the
+// pixel buffer in Chromium and WebKit, IndexSizeError for an empty source, and
+// NS_ERROR_FAILURE in Firefox. Anything else is a bug and is left to propagate.
+function isCanvasSizeError(err: unknown): boolean {
+  if (err instanceof RangeError) return true;
+  if (err instanceof DOMException) return err.name === "IndexSizeError";
+  return err instanceof Error && err.message.includes("NS_ERROR_FAILURE");
 }
 
 /**
@@ -75,9 +106,11 @@ export function reportCaptureFailure(
  * null context and let a tainted canvas's SecurityError escape it, so a click did
  * nothing and nobody was told (issue #1040).
  *
- * `no-context` is the browser refusing to allocate another document-sized canvas.
- * `tainted` is a cross-origin image loaded without CORS: drawing it is allowed,
- * reading it back throws, and one 1px read is enough to find out.
+ * `no-context` is the browser unable to back a document-sized canvas: a null
+ * context, a context that draws nothing (see canvasIsDead), or a read that fails
+ * on size. `tainted` is a cross-origin image loaded without CORS: drawing it is
+ * allowed, reading it back throws, and the 1px read in canvasIsDead finds out.
+ * Any other error is not ours to explain and propagates.
  */
 export function captureDocumentContext(
   stage: Konva.Stage,
@@ -86,14 +119,13 @@ export function captureDocumentContext(
 ): DocumentContext {
   try {
     const ctx = captureDocumentCanvas(stage, width, height).getContext("2d");
-    if (!ctx) return { ok: false, reason: "no-context" };
-    ctx.getImageData(0, 0, 1, 1);
+    if (!ctx || canvasIsDead(ctx)) return { ok: false, reason: "no-context" };
     return { ok: true, ctx };
   } catch (err) {
     if (err instanceof DOMException && err.name === "SecurityError") {
       return { ok: false, reason: "tainted" };
     }
-    console.error("Capturing the editor document failed:", err);
-    return { ok: false, reason: "no-context" };
+    if (isCanvasSizeError(err)) return { ok: false, reason: "no-context" };
+    throw err;
   }
 }

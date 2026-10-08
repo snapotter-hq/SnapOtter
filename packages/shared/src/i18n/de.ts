@@ -4760,7 +4760,7 @@ export const de: TranslationKeys = {
         noCanvasMemory:
           "Dieses Bild ist zu groß, um es im Browser mit diesem Werkzeug zu bearbeiten. Eine kleinere Leinwandgröße könnte helfen.",
         crossOriginBlocked:
-          "Der Editor kann die Pixel eines Bilds von einer anderen Website nicht lesen. Das Bild herunterladen und stattdessen die Datei öffnen.",
+          "Der Editor kann die Pixel eines Bilds von einer anderen Website nicht lesen. Laden Sie das Bild herunter und öffnen Sie stattdessen die Datei.",
         sourceImageFailed:
           "Das Bild konnte nicht geladen werden. Liegt es auf einer anderen Website, muss diese den Zugriff von anderen Ursprüngen erlauben.",
       },

@@ -65,7 +65,7 @@ test.describe("Editor pixel tools: cross-origin source image (issue #1040)", () 
     editorPage: page,
   }) => {
     const pageErrors: string[] = [];
-    page.on("pageerror", (err) => pageErrors.push(err.message));
+    page.on("pageerror", (err) => pageErrors.push(`${err.name}: ${err.message}`));
     await page.route(`${new URL(CROSS_ORIGIN_URL).origin}/**`, (route) =>
       route.fulfill({
         path: FIXTURE,
@@ -91,14 +91,32 @@ test.describe("Editor pixel tools: refused capture (issue #1040)", () => {
     await waitForSourceImage(page);
   });
 
-  // Stand in for a browser that is out of canvas memory: from here on, any canvas
-  // the size of the document gets no 2D context.
-  async function refuseDocumentSizedContexts(page: Page): Promise<void> {
+  // Stand in for a browser past its canvas limit. Chromium and WebKit do not return
+  // null there: they hand out a context that draws nothing and reads back zeros.
+  // From here on, any canvas the size of the document gets such a context.
+  async function makeDocumentSizedContextsDead(page: Page): Promise<void> {
     await page.evaluate(() => {
       const original = HTMLCanvasElement.prototype.getContext;
       HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, ...args) {
-        if (this.width === 200 && this.height === 150) return null;
-        return (original as (...a: unknown[]) => unknown).apply(this, args);
+        const ctx = (original as (...a: unknown[]) => unknown).apply(this, args);
+        if (!ctx || this.width !== 200 || this.height !== 150) return ctx;
+        const real = ctx as CanvasRenderingContext2D;
+        return new Proxy(real, {
+          get(target, prop) {
+            if (prop === "getImageData") {
+              return (_x: number, _y: number, w: number, h: number) => target.createImageData(w, h);
+            }
+            if (prop === "putImageData" || prop === "drawImage" || prop === "fillRect") {
+              return () => undefined;
+            }
+            const value = Reflect.get(target, prop);
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+          set(target, prop, value) {
+            Reflect.set(target, prop, value);
+            return true;
+          },
+        });
       } as typeof original;
     });
   }
@@ -112,7 +130,7 @@ test.describe("Editor pixel tools: refused capture (issue #1040)", () => {
         await page.mouse.click(source.x, source.y);
         await page.keyboard.up("Alt");
       }
-      await refuseDocumentSizedContexts(page);
+      await makeDocumentSizedContextsDead(page);
 
       const at = await documentPoint(page, 100, 75);
       await page.mouse.click(at.x, at.y);

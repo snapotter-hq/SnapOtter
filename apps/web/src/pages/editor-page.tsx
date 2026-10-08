@@ -1,8 +1,9 @@
 // apps/web/src/pages/editor-page.tsx
 import { ANALYTICS_EVENTS, apiToolPath } from "@snapotter/shared";
 import { Monitor } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { CanvasResizeDialog } from "@/components/editor/common/canvas-resize-dialog";
 import {
   AutosaveRecoveryBanner,
@@ -32,6 +33,9 @@ const SERVER_DECODED_EXTS = new Set(["psd", "tga", "exr", "hdr"]);
 
 export function EditorPage() {
   const { t } = useTranslation();
+  // Read at failure time: the ?url= effect below must not re-run on a locale change.
+  const sourceImageFailed = useRef(t.editor.ui.captureFailure.sourceImageFailed);
+  sourceImageFailed.current = t.editor.ui.captureFailure.sourceImageFailed;
   usePageTitle(t.sidebar.editor);
   const isMobile = useMobile();
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
@@ -136,6 +140,10 @@ export function EditorPage() {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => loadImage(url, img.naturalWidth, img.naturalHeight);
+      // Without CORS headers the browser refuses the image outright, and the
+      // editor used to stay on the welcome screen without a word.
+      img.onerror = () =>
+        toast.error(sourceImageFailed.current, { id: "editor-source-image-failed" });
       img.src = url;
     }
   }, [loadImage]);

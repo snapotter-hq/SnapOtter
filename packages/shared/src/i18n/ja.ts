@@ -4687,7 +4687,7 @@ export const ja: TranslationKeys = {
       },
       captureFailure: {
         noCanvasMemory:
-          "この画像は大きすぎて、ブラウザーでこのツールを使って編集できません。キャンバスサイズを小さくしてみてください。",
+          "この画像は大きすぎて、ブラウザでこのツールを使って編集できません。キャンバスサイズを小さくしてみてください。",
         crossOriginBlocked:
           "エディターは、別のサイトから読み込んだ画像のピクセルを読み取れません。画像をダウンロードして、そのファイルを開いてください。",
         sourceImageFailed:

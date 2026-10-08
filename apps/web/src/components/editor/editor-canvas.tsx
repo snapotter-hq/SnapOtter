@@ -18,9 +18,7 @@ import {
   Star,
   Text,
 } from "react-konva";
-import { toast } from "sonner";
 import useImage from "use-image";
-import { useTranslation } from "@/contexts/i18n-context";
 import { useCanvasZoom } from "@/hooks/use-canvas-zoom";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
@@ -137,12 +135,8 @@ function SourceImage({
   // (and export) then throws on its first read. editor-page only opens a ?url=
   // image after it has loaded with CORS, so asking for it here changes nothing for
   // a URL that worked before (#1040).
-  const [image, imageStatus] = useImage(url, "anonymous");
+  const [image] = useImage(url, "anonymous");
   const imageRef = useRef<Konva.Image>(null);
-  const { t } = useTranslation();
-  useEffect(() => {
-    if (imageStatus === "failed") toast.error(t.editor.ui.captureFailure.sourceImageFailed);
-  }, [imageStatus, t]);
 
   // Issue #12: Apply adjustments/filters to the source image node
   const hasActiveAdjustments = Object.values(adjustments).some((v) => v !== 0);
