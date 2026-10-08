@@ -193,6 +193,28 @@ describe("multipartParts", () => {
       expect(outcome).not.toBe(HUNG);
       expect(multipartFailure(outcome).status).toBe(413);
     });
+
+    it("answers 413 when the unread part crosses the limit after the consumer moved on", async () => {
+      const body = multipartBody([
+        { name: "file", filename: "huge.bin", content: Buffer.alloc(64 * 1024, 5) },
+        { name: "settings", content: "{}" },
+      ]);
+      // The headers and a few bytes first, the rest once the iterator has
+      // already advanced past the part, as on a slow connection.
+      const raw = new PassThrough();
+      Object.assign(raw, {
+        headers: { "content-type": `multipart/form-data; boundary=${BOUNDARY}` },
+      });
+      raw.write(body.subarray(0, 200));
+      setTimeout(() => raw.end(body.subarray(200)), 100);
+
+      const outcome = await collect({ raw } as unknown as FastifyRequest, async () => {}, {
+        fileSize: 1024,
+      }).catch((err: unknown) => err);
+
+      expect(outcome).not.toBe(HUNG);
+      expect(multipartFailure(outcome).status).toBe(413);
+    });
   });
 
   it("propagates malformed multipart as an error", async () => {

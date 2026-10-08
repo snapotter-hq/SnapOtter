@@ -150,6 +150,8 @@ export async function* multipartParts(
   }
   // The file part being read, if any: see the request "error" listener below.
   let openFile: Readable | null = null;
+  // A file part the consumer moved past without finishing: see the loop below.
+  let abandonedFile: Readable | null = null;
 
   const queue: Array<MultipartPart | Error | typeof DONE> = [];
   let wake: (() => void) | null = null;
@@ -177,7 +179,13 @@ export async function* multipartParts(
     // registered listener, not just the first.
     stream.on("error", () => {});
     // "limit" only fires when a fileSize limit is set, so fileSizeLimit is defined.
-    stream.on("limit", () => stream.destroy(fileTooLargeError(fileSizeLimit ?? 0)));
+    stream.on("limit", () => {
+      const error = fileTooLargeError(fileSizeLimit ?? 0);
+      stream.destroy(error);
+      // Nobody is reading this part any more, so nobody will see its error and
+      // the destroyed stream will never end: fail the request with it.
+      if (abandonedFile === stream) push(error);
+    });
     openFile = stream;
     const settled = () => {
       if (openFile === stream) openFile = null;
@@ -237,6 +245,7 @@ export async function* multipartParts(
     while (true) {
       if (previousFile && !previousFile.readableEnded) {
         if (previousFile.errored) throw previousFile.errored;
+        abandonedFile = previousFile;
         previousFile.resume();
       }
       previousFile = null;
