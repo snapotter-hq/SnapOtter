@@ -65,7 +65,7 @@ export function useGradientTool() {
     setPreview({ startX, startY, endX, endY, gradientType });
   }, []);
 
-  const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseUp = useCallback(() => {
     if (!dragRef.current) return;
 
     setPreview(null);
@@ -77,16 +77,12 @@ export function useGradientTool() {
       gradientOpacity,
       gradientReverse,
       canvasSize,
-      zoom,
-      panOffset,
     } = useEditorStore.getState();
 
-    // Konva drops the pointer position once the pointer leaves the stage, so a
-    // release over a panel falls back to where the preview last ended.
-    const pointer = e.target.getStage()?.getPointerPosition();
-    const { startX, startY } = dragRef.current;
-    const endX = pointer ? (pointer.x - panOffset.x) / zoom : dragRef.current.endX;
-    const endY = pointer ? (pointer.y - panOffset.y) / zoom : dragRef.current.endY;
+    // The end is where the preview last ended, not the stage pointer: Konva clears
+    // the pointer once it leaves the stage (a release over a panel), and a release
+    // that arrives late, from the next press, would read that press's position.
+    const { startX, startY, endX, endY } = dragRef.current;
 
     const dx = endX - startX;
     const dy = endY - startY;

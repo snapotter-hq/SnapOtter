@@ -113,14 +113,38 @@ function strokedCount(page: Page, className: string, stroke: string): Promise<nu
   );
 }
 
-// Width of the newest shape object (a Rect that carries an object id).
-function newestRectWidth(page: Page): Promise<number | null> {
+// The newest shape object (any Konva shape that carries an object id) as the
+// attributes its drag changes: size, radii and line points.
+function newestShapeSignature(page: Page): Promise<string | null> {
   return page.evaluate(() => {
     const stage = (window as unknown as StageView).Konva?.stages[0];
-    const rects = stage?.find("Rect").filter((node) => node.id()) ?? [];
-    const rect = rects[rects.length - 1];
-    return rect ? rect.width() : null;
+    const shapes = (stage?.find((node) => Boolean(node.id())) ?? []).filter(
+      (node) => (node as unknown as { className: string }).className !== "Image",
+    );
+    const shape = shapes[shapes.length - 1];
+    if (!shape) return null;
+    const names = [
+      "x",
+      "y",
+      "width",
+      "height",
+      "radiusX",
+      "radiusY",
+      "radius",
+      "outerRadius",
+      "innerRadius",
+      "points",
+    ];
+    return JSON.stringify(names.map((name) => shape.getAttr(name) ?? null));
   });
+}
+
+// Black-stroked marching ants of a committed selection, whichever shape it is.
+async function committedSelectionCount(page: Page): Promise<number> {
+  const counts = await Promise.all(
+    ["Rect", "Ellipse", "Line"].map((className) => strokedCount(page, className, "#000000")),
+  );
+  return counts.reduce((sum, n) => sum + n, 0);
 }
 
 // Image objects the user has drawn (the source image has no id).
@@ -247,13 +271,22 @@ test.describe("A drag ends when the button is released off the canvas (issue #21
     await waitForSourceImage(page);
   });
 
-  // Press on the image, drag past the canvas edge and release over the panel.
-  async function dragOutAndRelease(page: Page): Promise<void> {
+  // Press on the image and drag past the canvas edge, button still held.
+  async function pressAndDragOut(page: Page): Promise<void> {
     const start = await documentPoint(page, 60, 75);
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
-    await page.mouse.move(start.x + 40, start.y + 20, { steps: 4 });
+    await page.mouse.move(start.x + 40, start.y + 30, { steps: 4 });
     await page.mouse.move(OVER_THE_PANEL.x, OVER_THE_PANEL.y, { steps: 6 });
+  }
+
+  // Press and release inside the canvas.
+  async function dragWithinCanvas(page: Page): Promise<void> {
+    const start = await documentPoint(page, 60, 75);
+    const end = await documentPoint(page, 120, 120);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 6 });
     await page.mouse.up();
   }
 
@@ -264,19 +297,32 @@ test.describe("A drag ends when the button is released off the canvas (issue #21
     await page.mouse.move(back.x + 10, back.y + 5, { steps: 3 });
   }
 
-  test("a rectangle stops resizing after a release over the panel", async ({
-    editorPage: page,
-  }) => {
-    await selectTool(page, "shape-rect");
-    await dragOutAndRelease(page);
+  // The toolbar shows one entry per group; "u" cycles the shapes behind it.
+  const SHAPES: Array<[string, number]> = [
+    ["shape-rect", 0],
+    ["shape-ellipse", 1],
+    ["shape-line", 2],
+    ["shape-arrow", 3],
+    ["shape-polygon", 4],
+    ["shape-star", 5],
+  ];
 
-    const atRelease = await newestRectWidth(page);
-    expect(atRelease).not.toBeNull();
+  for (const [tool, presses] of SHAPES) {
+    test(`${tool} stops resizing after a release over the panel`, async ({ editorPage: page }) => {
+      await selectTool(page, "shape-rect");
+      for (let i = 0; i < presses; i++) await page.keyboard.press("u");
 
-    await wanderBack(page);
+      await pressAndDragOut(page);
+      await page.mouse.up();
 
-    expect(await newestRectWidth(page)).toBe(atRelease);
-  });
+      const atRelease = await newestShapeSignature(page);
+      expect(atRelease).not.toBeNull();
+
+      await wanderBack(page);
+
+      expect(await newestShapeSignature(page)).toBe(atRelease);
+    });
+  }
 
   for (const tool of ["marquee-rect", "marquee-ellipse"] as const) {
     test(`${tool} commits at the release and stops rubber-banding`, async ({
@@ -285,12 +331,16 @@ test.describe("A drag ends when the button is released off the canvas (issue #21
       // The ellipse sits behind the rectangle in the toolbar; "m" cycles to it.
       await selectTool(page, "marquee-rect");
       if (tool === "marquee-ellipse") await page.keyboard.press("m");
-      await dragOutAndRelease(page);
+      expect(await committedSelectionCount(page)).toBe(0);
+
+      await pressAndDragOut(page);
+      // The outline is on screen while the button is held.
+      expect(await dragPreviewCount(page)).toBeGreaterThan(0);
+      await page.mouse.up();
 
       // The drag ended: no orange outline left, and the selection is drawn.
       await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
-      const shape = tool === "marquee-rect" ? "Rect" : "Ellipse";
-      expect(await strokedCount(page, shape, "#000000")).toBeGreaterThan(0);
+      expect(await committedSelectionCount(page)).toBeGreaterThan(0);
 
       await wanderBack(page);
       expect(await dragPreviewCount(page)).toBe(0);
@@ -301,16 +351,19 @@ test.describe("A drag ends when the button is released off the canvas (issue #21
     editorPage: page,
   }) => {
     await selectTool(page, "lasso-free");
+    expect(await committedSelectionCount(page)).toBe(0);
+
     const start = await documentPoint(page, 60, 75);
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
     await page.mouse.move(start.x + 40, start.y, { steps: 3 });
     await page.mouse.move(start.x + 40, start.y + 30, { steps: 3 });
     await page.mouse.move(OVER_THE_PANEL.x, OVER_THE_PANEL.y, { steps: 6 });
+    expect(await dragPreviewCount(page)).toBeGreaterThan(0);
     await page.mouse.up();
 
     await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
-    expect(await strokedCount(page, "Line", "#000000")).toBeGreaterThan(0);
+    expect(await committedSelectionCount(page)).toBeGreaterThan(0);
 
     await wanderBack(page);
     expect(await dragPreviewCount(page)).toBe(0);
@@ -320,12 +373,88 @@ test.describe("A drag ends when the button is released off the canvas (issue #21
     await selectTool(page, "gradient");
     const before = await imageObjectCount(page);
 
-    await dragOutAndRelease(page);
+    await pressAndDragOut(page);
+    await page.mouse.up();
 
     await expect.poll(() => imageObjectCount(page), { timeout: 5_000 }).toBe(before + 1);
 
     // Wandering back without pressing must not add or change anything.
     await wanderBack(page);
     expect(await imageObjectCount(page)).toBe(before + 1);
+  });
+
+  test("an ordinary release inside the canvas still commits a marquee and a gradient once", async ({
+    editorPage: page,
+  }) => {
+    await selectTool(page, "marquee-rect");
+    await dragWithinCanvas(page);
+    await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
+    expect(await committedSelectionCount(page)).toBeGreaterThan(0);
+
+    await selectTool(page, "gradient");
+    const before = await imageObjectCount(page);
+    await dragWithinCanvas(page);
+    await expect.poll(() => imageObjectCount(page), { timeout: 5_000 }).toBe(before + 1);
+    await wanderBack(page);
+    expect(await imageObjectCount(page)).toBe(before + 1);
+  });
+
+  test("losing the window mid-drag ends a marquee", async ({ editorPage: page }) => {
+    await selectTool(page, "marquee-rect");
+    await pressAndDragOut(page);
+    expect(await dragPreviewCount(page)).toBeGreaterThan(0);
+
+    // Alt-tab away: the page gets a blur and never sees the button come up.
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+
+    await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
+    await wanderBack(page);
+    expect(await dragPreviewCount(page)).toBe(0);
+    await page.mouse.up();
+  });
+
+  test("switching tools mid-drag doesn't wipe the selection a lasso release commits over", async ({
+    editorPage: page,
+  }) => {
+    await selectTool(page, "marquee-rect");
+    await dragWithinCanvas(page);
+    await expect.poll(() => committedSelectionCount(page), { timeout: 5_000 }).toBeGreaterThan(0);
+
+    await selectTool(page, "lasso-free");
+    const start = await documentPoint(page, 40, 40);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 40, start.y, { steps: 3 });
+    await page.mouse.move(start.x + 40, start.y + 40, { steps: 3 });
+    // A tool shortcut with the button still held, then let go over the panel.
+    await page.keyboard.press("b");
+    await page.mouse.move(OVER_THE_PANEL.x, OVER_THE_PANEL.y, { steps: 6 });
+    await page.mouse.up();
+
+    await expect.poll(() => dragPreviewCount(page), { timeout: 5_000 }).toBe(0);
+    expect(await committedSelectionCount(page)).toBeGreaterThan(0);
+  });
+
+  test("the polygonal lasso stays click-driven: a release over the panel doesn't close it", async ({
+    editorPage: page,
+  }) => {
+    await selectTool(page, "lasso-free");
+    await page.keyboard.press("l");
+    for (const [x, y] of [
+      [60, 60],
+      [120, 60],
+    ]) {
+      const point = await documentPoint(page, x, y);
+      await page.mouse.click(point.x, point.y);
+    }
+    const third = await documentPoint(page, 120, 120);
+    await page.mouse.move(third.x, third.y);
+    await page.mouse.down();
+    await page.mouse.move(OVER_THE_PANEL.x, OVER_THE_PANEL.y, { steps: 6 });
+    await page.mouse.up();
+
+    // Still open: the rubber band is on screen and nothing was committed.
+    expect(await dragPreviewCount(page)).toBeGreaterThan(0);
+    expect(await committedSelectionCount(page)).toBe(0);
   });
 });

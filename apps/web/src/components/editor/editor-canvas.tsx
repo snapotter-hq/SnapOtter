@@ -3,7 +3,7 @@
 import type Konva from "konva";
 import KonvaFilters from "konva";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Arrow,
   Ellipse,
@@ -707,6 +707,9 @@ const DRAG_TOOLS = new Set<ToolType>([
   "lasso-free",
 ]);
 
+// The drag tools that commit through useSelectionTool.
+const SELECTION_DRAG_TOOLS = new Set<ToolType>(["marquee-rect", "marquee-ellipse", "lasso-free"]);
+
 // ---------------------------------------------------------------------------
 // Tool handler dispatcher
 // ---------------------------------------------------------------------------
@@ -906,11 +909,13 @@ export function EditorCanvas({
 
   const { handlers, moveTool, selectionTool, transformTool } = useActiveToolHandlers(stageRef);
 
-  // The handlers of the current render. A tool whose release reads React state
-  // (the marquee and lasso read their points) must end with these, not with the
-  // copy from the render its drag started in, which has none of the points yet.
-  const latestToolRef = useRef({ handlers, activeTool });
-  latestToolRef.current = { handlers, activeTool };
+  // The handlers of the latest committed render. A tool whose release reads React
+  // state (the marquee and lasso read their points) must end with these, not with
+  // the copy from the render its drag started in, which has none of the points yet.
+  const latestToolRef = useRef({ handlers, activeTool, selectionTool });
+  useLayoutEffect(() => {
+    latestToolRef.current = { handlers, activeTool, selectionTool };
+  });
 
   const [stageWidth, setStageWidth] = useState(800);
   const [stageHeight, setStageHeight] = useState(600);
@@ -1005,11 +1010,17 @@ export function EditorCanvas({
       };
       // The tool that started the drag ends it, even if a shortcut switched
       // activeTool mid-drag and the current handlers now point somewhere else.
-      // While the tool is unchanged the current render's handlers end it, since a
-      // release that reads React state would otherwise see the state from mousedown.
+      // A release that reads React state would see the state from mousedown, so
+      // the selection tools end through the latest render's hook (its points are
+      // the ones drawn so far, whichever tool is active now) and the others use
+      // the latest handlers while their tool is unchanged.
       const finish = () => {
         cancel();
         const current = latestToolRef.current;
+        if (SELECTION_DRAG_TOOLS.has(activeTool)) {
+          current.selectionTool.onMouseUp();
+          return;
+        }
         (current.activeTool === activeTool ? current.handlers : handlers)?.handleMouseUp(e);
       };
       document.addEventListener("mouseup", finish);
