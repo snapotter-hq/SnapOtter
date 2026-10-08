@@ -83,7 +83,7 @@ test.describe("@mobile Settings sheet during a run", () => {
     await requestSent;
 
     await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
-    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.locator("[role='dialog']")).toBeHidden();
     release();
 
     // The run finished behind the closed sheet: reopening shows its result

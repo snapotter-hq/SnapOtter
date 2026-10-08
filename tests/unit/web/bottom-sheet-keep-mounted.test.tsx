@@ -96,6 +96,27 @@ describe("BottomSheet keepMounted (#1974)", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("stops answering Escape once closed, and answers it while open", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <BottomSheet open onClose={onClose} keepMounted>
+        <Panel />
+      </BottomSheet>,
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <BottomSheet open={false} onClose={onClose} keepMounted>
+        <Panel />
+      </BottomSheet>,
+    );
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores Escape while closed", () => {
     const onClose = vi.fn();
     render(
