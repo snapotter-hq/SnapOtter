@@ -76,21 +76,115 @@ function noNumericColumnMessage(header: string[] | undefined, width: number): st
   return `${lead}none of the ${width} columns in this file have numbers.`;
 }
 
+type Decimal = "." | ",";
+
+const CURRENCY_SYMBOLS = "$€£¥₹₩₽₺฿₫₪₴₦";
+/**
+ * A number the way a spreadsheet displays it: optional "(" or sign, optional
+ * currency symbol ("$", "R$", "US$"), digits with grouping, optional trailing
+ * "%" or currency symbol, optional ")". The digits group is only a candidate;
+ * readGrouped decides whether its separators make sense.
+ */
+const DECORATED = new RegExp(
+  `^(\\()?\\s*([-+−])?\\s*(?:[A-Za-z]{0,3}[${CURRENCY_SYMBOLS}])?\\s*([-+−])?\\s*` +
+    `([.,]?\\d(?:[\\d.,\\s']*\\d)?)\\s*(?:%|[${CURRENCY_SYMBOLS}])?\\s*(\\))?$`,
+);
+/** Spreadsheet exports write 1E+05; keep reading it the way Number() does. */
+const SCIENTIFIC = /^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$/;
+/** A space or apostrophe between digit groups ("1 200", "1'200") only ever groups thousands. */
+const SPACE_GROUP = /(?<=\d)[\s'](?=\d{3}(?!\d))/g;
+const GROUPED_DOT_DECIMAL = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?$|^\.\d+$/;
+const GROUPED_COMMA_DECIMAL = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d*)?$|^,\d+$/;
+
+function isMinus(sign: string | undefined): boolean {
+  return sign === "-" || sign === "−";
+}
+
+/** Strip the decoration off a cell, leaving digits and "." / "," separators. */
+function undecorate(text: string): { core: string; negative: boolean } | null {
+  const match = DECORATED.exec(text);
+  if (!match) return null;
+  const [, open, sign, signAfterSymbol, digits, close] = match;
+  if (Boolean(open) !== Boolean(close)) return null;
+  if (sign && signAfterSymbol) return null;
+  return {
+    core: digits.replace(SPACE_GROUP, ""),
+    negative: Boolean(open) || isMinus(sign) || isMinus(signAfterSymbol),
+  };
+}
+
+/**
+ * Which separator is the decimal point, when this one cell says so on its own.
+ * "1,234.5" and "1.234,5" do (the later one is the point), as do repeated
+ * separators ("1,200,300") and anything that is not three digits after a lone
+ * separator. "1,200" and "4.400" do not: they read both ways.
+ */
+function decimalEvidence(core: string): Decimal | null {
+  const dots = core.split(".").length - 1;
+  const commas = core.split(",").length - 1;
+  if (dots > 0 && commas > 0) return core.lastIndexOf(".") > core.lastIndexOf(",") ? "." : ",";
+  if (dots === 0 && commas === 0) return null;
+  const sep: Decimal = dots > 0 ? "." : ",";
+  if (dots + commas > 1) return sep === "." ? "," : ".";
+  const [whole, fraction] = core.split(sep);
+  const reads = fraction.length === 3 && whole.length >= 1 && whole.length <= 3 && whole !== "0";
+  return reads ? null : sep;
+}
+
+/**
+ * One reading of the separators for a whole column. The file carries no
+ * locale, so deciding cell by cell would read "4.400" two ways in one column.
+ * Cells that settle the question vote; a column with no such cell ("1,200",
+ * "2,400") reads the en-US way, which is also what Number() always did.
+ */
+function columnDecimal(cells: unknown[]): Decimal {
+  let dots = 0;
+  let commas = 0;
+  for (const cell of cells) {
+    if (typeof cell !== "string") continue;
+    const parts = undecorate(cell.trim());
+    if (!parts) continue;
+    const evidence = decimalEvidence(parts.core);
+    if (evidence === ".") dots += 1;
+    else if (evidence === ",") commas += 1;
+  }
+  return commas > dots ? "," : ".";
+}
+
+function readGrouped(core: string, decimal: Decimal): number | null {
+  const grammar = decimal === "." ? GROUPED_DOT_DECIMAL : GROUPED_COMMA_DECIMAL;
+  if (!grammar.test(core)) return null;
+  const thousands = decimal === "." ? "," : ".";
+  return Number(core.replaceAll(thousands, "").replace(decimal, "."));
+}
+
 /**
  * Read one cell as a chart value, or null when it holds no number.
+ *
+ * Numbers written the way a spreadsheet shows them are numbers: "1,200",
+ * "$40", "85%", "(500)". `decimal` is the column's separator convention from
+ * columnDecimal; a lone cell has no column to ask and defaults to ".".
  *
  * The null cases carry the weight here. Number("") and Number(" ") are both 0,
  * so without the blank guard an empty column would win the vote below and
  * render a chart of zeros. Number("Infinity") is Infinity, which renders as a
- * degenerate SVG that Sharp drops on the floor.
+ * degenerate SVG that Sharp drops on the floor. Number("0x1F") is 31, which no
+ * spreadsheet writes: only the grammar above gets through.
  */
-function numericCell(cell: unknown): number | null {
+function numericCell(cell: unknown, decimal: Decimal = "."): number | null {
   if (typeof cell === "number") return Number.isFinite(cell) ? cell : null;
   if (typeof cell !== "string") return null;
   const trimmed = cell.trim();
   if (trimmed === "") return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (SCIENTIFIC.test(trimmed)) {
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const parts = undecorate(trimmed);
+  if (!parts) return null;
+  const parsed = readGrouped(parts.core, decimal);
+  if (parsed === null || !Number.isFinite(parsed)) return null;
+  return parts.negative ? -parsed : parsed;
 }
 
 function toCell(value: unknown): string {
@@ -120,13 +214,16 @@ function tableToPoints({ header, rows }: Table): DataPoint[] {
     if (row.length > width) width = row.length;
   }
 
+  const decimals: Decimal[] = [];
   const numericShare: number[] = [];
   const hasNegative: boolean[] = [];
   for (let col = 0; col < width; col++) {
+    const decimal = columnDecimal(rows.map((row) => row[col]));
+    decimals.push(decimal);
     let numeric = 0;
     let negative = false;
     for (const row of rows) {
-      const cell = numericCell(row[col]);
+      const cell = numericCell(row[col], decimal);
       if (cell === null) continue;
       numeric += 1;
       if (cell < 0) negative = true;
@@ -168,10 +265,8 @@ function tableToPoints({ header, rows }: Table): DataPoint[] {
   const points: DataPoint[] = [];
   for (const row of rows) {
     // A row with no number in the value column is not a data row. Blank cells
-    // are the common case. Numbers written the way a spreadsheet displays them
-    // ("1,200", "$40") are not read as numbers and are dropped here too, which
-    // is issue #1198.
-    const value = numericCell(row[valueCol]);
+    // are the common case.
+    const value = numericCell(row[valueCol], decimals[valueCol]);
     if (value === null) continue;
     points.push({
       label: labelCol < 0 ? String(points.length + 1) : toCell(row[labelCol]).trim(),
@@ -265,7 +360,7 @@ function pointsFromJson(raw: unknown): DataPoint[] {
   throw new ToolInputError(JSON_SHAPES);
 }
 
-function parseInput(buf: Buffer): DataPoint[] {
+export function parseInput(buf: Buffer): DataPoint[] {
   // Strip a UTF-8 BOM. JS counts U+FEFF as whitespace so the sniff below still
   // matches, but JSON.parse rejects it, which killed every BOM'd export.
   // Papa strips it from CSV on its own.

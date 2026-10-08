@@ -357,6 +357,24 @@ describe("Chart Maker column detection", () => {
     expect(png.equals(await renderChart("month,sales\nJan,100\nMar,300\n"))).toBe(true);
   });
 
+  it("keeps rows whose value carries a thousands separator", async () => {
+    const png = await renderChart(
+      'month,sales\nJan,900\nFeb,"1,200"\nMar,"2,400"\nApr,850\nMay,700\nJun,650\n',
+    );
+
+    expect(
+      png.equals(
+        await renderChart("month,sales\nJan,900\nFeb,1200\nMar,2400\nApr,850\nMay,700\nJun,650\n"),
+      ),
+    ).toBe(true);
+  });
+
+  it("charts a $-prefixed revenue column rather than the id column", async () => {
+    const png = await renderChart("id,region,revenue\n1,EMEA,$4400\n2,APAC,$3610\n");
+
+    expect(png.equals(await renderChart("region,revenue\nEMEA,4400\nAPAC,3610\n"))).toBe(true);
+  });
+
   it("names the columns it checked when the file holds no numbers", async () => {
     const res = await postChart("region,city\nEMEA,Berlin\nAPAC,Singapore\n");
 
