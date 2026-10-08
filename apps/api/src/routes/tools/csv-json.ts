@@ -49,7 +49,8 @@ export function jsonToRows(data: unknown): Record<string, unknown>[] {
  * "[object Object]"), and pass the union of all keys so columns appearing only
  * in later rows are not dropped. Rows are null-prototype objects: on a `{}`
  * literal, assigning a `__proto__` key hits the prototype setter and the column
- * silently vanishes (#2062).
+ * silently vanishes (#2062). The null prototype also keeps a row that lacks a
+ * key like `constructor` from reading the inherited function into its cell.
  */
 export function rowsToCsv(rows: Record<string, unknown>[]): string {
   const flattened = rows.map((row) => {

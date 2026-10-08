@@ -76,6 +76,14 @@ describe("rowsToCsv", () => {
     expect(rowsToCsv(rows)).toBe("__proto__,x\r\n5,1");
   });
 
+  it("leaves cells empty for prototype-named keys that a row lacks", () => {
+    // Rows must not inherit from Object.prototype: a row missing `constructor`
+    // would otherwise write the inherited function's source into the cell.
+    const rows = jsonToRows(JSON.parse('[{"__proto__": 5}, {"x": 1}]'));
+    expect(rowsToCsv(rows)).toBe("__proto__,x\r\n5,\r\n,1");
+    expect(rowsToCsv([{ constructor: 1 }, { x: 2 }])).toBe("constructor,x\r\n1,\r\n,2");
+  });
+
   it("refuses rows with no fields", () => {
     expect(() => rowsToCsv([{}])).toThrow(/no fields/);
   });
