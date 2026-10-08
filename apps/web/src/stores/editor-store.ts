@@ -165,8 +165,11 @@ function rebakeThenSetSource(
       console.error(`${label} could not update the source image`, err);
       void import("@/lib/analytics").then(({ captureHandledError }) =>
         captureHandledError(
-          new SafeError(`${label} could not update the source image`, { kind: "bug", cause: err }),
-          { error_class: "bug" },
+          new SafeError("Could not update the source image after a trim or crop", {
+            kind: "bug",
+            cause: err,
+          }),
+          { error_class: "bug", tool_id: `editor-${label.toLowerCase()}` },
         ),
       );
     },

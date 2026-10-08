@@ -121,11 +121,11 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
     await vi.waitFor(() =>
       expect(analytics.captureHandledError).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: "Crop could not update the source image",
+          message: "Could not update the source image after a trim or crop",
           isSafeMessage: true,
           cause: expect.any(Error),
         }),
-        { error_class: "bug" },
+        { error_class: "bug", tool_id: "editor-crop" },
       ),
     );
     // The canvas change already committed, so the original bitmap stays as is.
