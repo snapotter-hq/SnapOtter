@@ -28,10 +28,10 @@ afterAll(async () => {
 const OVER_LIMIT = Buffer.alloc(11 * 1024 * 1024, 1);
 const SMALL = Buffer.alloc(1024, 1);
 
-async function post(url: string, files: Buffer[]) {
+async function post(url: string, files: Buffer[], field = "file") {
   const { body, contentType } = createMultipartPayload(
     files.map((content, i) => ({
-      name: "file",
+      name: field,
       filename: `f${i}.png`,
       contentType: "image/png",
       content,
@@ -53,6 +53,19 @@ describe("tool routes answer 413 for an over-limit upload", () => {
     ["custom route", "/api/v1/tools/image/gif-tools/info"],
   ])("%s %s", async (_kind, url) => {
     const res = await post(url, [OVER_LIMIT]);
+
+    expect(res.statusCode).toBe(413);
+    expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 10 MB upload limit" });
+  });
+
+  // The second route in remove-background.ts kept its own 400 catch after
+  // #1341 because the per-file drift guard saw the first route's call (#1660).
+  it("remove-background effects answers 413 for an over-limit background image", async () => {
+    const res = await post(
+      "/api/v1/tools/image/remove-background/effects",
+      [OVER_LIMIT],
+      "backgroundImage",
+    );
 
     expect(res.statusCode).toBe(413);
     expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 10 MB upload limit" });
