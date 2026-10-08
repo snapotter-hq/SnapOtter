@@ -7,6 +7,10 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+const toastError = vi.hoisted(() => vi.fn());
+// By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
+vi.mock("../../../apps/web/node_modules/sonner", () => ({ toast: { error: toastError } }));
+
 // The shortcut hook reaches the stage through this module; the stage is not needed.
 vi.mock("@/components/editor/editor-canvas", () => ({
   editorStageRefHolder: { current: null },
@@ -44,8 +48,9 @@ function setup(zoom = 1) {
   return { result, click, dblclick, drawTriangle };
 }
 
-function setupCropOnEnter() {
-  const applyCrop = vi.fn();
+function setupCropOnEnter(applyImpl: () => Promise<void> = () => Promise.resolve()) {
+  // The store's applyCrop returns a promise (#2070); the shortcut handles its failure.
+  const applyCrop = vi.fn(applyImpl);
   const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };
   useEditorStore.setState({ ...INITIAL_STATE, isCropping: true, cropState, applyCrop }, true);
   renderHook(() => useEditorShortcuts());
@@ -166,6 +171,16 @@ describe("polygonal lasso close gestures (#1059)", () => {
     polygonalLassoRefHolder.current = { close: () => false, cancel: () => false };
     pressEnter();
     expect(applyCrop).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the user when the crop on Enter cannot be applied", async () => {
+    const { applyCrop, pressEnter } = setupCropOnEnter(() =>
+      Promise.reject(new Error("tainted canvas")),
+    );
+    polygonalLassoRefHolder.current = null;
+    pressEnter();
+    expect(applyCrop).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
   });
 
   it("still applies the crop on Enter when the lasso tool is not mounted", () => {

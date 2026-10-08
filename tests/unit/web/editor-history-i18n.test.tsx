@@ -25,6 +25,7 @@ import { HistoryPanel, historyActionLabel } from "@/components/editor/panels/his
 import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { useEditorStore } from "@/stores/editor-store";
+import { stubRaster } from "../../helpers/editor-raster-stub.js";
 
 const INITIAL_STATE = useEditorStore.getState();
 const h = de.editor.panels.history.actions;
@@ -92,8 +93,8 @@ describe("editor history labels (#1592)", () => {
 
   it("labels redo (future) steps too", async () => {
     const s = useEditorStore.getState();
-    s.flipCanvasHorizontal();
-    s.rotateCanvas(90);
+    await s.flipCanvasHorizontal();
+    await s.rotateCanvas(90);
     useEditorStore.temporal.getState().undo();
     renderIn("de");
 
@@ -177,5 +178,40 @@ describe("historyActionLabel (#1592)", () => {
   it("names every shape type and every adjustment slider", () => {
     expect(historyActionLabel(t, { id: "addObject", objectType: "star" })).toBe("Add Star");
     expect(historyActionLabel(t, { id: "adjust", key: "vibrance" })).toBe("Adjust Vibrance");
+  });
+});
+
+describe("History panel row clicks (#2070)", () => {
+  // A rotate still being built commits one more history entry before a row click is
+  // acted on. The click must land on the row's own state, so it can't be a step count
+  // taken when the row was drawn.
+  it("jump to the clicked row even while a rotate is still being built", async () => {
+    const raster = stubRaster({ manual: true });
+    try {
+      const s = useEditorStore.getState();
+      s.loadImage("blob:test", 800, 600);
+      s.addObject({
+        id: "a",
+        type: "rect",
+        layerId: s.activeLayerId,
+        attrs: { x: 0, y: 0, width: 10, height: 10 },
+      } as Parameters<typeof s.addObject>[0]);
+      renderIn("en");
+
+      const rotating = useEditorStore.getState().rotateCanvas(90);
+      await new Promise((r) => setTimeout(r, 0));
+      // The oldest row stands for the state before anything was done.
+      const rows = screen.getAllByRole("button").filter((b) => b.className.includes("w-full"));
+      fireEvent.click(rows[rows.length - 1]);
+      raster.release();
+      await rotating;
+      await act(async () => {});
+
+      expect(useEditorStore.getState().sourceImageUrl).toBeNull();
+      expect(useEditorStore.getState().objects).toEqual([]);
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
   });
 });

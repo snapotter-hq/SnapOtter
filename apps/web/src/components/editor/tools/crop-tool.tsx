@@ -1,6 +1,8 @@
 import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Group, Line, Rect, Transformer } from "react-konva";
+import { useTranslation } from "@/contexts/i18n-context";
+import { runEditorAction } from "@/lib/editor-action";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CropState } from "@/types/editor";
 
@@ -38,6 +40,7 @@ export interface CropToolApi {
 }
 
 export function useCropTool(): CropToolApi {
+  const { t } = useTranslation();
   const cropRef = useRef<Konva.Rect | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
   const [aspectRatio, setAspectRatioState] = useState("free");
@@ -93,8 +96,8 @@ export function useCropTool(): CropToolApi {
   );
 
   const applyCrop = useCallback(() => {
-    applyCropAction();
-  }, [applyCropAction]);
+    runEditorAction(applyCropAction(), t.common.somethingWentWrong);
+  }, [applyCropAction, t]);
 
   const cancelCrop = useCallback(() => {
     setCropState(null);

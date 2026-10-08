@@ -2,6 +2,7 @@ import { ArrowLeftRight, Check, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { ASPECT_RATIOS } from "@/components/editor/tools/crop-tool";
 import { useTranslation } from "@/contexts/i18n-context";
+import { runEditorAction } from "@/lib/editor-action";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -68,8 +69,8 @@ export function CropOptions() {
   }, [cropState, setCropState]);
 
   const handleApply = useCallback(() => {
-    applyCrop();
-  }, [applyCrop]);
+    runEditorAction(applyCrop(), t.common.somethingWentWrong);
+  }, [applyCrop, t]);
 
   const handleCancel = useCallback(() => {
     setCropState(null);

@@ -23,10 +23,16 @@ import {
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { runEditorAction } from "@/lib/editor-action";
 import { format } from "@/lib/format";
 import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/stores/editor-store";
+import {
+  jumpEditorToHistoryState,
+  redoEditor,
+  undoEditor,
+  useEditorStore,
+} from "@/stores/editor-store";
 import type { HistoryAction } from "@/types/editor";
 
 type IconComponent = React.ComponentType<{ size?: number }>;
@@ -120,6 +126,9 @@ export function historyActionLabel(t: Translations, action: HistoryAction | unde
 interface HistoryEntry {
   index: number;
   action: HistoryAction | undefined;
+  // The stored state this row stands for, so a click can find its way back to it
+  // even if the history changed since the row was drawn. Absent on the current row.
+  state?: unknown;
 }
 
 export function HistoryPanel() {
@@ -142,11 +151,11 @@ export function HistoryPanel() {
   const canRedo = futureLength > 0;
 
   const undo = useCallback(() => {
-    useEditorStore.temporal.getState().undo();
+    void undoEditor();
   }, []);
 
   const redo = useCallback(() => {
-    useEditorStore.temporal.getState().redo();
+    void redoEditor();
   }, []);
 
   // Build the history list from past states
@@ -159,7 +168,7 @@ export function HistoryPanel() {
 
     // Future states (dimmed, above current in reverse order)
     for (let i = future.length - 1; i >= 0; i--) {
-      result.push({ index: -(i + 1), action: future[i]?.lastAction });
+      result.push({ index: -(i + 1), action: future[i]?.lastAction, state: future[i] });
     }
 
     // Current state (highlighted)
@@ -167,7 +176,7 @@ export function HistoryPanel() {
 
     // Past states (newest first, below current)
     for (let i = past.length - 1; i >= 0; i--) {
-      result.push({ index: past.length - i, action: past[i]?.lastAction });
+      result.push({ index: past.length - i, action: past[i]?.lastAction, state: past[i] });
     }
 
     return result;
@@ -175,21 +184,15 @@ export function HistoryPanel() {
     // we read them inside via getState(). lastAction triggers recalculation.
   }, [lastAction]);
 
-  const jumpToState = useCallback((entry: HistoryEntry) => {
-    const temporal = useEditorStore.temporal.getState();
-    if (entry.index < 0) {
-      // Future state: redo N times
-      const steps = Math.abs(entry.index);
-      for (let i = 0; i < steps; i++) {
-        temporal.redo();
-      }
-    } else if (entry.index > 0) {
-      // Past state: undo N times
-      for (let i = 0; i < entry.index; i++) {
-        temporal.undo();
-      }
-    }
-  }, []);
+  // Jump by the row's stored state, not by a step count taken now: a rotate or crop
+  // still being built adds a history entry before this runs (#2070).
+  const jumpToState = useCallback(
+    (entry: HistoryEntry) => {
+      if (entry.index === 0 || entry.state === undefined) return;
+      runEditorAction(jumpEditorToHistoryState(entry.state), t.common.somethingWentWrong);
+    },
+    [t],
+  );
 
   return (
     <div className="flex flex-col h-full">

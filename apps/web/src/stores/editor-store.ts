@@ -58,29 +58,90 @@ function isCenterBased(obj: CanvasObject): boolean {
 
 type RasterTransform = "rot90" | "rot180" | "rot270" | "flipH" | "flipV";
 
+const SOURCE_RELOAD_TIMEOUT_MS = 30_000;
+
+// Counts decodes started, so enqueueRebake can tell a job that finished without
+// waiting on anything from one that is still in flight.
+let decodesStarted = 0;
+
+// Counts rebakes that committed, so an undo queued behind one can tell whether the
+// step it was meant to undo ever landed.
+let rebakesCommitted = 0;
+
+// Draw the source image onto a fresh `width` x `height` canvas and resolve with its
+// PNG data URL. Rejects on any failure (the image won't reload, no 2D context, a
+// cross-origin image tainting the canvas, a canvas past the browser's size limit) so
+// the caller can leave the store untouched. The previous blob URL is never revoked:
+// it's captured in undo history (partialize keeps sourceImageUrl), so undo/redo may
+// restore it, and revoking would 404 the reload.
+function renderSourceBitmap(
+  url: string,
+  width: number,
+  height: number,
+  draw: (ctx: CanvasRenderingContext2D, img: HTMLImageElement) => void,
+): Promise<string> {
+  decodesStarted++;
+  // A canvas with no pixels also comes back from toDataURL as "data:,", which would
+  // read as "too large" below. Say what's actually wrong.
+  if (!(width >= 1) || !(height >= 1)) {
+    return Promise.reject(new Error("Nothing to draw: the canvas would have no pixels"));
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    // Same as the `?url=` loader in editor-page.tsx: without it a cross-origin photo
+    // taints the canvas and toDataURL throws. Harmless for blob: and data: sources.
+    img.crossOrigin = "anonymous";
+    // Rebakes share a queue, so an image that never fires load or error (a hung
+    // `?url=` fetch) would block every later rotate, flip, crop and canvas resize
+    // until the page reloads. Blob and data URLs settle at once; this bounds the rest.
+    const timer = setTimeout(() => {
+      img.onload = null;
+      img.onerror = null;
+      // Stop the request too, or a hung fetch keeps running for a result nobody awaits.
+      img.src = "";
+      reject(new Error("Timed out reloading the source image"));
+    }, SOURCE_RELOAD_TIMEOUT_MS);
+    img.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error("Could not reload the source image"));
+    };
+    img.onload = () => {
+      clearTimeout(timer);
+      try {
+        const off = document.createElement("canvas");
+        off.width = width;
+        off.height = height;
+        const ctx = off.getContext("2d");
+        if (!ctx) throw new Error("2D canvas is unavailable");
+        draw(ctx, img);
+        const out = off.toDataURL("image/png");
+        // Past the browser's canvas size limit Chromium/WebKit hand back an empty URL
+        // instead of throwing, which would blank the image.
+        if (out === "data:,") throw new Error("Canvas is larger than this browser can draw");
+        resolve(out);
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    };
+    img.src = url;
+  });
+}
+
 // Rebake the source image bitmap through a transformed offscreen canvas so that
 // rotate/flip actually change the pixels (canvas-size + vector objects are
 // transformed separately by the caller). `width`/`height` are the pre-transform
 // canvas dimensions; the source is scaled to them first so a prior Image Size
-// resize is baked in too. Runs async (image decode); `apply` receives the new
-// data URL, and the old blob URL is revoked to avoid leaks.
+// resize is baked in too.
 function rebakeSourceRaster(
   url: string,
   width: number,
   height: number,
   transform: RasterTransform,
-  apply: (newUrl: string) => void,
-): void {
-  const img = new Image();
-  img.onload = () => {
-    const swap = transform === "rot90" || transform === "rot270";
-    const cw = swap ? height : width;
-    const ch = swap ? width : height;
-    const off = document.createElement("canvas");
-    off.width = cw;
-    off.height = ch;
-    const ctx = off.getContext("2d");
-    if (!ctx) return;
+): Promise<string> {
+  const swap = transform === "rot90" || transform === "rot270";
+  const cw = swap ? height : width;
+  const ch = swap ? width : height;
+  return renderSourceBitmap(url, cw, ch, (ctx, img) => {
     switch (transform) {
       case "rot90":
         ctx.translate(cw, 0);
@@ -104,17 +165,12 @@ function rebakeSourceRaster(
         break;
     }
     ctx.drawImage(img, 0, 0, width, height);
-    // Don't revoke the previous blob URL: it's captured in undo history (partialize
-    // keeps sourceImageUrl), so undo/redo may restore it. Revoking would 404 the reload.
-    apply(off.toDataURL("image/png"));
-  };
-  img.src = url;
+  });
 }
 
 // Rebake the source bitmap onto a canvas of a different size. The image keeps its
 // current drawn size (`width` x `height`) and lands at (offsetX, offsetY), so growing
-// the canvas adds transparent room and shrinking it crops, never scales. Resolves with
-// the new data URL; rejects on any failure so the caller can leave the store untouched.
+// the canvas adds transparent room and shrinking it crops, never scales.
 function rebakeSourceIntoCanvas(
   url: string,
   width: number,
@@ -124,36 +180,53 @@ function rebakeSourceIntoCanvas(
   offsetX: number,
   offsetY: number,
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    // Same as the ?url= loader: without it a cross-origin photo taints the canvas and
-    // toDataURL throws. Harmless for blob: and data: sources.
-    img.crossOrigin = "anonymous";
-    img.onerror = () => reject(new Error("Could not reload the source image"));
-    img.onload = () => {
-      try {
-        const off = document.createElement("canvas");
-        off.width = newWidth;
-        off.height = newHeight;
-        const ctx = off.getContext("2d");
-        if (!ctx) throw new Error("2D canvas is unavailable");
-        ctx.drawImage(img, offsetX, offsetY, width, height);
-        const out = off.toDataURL("image/png");
-        // Past the browser's canvas size limit Chromium/WebKit hand back an empty URL
-        // instead of throwing, which would blank the image.
-        if (out === "data:,") throw new Error("Canvas is larger than this browser can draw");
-        resolve(out);
-      } catch (err) {
-        reject(err instanceof Error ? err : new Error(String(err)));
-      }
-    };
-    img.src = url;
+  return renderSourceBitmap(url, newWidth, newHeight, (ctx, img) =>
+    ctx.drawImage(img, offsetX, offsetY, width, height),
+  );
+}
+
+// Rebake the source bitmap down to the crop rectangle. The crop is in canvas
+// coordinates, so the bitmap is drawn at canvas size first, as the editor draws it:
+// after an Image Size resize the bitmap's own pixels are a different scale (#2070).
+function rebakeSourceCrop(
+  url: string,
+  crop: { x: number; y: number; width: number; height: number },
+  canvas: { width: number; height: number },
+): Promise<string> {
+  return renderSourceBitmap(url, crop.width, crop.height, (ctx, img) =>
+    ctx.drawImage(img, -crop.x, -crop.y, canvas.width, canvas.height),
+  );
+}
+
+// Rebakes run one at a time, each reading the store when it starts. Two quick clicks
+// (rotate, rotate) then compose: the second decodes the first one's result at the
+// size the first left behind, where running both from the same bitmap would draw the
+// original through the wrong dimensions. An idle queue starts the job immediately, so
+// a lone rebake behaves exactly as if there were no queue. A job that never starts a
+// decode (no source image, or an undo) has finished by the time it returns, so it
+// leaves the queue idle and the next call in the same tick still runs at once. A
+// failed job doesn't block the next. The promise handed back is a separate one from
+// the queue's own, so a caller that ignores a rejection still gets an
+// unhandled-rejection report.
+let rebakeTail: Promise<void> | null = null;
+function enqueueRebake(job: () => Promise<void>): Promise<void> {
+  const decodesBefore = decodesStarted;
+  const run = rebakeTail ? rebakeTail.then(job) : job();
+  if (!rebakeTail && decodesStarted === decodesBefore) return run;
+  const tail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  rebakeTail = tail;
+  void tail.then(() => {
+    if (rebakeTail === tail) rebakeTail = null;
   });
+  return run.finally(() => undefined);
 }
 
 // Rebake for actions that commit the new canvas first and swap the bitmap in when it
-// is ready (trim, crop). A failure can't undo the canvas change, so say so loudly:
-// the console alone never reaches Sentry.
+// is ready (trim, which runs outside the rebake queue: #2116). A failure can't undo
+// the canvas change, so say so loudly: the console alone never reaches Sentry.
 function rebakeThenSetSource(
   label: string,
   rebake: Promise<string>,
@@ -165,7 +238,7 @@ function rebakeThenSetSource(
       console.error(`${label} could not update the source image`, err);
       void import("@/lib/analytics").then(({ captureHandledError }) =>
         captureHandledError(
-          new SafeError("Could not update the source image after a trim or crop", {
+          new SafeError("Could not update the source image after a trim", {
             kind: "bug",
             cause: err,
           }),
@@ -478,79 +551,81 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         });
       },
 
-      resizeCanvas: async (width, height, anchor, fill) => {
-        const { canvasSize, sourceImageUrl } = get();
-        const dw = width - canvasSize.width;
-        const dh = height - canvasSize.height;
-        // Whole pixels only: a half-pixel offset would resample (blur) the rebaked bitmap.
-        let offsetX = 0;
-        let offsetY = 0;
-        if (anchor === "center") {
-          offsetX = Math.floor(dw / 2);
-          offsetY = Math.floor(dh / 2);
-        } else {
-          if (anchor.endsWith("-center")) {
+      resizeCanvas: (width, height, anchor, fill) =>
+        enqueueRebake(async () => {
+          const { canvasSize, sourceImageUrl } = get();
+          const dw = width - canvasSize.width;
+          const dh = height - canvasSize.height;
+          // Whole pixels only: a half-pixel offset would resample (blur) the rebaked bitmap.
+          let offsetX = 0;
+          let offsetY = 0;
+          if (anchor === "center") {
             offsetX = Math.floor(dw / 2);
-          } else if (anchor.endsWith("-right")) {
-            offsetX = dw;
-          }
-          if (anchor.startsWith("center-")) {
             offsetY = Math.floor(dh / 2);
-          } else if (anchor.startsWith("bottom-")) {
-            offsetY = dh;
+          } else {
+            if (anchor.endsWith("-center")) {
+              offsetX = Math.floor(dw / 2);
+            } else if (anchor.endsWith("-right")) {
+              offsetX = dw;
+            }
+            if (anchor.startsWith("center-")) {
+              offsetY = Math.floor(dh / 2);
+            } else if (anchor.startsWith("bottom-")) {
+              offsetY = dh;
+            }
           }
-        }
-        // The source raster is always drawn at canvas size, so without a rebake the
-        // image would stretch to the new dimensions instead of staying put (#2016).
-        // Build it first and commit everything in one set: a failure leaves the editor
-        // untouched, and undo never sees a half-applied resize.
-        let newSourceUrl: string | null = null;
-        if (sourceImageUrl) {
-          newSourceUrl = await rebakeSourceIntoCanvas(
-            sourceImageUrl,
-            canvasSize.width,
-            canvasSize.height,
-            width,
-            height,
-            offsetX,
-            offsetY,
-          );
-          // The user loaded, rotated or resized something else while this decoded.
-          if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
-        }
-        const { objects } = get();
-        set({
-          canvasSize: { width, height },
-          sourceImageSize: { width, height },
-          ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-          ...(fill ? { canvasBackground: fill } : {}),
-          objects:
-            offsetX !== 0 || offsetY !== 0
-              ? objects.map((obj) => {
-                  const attrs = { ...obj.attrs };
-                  if (hasPointsArray(obj)) {
-                    const pts = [...(attrs as { points: number[] }).points];
-                    for (let i = 0; i < pts.length; i += 2) {
-                      pts[i] += offsetX;
-                      pts[i + 1] += offsetY;
+          // The source raster is always drawn at canvas size, so without a rebake the
+          // image would stretch to the new dimensions instead of staying put (#2016).
+          // Build it first and commit everything in one set: a failure leaves the editor
+          // untouched, and undo never sees a half-applied resize.
+          let newSourceUrl: string | null = null;
+          if (sourceImageUrl) {
+            newSourceUrl = await rebakeSourceIntoCanvas(
+              sourceImageUrl,
+              canvasSize.width,
+              canvasSize.height,
+              width,
+              height,
+              offsetX,
+              offsetY,
+            );
+            // The user loaded, rotated or resized something else while this decoded.
+            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+          }
+          const { objects } = get();
+          rebakesCommitted++;
+          set({
+            canvasSize: { width, height },
+            sourceImageSize: { width, height },
+            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+            ...(fill ? { canvasBackground: fill } : {}),
+            objects:
+              offsetX !== 0 || offsetY !== 0
+                ? objects.map((obj) => {
+                    const attrs = { ...obj.attrs };
+                    if (hasPointsArray(obj)) {
+                      const pts = [...(attrs as { points: number[] }).points];
+                      for (let i = 0; i < pts.length; i += 2) {
+                        pts[i] += offsetX;
+                        pts[i + 1] += offsetY;
+                      }
+                      (attrs as { points: number[] }).points = pts;
+                    } else {
+                      if ("x" in attrs) {
+                        (attrs as { x: number }).x += offsetX;
+                      }
+                      if ("y" in attrs) {
+                        (attrs as { y: number }).y += offsetY;
+                      }
                     }
-                    (attrs as { points: number[] }).points = pts;
-                  } else {
-                    if ("x" in attrs) {
-                      (attrs as { x: number }).x += offsetX;
-                    }
-                    if ("y" in attrs) {
-                      (attrs as { y: number }).y += offsetY;
-                    }
-                  }
-                  return { ...obj, attrs } as CanvasObject;
-                })
-              : objects,
-          isDirty: true,
-          lastAction: { id: "resizeCanvas" },
-          _historyVersion: get()._historyVersion + 1,
-        });
-      },
+                    return { ...obj, attrs } as CanvasObject;
+                  })
+                : objects,
+            isDirty: true,
+            lastAction: { id: "resizeCanvas" },
+            _historyVersion: get()._historyVersion + 1,
+          });
+        }),
 
       resizeImage: (width, height, resample) => {
         void resample; // accepted for future server-side resize; client-side scales objects only
@@ -592,164 +667,183 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         });
       },
 
-      rotateCanvas: (degrees) => {
-        const { canvasSize, objects, sourceImageUrl } = get();
-        const newSize =
-          degrees === 180 ? canvasSize : { width: canvasSize.height, height: canvasSize.width };
-        // Rebake the source bitmap so the pixels actually rotate. Runs async and
-        // updates sourceImageUrl once ready; canvas-size + objects rotate now.
-        if (sourceImageUrl) {
-          const transform: RasterTransform =
-            degrees === 90 ? "rot90" : degrees === 270 ? "rot270" : "rot180";
-          rebakeSourceRaster(
-            sourceImageUrl,
-            canvasSize.width,
-            canvasSize.height,
-            transform,
-            (newUrl) => set({ sourceImageUrl: newUrl }),
-          );
-        }
-        set({
-          canvasSize: newSize,
-          sourceImageSize: newSize,
-          objects: objects.map((obj) => {
-            const attrs = { ...obj.attrs };
-            const a = attrs as unknown as Record<string, number>;
+      rotateCanvas: (degrees) =>
+        enqueueRebake(async () => {
+          const { canvasSize, sourceImageUrl } = get();
+          const newSize =
+            degrees === 180 ? canvasSize : { width: canvasSize.height, height: canvasSize.width };
+          // Rebake the source bitmap so the pixels actually rotate. Build it first and
+          // commit size, bitmap and objects in one set, like resizeCanvas: a failure
+          // leaves the editor untouched, and undo never sees a half-applied rotation.
+          let newSourceUrl: string | null = null;
+          if (sourceImageUrl) {
+            const transform: RasterTransform =
+              degrees === 90 ? "rot90" : degrees === 270 ? "rot270" : "rot180";
+            newSourceUrl = await rebakeSourceRaster(
+              sourceImageUrl,
+              canvasSize.width,
+              canvasSize.height,
+              transform,
+            );
+            // The user loaded or undid to a different image while this decoded.
+            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+          }
+          // Read objects only now: anything added during the decode rotates with the rest.
+          const { objects } = get();
+          rebakesCommitted++;
+          set({
+            canvasSize: newSize,
+            sourceImageSize: newSize,
+            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+            objects: objects.map((obj) => {
+              const attrs = { ...obj.attrs };
+              const a = attrs as unknown as Record<string, number>;
 
-            // Handle points-based objects (line, arrow)
-            if (hasPointsArray(obj)) {
-              const pts = [...(attrs as { points: number[] }).points];
-              for (let i = 0; i < pts.length; i += 2) {
-                const px = pts[i];
-                const py = pts[i + 1];
-                if (degrees === 90) {
-                  pts[i] = canvasSize.height - py;
-                  pts[i + 1] = px;
-                } else if (degrees === 270) {
-                  pts[i] = py;
-                  pts[i + 1] = canvasSize.width - px;
-                } else {
-                  pts[i] = canvasSize.width - px;
-                  pts[i + 1] = canvasSize.height - py;
+              // Handle points-based objects (line, arrow)
+              if (hasPointsArray(obj)) {
+                const pts = [...(attrs as { points: number[] }).points];
+                for (let i = 0; i < pts.length; i += 2) {
+                  const px = pts[i];
+                  const py = pts[i + 1];
+                  if (degrees === 90) {
+                    pts[i] = canvasSize.height - py;
+                    pts[i + 1] = px;
+                  } else if (degrees === 270) {
+                    pts[i] = py;
+                    pts[i + 1] = canvasSize.width - px;
+                  } else {
+                    pts[i] = canvasSize.width - px;
+                    pts[i + 1] = canvasSize.height - py;
+                  }
+                }
+                (attrs as { points: number[] }).points = pts;
+              } else {
+                const centerBased = isCenterBased(obj);
+                const hasPos = "x" in attrs && "y" in attrs;
+                const hasSize = "width" in attrs && "height" in attrs;
+
+                if (hasPos) {
+                  if (degrees === 90) {
+                    const newX =
+                      canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
+                    const newY = a.x;
+                    a.x = newX;
+                    a.y = newY;
+                  } else if (degrees === 270) {
+                    const newX = a.y;
+                    const newY = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
+                    a.x = newX;
+                    a.y = newY;
+                  } else {
+                    a.x = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
+                    a.y = canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
+                  }
+                }
+                if (hasSize && degrees !== 180) {
+                  const oldW = a.width;
+                  a.width = a.height;
+                  a.height = oldW;
+                }
+                if ("radiusX" in attrs && "radiusY" in attrs && degrees !== 180) {
+                  const oldRx = a.radiusX;
+                  a.radiusX = a.radiusY;
+                  a.radiusY = oldRx;
                 }
               }
-              (attrs as { points: number[] }).points = pts;
-            } else {
-              const centerBased = isCenterBased(obj);
-              const hasPos = "x" in attrs && "y" in attrs;
-              const hasSize = "width" in attrs && "height" in attrs;
+              if ("rotation" in attrs) {
+                a.rotation = ((a.rotation || 0) + degrees) % 360;
+              }
+              return { ...obj, attrs } as CanvasObject;
+            }),
+            isDirty: true,
+            lastAction: { id: "rotateCanvas", degrees },
+            _historyVersion: get()._historyVersion + 1,
+          });
+        }),
 
-              if (hasPos) {
-                if (degrees === 90) {
-                  const newX = canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
-                  const newY = a.x;
-                  a.x = newX;
-                  a.y = newY;
-                } else if (degrees === 270) {
-                  const newX = a.y;
-                  const newY = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
-                  a.x = newX;
-                  a.y = newY;
-                } else {
-                  a.x = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
-                  a.y = canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
+      flipCanvasHorizontal: () =>
+        enqueueRebake(async () => {
+          const { canvasSize, sourceImageUrl } = get();
+          let newSourceUrl: string | null = null;
+          if (sourceImageUrl) {
+            newSourceUrl = await rebakeSourceRaster(
+              sourceImageUrl,
+              canvasSize.width,
+              canvasSize.height,
+              "flipH",
+            );
+            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+          }
+          const { objects } = get();
+          rebakesCommitted++;
+          set({
+            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+            objects: objects.map((obj) => {
+              const attrs = { ...obj.attrs };
+              const a = attrs as unknown as Record<string, number>;
+              if (hasPointsArray(obj)) {
+                const pts = [...(attrs as { points: number[] }).points];
+                for (let i = 0; i < pts.length; i += 2) {
+                  pts[i] = canvasSize.width - pts[i];
                 }
+                (attrs as { points: number[] }).points = pts;
+              } else if ("x" in attrs) {
+                const centerBased = isCenterBased(obj);
+                const w = centerBased ? 0 : "width" in attrs ? a.width : 0;
+                a.x = canvasSize.width - a.x - w;
               }
-              if (hasSize && degrees !== 180) {
-                const oldW = a.width;
-                a.width = a.height;
-                a.height = oldW;
+              if ("rotation" in attrs) {
+                a.rotation = (360 - (a.rotation || 0)) % 360;
               }
-              if ("radiusX" in attrs && "radiusY" in attrs && degrees !== 180) {
-                const oldRx = a.radiusX;
-                a.radiusX = a.radiusY;
-                a.radiusY = oldRx;
-              }
-            }
-            if ("rotation" in attrs) {
-              a.rotation = ((a.rotation || 0) + degrees) % 360;
-            }
-            return { ...obj, attrs } as CanvasObject;
-          }),
-          isDirty: true,
-          lastAction: { id: "rotateCanvas", degrees },
-          _historyVersion: get()._historyVersion + 1,
-        });
-      },
+              return { ...obj, attrs } as CanvasObject;
+            }),
+            isDirty: true,
+            lastAction: { id: "flipHorizontal" },
+            _historyVersion: get()._historyVersion + 1,
+          });
+        }),
 
-      flipCanvasHorizontal: () => {
-        const { canvasSize, objects, sourceImageUrl } = get();
-        if (sourceImageUrl) {
-          rebakeSourceRaster(
-            sourceImageUrl,
-            canvasSize.width,
-            canvasSize.height,
-            "flipH",
-            (newUrl) => set({ sourceImageUrl: newUrl }),
-          );
-        }
-        set({
-          objects: objects.map((obj) => {
-            const attrs = { ...obj.attrs };
-            const a = attrs as unknown as Record<string, number>;
-            if (hasPointsArray(obj)) {
-              const pts = [...(attrs as { points: number[] }).points];
-              for (let i = 0; i < pts.length; i += 2) {
-                pts[i] = canvasSize.width - pts[i];
+      flipCanvasVertical: () =>
+        enqueueRebake(async () => {
+          const { canvasSize, sourceImageUrl } = get();
+          let newSourceUrl: string | null = null;
+          if (sourceImageUrl) {
+            newSourceUrl = await rebakeSourceRaster(
+              sourceImageUrl,
+              canvasSize.width,
+              canvasSize.height,
+              "flipV",
+            );
+            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+          }
+          const { objects } = get();
+          rebakesCommitted++;
+          set({
+            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+            objects: objects.map((obj) => {
+              const attrs = { ...obj.attrs };
+              const a = attrs as unknown as Record<string, number>;
+              if (hasPointsArray(obj)) {
+                const pts = [...(attrs as { points: number[] }).points];
+                for (let i = 1; i < pts.length; i += 2) {
+                  pts[i] = canvasSize.height - pts[i];
+                }
+                (attrs as { points: number[] }).points = pts;
+              } else if ("y" in attrs) {
+                const centerBased = isCenterBased(obj);
+                const h = centerBased ? 0 : "height" in attrs ? a.height : 0;
+                a.y = canvasSize.height - a.y - h;
               }
-              (attrs as { points: number[] }).points = pts;
-            } else if ("x" in attrs) {
-              const centerBased = isCenterBased(obj);
-              const w = centerBased ? 0 : "width" in attrs ? a.width : 0;
-              a.x = canvasSize.width - a.x - w;
-            }
-            if ("rotation" in attrs) {
-              a.rotation = (360 - (a.rotation || 0)) % 360;
-            }
-            return { ...obj, attrs } as CanvasObject;
-          }),
-          isDirty: true,
-          lastAction: { id: "flipHorizontal" },
-          _historyVersion: get()._historyVersion + 1,
-        });
-      },
-
-      flipCanvasVertical: () => {
-        const { canvasSize, objects, sourceImageUrl } = get();
-        if (sourceImageUrl) {
-          rebakeSourceRaster(
-            sourceImageUrl,
-            canvasSize.width,
-            canvasSize.height,
-            "flipV",
-            (newUrl) => set({ sourceImageUrl: newUrl }),
-          );
-        }
-        set({
-          objects: objects.map((obj) => {
-            const attrs = { ...obj.attrs };
-            const a = attrs as unknown as Record<string, number>;
-            if (hasPointsArray(obj)) {
-              const pts = [...(attrs as { points: number[] }).points];
-              for (let i = 1; i < pts.length; i += 2) {
-                pts[i] = canvasSize.height - pts[i];
+              if ("rotation" in attrs) {
+                a.rotation = (360 - (a.rotation || 0)) % 360;
               }
-              (attrs as { points: number[] }).points = pts;
-            } else if ("y" in attrs) {
-              const centerBased = isCenterBased(obj);
-              const h = centerBased ? 0 : "height" in attrs ? a.height : 0;
-              a.y = canvasSize.height - a.y - h;
-            }
-            if ("rotation" in attrs) {
-              a.rotation = (360 - (a.rotation || 0)) % 360;
-            }
-            return { ...obj, attrs } as CanvasObject;
-          }),
-          isDirty: true,
-          lastAction: { id: "flipVertical" },
-          _historyVersion: get()._historyVersion + 1,
-        });
-      },
+              return { ...obj, attrs } as CanvasObject;
+            }),
+            isDirty: true,
+            lastAction: { id: "flipVertical" },
+            _historyVersion: get()._historyVersion + 1,
+          });
+        }),
 
       trimCanvas: () => {
         const { objects, canvasSize, sourceImageUrl } = get();
@@ -1336,56 +1430,63 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       setCropState: (state) => set({ cropState: state, isCropping: state !== null }),
 
       applyCrop: () => {
-        const { cropState, objects, sourceImageUrl, canvasSize } = get();
-        if (!cropState) return;
+        // The box is in the coordinates of the canvas it was drawn on. If a rotate,
+        // flip or resize ahead of this crop in the queue changes the canvas or the
+        // bitmap first, the box no longer means what it did: drop the crop and leave
+        // the box up for the user to redraw, rather than cut a region they never framed.
+        const { canvasSize: canvasAtCall, sourceImageUrl: sourceAtCall } = get();
+        return enqueueRebake(async () => {
+          const { cropState, canvasSize, sourceImageUrl } = get();
+          if (!cropState) return;
+          if (canvasSize !== canvasAtCall || sourceImageUrl !== sourceAtCall) return;
 
-        // Crop the source image via an offscreen canvas. The bitmap is drawn at canvas
-        // size (Image Size doesn't resample it), so draw it that big, not at natural size.
-        // Keep the pre-crop blob URL alive: it's in undo history and revoking it would
-        // break undo.
-        if (sourceImageUrl) {
-          rebakeThenSetSource(
-            "Crop",
-            rebakeSourceIntoCanvas(
-              sourceImageUrl,
-              canvasSize.width,
-              canvasSize.height,
-              cropState.width,
-              cropState.height,
-              -cropState.x,
-              -cropState.y,
-            ),
-            set,
-          );
-        }
-
-        set({
-          canvasSize: { width: cropState.width, height: cropState.height },
-          sourceImageSize: { width: cropState.width, height: cropState.height },
-          objects: objects.map((obj) => {
-            const attrs = { ...obj.attrs };
-            if (hasPointsArray(obj)) {
-              const pts = [...(attrs as { points: number[] }).points];
-              for (let i = 0; i < pts.length; i += 2) {
-                pts[i] -= cropState.x;
-                pts[i + 1] -= cropState.y;
-              }
-              (attrs as { points: number[] }).points = pts;
-            } else {
-              if ("x" in attrs) {
-                (attrs as { x: number }).x -= cropState.x;
-              }
-              if ("y" in attrs) {
-                (attrs as { y: number }).y -= cropState.y;
-              }
+          // Crop the source image first, then commit size, bitmap and objects together
+          // (see rotateCanvas). The crop box stays up until then, so a failed crop can be
+          // retried or cancelled.
+          let newSourceUrl: string | null = null;
+          if (sourceImageUrl) {
+            newSourceUrl = await rebakeSourceCrop(sourceImageUrl, cropState, canvasSize);
+            // Dropped when the image changed underneath, or when the crop box it was
+            // built from is gone or replaced (cancelled, redrawn, or the tool switched).
+            if (
+              get().sourceImageUrl !== sourceImageUrl ||
+              get().canvasSize !== canvasSize ||
+              get().cropState !== cropState
+            ) {
+              return;
             }
-            return { ...obj, attrs } as CanvasObject;
-          }),
-          cropState: null,
-          isCropping: false,
-          isDirty: true,
-          lastAction: { id: "crop" },
-          _historyVersion: get()._historyVersion + 1,
+          }
+          const { objects } = get();
+          rebakesCommitted++;
+          set({
+            canvasSize: { width: cropState.width, height: cropState.height },
+            sourceImageSize: { width: cropState.width, height: cropState.height },
+            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+            objects: objects.map((obj) => {
+              const attrs = { ...obj.attrs };
+              if (hasPointsArray(obj)) {
+                const pts = [...(attrs as { points: number[] }).points];
+                for (let i = 0; i < pts.length; i += 2) {
+                  pts[i] -= cropState.x;
+                  pts[i + 1] -= cropState.y;
+                }
+                (attrs as { points: number[] }).points = pts;
+              } else {
+                if ("x" in attrs) {
+                  (attrs as { x: number }).x -= cropState.x;
+                }
+                if ("y" in attrs) {
+                  (attrs as { y: number }).y -= cropState.y;
+                }
+              }
+              return { ...obj, attrs } as CanvasObject;
+            }),
+            cropState: null,
+            isCropping: false,
+            isDirty: true,
+            lastAction: { id: "crop" },
+            _historyVersion: get()._historyVersion + 1,
+          });
         });
       },
 
@@ -1613,3 +1714,60 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
     },
   ),
 );
+
+// Undo and redo wait for any rebake in flight. zundo restores a stored state through
+// the raw set, with the same canvasSize object and the same URL string the rebake
+// started from, so its stale check can't see the undo. Without the wait, Ctrl+Z
+// pressed while a rotate decodes undoes the step before it, the rotate then lands on
+// top, and its tracked set empties the redo stack (#2070). Queued, Ctrl+Z undoes the
+// rotate itself once it commits. With nothing in flight they run at once, so a lone
+// Ctrl+Z behaves as before.
+//
+// If an undo had to wait and no rebake committed meanwhile, the step it was meant to
+// undo never landed (the rebake failed, or was dropped because the image changed), so
+// undoing now would remove an unrelated earlier edit: it does nothing instead.
+type EditorTemporal = ReturnType<typeof useEditorStore.temporal.getState>;
+function enqueueRelativeStep(step: (temporal: EditorTemporal) => void): Promise<void> {
+  const waited = rebakeTail !== null;
+  const committedBefore = rebakesCommitted;
+  return enqueueRebake(async () => {
+    if (waited && rebakesCommitted === committedBefore) return;
+    step(useEditorStore.temporal.getState());
+  });
+}
+
+// zundo's undo(0), or a negative or fractional count, replaces the whole store with
+// undefined, so a bad count is ignored here.
+const validSteps = (steps: number) => Number.isInteger(steps) && steps >= 1;
+
+export function undoEditor(steps = 1): Promise<void> {
+  if (!validSteps(steps)) return Promise.resolve();
+  return enqueueRelativeStep((temporal) => temporal.undo(steps));
+}
+
+export function redoEditor(steps = 1): Promise<void> {
+  if (!validSteps(steps)) return Promise.resolve();
+  return enqueueRelativeStep((temporal) => temporal.redo(steps));
+}
+
+// A History panel row click. The row is identified by its stored state, and how many
+// steps away it is gets worked out when the job runs: a rebake ahead of it adds a past
+// state and empties the redo stack, so a count taken at click time would land one step
+// off. It's absolute, so unlike undo it still runs after a rebake ahead of it fails.
+// Rejects when the step is gone (a rebake that committed first cleared the redo stack).
+export function jumpEditorToHistoryState(target: unknown): Promise<void> {
+  return enqueueRebake(async () => {
+    const temporal = useEditorStore.temporal.getState();
+    const past = temporal.pastStates.indexOf(target as never);
+    if (past >= 0) {
+      temporal.undo(temporal.pastStates.length - past);
+      return;
+    }
+    const future = temporal.futureStates.indexOf(target as never);
+    if (future >= 0) {
+      temporal.redo(temporal.futureStates.length - future);
+      return;
+    }
+    throw new Error("That history step no longer exists");
+  });
+}

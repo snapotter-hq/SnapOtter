@@ -91,7 +91,10 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
     expect(useEditorStore.getState().sourceImageUrl).toBe("data:image/png;base64,REBAKED");
   });
 
-  it("reports a failed rebake instead of swallowing it", async () => {
+  // Crop no longer takes this path: it builds the bitmap first and rejects on failure
+  // (editor-rebake-transforms.test.ts). Trim still commits first, so its failure has to be
+  // reported here.
+  it("reports a failed trim rebake instead of swallowing it", async () => {
     stubRaster();
     vi.stubGlobal(
       "Image",
@@ -104,28 +107,22 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
       },
     );
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    useEditorStore.getState().setCropState({
-      x: 100,
-      y: 50,
-      width: 200,
-      height: 100,
-      aspectRatio: null,
-    });
-    useEditorStore.getState().applyCrop();
+    useEditorStore.getState().addObject(rect(100, 50));
+    useEditorStore.getState().trimCanvas();
     await flush();
     expect(logged).toHaveBeenCalledWith(
-      "Crop could not update the source image",
+      "Trim could not update the source image",
       expect.any(Error),
     );
     // The console alone never reaches Sentry; the report must carry the root cause.
     await vi.waitFor(() =>
       expect(analytics.captureHandledError).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: "Could not update the source image after a trim or crop",
+          message: "Could not update the source image after a trim",
           isSafeMessage: true,
           cause: expect.any(Error),
         }),
-        { error_class: "bug", tool_id: "editor-crop" },
+        { error_class: "bug", tool_id: "editor-trim" },
       ),
     );
     // The canvas change already committed, so the original bitmap stays as is.

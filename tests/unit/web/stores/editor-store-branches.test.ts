@@ -109,13 +109,13 @@ describe("editor store branch helpers", () => {
     expect((state().objects[1].attrs as { points: number[] }).points).toEqual([80, 20, 90, 30]);
   });
 
-  it("rotates point and center-based objects for 90 and 270 degrees", () => {
+  it("rotates point and center-based objects for 90 and 270 degrees", async () => {
     useEditorStore.setState({
       canvasSize: { width: 100, height: 50 },
       objects: [makeLine("line"), makeEllipse("ellipse")],
     });
 
-    state().rotateCanvas(90);
+    await state().rotateCanvas(90);
     expect((state().objects[0].attrs as { points: number[] }).points).toEqual([50, 0, 40, 10]);
     expect(state().objects[1].attrs).toMatchObject({
       x: 10,
@@ -125,7 +125,7 @@ describe("editor store branch helpers", () => {
       rotation: 90,
     });
 
-    state().rotateCanvas(270);
+    await state().rotateCanvas(270);
     expect((state().objects[0].attrs as { points: number[] }).points).toEqual([0, 0, 10, 10]);
     expect(state().objects[1].attrs).toMatchObject({
       x: 30,
@@ -136,17 +136,17 @@ describe("editor store branch helpers", () => {
     });
   });
 
-  it("flips point and center-based objects horizontally and vertically", () => {
+  it("flips point and center-based objects horizontally and vertically", async () => {
     useEditorStore.setState({
       canvasSize: { width: 100, height: 80 },
       objects: [makeLine("line"), makeEllipse("ellipse")],
     });
 
-    state().flipCanvasHorizontal();
+    await state().flipCanvasHorizontal();
     expect((state().objects[0].attrs as { points: number[] }).points).toEqual([100, 0, 90, 10]);
     expect(state().objects[1].attrs).toMatchObject({ x: 70, rotation: 0 });
 
-    state().flipCanvasVertical();
+    await state().flipCanvasVertical();
     expect((state().objects[0].attrs as { points: number[] }).points).toEqual([100, 80, 90, 70]);
     expect(state().objects[1].attrs).toMatchObject({ y: 40, rotation: 0 });
   });
@@ -175,8 +175,8 @@ describe("editor store branch helpers", () => {
     expect(Array.from(state().selection?.mask ?? [])).toEqual([1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1]);
   });
 
-  it("ignores crop and clipboard operations when there is no state to apply", () => {
-    state().applyCrop();
+  it("ignores crop and clipboard operations when there is no state to apply", async () => {
+    await state().applyCrop();
     state().cutObjects();
     state().pasteObjects();
     state().pasteInPlace();

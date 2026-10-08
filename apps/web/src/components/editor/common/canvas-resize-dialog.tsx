@@ -39,6 +39,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   const [height, setHeight] = useState(canvasSize.height);
   const [anchor, setAnchor] = useState<AnchorPosition>("center");
   const [fill, setFill] = useState("#ffffff");
+  // Resizes queue behind each other now, so a second click would commit a second,
+  // identical resize (and another full-size bitmap in undo history).
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -48,11 +51,14 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   }, [open, canvasSize]);
 
   const handleApply = useCallback(async () => {
+    setApplying(true);
     try {
       await resizeCanvas(width, height, anchor, fill);
       onClose();
     } catch {
       toast.error(t.common.somethingWentWrong);
+    } finally {
+      setApplying(false);
     }
   }, [width, height, anchor, fill, resizeCanvas, onClose, t]);
 
@@ -199,9 +205,10 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
           <button
             type="button"
             onClick={() => void handleApply()}
+            disabled={applying}
             className={cn(
               "h-8 rounded bg-primary px-3 text-sm text-primary-foreground",
-              "hover:bg-primary/90 transition-colors",
+              "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
             )}
           >
             {t.editor.ui.apply}

@@ -5,7 +5,8 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { copyMergedToClipboard } from "@/components/editor/copy-merged";
 import { polygonalLassoRefHolder } from "@/components/editor/tools/selection-tool";
 import { useTranslation } from "@/contexts/i18n-context";
-import { useEditorStore } from "@/stores/editor-store";
+import { runEditorAction } from "@/lib/editor-action";
+import { redoEditor, undoEditor, useEditorStore } from "@/stores/editor-store";
 import type { ToolType } from "@/types/editor";
 
 /**
@@ -72,7 +73,9 @@ export function useEditorShortcuts(callbacks?: {
 }) {
   const previousToolRef = useRef<ToolType | null>(null);
   const isSpaceHeldRef = useRef(false);
-  const copyFailedMessage = useTranslation().t.editor.ui.exportDialog.copyFailed;
+  const { t: translations } = useTranslation();
+  const copyFailedMessage = translations.editor.ui.exportDialog.copyFailed;
+  const actionFailedMessage = translations.common.somethingWentWrong;
 
   // ---- Tool shortcuts (single key, disabled when input focused) ----
 
@@ -356,7 +359,7 @@ export function useEditorShortcuts(callbacks?: {
     "mod+z",
     (e) => {
       e.preventDefault();
-      useEditorStore.temporal.getState().undo();
+      void undoEditor();
     },
     { preventDefault: true },
   );
@@ -366,7 +369,7 @@ export function useEditorShortcuts(callbacks?: {
     "mod+shift+z",
     (e) => {
       e.preventDefault();
-      useEditorStore.temporal.getState().redo();
+      void redoEditor();
     },
     { preventDefault: true },
   );
@@ -692,7 +695,7 @@ export function useEditorShortcuts(callbacks?: {
       if (polygonalLassoRefHolder.current?.close()) return;
       const state = useEditorStore.getState();
       if (state.isCropping && state.cropState) {
-        state.applyCrop();
+        runEditorAction(state.applyCrop(), actionFailedMessage);
       }
     },
     { preventDefault: false },

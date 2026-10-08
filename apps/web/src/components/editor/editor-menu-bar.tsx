@@ -6,9 +6,10 @@ import { useNavigate } from "react-router";
 import { copyMergedToClipboard } from "@/components/editor/copy-merged";
 import { useTranslation } from "@/contexts/i18n-context";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { runEditorAction } from "@/lib/editor-action";
 import { hotkeysModIsMeta } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/stores/editor-store";
+import { redoEditor, undoEditor, useEditorStore } from "@/stores/editor-store";
 
 export interface MenuBarCallbacks {
   onNewDocument: () => void;
@@ -68,9 +69,15 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const invertSelection = useEditorStore((s) => s.invertSelection);
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const setPanOffset = useEditorStore((s) => s.setPanOffset);
-  const rotateCanvas = useEditorStore((s) => s.rotateCanvas);
-  const flipCanvasHorizontal = useEditorStore((s) => s.flipCanvasHorizontal);
-  const flipCanvasVertical = useEditorStore((s) => s.flipCanvasVertical);
+  const rotateAction = useEditorStore((s) => s.rotateCanvas);
+  const flipHorizontalAction = useEditorStore((s) => s.flipCanvasHorizontal);
+  const flipVerticalAction = useEditorStore((s) => s.flipCanvasVertical);
+  // These rebuild the bitmap and can fail, leaving the editor as it was; say so.
+  const transformFailed = t.common.somethingWentWrong;
+  const rotateCanvas = (degrees: 90 | 180 | 270) =>
+    runEditorAction(rotateAction(degrees), transformFailed);
+  const flipCanvasHorizontal = () => runEditorAction(flipHorizontalAction(), transformFailed);
+  const flipCanvasVertical = () => runEditorAction(flipVerticalAction(), transformFailed);
   const trimCanvas = useEditorStore((s) => s.trimCanvas);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const toggleRulers = useEditorStore((s) => s.toggleRulers);
@@ -92,10 +99,10 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
   const singleLayer = layers.length <= 1;
   const undo = useCallback(() => {
-    useEditorStore.temporal.getState().undo();
+    void undoEditor();
   }, []);
   const redo = useCallback(() => {
-    useEditorStore.temporal.getState().redo();
+    void redoEditor();
   }, []);
 
   // A row's `shortcut` must name a key use-editor-shortcuts.ts binds to that

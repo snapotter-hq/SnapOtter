@@ -461,9 +461,11 @@ export interface EditorState {
     fill?: string,
   ) => Promise<void>;
   resizeImage: (width: number, height: number, resample?: string) => void;
-  rotateCanvas: (degrees: 90 | 180 | 270) => void;
-  flipCanvasHorizontal: () => void;
-  flipCanvasVertical: () => void;
+  // These rebuild the source bitmap, so like resizeCanvas they resolve once the change
+  // is committed and reject (leaving the editor untouched) if the bitmap can't be built.
+  rotateCanvas: (degrees: 90 | 180 | 270) => Promise<void>;
+  flipCanvasHorizontal: () => Promise<void>;
+  flipCanvasVertical: () => Promise<void>;
   trimCanvas: () => void;
 
   // Colors
@@ -508,7 +510,7 @@ export interface EditorState {
 
   // Crop
   setCropState: (state: CropState | null) => void;
-  applyCrop: () => void;
+  applyCrop: () => Promise<void>;
 
   // Brush
   setBrushSize: (size: number) => void;
