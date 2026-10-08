@@ -94,6 +94,42 @@ test.describe("@mobile Settings sheet during a run", () => {
 });
 
 // ---------------------------------------------------------------------------
+// #2176: the side-by-side result (two stacked cards) is taller than the preview
+// area on a short phone. It used to spill over the "Process" peek bar and the
+// Settings button, so nothing could reopen the sheet and reach the download.
+// Pixel 7 is tall enough to hide it, so this runs at an iPhone 14 viewport on
+// every mobile project, where the layout fails the same way in any engine.
+// ---------------------------------------------------------------------------
+test.describe("@mobile A result taller than the preview area", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("leaves the peek bar and the Settings button tappable", async ({ loggedInPage: page }) => {
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+    await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+    await page
+      .getByRole("button", { name: /^resize$/i })
+      .last()
+      .click();
+    await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+    await expect(page.locator("[role='dialog']")).toBeHidden();
+
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await peekBar.click({ trial: true, timeout: 5_000 });
+    // Scoped to the page: the bottom navigation has a Settings button too.
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Responsive chrome: mobile-bottom-nav, hamburger, tool-grid, footer hidden
 // ---------------------------------------------------------------------------
 test.describe("@mobile Responsive chrome", () => {
