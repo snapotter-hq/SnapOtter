@@ -8,8 +8,8 @@ export const PDF_MULTI_TOOL_LIMITS = { documents: 20, outputPages: 1200 } as con
 
 /**
  * Largest width or height, in pixels, the resize-style tools accept. The API schemas
- * enforce it (through image-engine, which re-exports it) and the settings panels
- * bound their inputs with it, so a panel can't offer a value the server rejects.
+ * enforce it (image-engine re-exports it for them); web panels import it from here
+ * to bound their inputs.
  */
 export const MAX_RESIZE_OUTPUT_DIMENSION = 16383;
 
