@@ -9,7 +9,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared/i18n/en.js";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The jsdom env here has no working localStorage; the provider reads the
@@ -19,7 +19,7 @@ const storageFails = vi.hoisted(() => ({ set: false }));
 vi.stubGlobal("localStorage", {
   getItem: (k: string) => storage.get(k) ?? null,
   setItem: (k: string, v: string) => {
-    if (storageFails.set && k === "snapotter-welcome") throw new Error("QuotaExceededError");
+    if (storageFails.set) throw new Error("QuotaExceededError");
     storage.set(k, v);
   },
   removeItem: (k: string) => void storage.delete(k),
@@ -27,8 +27,10 @@ vi.stubGlobal("localStorage", {
 });
 
 import { I18nProvider } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { ChangePasswordPage } from "@/pages/change-password-page";
 
+const originalLocation = window.location;
 const fetchMock = vi.fn();
 const submitSpy = vi.fn();
 
@@ -42,6 +44,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.stubGlobal("location", originalLocation);
   cleanup();
   fetchMock.mockReset();
   submitSpy.mockReset();
@@ -154,10 +157,11 @@ describe("every broken rule is listed at once", () => {
 
     const alert = await screen.findByRole("alert");
     // The list sits inside the alert region, not on it, so the items keep list semantics.
-    expect(alert.tagName).not.toBe("UL");
-    const lines = Array.from(alert.querySelectorAll("li")).map((li) => li.textContent);
+    const lines = within(within(alert).getByRole("list"))
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
     expect(lines).toEqual([
-      "Password must be at least 12 characters.",
+      format(en.errors.passwordTooShort, { minLength: 12 }),
       en.errors.passwordNeedsUppercase,
       en.errors.passwordNeedsSpecial,
     ]);
@@ -179,5 +183,27 @@ describe("every broken rule is listed at once", () => {
     await fillAndSubmit("ALLUPPER1");
 
     expect(await screen.findByText(en.errors.passwordNeedsLowercase)).toBeVisible();
+  });
+});
+
+describe("a refused change stays on the page", () => {
+  it("does not navigate and re-enables the button when the server refuses the password", async () => {
+    answer(400, { code: "VALIDATION_ERROR", rule: "digit", rules: ["digit"] });
+
+    await fillAndSubmit("NoDigitsHere");
+
+    expect(await screen.findByText(en.errors.passwordNeedsDigit)).toBeVisible();
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: en.changePassword.changeButton })).toBeEnabled();
+  });
+
+  it("does not navigate and re-enables the button when the request itself fails", async () => {
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await fillAndSubmit();
+
+    expect(await screen.findByText(en.changePassword.failedError)).toBeVisible();
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: en.changePassword.changeButton })).toBeEnabled();
   });
 });

@@ -53,12 +53,12 @@ describe("passwordErrorMessages (#1569)", () => {
       passwordErrorMessages(en, 400, {
         code: "VALIDATION_ERROR",
         rule: "minLength",
-        rules: ["minLength", "digit", "special"],
+        rules: ["minLength", "uppercase", "special"],
         minLength: 12,
       }),
     ).toEqual([
       en.errors.passwordTooShort.replace("{minLength}", "12"),
-      en.errors.passwordNeedsDigit,
+      en.errors.passwordNeedsUppercase,
       en.errors.passwordNeedsSpecial,
     ]);
   });

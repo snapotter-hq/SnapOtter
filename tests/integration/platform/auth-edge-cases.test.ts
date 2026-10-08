@@ -1119,6 +1119,7 @@ describe("Admin user-management guards", () => {
     expect(JSON.parse(res.body)).toMatchObject({
       code: "VALIDATION_ERROR",
       rule: "minLength",
+      rules: ["minLength", "uppercase", "digit"],
       minLength: 8,
       error: expect.stringMatching(/^Password must/),
     });
@@ -1226,7 +1227,25 @@ describe("Admin user-management guards", () => {
   it("change-password sends a one-element rules list when a single rule is broken", async () => {
     const res = await sendChangePassword(await loggedInUser(), "alllower1");
 
-    expect(JSON.parse(res.body)).toMatchObject({ rule: "uppercase", rules: ["uppercase"] });
+    const body = JSON.parse(res.body);
+    expect(body).toMatchObject({ rule: "uppercase", rules: ["uppercase"] });
+    // The length is only echoed when the length rule is among the broken ones.
+    expect(body).not.toHaveProperty("minLength");
+  });
+
+  it("change-password names all five rules, in a fixed order, for a password that meets none", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, "\t");
+
+      expect(JSON.parse(res.body)).toMatchObject({
+        rule: "minLength",
+        rules: ["minLength", "uppercase", "lowercase", "digit", "special"],
+      });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
   });
 
   it("change-password names the special-character rule when the policy requires one", async () => {
@@ -1453,6 +1472,7 @@ describe("Admin user-management guards", () => {
     expect(JSON.parse(res.body)).toMatchObject({
       code: "VALIDATION_ERROR",
       rule: "minLength",
+      rules: ["minLength"],
       minLength: 8,
       error: expect.stringMatching(/^Password must/),
     });
