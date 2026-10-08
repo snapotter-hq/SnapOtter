@@ -3,6 +3,7 @@ import Konva from "konva";
 import * as pdfjs from "pdfjs-dist";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { toNormalizedRect } from "@/lib/sign-geometry";
 import type { SavedSignature } from "@/lib/signature-store";
 import { safeRandomUUID } from "@/lib/uuid";
@@ -87,7 +88,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     onCountChange?.(0);
     onSelectionChange?.(false);
     (async () => {
-      const doc = await pdfjs.getDocument({ url: fileUrl }).promise;
+      const doc = await pdfjs.getDocument({ url: fileUrl, ...pdfDocumentOptions() }).promise;
       if (cancelled) return;
       docRef.current = doc;
       setPageCount(doc.numPages);

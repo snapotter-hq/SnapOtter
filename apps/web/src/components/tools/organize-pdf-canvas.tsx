@@ -23,6 +23,7 @@ import { DocumentView } from "@/components/tools/document-view";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
+import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { useFileStore } from "@/stores/file-store";
 import { useOrganizeStore } from "@/stores/organize-store";
 
@@ -53,7 +54,7 @@ function renderPageThumbs(
     try {
       const data = new Uint8Array(await file.arrayBuffer());
       if (cancelled) return;
-      const loadingTask = pdfjs.getDocument({ data });
+      const loadingTask = pdfjs.getDocument({ data, ...pdfDocumentOptions() });
       destroy = () => loadingTask.destroy();
       doc = await loadingTask.promise;
     } catch {

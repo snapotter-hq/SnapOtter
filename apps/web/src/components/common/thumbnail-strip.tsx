@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { hasResultWarning } from "@/lib/result-notes";
 import type { FileEntry, PreviewKind } from "@/stores/file-store";
 
@@ -115,7 +116,10 @@ async function renderPdfThumb(file: File, onDone: (url: string | null) => void):
       "pdfjs-dist/build/pdf.worker.min.mjs",
       import.meta.url,
     ).href;
-    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(await file.arrayBuffer()),
+      ...pdfDocumentOptions(),
+    });
     const doc = await loadingTask.promise;
     const page = await doc.getPage(1);
     const base = page.getViewport({ scale: 1 });

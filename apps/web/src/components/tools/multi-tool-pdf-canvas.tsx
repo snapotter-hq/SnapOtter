@@ -32,6 +32,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
+import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { useFileStore } from "@/stores/file-store";
 import { type LoadedDoc, THUMB_ZOOM_LEVELS, useMultiToolStore } from "@/stores/multi-tool-store";
 
@@ -78,7 +79,7 @@ function renderDocThumbs(
     try {
       const data = new Uint8Array(await file.arrayBuffer());
       if (cancelled) return;
-      const loadingTask = pdfjs.getDocument({ data });
+      const loadingTask = pdfjs.getDocument({ data, ...pdfDocumentOptions() });
       destroy = () => loadingTask.destroy();
       doc = await loadingTask.promise;
     } catch (cause) {
