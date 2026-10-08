@@ -203,6 +203,9 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     const view = await applyEffects(expired);
     expect(await screen.findByText(note())).toBeVisible();
 
+    // A run that starts clears the entry's result, and a failed one leaves it
+    // cleared, so the panel never sees a fresh download URL.
+    deployment.beforeRun = true;
     deployment.processing = true;
     view.rerender(<RemoveBgSettings />);
     deployment.processing = false;
