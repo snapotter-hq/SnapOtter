@@ -1203,6 +1203,32 @@ describe("Admin user-management guards", () => {
     });
   });
 
+  // A password that breaks several rules names all of them, so the user can fix
+  // them in one go instead of one retry per rule (#1569). `rule` stays the first.
+  it("change-password lists every broken rule, first one in `rule`", async () => {
+    const user = await loggedInUser();
+    await setSetting("passwordRequireSpecial", "true");
+    try {
+      const res = await sendChangePassword(user, "abc");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        code: "VALIDATION_ERROR",
+        rule: "minLength",
+        minLength: 8,
+        rules: ["minLength", "uppercase", "digit", "special"],
+      });
+    } finally {
+      await clearSetting("passwordRequireSpecial");
+    }
+  });
+
+  it("change-password sends a one-element rules list when a single rule is broken", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "alllower1");
+
+    expect(JSON.parse(res.body)).toMatchObject({ rule: "uppercase", rules: ["uppercase"] });
+  });
+
   it("change-password names the special-character rule when the policy requires one", async () => {
     // The user first: createUser's own password has no special character.
     const user = await loggedInUser();

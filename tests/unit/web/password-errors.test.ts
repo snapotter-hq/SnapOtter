@@ -6,7 +6,7 @@
 
 import { en, PASSWORD_RULES } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
-import { passwordErrorMessage } from "@/lib/password-errors";
+import { passwordErrorMessage, passwordErrorMessages } from "@/lib/password-errors";
 
 describe("passwordErrorMessage (#1446)", () => {
   it("has a message for every rule the server can name", () => {
@@ -44,5 +44,47 @@ describe("passwordErrorMessage (#1446)", () => {
       en.auth.passwordManagedByProvider,
     );
     expect(passwordErrorMessage(en, 429, {})).toBe(en.errors.tooManyRequests);
+  });
+});
+
+describe("passwordErrorMessages (#1569)", () => {
+  it("gives one message per rule the server lists, in order", () => {
+    expect(
+      passwordErrorMessages(en, 400, {
+        code: "VALIDATION_ERROR",
+        rule: "minLength",
+        rules: ["minLength", "digit", "special"],
+        minLength: 12,
+      }),
+    ).toEqual([
+      en.errors.passwordTooShort.replace("{minLength}", "12"),
+      en.errors.passwordNeedsDigit,
+      en.errors.passwordNeedsSpecial,
+    ]);
+  });
+
+  it("skips rules this client doesn't know and the length rule without a number", () => {
+    expect(
+      passwordErrorMessages(en, 400, {
+        code: "VALIDATION_ERROR",
+        rules: ["breached", "minLength", "uppercase"],
+      }),
+    ).toEqual([en.errors.passwordNeedsUppercase]);
+  });
+
+  it("falls back to the single-rule message when the list is missing or unusable", () => {
+    const single = { code: "VALIDATION_ERROR", rule: "lowercase" };
+    expect(passwordErrorMessages(en, 400, single)).toEqual([en.errors.passwordNeedsLowercase]);
+    expect(passwordErrorMessages(en, 400, { ...single, rules: [] })).toEqual([
+      en.errors.passwordNeedsLowercase,
+    ]);
+    expect(passwordErrorMessages(en, 400, { ...single, rules: "digit" })).toEqual([
+      en.errors.passwordNeedsLowercase,
+    ]);
+  });
+
+  it("wraps the other messages it knows and is empty for what it doesn't", () => {
+    expect(passwordErrorMessages(en, 429, {})).toEqual([en.errors.tooManyRequests]);
+    expect(passwordErrorMessages(en, 500, {})).toEqual([]);
   });
 });

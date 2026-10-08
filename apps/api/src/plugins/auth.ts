@@ -96,13 +96,16 @@ export function computeKeyPrefix(rawKey: string): string {
 }
 
 /**
- * The password-policy rule a password broke. `rule` (and `minLength`) travel
- * in the 400 so a client can word the failure in its own language; it can't
- * read the policy itself before the user has a usable password (#1446).
+ * The password-policy rules a password broke. `rules` lists every one, so the
+ * client can show them all at once; `rule` is the first, kept for clients that
+ * read a single rule. `rule`, `rules` (and `minLength`) travel in the 400 so a
+ * client can word the failure in its own language; it can't read the policy
+ * itself before the user has a usable password (#1446, #1569).
  */
 interface PasswordRuleFailure {
   message: string;
   rule: PasswordRule;
+  rules: PasswordRule[];
   minLength?: number;
 }
 
@@ -117,14 +120,6 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
   }
 
   const minLength = await getSettingNumber("passwordMinLength", 8);
-  if (password.length < minLength) {
-    return {
-      message: `Password must be at least ${minLength} characters`,
-      rule: "minLength",
-      minLength,
-    };
-  }
-
   const requireUpper = await getSettingString("passwordRequireUppercase", "true");
   const requireLower = await getSettingString("passwordRequireLowercase", "true");
   const requireDigit = await getSettingString("passwordRequireDigit", "true");
@@ -142,24 +137,38 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
   // #618, a hand edit) fails closed instead of showing a switch that's on while
   // enforcing nothing (#2026). Special defaults off, so it stays on only for
   // "true", matching its switch.
+  const broken: { rule: PasswordRule; message: string }[] = [];
+  if (password.length < minLength)
+    broken.push({
+      rule: "minLength",
+      message: `Password must be at least ${minLength} characters`,
+    });
   if (requireUpper !== "false" && !/\p{Lu}/u.test(password))
-    return { message: "Password must contain an uppercase letter", rule: "uppercase" };
+    broken.push({ rule: "uppercase", message: "Password must contain an uppercase letter" });
   if (requireLower !== "false" && !/\p{Ll}/u.test(password))
-    return { message: "Password must contain a lowercase letter", rule: "lowercase" };
+    broken.push({ rule: "lowercase", message: "Password must contain a lowercase letter" });
   if (requireDigit !== "false" && !/\p{Nd}/u.test(password))
-    return { message: "Password must contain a digit", rule: "digit" };
+    broken.push({ rule: "digit", message: "Password must contain a digit" });
   if (requireSpecial === "true" && !/[\p{P}\p{S}\p{Zs}]/u.test(password))
-    return { message: "Password must contain a special character", rule: "special" };
+    broken.push({ rule: "special", message: "Password must contain a special character" });
 
-  return null;
+  if (broken.length === 0) return null;
+  const rules = broken.map((b) => b.rule);
+  return {
+    message: broken[0].message,
+    rule: broken[0].rule,
+    rules,
+    ...(rules.includes("minLength") && { minLength }),
+  };
 }
 
 /** The 400 body for a password that broke the policy. */
-function weakPasswordBody({ message, rule, minLength }: PasswordRuleFailure) {
+function weakPasswordBody({ message, rule, rules, minLength }: PasswordRuleFailure) {
   return {
     error: message,
     code: "VALIDATION_ERROR",
     rule,
+    rules,
     ...(minLength !== undefined && { minLength }),
   };
 }

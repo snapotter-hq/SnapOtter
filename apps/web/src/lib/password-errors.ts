@@ -5,6 +5,7 @@ import { format } from "@/lib/format";
 export interface PasswordErrorBody {
   code?: unknown;
   rule?: unknown;
+  rules?: unknown;
   minLength?: unknown;
 }
 
@@ -52,4 +53,26 @@ export function passwordErrorMessage(
     return ruleMessage(t, body.rule, body.minLength);
   }
   return null;
+}
+
+/**
+ * Every message a refused password change needs, in the user's language: one
+ * per broken rule when the server lists them (#1569), otherwise the single
+ * message `passwordErrorMessage` gives. Empty when the response isn't one this
+ * recognizes, so the caller falls back to its own generic copy.
+ */
+export function passwordErrorMessages(
+  t: TranslationKeys,
+  status: number,
+  body: PasswordErrorBody,
+): string[] {
+  if (body.code === "VALIDATION_ERROR" && Array.isArray(body.rules)) {
+    const messages = body.rules
+      .filter(isPasswordRule)
+      .map((rule) => ruleMessage(t, rule, body.minLength))
+      .filter((message): message is string => message !== null);
+    if (messages.length > 0) return messages;
+  }
+  const message = passwordErrorMessage(t, status, body);
+  return message ? [message] : [];
 }
