@@ -154,3 +154,57 @@ test.describe("Editor pixel brushes (issue #829)", () => {
     expect(corner?.a).toBe(0);
   });
 });
+
+// Same defect in the dodge, burn and sponge brushes (issue #1038): their hook
+// seeded the stroke canvas with the whole document snapshot too. Each of them
+// changes the colour under the brush on this fixture (or leaves it alone, for a
+// sponge on an already saturated colour), so only alpha is asserted here.
+for (const tool of ["dodge", "burn", "sponge"] as const) {
+  test.describe(`Editor ${tool} brush (issue #1038)`, () => {
+    test.beforeEach(async ({ editorPage: page }) => {
+      await loadTestImage(page);
+      await waitForSourceImage(page);
+      await selectTool(page, tool);
+    });
+
+    test(`a ${tool} click adds only the brushed pixels, not a copy of the whole image`, async ({
+      editorPage: page,
+    }) => {
+      const center = await screenPointForDocumentPixel(page, 100, 75);
+      await page.mouse.click(center.x, center.y);
+
+      await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
+
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 100, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+
+      const corner = await readStrokeObjectPixel(page, 2, 2);
+      expect(corner).not.toBeNull();
+      expect(corner?.a).toBe(0);
+
+      // (105,80) is inside the dab's bounding square but outside the circle.
+      const outsideCircle = await readStrokeObjectPixel(page, 105, 80);
+      expect(outsideCircle?.a).toBe(0);
+    });
+
+    test(`a ${tool} drag keeps the brushed pixels along the whole stroke`, async ({
+      editorPage: page,
+    }) => {
+      const start = await screenPointForDocumentPixel(page, 60, 75);
+      const end = await screenPointForDocumentPixel(page, 140, 75);
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(end.x, end.y, { steps: 8 });
+      await page.mouse.up();
+
+      await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+
+      const corner = await readStrokeObjectPixel(page, 2, 2);
+      expect(corner?.a).toBe(0);
+    });
+  });
+}
