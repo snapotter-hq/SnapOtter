@@ -91,8 +91,10 @@ export function OptimizeForWebSettings() {
       progressive: true,
       stripMetadata,
     };
-    const mw = Number(maxWidth);
-    const mh = Number(maxHeight);
+    // Whole pixels: the API rejects 800.5, and with the section collapsed the input's
+    // own step check isn't there to stop it.
+    const mw = Math.floor(Number(maxWidth));
+    const mh = Math.floor(Number(maxHeight));
     if (mw > 0) settings.maxWidth = mw;
     if (mh > 0) settings.maxHeight = mh;
     return settings;

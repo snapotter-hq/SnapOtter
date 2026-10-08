@@ -106,6 +106,19 @@ describe("Optimize for Web max dimensions stay within what the API accepts (#205
     expect(settings.maxHeight).toBe(800);
   });
 
+  // With the section collapsed the inputs unmount, so the browser's own step check
+  // can't stop a decimal: it would go out and come back 400.
+  it("sends whole pixels when the section is collapsed over a decimal", () => {
+    const { width, height } = open();
+    fireEvent.change(width, { target: { value: "800.5" } });
+    fireEvent.change(height, { target: { value: "0.5" } });
+    fireEvent.click(screen.getByText(copy.maxDimensions));
+    const settings = submit();
+    expect(settings.maxWidth).toBe(800);
+    // Under one whole pixel is no limit at all, not a request for 0.
+    expect(settings).not.toHaveProperty("maxHeight");
+  });
+
   it("lets the box be cleared and sends no limit then", () => {
     const { width } = open();
     fireEvent.change(width, { target: { value: "20000" } });
