@@ -27,6 +27,7 @@ import type {
   FilterConfig,
   ImageAttrs,
   ObjectEffects,
+  ToolType,
 } from "@/types/editor";
 import {
   type CurvesState,
@@ -679,6 +680,21 @@ function CanvasObjectRenderer({
   }
 }
 
+// Tools whose stroke state lives from mousedown to mouseup. Konva only hears a
+// release over its own canvas, so these also listen on the document (#1041).
+const STROKE_TOOLS = new Set<ToolType>([
+  "brush",
+  "pencil",
+  "eraser",
+  "clone-stamp",
+  "dodge",
+  "burn",
+  "sponge",
+  "blur-brush",
+  "sharpen-brush",
+  "smudge",
+]);
+
 // ---------------------------------------------------------------------------
 // Tool handler dispatcher
 // ---------------------------------------------------------------------------
@@ -851,6 +867,7 @@ export function EditorCanvas({
 } = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionLayerRef = useRef<Konva.Layer>(null);
+  const releaseListenerRef = useRef<(() => void) | null>(null);
   const { stageRef, handleWheel, fitToScreen, handleTouchMove, handleTouchEnd } = useCanvasZoom();
 
   const zoom = useEditorStore((s) => s.zoom);
@@ -953,6 +970,17 @@ export function EditorCanvas({
 
       if (handlers) {
         handlers.handleMouseDown(e);
+        if (STROKE_TOOLS.has(activeTool)) {
+          // Releasing over the toolbar, a panel or outside the window never reaches
+          // the Stage, so end the stroke from the document instead.
+          const finishStroke = () => {
+            releaseListenerRef.current = null;
+            handlers.handleMouseUp(e);
+          };
+          releaseListenerRef.current?.();
+          document.addEventListener("mouseup", finishStroke, { once: true });
+          releaseListenerRef.current = () => document.removeEventListener("mouseup", finishStroke);
+        }
       }
     },
     [handlers, activeTool, moveTool],
@@ -960,12 +988,19 @@ export function EditorCanvas({
 
   const handleMouseUp = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // A release over the canvas ends the stroke here; the document listener
+      // would only end it a second time.
+      releaseListenerRef.current?.();
+      releaseListenerRef.current = null;
       if (handlers) {
         handlers.handleMouseUp(e);
       }
     },
     [handlers],
   );
+
+  // A stroke that is still open when the canvas goes away has nothing to finish.
+  useEffect(() => () => releaseListenerRef.current?.(), []);
 
   // Issue #5: Track screen-space cursor for brush overlay
   const handleContainerMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
