@@ -8,7 +8,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decrypt, encrypt } from "../lib/encryption.js";
+import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -105,7 +105,10 @@ async function decryptSecret(stored: string): Promise<string | null> {
   if (env.DATA_ENCRYPTION_KEY) {
     return decrypt(stored, env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined);
   }
-  return stored;
+  // An encrypted row with no key configured (the key was removed after
+  // enrollment) is as unreadable as a wrong key. Returning the ciphertext as
+  // if it were the base32 secret makes otpauth throw a TypeError instead.
+  return isEncrypted(stored) ? null : stored;
 }
 
 /**
