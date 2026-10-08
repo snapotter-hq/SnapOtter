@@ -30,6 +30,14 @@ export interface JobProgress {
   failedFiles: number;
   /** Names of files that failed, with error messages. */
   errors: Array<{ filename: string; error: string }>;
+  /**
+   * Failed frames only: the shared fault the whole batch failed on, such as
+   * ENGINE_UNAVAILABLE, so a client reads the same reason the HTTP reply gives
+   * (#2178). Absent when the failure had no single cause.
+   */
+  code?: string;
+  /** Operator hint that goes with `code` ("Check QPDF_PATH ..."). */
+  details?: string;
   /** Current file being processed (if any). */
   currentFile?: string;
   /**
@@ -219,7 +227,16 @@ export function buildBatchReplayEvent(row: BatchReplayRow): JobProgress & { type
           : "Processing failed";
     errors.push({ filename: "", error: message });
   }
-  return { ...base, status: "failed", errors };
+  // A shared fault's reason and hint (#2178), as the live frame carried them.
+  const code = isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
+  const hint = isRecord(row.error) && typeof row.error.hint === "string" ? row.error.hint : "";
+  return {
+    ...base,
+    status: "failed",
+    errors,
+    ...(code && { code }),
+    ...(hint && { details: hint }),
+  };
 }
 
 // ── Redis channels / keys ──────────────────────────────────────
@@ -586,6 +603,9 @@ export interface FailBatchJobArgs {
    * can answer a capacity failure with the same 503 and code its own
    * ingress checks use (#1161). */
   code?: string;
+  /** The operator hint that goes with `code` ("Check QPDF_PATH ..."). It rides
+   * on the terminal frame and its replay beside `code` (#2178). */
+  details?: string;
 }
 
 /**
@@ -602,6 +622,8 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
     completedFiles: args.completedFiles,
     failedFiles: args.failedFiles,
     errors: args.errors,
+    ...(args.code && { code: args.code }),
+    ...(args.details && { details: args.details }),
   };
   let applied = false;
   await enqueuePersist(args.jobId, async () => {
@@ -614,6 +636,8 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
         error: {
           message: args.message,
           ...(args.code ? { code: args.code } : {}),
+          // `details` on this column is the per-file errors, so the hint has its own key.
+          ...(args.details ? { hint: args.details } : {}),
           ...(args.errors.length > 0 ? { details: args.errors } : {}),
         },
       })

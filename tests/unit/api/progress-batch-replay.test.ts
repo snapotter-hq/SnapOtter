@@ -8,7 +8,25 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-const dbMocks = vi.hoisted(() => ({ failure: null as Error | null }));
+const dbMocks = vi.hoisted(() => ({
+  failure: null as Error | null,
+  // What the last update wrote, and how many rows it claims to have changed
+  // (0 keeps announce() quiet, as the guarded terminal writers expect).
+  lastSet: null as Record<string, unknown> | null,
+  rowCount: 0,
+}));
+// Frames the terminal writers publish, so a test can read the one a client gets.
+const redisMocks = vi.hoisted(() => ({ published: [] as string[] }));
+
+vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
+  sharedRedis: () => ({
+    setex: async () => {},
+    publish: async (_channel: string, json: string) => {
+      redisMocks.published.push(json);
+    },
+  }),
+  createRedisSubscriberConnection: () => ({}),
+}));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: (() => {
@@ -27,9 +45,11 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         },
       }),
       update: () => ({
-        set: () => ({
+        set: (values: Record<string, unknown>) => ({
           where: async () => {
             if (dbMocks.failure) throw dbMocks.failure;
+            dbMocks.lastSet = values;
+            return { rowCount: dbMocks.rowCount };
           },
         }),
       }),
@@ -233,6 +253,59 @@ describe("buildBatchReplayEvent", () => {
     });
   });
 
+  it("replays a shared fault's code and operator hint on the failed frame (#2178)", () => {
+    expect(
+      buildBatchReplayEvent({
+        jobId: "batch-fault",
+        status: "failed",
+        progress: { percent: 100, totalFiles: 2, completedFiles: 2, failedFiles: 2 },
+        error: {
+          message: "A required tool could not be started",
+          code: "ENGINE_UNAVAILABLE",
+          hint: "Check QPDF_PATH",
+          details: [
+            { filename: "", error: "A required tool could not be started: Check QPDF_PATH" },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      status: "failed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+    });
+  });
+
+  it("replays a code without a hint, and neither key when the row has none (#2178)", () => {
+    const withCode = buildBatchReplayEvent({
+      jobId: "batch-code-only",
+      status: "failed",
+      progress: { percent: 100, totalFiles: 1, completedFiles: 1, failedFiles: 1 },
+      error: { message: "Workspace is full.", code: "WORKSPACE_FULL" },
+    });
+    expect(withCode).toMatchObject({ code: "WORKSPACE_FULL" });
+    expect(withCode).not.toHaveProperty("details");
+
+    const plain = buildBatchReplayEvent({
+      jobId: "batch-plain",
+      status: "failed",
+      progress: { percent: 100, totalFiles: 1, completedFiles: 1, failedFiles: 1 },
+      error: { message: "All files failed processing" },
+    });
+    expect(plain).not.toHaveProperty("code");
+    expect(plain).not.toHaveProperty("details");
+  });
+
+  it("ignores a code or hint that is not text", () => {
+    const event = buildBatchReplayEvent({
+      jobId: "batch-odd",
+      status: "failed",
+      progress: { percent: 100, totalFiles: 1, completedFiles: 1, failedFiles: 1 },
+      error: { message: "x", code: 503, hint: { nested: true } },
+    });
+    expect(event).not.toHaveProperty("code");
+    expect(event).not.toHaveProperty("details");
+  });
+
   it("falls back to the error message when a failed row has no details", () => {
     expect(
       buildBatchReplayEvent({
@@ -375,6 +448,88 @@ describe("terminal batch writers", () => {
         message: "All files failed processing",
       }),
     ).resolves.toBeUndefined();
+  });
+
+  describe("failBatchJob and a shared fault (#2178)", () => {
+    // announce() publishes a few promise ticks after the writer resolves.
+    const publishedFrames = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    const base = {
+      jobId: "batch-fault-writer",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [{ filename: "", error: "A required tool could not be started: Check QPDF_PATH" }],
+      message: "A required tool could not be started",
+    };
+
+    it("announces the code and hint on the terminal frame and stores both on the row", async () => {
+      dbMocks.failure = null;
+      dbMocks.rowCount = 1;
+      redisMocks.published.length = 0;
+      dbMocks.lastSet = null;
+
+      await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
+      await publishedFrames();
+
+      const frame = JSON.parse(redisMocks.published[0]);
+      expect(frame).toMatchObject({
+        status: "failed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+      });
+      expect(dbMocks.lastSet?.error).toMatchObject({
+        message: "A required tool could not be started",
+        code: "ENGINE_UNAVAILABLE",
+        hint: "Check QPDF_PATH",
+        details: base.errors,
+      });
+    });
+
+    it("a frame announced live and one replayed from the row say the same thing", async () => {
+      dbMocks.failure = null;
+      dbMocks.rowCount = 1;
+      redisMocks.published.length = 0;
+      dbMocks.lastSet = null;
+
+      await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
+      await publishedFrames();
+
+      const live = JSON.parse(redisMocks.published[0]);
+      const replayed = buildBatchReplayEvent({
+        jobId: base.jobId,
+        status: "failed",
+        progress: dbMocks.lastSet?.progress,
+        error: dbMocks.lastSet?.error,
+      });
+      expect(replayed).toEqual(live);
+    });
+
+    it("leaves code and details off a frame that had neither", async () => {
+      dbMocks.failure = null;
+      dbMocks.rowCount = 1;
+      redisMocks.published.length = 0;
+      dbMocks.lastSet = null;
+
+      await failBatchJob({ ...base, message: "All files failed processing" });
+      await publishedFrames();
+
+      const frame = JSON.parse(redisMocks.published[0]);
+      expect(frame).not.toHaveProperty("code");
+      expect(frame).not.toHaveProperty("details");
+      expect(dbMocks.lastSet?.error).not.toHaveProperty("hint");
+    });
+
+    it("announces nothing when the guarded write changed no row", async () => {
+      dbMocks.failure = null;
+      dbMocks.rowCount = 0;
+      redisMocks.published.length = 0;
+
+      await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
+      await publishedFrames();
+
+      expect(redisMocks.published).toEqual([]);
+    });
   });
 
   it("completeBatchJob propagates a durable persistence failure", async () => {

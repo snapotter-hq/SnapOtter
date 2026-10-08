@@ -29,6 +29,7 @@ import { InputValidationError } from "../../../apps/api/src/modality/contract.js
 import { DocumentInputHandler } from "../../../apps/api/src/modality/document-input.js";
 import { ImageInputHandler } from "../../../apps/api/src/modality/image-input.js";
 import { MediaInputHandler } from "../../../apps/api/src/modality/media-input.js";
+import { buildBatchReplayEvent } from "../../../apps/api/src/routes/progress.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -178,6 +179,28 @@ describe("engine-unavailable 503s are reported, not just returned (#1403)", () =
     expect(engineReports("mute-video"), "a busy instance must not report per upload").toHaveLength(
       1,
     );
+  });
+
+  it("a batch that fails at upload on the missing engine replays its code and hint as a frame (#2178)", async () => {
+    const clientJobId = randomUUID();
+    const res = await post("/api/v1/tools/video/mute-video/batch", [
+      videoPart("a.mp4"),
+      videoPart("b.mp4"),
+      { name: "settings", content: "{}" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    const replayed = buildBatchReplayEvent({
+      jobId: clientJobId,
+      status: row.status,
+      progress: row.progress,
+      error: row.error,
+    });
+    expect(replayed.status).toBe("failed");
+    expect(replayed.code).toBe("ENGINE_UNAVAILABLE");
+    expect(replayed.details).toContain("FFPROBE_PATH");
   });
 
   it("pipeline execute reports it and keeps the code in the reply", async () => {
@@ -414,7 +437,17 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     expect(row?.error).toMatchObject({
       message: engineDown().message,
       code: "ENGINE_UNAVAILABLE",
+      hint: HINT,
     });
+    // ...as a frame, with the fault's code and hint beside the text (#2178).
+    expect(
+      buildBatchReplayEvent({
+        jobId: clientJobId,
+        status: row.status,
+        progress: row.progress,
+        error: row.error,
+      }),
+    ).toMatchObject({ status: "failed", code: "ENGINE_UNAVAILABLE", details: HINT });
     // failBatchJob keeps the per-file entries, plus the run's own blank-name
     // one, as the row error's details.
     const entries = (row?.error as { details?: Array<{ filename: string; error: string }> })

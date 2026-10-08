@@ -1682,6 +1682,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       errors: shared ? [...counters.errors, { filename: "", error: shared }] : counters.errors,
       message: fault?.error ?? shared ?? "All files failed processing",
       ...(fault && { code: fault.code }),
+      ...(fault?.details && { details: fault.details }),
     });
     return {
       outputRefs: [],

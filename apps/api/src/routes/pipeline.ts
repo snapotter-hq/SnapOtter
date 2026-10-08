@@ -1457,6 +1457,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 : errors,
               message: shared?.error ?? "All files failed processing",
               ...(shared && { code: shared.code }),
+              ...(shared?.details && { details: shared.details }),
             }).catch((err) => {
               request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
             });
