@@ -10,7 +10,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { de } from "@snapotter/shared/i18n/de.js";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -286,6 +286,130 @@ describe("People", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
     await expectShown(expected);
+  });
+
+  // A refused password is explained in the reset form, next to the field that
+  // caused it, and stays until the admin edits it (#2025). A three-second banner
+  // above the member search was easy to miss, and the form stayed open with the
+  // rejected value and nothing saying why.
+  describe("a password the server refuses on the reset form", () => {
+    const refusal = () => apiError(400, "VALIDATION_ERROR", { rule: "digit" });
+
+    async function submitRefusedPassword() {
+      apiPost.mockRejectedValueOnce(refusal());
+      await openUserMenu(s.people.resetPasswordAction);
+      const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+      fireEvent.change(input, { target: { value: "NoDigitsHere" } });
+      fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+      return { input, form: input.closest("form") as HTMLFormElement };
+    }
+
+    it("shows the reason inside the form, announced as an alert", async () => {
+      const { form } = await submitRefusedPassword();
+
+      const alert = await within(form).findByRole("alert");
+      expect(alert).toHaveTextContent(de.errors.passwordNeedsDigit);
+      // Not a second copy in the banner above the member list.
+      expect(screen.getAllByText(de.errors.passwordNeedsDigit)).toHaveLength(1);
+    });
+
+    it("keeps the rejected value and the reason well past the old banner's three seconds", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const { form, input } = await submitRefusedPassword();
+        await within(form).findByRole("alert");
+
+        await act(async () => {
+          vi.advanceTimersByTime(10_000);
+        });
+
+        expect(within(form).getByRole("alert")).toHaveTextContent(de.errors.passwordNeedsDigit);
+        expect(input).toHaveValue("NoDigitsHere");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("clears the reason when the admin edits the password", async () => {
+      const { form, input } = await submitRefusedPassword();
+      await within(form).findByRole("alert");
+
+      fireEvent.change(input, { target: { value: "WithDigit1" } });
+
+      expect(within(form).queryByRole("alert")).toBeNull();
+    });
+
+    it("does not carry the reason into the next reset form", async () => {
+      const { form } = await submitRefusedPassword();
+      await within(form).findByRole("alert");
+
+      fireEvent.click(within(form).getByRole("button", { name: de.common.cancel }));
+      fireEvent.click(screen.getByRole("button", { name: de.common.actions }));
+      fireEvent.click(screen.getByText(s.people.resetPasswordAction));
+
+      const reopened = screen
+        .getByPlaceholderText(s.people.newPasswordLabel)
+        .closest("form") as HTMLFormElement;
+      expect(within(reopened).queryByRole("alert")).toBeNull();
+    });
+
+    it("announces the same reason again when the same password is refused twice", async () => {
+      // role="alert" only announces a node on insertion, so the old one has to
+      // go before the response and a fresh one arrive with it.
+      const { form } = await submitRefusedPassword();
+      const first = await within(form).findByRole("alert");
+
+      apiPost.mockRejectedValueOnce(refusal());
+      fireEvent.click(within(form).getByRole("button", { name: s.people.resetPasswordButton }));
+
+      expect(first).not.toBeInTheDocument();
+      expect(await within(form).findByRole("alert")).toHaveTextContent(
+        de.errors.passwordNeedsDigit,
+      );
+    });
+
+    it("drops a banner left by the previous submit when the next one is refused", async () => {
+      apiPost.mockRejectedValueOnce(apiError(500));
+      await openUserMenu(s.people.resetPasswordAction);
+      const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+      const form = input.closest("form") as HTMLFormElement;
+      fireEvent.change(input, { target: { value: "ValidPass1" } });
+      fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+      await screen.findByText(s.people.resetFailed);
+
+      apiPost.mockRejectedValueOnce(refusal());
+      fireEvent.change(input, { target: { value: "NoDigitsHere" } });
+      fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+      expect(await within(form).findByRole("alert")).toHaveTextContent(
+        de.errors.passwordNeedsDigit,
+      );
+      expect(screen.queryByText(s.people.resetFailed)).toBeNull();
+    });
+
+    it("keeps a rate limit in the banner: editing the password can't fix it", async () => {
+      apiPost.mockRejectedValueOnce(apiError(429));
+      await openUserMenu(s.people.resetPasswordAction);
+      const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+      fireEvent.change(input, { target: { value: "ValidPass1" } });
+      fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+      const banner = await screen.findByText(de.errors.tooManyRequests);
+      expect(input.closest("form")).not.toContainElement(banner);
+      expect(within(input.closest("form") as HTMLFormElement).queryByRole("alert")).toBeNull();
+    });
+
+    it("leaves other failures in the banner, outside the form", async () => {
+      apiPost.mockRejectedValueOnce(apiError(500));
+      await openUserMenu(s.people.resetPasswordAction);
+      const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+      fireEvent.change(input, { target: { value: "ValidPass1" } });
+      fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+      const banner = await screen.findByText(s.people.resetFailed);
+      expect(input.closest("form")).not.toContainElement(banner);
+      expect(within(input.closest("form") as HTMLFormElement).queryByRole("alert")).toBeNull();
+    });
   });
 
   it.each([

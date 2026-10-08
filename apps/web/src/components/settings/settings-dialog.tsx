@@ -1481,6 +1481,9 @@ export function PeopleSection() {
   const [editTeam, setEditTeam] = useState("");
   const [resetPasswordUser, setResetPasswordUser] = useState<UserEntry | null>(null);
   const [resetPassword, setResetPassword] = useState("");
+  // Why the server refused the password, shown in the reset form until the next
+  // edit; the banner's three seconds are too easy to miss (#2025).
+  const [resetError, setResetError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
@@ -1662,6 +1665,7 @@ export function PeopleSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!resetPasswordUser) return;
+      setResetError(null);
       try {
         await apiPost(`/auth/users/${resetPasswordUser.id}/reset-password`, {
           newPassword: resetPassword,
@@ -1670,17 +1674,32 @@ export function PeopleSection() {
         setResetPassword("");
         setActionMsg({ type: "success", text: t.settings.people.resetSuccess });
       } catch (err) {
-        setActionMsg({
-          type: "error",
-          text:
-            (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
-            apiErrorMessage(
+        // A password the policy refuses belongs next to the field. Anything
+        // else (a denied escalation, a rate limit, a server fault) is about the
+        // request, not the value: editing the password can't fix it, so it
+        // keeps the banner.
+        const passwordMessage =
+          err instanceof ApiError &&
+          err.code === "VALIDATION_ERROR" &&
+          passwordErrorMessage(t, err.status, err.body);
+        if (passwordMessage) {
+          setResetError(passwordMessage);
+          // The banner may still hold the last submit's outcome.
+          setActionMsg(null);
+        } else {
+          setActionMsg({
+            type: "error",
+            text: apiErrorMessage(
               t,
               err,
-              { ESCALATION_DENIED: t.errors.escalationDenied },
+              {
+                ESCALATION_DENIED: t.errors.escalationDenied,
+                OIDC_NO_PASSWORD: t.auth.passwordManagedByProvider,
+              },
               t.settings.people.resetFailed,
             ),
-        });
+          });
+        }
       }
       later(() => setActionMsg(null), 3000, "actionMsg");
     },
@@ -2017,7 +2036,10 @@ export function PeopleSection() {
             <input
               type="password"
               value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
+              onChange={(e) => {
+                setResetPassword(e.target.value);
+                setResetError(null);
+              }}
               placeholder={t.settings.people.newPasswordLabel}
               required
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60"
@@ -2033,12 +2055,18 @@ export function PeopleSection() {
               onClick={() => {
                 setResetPasswordUser(null);
                 setResetPassword("");
+                setResetError(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
               {t.common.cancel}
             </button>
           </div>
+          {resetError && (
+            <p role="alert" className="text-sm text-destructive">
+              {resetError}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">{t.settings.people.resetPasswordWarning}</p>
         </form>
       )}
@@ -2195,6 +2223,7 @@ export function PeopleSection() {
                         onClick={() => {
                           setResetPasswordUser(u);
                           setResetPassword("");
+                          setResetError(null);
                           setOpenMenuId(null);
                         }}
                         className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
