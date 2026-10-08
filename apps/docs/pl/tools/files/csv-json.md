@@ -1,13 +1,13 @@
 ---
 description: "Konwertuje między CSV a JSON w obu kierunkach."
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: 26c25e28620d
+i18n_output_hash: b063dd08a10a
 ---
 
 # CSV to JSON {#csv-to-json}
 
-Konwertuje między formatami CSV a JSON w obu kierunkach. Prześlij plik CSV lub TSV, aby otrzymać tablicę obiektów JSON, albo prześlij tablicę JSON, aby otrzymać plik CSV.
+Konwertuje między formatami CSV a JSON w obu kierunkach. Prześlij plik CSV lub TSV, aby otrzymać tablicę obiektów JSON, albo prześlij JSON (tablicę obiektów lub obiekt, który ją zawiera), aby otrzymać plik CSV.
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - Kierunek konwersji jest automatycznie wykrywany na podstawie rozszerzenia pliku wejściowego: `.csv` lub `.tsv` tworzy `.json`, a `.json` tworzy `.csv`.
 - Parametr `pretty` wpływa tylko na wynik JSON. Ustawiony na `false` powoduje, że wynikiem jest zwarty jednowierszowy ciąg JSON.
-- Wejście JSON musi być tablicą obiektów o spójnych kluczach. Każdy obiekt staje się wierszem, a każdy klucz nagłówkiem kolumny.
+- Wejście JSON może być tablicą obiektów, obiektem z jednym kluczem zawierającym taką tablicę (np. `{"data": [...]}`) albo płaskim obiektem z wartościami skalarnymi. Każdy obiekt staje się wierszem, a każdy klucz nagłówkiem kolumny. Płaski obiekt daje tabelę o dwóch kolumnach `key,value`. Obiekty z kilkoma kluczami najwyższego poziomu oraz puste tablice są odrzucane.
 - Pliki TSV (wartości rozdzielane tabulatorami) są obsługiwane obok CSV.

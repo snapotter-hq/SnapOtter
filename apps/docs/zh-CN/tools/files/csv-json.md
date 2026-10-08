@@ -1,13 +1,13 @@
 ---
 description: "在 CSV 与 JSON 之间双向转换。"
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: 96c06a2986a3
+i18n_output_hash: 9156cbfb3785
 ---
 
 # CSV to JSON {#csv-to-json}
 
-在 CSV 与 JSON 格式之间双向转换。上传 CSV 或 TSV 文件可得到 JSON 对象数组，或上传 JSON 数组可得到 CSV 文件。
+在 CSV 与 JSON 格式之间双向转换。上传 CSV 或 TSV 文件可得到 JSON 对象数组，或上传 JSON（对象数组，或包着一个对象数组的对象）可得到 CSV 文件。
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - 转换方向根据输入文件扩展名自动检测：`.csv` 或 `.tsv` 生成 `.json`，而 `.json` 生成 `.csv`。
 - `pretty` 参数只影响 JSON 输出。设为 `false` 时，输出为紧凑的单行 JSON 字符串。
-- JSON 输入必须是键一致的对象数组。每个对象成为一行，每个键成为一个列标题。
+- JSON 输入可以是对象数组、只含一个键且其值为这类数组的对象（如 `{"data": [...]}`），或仅含标量值的扁平对象。每个对象成为一行，每个键成为一个列标题。扁平对象会生成 `key,value` 两列的表格。含多个顶层键的对象和空数组会被拒绝。
 - 除 CSV 外，还支持 TSV（制表符分隔值）文件。

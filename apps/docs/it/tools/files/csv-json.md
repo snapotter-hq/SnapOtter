@@ -1,13 +1,13 @@
 ---
 description: "Converte tra CSV e JSON, in entrambe le direzioni."
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: f7113d2bf1c6
+i18n_output_hash: 9d4ca33b8d46
 ---
 
 # CSV to JSON {#csv-to-json}
 
-Converte tra i formati CSV e JSON in entrambe le direzioni. Carica un file CSV o TSV per ottenere un array JSON di oggetti, oppure carica un array JSON per ottenere un file CSV.
+Converte tra i formati CSV e JSON in entrambe le direzioni. Carica un file CSV o TSV per ottenere un array JSON di oggetti, oppure carica JSON (un array di oggetti, o un oggetto che ne contiene uno) per ottenere un file CSV.
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - La direzione della conversione viene rilevata automaticamente dall'estensione del file di input: `.csv` o `.tsv` produce `.json`, e `.json` produce `.csv`.
 - Il parametro `pretty` influisce solo sull'output JSON. Quando impostato su `false`, l'output è una stringa JSON compatta su una sola riga.
-- L'input JSON deve essere un array di oggetti con chiavi coerenti. Ogni oggetto diventa una riga e ogni chiave diventa un'intestazione di colonna.
+- L'input JSON può essere un array di oggetti, un oggetto con una sola chiave che contiene un array simile (come `{"data": [...]}`) o un oggetto piatto di valori scalari. Ogni oggetto diventa una riga e ogni chiave diventa un'intestazione di colonna. Un oggetto piatto produce una tabella a due colonne `key,value`. Gli oggetti con più chiavi di primo livello e gli array vuoti vengono rifiutati.
 - I file TSV (valori separati da tabulazioni) sono supportati insieme a CSV.

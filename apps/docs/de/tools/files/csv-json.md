@@ -1,13 +1,13 @@
 ---
 description: "Konvertiert zwischen CSV und JSON, in beide Richtungen."
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: 62671e7712c0
+i18n_output_hash: 4418a907faca
 ---
 
 # CSV to JSON {#csv-to-json}
 
-Konvertiert zwischen den Formaten CSV und JSON in beide Richtungen. Lade eine CSV- oder TSV-Datei hoch, um ein JSON-Array von Objekten zu erhalten, oder lade ein JSON-Array hoch, um eine CSV-Datei zu erhalten.
+Konvertiert zwischen den Formaten CSV und JSON in beide Richtungen. Lade eine CSV- oder TSV-Datei hoch, um ein JSON-Array von Objekten zu erhalten, oder lade JSON hoch (ein Array von Objekten oder ein Objekt, das eines enthält), um eine CSV-Datei zu erhalten.
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - Die Konvertierungsrichtung wird automatisch aus der Dateierweiterung der Eingabe erkannt: `.csv` oder `.tsv` erzeugt `.json`, und `.json` erzeugt `.csv`.
 - Der Parameter `pretty` wirkt sich nur auf die JSON-Ausgabe aus. Wenn er auf `false` gesetzt ist, ist die Ausgabe ein kompakter, einzeiliger JSON-String.
-- Die JSON-Eingabe muss ein Array von Objekten mit konsistenten Schlüsseln sein. Jedes Objekt wird zu einer Zeile, und jeder Schlüssel wird zu einer Spaltenüberschrift.
+- Die JSON-Eingabe kann ein Array von Objekten sein, ein Objekt mit einem einzigen Schlüssel, der ein solches Array enthält (etwa `{"data": [...]}`), oder ein flaches Objekt aus einfachen Werten. Jedes Objekt wird zu einer Zeile, und jeder Schlüssel wird zu einer Spaltenüberschrift. Ein flaches Objekt ergibt eine Tabelle mit den zwei Spalten `key,value`. Objekte mit mehreren Schlüsseln auf oberster Ebene und leere Arrays werden abgelehnt.
 - TSV-Dateien (durch Tabulatoren getrennte Werte) werden neben CSV unterstützt.

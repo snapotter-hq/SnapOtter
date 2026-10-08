@@ -1,13 +1,13 @@
 ---
 description: "Chuyển đổi giữa CSV và JSON, cả hai chiều."
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: 7d696cb2fe64
+i18n_output_hash: 8c4b55fe7fcf
 ---
 
 # CSV to JSON {#csv-to-json}
 
-Chuyển đổi giữa các định dạng CSV và JSON theo cả hai chiều. Tải lên tệp CSV hoặc TSV để nhận một mảng JSON các đối tượng, hoặc tải lên một mảng JSON để nhận tệp CSV.
+Chuyển đổi giữa các định dạng CSV và JSON theo cả hai chiều. Tải lên tệp CSV hoặc TSV để nhận một mảng JSON các đối tượng, hoặc tải lên JSON (một mảng các đối tượng, hoặc một đối tượng bao quanh nó) để nhận tệp CSV.
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - Chiều chuyển đổi được tự động phát hiện từ phần mở rộng tệp đầu vào: `.csv` hoặc `.tsv` tạo ra `.json`, còn `.json` tạo ra `.csv`.
 - Tham số `pretty` chỉ ảnh hưởng đến đầu ra JSON. Khi đặt thành `false`, đầu ra là một chuỗi JSON gọn trên một dòng.
-- Đầu vào JSON phải là một mảng các đối tượng có các khóa nhất quán. Mỗi đối tượng trở thành một hàng, và mỗi khóa trở thành một tiêu đề cột.
+- Đầu vào JSON có thể là một mảng các đối tượng, một đối tượng có một khóa duy nhất chứa mảng như vậy (ví dụ `{"data": [...]}`), hoặc một đối tượng phẳng gồm các giá trị vô hướng. Mỗi đối tượng trở thành một hàng, và mỗi khóa trở thành một tiêu đề cột. Đối tượng phẳng cho ra bảng hai cột `key,value`. Các đối tượng có nhiều khóa cấp cao nhất và các mảng rỗng sẽ bị từ chối.
 - Các tệp TSV (giá trị phân tách bằng tab) được hỗ trợ song song với CSV.

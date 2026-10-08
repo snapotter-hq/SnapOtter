@@ -1,13 +1,13 @@
 ---
 description: "CSV と JSON を双方向に変換します。"
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: cf405d7e54d1
+i18n_output_hash: 759f7f7c0979
 ---
 
 # CSV to JSON {#csv-to-json}
 
-CSV と JSON 形式を双方向に変換します。CSV または TSV ファイルをアップロードするとオブジェクトの JSON 配列が得られ、JSON 配列をアップロードすると CSV ファイルが得られます。
+CSV と JSON 形式を双方向に変換します。CSV または TSV ファイルをアップロードするとオブジェクトの JSON 配列が得られ、JSON（オブジェクトの配列、またはそれを包むオブジェクト）をアップロードすると CSV ファイルが得られます。
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - 変換方向は入力ファイルの拡張子から自動検出されます。`.csv` または `.tsv` は `.json` を生成し、`.json` は `.csv` を生成します。
 - `pretty` パラメータは JSON 出力にのみ影響します。`false` に設定すると、出力はコンパクトな 1 行の JSON 文字列になります。
-- JSON 入力は、一貫したキーを持つオブジェクトの配列である必要があります。各オブジェクトが 1 行になり、各キーが列ヘッダーになります。
+- JSON 入力には、オブジェクトの配列、そのような配列を 1 つのキーで保持するオブジェクト（例: `{"data": [...]}`）、またはスカラー値だけのフラットなオブジェクトを使えます。各オブジェクトが 1 行になり、各キーが列ヘッダーになります。フラットなオブジェクトは `key,value` の 2 列のテーブルになります。最上位に複数のキーを持つオブジェクトと空の配列は拒否されます。
 - TSV（タブ区切り値）ファイルは CSV とともにサポートされます。

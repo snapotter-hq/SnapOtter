@@ -1,13 +1,13 @@
 ---
 description: "Konvertera mellan CSV och JSON, i båda riktningarna."
-i18n_source_hash: 978c08ad46d3
+i18n_source_hash: 5b24abf5e9d2
 i18n_provenance: human
-i18n_output_hash: cc278b26876a
+i18n_output_hash: a2074609ec6f
 ---
 
 # CSV to JSON {#csv-to-json}
 
-Konvertera mellan formaten CSV och JSON i båda riktningarna. Ladda upp en CSV- eller TSV-fil för att få en JSON-array av objekt, eller ladda upp en JSON-array för att få en CSV-fil.
+Konvertera mellan formaten CSV och JSON i båda riktningarna. Ladda upp en CSV- eller TSV-fil för att få en JSON-array av objekt, eller ladda upp JSON (en array av objekt, eller ett objekt som innehåller en) för att få en CSV-fil.
 
 ## API Endpoint {#api-endpoint}
 
@@ -56,5 +56,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - Konverteringsriktningen identifieras automatiskt från indatafilens filändelse: `.csv` eller `.tsv` ger `.json`, och `.json` ger `.csv`.
 - Parametern `pretty` påverkar endast JSON-utdata. När den är satt till `false` blir utdata en kompakt JSON-sträng på en enda rad.
-- JSON-indata måste vara en array av objekt med konsekventa nycklar. Varje objekt blir en rad, och varje nyckel blir en kolumnrubrik.
+- JSON-indata kan vara en array av objekt, ett objekt med en enda nyckel som innehåller en sådan array (till exempel `{"data": [...]}`) eller ett platt objekt med skalära värden. Varje objekt blir en rad, och varje nyckel blir en kolumnrubrik. Ett platt objekt ger en tabell med två kolumner, `key,value`. Objekt med flera nycklar på översta nivån och tomma arrayer avvisas.
 - TSV-filer (tabbseparerade värden) stöds vid sidan av CSV.
