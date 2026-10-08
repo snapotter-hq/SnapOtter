@@ -15,7 +15,8 @@ import { passwordErrorMessages } from "@/lib/password-errors";
  *   2. Visible input fields with autocomplete="username" + "new-password"
  *   3. An actual page navigation following the submission
  *
- * We POST to "/" which the SPA serves as index.html. The browser sees the
+ * We POST to "/", which the API answers with a 303 back to the app (static.ts,
+ * #2088; a plain 404 there would end the flow on "Not found"). The browser sees the
  * form submission + navigation and prompts to save.
  */
 function triggerBrowserPasswordSave(username: string, password: string) {

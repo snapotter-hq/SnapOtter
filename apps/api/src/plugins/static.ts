@@ -49,6 +49,14 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
     // rewriteUrl has already stripped a configured deployment path.
     const path = request.url.split(/[?#]/)[0];
     warnUndeclaredPrefix(app, path, warnedUndeclaredPrefixes);
+    // The forced change-password page submits a real form POST to the app root so
+    // the browser offers to save the new password. Send the browser on to the app
+    // (303 turns it into a GET); the form body, which carries the password, is
+    // never read or echoed (#2088).
+    if (request.method === "POST" && path === "/") {
+      reply.redirect(`${env.BASE_PATH}/`, 303);
+      return;
+    }
     // Only a browser navigation wants the shell. A missing chunk answered with
     // HTML and a 200 surfaces as "Expected a JavaScript module script" with
     // nothing but 200s in the log, and a POST answered with HTML fails as a
