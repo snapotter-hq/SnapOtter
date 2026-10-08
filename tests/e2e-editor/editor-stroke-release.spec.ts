@@ -141,3 +141,53 @@ test.describe("A stroke ends when the button is released off the canvas (issue #
     expect(await newestLinePointCount(page)).toBe(atRelease);
   });
 });
+
+test.describe("A stroke still ends when the release never reaches the canvas (issue #1041)", () => {
+  test.beforeEach(async ({ editorPage: page }) => {
+    await loadTestImage(page);
+    await waitForSourceImage(page);
+  });
+
+  test("a tool shortcut pressed mid-drag doesn't leave the brush stroke open", async ({
+    editorPage: page,
+  }) => {
+    await selectTool(page, "brush");
+    const start = await documentPoint(page, 60, 75);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 30, start.y, { steps: 4 });
+
+    // Switch to the eraser with the button still held, then let go over the canvas.
+    await page.keyboard.press("e");
+    await page.mouse.up();
+    const atRelease = await newestLinePointCount(page);
+    expect(atRelease).not.toBeNull();
+
+    // Back to the brush, nothing held: it must not pick the old stroke back up.
+    await page.keyboard.press("b");
+    const back = await documentPoint(page, 150, 75);
+    await page.mouse.move(back.x, back.y, { steps: 6 });
+    await page.mouse.move(back.x + 10, back.y, { steps: 3 });
+
+    expect(await newestLinePointCount(page)).toBe(atRelease);
+  });
+
+  test("losing the window mid-drag ends the stroke", async ({ editorPage: page }) => {
+    await selectTool(page, "dodge");
+    const start = await documentPoint(page, 60, 75);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 30, start.y, { steps: 4 });
+
+    // Alt-tab away: the page gets a blur and never sees the button come up.
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+
+    const back = await documentPoint(page, 150, 75);
+    await page.mouse.move(back.x, back.y, { steps: 6 });
+    await page.mouse.move(back.x + 10, back.y, { steps: 3 });
+    await page.mouse.up();
+
+    await expect.poll(() => strokeAlphaAt(page, 60, 75), { timeout: 10_000 }).toBe(255);
+    expect(await strokeAlphaAt(page, 150, 75)).toBe(0);
+  });
+});
