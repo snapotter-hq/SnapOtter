@@ -233,3 +233,41 @@ for (const tool of ["dodge", "burn", "sponge"] as const) {
     });
   });
 }
+
+// Issue #1039: the pixel brushes never showed their stroke until mouse up. The
+// hooks pushed the live canvas into the object as `image`, but the renderer only
+// ever read `src`, so the node kept showing the mouse-down bitmap (the first dab
+// alone). Sampling the node's bitmap while the button is still held tells the two
+// apart: far along the stroke it is transparent before the fix, opaque after.
+for (const tool of ["blur-brush", "sharpen-brush", "smudge", "dodge", "burn", "sponge"] as const) {
+  test.describe(`Editor ${tool} live preview (issue #1039)`, () => {
+    test.beforeEach(async ({ editorPage: page }) => {
+      await loadTestImage(page);
+      await waitForSourceImage(page);
+      await selectTool(page, tool);
+    });
+
+    test(`a ${tool} stroke is visible on the canvas while the mouse is still down`, async ({
+      editorPage: page,
+    }) => {
+      const start = await screenPointForDocumentPixel(page, 60, 75);
+      const end = await screenPointForDocumentPixel(page, 140, 75);
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(end.x, end.y, { steps: 8 });
+
+      // Button still held: no mouse-up has swapped in a fresh data URL yet.
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+
+      await page.mouse.up();
+
+      // The finished stroke keeps its pixels and stays confined to the brush path.
+      await expect
+        .poll(async () => (await readStrokeObjectPixel(page, 140, 75))?.a, { timeout: 10_000 })
+        .toBe(255);
+      expect((await readStrokeObjectPixel(page, 2, 2))?.a).toBe(0);
+    });
+  });
+}
