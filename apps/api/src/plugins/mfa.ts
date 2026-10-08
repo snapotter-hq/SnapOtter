@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as OTPAuth from "otpauth";
@@ -9,6 +10,7 @@ import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
@@ -104,6 +106,38 @@ async function decryptSecret(stored: string): Promise<string | null> {
     return decrypt(stored, env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined);
   }
   return stored;
+}
+
+/**
+ * A stored TOTP secret that won't decrypt means DATA_ENCRYPTION_KEY (and its
+ * PREVIOUS key) no longer matches what enrolled it, so every enrolled user hits
+ * this at once. The 500 body alone is invisible to an operator: log it and
+ * report it as operational (#2020). request.log has no Sentry bridge, and the
+ * reply is sent here rather than thrown, so the global handler never sees it.
+ */
+function replyDecryptionFailed(request: FastifyRequest, reply: FastifyReply, userId: string) {
+  request.log.error(
+    { userId },
+    "mfa: stored TOTP secret could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+  );
+  void reportError(
+    new SafeError("Failed to decrypt TOTP secret", {
+      kind: "operational",
+      code: "MFA_DECRYPTION_FAILED",
+      statusCode: 500,
+    }),
+    {
+      source: "http",
+      route: request.routeOptions?.url,
+      method: request.method,
+      statusCode: 500,
+      subsystem: "mfa-secret",
+    },
+  );
+  return reply.status(500).send({
+    error: "Failed to decrypt TOTP secret",
+    code: "DECRYPTION_FAILED",
+  });
 }
 
 // ── MFA policy helpers ────────────────────────────────────────────
@@ -328,12 +362,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       // Decrypt the stored secret
       const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
-      }
+      if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
       // Validate the code
       if (!verifyTotpCode(secretBase32, code)) {
@@ -393,12 +422,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       // Decrypt the stored secret
       const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
-      }
+      if (!secretBase32) return replyDecryptionFailed(request, reply, userId);
 
       const audit = auditFromRequest(request);
       let verified = false;
@@ -523,12 +547,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
-      }
+      if (!secretBase32) return replyDecryptionFailed(request, reply, userId);
 
       const audit = auditFromRequest(request);
 
@@ -617,12 +636,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       // Decrypt and verify the code
       const secretBase32 = await decryptSecret(dbUser.totpSecret);
-      if (!secretBase32) {
-        return reply.status(500).send({
-          error: "Failed to decrypt TOTP secret",
-          code: "DECRYPTION_FAILED",
-        });
-      }
+      if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
       if (!verifyTotpCode(secretBase32, code)) {
         return reply.status(401).send({
