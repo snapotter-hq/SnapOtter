@@ -196,7 +196,7 @@ async function processTrim(
     // bare Error. Only reachable without a targetSize, since that is capped by the schema.
     if (target * target > MAX_STEP_PIXELS) {
       throw new ToolInputError(
-        `The trimmed image is too large to pad to a square (${target} x ${target} pixels)`,
+        `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_RESIZE_OUTPUT_DIMENSION} or less.`,
       );
     }
     const padR = Math.round(Number.parseInt(settings.padColor.slice(1, 3), 16));
