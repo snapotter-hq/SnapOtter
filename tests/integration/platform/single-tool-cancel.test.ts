@@ -56,7 +56,7 @@ import {
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
-import { putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { objectExists, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory.js";
@@ -64,12 +64,14 @@ import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory
 const passthroughSchema = { parse: (v: unknown) => v } as never;
 
 interface RunSettings {
-  mode: "fast" | "slow";
+  mode: "fast" | "slow" | "ignore-abort";
   tag: string;
 }
 
 // Behavior keyed on settings: fast returns instantly, slow waits on the
-// worker's abort signal, so a cancel has a real running target. Every
+// worker's abort signal, so a cancel has a real running target. ignore-abort
+// stands in for a handler that never reads the signal (Erase Object, #2092):
+// it notices the abort only to finish a beat later and return a result anyway. Every
 // invocation records its tag, so "this run never started" is a positive
 // assertion instead of a timing guess.
 const invoked: string[] = [];
@@ -105,6 +107,16 @@ registerToolProcessFn({
           { once: true },
         );
       });
+    }
+    if (mode === "ignore-abort") {
+      const signal = ctx?.signal;
+      if (!signal) throw new Error("wt-single-cancel requires an abort signal");
+      if (!signal.aborted) {
+        await new Promise<void>((resolve) => {
+          signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+      }
+      await delay(200);
     }
     return { buffer: inputBuffer, filename, contentType: "image/png" };
   },
@@ -175,7 +187,7 @@ async function createOwner(): Promise<string> {
 }
 
 interface EnqueueOpts {
-  mode: "fast" | "slow";
+  mode: "fast" | "slow" | "ignore-abort";
   tag: string;
   clientJobId?: string;
   userId?: string | null;
@@ -363,6 +375,27 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const frame = await terminalFrame(clientJobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
+  });
+
+  it("does not save a result that finished after the cancel landed (#2092)", async () => {
+    const clientJobId = randomUUID();
+    const { jobId } = await enqueueSingleRun({
+      mode: "ignore-abort",
+      tag: "ignore-abort",
+      clientJobId,
+    });
+    await waitFor(async () => (invoked.includes("ignore-abort") ? true : undefined));
+
+    expect(await requestCancel(clientJobId)).toBe(true);
+
+    // The handler returned a result after the abort. The worker must settle
+    // canceled and write nothing, instead of completing and saving it.
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    expect((await terminalRow(clientJobId)).status).toBe("canceled");
+    const frame = await terminalFrame(clientJobId);
+    expect(frame.phase).toBe("failed");
+    expect(frame.error).toBe("Canceled");
+    expect(await objectExists(`outputs/${jobId}/input.png`)).toBe(false);
   });
 
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
