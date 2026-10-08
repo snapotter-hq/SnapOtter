@@ -113,7 +113,7 @@ export function ContentAwareResizeControls({
           />
           <span>{t.toolSettings["content-aware-resize"].protectFaces}</span>
         </label>
-        <HintIcon text="Detect and protect face regions from seam removal using face detection" />
+        <HintIcon text={t.toolSettings["content-aware-resize"].protectFacesHint} />
       </div>
 
       {/* Blur radius */}

@@ -329,7 +329,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
               <span className="text-xs text-muted-foreground">
                 {t.toolSettings["smart-crop"].detectionStrategy}
               </span>
-              <HintIcon text="Attention finds the most visually salient region. Entropy finds the area with most detail and information." />
+              <HintIcon text={t.toolSettings["smart-crop"].detectionStrategyHint} />
             </div>
             <div className="flex gap-1">
               <button
@@ -356,7 +356,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
                 <label htmlFor="sc-padding" className="text-xs text-muted-foreground">
                   {t.toolSettings["smart-crop"].padding}
                 </label>
-                <HintIcon text="Extra breathing room around the focus area" />
+                <HintIcon text={t.toolSettings["smart-crop"].paddingHint} />
               </div>
               <span className="text-xs text-muted-foreground tabular-nums">{padding}%</span>
             </div>
@@ -435,7 +435,7 @@ export function SmartCropControls({ settings: initialSettings, onChange }: Smart
                 <label htmlFor="sc-face-padding" className="text-xs text-muted-foreground">
                   {t.toolSettings["smart-crop"].facePadding}
                 </label>
-                <HintIcon text="Extra space around detected faces" />
+                <HintIcon text={t.toolSettings["smart-crop"].facePaddingHint} />
               </div>
               <span className="text-xs text-muted-foreground tabular-nums">{padding}%</span>
             </div>
