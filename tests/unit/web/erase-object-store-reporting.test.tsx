@@ -391,6 +391,33 @@ describe("erase-object single file: every other way the request ends", () => {
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 
+  it("keeps the server's text and ends the run when showing it throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    // The first error write breaks its listener; the write itself still lands.
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      // Only what runs after this write counts as ending the run.
+      clearIntervalSpy.mockClear();
+      throw new Error("store broke");
+    });
+
+    try {
+      // The throw is ours, not the server's: it surfaces instead of being read
+      // as an unparseable body (#2109).
+      expect(() => xhr.respond(422, { error: "Object erasing failed" })).toThrow("store broke");
+      expect(useFileStore.getState().error).toBe("Object erasing failed");
+      // The UI teardown still ran: the elapsed counter stops.
+      expect(clearIntervalSpy).toHaveBeenCalled();
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+    }
+  });
+
   it("falls back to the details when there is no error text", async () => {
     renderPanel();
 

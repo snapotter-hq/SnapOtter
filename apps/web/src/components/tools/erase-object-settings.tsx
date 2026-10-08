@@ -662,18 +662,26 @@ export function EraseObjectSettings({
           }
         }
       } else {
+        // Parse inside the try, write outside it: the catch is for a body that
+        // does not parse, not for a store write that throws (#2109).
+        let message: string;
         try {
           const body = JSON.parse(xhr.responseText);
-          setError(
+          message =
             typeof body.error === "string"
               ? body.error
               : typeof body.details === "string"
                 ? body.details
-                : format(t.errors.failedWithStatus, { status: xhr.status }),
-          );
+                : format(t.errors.failedWithStatus, { status: xhr.status });
         } catch {
-          setError(format(t.errors.processingFailedWithStatus, { status: xhr.status }));
+          message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
         }
+        try {
+          setError(message);
+        } finally {
+          finishUi();
+        }
+        return;
       }
       finishUi();
     };
