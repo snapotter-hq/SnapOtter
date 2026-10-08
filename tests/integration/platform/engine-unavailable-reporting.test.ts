@@ -415,9 +415,11 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       message: engineDown().message,
       code: "ENGINE_UNAVAILABLE",
     });
-    const errors = (row?.progress as { errors?: Array<{ filename: string; error: string }> })
-      ?.errors;
-    expect(errors?.at(-1)).toEqual({ filename: "", error: `${engineDown().message}: ${HINT}` });
+    // failBatchJob keeps the per-file entries, plus the run's own blank-name
+    // one, as the row error's details.
+    const entries = (row?.error as { details?: Array<{ filename: string; error: string }> })
+      ?.details;
+    expect(entries?.at(-1)).toEqual({ filename: "", error: `${engineDown().message}: ${HINT}` });
   });
 
   it("counts a file that failed the same way at upload alongside the worker's", async () => {

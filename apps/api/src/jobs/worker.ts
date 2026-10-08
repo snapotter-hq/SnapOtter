@@ -1230,11 +1230,13 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       })
       .where(eq(schema.jobs.id, data.jobId));
 
+    // The failed frame rewrites the row's error, so it carries the fault too.
     await updateSingleFileProgress({
       jobId: progressJobId,
       phase: "failed",
       percent: 0,
       error: errorMsg,
+      ...failFault,
     });
 
     // Batch progress (pipeline-batch only)
