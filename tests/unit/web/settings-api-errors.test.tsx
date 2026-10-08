@@ -202,6 +202,36 @@ describe("Security: change password", () => {
     expect(screen.queryByText(SERVER_TEXT)).toBeNull();
   });
 
+  it("shows the success message in the same alert slot", async () => {
+    apiPost.mockResolvedValueOnce({});
+    await submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(s.security.changeSuccess);
+  });
+
+  it("answers a lost session in the user's language, not with the generic failure", async () => {
+    apiPost.mockRejectedValueOnce(apiError(401, "AUTH_REQUIRED"));
+    await submit();
+
+    await expectShown(de.errors.sessionEnded);
+    expect(screen.queryByText(s.security.changeFailed)).toBeNull();
+  });
+
+  it("shows a rule the server repeats only once", async () => {
+    apiPost.mockRejectedValueOnce(
+      apiError(400, "VALIDATION_ERROR", {
+        rule: "digit",
+        rules: ["digit", "digit", "special"],
+      }),
+    );
+    await submit("NoDigitsHere");
+
+    expect(listedMessages(await screen.findByRole("alert"))).toEqual([
+      de.errors.passwordNeedsDigit,
+      de.errors.passwordNeedsSpecial,
+    ]);
+  });
+
   it("keeps a single broken rule as plain text, not a one-item list", async () => {
     apiPost.mockRejectedValueOnce(
       apiError(400, "VALIDATION_ERROR", { rule: "digit", rules: ["digit"] }),

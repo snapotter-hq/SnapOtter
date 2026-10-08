@@ -64,7 +64,7 @@ import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
-import { ErrorMessages } from "../common/error-messages";
+import { AlertMessages } from "../common/alert-messages";
 import { OtterLogo } from "../common/otter-logo";
 import { AdminInstallFeedbackCard } from "../feedback/admin-install-feedback-card";
 import { FeedbackDialog } from "../feedback/feedback-dialog";
@@ -968,7 +968,11 @@ export function SecuritySection() {
         setMessage({
           type: "error",
           messages:
-            passwordMessages.length > 0 ? passwordMessages : [t.settings.security.changeFailed],
+            passwordMessages.length > 0
+              ? passwordMessages
+              : // Anything else keeps the reason in the console and gets the
+                // shared mapping for a lost session or a denied request.
+                [apiErrorMessage(t, err, {}, t.settings.security.changeFailed)],
         });
       } finally {
         setSubmitting(false);
@@ -1064,7 +1068,7 @@ export function SecuritySection() {
           </div>
 
           {message && (
-            <ErrorMessages
+            <AlertMessages
               id="password-change-error"
               messages={message.messages}
               className={cn(
@@ -1987,7 +1991,7 @@ export function PeopleSection() {
               {t.settings.people.copyPasswordWarning}
             </p>
           )}
-          {addErrors && <ErrorMessages messages={addErrors} className="text-sm text-destructive" />}
+          {addErrors && <AlertMessages messages={addErrors} className="text-sm text-destructive" />}
         </form>
       )}
 
@@ -2094,7 +2098,7 @@ export function PeopleSection() {
             </button>
           </div>
           {resetErrors && (
-            <ErrorMessages messages={resetErrors} className="text-sm text-destructive" />
+            <AlertMessages messages={resetErrors} className="text-sm text-destructive" />
           )}
           <p className="text-xs text-muted-foreground">{t.settings.people.resetPasswordWarning}</p>
         </form>
