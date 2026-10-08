@@ -545,9 +545,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         resultSize = resultBuffer.length;
       }
 
-      // A handler that never reads the signal can still finish after a cancel or
-      // timeout landed. Settle it as canceled before anything is written (#2092).
-      if (signal.aborted) throw new Error("Canceled");
+      // A handler that never reads the signal can still finish after a user cancel
+      // landed. Settle it as canceled before anything is written (#2092). A timeout
+      // abort is left alone: that result is finished and good, and throwing here
+      // would retry the whole job.
+      if (signal.aborted && signal.reason !== "timeout") throw new Error("Canceled");
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
@@ -593,8 +595,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // not auto-saved.
       let savedFileId: string | undefined;
       if (resultBuffer) {
-        // The overwrite is the one write a cancel must never lose to (#2092).
-        if (signal.aborted) throw new Error("Canceled");
+        // Re-check just before the library overwrite, the one write a cancel is
+        // most costly to lose to. A cancel landing during the save itself is not
+        // covered (#2092).
+        if (signal.aborted && signal.reason !== "timeout") throw new Error("Canceled");
         savedFileId = await autoSaveToLibrary({
           fileId: data.fileId,
           saveMode: data.saveMode,
