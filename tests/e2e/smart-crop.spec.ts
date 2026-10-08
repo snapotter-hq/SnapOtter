@@ -54,8 +54,9 @@ test.describe("Smart Crop tool", () => {
 
     // Subject Focus is default
     await expect(page.getByText("Detection Strategy")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Attention" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Entropy" })).toBeVisible();
+    // Exact names: the hint icon's aria-label is help text containing both words.
+    await expect(page.getByRole("button", { name: "Attention", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Entropy", exact: true })).toBeVisible();
     await expect(page.getByText("Padding")).toBeVisible();
     await expect(page.getByText("Width (px)")).toBeVisible();
     await expect(page.getByText("Height (px)")).toBeVisible();

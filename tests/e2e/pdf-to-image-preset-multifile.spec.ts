@@ -59,11 +59,14 @@ test.describe("pdf-to-image conversion presets with multiple files (issue #632)"
     await expect(page.getByText("Files (2)")).toBeVisible();
     await page.getByTestId("preset-submit").click();
 
-    // The preview area's failed-state card repeats the message, so scope to
-    // the settings panel's form, which is what this test is about.
+    // The message shows twice by design: in the settings panel's form and on
+    // the preview area's failed-state card. Check each copy in its own place.
     await expect(page.locator("form").getByText(/All files failed processing/i)).toBeVisible({
       timeout: 15_000,
     });
+    const preview = page.getByLabel("Preview area");
+    await expect(preview.getByText(/All files failed processing/i)).toBeVisible();
+    await expect(preview.getByText("Your settings are saved.")).toBeVisible();
   });
 
   test("a single PDF still uses the single-file route", async ({ loggedInPage: page }) => {

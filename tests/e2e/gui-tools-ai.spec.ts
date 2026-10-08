@@ -542,7 +542,7 @@ test.describe("GUI AI Tools", () => {
       await uploadTestImage(page);
 
       // Strategy buttons. Exact names: the hint icon beside them is a button
-      // whose aria-label is its help text, which starts with "Attention".
+      // whose aria-label is its help text, which contains both words.
       await expect(page.getByRole("button", { name: "Attention", exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "Entropy", exact: true })).toBeVisible();
 
