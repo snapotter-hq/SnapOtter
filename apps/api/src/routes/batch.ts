@@ -46,7 +46,6 @@ import {
   deleteObject,
   getObjectStream,
   putObject,
-  STORAGE_FAULT_CODES,
   workspaceHeadroomBytes,
 } from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
@@ -64,6 +63,7 @@ import {
 import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
+import { settledFailureResponse } from "../lib/settled-failure.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -76,30 +76,6 @@ type ParsedFile =
   | ({ kind: "path" } & SpooledMultipartFile);
 
 const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-
-/**
- * The failure a finalize committed to the parent row before it rethrew, or
- * null when the row is not settled as failed. The rejection that reaches the
- * route through BullMQ is a plain Error, so the row is the only carrier of
- * the user-facing reason and code.
- */
-async function settledFailure(jobId: string): Promise<{
-  message: string;
-  code?: string;
-  errors: Array<{ filename: string; error: string }>;
-} | null> {
-  const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-  if (row?.status !== "failed") return null;
-  const error = row.error as { message?: string; code?: string; details?: unknown } | null;
-  if (!error?.message) return null;
-  return {
-    message: error.message,
-    ...(typeof error.code === "string" ? { code: error.code } : {}),
-    errors: Array.isArray(error.details)
-      ? (error.details as Array<{ filename: string; error: string }>)
-      : [],
-  };
-}
 
 /** Recursively inject OTel trace context into every node of a FlowJob tree. */
 function injectTraceContextIntoFlow(node: FlowJob): void {
@@ -681,21 +657,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             batchResult = await waitForJob("system", parentId, 30 * 60_000);
           } catch (err) {
             // A failed finalize settles the parent row with its reason (the
-            // workspace cap's message, for one) before it rethrows, but the
-            // rejection that reaches this side is BullMQ's plain Error, which
-            // the error handler would mask as "Internal server error". The
-            // row is what the sync client and API consumers must see (#1161).
-            const failure = await settledFailure(parentId);
+            // workspace cap's message, for one); answer with that instead of
+            // the plain Error BullMQ rejects with (#1161).
+            const failure = await settledFailureResponse(parentId);
             if (!failure) throw err;
-            // Storage faults answer 503 wherever they surface, so a client
-            // keys on one status and code for "the instance can't store
-            // this" (#1161, #1421).
-            const status = failure.code && STORAGE_FAULT_CODES.has(failure.code) ? 503 : 500;
-            return reply.status(status).send({
-              error: failure.message,
-              ...(failure.code ? { code: failure.code } : {}),
-              errors: failure.errors,
-            });
+            return reply.status(failure.status).send(failure.body);
           }
 
           if (!batchResult) {

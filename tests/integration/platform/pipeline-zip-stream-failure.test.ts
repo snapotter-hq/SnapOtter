@@ -33,13 +33,29 @@ const mocks = vi.hoisted(() => ({
   // When set, getObjectStream throws for the stored batch ZIP itself
   // (outputs/<id>/...), the key the route streams after the finalize.
   failZipObjectForParentId: null as string | null,
+  // When set, storing the batch ZIP (outputs/<id>/...) fails the way the
+  // workspace cap does, so the finalize settles the parent row with that
+  // reason before it rethrows (#2180).
+  capZipStoreForParentId: null as string | null,
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  const { SafeError } = await import("@snapotter/shared");
   return {
     ...actual,
+    putObjectStream: async (key: string, stream: Parameters<typeof actual.putObjectStream>[1]) => {
+      const capParent = mocks.capZipStoreForParentId;
+      if (capParent && key.startsWith(`outputs/${capParent}/`)) {
+        throw new SafeError("Injected cap at packaging", {
+          kind: "operational",
+          code: "workspace-cap",
+          statusCode: 503,
+        });
+      }
+      return actual.putObjectStream(key, stream);
+    },
     getObjectStream: async (key: string, range?: { start: number; end?: number }) => {
       const entryParent = mocks.failEntryStreamsForParentId;
       if (entryParent && new RegExp(`^outputs/${entryParent}-f\\d+/`).test(key)) {
@@ -76,6 +92,7 @@ afterAll(async () => {
 afterEach(() => {
   mocks.failEntryStreamsForParentId = null;
   mocks.failZipObjectForParentId = null;
+  mocks.capZipStoreForParentId = null;
 });
 
 function postBatch(clientJobId: string) {
@@ -118,6 +135,8 @@ describe("Pipeline batch ZIP delivery", () => {
     expect(res.statusCode).toBeGreaterThanOrEqual(500);
     expect(res.headers["content-type"]).toContain("application/json");
     expect(res.rawPayload.includes(ZIP_EOCD)).toBe(false);
+    // The settled reason, not the error handler's mask (#2180).
+    expect(JSON.parse(res.body).error).toBe("Failed to package batch results");
 
     // The failure is durable: the parent row replays a terminal failed frame,
     // which is what settles a client that degraded to the SSE path.
@@ -138,6 +157,22 @@ describe("Pipeline batch ZIP delivery", () => {
       if (terminal) break;
     }
     expect(terminal?.status).toBe("failed");
+  }, 30_000);
+
+  it("answers a storage failure at packaging with the settled reason and a 503 (#2180)", async () => {
+    const parentId = "zip-cap-failure-parent";
+    mocks.capZipStoreForParentId = parentId;
+
+    const res = await postBatch(parentId);
+
+    // BullMQ rejects the sync wait with a plain Error, so the message and
+    // code have to come from the row the finalize settled, as batch does; a
+    // capacity code answers 503 like the ingress paths do (#1161, #1421).
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body)).toMatchObject({
+      error: "Injected cap at packaging",
+      code: "workspace-cap",
+    });
   }, 30_000);
 
   it("keeps original-index alignment in fileResults across a pre-failed upload", async () => {

@@ -24,6 +24,7 @@ import {
   parseClientJobIdField,
   queueName,
   type ToolJobData,
+  type ToolJobResult,
 } from "../jobs/types.js";
 import { autoOrient } from "../lib/auto-orient.js";
 import { getSecurityHeaders } from "../lib/csp.js";
@@ -61,6 +62,7 @@ import {
 import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
+import { settledFailureResponse } from "../lib/settled-failure.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
@@ -1520,7 +1522,17 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           uncommittedOcrKeys.clear();
 
           // ── Wait for completion and stream the stored ZIP ────────────────
-          const batchResult = await waitForJob("system", parentId, 30 * 60_000);
+          let batchResult: ToolJobResult | null;
+          try {
+            batchResult = await waitForJob("system", parentId, 30 * 60_000);
+          } catch (err) {
+            // As in batch.ts: a failed finalize settles the parent row with
+            // its reason, which the sync client must see instead of the
+            // masked rejection (#2180).
+            const failure = await settledFailureResponse(parentId);
+            if (!failure) throw err;
+            return reply.status(failure.status).send(failure.body);
+          }
 
           if (!batchResult) {
             // The flow keeps running; the finalize persists the ZIP and
