@@ -16,11 +16,7 @@ import {
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { copyObjectToFile, deleteObject } from "../../lib/object-storage.js";
-import {
-  ocrRuntimeUnavailable,
-  ocrTierMismatch,
-  resolveOcrIngressSettings,
-} from "../../lib/ocr-capability.js";
+import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
 import {
   ocrUploadErrorMessage,
   ocrUploadErrorStatus,
@@ -91,7 +87,7 @@ registerAiPathJobHandler("ocr-pdf", async (input, data, ctx) => {
   const outName = `${base}_ocr.txt`;
 
   if (result.requestedQuality !== quality || result.actualQuality !== quality) {
-    throw ocrTierMismatch(
+    throw new Error(
       `OCR runtime tier mismatch: requested ${quality}, reported ${result.requestedQuality}/${result.actualQuality}`,
     );
   }

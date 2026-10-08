@@ -144,16 +144,7 @@ export function ocrRuntimeUnavailable(quality: OcrRuntimeQuality): InputValidati
   return new InputValidationError(
     `OCR ${quality} runtime is no longer available`,
     503,
-    "The accurate OCR runtime was installed when the file was uploaded and is missing now. Check the OCR optional pack in Settings, then run it again.",
+    "Repair or reinstall OCR in Settings > AI Features, then run it again.",
     "ENGINE_UNAVAILABLE",
   );
-}
-
-/**
- * The runtime ran a different tier than the worker asked for. The worker checked
- * the tier first, so this is an invariant breaking inside the server, not
- * anything about the file: a 500 with a code, reported like any server bug.
- */
-export function ocrTierMismatch(message: string): InputValidationError {
-  return new InputValidationError(message, 500, undefined, "OCR_TIER_MISMATCH");
 }

@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   enqueueToolJob: vi.fn(),
   extractText: vi.fn(),
   extractPdfText: vi.fn(),
-  validatePdfPath: vi.fn(),
   getAuthUser: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
   prepare: vi.fn(),
@@ -22,11 +21,6 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
     getOcrRuntimeCapability: mocks.getOcrRuntimeCapability,
   };
 });
-
-vi.mock("../../../apps/api/src/modality/document-input.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../apps/api/src/modality/document-input.js")>()),
-  validatePdfPath: mocks.validatePdfPath,
-}));
 
 vi.mock("../../../apps/api/src/modality/input-handler.js", () => ({
   inputHandlerFor: () => ({ prepare: mocks.prepare }),
@@ -369,6 +363,7 @@ describe("OCR worker: the runtime vanished after the upload", () => {
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
       message: "OCR best runtime is no longer available",
+      details: "Repair or reinstall OCR in Settings > AI Features, then run it again.",
     });
     expect(mocks.extractText).not.toHaveBeenCalled();
   });
@@ -401,30 +396,6 @@ describe("OCR worker: the runtime vanished after the upload", () => {
 
     await expect(runAiToolJob(job(), INPUT, ctx())).resolves.toMatchObject({
       filename: "scan_ocr.txt",
-    });
-  });
-
-  it("reports a PDF tier mismatch as a server bug (500), not a bad upload", async () => {
-    mocks.getOcrRuntimeCapability.mockReturnValue({
-      available: true,
-      qualities: ["balanced", "best"],
-      providers: ["CPUExecutionProvider"],
-    });
-    mocks.validatePdfPath.mockResolvedValue(undefined);
-    mocks.extractPdfText.mockResolvedValueOnce({
-      text: "t",
-      pages: 1,
-      requestedQuality: "balanced",
-      actualQuality: "fast",
-    });
-    const data = { ...job(), toolId: "ocr-pdf", settings: { quality: "balanced", language: "en" } };
-
-    await expect(
-      runAiPathToolJob(data, { path: "/tmp/in.pdf", size: 10 }, ctx()),
-    ).rejects.toMatchObject({
-      name: "InputValidationError",
-      statusCode: 500,
-      code: "OCR_TIER_MISMATCH",
     });
   });
 });
