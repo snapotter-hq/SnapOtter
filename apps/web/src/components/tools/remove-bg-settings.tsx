@@ -906,6 +906,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     }
   }, [downloadUrl, processing]);
 
+  // A removal that failed or was cancelled leaves its own error on screen; the
+  // "expired, running again" note would sit beside it saying otherwise (#2119).
+  useEffect(() => {
+    if (error) setEffectsError(null);
+  }, [error]);
+
   // Phase 2: Apply effects and download
   const handleDownloadWithEffects = async () => {
     if (!bgJobId || !bgFilename) return;
@@ -959,6 +965,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         // (#2119). Remove the background again so effects have something to
         // read; the note holds until that run's result arrives.
         if (body?.code === "BACKGROUND_REMOVAL_EXPIRED") {
+          // The user may have swapped the file while this request ran; the
+          // removal below would then upload the old one into the new entry.
+          const live = useFileStore.getState().files;
+          if (live.length === 0 || live[0] !== files[0]) return;
           setEffectsError(t.toolSettings["remove-background"].effectsExpired);
           handleRemoveBg();
           return;

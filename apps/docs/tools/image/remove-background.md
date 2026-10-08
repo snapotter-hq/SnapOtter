@@ -125,6 +125,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/remove-background/effects 
 }
 ```
 
+#### Error: Background Removal Expired (410) {#error-background-removal-expired-410}
+
+The effects endpoint works from the mask and original that Phase 1 stored for `jobId`. Stored outputs are cleaned up after a while, so if too much time passes between the two calls, they are gone. Run Phase 1 again with the same image and use the `jobId` it returns.
+
+```json
+{
+  "error": "This image's background removal has expired. Remove the background again.",
+  "code": "BACKGROUND_REMOVAL_EXPIRED"
+}
+```
+
+A `jobId` or `filename` that can't name a stored file (a path separator, `..`, an empty string) answers 400.
+
 ## Notes {#notes}
 
 - Requires the `background-removal` model bundle to be installed (4-5 GB).

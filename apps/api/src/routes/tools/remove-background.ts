@@ -408,14 +408,27 @@ export function registerRemoveBackground(app: FastifyInstance) {
         getObjectBuffer(originalKey),
       ]);
       if (maskRead.status === "rejected" || originalRead.status === "rejected") {
-        const failures = [maskRead, originalRead].flatMap((read) =>
-          read.status === "rejected" ? [read.reason] : [],
+        const reads = [
+          { key: maskKey, read: maskRead },
+          { key: originalKey, read: originalRead },
+        ].flatMap(({ key, read }) =>
+          read.status === "rejected" ? [{ key, err: read.reason }] : [],
         );
-        const fault = failures.find((err) => !isMissingObjectError(err));
-        if (fault) throw fault;
+        const faults = reads.filter(({ err }) => !isMissingObjectError(err));
+        if (faults.length > 0) {
+          // Only the first reaches the error handler; keep the rest in the logs.
+          for (const { key, err } of faults.slice(1)) {
+            request.log.error({ err, key }, "Stored cutout read failed");
+          }
+          throw faults[0].err;
+        }
         // Expected once in a while; a stream of these means the volume or
-        // bucket lost outputs it should still hold.
-        request.log.warn({ jobId, toolId: "remove-background" }, "Cutout missing at effects");
+        // bucket lost outputs it should still hold. Both missing is a swept
+        // job; only one missing is an anomaly worth noticing.
+        request.log.warn(
+          { jobId, toolId: "remove-background", missing: reads.map(({ key }) => key) },
+          "Cutout missing at effects",
+        );
         return reply.status(410).send({
           error: "This image's background removal has expired. Remove the background again.",
           code: "BACKGROUND_REMOVAL_EXPIRED",

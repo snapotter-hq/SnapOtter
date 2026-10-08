@@ -9,8 +9,11 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { putObject } from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -309,6 +312,63 @@ describe("Remove Background", () => {
     expect(res.statusCode).toBe(400);
     const result = JSON.parse(res.body);
     expect(result.error).toMatch(/invalid settings/i);
+  });
+
+  // The route used to answer 422 for every failure to read the stored mask and
+  // original, a missing object and a storage fault alike (#2119).
+  async function effectsFor(settings: Record<string, unknown>) {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    return app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+  }
+
+  it("effects route answers 410 BACKGROUND_REMOVAL_EXPIRED when the stored cutout is gone (#2119)", async () => {
+    // No removal ever stored a mask for this job, the same state as one whose
+    // outputs were cleaned up between the two calls.
+    const res = await effectsFor({ jobId: randomUUID(), filename: "test.png" });
+
+    expect(res.statusCode).toBe(410);
+    expect(JSON.parse(res.body).code).toBe("BACKGROUND_REMOVAL_EXPIRED");
+    // The raw ENOENT carried the absolute data path; nothing of it leaks.
+    expect(res.body).not.toMatch(/ENOENT|outputs\//);
+  });
+
+  it("effects route answers 400 for a filename the store would refuse (#2119)", async () => {
+    const res = await effectsFor({ jobId: randomUUID(), filename: "../../escape.png" });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("effects route lets a storage fault reading the mask reach the error handler (#2119)", async () => {
+    // A directory where the mask should be makes the read fail with EISDIR:
+    // the object exists but can't be read, which is the server's fault.
+    // Built on disk directly, since putObject refuses a nested key. Assumes
+    // the local backend, which every integration run uses.
+    const jobId = randomUUID();
+    await mkdir(join(env.WORKSPACE_PATH, "outputs", jobId, "test_mask.png"), { recursive: true });
+    await putObject(
+      `outputs/${jobId}/test_original.png`,
+      await sharp({
+        create: { width: 8, height: 8, channels: 3, background: "#888" },
+      })
+        .png()
+        .toBuffer(),
+    );
+
+    const res = await effectsFor({ jobId, filename: "test.png" });
+
+    // Status only: the test server skips the production error handler
+    // (#1243), so the body is Fastify's default. The unit suite pins ours.
+    expect(res.statusCode).toBe(500);
   });
 
   // ── Validation (always testable) ─────────────────────────────────
