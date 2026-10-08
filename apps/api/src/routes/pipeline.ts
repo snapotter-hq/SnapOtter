@@ -764,44 +764,59 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           await getFlowProducer().add(tree);
           uncommittedOcrKey = undefined;
 
-          // Wait for the finalize job (pipelines block to completion)
-          try {
-            const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
+          // Wait for the finalize job (pipelines block to completion). A
+          // rejection here is a server fault (Redis down, a crashed finalize)
+          // and BullMQ's text can carry internal paths, so it is left to the
+          // error handler, which masks it, logs it and reports it (#2179).
+          const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
 
-            if (!result) {
-              // The flow keeps running and the finalize's terminal single
-              // frame carries the full result; the client rides the SSE to
-              // it instead of being told the run failed (#766).
-              return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
+          if (!result) {
+            // The flow keeps running and the finalize's terminal single
+            // frame carries the full result; the client rides the SSE to
+            // it instead of being told the run failed (#766).
+            return reply.status(202).send({ jobId: clientJobId ?? jobId, async: true });
+          }
+
+          // Check for step failure reported by the finalize handler. A
+          // canceled run keeps the same 422 shape plus the structural
+          // marker the web client settles on (#771), mirroring batch.ts.
+          if (result.resultPayload?.error) {
+            // A step that failed on a server fault (an engine that broke
+            // between upload and the worker, a full workspace) answers with
+            // its own status, code and hint, as the single-file tool route
+            // does (#1742). Anything else stays the client's 422 (#2179).
+            const { httpStatus, code, details } = result.resultPayload as {
+              httpStatus?: number;
+              code?: string;
+              details?: string;
+            };
+            const serverFault = typeof httpStatus === "number" && httpStatus >= 500;
+            if (serverFault) {
+              request.log.error(
+                { toolId: "pipeline", jobId, code },
+                "pipeline step failed on a server fault",
+              );
             }
-
-            // Check for step failure reported by the finalize handler. A
-            // canceled run keeps the same 422 shape plus the structural
-            // marker the web client settles on (#771), mirroring batch.ts.
-            if (result.resultPayload?.error) {
-              return reply.status(422).send({
-                error: result.resultPayload.error as string,
-                completedSteps: result.resultPayload.steps,
-                ...(result.resultPayload.canceled === true ? { canceled: true } : {}),
-              });
-            }
-
-            return reply.send({
-              jobId,
-              downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
-              previewUrl: result.previewRef
-                ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
-                : undefined,
-              originalSize,
-              processedSize: result.processedSize,
-              stepsCompleted: result.resultPayload?.stepsCompleted ?? parsedSteps.length,
-              steps: result.resultPayload?.steps ?? [],
-            });
-          } catch (err) {
-            return reply.status(422).send({
-              error: err instanceof Error ? err.message : "Pipeline processing failed",
+            return reply.status(serverFault ? httpStatus : 422).send({
+              error: result.resultPayload.error as string,
+              ...(serverFault && code ? { code } : {}),
+              ...(serverFault && details ? { details } : {}),
+              completedSteps: result.resultPayload.steps,
+              ...(result.resultPayload.canceled === true ? { canceled: true } : {}),
             });
           }
+
+          return reply.send({
+            jobId,
+            downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(result.filename)}`,
+            previewUrl: result.previewRef
+              ? `/api/v1/download/${jobId}/${result.previewRef.split("/").pop()}`
+              : undefined,
+            originalSize,
+            processedSize: result.processedSize,
+            stepsCompleted: result.resultPayload?.stepsCompleted ?? parsedSteps.length,
+            steps: result.resultPayload?.steps ?? [],
+          });
         } finally {
           request.raw.removeListener("aborted", abortIngress);
           if (uncommittedOcrKey) await deleteObject(uncommittedOcrKey).catch(() => {});

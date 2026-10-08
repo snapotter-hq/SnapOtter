@@ -1265,8 +1265,11 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       contentType: "",
       originalSize: firstBytesIn,
       processedSize: 0,
+      // The failed step's status, code and hint ride along so the sync route
+      // can answer a server fault with its own status (#2179).
       resultPayload: {
         error: errorMsg,
+        ...failFault,
         stepsCompleted: steps.length,
         steps,
       },
