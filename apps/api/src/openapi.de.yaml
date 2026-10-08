@@ -4068,6 +4068,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
   /api/v1/tools/image/transparency-fixer:
     post:
       operationId: fixTransparency

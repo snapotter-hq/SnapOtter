@@ -41,9 +41,7 @@ const OWN_413 = [
 
 // Multipart routes that don't answer 413 yet, so the reference mustn't say
 // they do. Drop an entry, and add the 413, with its fix.
-const NO_413: Record<string, string> = {
-  "POST /api/v1/tools/image/remove-background/effects": "#1660: an over-limit file gets 400",
-};
+const NO_413: Record<string, string> = {};
 
 // Catalog tools that make something from settings alone, so take no upload.
 const NO_UPLOAD_TOOLS = ["barcode-generate", "html-to-image", "passport-photo", "qr-generate"];

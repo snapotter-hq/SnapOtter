@@ -338,10 +338,8 @@ export function registerRemoveBackground(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        return reply.status(400).send({
-          error: "Failed to parse request",
-          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-        });
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       // Same 400 gate as the Phase 1 route: this is the FINAL request when the
