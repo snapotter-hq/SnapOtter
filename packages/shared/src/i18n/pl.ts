@@ -5006,7 +5006,7 @@ export const pl: TranslationKeys = {
       updateFailed: "Nie udało się zaktualizować użytkownika",
       cannotRemoveOwnAdmin: "Nie można usunąć własnej roli administratora",
       resetPasswordHeading: "Resetowanie hasła dla {username}",
-      newPasswordLabel: "Nowe hasło (min. 8 znaków)",
+      newPasswordLabel: "Nowe hasło",
       resetPasswordButton: "Resetuj hasło",
       resetPasswordWarning:
         "Spowoduje to unieważnienie wszystkich sesji i kluczy API tego użytkownika.",
@@ -5362,14 +5362,13 @@ export const pl: TranslationKeys = {
   },
   changePassword: {
     title: "Zmiana hasła",
-    description:
-      "Przed kontynuowaniem należy ustawić nowe hasło. Hasło musi mieć co najmniej 8 znaków, w tym wielkie i małe litery oraz cyfrę.",
+    description: "Przed kontynuowaniem należy ustawić nowe hasło.",
     usernameLabel: "Nazwa użytkownika",
     currentPasswordLabel: "Bieżące hasło",
     currentPasswordPlaceholder: "Wprowadź bieżące hasło",
     newPasswordLabel: "Nowe hasło",
     generateButton: "Wygeneruj silne hasło",
-    newPasswordPlaceholder: "Co najmniej 8 znaków",
+    newPasswordPlaceholder: "Wprowadź nowe hasło",
     confirmPasswordLabel: "Potwierdź nowe hasło",
     confirmPasswordPlaceholder: "Powtórz nowe hasło",
     passwordsMismatch: "Hasła nie są zgodne",

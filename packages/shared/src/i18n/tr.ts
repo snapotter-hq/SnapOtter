@@ -5003,7 +5003,7 @@ export const tr: TranslationKeys = {
       updateFailed: "Kullanıcı güncellenemedi",
       cannotRemoveOwnAdmin: "Kendi yönetici rolünüzü kaldıramazsınız",
       resetPasswordHeading: "{username} için parolayı sıfırla",
-      newPasswordLabel: "Yeni parola (en az 8 karakter)",
+      newPasswordLabel: "Yeni parola",
       resetPasswordButton: "Parolayı Sıfırla",
       resetPasswordWarning:
         "Bu, kullanıcının tüm oturumlarını ve API anahtarlarını geçersiz kılar.",
@@ -5355,14 +5355,13 @@ export const tr: TranslationKeys = {
   },
   changePassword: {
     title: "Parolanızı değiştirin",
-    description:
-      "Devam etmeden önce yeni bir parola belirlemeniz gerekiyor. Parolanız en az 8 karakter uzunluğunda olmalı ve büyük harf, küçük harf ile bir rakam içermelidir.",
+    description: "Devam etmeden önce yeni bir parola belirlemeniz gerekiyor.",
     usernameLabel: "Kullanıcı adı",
     currentPasswordLabel: "Mevcut parola",
     currentPasswordPlaceholder: "Mevcut parolayı girin",
     newPasswordLabel: "Yeni parola",
     generateButton: "Güçlü parola oluştur",
-    newPasswordPlaceholder: "En az 8 karakter",
+    newPasswordPlaceholder: "Yeni parolayı girin",
     confirmPasswordLabel: "Yeni parolayı onaylayın",
     confirmPasswordPlaceholder: "Yeni parolayı tekrarlayın",
     passwordsMismatch: "Parolalar eşleşmiyor",

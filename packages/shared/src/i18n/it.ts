@@ -5010,7 +5010,7 @@ export const it: TranslationKeys = {
       updateFailed: "Aggiornamento dell'utente non riuscito",
       cannotRemoveOwnAdmin: "Non è possibile rimuovere il proprio ruolo di amministratore",
       resetPasswordHeading: "Reimposta password per {username}",
-      newPasswordLabel: "Nuova password (min. 8 caratteri)",
+      newPasswordLabel: "Nuova password",
       resetPasswordButton: "Reimposta password",
       resetPasswordWarning:
         "Questa operazione invaliderà tutte le sessioni e le chiavi API di questo utente.",
@@ -5364,14 +5364,13 @@ export const it: TranslationKeys = {
   },
   changePassword: {
     title: "Cambia la tua password",
-    description:
-      "Devi impostare una nuova password prima di continuare. La password deve contenere almeno 8 caratteri con maiuscole, minuscole e un numero.",
+    description: "Devi impostare una nuova password prima di continuare.",
     usernameLabel: "Nome utente",
     currentPasswordLabel: "Password attuale",
     currentPasswordPlaceholder: "Inserisci la password attuale",
     newPasswordLabel: "Nuova password",
     generateButton: "Genera password sicura",
-    newPasswordPlaceholder: "Almeno 8 caratteri",
+    newPasswordPlaceholder: "Inserisci la nuova password",
     confirmPasswordLabel: "Conferma nuova password",
     confirmPasswordPlaceholder: "Ripeti la nuova password",
     passwordsMismatch: "Le password non corrispondono",

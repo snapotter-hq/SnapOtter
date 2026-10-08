@@ -4995,7 +4995,7 @@ export const sv: TranslationKeys = {
       updateFailed: "Kunde inte uppdatera användare",
       cannotRemoveOwnAdmin: "Du kan inte ta bort din egen administratörsroll",
       resetPasswordHeading: "Återställ lösenord för {username}",
-      newPasswordLabel: "Nytt lösenord (minst 8 tecken)",
+      newPasswordLabel: "Nytt lösenord",
       resetPasswordButton: "Återställ lösenord",
       resetPasswordWarning:
         "Detta ogiltigförklarar alla sessioner och API-nycklar för denna användare.",
@@ -5346,14 +5346,13 @@ export const sv: TranslationKeys = {
   },
   changePassword: {
     title: "Byt lösenord",
-    description:
-      "Du måste ange ett nytt lösenord innan du kan fortsätta. Ditt lösenord måste vara minst 8 tecken med versaler, gemener och en siffra.",
+    description: "Du måste ange ett nytt lösenord innan du kan fortsätta.",
     usernameLabel: "Användarnamn",
     currentPasswordLabel: "Nuvarande lösenord",
     currentPasswordPlaceholder: "Ange nuvarande lösenord",
     newPasswordLabel: "Nytt lösenord",
     generateButton: "Generera starkt lösenord",
-    newPasswordPlaceholder: "Minst 8 tecken",
+    newPasswordPlaceholder: "Ange nytt lösenord",
     confirmPasswordLabel: "Bekräfta nytt lösenord",
     confirmPasswordPlaceholder: "Upprepa nytt lösenord",
     passwordsMismatch: "Lösenorden matchar inte",

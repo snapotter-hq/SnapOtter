@@ -4987,7 +4987,7 @@ export const vi: TranslationKeys = {
       updateFailed: "Cập nhật người dùng thất bại",
       cannotRemoveOwnAdmin: "Không thể xóa vai trò quản trị của chính bạn",
       resetPasswordHeading: "Đặt lại mật khẩu cho {username}",
-      newPasswordLabel: "Mật khẩu mới (tối thiểu 8 ký tự)",
+      newPasswordLabel: "Mật khẩu mới",
       resetPasswordButton: "Đặt lại mật khẩu",
       resetPasswordWarning:
         "Thao tác này sẽ vô hiệu hóa tất cả phiên và khóa API của người dùng này.",
@@ -5334,14 +5334,13 @@ export const vi: TranslationKeys = {
   },
   changePassword: {
     title: "Đổi mật khẩu của bạn",
-    description:
-      "Bạn cần đặt mật khẩu mới trước khi tiếp tục. Mật khẩu phải có ít nhất 8 ký tự bao gồm chữ hoa, chữ thường và số.",
+    description: "Bạn cần đặt mật khẩu mới trước khi tiếp tục.",
     usernameLabel: "Tên đăng nhập",
     currentPasswordLabel: "Mật khẩu hiện tại",
     currentPasswordPlaceholder: "Nhập mật khẩu hiện tại",
     newPasswordLabel: "Mật khẩu mới",
     generateButton: "Tạo mật khẩu mạnh",
-    newPasswordPlaceholder: "Ít nhất 8 ký tự",
+    newPasswordPlaceholder: "Nhập mật khẩu mới",
     confirmPasswordLabel: "Xác nhận mật khẩu mới",
     confirmPasswordPlaceholder: "Nhập lại mật khẩu mới",
     passwordsMismatch: "Mật khẩu không khớp",

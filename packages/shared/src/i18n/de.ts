@@ -5024,7 +5024,7 @@ export const de: TranslationKeys = {
       updateFailed: "Benutzer konnte nicht aktualisiert werden",
       cannotRemoveOwnAdmin: "Sie können Ihre eigene Administratorrolle nicht entfernen",
       resetPasswordHeading: "Passwort zurücksetzen für {username}",
-      newPasswordLabel: "Neues Passwort (mind. 8 Zeichen)",
+      newPasswordLabel: "Neues Passwort",
       resetPasswordButton: "Passwort zurücksetzen",
       resetPasswordWarning:
         "Dadurch werden alle Sitzungen und API-Schlüssel dieses Benutzers ungültig.",
@@ -5384,14 +5384,13 @@ export const de: TranslationKeys = {
   },
   changePassword: {
     title: "Passwort ändern",
-    description:
-      "Sie müssen ein neues Passwort festlegen, bevor Sie fortfahren können. Ihr Passwort muss mindestens 8 Zeichen mit Groß- und Kleinbuchstaben sowie einer Zahl enthalten.",
+    description: "Sie müssen ein neues Passwort festlegen, bevor Sie fortfahren können.",
     usernameLabel: "Benutzername",
     currentPasswordLabel: "Aktuelles Passwort",
     currentPasswordPlaceholder: "Aktuelles Passwort eingeben",
     newPasswordLabel: "Neues Passwort",
     generateButton: "Sicheres Passwort generieren",
-    newPasswordPlaceholder: "Mindestens 8 Zeichen",
+    newPasswordPlaceholder: "Neues Passwort eingeben",
     confirmPasswordLabel: "Neues Passwort bestätigen",
     confirmPasswordPlaceholder: "Neues Passwort wiederholen",
     passwordsMismatch: "Passwörter stimmen nicht überein",
