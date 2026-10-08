@@ -116,6 +116,7 @@ async function validatePasswordStrength(password: string): Promise<PasswordRuleF
     return {
       message: "Password must not contain control characters",
       rule: "controlCharacter",
+      rules: ["controlCharacter"],
     };
   }
 

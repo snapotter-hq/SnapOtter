@@ -1237,7 +1237,8 @@ describe("Admin user-management guards", () => {
     const user = await loggedInUser();
     await setSetting("passwordRequireSpecial", "true");
     try {
-      const res = await sendChangePassword(user, "\t");
+      // A single Thai letter: no case, not a digit, not a symbol, and too short.
+      const res = await sendChangePassword(user, "\u0e01");
 
       expect(JSON.parse(res.body)).toMatchObject({
         rule: "minLength",
@@ -1321,7 +1322,10 @@ describe("Admin user-management guards", () => {
     });
 
     expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body)).toMatchObject({ rule: "controlCharacter" });
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "controlCharacter",
+      rules: ["controlCharacter"],
+    });
   });
 
   it("lets a user sign in with the non-Latin password they just set", async () => {
