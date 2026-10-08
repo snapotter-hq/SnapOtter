@@ -385,6 +385,10 @@ describe("SPA fallback disambiguation (#1275)", () => {
         // pdf.js CMaps and fonts (#1084): an HTML 200 here reads as a corrupt CMap.
         "/pdfjs/cmaps/gone.bcmap",
         "/pdfjs/standard_fonts/gone.pfb",
+        // pdf.js image decoders and their JS fallbacks (#2082): a shell served
+        // as the fallback module blanks the page with no error.
+        "/pdfjs/wasm/gone.wasm",
+        "/pdfjs/wasm/gone_nowasm_fallback.js",
         // A prefix-preserving proxy with BASE_PATH unset reaches the same spots.
         "/snapotter/assets/gone.js",
         "/apps/snapotter/gone.css",

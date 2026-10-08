@@ -38,8 +38,10 @@ describe("pdf.js asset options (#1084)", () => {
       cMapUrl: `${location.origin}/pdfjs/cmaps/`,
       cMapPacked: true,
       standardFontDataUrl: `${location.origin}/pdfjs/standard_fonts/`,
+      // CCITT, JBIG2 and JPEG 2000 images decode from here (#2082). useWasm is
+      // off because the API's CSP refuses wasm; pdf.js takes the JS fallbacks.
       wasmUrl: `${location.origin}/pdfjs/wasm/`,
-      iccUrl: `${location.origin}/pdfjs/iccs/`,
+      useWasm: false,
     });
   });
 
@@ -48,14 +50,6 @@ describe("pdf.js asset options (#1084)", () => {
       cMapUrl: `${location.origin}/sub/pdfjs/cmaps/`,
       standardFontDataUrl: `${location.origin}/sub/pdfjs/standard_fonts/`,
       wasmUrl: `${location.origin}/sub/pdfjs/wasm/`,
-      iccUrl: `${location.origin}/sub/pdfjs/iccs/`,
-    });
-  });
-
-  it("points wasmUrl and iccUrl at the emitted directories so CCITT, JBIG2 and JPEG 2000 images decode (#2082)", async () => {
-    expect(await optionsAt("/pdf/organize-pdf")).toMatchObject({
-      wasmUrl: `${location.origin}/pdfjs/wasm/`,
-      iccUrl: `${location.origin}/pdfjs/iccs/`,
     });
   });
 
@@ -107,7 +101,7 @@ describe("pdf.js asset options (#1084)", () => {
     expect(emitted).toContain("pdfjs/standard_fonts/FoxitSerif.pfb");
   });
 
-  it("the build emits the wasm decoders, their JS fallbacks and the ICC profile (#2082)", () => {
+  it("the build emits the image decoders and the JS fallbacks pdf.js imports (#2082)", () => {
     const emitted: string[] = [];
     const generateBundle = pdfjsAssets().generateBundle as (this: unknown) => void;
     generateBundle.call({ emitFile: (f: { fileName: string }) => emitted.push(f.fileName) });
@@ -118,8 +112,6 @@ describe("pdf.js asset options (#1084)", () => {
         "pdfjs/wasm/jbig2_nowasm_fallback.js",
         "pdfjs/wasm/openjpeg.wasm",
         "pdfjs/wasm/openjpeg_nowasm_fallback.js",
-        "pdfjs/wasm/qcms_bg.wasm",
-        "pdfjs/iccs/CGATS001Compat-v2-micro.icc",
       ]),
     );
   });
@@ -145,9 +137,9 @@ describe("pdf.js asset options (#1084)", () => {
     }
 
     it("serves the wasm directory with the MIME types browsers require for import() and instantiate", () => {
-      expect(
-        serve("/jbig2_nowasm_fallback.js".replace("/", "/wasm/")).headers["Content-Type"],
-      ).toBe("text/javascript");
+      expect(serve("/wasm/jbig2_nowasm_fallback.js").headers["Content-Type"]).toBe(
+        "text/javascript",
+      );
       expect(serve("/wasm/jbig2.wasm").headers["Content-Type"]).toBe("application/wasm");
       expect(serve("/cmaps/UniJIS-UCS2-H.bcmap").headers["Content-Type"]).toBe(
         "application/octet-stream",

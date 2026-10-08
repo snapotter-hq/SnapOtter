@@ -1,30 +1,32 @@
 // @vitest-environment node
 
-import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { decodeFirstImage } from "./ccitt-pdf-fixture";
+import { describe, expect, it, vi } from "vitest";
+import { decodeFirstImage, PDFJS_WASM_DIR } from "./ccitt-pdf-fixture";
 
 // The API's CSP has no 'wasm-unsafe-eval', so a browser refuses to compile the
-// wasm decoders (#2082). pdf.js then imports the *_nowasm_fallback.js module
-// from the same wasmUrl, which script-src 'self' allows. WebAssembly.instantiate
-// is made to reject the way the CSP does, and the image must still decode.
-describe("pdf.js wasm fallback under a CSP that refuses wasm (#2082)", () => {
-  it("decodes a CCITT Group 4 image through the JS fallback", async () => {
-    const instantiate = WebAssembly.instantiate;
-    WebAssembly.instantiate = (async () => {
+// wasm decoders (#2082). pdfDocumentOptions() sets useWasm: false, which sends
+// pdf.js straight to the *_nowasm_fallback.js modules in wasmUrl, and
+// script-src 'self' allows those. Same options here: the image must decode
+// without WebAssembly.instantiate being called. If pdf.js stops honouring
+// useWasm, the spy still fires on a refused compile and fails the test.
+describe("pdf.js decodes through the JS fallback with useWasm off (#2082)", () => {
+  it("decodes a CCITT Group 4 image without compiling wasm", async () => {
+    const original = WebAssembly.instantiate;
+    const instantiate = vi.fn(async () => {
       throw new WebAssembly.CompileError("Refused to compile: Content Security Policy");
-    }) as typeof WebAssembly.instantiate;
+    });
+    WebAssembly.instantiate = instantiate as unknown as typeof WebAssembly.instantiate;
     try {
       // @ts-expect-error legacy build ships no types; the main build needs a DOM worker
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const wasmDir = path.resolve(__dirname, "../../../apps/web/node_modules/pdfjs-dist/wasm/");
 
-      expect(await decodeFirstImage(pdfjs, { wasmUrl: `${wasmDir}/` })).toEqual({
+      expect(await decodeFirstImage(pdfjs, { wasmUrl: PDFJS_WASM_DIR, useWasm: false })).toEqual({
         width: 64,
         height: 64,
       });
+      expect(instantiate).not.toHaveBeenCalled();
     } finally {
-      WebAssembly.instantiate = instantiate;
+      WebAssembly.instantiate = original;
     }
   });
 });

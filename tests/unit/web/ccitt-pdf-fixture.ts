@@ -1,4 +1,10 @@
 import { Buffer } from "node:buffer";
+import path from "node:path";
+
+export const PDFJS_WASM_DIR = `${path.resolve(
+  __dirname,
+  "../../../apps/web/node_modules/pdfjs-dist/wasm",
+)}/`;
 
 // A one-page PDF holding a 64x64 CCITT Group 4 image (the usual compression
 // for B&W scans). Every row is the "V0" code, a single 1-bit, so the stream is
@@ -43,7 +49,10 @@ export function buildCcittPdf(): Uint8Array {
 }
 
 // Decodes the page's image through pdf.js and returns its size, or null when
-// pdf.js could not decode it (the blank-preview symptom of #2082).
+// pdf.js could not decode it (the blank-preview symptom of #2082). The document
+// is cleaned up afterwards, which drops pdf.js's cached decoder so a later call
+// in the same process starts from scratch. A failed init stays cached until
+// then, so run the call without wasmUrl first.
 export async function decodeFirstImage(
   pdfjs: {
     getDocument: (src: object) => { promise: Promise<unknown> };
@@ -56,13 +65,18 @@ export async function decodeFirstImage(
     objs: { get: (name: string, cb: (img: unknown) => void) => void };
   };
   const doc = (await pdfjs.getDocument({ data: buildCcittPdf(), verbosity: 0, ...options })
-    .promise) as { getPage: (n: number) => Promise<Page> };
-  const page = await doc.getPage(1);
-  const ops = await page.getOperatorList();
-  const at = ops.fnArray.indexOf(pdfjs.OPS.paintImageXObject);
-  const name = ops.argsArray[at][0] as string;
-  const img = await new Promise<{ width: number; height: number } | null>((resolve) =>
-    page.objs.get(name, resolve as (img: unknown) => void),
-  );
-  return img ? { width: img.width, height: img.height } : null;
+    .promise) as { getPage: (n: number) => Promise<Page>; cleanup: () => Promise<void> };
+  try {
+    const page = await doc.getPage(1);
+    const ops = await page.getOperatorList();
+    const at = ops.fnArray.indexOf(pdfjs.OPS.paintImageXObject);
+    if (at < 0) throw new Error("page 1 has no paintImageXObject op");
+    const name = ops.argsArray[at][0] as string;
+    const img = await new Promise<{ width: number; height: number } | null>((resolve) =>
+      page.objs.get(name, resolve as (img: unknown) => void),
+    );
+    return img ? { width: img.width, height: img.height } : null;
+  } finally {
+    await doc.cleanup();
+  }
 }
