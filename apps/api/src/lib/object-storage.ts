@@ -220,13 +220,21 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
   assertValidKey(key);
   if (isS3Enabled()) {
     const s3 = await getS3();
-    await s3.putGenericObject(key, data);
+    try {
+      await s3.putGenericObject(key, data);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
   await assertLocalCapacity();
-  const p = localPath(key);
-  await mkdir(dirname(p), { recursive: true });
-  await writeFile(p, data);
+  try {
+    const p = localPath(key);
+    await mkdir(dirname(p), { recursive: true });
+    await writeFile(p, data);
+  } catch (err) {
+    throw localWriteFault(err);
+  }
 }
 
 export async function putObjectStream(

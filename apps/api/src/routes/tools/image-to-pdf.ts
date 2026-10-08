@@ -122,7 +122,9 @@ async function readOwnOutput(key: string): Promise<Buffer> {
     return await getObjectBuffer(key);
   } catch (err) {
     if (hasServerErrorStatus(err)) throw err;
-    throw Object.assign(err instanceof Error ? err : new Error(String(err)), { statusCode: 500 });
+    throw Object.assign(new Error("Could not read back a stored output", { cause: err }), {
+      statusCode: 500,
+    });
   }
 }
 

@@ -108,7 +108,9 @@ describe("pdf-to-image single-file route", () => {
     const app = await buildApp(registerPdfToImage);
     const res = await send(app);
 
+    expect(getObjectBuffer).toHaveBeenCalled();
     expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain("read failed");
     await app.close();
   });
 
@@ -171,7 +173,9 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
     const app = await buildApp(registerImageToPdf);
     const res = await send(app);
 
+    expect(getObjectBuffer).toHaveBeenCalled();
     expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain("read failed");
     await app.close();
   });
 

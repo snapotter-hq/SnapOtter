@@ -150,6 +150,28 @@ describe("object-storage (local backend)", () => {
     });
   });
 
+  // #2120: putObject let a raw errno through, so a route's catch-all read a
+  // full or read-only volume as a bad file (422).
+  it("answers a failed buffer write with a 503 naming the condition", async () => {
+    // A file where the job directory should be: creating it fails with EEXIST.
+    const blocker = join(env.WORKSPACE_PATH, "outputs", `put-blocker-${process.pid}`);
+    await mkdir(join(env.WORKSPACE_PATH, "outputs"), { recursive: true });
+    writeFileSync(blocker, "x");
+    try {
+      await expect(
+        putObject(`outputs/put-blocker-${process.pid}/page-1.png`, Buffer.from("y")),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ syscall: "mkdir" }),
+      });
+    } finally {
+      rmSync(blocker, { force: true });
+    }
+  });
+
   it("rejects a pre-pipeline abort without emitting an unhandled source error", () => {
     const objectStoragePath = join(process.cwd(), "apps/api/src/lib/object-storage.ts");
     const tsxPath = join(process.cwd(), "apps/api/node_modules/.bin/tsx");
