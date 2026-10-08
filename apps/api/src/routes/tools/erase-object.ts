@@ -276,6 +276,7 @@ registerAiJobHandler("erase-object", async (input, data, ctx) => {
     ctx.scratchDir,
     (percent, stage) => ctx.report(percent, stage),
     settings.qualityMode,
+    { signal: ctx.signal },
   );
 
   // Convert to requested output format
