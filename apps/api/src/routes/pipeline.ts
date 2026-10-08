@@ -781,16 +781,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // canceled run keeps the same 422 shape plus the structural
           // marker the web client settles on (#771), mirroring batch.ts.
           if (result.resultPayload?.error) {
-            // A step that failed on a server fault (an engine that broke
-            // between upload and the worker, a full workspace) answers with
-            // its own status, code and hint, as the single-file tool route
-            // does (#1742). Anything else stays the client's 422 (#2179).
+            // A step that failed on a server fault the worker recorded a
+            // status for (an engine that broke between upload and the worker)
+            // answers with that status, code and hint, as the single-file
+            // tool route does (#1742). Anything else stays the client's 422
+            // (#2179).
             const { httpStatus, code, details } = result.resultPayload as {
               httpStatus?: number;
               code?: string;
               details?: string;
             };
-            const serverFault = typeof httpStatus === "number" && httpStatus >= 500;
+            const serverFault =
+              typeof httpStatus === "number" && httpStatus >= 500 && httpStatus < 600;
             if (serverFault) {
               request.log.error(
                 { toolId: "pipeline", jobId, code },
