@@ -5276,6 +5276,7 @@ export const uk: TranslationKeys = {
   auth: {
     login: "Вхід",
     logout: "Вийти",
+    logoutFailed: "Не вдалося вийти. Спробуйте ще раз.",
     username: "Ім'я користувача",
     password: "Пароль",
     loginButton: "Увійти",

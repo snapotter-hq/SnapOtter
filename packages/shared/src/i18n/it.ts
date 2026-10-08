@@ -5285,6 +5285,7 @@ export const it: TranslationKeys = {
   auth: {
     login: "Accedi",
     logout: "Esci",
+    logoutFailed: "Impossibile disconnetterti. Riprova.",
     username: "Nome utente",
     password: "Password",
     loginButton: "Accedi",

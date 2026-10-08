@@ -5256,6 +5256,7 @@ export const vi: TranslationKeys = {
   auth: {
     login: "Đăng nhập",
     logout: "Đăng xuất",
+    logoutFailed: "Không thể đăng xuất. Vui lòng thử lại.",
     username: "Tên đăng nhập",
     password: "Mật khẩu",
     loginButton: "Đăng nhập",

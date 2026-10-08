@@ -5276,6 +5276,7 @@ export const tr: TranslationKeys = {
   auth: {
     login: "Giriş Yap",
     logout: "Çıkış yap",
+    logoutFailed: "Çıkış yapılamadı. Tekrar deneyin.",
     username: "Kullanıcı adı",
     password: "Parola",
     loginButton: "Giriş Yap",

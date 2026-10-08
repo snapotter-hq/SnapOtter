@@ -4973,6 +4973,7 @@ export const zhCN: TranslationKeys = {
   auth: {
     login: "登录",
     logout: "退出登录",
+    logoutFailed: "无法退出登录。请重试。",
     username: "用户名",
     password: "密码",
     loginButton: "登录",

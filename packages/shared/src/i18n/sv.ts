@@ -5267,6 +5267,7 @@ export const sv: TranslationKeys = {
   auth: {
     login: "Logga in",
     logout: "Logga ut",
+    logoutFailed: "Det gick inte att logga ut. Försök igen.",
     username: "Användarnamn",
     password: "Lösenord",
     loginButton: "Logga in",

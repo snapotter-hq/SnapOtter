@@ -5278,6 +5278,7 @@ export const ru: TranslationKeys = {
   auth: {
     login: "Вход",
     logout: "Выйти",
+    logoutFailed: "Не удалось выйти. Попробуйте ещё раз.",
     username: "Имя пользователя",
     password: "Пароль",
     loginButton: "Войти",

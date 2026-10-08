@@ -5282,6 +5282,7 @@ export const ptBR: TranslationKeys = {
   auth: {
     login: "Entrar",
     logout: "Sair",
+    logoutFailed: "Não foi possível sair. Tente novamente.",
     username: "Nome de usuário",
     password: "Senha",
     loginButton: "Entrar",

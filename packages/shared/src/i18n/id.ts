@@ -5267,6 +5267,7 @@ export const id: TranslationKeys = {
   auth: {
     login: "Masuk",
     logout: "Keluar",
+    logoutFailed: "Gagal keluar. Coba lagi.",
     username: "Nama pengguna",
     password: "Kata sandi",
     loginButton: "Masuk",

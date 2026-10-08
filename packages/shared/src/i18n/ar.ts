@@ -5225,6 +5225,7 @@ export const ar: TranslationKeys = {
   auth: {
     login: "تسجيل الدخول",
     logout: "تسجيل الخروج",
+    logoutFailed: "تعذّر تسجيل خروجك. حاول مرة أخرى.",
     username: "اسم المستخدم",
     password: "كلمة المرور",
     loginButton: "تسجيل الدخول",

@@ -5215,6 +5215,7 @@ export const ja: TranslationKeys = {
   auth: {
     login: "ログイン",
     logout: "ログアウト",
+    logoutFailed: "ログアウトできませんでした。もう一度お試しください。",
     username: "ユーザー名",
     password: "パスワード",
     loginButton: "ログイン",

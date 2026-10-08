@@ -4973,6 +4973,7 @@ export const zhTW: TranslationKeys = {
   auth: {
     login: "登入",
     logout: "登出",
+    logoutFailed: "無法登出。請再試一次。",
     username: "使用者名稱",
     password: "密碼",
     loginButton: "登入",

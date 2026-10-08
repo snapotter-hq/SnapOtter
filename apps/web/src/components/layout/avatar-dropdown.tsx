@@ -2,9 +2,8 @@ import { ExternalLink, LogOut, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { clearToken } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { logoutDestination } from "@/lib/logout-destination";
+import { logout } from "@/lib/logout";
 import { cn } from "@/lib/utils";
 
 interface AvatarDropdownProps {
@@ -16,6 +15,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
   const { t } = useTranslation();
   const { authEnabled, loading, username: sessionUsername } = useAuth();
   const [open, setOpen] = useState(false);
+  const [logoutFailed, setLogoutFailed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // The session is the source of truth: OIDC/SAML logins never run the login
@@ -37,18 +37,19 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  // A reopened menu shouldn't greet the user with the last attempt's error.
+  useEffect(() => {
+    if (!open) setLogoutFailed(false);
+  }, [open]);
+
   const handleLogout = async () => {
-    try {
-      const res = await fetch(appUrl("/api/auth/logout"), { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      window.location.href = logoutDestination(data.logoutUrl);
-    } catch {
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      window.location.href = appUrl("/login");
+    setLogoutFailed(false);
+    const destination = await logout();
+    if (destination === null) {
+      setLogoutFailed(true);
+      return;
     }
+    window.location.href = destination;
   };
 
   return (
@@ -141,10 +142,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
               />
               <button
                 type="button"
-                onClick={() => {
-                  setOpen(false);
-                  handleLogout();
-                }}
+                onClick={handleLogout}
                 className={cn(
                   "w-full text-start px-3 py-2 text-sm flex items-center gap-2 transition-colors",
                   variant === "dark"
@@ -155,6 +153,11 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
                 <LogOut className="h-4 w-4" />
                 {t.auth.logout}
               </button>
+              {logoutFailed && (
+                <p role="alert" className="px-3 pb-2 text-xs text-destructive">
+                  {t.auth.logoutFailed}
+                </p>
+              )}
             </>
           )}
         </div>

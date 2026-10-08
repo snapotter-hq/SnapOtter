@@ -5303,6 +5303,7 @@ export const de: TranslationKeys = {
   auth: {
     login: "Anmelden",
     logout: "Abmelden",
+    logoutFailed: "Abmeldung fehlgeschlagen. Bitte erneut versuchen.",
     username: "Benutzername",
     password: "Passwort",
     loginButton: "Anmelden",

@@ -5195,6 +5195,7 @@ export const en = {
   auth: {
     login: "Login",
     logout: "Log out",
+    logoutFailed: "Couldn't sign you out. Try again.",
     username: "Username",
     password: "Password",
     loginButton: "Login",

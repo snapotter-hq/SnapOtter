@@ -5298,6 +5298,7 @@ export const fr: TranslationKeys = {
   auth: {
     login: "Connexion",
     logout: "Se déconnecter",
+    logoutFailed: "Impossible de vous déconnecter. Réessayez.",
     username: "Nom d'utilisateur",
     password: "Mot de passe",
     loginButton: "Se connecter",

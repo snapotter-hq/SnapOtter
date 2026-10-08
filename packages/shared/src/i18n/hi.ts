@@ -5053,6 +5053,7 @@ export const hi: TranslationKeys = {
   auth: {
     login: "लॉगिन",
     logout: "लॉग आउट",
+    logoutFailed: "साइन आउट नहीं हो सका। फिर से कोशिश करें।",
     username: "यूज़रनेम",
     password: "पासवर्ड",
     loginButton: "लॉगिन",

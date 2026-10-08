@@ -5282,6 +5282,7 @@ export const pl: TranslationKeys = {
   auth: {
     login: "Logowanie",
     logout: "Wyloguj",
+    logoutFailed: "Nie udało się wylogować. Spróbuj ponownie.",
     username: "Nazwa użytkownika",
     password: "Hasło",
     loginButton: "Zaloguj",

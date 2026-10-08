@@ -5275,6 +5275,7 @@ export const es: TranslationKeys = {
   auth: {
     login: "Iniciar sesión",
     logout: "Cerrar sesión",
+    logoutFailed: "No se pudo cerrar la sesión. Inténtalo de nuevo.",
     username: "Nombre de usuario",
     password: "Contraseña",
     loginButton: "Iniciar sesión",

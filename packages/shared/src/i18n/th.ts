@@ -5196,6 +5196,7 @@ export const th: TranslationKeys = {
   auth: {
     login: "เข้าสู่ระบบ",
     logout: "ออกจากระบบ",
+    logoutFailed: "ออกจากระบบไม่สำเร็จ ลองอีกครั้ง",
     username: "ชื่อผู้ใช้",
     password: "รหัสผ่าน",
     loginButton: "เข้าสู่ระบบ",

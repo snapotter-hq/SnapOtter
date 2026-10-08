@@ -5187,6 +5187,7 @@ export const ko: TranslationKeys = {
   auth: {
     login: "로그인",
     logout: "로그아웃",
+    logoutFailed: "로그아웃하지 못했습니다. 다시 시도하세요.",
     username: "사용자명",
     password: "비밀번호",
     loginButton: "로그인",

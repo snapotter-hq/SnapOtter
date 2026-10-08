@@ -5287,6 +5287,7 @@ export const nl: TranslationKeys = {
   auth: {
     login: "Inloggen",
     logout: "Uitloggen",
+    logoutFailed: "Uitloggen is mislukt. Probeer het opnieuw.",
     username: "Gebruikersnaam",
     password: "Wachtwoord",
     loginButton: "Inloggen",

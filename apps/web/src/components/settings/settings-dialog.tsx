@@ -50,14 +50,13 @@ import {
   apiGet,
   apiPost,
   apiPut,
-  clearToken,
   formatHeaders,
 } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
 import { generatePassword } from "@/lib/generate-password";
-import { logoutDestination } from "@/lib/logout-destination";
+import { logout } from "@/lib/logout";
 import { passwordErrorMessage } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
@@ -386,6 +385,7 @@ function GeneralSection() {
   const [defaultToolView, setDefaultToolView] = useState("sidebar");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [logoutFailed, setLogoutFailed] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -412,20 +412,13 @@ function GeneralSection() {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      const res = await fetch(appUrl("/api/auth/logout"), {
-        method: "POST",
-        headers: formatHeaders(),
-      });
-      const data = await res.json().catch(() => ({}));
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      window.location.href = logoutDestination(data.logoutUrl);
-    } catch {
-      clearToken();
-      localStorage.removeItem("snapotter-username");
-      window.location.href = appUrl("/login");
+    setLogoutFailed(false);
+    const destination = await logout();
+    if (destination === null) {
+      setLogoutFailed(true);
+      return;
     }
+    window.location.href = destination;
   };
 
   const handleSave = useCallback(async () => {
@@ -474,14 +467,21 @@ function GeneralSection() {
           </div>
         </div>
         {authEnabled && (
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            {t.settings.general.logOut}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              {t.settings.general.logOut}
+            </button>
+            {logoutFailed && (
+              <p role="alert" className="text-xs text-destructive">
+                {t.auth.logoutFailed}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
