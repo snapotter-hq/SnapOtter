@@ -25,6 +25,8 @@ const mockBrowserTracingIntegration = vi.fn(() => ({ name: "BrowserTracing" }));
 vi.mock("@sentry/react", () => ({
   init: mockSentryInit,
   browserTracingIntegration: mockBrowserTracingIntegration,
+  getIsolationScope: () => ({ clearBreadcrumbs: vi.fn() }),
+  getCurrentScope: () => ({ clearBreadcrumbs: vi.fn() }),
 }));
 
 const noop = () => {};

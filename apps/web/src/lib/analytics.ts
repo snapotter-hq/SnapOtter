@@ -162,13 +162,18 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
     // identify() call), so events stay anonymous and person-less while enabling
     // fleet rollups ("how many distinct instances use tool X") via a HogQL
     // uniq(). Omitted when empty so we never register a blank value.
-    const superProps: Record<string, string> = {
-      app_version: (await import("@snapotter/shared")).APP_VERSION,
-    };
-    if (config.instanceId) superProps.instance_id = config.instanceId;
-    // Registered even if an opt-out landed meanwhile: it only stores them
-    // locally, and a re-enable resumes this same instance, which needs them.
-    posthog.register(superProps);
+    try {
+      const superProps: Record<string, string> = {
+        app_version: (await import("@snapotter/shared")).APP_VERSION,
+      };
+      if (config.instanceId) superProps.instance_id = config.instanceId;
+      // Registered even if an opt-out landed meanwhile: it only stores them
+      // locally, and a re-enable resumes this same instance, which needs them.
+      posthog.register(superProps);
+    } catch (err) {
+      // Events go without the rollup properties; Sentry must still start.
+      console.warn("[analytics] PostHog super properties failed:", err);
+    }
   }
 
   // startSentry() itself stops short if the tab was opted out by now.
@@ -190,6 +195,11 @@ async function startSentry(config: AnalyticsConfig): Promise<void> {
     const release =
       import.meta.env.VITE_SENTRY_RELEASE || (await import("@snapotter/shared")).APP_VERSION;
     if (!wanted || sentryRunning) return;
+    // A closed client still lets breadcrumbs pile up on the shared scopes, so
+    // a restart after an opt-out would send the opted-out trail with its first
+    // event. Start from an empty one.
+    Sentry.getIsolationScope().clearBreadcrumbs();
+    Sentry.getCurrentScope().clearBreadcrumbs();
     // buildWebBeforeSend is typed on loose Record shapes so sentry-scrub.ts
     // never imports @sentry/react (this module loads the SDK lazily); cast
     // at this one boundary to the SDK callback type.
@@ -305,6 +315,8 @@ export async function applyInstanceAnalytics(config: AnalyticsConfig | null): Pr
   if (config?.enabled) {
     // A tab that started and was then opted out resumes; any other starts.
     if (initialized && !enabled) optIn();
+    // Sentry failed to start earlier (a chunk that didn't load, say): retry.
+    else if (initialized && sentryConfig && !sentryRunning) await startSentry(sentryConfig);
     else await initAnalytics(config);
     return;
   }

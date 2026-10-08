@@ -16,14 +16,27 @@ const posthogInstance = () => ({
 const mockPosthogInit = vi.fn(posthogInstance);
 vi.mock("posthog-js", () => ({ __esModule: true, default: { init: mockPosthogInit } }));
 
-// A Sentry whose client can be closed, like the real one.
+// A Sentry whose client can be closed, like the real one. `order` records
+// scope clears and inits so a test can check which came first.
 let client: { close: ReturnType<typeof vi.fn> } | null = null;
+const order: string[] = [];
 const mockSentryInit = vi.fn(() => {
+  order.push("init");
   client = { close: vi.fn() };
 });
 const mockCaptureException = vi.fn();
+/** Fail the next Sentry.init calls, as a chunk that didn't load would. */
+let sentryInitFailures = 0;
 vi.mock("@sentry/react", () => ({
-  init: mockSentryInit,
+  init: (...args: unknown[]) => {
+    if (sentryInitFailures > 0) {
+      sentryInitFailures--;
+      throw new Error("chunk failed");
+    }
+    return mockSentryInit(...(args as []));
+  },
+  getIsolationScope: () => ({ clearBreadcrumbs: () => order.push("clear isolation") }),
+  getCurrentScope: () => ({ clearBreadcrumbs: () => order.push("clear current") }),
   getClient: () => client,
   captureException: mockCaptureException,
   captureReactException: vi.fn(),
@@ -60,6 +73,8 @@ describe("analytics lifecycle (#2197)", () => {
     mockSentryInit.mockClear();
     mockCaptureException.mockClear();
     client = null;
+    order.length = 0;
+    sentryInitFailures = 0;
     vi.resetModules();
     early = await import("../../../apps/web/src/lib/early-errors");
     mod = await import("../../../apps/web/src/lib/analytics");
@@ -153,6 +168,31 @@ describe("analytics lifecycle (#2197)", () => {
     await settle();
 
     expect(mockCaptureException).toHaveBeenCalledWith(err);
+  });
+
+  it("restarts Sentry without the breadcrumbs from the opted-out period", async () => {
+    await mod.applyInstanceAnalytics(ON);
+    await mod.applyInstanceAnalytics(OFF);
+    await settle();
+    order.length = 0;
+
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+
+    expect(order).toEqual(["clear isolation", "clear current", "init"]);
+  });
+
+  it("retries a Sentry start that failed on the next answer that says on", async () => {
+    sentryInitFailures = 1;
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+    expect(mockSentryInit).not.toHaveBeenCalled();
+
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+
+    expect(mockSentryInit).toHaveBeenCalledTimes(1);
   });
 
   it("optIn() after optOut() brings Sentry back too", async () => {
