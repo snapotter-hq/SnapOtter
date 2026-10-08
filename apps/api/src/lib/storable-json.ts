@@ -9,15 +9,19 @@ const toStorableString = (s: string): string =>
  *
  * jsonb refuses U+0000 and an unpaired UTF-16 surrogate, in keys and strings
  * alike, and a tool request can carry either, so the jobs insert failed and the
- * request answered 500. The stored copy is bookkeeping (the worker reads
- * settings from the queue's job data), so NUL is dropped, as nothing in a tool's
- * settings means it, and a lone surrogate becomes U+FFFD. Returns a copy.
+ * request answered 500. For the job row's copy of the settings, which is
+ * bookkeeping (the worker reads settings from the queue's job data), NUL is
+ * dropped, as nothing in a tool's settings means it, and a lone surrogate
+ * becomes U+FFFD. Do not use it where the stored value is read back as data:
+ * the copy is lossy, and keys that collapse to the same text keep the last
+ * one's value. Returns a copy.
  */
 export function toStorableJson<T>(value: T): T {
   if (typeof value === "string") return toStorableString(value) as T;
   if (Array.isArray(value)) return value.map(toStorableJson) as T;
   if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
+    // No prototype, so a "__proto__" key is stored as a key, not set as one.
+    const out: Record<string, unknown> = Object.create(null);
     for (const [k, v] of Object.entries(value)) out[toStorableString(k)] = toStorableJson(v);
     return out as T;
   }

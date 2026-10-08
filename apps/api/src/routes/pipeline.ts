@@ -61,6 +61,7 @@ import {
 import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
+import { toStorableJson } from "../lib/storable-json.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -736,7 +737,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               type: "pipeline-step",
               status: "queued",
               inputRefs: i === 0 ? [uploadKey] : [],
-              settings: parsedSteps[i].parsedSettings as Record<string, unknown>,
+              settings: toStorableJson(parsedSteps[i].parsedSettings as Record<string, unknown>),
             });
           }
 
@@ -1399,7 +1400,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 type: "pipeline-step",
                 status: "queued",
                 inputRefs: si === 0 ? [uploadKey] : [],
-                settings: parsedSteps[si].parsedSettings as Record<string, unknown>,
+                settings: toStorableJson(parsedSteps[si].parsedSettings as Record<string, unknown>),
               });
             }
 

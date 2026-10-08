@@ -61,6 +61,21 @@ describe("toStorableJson", () => {
     expect(input[`a${NUL}`]).toEqual([`x${HIGH}`]);
   });
 
+  it("stores a __proto__ key as a key and leaves the prototype alone", () => {
+    const out = toStorableJson(JSON.parse('{"__proto__":{"polluted":true},"scale":"log"}')) as {
+      polluted?: boolean;
+    };
+
+    expect(Object.keys(out).sort()).toEqual(["__proto__", "scale"]);
+    expect(out.polluted).toBeUndefined();
+    expect(Object.getPrototypeOf(out)).toBeNull();
+  });
+
+  it("keeps the last value when keys collapse to the same text", () => {
+    expect(toStorableJson({ [`a${NUL}b`]: 1, ab: 2 })).toEqual({ ab: 2 });
+    expect(toStorableJson({ ab: 1, [`a${NUL}b`]: 2 })).toEqual({ ab: 2 });
+  });
+
   it("returns something JSON.stringify and a jsonb column accept", () => {
     const out = JSON.stringify(toStorableJson({ [`a${NUL}`]: `x${HIGH}${NUL}` }));
     // JSON.stringify writes a lone surrogate or NUL as an escape; none may remain.

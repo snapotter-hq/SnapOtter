@@ -64,6 +64,7 @@ import {
 import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
+import { toStorableJson } from "../lib/storable-json.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
@@ -543,7 +544,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               type: "batch-child",
               status: "queued",
               inputRefs: [key],
-              settings: settings as Record<string, unknown>,
+              settings: toStorableJson(settings as Record<string, unknown>),
             });
             stagedBatch?.childIds.push(childId);
 

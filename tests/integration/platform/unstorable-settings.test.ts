@@ -3,7 +3,9 @@
  * UTF-16 surrogate in a key or string, answered 500 because Postgres jsonb
  * refuses both and the jobs insert failed. Nightly Schemathesis found it on
  * histogram, the one tool schema that keeps unknown keys. The request is now
- * accepted and the stored copy of the settings is made storable.
+ * accepted and the stored copy of the settings is made storable. The two key
+ * rows below depend on that: if histogram stops keeping unknown keys they no
+ * longer reach the insert, and the unit tests are what pin key handling.
  *
  * Status only for the old failure: the test server skips the production error
  * handler (#1243), so a 500 body here is Fastify's default, SQL text included.
@@ -81,8 +83,46 @@ describe("settings Postgres cannot store (#2177)", () => {
     // insert without relying on passthrough keys.
     const res = await post("watermark-text", { text: `Sample ${LONE_HIGH}` });
 
-    expect(res.statusCode).not.toBe(500);
+    expect(res.statusCode).toBe(200);
     const { jobId } = JSON.parse(res.body);
     expect(await storedSettings(jobId)).toMatchObject({ text: `Sample ${REPLACEMENT}` });
+  });
+
+  // Batch children and pipeline steps store the same Zod-parsed settings in the
+  // same column without going through enqueueToolJob.
+  it("a batch run stores a lone surrogate in a setting too", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ text: `Sample ${LONE_HIGH}` }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/watermark-text/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect([200, 202]).toContain(res.statusCode);
+  });
+
+  it("a pipeline run stores a lone surrogate in a step's settings too", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "watermark-text", settings: { text: `Sample ${LONE_HIGH}` } }],
+        }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect([200, 202]).toContain(res.statusCode);
   });
 });
