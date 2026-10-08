@@ -311,9 +311,10 @@ export function EraseObjectSettings({
       // Drops this file where it stands. The error only settles the promise:
       // the batch has already decided to write nothing more for it.
       onStoppable(() => {
+        // First, so a teardown step that throws can't leave the job running.
+        if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
         stopProgress();
         abandon(new Error("Erase Object batch stopped"));
-        if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });

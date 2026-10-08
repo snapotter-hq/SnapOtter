@@ -205,10 +205,10 @@ export function ocrOneFile(
     callbacks.onStoppable?.(() => {
       // Only a file the server queued has a job to cancel, and only one that is
       // still unsettled has a job still running (#2093).
-      const cancelJob = asyncMode && !settled;
+      // Posted first, so a teardown step that throws can't leave the job running.
+      if (asyncMode && !settled) void cancelAbandonedJob(clientJobId, "ocr");
       rejectOnce(new Error("OCR scan stopped"));
       xhr.abort();
-      if (cancelJob) void cancelAbandonedJob(clientJobId, "ocr");
     });
     xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
     for (const [key, value] of formatHeaders()) {
