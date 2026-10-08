@@ -877,7 +877,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     // Actually, let's use processFiles and then fetch the job info.
     // Phase 1 is always an intermediate here: the Phase 2 effects request owns
     // the library save (#565), so never auto-save the transparent result.
-    processFiles(files, { model: settings.model }, { skipLibrarySave: true });
+    // The sidecar options ride on this request: Phase 2 can't apply them.
+    const phase1Settings: Record<string, unknown> = { model: settings.model };
+    if (settings.edgeRefine != null) phase1Settings.edgeRefine = settings.edgeRefine;
+    if (settings.decontaminate != null) phase1Settings.decontaminate = settings.decontaminate;
+    processFiles(files, phase1Settings, { skipLibrarySave: true });
   };
 
   // After processFiles completes, extract jobId from downloadUrl

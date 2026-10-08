@@ -4,7 +4,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const deployment = vi.hoisted(() => ({ basePath: "", downloadUrl: null as string | null }));
+const deployment = vi.hoisted(() => ({
+  basePath: "",
+  downloadUrl: null as string | null,
+  // Phase 1 not run yet: no result, so the submit button is what renders.
+  beforeRun: false,
+  processFiles: vi.fn(),
+}));
 
 // Phase 1 (background removal) is "done": the processor exposes a mask PNG
 // download URL and is no longer processing, so the wrapper renders its
@@ -12,12 +18,13 @@ const deployment = vi.hoisted(() => ({ basePath: "", downloadUrl: null as string
 // chosen output format; Phase 1 always emits PNG.
 vi.mock("@/hooks/use-tool-processor", () => ({
   useToolProcessor: () => ({
-    processFiles: vi.fn(),
+    processFiles: deployment.processFiles,
     processAllFiles: vi.fn(),
     processing: false,
     error: null,
-    downloadUrl:
-      deployment.downloadUrl ?? `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`,
+    downloadUrl: deployment.beforeRun
+      ? null
+      : (deployment.downloadUrl ?? `${deployment.basePath}/api/v1/download/JOB123/pic_mask.png`),
     originalSize: 1000,
     processedSize: 500,
     progress: { phase: "idle", percent: 0, stage: "", elapsed: 0 },
@@ -43,7 +50,44 @@ afterEach(() => {
   vi.unstubAllGlobals();
   deployment.basePath = "";
   deployment.downloadUrl = null;
+  deployment.beforeRun = false;
+  deployment.processFiles.mockReset();
   useFileStore.getState().setFiles([]);
+});
+
+// The single-file page sent only the model to Phase 1, while the batch and
+// pipeline paths sent every setting. Edge smoothing and decontamination are
+// sidecar options that Phase 2 can't apply, so they have to ride on the
+// Phase 1 request (#2077).
+describe("remove-background Phase 1 request (#2077)", () => {
+  it("sends edge smoothing and decontamination for a single file", async () => {
+    deployment.beforeRun = true;
+    render(<RemoveBgSettings />);
+
+    fireEvent.click(await screen.findByText("Effects"));
+    fireEvent.change(await screen.findByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [, settings, options] = deployment.processFiles.mock.calls[0];
+    expect(settings).toMatchObject({ edgeRefine: 3, decontaminate: true });
+    expect(options).toEqual({ skipLibrarySave: true });
+  });
+
+  it("sends only the model when the refinements are left at their defaults", async () => {
+    deployment.beforeRun = true;
+    render(<RemoveBgSettings />);
+
+    fireEvent.click(await screen.findByTestId("remove-background-submit"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    const [, settings] = deployment.processFiles.mock.calls[0];
+    expect(settings).not.toHaveProperty("edgeRefine");
+    expect(settings).not.toHaveProperty("decontaminate");
+  });
 });
 
 describe("remove-background output format routing (#720)", () => {
