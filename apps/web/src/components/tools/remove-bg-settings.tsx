@@ -88,19 +88,36 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 // ── Shared controls (used by both standalone page and pipeline steps) ──
 
+/** The pipeline step's controls: a step has no upload to carry a background image. */
+export function RemoveBgPipelineControls(props: RemoveBgControlsProps) {
+  return <RemoveBgControls {...props} allowImageBackground={false} />;
+}
+
 export interface RemoveBgControlsProps {
   settings: Record<string, unknown>;
   onChange: (settings: Record<string, unknown>) => void;
+  /**
+   * A background image is an uploaded file, which pipelines and multi-file
+   * runs have no way to carry; the server answers 400 for it there (#1047).
+   * False hides the option and treats a stored "image" as transparent.
+   */
+  allowImageBackground?: boolean;
 }
 
-export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) {
+export function RemoveBgControls({
+  settings,
+  onChange,
+  allowImageBackground = true,
+}: RemoveBgControlsProps) {
   const { t } = useTranslation();
   const [subject, setSubject] = useState<SubjectType>("people");
   const [quality, setQuality] = useState<Quality>("balanced");
   const [isPassport, setIsPassport] = useState(true);
 
   // Background
-  const [bgType, setBgType] = useState<BackgroundType>("transparent");
+  const [chosenBgType, setBgType] = useState<BackgroundType>("transparent");
+  const bgType: BackgroundType =
+    chosenBgType === "image" && !allowImageBackground ? "transparent" : chosenBgType;
   const [bgColor, setBgColor] = useState("#FFFFFF");
   const [gradColor1, setGradColor1] = useState("#667eea");
   const [gradColor2, setGradColor2] = useState("#764ba2");
@@ -311,12 +328,14 @@ export function RemoveBgControls({ settings, onChange }: RemoveBgControlsProps) 
             gradient={{ color1: gradColor1, color2: gradColor2 }}
             label={t.toolSettings["remove-bg"].gradient}
           />
-          <BgTypeButton
-            active={bgType === "image"}
-            onClick={() => setBgType("image")}
-            label={t.toolSettings["remove-bg"].image}
-            isImage
-          />
+          {allowImageBackground && (
+            <BgTypeButton
+              active={bgType === "image"}
+              onClick={() => setBgType("image")}
+              label={t.toolSettings["remove-bg"].image}
+              isImage
+            />
+          )}
         </div>
 
         {/* Color options */}
@@ -969,7 +988,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
   return (
     <div className="space-y-4">
-      <RemoveBgControls settings={settings} onChange={setSettings} />
+      <RemoveBgControls
+        settings={settings}
+        onChange={setSettings}
+        allowImageBackground={files.length <= 1}
+      />
 
       {/* Errors */}
       {error && <p className="text-xs text-destructive-ink">{error}</p>}

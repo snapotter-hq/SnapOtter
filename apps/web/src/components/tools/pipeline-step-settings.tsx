@@ -44,7 +44,7 @@ const CONTROLS: Record<string, React.LazyExoticComponent<React.FC<ControlProps>>
     import("./enhance-faces-settings").then((m) => ({ default: m.EnhanceFacesControls })),
   ),
   "remove-background": lazy(() =>
-    import("./remove-bg-settings").then((m) => ({ default: m.RemoveBgControls })),
+    import("./remove-bg-settings").then((m) => ({ default: m.RemoveBgPipelineControls })),
   ),
   "noise-removal": lazy(() =>
     import("./noise-removal-settings").then((m) => ({ default: m.NoiseRemovalControls })),
