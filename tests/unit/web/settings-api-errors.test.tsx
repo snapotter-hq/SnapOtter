@@ -64,6 +64,26 @@ function apiError(status: number, code?: string, extra: Record<string, unknown> 
   return new ApiError(SERVER_TEXT, status, code, { error: SERVER_TEXT, code, ...extra });
 }
 
+/**
+ * A password breaking three rules at once, as the server lists them since
+ * #1569: the settings screens used to name only the first (#2090).
+ */
+const manyRulesRefusal = () =>
+  apiError(400, "VALIDATION_ERROR", {
+    rule: "minLength",
+    rules: ["minLength", "digit", "special"],
+    minLength: 12,
+  });
+const MANY_RULES_MESSAGES = [
+  format(de.errors.passwordTooShort, { minLength: 12 }),
+  de.errors.passwordNeedsDigit,
+  de.errors.passwordNeedsSpecial,
+];
+const listedMessages = (alert: HTMLElement) =>
+  within(alert)
+    .getAllByRole("listitem")
+    .map((item) => item.textContent);
+
 type Case = [name: string, err: ApiError, expected: string];
 
 /** One table row, named by the status and code it rejects with. */
@@ -172,6 +192,25 @@ describe("Security: change password", () => {
     apiPost.mockRejectedValueOnce(apiError(500));
     await submit();
     await expectShown(s.security.changeFailed);
+  });
+
+  it("lists every broken rule at once instead of one per retry (#2090)", async () => {
+    apiPost.mockRejectedValueOnce(manyRulesRefusal());
+    await submit("ab");
+
+    expect(listedMessages(await screen.findByRole("alert"))).toEqual(MANY_RULES_MESSAGES);
+    expect(screen.queryByText(SERVER_TEXT)).toBeNull();
+  });
+
+  it("keeps a single broken rule as plain text, not a one-item list", async () => {
+    apiPost.mockRejectedValueOnce(
+      apiError(400, "VALIDATION_ERROR", { rule: "digit", rules: ["digit"] }),
+    );
+    await submit("NoDigitsHere");
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(de.errors.passwordNeedsDigit);
+    expect(within(alert).queryByRole("list")).toBeNull();
   });
 });
 
@@ -410,6 +449,26 @@ describe("People", () => {
       expect(input.closest("form")).not.toContainElement(banner);
       expect(within(input.closest("form") as HTMLFormElement).queryByRole("alert")).toBeNull();
     });
+  });
+
+  it("adding a user lists every broken password rule at once (#2090)", async () => {
+    apiPost.mockRejectedValueOnce(manyRulesRefusal());
+    await openAddForm();
+
+    expect(listedMessages(await screen.findByRole("alert"))).toEqual(MANY_RULES_MESSAGES);
+    expect(screen.queryByText(SERVER_TEXT)).toBeNull();
+  });
+
+  it("resetting a password lists every broken rule inside the form (#2090)", async () => {
+    apiPost.mockRejectedValueOnce(manyRulesRefusal());
+    await openUserMenu(s.people.resetPasswordAction);
+    const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+    fireEvent.change(input, { target: { value: "ab" } });
+    fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+    const form = input.closest("form") as HTMLFormElement;
+    expect(listedMessages(await within(form).findByRole("alert"))).toEqual(MANY_RULES_MESSAGES);
+    expect(screen.queryByText(SERVER_TEXT)).toBeNull();
   });
 
   it.each([

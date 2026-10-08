@@ -57,13 +57,14 @@ import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { logout } from "@/lib/logout";
-import { passwordErrorMessage } from "@/lib/password-errors";
+import { passwordErrorMessages } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { ErrorMessages } from "../common/error-messages";
 import { OtterLogo } from "../common/otter-logo";
 import { AdminInstallFeedbackCard } from "../feedback/admin-install-feedback-card";
 import { FeedbackDialog } from "../feedback/feedback-dialog";
@@ -937,31 +938,37 @@ export function SecuritySection() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // `messages` is a list because a password can break several policy rules at
+  // once, and the server names them all (#2090).
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    messages: string[];
+  } | null>(null);
 
   const handleChangePassword = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (newPassword !== confirmPassword) {
-        setMessage({ type: "error", text: t.settings.security.passwordsMismatch });
+        setMessage({ type: "error", messages: [t.settings.security.passwordsMismatch] });
         return;
       }
       setSubmitting(true);
       setMessage(null);
       try {
         await apiPost("/auth/change-password", { currentPassword, newPassword });
-        setMessage({ type: "success", text: t.settings.security.changeSuccess });
+        setMessage({ type: "success", messages: [t.settings.security.changeSuccess] });
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } catch (err) {
         // The server knows the password policy (the length rule included), so
         // its named rule answers here, in the user's language (#1445).
+        const passwordMessages =
+          err instanceof ApiError ? passwordErrorMessages(t, err.status, err.body) : [];
         setMessage({
           type: "error",
-          text:
-            (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
-            t.settings.security.changeFailed,
+          messages:
+            passwordMessages.length > 0 ? passwordMessages : [t.settings.security.changeFailed],
         });
       } finally {
         setSubmitting(false);
@@ -1057,16 +1064,14 @@ export function SecuritySection() {
           </div>
 
           {message && (
-            <p
+            <ErrorMessages
               id="password-change-error"
-              role="alert"
+              messages={message.messages}
               className={cn(
                 "text-sm",
                 message.type === "error" ? "text-destructive" : "text-success-ink",
               )}
-            >
-              {message.text}
-            </p>
+            />
           )}
 
           <button
@@ -1471,7 +1476,7 @@ export function PeopleSection() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("user");
   const [newTeam, setNewTeam] = useState("Default");
-  const [addError, setAddError] = useState<string | null>(null);
+  const [addErrors, setAddErrors] = useState<string[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [showGeneratedPw, setShowGeneratedPw] = useState(false);
   const [pwCopy, setPwCopy] = useState<"copied" | "failed" | null>(null);
@@ -1483,7 +1488,7 @@ export function PeopleSection() {
   const [resetPassword, setResetPassword] = useState("");
   // Why the server refused the password, shown in the reset form until the next
   // edit; the banner's three seconds are too easy to miss (#2025).
-  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetErrors, setResetErrors] = useState<string[] | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
@@ -1571,10 +1576,10 @@ export function PeopleSection() {
   const handleAddUser = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      setAddError(null);
+      setAddErrors(null);
       // The server's refusal names no rule, so check here and say which (#1445).
       if (!isValidUsername(newUsername)) {
-        setAddError(t.settings.people.usernameInvalid);
+        setAddErrors([t.settings.people.usernameInvalid]);
         return;
       }
       setAdding(true);
@@ -1600,18 +1605,26 @@ export function PeopleSection() {
         if (err instanceof ApiError && typeof err.body.minLength === "number") {
           setPolicyMinLength(err.body.minLength);
         }
-        setAddError(
-          (err instanceof ApiError && passwordErrorMessage(t, err.status, err.body)) ||
-            apiErrorMessage(
-              t,
-              err,
-              {
-                USER_LIMIT_REACHED: format(t.settings.people.userLimitReached, { max: maxUsers }),
-                CONFLICT: t.settings.people.usernameTaken,
-                ESCALATION_DENIED: t.errors.escalationDenied,
-              },
-              t.settings.people.createFailed,
-            ),
+        // Every rule the password broke, since the server lists them (#2090).
+        const passwordMessages =
+          err instanceof ApiError ? passwordErrorMessages(t, err.status, err.body) : [];
+        setAddErrors(
+          passwordMessages.length > 0
+            ? passwordMessages
+            : [
+                apiErrorMessage(
+                  t,
+                  err,
+                  {
+                    USER_LIMIT_REACHED: format(t.settings.people.userLimitReached, {
+                      max: maxUsers,
+                    }),
+                    CONFLICT: t.settings.people.usernameTaken,
+                    ESCALATION_DENIED: t.errors.escalationDenied,
+                  },
+                  t.settings.people.createFailed,
+                ),
+              ],
         );
       } finally {
         setAdding(false);
@@ -1687,7 +1700,7 @@ export function PeopleSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!resetPasswordUser) return;
-      setResetError(null);
+      setResetErrors(null);
       try {
         await apiPost(`/auth/users/${resetPasswordUser.id}/reset-password`, {
           newPassword: resetPassword,
@@ -1700,12 +1713,12 @@ export function PeopleSection() {
         // else (a denied escalation, a rate limit, a server fault) is about the
         // request, not the value: editing the password can't fix it, so it
         // keeps the banner.
-        const passwordMessage =
-          err instanceof ApiError &&
-          err.code === "VALIDATION_ERROR" &&
-          passwordErrorMessage(t, err.status, err.body);
-        if (passwordMessage) {
-          setResetError(passwordMessage);
+        const passwordMessages =
+          err instanceof ApiError && err.code === "VALIDATION_ERROR"
+            ? passwordErrorMessages(t, err.status, err.body)
+            : [];
+        if (passwordMessages.length > 0) {
+          setResetErrors(passwordMessages);
           // The banner may still hold the last submit's outcome.
           setActionMsg(null);
         } else {
@@ -1798,7 +1811,7 @@ export function PeopleSection() {
           type="button"
           onClick={() => {
             setShowAddForm(!showAddForm);
-            setAddError(null);
+            setAddErrors(null);
           }}
           disabled={atLimit && !showAddForm}
           className={cn(
@@ -1961,7 +1974,7 @@ export function PeopleSection() {
                 // Reset the field values too, so re-opening the form is clean.
                 setNewUsername("");
                 setNewPassword("");
-                setAddError(null);
+                setAddErrors(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
@@ -1974,11 +1987,7 @@ export function PeopleSection() {
               {t.settings.people.copyPasswordWarning}
             </p>
           )}
-          {addError && (
-            <p role="alert" className="text-sm text-destructive">
-              {addError}
-            </p>
-          )}
+          {addErrors && <ErrorMessages messages={addErrors} className="text-sm text-destructive" />}
         </form>
       )}
 
@@ -2060,7 +2069,7 @@ export function PeopleSection() {
               value={resetPassword}
               onChange={(e) => {
                 setResetPassword(e.target.value);
-                setResetError(null);
+                setResetErrors(null);
               }}
               placeholder={t.settings.people.newPasswordLabel}
               required
@@ -2077,17 +2086,15 @@ export function PeopleSection() {
               onClick={() => {
                 setResetPasswordUser(null);
                 setResetPassword("");
-                setResetError(null);
+                setResetErrors(null);
               }}
               className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
             >
               {t.common.cancel}
             </button>
           </div>
-          {resetError && (
-            <p role="alert" className="text-sm text-destructive">
-              {resetError}
-            </p>
+          {resetErrors && (
+            <ErrorMessages messages={resetErrors} className="text-sm text-destructive" />
           )}
           <p className="text-xs text-muted-foreground">{t.settings.people.resetPasswordWarning}</p>
         </form>
@@ -2245,7 +2252,7 @@ export function PeopleSection() {
                         onClick={() => {
                           setResetPasswordUser(u);
                           setResetPassword("");
-                          setResetError(null);
+                          setResetErrors(null);
                           setOpenMenuId(null);
                         }}
                         className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
