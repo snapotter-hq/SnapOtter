@@ -67,6 +67,8 @@ export function initAnalytics(config: AnalyticsConfig): Promise<void> {
 }
 
 async function startAnalytics(config: AnalyticsConfig): Promise<void> {
+  // Before any await, so an opt-out mid-start can't leave optIn() without it.
+  if (config.sentryDsnWeb) sentryConfig = config;
   if (!config.posthogApiKey) {
     // Web-DSN-only bake: no PostHog key, so skip the PostHog SDK entirely
     // (mirrors the API guard) instead of feeding it an empty key. Still mark
@@ -164,14 +166,13 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
       app_version: (await import("@snapotter/shared")).APP_VERSION,
     };
     if (config.instanceId) superProps.instance_id = config.instanceId;
-    if (!wanted) return; // opted out while it loaded; optOut() already stopped PostHog
+    // Registered even if an opt-out landed meanwhile: it only stores them
+    // locally, and a re-enable resumes this same instance, which needs them.
     posthog.register(superProps);
   }
 
-  if (config.sentryDsnWeb) {
-    sentryConfig = config;
-    await startSentry(config);
-  }
+  // startSentry() itself stops short if the tab was opted out by now.
+  if (sentryConfig) await startSentry(sentryConfig);
 
   // Replay crashes captured before Sentry was ready. Not after an opt-out:
   // optOut() already threw the buffer away (#2197).
@@ -309,8 +310,10 @@ export async function applyInstanceAnalytics(config: AnalyticsConfig | null): Pr
   }
   // Off, including a start still in flight (#2197).
   if (enabled || starting) optOut();
-  // Off from the start: nothing buffered may ever leave this tab.
-  else discardEarlyErrors();
+  // Off from the start: nothing buffered may ever leave this tab. A null
+  // setting is unknown (the first fetch failed), not off, so the buffer stays
+  // for a later answer to decide (#2196).
+  else if (config) discardEarlyErrors();
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */

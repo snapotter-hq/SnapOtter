@@ -123,6 +123,38 @@ describe("analytics lifecycle (#2197)", () => {
     expect(instance.opt_in_capturing).toHaveBeenCalledTimes(2);
   });
 
+  it("brings Sentry back after an opt-out that landed once PostHog was up", async () => {
+    // The opt-out arrives right after posthog.init, while the start is still
+    // loading what it registers as super properties.
+    mockPosthogInit.mockImplementationOnce(() => {
+      queueMicrotask(() => mod.optOut());
+      return posthogInstance();
+    });
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+    expect(mockSentryInit).not.toHaveBeenCalled();
+
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+
+    expect(mod.isTelemetryEnabled()).toBe(true);
+    expect(mockSentryInit).toHaveBeenCalledTimes(1);
+    const instance = mockPosthogInit.mock.results[0]?.value;
+    expect(instance.register).toHaveBeenCalled();
+  });
+
+  it("keeps errors for later when the setting couldn't be loaded", async () => {
+    early.startEarlyErrorCapture();
+    const err = new Error("before the setting");
+    window.dispatchEvent(new ErrorEvent("error", { error: err }));
+
+    await mod.applyInstanceAnalytics(null);
+    await mod.applyInstanceAnalytics(ON);
+    await settle();
+
+    expect(mockCaptureException).toHaveBeenCalledWith(err);
+  });
+
   it("optIn() after optOut() brings Sentry back too", async () => {
     await mod.initAnalytics(ON);
     mod.optOut();

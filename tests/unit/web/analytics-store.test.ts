@@ -57,6 +57,27 @@ describe("analytics store fetchConfig", () => {
     expect(useAnalyticsStore.getState().configLoaded).toBe(true);
   });
 
+  it("ignores an answer that arrives after a newer one was asked for (#2197)", async () => {
+    // The first fetch's answer (still on) is held until the second (off) has
+    // landed, the way a slow refetch can lose a race with the admin's save.
+    let releaseStale: (r: Response) => void = () => {};
+    const stale = new Promise<Response>((resolve) => {
+      releaseStale = resolve;
+    });
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+    vi.spyOn(globalThis, "fetch")
+      .mockReturnValueOnce(stale)
+      .mockResolvedValueOnce(json({ ...ON, enabled: false }));
+
+    const first = useAnalyticsStore.getState().fetchConfig();
+    await useAnalyticsStore.getState().fetchConfig();
+    releaseStale(json(ON));
+    await first;
+
+    expect(useAnalyticsStore.getState().config?.enabled).toBe(false);
+  });
+
   it("takes an instance-wide opt-out the server reports", async () => {
     respond(200, ON);
     await useAnalyticsStore.getState().fetchConfig();
