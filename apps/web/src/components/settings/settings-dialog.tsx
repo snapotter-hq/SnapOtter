@@ -1103,6 +1103,7 @@ function securitySettingLabel(t: TranslationKeys, key: string): string | undefin
     ssoBreakGlassUsername: t.settings.security.ssoBreakGlassUsername,
     passwordMinLength: t.settings.security.passwordMinLength,
     passwordRequireUppercase: t.settings.security.passwordRequireUppercase,
+    passwordRequireLowercase: t.settings.security.passwordRequireLowercase,
     passwordRequireDigit: t.settings.security.passwordRequireNumber,
     passwordRequireSpecial: t.settings.security.passwordRequireSpecial,
   };
@@ -1309,7 +1310,7 @@ export function AdminSecuritySettings() {
           onChange={(v) => updateSetting("passwordMinLength", v)}
           aria-label={t.settings.security.passwordMinLength}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground w-24"
-          min={8}
+          min={1}
           max={128}
         />
       </SettingRow>
@@ -1338,6 +1339,35 @@ export function AdminSecuritySettings() {
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
               settings.passwordRequireUppercase !== "false" ? "translate-x-6" : "translate-x-1",
+            )}
+          />
+        </button>
+      </SettingRow>
+
+      <SettingRow
+        label={t.settings.security.passwordRequireLowercase}
+        description={t.settings.security.passwordRequireLowercaseDesc}
+      >
+        <button
+          type="button"
+          role="switch"
+          aria-checked={settings.passwordRequireLowercase !== "false"}
+          aria-label={t.settings.security.passwordRequireLowercase}
+          onClick={() =>
+            updateSetting(
+              "passwordRequireLowercase",
+              settings.passwordRequireLowercase === "false" ? "true" : "false",
+            )
+          }
+          className={cn(
+            "w-11 h-6 rounded-full transition-colors relative",
+            settings.passwordRequireLowercase !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+          )}
+        >
+          <span
+            className={cn(
+              "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
+              settings.passwordRequireLowercase !== "false" ? "translate-x-6" : "translate-x-1",
             )}
           />
         </button>
@@ -1786,7 +1816,6 @@ export function PeopleSection() {
                 }}
                 placeholder={t.auth.password}
                 required
-                minLength={8}
                 className={cn(
                   "flex-1 min-w-0 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground",
                   showGeneratedPw && "font-mono",
@@ -1991,7 +2020,6 @@ export function PeopleSection() {
               onChange={(e) => setResetPassword(e.target.value)}
               placeholder={t.settings.people.newPasswordLabel}
               required
-              minLength={8}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60"
             />
             <button

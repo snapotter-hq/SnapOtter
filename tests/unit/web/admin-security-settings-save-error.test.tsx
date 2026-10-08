@@ -46,14 +46,36 @@ describe("AdminSecuritySettings save errors", () => {
     expect(message).toHaveClass("text-destructive");
   });
 
-  it("enforces the API minimum password length of 8", async () => {
+  it("matches the API minimum password length of 1 (#1028)", async () => {
     render(<AdminSecuritySettings />);
     await waitFor(() => expect(apiGet).toHaveBeenCalled());
 
     // The form renders only after the settings load settles, so wait for it
     // rather than reading it as soon as the request is sent (#1785).
     const input = await screen.findByLabelText("Minimum Password Length");
-    expect(input).toHaveAttribute("min", "8");
+    expect(input).toHaveAttribute("min", "1");
+  });
+
+  it("lets an admin switch the lowercase rule off and saves it (#1028)", async () => {
+    apiPut.mockResolvedValue({});
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    const toggle = await screen.findByRole("switch", {
+      name: en.settings.security.passwordRequireLowercase,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith(
+        "/v1/settings",
+        expect.objectContaining({ passwordRequireLowercase: "false" }),
+      ),
+    );
   });
 
   it("falls back to a generic message when the save rejects with a non-Error value", async () => {

@@ -4940,6 +4940,8 @@ export const vi: TranslationKeys = {
       passwordMinLengthDesc: "Số ký tự tối thiểu yêu cầu cho mật khẩu.",
       passwordRequireUppercase: "Yêu cầu chữ hoa",
       passwordRequireUppercaseDesc: "Yêu cầu ít nhất một chữ cái viết hoa.",
+      passwordRequireLowercase: "Yêu cầu chữ thường",
+      passwordRequireLowercaseDesc: "Yêu cầu ít nhất một chữ cái viết thường.",
       passwordRequireNumber: "Yêu cầu chữ số",
       passwordRequireNumberDesc: "Yêu cầu ít nhất một chữ số.",
       passwordRequireSpecial: "Yêu cầu ký tự đặc biệt",

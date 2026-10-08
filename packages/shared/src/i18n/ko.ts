@@ -4875,6 +4875,8 @@ export const ko: TranslationKeys = {
       passwordMinLengthDesc: "비밀번호에 필요한 최소 문자 수입니다.",
       passwordRequireUppercase: "대문자 필수",
       passwordRequireUppercaseDesc: "대문자를 하나 이상 포함해야 합니다.",
+      passwordRequireLowercase: "소문자 필수",
+      passwordRequireLowercaseDesc: "소문자를 하나 이상 포함해야 합니다.",
       passwordRequireNumber: "숫자 필수",
       passwordRequireNumberDesc: "숫자를 하나 이상 포함해야 합니다.",
       passwordRequireSpecial: "특수 문자 필수",

@@ -4975,6 +4975,8 @@ export const fr: TranslationKeys = {
       passwordMinLengthDesc: "Nombre minimal de caractères requis pour les mots de passe.",
       passwordRequireUppercase: "Majuscule requise",
       passwordRequireUppercaseDesc: "Exiger au moins une lettre majuscule.",
+      passwordRequireLowercase: "Minuscule requise",
+      passwordRequireLowercaseDesc: "Exiger au moins une lettre minuscule.",
       passwordRequireNumber: "Chiffre requis",
       passwordRequireNumberDesc: "Exiger au moins un chiffre.",
       passwordRequireSpecial: "Caractère spécial requis",

@@ -4667,6 +4667,8 @@ export const zhTW: TranslationKeys = {
       passwordMinLengthDesc: "密碼所需的最少字元數。",
       passwordRequireUppercase: "需要大寫字母",
       passwordRequireUppercaseDesc: "需要至少一個大寫字母。",
+      passwordRequireLowercase: "需要小寫字母",
+      passwordRequireLowercaseDesc: "需要至少一個小寫字母。",
       passwordRequireNumber: "需要數字",
       passwordRequireNumberDesc: "需要至少一個數字。",
       passwordRequireSpecial: "需要特殊字元",

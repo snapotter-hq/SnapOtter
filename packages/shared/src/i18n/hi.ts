@@ -4743,6 +4743,8 @@ export const hi: TranslationKeys = {
       passwordMinLengthDesc: "पासवर्ड के लिए आवश्यक न्यूनतम अक्षर संख्या।",
       passwordRequireUppercase: "अपरकेस आवश्यक",
       passwordRequireUppercaseDesc: "कम से कम एक अपरकेस अक्षर आवश्यक।",
+      passwordRequireLowercase: "लोअरकेस आवश्यक",
+      passwordRequireLowercaseDesc: "कम से कम एक लोअरकेस अक्षर आवश्यक।",
       passwordRequireNumber: "संख्या आवश्यक",
       passwordRequireNumberDesc: "कम से कम एक संख्या आवश्यक।",
       passwordRequireSpecial: "विशेष वर्ण आवश्यक",

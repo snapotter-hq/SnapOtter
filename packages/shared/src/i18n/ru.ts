@@ -4955,6 +4955,8 @@ export const ru: TranslationKeys = {
       passwordMinLengthDesc: "Минимальное количество символов в пароле.",
       passwordRequireUppercase: "Требовать заглавные буквы",
       passwordRequireUppercaseDesc: "Требовать хотя бы одну заглавную букву.",
+      passwordRequireLowercase: "Требовать строчные буквы",
+      passwordRequireLowercaseDesc: "Требовать хотя бы одну строчную букву.",
       passwordRequireNumber: "Требовать цифры",
       passwordRequireNumberDesc: "Требовать хотя бы одну цифру.",
       passwordRequireSpecial: "Требовать спецсимволы",

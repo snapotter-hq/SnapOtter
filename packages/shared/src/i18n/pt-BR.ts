@@ -4961,6 +4961,8 @@ export const ptBR: TranslationKeys = {
       passwordMinLengthDesc: "Número mínimo de caracteres exigido para senhas.",
       passwordRequireUppercase: "Exigir maiúscula",
       passwordRequireUppercaseDesc: "Exigir pelo menos uma letra maiúscula.",
+      passwordRequireLowercase: "Exigir minúscula",
+      passwordRequireLowercaseDesc: "Exigir pelo menos uma letra minúscula.",
       passwordRequireNumber: "Exigir número",
       passwordRequireNumberDesc: "Exigir pelo menos um número.",
       passwordRequireSpecial: "Exigir caractere especial",

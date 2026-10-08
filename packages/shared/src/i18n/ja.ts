@@ -4899,6 +4899,8 @@ export const ja: TranslationKeys = {
       passwordMinLengthDesc: "パスワードに必要な最小文字数です。",
       passwordRequireUppercase: "大文字を必須にする",
       passwordRequireUppercaseDesc: "大文字を1文字以上含める必要があります。",
+      passwordRequireLowercase: "小文字を必須にする",
+      passwordRequireLowercaseDesc: "小文字を1文字以上含める必要があります。",
       passwordRequireNumber: "数字を必須にする",
       passwordRequireNumberDesc: "数字を1文字以上含める必要があります。",
       passwordRequireSpecial: "特殊文字を必須にする",

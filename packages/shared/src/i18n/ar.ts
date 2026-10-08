@@ -4913,6 +4913,8 @@ export const ar: TranslationKeys = {
       passwordMinLengthDesc: "الحد الأدنى لعدد الأحرف المطلوبة لكلمات المرور.",
       passwordRequireUppercase: "طلب أحرف كبيرة",
       passwordRequireUppercaseDesc: "طلب حرف كبير واحد على الأقل.",
+      passwordRequireLowercase: "طلب أحرف صغيرة",
+      passwordRequireLowercaseDesc: "طلب حرف صغير واحد على الأقل.",
       passwordRequireNumber: "طلب رقم",
       passwordRequireNumberDesc: "طلب رقم واحد على الأقل.",
       passwordRequireSpecial: "طلب حرف خاص",

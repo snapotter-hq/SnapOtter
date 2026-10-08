@@ -4882,6 +4882,8 @@ export const en = {
       passwordMinLengthDesc: "Minimum number of characters required for passwords.",
       passwordRequireUppercase: "Require Uppercase",
       passwordRequireUppercaseDesc: "Require at least one uppercase letter.",
+      passwordRequireLowercase: "Require Lowercase",
+      passwordRequireLowercaseDesc: "Require at least one lowercase letter.",
       passwordRequireNumber: "Require Number",
       passwordRequireNumberDesc: "Require at least one number.",
       passwordRequireSpecial: "Require Special Character",

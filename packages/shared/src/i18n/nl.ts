@@ -4966,6 +4966,8 @@ export const nl: TranslationKeys = {
       passwordMinLengthDesc: "Minimaal aantal tekens vereist voor wachtwoorden.",
       passwordRequireUppercase: "Hoofdletter vereist",
       passwordRequireUppercaseDesc: "Minimaal een hoofdletter vereist.",
+      passwordRequireLowercase: "Kleine letter vereist",
+      passwordRequireLowercaseDesc: "Minimaal een kleine letter vereist.",
       passwordRequireNumber: "Cijfer vereist",
       passwordRequireNumberDesc: "Minimaal een cijfer vereist.",
       passwordRequireSpecial: "Speciaal teken vereist",

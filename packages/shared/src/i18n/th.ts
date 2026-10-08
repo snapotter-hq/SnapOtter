@@ -4890,6 +4890,8 @@ export const th: TranslationKeys = {
       passwordMinLengthDesc: "จำนวนอักขระขั้นต่ำที่ต้องมีสำหรับรหัสผ่าน",
       passwordRequireUppercase: "ต้องมีตัวพิมพ์ใหญ่",
       passwordRequireUppercaseDesc: "ต้องมีตัวอักษรพิมพ์ใหญ่อย่างน้อยหนึ่งตัว",
+      passwordRequireLowercase: "ต้องมีตัวพิมพ์เล็ก",
+      passwordRequireLowercaseDesc: "ต้องมีตัวอักษรพิมพ์เล็กอย่างน้อยหนึ่งตัว",
       passwordRequireNumber: "ต้องมีตัวเลข",
       passwordRequireNumberDesc: "ต้องมีตัวเลขอย่างน้อยหนึ่งตัว",
       passwordRequireSpecial: "ต้องมีอักขระพิเศษ",

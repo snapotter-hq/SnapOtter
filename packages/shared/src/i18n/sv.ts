@@ -4947,6 +4947,8 @@ export const sv: TranslationKeys = {
       passwordMinLengthDesc: "Minsta antal tecken som krävs för lösenord.",
       passwordRequireUppercase: "Kräv versal",
       passwordRequireUppercaseDesc: "Kräv minst en stor bokstav.",
+      passwordRequireLowercase: "Kräv gemen",
+      passwordRequireLowercaseDesc: "Kräv minst en liten bokstav.",
       passwordRequireNumber: "Kräv siffra",
       passwordRequireNumberDesc: "Kräv minst en siffra.",
       passwordRequireSpecial: "Kräv specialtecken",

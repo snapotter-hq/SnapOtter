@@ -178,7 +178,6 @@ export function ChangePasswordPage() {
                 placeholder={t.changePassword.newPasswordPlaceholder}
                 className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${showGenerated ? "font-mono text-sm" : ""}`}
                 required
-                minLength={8}
               />
             </div>
             <div>
@@ -200,7 +199,6 @@ export function ChangePasswordPage() {
                 placeholder={t.changePassword.confirmPasswordPlaceholder}
                 className={`w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${showGenerated ? "font-mono text-sm" : ""}`}
                 required
-                minLength={8}
               />
             </div>
             {sessionEnded && (

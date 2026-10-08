@@ -4956,6 +4956,8 @@ export const uk: TranslationKeys = {
       passwordMinLengthDesc: "Мінімальна кількість символів для паролів.",
       passwordRequireUppercase: "Вимагати великі літери",
       passwordRequireUppercaseDesc: "Вимагати принаймні одну велику літеру.",
+      passwordRequireLowercase: "Вимагати малі літери",
+      passwordRequireLowercaseDesc: "Вимагати принаймні одну малу літеру.",
       passwordRequireNumber: "Вимагати цифру",
       passwordRequireNumberDesc: "Вимагати принаймні одну цифру.",
       passwordRequireSpecial: "Вимагати спеціальний символ",

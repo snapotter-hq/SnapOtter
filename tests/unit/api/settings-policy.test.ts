@@ -35,7 +35,7 @@ describe("settings policy registry", () => {
     { key: "loginAttemptLimit", input: "0" },
     { key: "loginThrottleMaxFailures", input: "-1" },
     { key: "loginThrottleWindowSeconds", input: "0" },
-    { key: "passwordMinLength", input: "7" },
+    { key: "passwordMinLength", input: "0" },
     { key: "disabledTools", input: "not-json" },
     { key: "ssoBreakGlassUsername", input: "invalid username" },
     // Number("") is 0, and 0 means unlimited or off for these keys (#1695).

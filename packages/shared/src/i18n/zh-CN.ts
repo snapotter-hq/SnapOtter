@@ -4668,6 +4668,8 @@ export const zhCN: TranslationKeys = {
       passwordMinLengthDesc: "密码所需的最少字符数。",
       passwordRequireUppercase: "要求大写字母",
       passwordRequireUppercaseDesc: "要求至少包含一个大写字母。",
+      passwordRequireLowercase: "要求小写字母",
+      passwordRequireLowercaseDesc: "要求至少包含一个小写字母。",
       passwordRequireNumber: "要求数字",
       passwordRequireNumberDesc: "要求至少包含一个数字。",
       passwordRequireSpecial: "要求特殊字符",

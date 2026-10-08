@@ -1230,6 +1230,35 @@ describe("Admin user-management guards", () => {
     }
   });
 
+  it("an admin can switch every password rule off and register a one-character password with no letters (#1028)", async () => {
+    const policy = {
+      passwordMinLength: "1",
+      passwordRequireUppercase: "false",
+      passwordRequireLowercase: "false",
+      passwordRequireDigit: "false",
+      passwordRequireSpecial: "false",
+    };
+    try {
+      const saved = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: policy,
+      });
+      expect(saved.statusCode, saved.body).toBe(200);
+
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: uid(), password: "!" },
+      });
+      expect(res.statusCode, res.body).toBe(201);
+    } finally {
+      for (const key of Object.keys(policy)) await clearSetting(key);
+    }
+  });
+
   it("register names the broken password rule too", async () => {
     const res = await testApp.app.inject({
       method: "POST",

@@ -148,7 +148,7 @@ const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
   mfaPolicy: security(z.enum(["optional", "admins_only", "required"])),
   ssoEnforcement: security(booleanSetting),
   ssoBreakGlassUsername: security(breakGlassUsernameSetting),
-  passwordMinLength: security(integerSetting(8, 128)),
+  passwordMinLength: security(integerSetting(1, 128)),
   passwordRequireUppercase: security(booleanSetting),
   passwordRequireLowercase: security(booleanSetting),
   passwordRequireDigit: security(booleanSetting),

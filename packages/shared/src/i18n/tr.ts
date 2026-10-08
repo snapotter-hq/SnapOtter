@@ -4955,6 +4955,8 @@ export const tr: TranslationKeys = {
       passwordMinLengthDesc: "Parolalar için gereken minimum karakter sayısı.",
       passwordRequireUppercase: "Büyük Harf Gerekli",
       passwordRequireUppercaseDesc: "En az bir büyük harf gerektirir.",
+      passwordRequireLowercase: "Küçük Harf Gerekli",
+      passwordRequireLowercaseDesc: "En az bir küçük harf gerektirir.",
       passwordRequireNumber: "Rakam Gerekli",
       passwordRequireNumberDesc: "En az bir rakam gerektirir.",
       passwordRequireSpecial: "Özel Karakter Gerekli",

@@ -4946,6 +4946,8 @@ export const id: TranslationKeys = {
       passwordMinLengthDesc: "Jumlah karakter minimum yang diperlukan untuk kata sandi.",
       passwordRequireUppercase: "Wajib Huruf Besar",
       passwordRequireUppercaseDesc: "Wajib mengandung minimal satu huruf besar.",
+      passwordRequireLowercase: "Wajib Huruf Kecil",
+      passwordRequireLowercaseDesc: "Wajib mengandung minimal satu huruf kecil.",
       passwordRequireNumber: "Wajib Angka",
       passwordRequireNumberDesc: "Wajib mengandung minimal satu angka.",
       passwordRequireSpecial: "Wajib Karakter Khusus",

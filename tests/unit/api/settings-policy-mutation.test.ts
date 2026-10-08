@@ -113,16 +113,16 @@ describe("prepareSetting Zod refinements", () => {
     expect(prepareSetting("loginAttemptLimit", "0")).toMatchObject({ success: false });
   });
 
-  it("accepts passwordMinLength at its lower and upper bounds (8 and 128)", () => {
-    expect(prepareSetting("passwordMinLength", "8")).toMatchObject({ success: true, value: "8" });
+  it("accepts passwordMinLength at its lower and upper bounds (1 and 128)", () => {
+    expect(prepareSetting("passwordMinLength", "1")).toMatchObject({ success: true, value: "1" });
     expect(prepareSetting("passwordMinLength", "128")).toMatchObject({
       success: true,
       value: "128",
     });
   });
 
-  it("rejects passwordMinLength just outside each bound (7 and 129)", () => {
-    expect(prepareSetting("passwordMinLength", "7")).toMatchObject({ success: false });
+  it("rejects passwordMinLength just outside each bound (0 and 129)", () => {
+    expect(prepareSetting("passwordMinLength", "0")).toMatchObject({ success: false });
     expect(prepareSetting("passwordMinLength", "129")).toMatchObject({ success: false });
   });
 
