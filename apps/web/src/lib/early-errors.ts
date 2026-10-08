@@ -48,6 +48,20 @@ export async function flushEarlyErrors(): Promise<void> {
   }
 }
 
+/**
+ * Stop buffering and throw away what was buffered. Called once telemetry is
+ * known to be off: errors from an opted-out period must never be sent, even if
+ * the instance turns telemetry back on later in this tab (#2197).
+ */
+export function discardEarlyErrors(): void {
+  if (typeof window !== "undefined" && capturing) {
+    window.removeEventListener("error", onError);
+    window.removeEventListener("unhandledrejection", onRejection);
+  }
+  capturing = false;
+  buffer.length = 0;
+}
+
 /** Test-only reset. */
 export function resetEarlyErrorsForTests(): void {
   buffer.length = 0;
