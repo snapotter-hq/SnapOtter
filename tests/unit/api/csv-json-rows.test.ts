@@ -7,7 +7,7 @@
  * names the shapes that are accepted.
  */
 import { describe, expect, it } from "vitest";
-import { jsonToRows } from "../../../apps/api/src/routes/tools/csv-json.js";
+import { jsonToRows, rowsToCsv } from "../../../apps/api/src/routes/tools/csv-json.js";
 
 describe("jsonToRows", () => {
   it("passes a top-level array of objects through", () => {
@@ -53,5 +53,30 @@ describe("jsonToRows", () => {
 
   it("rejects nested objects that are not a single array wrapper", () => {
     expect(() => jsonToRows({ a: { b: 1 } })).toThrow(/array of objects/);
+  });
+});
+
+describe("rowsToCsv", () => {
+  it("writes the union of columns and stringifies nested values", () => {
+    const csv = rowsToCsv([
+      { a: 1, n: { x: 1 } },
+      { a: 2, b: "late" },
+    ]);
+    expect(csv).toBe('a,n,b\r\n1,"{""x"":1}",\r\n2,,late');
+  });
+
+  it("keeps a __proto__ column instead of dropping it (#2062)", () => {
+    // JSON.parse makes __proto__ an own property; a plain {} would swallow the assignment.
+    const rows = jsonToRows(JSON.parse('[{"__proto__": {"a": 1}, "x": 1}]'));
+    expect(rowsToCsv(rows)).toBe('__proto__,x\r\n"{""a"":1}",1');
+  });
+
+  it("keeps a primitive __proto__ value too", () => {
+    const rows = jsonToRows(JSON.parse('[{"__proto__": 5, "x": 1}]'));
+    expect(rowsToCsv(rows)).toBe("__proto__,x\r\n5,1");
+  });
+
+  it("refuses rows with no fields", () => {
+    expect(() => rowsToCsv([{}])).toThrow(/no fields/);
   });
 });

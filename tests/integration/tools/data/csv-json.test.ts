@@ -117,6 +117,16 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(dl.payload).toContain("key1,value");
   }, 30_000);
 
+  it("keeps a __proto__ column in JSON-to-CSV (#2062)", async () => {
+    const res = await runTool("proto.json", Buffer.from('[{"__proto__": {"a": 1}, "x": 1}]'));
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.payload).toBe('__proto__,x\r\n"{""a"":1}",1');
+  }, 30_000);
+
   it("answers 400, not 422, for empty and field-less JSON rows (#1159)", async () => {
     for (const body of ['{"data": []}', "[]", "[{}]"]) {
       const res = await runTool("empty.json", Buffer.from(body));

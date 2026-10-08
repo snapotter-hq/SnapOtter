@@ -44,6 +44,30 @@ export function jsonToRows(data: unknown): Record<string, unknown>[] {
   return rows;
 }
 
+/**
+ * Flatten nested objects/arrays to JSON strings (Papa would otherwise emit
+ * "[object Object]"), and pass the union of all keys so columns appearing only
+ * in later rows are not dropped. Rows are null-prototype objects: on a `{}`
+ * literal, assigning a `__proto__` key hits the prototype setter and the column
+ * silently vanishes (#2062).
+ */
+export function rowsToCsv(rows: Record<string, unknown>[]): string {
+  const flattened = rows.map((row) => {
+    const out: Record<string, unknown> = Object.create(null);
+    for (const [k, v] of Object.entries(row)) {
+      out[k] = v !== null && typeof v === "object" ? JSON.stringify(v) : v;
+    }
+    return out;
+  });
+  const columns = Array.from(new Set(flattened.flatMap((row) => Object.keys(row))));
+  if (columns.length === 0) {
+    throw new InputValidationError(
+      "JSON rows have no fields, so there are no CSV columns to write",
+    );
+  }
+  return Papa.unparse(flattened, { columns });
+}
+
 export function registerCsvJson(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "csv-json",
@@ -66,25 +90,8 @@ export function registerCsvJson(app: FastifyInstance) {
           throw new InputValidationError(`Not valid JSON: ${msg.split("\n")[0]}`);
         }
         const rows = jsonToRows(data);
-        // Flatten nested objects/arrays to JSON strings (Papa would otherwise emit
-        // "[object Object]"), and pass the union of all keys so columns appearing
-        // only in later rows are not dropped.
-        const flattened = rows.map((row) => {
-          const out: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(row)) {
-            out[k] = v !== null && typeof v === "object" ? JSON.stringify(v) : v;
-          }
-          return out;
-        });
-        const columns = Array.from(new Set(flattened.flatMap((row) => Object.keys(row))));
-        if (columns.length === 0) {
-          throw new InputValidationError(
-            "JSON rows have no fields, so there are no CSV columns to write",
-          );
-        }
-        const csv = Papa.unparse(flattened, { columns });
         return {
-          buffer: Buffer.from(csv, "utf8"),
+          buffer: Buffer.from(rowsToCsv(rows), "utf8"),
           filename: `${base}.csv`,
           contentType: "text/csv",
         };
