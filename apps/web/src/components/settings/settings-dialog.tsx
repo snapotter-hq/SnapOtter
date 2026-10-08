@@ -56,6 +56,7 @@ import {
 import { appUrl } from "@/lib/app-url";
 import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
+import { generatePassword } from "@/lib/generate-password";
 import { logoutDestination } from "@/lib/logout-destination";
 import { passwordErrorMessage } from "@/lib/password-errors";
 import { changedSettings, writableSettings } from "@/lib/settings-payload";
@@ -1426,36 +1427,6 @@ export function AdminSecuritySettings() {
 }
 
 /* ────────────────────── People ────────────────────── */
-
-function secureRandom(max: number): number {
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  return array[0] % max;
-}
-
-function generatePassword(): string {
-  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower = "abcdefghijklmnopqrstuvwxyz";
-  const digits = "0123456789";
-  // The server policy can require a special character (passwordRequireSpecial), so
-  // always include one alongside an upper, lower, and digit; otherwise Generate can
-  // produce a password the server rejects. These specials all satisfy its check.
-  const special = "!@#$%^&*()-_=+";
-  const all = upper + lower + digits + special;
-  const required = [
-    upper[secureRandom(upper.length)],
-    lower[secureRandom(lower.length)],
-    digits[secureRandom(digits.length)],
-    special[secureRandom(special.length)],
-  ];
-  const rest = Array.from({ length: 12 }, () => all[secureRandom(all.length)]);
-  const chars = [...required, ...rest];
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = secureRandom(i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  return chars.join("");
-}
 
 export function PeopleSection() {
   const { t } = useTranslation();

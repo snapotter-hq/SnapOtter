@@ -3,6 +3,7 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { generatePassword } from "@/lib/generate-password";
 import { passwordErrorMessage } from "@/lib/password-errors";
 
 /**
@@ -41,31 +42,6 @@ function triggerBrowserPasswordSave(username: string, password: string) {
   document.body.appendChild(form);
   form.submit();
   // The form.submit() causes a full page navigation to "/", so no cleanup needed.
-}
-
-function secureRandom(max: number): number {
-  const array = new Uint32Array(1);
-  crypto.getRandomValues(array);
-  return array[0] % max;
-}
-
-function generatePassword(): string {
-  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower = "abcdefghijklmnopqrstuvwxyz";
-  const digits = "0123456789";
-  const all = upper + lower + digits;
-  const required = [
-    upper[secureRandom(upper.length)],
-    lower[secureRandom(lower.length)],
-    digits[secureRandom(digits.length)],
-  ];
-  const rest = Array.from({ length: 13 }, () => all[secureRandom(all.length)]);
-  const chars = [...required, ...rest];
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = secureRandom(i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  return chars.join("");
 }
 
 export function ChangePasswordPage() {
