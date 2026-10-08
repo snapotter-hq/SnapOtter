@@ -5650,6 +5650,7 @@ export const fr: TranslationKeys = {
     passwordNeedsLowercase: "Le mot de passe doit contenir une lettre minuscule.",
     passwordNeedsDigit: "Le mot de passe doit contenir un chiffre.",
     passwordNeedsSpecial: "Le mot de passe doit contenir un caractère spécial.",
+    passwordNoControlCharacters: "Le mot de passe ne doit pas contenir de caractères de contrôle.",
     tooManyRequests: "Trop de tentatives. Patientez une minute puis réessayez.",
     escalationDenied: "Cette action demande plus de droits que n'en a votre rôle.",
     featureNotLicensed: "Cette fonction nécessite une licence entreprise.",

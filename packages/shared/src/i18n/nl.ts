@@ -5636,6 +5636,7 @@ export const nl: TranslationKeys = {
     passwordNeedsLowercase: "Het wachtwoord moet een kleine letter bevatten.",
     passwordNeedsDigit: "Het wachtwoord moet een cijfer bevatten.",
     passwordNeedsSpecial: "Het wachtwoord moet een speciaal teken bevatten.",
+    passwordNoControlCharacters: "Het wachtwoord mag geen besturingstekens bevatten.",
     tooManyRequests: "Te veel pogingen. Wacht een minuut en probeer het opnieuw.",
     escalationDenied: "Daarvoor heb je meer rechten nodig dan je rol heeft.",
     featureNotLicensed: "Hiervoor is een enterprise-licentie nodig.",

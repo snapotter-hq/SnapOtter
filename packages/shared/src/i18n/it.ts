@@ -5633,6 +5633,7 @@ export const it: TranslationKeys = {
     passwordNeedsLowercase: "La password deve contenere una lettera minuscola.",
     passwordNeedsDigit: "La password deve contenere un numero.",
     passwordNeedsSpecial: "La password deve contenere un carattere speciale.",
+    passwordNoControlCharacters: "La password non deve contenere caratteri di controllo.",
     tooManyRequests: "Troppi tentativi. Attendi un minuto e riprova.",
     escalationDenied: "Serve un accesso superiore a quello del tuo ruolo.",
     featureNotLicensed: "Serve una licenza enterprise.",

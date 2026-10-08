@@ -5626,6 +5626,7 @@ export const ru: TranslationKeys = {
     passwordNeedsLowercase: "Пароль должен содержать строчную букву.",
     passwordNeedsDigit: "Пароль должен содержать цифру.",
     passwordNeedsSpecial: "Пароль должен содержать специальный символ.",
+    passwordNoControlCharacters: "Пароль не должен содержать управляющие символы.",
     tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
     escalationDenied: "Для этого нужно больше прав, чем есть у вашей роли.",
     featureNotLicensed: "Для этого нужна корпоративная лицензия.",

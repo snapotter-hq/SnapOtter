@@ -4,7 +4,14 @@
  * (#1446). One list for both sides: a rule added to the server without a
  * client message is a type error, not a silent generic failure.
  */
-export const PASSWORD_RULES = ["minLength", "uppercase", "lowercase", "digit", "special"] as const;
+export const PASSWORD_RULES = [
+  "minLength",
+  "uppercase",
+  "lowercase",
+  "digit",
+  "special",
+  "controlCharacter",
+] as const;
 
 export type PasswordRule = (typeof PASSWORD_RULES)[number];
 

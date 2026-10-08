@@ -107,6 +107,15 @@ interface PasswordRuleFailure {
 }
 
 async function validatePasswordStrength(password: string): Promise<PasswordRuleFailure | null> {
+  // A control character can be saved but never typed back: login refuses NUL
+  // outright and browsers strip LF and CR from password inputs (#2055).
+  if (/\p{Cc}/u.test(password)) {
+    return {
+      message: "Password must not contain control characters",
+      rule: "controlCharacter",
+    };
+  }
+
   const minLength = await getSettingNumber("passwordMinLength", 8);
   if (password.length < minLength) {
     return {

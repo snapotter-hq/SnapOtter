@@ -5310,6 +5310,7 @@ export const zhCN: TranslationKeys = {
     passwordNeedsLowercase: "密码必须包含一个小写字母。",
     passwordNeedsDigit: "密码必须包含一个数字。",
     passwordNeedsSpecial: "密码必须包含一个特殊字符。",
+    passwordNoControlCharacters: "密码不能包含控制字符。",
     tooManyRequests: "尝试次数过多。请等待一分钟后重试。",
     escalationDenied: "此操作需要超出您角色的权限。",
     featureNotLicensed: "这需要企业版许可证。",

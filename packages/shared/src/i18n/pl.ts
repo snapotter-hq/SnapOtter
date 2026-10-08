@@ -5632,6 +5632,7 @@ export const pl: TranslationKeys = {
     passwordNeedsLowercase: "Hasło musi zawierać małą literę.",
     passwordNeedsDigit: "Hasło musi zawierać cyfrę.",
     passwordNeedsSpecial: "Hasło musi zawierać znak specjalny.",
+    passwordNoControlCharacters: "Hasło nie może zawierać znaków sterujących.",
     tooManyRequests: "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
     escalationDenied: "To wymaga szerszego dostępu, niż ma twoja rola.",
     featureNotLicensed: "Wymaga to licencji enterprise.",

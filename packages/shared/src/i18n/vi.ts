@@ -5601,6 +5601,7 @@ export const vi: TranslationKeys = {
     passwordNeedsLowercase: "Mật khẩu phải chứa một chữ cái viết thường.",
     passwordNeedsDigit: "Mật khẩu phải chứa một chữ số.",
     passwordNeedsSpecial: "Mật khẩu phải chứa một ký tự đặc biệt.",
+    passwordNoControlCharacters: "Mật khẩu không được chứa ký tự điều khiển.",
     tooManyRequests: "Quá nhiều lần thử. Hãy đợi một phút rồi thử lại.",
     escalationDenied: "Việc này cần quyền truy cập cao hơn vai trò của bạn.",
     featureNotLicensed: "Tính năng này cần giấy phép doanh nghiệp.",

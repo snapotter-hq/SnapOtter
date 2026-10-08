@@ -5530,6 +5530,7 @@ export const ko: TranslationKeys = {
     passwordNeedsLowercase: "비밀번호에 소문자를 포함해야 합니다.",
     passwordNeedsDigit: "비밀번호에 숫자를 포함해야 합니다.",
     passwordNeedsSpecial: "비밀번호에 특수 문자를 포함해야 합니다.",
+    passwordNoControlCharacters: "비밀번호에 제어 문자를 포함할 수 없습니다.",
     tooManyRequests: "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요.",
     escalationDenied: "이 작업에는 현재 역할보다 높은 권한이 필요합니다.",
     featureNotLicensed: "엔터프라이즈 라이선스가 필요합니다.",

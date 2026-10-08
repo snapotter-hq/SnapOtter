@@ -5615,6 +5615,7 @@ export const id: TranslationKeys = {
     passwordNeedsLowercase: "Kata sandi harus mengandung huruf kecil.",
     passwordNeedsDigit: "Kata sandi harus mengandung angka.",
     passwordNeedsSpecial: "Kata sandi harus mengandung karakter khusus.",
+    passwordNoControlCharacters: "Kata sandi tidak boleh mengandung karakter kontrol.",
     tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
     escalationDenied: "Tindakan itu memerlukan akses lebih dari yang dimiliki peran Anda.",
     featureNotLicensed: "Ini memerlukan lisensi enterprise.",

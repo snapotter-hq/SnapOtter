@@ -5395,6 +5395,7 @@ export const hi: TranslationKeys = {
     passwordNeedsLowercase: "पासवर्ड में एक लोअरकेस अक्षर होना चाहिए।",
     passwordNeedsDigit: "पासवर्ड में एक संख्या होनी चाहिए।",
     passwordNeedsSpecial: "पासवर्ड में एक विशेष वर्ण होना चाहिए।",
+    passwordNoControlCharacters: "पासवर्ड में नियंत्रण वर्ण नहीं होने चाहिए।",
     tooManyRequests: "बहुत अधिक प्रयास। एक मिनट रुककर फिर से प्रयास करें।",
     escalationDenied: "इसके लिए आपकी भूमिका से अधिक पहुंच चाहिए।",
     featureNotLicensed: "इसके लिए एंटरप्राइज़ लाइसेंस आवश्यक है।",

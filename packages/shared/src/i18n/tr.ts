@@ -5625,6 +5625,7 @@ export const tr: TranslationKeys = {
     passwordNeedsLowercase: "Parola bir küçük harf içermelidir.",
     passwordNeedsDigit: "Parola bir rakam içermelidir.",
     passwordNeedsSpecial: "Parola bir özel karakter içermelidir.",
+    passwordNoControlCharacters: "Parola kontrol karakterleri içermemelidir.",
     tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
     escalationDenied: "Bu işlem, rolünüzün sahip olduğundan daha fazla erişim gerektirir.",
     featureNotLicensed: "Bunun için kurumsal lisans gerekir.",

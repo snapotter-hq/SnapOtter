@@ -5540,6 +5540,7 @@ export const en = {
     passwordNeedsLowercase: "Password must contain a lowercase letter.",
     passwordNeedsDigit: "Password must contain a number.",
     passwordNeedsSpecial: "Password must contain a special character.",
+    passwordNoControlCharacters: "Password must not contain control characters.",
     tooManyRequests: "Too many attempts. Wait a minute and try again.",
     escalationDenied: "That needs more access than your role has.",
     featureNotLicensed: "This needs an enterprise license.",

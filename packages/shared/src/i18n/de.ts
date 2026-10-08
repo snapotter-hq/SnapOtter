@@ -5657,6 +5657,7 @@ export const de: TranslationKeys = {
     passwordNeedsLowercase: "Das Passwort muss einen Kleinbuchstaben enthalten.",
     passwordNeedsDigit: "Das Passwort muss eine Zahl enthalten.",
     passwordNeedsSpecial: "Das Passwort muss ein Sonderzeichen enthalten.",
+    passwordNoControlCharacters: "Das Passwort darf keine Steuerzeichen enthalten.",
     tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
     escalationDenied: "Dafür reichen die Rechte Ihrer Rolle nicht aus.",
     featureNotLicensed: "Dafür ist eine Enterprise-Lizenz erforderlich.",

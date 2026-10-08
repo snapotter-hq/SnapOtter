@@ -22,6 +22,8 @@ function ruleMessage(t: TranslationKeys, rule: PasswordRule, minLength: unknown)
       return t.errors.passwordNeedsDigit;
     case "special":
       return t.errors.passwordNeedsSpecial;
+    case "controlCharacter":
+      return t.errors.passwordNoControlCharacters;
     default: {
       // A rule added to PASSWORD_RULES without a message fails to compile here.
       const unhandled: never = rule;

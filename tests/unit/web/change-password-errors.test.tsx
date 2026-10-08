@@ -126,6 +126,7 @@ describe("change-password errors are translated (#1446)", () => {
     ["lowercase", de.errors.passwordNeedsLowercase],
     ["digit", de.errors.passwordNeedsDigit],
     ["special", de.errors.passwordNeedsSpecial],
+    ["controlCharacter", de.errors.passwordNoControlCharacters],
   ])("explains a missing %s character", async (rule, expected) => {
     answer(400, { error: "Password must contain something", code: "VALIDATION_ERROR", rule });
 

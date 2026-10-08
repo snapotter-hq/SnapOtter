@@ -1247,6 +1247,38 @@ describe("Admin user-management guards", () => {
     }
   });
 
+  // A control character can be set but never typed back: login refuses NUL before
+  // the user lookup, and browsers strip LF and CR from password inputs (#2055).
+  it.each([
+    ["NUL", "Abcdefg1\u0000"],
+    ["a tab", "Abcdefg1\t"],
+    ["a trailing newline", "Abcdefg1\n"],
+    ["a carriage return", "Abcdefg1\r"],
+    ["DEL", "Abcdefg1\u007f"],
+    ["a C1 control", "Abcdefg1\u0085"],
+  ])("change-password refuses %s and names the rule", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must not contain control characters",
+      rule: "controlCharacter",
+    });
+  });
+
+  it("register refuses a control character in the password", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `ctl_${Date.now()}`, password: "Abcdefg1\u0000" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ rule: "controlCharacter" });
+  });
+
   it("lets a user sign in with the non-Latin password they just set", async () => {
     const { username, password } = await createUser();
     const token = await loginAs(username, password);
@@ -1277,8 +1309,6 @@ describe("Admin user-management guards", () => {
     ["letters and digits of any script", "Пароль\u0661\u0662\u0663д"],
     ["combining marks that belong to a letter", "Abcdefg1e\u0301"],
     ["a zero-width space", "Abcdefg1\u200b"],
-    ["a tab", "Abcdefg1\t"],
-    ["a NUL, which login refuses", "Abcdefg1\u0000"],
   ])("does not count %s as special", async (_label, newPassword) => {
     const user = await loggedInUser();
     await setSetting("passwordRequireSpecial", "true");

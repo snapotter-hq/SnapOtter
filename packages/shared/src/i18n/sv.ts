@@ -5613,6 +5613,7 @@ export const sv: TranslationKeys = {
     passwordNeedsLowercase: "Lösenordet måste innehålla en liten bokstav.",
     passwordNeedsDigit: "Lösenordet måste innehålla en siffra.",
     passwordNeedsSpecial: "Lösenordet måste innehålla ett specialtecken.",
+    passwordNoControlCharacters: "Lösenordet får inte innehålla styrtecken.",
     tooManyRequests: "För många försök. Vänta en minut och försök igen.",
     escalationDenied: "Det kräver mer åtkomst än din roll har.",
     featureNotLicensed: "Det här kräver en enterprise-licens.",
