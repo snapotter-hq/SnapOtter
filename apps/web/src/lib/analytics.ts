@@ -249,8 +249,29 @@ export function getDistinctId(): string | null {
   }
 }
 
+/** PostHog product analytics is live: telemetry on and a PostHog key baked. */
 export function isAnalyticsActive(): boolean {
   return enabled && !!posthog;
+}
+
+/**
+ * Telemetry of any kind may leave this tab. False after the instance-wide
+ * opt-out. Unlike isAnalyticsActive(), this is true on an instance baked with
+ * a Sentry DSN and no PostHog key, where Sentry is live on its own (#1115).
+ */
+export function isTelemetryEnabled(): boolean {
+  return enabled;
+}
+
+/**
+ * Apply the instance's analytics setting as the server reports it: start
+ * telemetry when it's on, stop all of it when it's off (or unknown) after
+ * this tab started. Stopping keys on telemetry as a whole, so a Sentry-only
+ * instance stops too (#1115).
+ */
+export async function applyInstanceAnalytics(config: AnalyticsConfig | null): Promise<void> {
+  if (config?.enabled) await initAnalytics(config);
+  else if (isTelemetryEnabled()) optOut();
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */

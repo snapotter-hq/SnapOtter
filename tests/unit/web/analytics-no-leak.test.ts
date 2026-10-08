@@ -191,6 +191,12 @@ describe("Analytics No-Leak Invariant (baked model)", () => {
       expect(mod.isTelemetryEnabled()).toBe(false);
       expect(beforeSend({ exception: { values: [{ type: "TypeError", value: "x" }] } })).toBeNull();
     });
+
+    it("an analytics setting that failed to load stops telemetry too", async () => {
+      await mod.initAnalytics(sentryOnlyConfig);
+      await mod.applyInstanceAnalytics(null);
+      expect(mod.isTelemetryEnabled()).toBe(false);
+    });
   });
 
   describe("PII never leaks even when analytics enabled", () => {

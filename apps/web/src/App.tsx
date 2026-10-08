@@ -22,7 +22,7 @@ import { UsageSurveyOverlay } from "./components/onboarding/usage-survey-overlay
 import { I18nProvider } from "./contexts/i18n-context";
 import { useAuth } from "./hooks/use-auth";
 import { useMobile } from "./hooks/use-mobile";
-import { initAnalytics, isAnalyticsActive, optOut } from "./lib/analytics";
+import { applyInstanceAnalytics } from "./lib/analytics";
 import { AUTH_GUARD_UNGATED_PATHS } from "./lib/auth-routes";
 import { reportRenderError } from "./lib/report-render-error";
 import { useAnalyticsStore } from "./stores/analytics-store";
@@ -241,12 +241,9 @@ export function App() {
 
   useEffect(() => {
     if (!analyticsConfigLoaded) return;
-    if (analyticsConfig?.enabled) {
-      void initAnalytics(analyticsConfig);
-    } else if (isAnalyticsActive()) {
-      // Instance-wide opt-out observed after this tab already initialized.
-      optOut();
-    }
+    // Starts telemetry, or stops it if the instance-wide opt-out arrived
+    // after this tab already initialized.
+    void applyInstanceAnalytics(analyticsConfig);
   }, [analyticsConfigLoaded, analyticsConfig]);
 
   useEffect(() => {
