@@ -1490,6 +1490,16 @@ export function PeopleSection() {
   const [teams, setTeams] = useState<TeamEntry[]>([]);
   const [availableRoles, setAvailableRoles] = useState<RoleEntry[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
+  // The server's minimum password length, so Generate can meet it (#2027). Like
+  // the team and role lists it only feeds a convenience: an admin without
+  // settings access, or a failed read, leaves Generate at its default length.
+  const [policyMinLength, setPolicyMinLength] = useState<unknown>(undefined);
+
+  useEffect(() => {
+    apiGet<{ settings: Record<string, string> }>("/v1/settings")
+      .then((data) => setPolicyMinLength(data.settings.passwordMinLength))
+      .catch(() => {});
+  }, []);
 
   const loadTeams = useCallback(async () => {
     try {
@@ -1918,17 +1928,9 @@ export function PeopleSection() {
             </button>
             <button
               type="button"
-              onClick={async () => {
-                // Meet the server's minimum length, which can exceed the default
-                // (#2027). An admin without settings access gets the default.
-                let minLength: unknown;
-                try {
-                  const data = await apiGet<{ settings: Record<string, string> }>("/v1/settings");
-                  minLength = data.settings.passwordMinLength;
-                } catch {
-                  // Unreadable policy: the default length applies.
-                }
-                setNewPassword(generatePassword(passwordLengthFor(minLength)));
+              onClick={() => {
+                const pw = generatePassword(passwordLengthFor(policyMinLength));
+                setNewPassword(pw);
                 setShowGeneratedPw(true);
                 setPwCopy(null);
               }}

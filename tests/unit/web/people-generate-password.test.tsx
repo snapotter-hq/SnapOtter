@@ -3,13 +3,13 @@
 /**
  * The Generate button on the Add user form sizes the password to the
  * server's minimum length, which can be anywhere from 1 to 128, instead of
- * always making 20 characters (#2027). An admin can read the policy; when the
- * read fails the default length still applies.
+ * always making 20 characters (#2027). The policy is read once when the section
+ * mounts; when that read fails the default length still applies.
  */
 
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared/i18n/en.js";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The jsdom env here has no working localStorage; the provider reads the
@@ -80,6 +80,8 @@ async function generate() {
     </I18nProvider>,
   );
   fireEvent.click(await screen.findByRole("button", { name: en.settings.people.addMembersButton }));
+  // Let the policy read that ran on mount settle before Generate uses it.
+  await act(async () => {});
   fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
   const input = screen.getByPlaceholderText(en.auth.password) as HTMLInputElement;
   return { input };
