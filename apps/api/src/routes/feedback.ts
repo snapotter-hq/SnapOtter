@@ -14,7 +14,11 @@ import {
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { captureFeedback, type FeedbackEventProperties } from "../lib/analytics.js";
+import {
+  captureFeedback,
+  type FeedbackEventProperties,
+  hasFeedbackSink,
+} from "../lib/analytics.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { requireAuth } from "../plugins/auth.js";
 
@@ -130,7 +134,10 @@ export async function feedbackRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      if (!analyticsEnabled()) {
+      // Telemetry off, or on with no PostHog client to take the event (a
+      // Sentry-only bake): either way the feedback goes nowhere, so say so and
+      // let the dialog offer the GitHub and email handoff (#2198).
+      if (!analyticsEnabled() || !hasFeedbackSink()) {
         return reply.send({ ok: true, accepted: false });
       }
 

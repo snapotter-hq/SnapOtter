@@ -158,6 +158,16 @@ function cleanFeedbackProperties(properties: FeedbackEventProperties): Record<st
   return out;
 }
 
+/**
+ * Whether feedback has anywhere to go. It lives only in PostHog events, so an
+ * instance with analytics on but no PostHog client (a Sentry-only bake) would
+ * accept feedback and drop it. The feedback route answers `accepted: false`
+ * there, which gives the user the GitHub and email handoff instead (#2198).
+ */
+export function hasFeedbackSink(): boolean {
+  return posthogClient !== null;
+}
+
 export async function captureFeedback(
   properties: FeedbackEventProperties,
   distinctId?: string,

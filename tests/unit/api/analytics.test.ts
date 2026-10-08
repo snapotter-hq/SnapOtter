@@ -249,6 +249,38 @@ describe("trackEvent", () => {
   });
 });
 
+describe("hasFeedbackSink (#2198)", () => {
+  it("is false before analytics starts", () => {
+    expect(mod.hasFeedbackSink()).toBe(false);
+  });
+
+  it("is false on a Sentry-only bake: enabled, but no PostHog key", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "";
+    bakedConfig.sentryDsn = "https://test@sentry.io/123";
+    await mod.initAnalytics();
+
+    expect(mod.hasFeedbackSink()).toBe(false);
+  });
+
+  it("is true once a PostHog client exists", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    expect(mod.hasFeedbackSink()).toBe(true);
+  });
+
+  it("is false again after analytics shuts down", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+    await mod.shutdownAnalytics();
+
+    expect(mod.hasFeedbackSink()).toBe(false);
+  });
+});
+
 describe("captureFeedback", () => {
   it("captures feedback_submitted with explicit feedback properties", async () => {
     bakedConfig.enabled = true;
