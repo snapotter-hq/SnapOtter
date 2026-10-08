@@ -16,6 +16,12 @@ export const useAnalyticsStore = create<AnalyticsState>((set) => ({
   fetchConfig: async () => {
     try {
       const res = await fetch(appUrl("/api/v1/config/analytics"));
+      // An error body has no `enabled` and would read as an opt-out, which
+      // the tab can't undo without a reload (#1115). Keep what we had.
+      if (!res.ok) {
+        set({ configLoaded: true });
+        return;
+      }
       const config: AnalyticsConfig = await res.json();
       set({ config, configLoaded: true });
     } catch {

@@ -36,5 +36,8 @@ function sendRenderError(error: unknown, errorInfo?: ErrorInfo): void {
       if (errorInfo) Sentry.captureReactException(error, errorInfo);
       else Sentry.captureException(error);
     })
-    .catch(() => {});
+    .catch((importErr) => {
+      // Likely when the crash itself was a failed chunk load; say so locally.
+      console.warn("Could not load Sentry to report a render error:", importErr);
+    });
 }

@@ -29,7 +29,9 @@ export function analyticsModuleMock() {
     captureHandledError: vi.fn(async () => {}),
     setSentryTag: vi.fn(),
     isAnalyticsActive: vi.fn(() => false),
+    isTelemetryEnabled: vi.fn(() => false),
     initAnalytics: vi.fn(async () => {}),
+    applyInstanceAnalytics: vi.fn(async () => {}),
     optOut: vi.fn(),
     optIn: vi.fn(),
   };
