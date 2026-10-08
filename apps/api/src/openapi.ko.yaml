@@ -6918,7 +6918,7 @@ paths:
       operationId: updateTeam
       tags:
         - Teams
-      summary: 팀 이름 변경
+      summary: 팀 업데이트
       description: teams:manage 권한이 필요합니다.
       security:
         - bearerAuth: []
@@ -6935,11 +6935,23 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - name
+              additionalProperties: false
+              minProperties: 1
               properties:
                 name:
                   type: string
+                storageQuota:
+                  type:
+                    - integer
+                    - 'null'
+                  minimum: 1
+                  description: Team-wide limit on library storage, in bytes, counted across all members. null removes the limit.
+                retentionHours:
+                  type:
+                    - integer
+                    - 'null'
+                  minimum: 1
+                  description: Hours to keep the team's job results before they are deleted. null uses the instance default (FILE_MAX_AGE_HOURS). Only applies when the team_retention_overrides enterprise feature is on.
       responses:
         '200':
           description: Team updated
@@ -6950,6 +6962,12 @@ paths:
                 properties:
                   ok:
                     type: boolean
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Authentication required
           content:
@@ -21193,9 +21211,9 @@ x-i18n:
       provenance: machine
       outputHash: 085968d2e449
     paths./api/v1/teams/{id}.put.summary:
-      sourceHash: c5dd33827a5b
+      sourceHash: 645d474857ba
       provenance: machine
-      outputHash: 9e29e96f0fa8
+      outputHash: 3fb2b720b631
     paths./api/v1/teams/{id}.put.description:
       sourceHash: 88ce5170c6ed
       provenance: machine

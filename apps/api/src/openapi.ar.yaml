@@ -6918,7 +6918,7 @@ paths:
       operationId: updateTeam
       tags:
         - Teams
-      summary: إعادة تسمية فريق
+      summary: تحديث فريق
       description: يتطلب إذن teams:manage.
       security:
         - bearerAuth: []
@@ -6935,11 +6935,23 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - name
+              additionalProperties: false
+              minProperties: 1
               properties:
                 name:
                   type: string
+                storageQuota:
+                  type:
+                    - integer
+                    - 'null'
+                  minimum: 1
+                  description: Team-wide limit on library storage, in bytes, counted across all members. null removes the limit.
+                retentionHours:
+                  type:
+                    - integer
+                    - 'null'
+                  minimum: 1
+                  description: Hours to keep the team's job results before they are deleted. null uses the instance default (FILE_MAX_AGE_HOURS). Only applies when the team_retention_overrides enterprise feature is on.
       responses:
         '200':
           description: Team updated
@@ -6950,6 +6962,12 @@ paths:
                 properties:
                   ok:
                     type: boolean
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Authentication required
           content:
@@ -21194,9 +21212,9 @@ x-i18n:
       provenance: machine
       outputHash: ae9548df2184
     paths./api/v1/teams/{id}.put.summary:
-      sourceHash: c5dd33827a5b
+      sourceHash: 645d474857ba
       provenance: machine
-      outputHash: dc8c883f1cf4
+      outputHash: 582d57c1ae61
     paths./api/v1/teams/{id}.put.description:
       sourceHash: 88ce5170c6ed
       provenance: machine
