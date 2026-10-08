@@ -14,9 +14,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const track = vi.fn();
 const captureReactException = vi.fn();
 const captureException = vi.fn();
+/** PostHog analytics (track) and telemetry as a whole (Sentry), set per test. */
+const live = { analytics: true, telemetry: true };
 
 vi.mock("@/lib/analytics", () => ({
-  isAnalyticsActive: () => true,
+  isAnalyticsActive: () => live.analytics,
+  isTelemetryEnabled: () => live.telemetry,
   track: (...args: unknown[]) => track(...args),
 }));
 vi.mock("@sentry/react", () => ({
@@ -57,6 +60,31 @@ describe("reportRenderError", () => {
     track.mockReset();
     captureReactException.mockReset();
     captureException.mockReset();
+    live.analytics = true;
+    live.telemetry = true;
+  });
+
+  // #1115: an instance baked with a Sentry DSN and no PostHog key has Sentry
+  // live and PostHog analytics off. The crash still belongs in Sentry.
+  it("reports to Sentry on a Sentry-only instance, with no analytics event", async () => {
+    live.analytics = false;
+    const error = new Error("boom");
+    reportRenderError(error, { componentStack: "\n    at Page" });
+    await settle();
+
+    expect(captureReactException).toHaveBeenCalledWith(error, { componentStack: "\n    at Page" });
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing once telemetry is opted out", async () => {
+    live.analytics = false;
+    live.telemetry = false;
+    reportRenderError(new Error("boom"), { componentStack: "\n    at Page" });
+    await settle();
+
+    expect(captureReactException).not.toHaveBeenCalled();
+    expect(captureException).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalled();
   });
 
   it("reports a render crash to analytics and Sentry", async () => {
