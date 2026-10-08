@@ -64,7 +64,7 @@ export async function registerStatic(app: FastifyInstance, root?: string) {
 const ASSET_EXTENSION = /\.(js|mjs|css|map|wasm)$/;
 
 function isAssetPath(path: string): boolean {
-  return path.startsWith("/assets/") || ASSET_EXTENSION.test(path);
+  return path.startsWith("/assets/") || path.startsWith("/pdfjs/") || ASSET_EXTENSION.test(path);
 }
 
 // Anyone can send these paths unauthenticated and they skip the rate limit,

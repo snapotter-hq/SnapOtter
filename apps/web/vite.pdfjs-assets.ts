@@ -14,17 +14,24 @@ export function pdfjsAssets(): Plugin {
   return {
     name: "snapotter:pdfjs-assets",
     configureServer(server) {
-      server.middlewares.use(`/${URL_PREFIX}`, (req, res, next) => {
+      server.middlewares.use(`/${URL_PREFIX}`, (req, res) => {
         const [dir, file, ...rest] = (req.url ?? "").split("?")[0].split("/").filter(Boolean);
+        // Never next(): Vite's HTML fallback would answer a miss with the SPA
+        // shell and a 200, which pdf.js reads as a corrupt CMap.
+        const miss = (reason: string) => {
+          server.config.logger.warn(`[pdfjs-assets] ${reason}: ${req.url}`);
+          res.statusCode = 404;
+          res.end();
+        };
         if (!ASSET_DIRS.includes(dir) || !file || rest.length > 0 || file !== path.basename(file)) {
-          return next();
+          return miss("not a pdf.js asset");
         }
         try {
           const body = readFileSync(path.join(PDFJS_DIR, dir, file));
           res.setHeader("Content-Type", "application/octet-stream");
           res.end(body);
-        } catch {
-          next();
+        } catch (err) {
+          miss((err as NodeJS.ErrnoException).code ?? "unreadable");
         }
       });
     },

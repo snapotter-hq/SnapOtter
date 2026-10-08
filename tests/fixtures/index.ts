@@ -147,6 +147,7 @@ export const fixtures = {
     pdf2: p("document/valid/alt-2page.pdf"),
     pdf3: p("document/valid/test-3page.pdf"),
     pdfScanned: p("document/valid/ocr-scanned.pdf"),
+    pdfCidFont: p("document/valid/cid-font-not-embedded.pdf"),
     encrypted: p("document/valid/encrypted.pdf"),
     coloredBlock: p("document/edge/colored-block.pdf"),
     tiny: (ext: string) => p(`document/formats/tiny.${ext}`),

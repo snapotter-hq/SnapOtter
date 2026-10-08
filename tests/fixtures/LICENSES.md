@@ -23,6 +23,7 @@ carry no third-party copyright. They are deterministic and reproducible.
 | `content/cross-format-chat.webp` | A | Sharp SVG render | Same mock chat UI as ocr-chat.jpeg, WebP format |
 | `content/alt-2page.pdf` | A | PDF byte generator | Minimal 2-page PDF with text |
 | `content/multipage-6.pdf` | A | PDF byte generator | Minimal 6-page PDF with text |
+| `content/cid-font-not-embedded.pdf` | A | Hand-written PDF bytes | One line of Japanese in a non-embedded CID font (HeiseiMin-W3, UniJIS-UCS2-H), for #1084 |
 | `content/audio-with-tags.mp3` | A | ffmpeg sine 440Hz | 1.2s MP3, ID3: "Test Song" / "Test Artist" |
 | `content/video-with-meta.mp4` | A | ffmpeg color frame | 1s, 64x64, solid orange H.264 |
 | `content/media-30s.wav` | A | ffmpeg sine 440Hz | 30s, 44100Hz, mono PCM |

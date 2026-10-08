@@ -382,6 +382,9 @@ describe("SPA fallback disambiguation (#1275)", () => {
         "/deep/gone.js",
         "/gone.css",
         "/gone.wasm",
+        // pdf.js CMaps and fonts (#1084): an HTML 200 here reads as a corrupt CMap.
+        "/pdfjs/cmaps/gone.bcmap",
+        "/pdfjs/standard_fonts/gone.pfb",
         // A prefix-preserving proxy with BASE_PATH unset reaches the same spots.
         "/snapotter/assets/gone.js",
         "/apps/snapotter/gone.css",

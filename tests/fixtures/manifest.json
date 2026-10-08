@@ -73,6 +73,14 @@
       "bytes": 854
     },
     {
+      "path": "document/valid/cid-font-not-embedded.pdf",
+      "sourceUrl": "hand-written PDF bytes (non-embedded HeiseiMin-W3 CID font, UniJIS-UCS2-H)",
+      "license": "CC0",
+      "toolsServed": [],
+      "sha256": "f88be4b2d7f9367a4b7dcb5b0b86c020ca90a6001489cb8c8898d8f74a865a6b",
+      "bytes": 1023
+    },
+    {
       "path": "document/valid/encrypted.pdf",
       "sourceUrl": "generate-test-fixtures.mjs (qpdf AES-256 encryption of test-3page.pdf)",
       "license": "CC0",
@@ -111,6 +119,14 @@
       "toolsServed": [],
       "sha256": "738a6c04c1744c32bd9889372a4754dcb2d7af84586a33c9aa67e09ada8bdeb8",
       "bytes": 193823
+    },
+    {
+      "path": "image/valid/animated.apng",
+      "sourceUrl": "UNVERIFIED",
+      "license": "UNVERIFIED",
+      "toolsServed": [],
+      "sha256": "f5ad382a3be6b046b234a18b4a69dc08108301e2a32dfad1f3c0ce1072c130db",
+      "bytes": 1307
     },
     {
       "path": "image/valid/animated.gif",
