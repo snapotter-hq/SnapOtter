@@ -31,7 +31,10 @@ export function SideBySideComparison({
       : null;
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-3xl mx-auto">
+    // Stacked on a phone the two cards are taller than the preview area. Without
+    // max-h-full + overflow the result spilled over the "Process" peek bar and
+    // swallowed the tap that reopens the settings sheet (#2176).
+    <div className="flex flex-col items-center gap-3 w-full max-w-3xl mx-auto max-h-full overflow-y-auto">
       {/* Side-by-side images */}
       <div className="flex flex-col sm:flex-row gap-4 w-full">
         {/* Original */}
