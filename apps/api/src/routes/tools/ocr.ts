@@ -19,7 +19,7 @@ import {
 } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { deleteObject } from "../../lib/object-storage.js";
-import { resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
+import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
 import {
   ocrUploadErrorMessage,
   ocrUploadErrorStatus,
@@ -65,7 +65,7 @@ async function processOcrJob(
   if (quality !== "fast") {
     const capability = getOcrRuntimeCapability();
     if (!capability.available || !capability.qualities.includes(quality)) {
-      throw new Error(`OCR ${quality} runtime is no longer available`);
+      throw ocrRuntimeUnavailable(quality);
     }
   }
 

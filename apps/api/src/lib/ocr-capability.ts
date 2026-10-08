@@ -4,6 +4,7 @@ import {
   type OcrRuntimeCapability,
   type OcrRuntimeQuality,
 } from "@snapotter/ai";
+import { InputValidationError } from "../modality/contract.js";
 
 export type OcrIngressQuality = "fast" | OcrRuntimeQuality;
 
@@ -131,4 +132,28 @@ export function resolveOcrIngressSettings(
     reason: capability.reason,
     requestedQuality: quality,
   };
+}
+
+/**
+ * The accurate OCR runtime was there when the file was uploaded and is gone by
+ * the time the worker looks. That is the operator's install, not the caller's
+ * file, so it is a 503 with a code: the route and a batch of these answer it as
+ * a server-side failure instead of a 422 that blames the upload (#2181).
+ */
+export function ocrRuntimeUnavailable(quality: OcrRuntimeQuality): InputValidationError {
+  return new InputValidationError(
+    `OCR ${quality} runtime is no longer available`,
+    503,
+    "The accurate OCR runtime was installed when the file was uploaded and is missing now. Check the OCR optional pack in Settings, then run it again.",
+    "ENGINE_UNAVAILABLE",
+  );
+}
+
+/**
+ * The runtime ran a different tier than the worker asked for. The worker checked
+ * the tier first, so this is an invariant breaking inside the server, not
+ * anything about the file: a 500 with a code, reported like any server bug.
+ */
+export function ocrTierMismatch(message: string): InputValidationError {
+  return new InputValidationError(message, 500, undefined, "OCR_TIER_MISMATCH");
 }
