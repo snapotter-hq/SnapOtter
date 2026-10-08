@@ -5242,6 +5242,7 @@ export const ja: TranslationKeys = {
     verify: "確認",
     verifying: "確認中...",
     mfaInvalidCode: "無効なコードです。もう一度お試しください。",
+    mfaExpired: "認証セッションの有効期限が切れました。もう一度ログインしてください。",
     mfaEnrollmentHeading: "続行するには 2 要素認証を設定してください",
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
     mfaPolicyUnavailable:

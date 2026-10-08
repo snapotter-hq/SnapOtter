@@ -5303,6 +5303,7 @@ export const tr: TranslationKeys = {
     verify: "Doğrula",
     verifying: "Doğrulanıyor...",
     mfaInvalidCode: "Geçersiz kod. Lütfen tekrar deneyin.",
+    mfaExpired: "Doğrulama oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
     mfaEnrollmentHeading: "Devam etmek için iki faktörlü kimlik doğrulamayı ayarlayın",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",

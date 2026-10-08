@@ -5294,6 +5294,7 @@ export const sv: TranslationKeys = {
     verify: "Verifiera",
     verifying: "Verifierar...",
     mfaInvalidCode: "Ogiltig kod. Försök igen.",
+    mfaExpired: "Din verifieringssession har gått ut. Logga in igen.",
     mfaEnrollmentHeading: "Konfigurera tvåfaktorsautentisering för att fortsätta",
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",

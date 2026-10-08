@@ -5250,6 +5250,7 @@ export const ar: TranslationKeys = {
     verify: "تحقق",
     verifying: "جارٍ التحقق...",
     mfaInvalidCode: "رمز غير صالح. يرجى المحاولة مرة أخرى.",
+    mfaExpired: "انتهت صلاحية جلسة التحقق. يرجى تسجيل الدخول مرة أخرى.",
     mfaEnrollmentHeading: "قم بإعداد المصادقة الثنائية للمتابعة",
     mfaEnrollmentRequired: "تتطلب مؤسستك المصادقة متعددة العوامل. يرجى إعداد MFA في إعدادات حسابك.",
     mfaPolicyUnavailable: "تعذّر التحقق من سياسة MFA. يرجى المحاولة مرة أخرى بعد قليل.",

@@ -5311,6 +5311,7 @@ export const pl: TranslationKeys = {
     verify: "Zweryfikuj",
     verifying: "Weryfikowanie...",
     mfaInvalidCode: "Nieprawidłowy kod. Spróbuj ponownie.",
+    mfaExpired: "Sesja weryfikacji wygasła. Zaloguj się ponownie.",
     mfaEnrollmentHeading: "Skonfiguruj uwierzytelnianie dwuskładnikowe, aby kontynuować",
     mfaEnrollmentRequired:
       "Twoja organizacja wymaga uwierzytelniania wieloskładnikowego. Skonfiguruj MFA w ustawieniach konta.",

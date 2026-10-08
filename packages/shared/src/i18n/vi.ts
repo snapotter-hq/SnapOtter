@@ -5283,6 +5283,7 @@ export const vi: TranslationKeys = {
     verify: "Xác minh",
     verifying: "Đang xác minh...",
     mfaInvalidCode: "Mã không hợp lệ. Vui lòng thử lại.",
+    mfaExpired: "Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.",
     mfaEnrollmentHeading: "Thiết lập xác thực hai yếu tố để tiếp tục",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",

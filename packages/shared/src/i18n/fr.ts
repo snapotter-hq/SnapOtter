@@ -5326,6 +5326,7 @@ export const fr: TranslationKeys = {
     verify: "Vérifier",
     verifying: "Vérification...",
     mfaInvalidCode: "Code invalide. Veuillez réessayer.",
+    mfaExpired: "Votre session de vérification a expiré. Veuillez vous reconnecter.",
     mfaEnrollmentHeading: "Configurez l'authentification à deux facteurs pour continuer",
     mfaEnrollmentRequired:
       "Votre organisation exige l'authentification multifacteur. Veuillez configurer le MFA dans les paramètres de votre compte.",

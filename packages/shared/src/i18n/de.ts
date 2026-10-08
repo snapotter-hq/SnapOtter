@@ -5331,6 +5331,7 @@ export const de: TranslationKeys = {
     verify: "Bestätigen",
     verifying: "Wird überprüft...",
     mfaInvalidCode: "Ungültiger Code. Bitte versuchen Sie es erneut.",
+    mfaExpired: "Ihre Verifizierungssitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     mfaEnrollmentHeading: "Richten Sie die Zwei-Faktor-Authentifizierung ein, um fortzufahren",
     mfaEnrollmentRequired:
       "Ihre Organisation erfordert Multi-Faktor-Authentifizierung. Bitte richten Sie MFA in Ihren Kontoeinstellungen ein.",
