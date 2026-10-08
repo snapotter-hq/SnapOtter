@@ -448,7 +448,12 @@ export interface EditorState {
   setZoom: (zoom: number) => void;
   setPanOffset: (offset: { x: number; y: number }) => void;
   loadImage: (url: string, width: number, height: number) => void;
-  resizeCanvas: (width: number, height: number, anchor: AnchorPosition, fill?: string) => void;
+  resizeCanvas: (
+    width: number,
+    height: number,
+    anchor: AnchorPosition,
+    fill?: string,
+  ) => Promise<void>;
   resizeImage: (width: number, height: number, resample?: string) => void;
   rotateCanvas: (degrees: 90 | 180 | 270) => void;
   flipCanvasHorizontal: () => void;

@@ -111,6 +111,43 @@ function rebakeSourceRaster(
   img.src = url;
 }
 
+// Rebake the source bitmap onto a canvas of a different size. The image keeps its
+// current drawn size (`width` x `height`) and lands at (offsetX, offsetY), so growing
+// the canvas adds transparent room and shrinking it crops, never scales. Resolves with
+// the new data URL; rejects on any failure so the caller can leave the store untouched.
+function rebakeSourceIntoCanvas(
+  url: string,
+  width: number,
+  height: number,
+  newWidth: number,
+  newHeight: number,
+  offsetX: number,
+  offsetY: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error("Could not reload the source image"));
+    img.onload = () => {
+      try {
+        const off = document.createElement("canvas");
+        off.width = newWidth;
+        off.height = newHeight;
+        const ctx = off.getContext("2d");
+        if (!ctx) throw new Error("2D canvas is unavailable");
+        ctx.drawImage(img, offsetX, offsetY, width, height);
+        const out = off.toDataURL("image/png");
+        // Past the browser's canvas size limit Chromium/WebKit hand back an empty URL
+        // instead of throwing, which would blank the image.
+        if (out === "data:,") throw new Error("Canvas is larger than this browser can draw");
+        resolve(out);
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    };
+    img.src = url;
+  });
+}
+
 // Extended store state with additional fields/methods not yet in the shared interface
 interface EditorStateExtensions {
   canvasBackground: string;
@@ -413,29 +450,51 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         });
       },
 
-      resizeCanvas: (width, height, anchor, fill) => {
-        const { canvasSize, objects } = get();
+      resizeCanvas: async (width, height, anchor, fill) => {
+        const { canvasSize, sourceImageUrl } = get();
         const dw = width - canvasSize.width;
         const dh = height - canvasSize.height;
+        // Whole pixels only: a half-pixel offset would resample (blur) the rebaked bitmap.
         let offsetX = 0;
         let offsetY = 0;
         if (anchor === "center") {
-          offsetX = dw / 2;
-          offsetY = dh / 2;
+          offsetX = Math.floor(dw / 2);
+          offsetY = Math.floor(dh / 2);
         } else {
-          if (anchor.includes("center")) {
-            offsetX = dw / 2;
-          } else if (anchor.includes("right")) {
+          if (anchor.endsWith("-center")) {
+            offsetX = Math.floor(dw / 2);
+          } else if (anchor.endsWith("-right")) {
             offsetX = dw;
           }
-          if (anchor.startsWith("center")) {
-            offsetY = dh / 2;
-          } else if (anchor.startsWith("bottom")) {
+          if (anchor.startsWith("center-")) {
+            offsetY = Math.floor(dh / 2);
+          } else if (anchor.startsWith("bottom-")) {
             offsetY = dh;
           }
         }
+        // The source raster is always drawn at canvas size, so without a rebake the
+        // image would stretch to the new dimensions instead of staying put (#2016).
+        // Build it first and commit everything in one set: a failure leaves the editor
+        // untouched, and undo never sees a half-applied resize.
+        let newSourceUrl: string | null = null;
+        if (sourceImageUrl) {
+          newSourceUrl = await rebakeSourceIntoCanvas(
+            sourceImageUrl,
+            canvasSize.width,
+            canvasSize.height,
+            width,
+            height,
+            offsetX,
+            offsetY,
+          );
+          // The user loaded, rotated or resized something else while this decoded.
+          if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+        }
+        const { objects } = get();
         set({
           canvasSize: { width, height },
+          sourceImageSize: { width, height },
+          ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
           ...(fill ? { canvasBackground: fill } : {}),
           objects:
             offsetX !== 0 || offsetY !== 0

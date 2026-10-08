@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,13 @@ const ANCHOR_POSITIONS: AnchorPosition[] = [
   "bottom-right",
 ];
 
+// Browsers refuse to draw canvases past this edge length, so the rebake would fail.
+const MAX_DIMENSION = 16384;
+
+function clampDimension(value: number): number {
+  return Math.min(MAX_DIMENSION, Math.max(1, Math.round(value) || 1));
+}
+
 export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
@@ -39,10 +47,14 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
     }
   }, [open, canvasSize]);
 
-  const handleApply = useCallback(() => {
-    resizeCanvas(width, height, anchor, fill);
-    onClose();
-  }, [width, height, anchor, fill, resizeCanvas, onClose]);
+  const handleApply = useCallback(async () => {
+    try {
+      await resizeCanvas(width, height, anchor, fill);
+      onClose();
+    } catch {
+      toast.error(t.common.somethingWentWrong);
+    }
+  }, [width, height, anchor, fill, resizeCanvas, onClose, t]);
 
   if (!open) return null;
 
@@ -101,9 +113,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
                 id="canvas-w"
                 type="number"
                 min={1}
-                max={16384}
+                max={MAX_DIMENSION}
                 value={width}
-                onChange={(e) => setWidth(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => setWidth(clampDimension(Number(e.target.value)))}
                 className={inputCn}
               />
             </div>
@@ -115,9 +127,9 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
                 id="canvas-h"
                 type="number"
                 min={1}
-                max={16384}
+                max={MAX_DIMENSION}
                 value={height}
-                onChange={(e) => setHeight(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => setHeight(clampDimension(Number(e.target.value)))}
                 className={inputCn}
               />
             </div>
@@ -186,7 +198,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
           </button>
           <button
             type="button"
-            onClick={handleApply}
+            onClick={() => void handleApply()}
             className={cn(
               "h-8 rounded bg-primary px-3 text-sm text-primary-foreground",
               "hover:bg-primary/90 transition-colors",
