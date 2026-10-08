@@ -114,17 +114,36 @@ function nameOf(fn: ts.SignatureDeclaration | undefined): string | undefined {
     : undefined;
 }
 
-/** True when the catch calls `helper` and does something with what it returns. */
+/**
+ * True when the catch calls `helper` and does something with what it returns. A bare
+ * call, `void helper(...)`, and `const failure = helper(...)` that nothing reads
+ * afterwards all leave the route answering with its own hand-written status.
+ */
 function catchUses(catchClause: ts.CatchClause, helper: string): boolean {
   let used = false;
+  const countReads = (name: string, declaration: ts.Identifier) => {
+    let reads = 0;
+    const walk = (node: ts.Node) => {
+      if (ts.isIdentifier(node) && node.text === name && node !== declaration) reads++;
+      ts.forEachChild(node, walk);
+    };
+    walk(catchClause);
+    return reads;
+  };
   const walk = (node: ts.Node) => {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      node.expression.text === helper &&
-      !ts.isExpressionStatement(node.parent)
+      node.expression.text === helper
     ) {
-      used = true;
+      const parent = node.parent;
+      if (ts.isExpressionStatement(parent) || ts.isVoidExpression(parent)) {
+        // thrown away
+      } else if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+        if (countReads(parent.name.text, parent.name) > 0) used = true;
+      } else {
+        used = true;
+      }
     }
     ts.forEachChild(node, walk);
   };
@@ -295,10 +314,21 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
           return reply.status(400).send({ error: "Failed to parse multipart request" });
         }
       });
-      function elsewhere(err) { multipartFailure(err); multipartFailure(err); }
+      function elsewhere(err) { return multipartFailure(err); }
+      function elsewhereToo(err) { return multipartFailure(err); }
     `;
-    // Three helper calls against two reads: the old count saw "enough".
-    expect(check("r.ts", src)).toHaveLength(1);
+    // Three used helper calls against two reads: the old count saw "enough".
+    const findings = check("r.ts", src);
+    expect(findings).toHaveLength(1);
+    // It is the second route's read, not the first.
+    const secondRead = src
+      .split("\n")
+      .findIndex(
+        (l, i, all) =>
+          l.includes("request.parts()") &&
+          all.slice(0, i).some((p) => p.includes("request.parts()")),
+      );
+    expect(findings[0].line).toBe(secondRead + 1);
   });
 
   it("flags the same regression in the real pdf-to-image.ts, which has spare calls", () => {
@@ -337,12 +367,40 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
     );
   });
 
-  it("flags a helper call whose result is thrown away", () => {
-    const src = GOOD.replace(
-      "const failure = multipartFailure(err);\n        return reply.status(failure.status).send(failure.body);",
-      'multipartFailure(err);\n        return reply.status(400).send({ error: "bad" });',
-    );
+  it.each([
+    ["a bare call", "multipartFailure(err);"],
+    ["a void call", "void multipartFailure(err);"],
+    ["a variable nothing reads", "const failure = multipartFailure(err);"],
+  ])("flags a helper result that is thrown away: %s", (_label, line) => {
+    const src = `
+      app.post("/a", async (request, reply) => {
+        try {
+          for await (const part of request.parts()) { void part; }
+        } catch (err) {
+          ${line}
+          return reply.status(400).send({ error: "bad" });
+        }
+      });
+    `;
     expect(check("r.ts", src)).toHaveLength(1);
+  });
+
+  it("counts a result used straight away, or through a destructure", () => {
+    const direct = `
+      app.post("/a", async (request, reply) => {
+        try {
+          for await (const part of request.parts()) { void part; }
+        } catch (err) {
+          return reply.status(multipartFailure(err).status).send({});
+        }
+      });
+    `;
+    const destructured = direct.replace(
+      "return reply.status(multipartFailure(err).status).send({});",
+      "const { status, body } = multipartFailure(err);\n          return reply.status(status).send(body);",
+    );
+    expect(check("r.ts", direct)).toEqual([]);
+    expect(check("r.ts", destructured)).toEqual([]);
   });
 
   it("flags a read with no catch at all", () => {
@@ -354,6 +412,8 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
     expect(check("r.ts", src)).toHaveLength(1);
   });
 
+  // Deliberately strict: awaited inside the try, a rejection here would reach the catch,
+  // but a read that hides in a closure is easy to lose track of, so it has to be listed.
   it("flags a read whose try is outside the function it sits in", () => {
     const src = `
       app.post("/a", async (request, reply) => {
@@ -428,6 +488,19 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
     expect(check("r.ts", file)).toHaveLength(1);
   });
 
+  it.each([
+    ["req.files()", "req.files()"],
+    ["request.files()", "request.files()"],
+  ])("scans %s too", (_label, call) => {
+    const src = `app.post("/a", async (request, req) => { const files = ${call}; void files; });`;
+    expect(check("r.ts", src)).toHaveLength(1);
+  });
+
+  it("leaves an archive's .file() alone: it is not a multipart read", () => {
+    const src = `function zip(archive) { archive.file("a.txt", "x"); archive.files(); }`;
+    expect(check("r.ts", src)).toEqual([]);
+  });
+
   it("flags .parts() on a receiver it doesn't scan", () => {
     const src = `app.post("/a", async (r) => { const p = r.parts(); void p; });`;
     expect(check("r.ts", src)).toHaveLength(1);
@@ -472,6 +545,45 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
     expect(check("r.ts", two, { handled })).toHaveLength(1);
     // A pin that is too high is as stale as one that is too low.
     expect(check("r.ts", one, { handled: { how: "error handler", reads: 2 } })).toHaveLength(1);
+  });
+
+  it("holds every read in an OCR-mapped file to its own ocrUploadErrorStatus catch", () => {
+    // pipeline.ts reads twice; one call to the helper must not cover both.
+    const read = (catchBody: string) => `
+      app.post("/x", async (request, reply) => {
+        try {
+          for await (const part of request.parts()) { void part; }
+        } catch (err) {
+          ${catchBody}
+        }
+      });
+    `;
+    const mapped =
+      "const status = ocrUploadErrorStatus(err); return reply.status(status).send({});";
+    const handWritten = 'return reply.status(400).send({ error: "bad" });';
+    const handled: Handled = { how: "ocrUploadErrorStatus" };
+    expect(check("r.ts", read(mapped) + read(mapped), { handled })).toEqual([]);
+    expect(check("r.ts", read(mapped) + read(handWritten), { handled })).toHaveLength(1);
+  });
+
+  it("does not let an OCR-mapped file keep a read with no catch", () => {
+    const src = `app.post("/a", async (request) => { for await (const p of request.parts()) { void p; } });`;
+    expect(check("r.ts", src, { handled: { how: "ocrUploadErrorStatus" } })).toHaveLength(1);
+  });
+
+  it("does not count a hand-written-400 catch as an error-handler read", () => {
+    const src = `
+      app.post("/a", async (request, reply) => {
+        try {
+          for await (const part of request.parts()) { void part; }
+        } catch {
+          return reply.status(400).send({ error: "bad" });
+        }
+      });
+    `;
+    const findings = check("r.ts", src, { handled: { how: "error handler", reads: 1 } });
+    // The catch is what is wrong; the pin is not what fails here.
+    expect(findings.some((f) => f.what.includes("never uses"))).toBe(true);
   });
 
   it("requires the OCR helper, not multipartFailure, in the files mapped to it", () => {
