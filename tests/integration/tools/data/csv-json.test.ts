@@ -117,6 +117,13 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(dl.payload).toContain("key1,value");
   }, 30_000);
 
+  it("answers 400, not 422, for empty and field-less JSON rows (#1159)", async () => {
+    for (const body of ['{"data": []}', "[]", "[{}]"]) {
+      const res = await runTool("empty.json", Buffer.from(body));
+      expect(res.statusCode, body).toBe(400);
+    }
+  }, 30_000);
+
   it("rejects ambiguous JSON input for JSON-to-CSV", async () => {
     const obj = Buffer.from(JSON.stringify({ users: [{ id: 1 }], meta: { total: 1 } }));
     const res = await runTool("ambiguous.json", obj);

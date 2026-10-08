@@ -46,6 +46,11 @@ describe("jsonToRows", () => {
     expect(() => jsonToRows({ ids: [1, 2] })).toThrow(/must be objects/);
   });
 
+  it("rejects empty row sets with a clear message instead of crashing in Papa", () => {
+    expect(() => jsonToRows([])).toThrow(/no rows/);
+    expect(() => jsonToRows({ data: [] })).toThrow(/no rows/);
+  });
+
   it("rejects nested objects that are not a single array wrapper", () => {
     expect(() => jsonToRows({ a: { b: 1 } })).toThrow(/array of objects/);
   });

@@ -38,6 +38,9 @@ export function jsonToRows(data: unknown): Record<string, unknown>[] {
   if (!rows.every(isPlainObject)) {
     throw new InputValidationError("JSON array elements must be objects to convert to CSV");
   }
+  if (rows.length === 0) {
+    throw new InputValidationError("JSON input has no rows to convert to CSV (the array is empty)");
+  }
   return rows;
 }
 
@@ -74,6 +77,11 @@ export function registerCsvJson(app: FastifyInstance) {
           return out;
         });
         const columns = Array.from(new Set(flattened.flatMap((row) => Object.keys(row))));
+        if (columns.length === 0) {
+          throw new InputValidationError(
+            "JSON rows have no fields, so there are no CSV columns to write",
+          );
+        }
         const csv = Papa.unparse(flattened, { columns });
         return {
           buffer: Buffer.from(csv, "utf8"),

@@ -4,7 +4,7 @@ description: Convert between CSV and JSON, both directions.
 
 # CSV to JSON {#csv-to-json}
 
-Convert between CSV and JSON formats in both directions. Upload a CSV or TSV file to get a JSON array of objects, or upload a JSON array to get a CSV file.
+Convert between CSV and JSON formats in both directions. Upload a CSV or TSV file to get a JSON array of objects, or upload JSON (an array of objects, or an object wrapping one) to get a CSV file.
 
 ## API Endpoint {#api-endpoint}
 
@@ -53,5 +53,5 @@ curl -X POST http://localhost:1349/api/v1/tools/files/csv-json \
 
 - Conversion direction is auto-detected from the input file extension: `.csv` or `.tsv` produces `.json`, and `.json` produces `.csv`.
 - The `pretty` parameter only affects JSON output. When set to `false`, the output is a compact single-line JSON string.
-- JSON input must be an array of objects with consistent keys. Each object becomes a row, and each key becomes a column header.
+- JSON input can be an array of objects, an object with a single key holding such an array (like `{"data": [...]}`), or a flat object of scalar values. Each object becomes a row, and each key becomes a column header. A flat object comes out as a two-column `key,value` table. Objects with several top-level keys, and empty arrays, are rejected.
 - TSV (tab-separated values) files are supported alongside CSV.
