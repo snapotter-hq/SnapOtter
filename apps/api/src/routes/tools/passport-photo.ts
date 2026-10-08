@@ -28,7 +28,12 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, isMissingObjectError, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  isMissingObjectError,
+  isValidObjectKey,
+  putObject,
+} from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
@@ -437,11 +442,19 @@ export function registerPassportPhoto(app: FastifyInstance) {
       // and the client must re-run it (#1674); any other read failure is a
       // storage fault and belongs to the error handler and Sentry.
       const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+      const bgRemovedKey = `outputs/${jobId}/${bgRemovedFilename}`;
+      // A key the store would refuse is the client's mistake, not a fault.
+      if (!isValidObjectKey(bgRemovedKey)) {
+        return reply.status(400).send({ error: "Invalid jobId or filename" });
+      }
       let bgRemovedBuffer: Buffer;
       try {
-        bgRemovedBuffer = await getObjectBuffer(`outputs/${jobId}/${bgRemovedFilename}`);
+        bgRemovedBuffer = await getObjectBuffer(bgRemovedKey);
       } catch (err) {
         if (!isMissingObjectError(err)) throw err;
+        // Expected once in a while; a stream of these means the volume or
+        // bucket lost outputs it should still hold.
+        request.log.warn({ jobId, toolId: "passport-photo" }, "Analyze output missing at generate");
         return reply.status(410).send({
           error: "This photo's analysis has expired. Analyze it again, then generate.",
           code: "ANALYSIS_EXPIRED",

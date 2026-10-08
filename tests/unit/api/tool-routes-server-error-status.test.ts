@@ -13,13 +13,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
 const getObjectBuffer = vi.fn();
+// Defaults to the local-backend rule; the integration suite exercises the
+// real one. A test can answer for S3 instead.
+const localMissing = (err: unknown) => (err as NodeJS.ErrnoException)?.code === "ENOENT";
+const isMissingObjectError = vi.fn(localMissing);
 
-vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
-  putObject: (...args: unknown[]) => putObject(...args),
-  getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
-  // The local-backend rule; the integration suite exercises the real one.
-  isMissingObjectError: (err: unknown) => (err as NodeJS.ErrnoException)?.code === "ENOENT",
-}));
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    putObject: (...args: unknown[]) => putObject(...args),
+    getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
+    isMissingObjectError: (err: unknown) => isMissingObjectError(err),
+    isValidObjectKey: actual.isValidObjectKey,
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
   isBrowserAvailable: () => true,
@@ -176,6 +184,7 @@ describe("json-bodied routes", () => {
   beforeEach(() => {
     putObject.mockReset();
     getObjectBuffer.mockReset();
+    isMissingObjectError.mockClear();
   });
 
   afterEach(async () => {
@@ -295,6 +304,37 @@ describe("json-bodied routes", () => {
     expect(res.statusCode).toBe(410);
     expect(res.json().code).toBe("ANALYSIS_EXPIRED");
     expect(res.body).not.toContain("/data/x");
+  });
+
+  it("passport-photo generate asks the storage backend whether an object is missing", async () => {
+    // S3 reports a missing key as NoSuchKey with no errno code, so the route
+    // must defer to the backend's classifier rather than test for ENOENT.
+    const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
+      name: "NoSuchKey",
+    });
+    getObjectBuffer.mockImplementation(async () => {
+      throw noSuchKey;
+    });
+    isMissingObjectError.mockImplementationOnce((err) => err === noSuchKey);
+    app = await buildApp(registerPassportPhoto);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+    });
+    expect(res.statusCode).toBe(410);
+    expect(isMissingObjectError).toHaveBeenCalledWith(noSuchKey);
+  });
+
+  it("passport-photo generate answers 400 for a jobId or filename the store would refuse", async () => {
+    app = await buildApp(registerPassportPhoto);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: { ...passportBody, filename: "../../escape.png" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(getObjectBuffer).not.toHaveBeenCalled();
   });
 
   it("html-to-image answers a storage fault that mentions a timeout as storage, not a slow page", async () => {

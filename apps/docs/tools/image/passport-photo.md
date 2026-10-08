@@ -145,6 +145,19 @@ curl -X POST http://localhost:1349/api/v1/tools/image/passport-photo/generate \
 }
 ```
 
+#### Error: Analysis Expired (410) {#error-analysis-expired-410}
+
+Generate works from the background-removed image that analyze stored for `jobId`. Stored outputs are cleaned up after a while, so if too much time passes between the two calls, that image is gone. Call analyze again with the same photo and use the `jobId` it returns.
+
+```json
+{
+  "error": "This photo's analysis has expired. Analyze it again, then generate.",
+  "code": "ANALYSIS_EXPIRED"
+}
+```
+
+A `jobId` or `filename` that can't name a stored file (a path separator, `..`, an empty string) answers 400.
+
 ---
 
 ### Base Route {#base-route}

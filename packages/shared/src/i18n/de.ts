@@ -2414,7 +2414,7 @@ export const de: TranslationKeys = {
       generationFailedWithStatus: "Erstellung fehlgeschlagen: {status}",
       photoGenerationFailed: "Fotoerstellung fehlgeschlagen",
       analysisExpired:
-        "Die Analyse ist abgelaufen, daher wird das Foto erneut analysiert. Erstelle es, sobald das erledigt ist.",
+        "Die Analyse ist abgelaufen, daher wird das Foto erneut analysiert. Erstellen Sie es, sobald das erledigt ist.",
     },
     "transcribe-audio": {
       language: "Sprache",

@@ -11,8 +11,11 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { getObjectBuffer, putObject } from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -361,8 +364,10 @@ describe("passport-photo/generate", () => {
   it("lets a storage fault reading the analyze output reach the error handler (#1674)", async () => {
     // A directory where the PNG should be makes the read fail with EISDIR:
     // the object exists but can't be read, which is the server's fault.
+    // Built on disk directly, since putObject refuses a nested key. Assumes
+    // the local backend, which every integration run uses.
     const jobId = randomUUID();
-    await putObject(`outputs/${jobId}/test_nobg.png/blocker`, Buffer.from("x"));
+    await mkdir(join(env.WORKSPACE_PATH, "outputs", jobId, "test_nobg.png"), { recursive: true });
 
     const res = await generateFor(jobId);
 

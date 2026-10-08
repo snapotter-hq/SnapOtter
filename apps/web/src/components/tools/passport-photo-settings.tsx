@@ -422,8 +422,10 @@ export function PassportPhotoSettings() {
         // The server no longer holds this analysis's background-removed image
         // (#1674). Analyze the same file again so generate has one to read.
         if (errBody?.code === "ANALYSIS_EXPIRED" && files[0]) {
+          // The note only holds while that analysis runs: once it settles the
+          // Generate button (or the analysis error) says what happens next.
           setGenerateError(t.toolSettings["passport-photo"].analysisExpired);
-          void runAnalyze(files[0]);
+          void runAnalyze(files[0]).finally(() => setGenerateError(null));
           return;
         }
         const msg = errBody
