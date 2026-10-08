@@ -166,6 +166,10 @@ export function finishStroke(
   const dataUrl = strokeToDataUrl(canvas);
   const { updateObject, removeObjects } = useEditorStore.getState();
   if (!dataUrl) {
+    // The object still points at the live stroke canvas. Cut that loose first:
+    // the delete is an undo step, and undoing it must not bring back a stroke
+    // that never saved, nor keep the canvas that couldn't be encoded alive.
+    updateObject(objectId, { image: undefined } as unknown as Record<string, unknown>);
     removeObjects([objectId]);
     reportCaptureFailure("no-context", messages);
     return false;

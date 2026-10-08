@@ -71,11 +71,12 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
         return;
       }
 
-      const sourceSnapshot = readDocumentPixels(capture.ctx, canvasSize.width, canvasSize.height);
-      if (!sourceSnapshot) {
-        reportCaptureFailure("no-context", captureMessages);
+      const read = readDocumentPixels(capture.ctx, canvasSize.width, canvasSize.height);
+      if (!read.ok) {
+        reportCaptureFailure(read.reason, captureMessages);
         return;
       }
+      const sourceSnapshot = read.imageData;
 
       // Create an offscreen canvas for the clone output
       const canvas = document.createElement("canvas");

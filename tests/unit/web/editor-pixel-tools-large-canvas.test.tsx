@@ -127,20 +127,54 @@ describe("pixel brush: running out of memory partway through a stroke", () => {
     useEditorStore.setState({ activeTool: "blur-brush" });
     const { result } = renderHook(() => usePixelBrushTool(stageRef));
     result.current.handleMouseDown(event);
-    expect(objects()).toHaveLength(1);
+    // A good move first, so the object points at the live canvas.
+    result.current.handleMouseMove(event);
+    const attrsOf = () => objects()[0].attrs as unknown as { src: string; image?: unknown };
+    expect(attrsOf().image).toBeDefined();
 
     state.bigReadsFail = true;
+    state.dataUrl = "data:image/png;base64,FINAL";
     expect(() => result.current.handleMouseMove(event)).not.toThrow();
 
     expectOneMemoryToast();
-    // The stroke is over: a later move touches nothing, and the object no longer
-    // points at the live canvas.
-    const [obj] = objects();
-    expect((obj.attrs as unknown as Record<string, unknown>).image).toBeUndefined();
-    expect((obj.attrs as unknown as { src: string }).src).toBe(state.dataUrl);
+    // The stroke is saved as it stood: encoded, and no longer the live canvas.
+    expect(attrsOf().src).toBe("data:image/png;base64,FINAL");
+    expect(attrsOf().image).toBeUndefined();
+
+    // And it is over: a later move changes nothing about the object.
     state.bigReadsFail = false;
+    state.dataUrl = "data:image/png;base64,LATER";
     result.current.handleMouseMove(event);
+    result.current.handleMouseUp();
+    expect(attrsOf().src).toBe("data:image/png;base64,FINAL");
+    expect(attrsOf().image).toBeUndefined();
     expect(toastError).toHaveBeenCalledTimes(1);
+  });
+
+  it("cuts the live canvas loose before removing an object it can't encode", () => {
+    useEditorStore.setState({ activeTool: "blur-brush" });
+    const { result } = renderHook(() => usePixelBrushTool(stageRef));
+    result.current.handleMouseDown(event);
+    result.current.handleMouseMove(event);
+    const { updateObject, removeObjects } = useEditorStore.getState();
+    const calls: string[] = [];
+    useEditorStore.setState({
+      updateObject: (id, attrs) => {
+        calls.push(`update:${JSON.stringify(Object.keys(attrs))}`);
+        updateObject(id, attrs);
+      },
+      removeObjects: (ids) => {
+        calls.push("remove");
+        removeObjects(ids);
+      },
+    });
+
+    state.dataUrl = "data:,";
+    result.current.handleMouseUp();
+
+    // An undo of the delete would otherwise restore the whole stroke, still tied to
+    // the canvas that could not be encoded.
+    expect(calls).toEqual(['update:["image"]', "remove"]);
   });
 
   it("drops the object when the finished stroke can't be encoded", () => {

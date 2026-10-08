@@ -137,15 +137,16 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
 
       // Update source snapshot for smudge continuity. A document too big to read
       // again ends the stroke where it is rather than throwing out of the handler.
-      const updatedData = readDocumentPixels(workingCtx, canvasSize.width, canvasSize.height);
-      if (!updatedData) {
+      const read = readDocumentPixels(workingCtx, canvasSize.width, canvasSize.height);
+      if (!read.ok) {
         strokeRef.current = null;
+        // finishStroke has already told the user when the stroke couldn't be saved.
         if (finishStroke(objectId, canvas, captureMessages)) {
-          reportCaptureFailure("no-context", captureMessages);
+          reportCaptureFailure(read.reason, captureMessages);
         }
         return;
       }
-      strokeRef.current.sourceSnapshot = updatedData;
+      strokeRef.current.sourceSnapshot = read.imageData;
       strokeRef.current.lastX = x;
       strokeRef.current.lastY = y;
 

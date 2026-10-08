@@ -176,11 +176,12 @@ export function useFillTool(stageRef: React.RefObject<Konva.Stage | null>) {
       }
       const { ctx } = capture;
 
-      const imageData = readDocumentPixels(ctx, canvasSize.width, canvasSize.height);
-      if (!imageData) {
-        reportCaptureFailure("no-context", captureMessages);
+      const read = readDocumentPixels(ctx, canvasSize.width, canvasSize.height);
+      if (!read.ok) {
+        reportCaptureFailure(read.reason, captureMessages);
         return;
       }
+      const imageData = read.imageData;
       const [fillR, fillG, fillB] = hexToRgb(foregroundColor);
 
       floodFill(imageData, x, y, fillR, fillG, fillB, fillTolerance, fillContiguous);
