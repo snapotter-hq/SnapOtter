@@ -4759,6 +4759,8 @@ export const ru: TranslationKeys = {
         exportButton: "Экспорт",
         copied: "Скопировано",
         copyFailed: "Не удалось скопировать",
+        tooLarge:
+          "Этот экспорт слишком большой, чтобы браузер мог его создать. Попробуйте уменьшить размеры.",
         saveProject: "Сохранить проект",
         loadProject: "Загрузить проект",
       },

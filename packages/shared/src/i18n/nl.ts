@@ -4769,6 +4769,8 @@ export const nl: TranslationKeys = {
         exportButton: "Exporteren",
         copied: "Gekopieerd",
         copyFailed: "Kopiëren mislukt",
+        tooLarge:
+          "Deze export is te groot voor de browser om te verwerken. Probeer kleinere afmetingen.",
         saveProject: "Project opslaan",
         loadProject: "Project laden",
       },

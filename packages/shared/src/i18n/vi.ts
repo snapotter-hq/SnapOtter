@@ -4746,6 +4746,7 @@ export const vi: TranslationKeys = {
         exportButton: "Xuất",
         copied: "Đã sao chép",
         copyFailed: "Sao chép thất bại",
+        tooLarge: "Bản xuất này quá lớn để trình duyệt tạo ra. Hãy thử kích thước nhỏ hơn.",
         saveProject: "Lưu dự án",
         loadProject: "Mở dự án",
       },

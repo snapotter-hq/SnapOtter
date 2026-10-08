@@ -4687,6 +4687,7 @@ export const en = {
         exportButton: "Export",
         copied: "Copied",
         copyFailed: "Copy failed",
+        tooLarge: "This export is too big for your browser to render. Try smaller dimensions.",
         saveProject: "Save Project",
         loadProject: "Load Project",
       },

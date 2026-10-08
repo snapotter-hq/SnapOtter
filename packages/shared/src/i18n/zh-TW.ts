@@ -4474,6 +4474,7 @@ export const zhTW: TranslationKeys = {
         exportButton: "匯出",
         copied: "已複製",
         copyFailed: "複製失敗",
+        tooLarge: "匯出內容太大，瀏覽器無法產生。請嘗試較小的尺寸。",
         saveProject: "儲存專案",
         loadProject: "載入專案",
       },

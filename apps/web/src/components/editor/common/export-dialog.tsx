@@ -13,10 +13,15 @@ import {
   Unlock,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
-import { captureDocumentCanvas } from "@/components/editor/stage-capture";
+import {
+  type CaptureFailureMessages,
+  captureDocumentCanvas,
+  classifyCaptureError,
+  reportCaptureFailure,
+} from "@/components/editor/stage-capture";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { format } from "@/lib/format";
@@ -103,19 +108,35 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const fmtOpt = FORMAT_OPTIONS.find((o) => o.value === settings.format);
     const previewMime = fmtOpt?.needsServerConvert ? "image/png" : getMimeType(settings.format);
 
-    const url = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, scale).toDataURL(
-      previewMime,
-      settings.quality / 100,
-    );
-    setPreviewUrl(url);
+    // A tainted or over-limit canvas can't be encoded. The preview just goes blank;
+    // Export and Copy are where the user is told why. A throw here would reach the
+    // route ErrorBoundary from a passive effect (#2140).
+    let url: string;
+    let fullUrl: string;
+    try {
+      url = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, scale).toDataURL(
+        previewMime,
+        settings.quality / 100,
+      );
+      const pixelRatio = settings.width / canvasSize.width;
+      fullUrl = captureDocumentCanvas(
+        stage,
+        canvasSize.width,
+        canvasSize.height,
+        pixelRatio,
+      ).toDataURL(previewMime, settings.quality / 100);
+    } catch (err) {
+      if (!classifyCaptureError(err)) throw err;
+      setPreviewUrl(null);
+      setEstimatedSize(null);
+      return;
+    }
+    setPreviewUrl(url === "data:," ? null : url);
 
-    const pixelRatio = settings.width / canvasSize.width;
-    const fullUrl = captureDocumentCanvas(
-      stage,
-      canvasSize.width,
-      canvasSize.height,
-      pixelRatio,
-    ).toDataURL(previewMime, settings.quality / 100);
+    if (fullUrl === "data:,") {
+      setEstimatedSize(null);
+      return;
+    }
     fetch(fullUrl)
       .then((res) => res.blob())
       .then((blob) => setEstimatedSize(blob.size))
@@ -161,12 +182,37 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     [settings.lockAspect, aspectRatio],
   );
 
+  const captureMessages = useMemo<CaptureFailureMessages>(
+    () => ({
+      noCanvasMemory: t.editor.ui.exportDialog.tooLarge,
+      crossOriginBlocked: t.editor.ui.captureFailure.crossOriginBlocked,
+    }),
+    [t],
+  );
+
   // Past the browser's canvas limit Chromium and WebKit still hand out a canvas,
   // but toDataURL() answers "data:," and toBlob() answers null or an empty blob.
   // Saying so beats downloading an empty file and marking the document saved (#2140).
   const reportEmptyExport = useCallback(() => {
-    toast.error(t.editor.ui.captureFailure.noCanvasMemory);
-  }, [t]);
+    reportCaptureFailure("no-context", captureMessages);
+  }, [captureMessages]);
+
+  // Run a capture-and-encode step. A tainted or over-limit canvas is reported to
+  // the user and answers `false`; any other error is a bug and propagates.
+  const guardCapture = useCallback(
+    (step: () => void): boolean => {
+      try {
+        step();
+        return true;
+      } catch (err) {
+        const reason = classifyCaptureError(err);
+        if (!reason) throw err;
+        reportCaptureFailure(reason, captureMessages);
+        return false;
+      }
+    },
+    [captureMessages],
+  );
 
   // Issue #6: Export using Konva stage.toDataURL for correct output
   const handleExport = useCallback(() => {
@@ -176,153 +222,160 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     const stage = editorStageRefHolder.current;
     if (!stage) return;
 
-    const pixelRatio = settings.width / canvasSize.width;
+    guardCapture(() => {
+      const pixelRatio = settings.width / canvasSize.width;
 
-    // Server-side convert for formats the Canvas API cannot produce
-    const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
-    if (formatOption?.needsServerConvert) {
-      let stageCanvas: HTMLCanvasElement;
-      if (!settings.transparent || settings.format === "jpeg") {
-        const raw = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, pixelRatio);
-        const exportCanvas = document.createElement("canvas");
-        exportCanvas.width = raw.width;
-        exportCanvas.height = raw.height;
-        const ctx = exportCanvas.getContext("2d");
-        if (!ctx) return;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-        ctx.drawImage(raw, 0, 0);
-        stageCanvas = exportCanvas;
-      } else {
-        stageCanvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, pixelRatio);
-      }
-
-      stageCanvas.toBlob(async (blob) => {
-        if (!blob || blob.size === 0) {
-          reportEmptyExport();
-          return;
+      // Server-side convert for formats the Canvas API cannot produce
+      const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
+      if (formatOption?.needsServerConvert) {
+        let stageCanvas: HTMLCanvasElement;
+        if (!settings.transparent || settings.format === "jpeg") {
+          const raw = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, pixelRatio);
+          const exportCanvas = document.createElement("canvas");
+          exportCanvas.width = raw.width;
+          exportCanvas.height = raw.height;
+          const ctx = exportCanvas.getContext("2d");
+          if (!ctx) return;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+          ctx.drawImage(raw, 0, 0);
+          stageCanvas = exportCanvas;
+        } else {
+          stageCanvas = captureDocumentCanvas(
+            stage,
+            canvasSize.width,
+            canvasSize.height,
+            pixelRatio,
+          );
         }
-        const formData = new FormData();
-        formData.append("file", blob, "export.png");
-        formData.append(
-          "settings",
-          JSON.stringify({ format: settings.format, quality: settings.quality }),
-        );
-        try {
-          const res = await fetch(appUrl(apiToolPath("convert")), {
-            method: "POST",
-            body: formData,
-          });
-          if (!res.ok) throw new Error("Server convert failed");
-          const json = resolveServerUrls(await res.json());
-          if (json.downloadUrl) {
-            const a = document.createElement("a");
-            a.href = json.downloadUrl;
-            a.download = `export.${settings.format}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            markClean();
+
+        stageCanvas.toBlob(async (blob) => {
+          if (!blob || blob.size === 0) {
+            reportEmptyExport();
+            return;
           }
-        } catch (err) {
-          console.error("Server-side export failed:", err);
-        }
-      }, "image/png");
-      return;
-    }
-
-    let dataUrl: string;
-
-    if (!settings.transparent || settings.format === "jpeg") {
-      // Create canvas with white background for non-transparent exports
-      const stageCanvas = captureDocumentCanvas(
-        stage,
-        canvasSize.width,
-        canvasSize.height,
-        pixelRatio,
-      );
-      const exportCanvas = document.createElement("canvas");
-      exportCanvas.width = stageCanvas.width;
-      exportCanvas.height = stageCanvas.height;
-      const ctx = exportCanvas.getContext("2d");
-      if (!ctx) return;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-      ctx.drawImage(stageCanvas, 0, 0);
-      dataUrl = exportCanvas.toDataURL(
-        getMimeType(settings.format),
-        settings.format === "png" ? undefined : settings.quality / 100,
-      );
-    } else {
-      dataUrl = captureDocumentCanvas(
-        stage,
-        canvasSize.width,
-        canvasSize.height,
-        pixelRatio,
-      ).toDataURL(
-        getMimeType(settings.format),
-        settings.format === "png" ? undefined : settings.quality / 100,
-      );
-    }
-
-    if (dataUrl === "data:,") {
-      reportEmptyExport();
-      return;
-    }
-
-    const formatOpt = FORMAT_OPTIONS.find((f) => f.value === settings.format);
-    if (formatOpt?.needsServerConvert) {
-      fetch(dataUrl)
-        .then((res) => res.blob())
-        .then(async (pngBlob) => {
           const formData = new FormData();
-          formData.append("file", pngBlob, "export.png");
+          formData.append("file", blob, "export.png");
           formData.append(
             "settings",
             JSON.stringify({ format: settings.format, quality: settings.quality }),
           );
-          const res = await fetch(appUrl(apiToolPath("convert")), {
-            method: "POST",
-            body: formData,
+          try {
+            const res = await fetch(appUrl(apiToolPath("convert")), {
+              method: "POST",
+              body: formData,
+            });
+            if (!res.ok) throw new Error("Server convert failed");
+            const json = resolveServerUrls(await res.json());
+            if (json.downloadUrl) {
+              const a = document.createElement("a");
+              a.href = json.downloadUrl;
+              a.download = `export.${settings.format}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              markClean();
+            }
+          } catch (err) {
+            console.error("Server-side export failed:", err);
+          }
+        }, "image/png");
+        return;
+      }
+
+      let dataUrl: string;
+
+      if (!settings.transparent || settings.format === "jpeg") {
+        // Create canvas with white background for non-transparent exports
+        const stageCanvas = captureDocumentCanvas(
+          stage,
+          canvasSize.width,
+          canvasSize.height,
+          pixelRatio,
+        );
+        const exportCanvas = document.createElement("canvas");
+        exportCanvas.width = stageCanvas.width;
+        exportCanvas.height = stageCanvas.height;
+        const ctx = exportCanvas.getContext("2d");
+        if (!ctx) return;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+        ctx.drawImage(stageCanvas, 0, 0);
+        dataUrl = exportCanvas.toDataURL(
+          getMimeType(settings.format),
+          settings.format === "png" ? undefined : settings.quality / 100,
+        );
+      } else {
+        dataUrl = captureDocumentCanvas(
+          stage,
+          canvasSize.width,
+          canvasSize.height,
+          pixelRatio,
+        ).toDataURL(
+          getMimeType(settings.format),
+          settings.format === "png" ? undefined : settings.quality / 100,
+        );
+      }
+
+      if (dataUrl === "data:,") {
+        reportEmptyExport();
+        return;
+      }
+
+      const formatOpt = FORMAT_OPTIONS.find((f) => f.value === settings.format);
+      if (formatOpt?.needsServerConvert) {
+        fetch(dataUrl)
+          .then((res) => res.blob())
+          .then(async (pngBlob) => {
+            const formData = new FormData();
+            formData.append("file", pngBlob, "export.png");
+            formData.append(
+              "settings",
+              JSON.stringify({ format: settings.format, quality: settings.quality }),
+            );
+            const res = await fetch(appUrl(apiToolPath("convert")), {
+              method: "POST",
+              body: formData,
+            });
+            if (!res.ok) throw new Error("Server conversion failed");
+            const json = resolveServerUrls(await res.json());
+            if (json.downloadUrl) {
+              const a = document.createElement("a");
+              a.href = json.downloadUrl;
+              a.download = `export.${settings.format}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              markClean();
+            }
+          })
+          .catch((err) => {
+            console.error("Export failed:", err);
           });
-          if (!res.ok) throw new Error("Server conversion failed");
-          const json = resolveServerUrls(await res.json());
-          if (json.downloadUrl) {
+      } else {
+        fetch(dataUrl)
+          .then((res) => res.blob())
+          .then((blob) => {
+            if (blob.size === 0) {
+              reportEmptyExport();
+              return;
+            }
+            const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = json.downloadUrl;
+            a.href = url;
             a.download = `export.${settings.format}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             markClean();
-          }
-        })
-        .catch((err) => {
-          console.error("Export failed:", err);
-        });
-    } else {
-      fetch(dataUrl)
-        .then((res) => res.blob())
-        .then((blob) => {
-          if (blob.size === 0) {
-            reportEmptyExport();
-            return;
-          }
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `export.${settings.format}`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          markClean();
-        })
-        .catch((err) => {
-          console.error("Export failed:", err);
-        });
-    }
-  }, [settings, canvasSize, markClean, reportEmptyExport]);
+          })
+          .catch((err) => {
+            console.error("Export failed:", err);
+          });
+      }
+    });
+  }, [settings, canvasSize, markClean, reportEmptyExport, guardCapture]);
 
   // Issue #6: Copy to clipboard using Konva stage
   const handleCopyToClipboard = useCallback(async () => {
@@ -330,12 +383,22 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     if (!stage) return;
 
     const pixelRatio = settings.width / canvasSize.width;
-    const dataUrl = captureDocumentCanvas(
-      stage,
-      canvasSize.width,
-      canvasSize.height,
-      pixelRatio,
-    ).toDataURL("image/png");
+    let dataUrl = "";
+    const captured = guardCapture(() => {
+      dataUrl = captureDocumentCanvas(
+        stage,
+        canvasSize.width,
+        canvasSize.height,
+        pixelRatio,
+      ).toDataURL("image/png");
+    });
+    if (!captured || dataUrl === "data:,") {
+      // An over-limit canvas copies as an empty image while the button says copied.
+      if (captured) reportEmptyExport();
+      setCopyStatus("failed");
+      later(() => setCopyStatus("idle"), 2000, "copyStatus");
+      return;
+    }
 
     try {
       const res = await fetch(dataUrl);
@@ -349,7 +412,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       setCopyStatus("failed");
       later(() => setCopyStatus("idle"), 2000, "copyStatus");
     }
-  }, [settings, canvasSize, later]);
+  }, [settings, canvasSize, later, guardCapture, reportEmptyExport]);
 
   // Project save (.snapotter file)
   const handleSaveProject = useCallback(() => {

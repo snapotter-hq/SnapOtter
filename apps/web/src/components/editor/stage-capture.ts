@@ -124,6 +124,17 @@ export function readDocumentPixels(
 }
 
 /**
+ * Why a failed read or encode of a captured canvas happened, or null when it is
+ * not a failure the user can act on (a bug, left to propagate). A tainted canvas
+ * throws SecurityError on read; one the browser cannot back throws a size error.
+ */
+export function classifyCaptureError(err: unknown): CaptureFailure | null {
+  if (err instanceof DOMException && err.name === "SecurityError") return "tainted";
+  if (isCanvasSizeError(err)) return "no-context";
+  return null;
+}
+
+/**
  * Capture the document and hand back a 2D context whose pixels the caller may
  * read, or say why not. The pixel tools used to bail out of the mouse handler on a
  * null context and let a tainted canvas's SecurityError escape it, so a click did
@@ -145,10 +156,8 @@ export function captureDocumentContext(
     if (!ctx || canvasIsDead(ctx)) return { ok: false, reason: "no-context" };
     return { ok: true, ctx };
   } catch (err) {
-    if (err instanceof DOMException && err.name === "SecurityError") {
-      return { ok: false, reason: "tainted" };
-    }
-    if (isCanvasSizeError(err)) return { ok: false, reason: "no-context" };
+    const reason = classifyCaptureError(err);
+    if (reason) return { ok: false, reason };
     throw err;
   }
 }

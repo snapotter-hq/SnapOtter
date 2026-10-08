@@ -4774,6 +4774,8 @@ export const fr: TranslationKeys = {
         exportButton: "Exporter",
         copied: "Copié",
         copyFailed: "Échec de la copie",
+        tooLarge:
+          "Cet export est trop grand pour que le navigateur puisse le générer. Essayez des dimensions plus petites.",
         saveProject: "Enregistrer le projet",
         loadProject: "Charger le projet",
       },

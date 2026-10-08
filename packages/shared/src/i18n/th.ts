@@ -4695,6 +4695,7 @@ export const th: TranslationKeys = {
         exportButton: "ส่งออก",
         copied: "คัดลอกแล้ว",
         copyFailed: "คัดลอกไม่สำเร็จ",
+        tooLarge: "การส่งออกนี้ใหญ่เกินกว่าที่เบราว์เซอร์จะสร้างได้ ลองใช้ขนาดที่เล็กลง",
         saveProject: "บันทึกโปรเจกต์",
         loadProject: "โหลดโปรเจกต์",
       },

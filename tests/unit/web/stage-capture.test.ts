@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   captureDocumentContext,
+  classifyCaptureError,
   readDocumentPixels,
 } from "../../../apps/web/src/components/editor/stage-capture";
 
@@ -154,5 +155,24 @@ describe("readDocumentPixels", () => {
         2,
       ),
     ).toThrow("not a size problem");
+  });
+});
+
+describe("classifyCaptureError", () => {
+  it("calls a SecurityError a tainted canvas", () => {
+    expect(classifyCaptureError(new DOMException("tainted", "SecurityError"))).toBe("tainted");
+  });
+
+  it.each([
+    ["a RangeError", new RangeError("Invalid array length")],
+    ["an IndexSizeError", new DOMException("The source width is 0", "IndexSizeError")],
+    ["Firefox's NS_ERROR_FAILURE", new Error("NS_ERROR_FAILURE")],
+  ])("calls %s a canvas the browser could not back", (_label, err) => {
+    expect(classifyCaptureError(err)).toBe("no-context");
+  });
+
+  it("leaves a bug alone", () => {
+    expect(classifyCaptureError(new TypeError("Cannot read properties of null"))).toBeNull();
+    expect(classifyCaptureError("not even an error")).toBeNull();
   });
 });

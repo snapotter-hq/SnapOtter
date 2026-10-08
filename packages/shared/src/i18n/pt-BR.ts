@@ -4761,6 +4761,8 @@ export const ptBR: TranslationKeys = {
         exportButton: "Exportar",
         copied: "Copiado",
         copyFailed: "Falha ao copiar",
+        tooLarge:
+          "Esta exportação é grande demais para o navegador gerar. Tente dimensões menores.",
         saveProject: "Salvar projeto",
         loadProject: "Abrir projeto",
       },

@@ -4750,6 +4750,8 @@ export const sv: TranslationKeys = {
         exportButton: "Exportera",
         copied: "Kopierat",
         copyFailed: "Kopiering misslyckades",
+        tooLarge:
+          "Den här exporten är för stor för att webbläsaren ska kunna skapa den. Prova mindre mått.",
         saveProject: "Spara projekt",
         loadProject: "Öppna projekt",
       },

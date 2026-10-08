@@ -4475,6 +4475,7 @@ export const zhCN: TranslationKeys = {
         exportButton: "导出",
         copied: "已复制",
         copyFailed: "复制失败",
+        tooLarge: "导出内容太大，浏览器无法生成。请尝试更小的尺寸。",
         saveProject: "保存项目",
         loadProject: "载入项目",
       },

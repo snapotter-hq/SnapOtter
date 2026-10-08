@@ -4760,6 +4760,8 @@ export const uk: TranslationKeys = {
         exportButton: "Експортувати",
         copied: "Скопійовано",
         copyFailed: "Не вдалося скопіювати",
+        tooLarge:
+          "Цей експорт завеликий, щоб браузер міг його створити. Спробуйте зменшити розміри.",
         saveProject: "Зберегти проєкт",
         loadProject: "Відкрити проєкт",
       },

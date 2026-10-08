@@ -4757,6 +4757,8 @@ export const tr: TranslationKeys = {
         exportButton: "Dışa Aktar",
         copied: "Kopyalandı",
         copyFailed: "Kopyalanamadı",
+        tooLarge:
+          "Bu dışa aktarma, tarayıcının oluşturamayacağı kadar büyük. Daha küçük boyutlar deneyin.",
         saveProject: "Projeyi Kaydet",
         loadProject: "Projeyi Yükle",
       },

@@ -4551,6 +4551,7 @@ export const hi: TranslationKeys = {
         exportButton: "एक्सपोर्ट",
         copied: "कॉपी हो गया",
         copyFailed: "कॉपी विफल",
+        tooLarge: "यह एक्सपोर्ट इतना बड़ा है कि ब्राउज़र उसे रेंडर नहीं कर सकता। छोटे आयाम आज़माकर देखें।",
         saveProject: "प्रोजेक्ट सहेजें",
         loadProject: "प्रोजेक्ट लोड करें",
       },
