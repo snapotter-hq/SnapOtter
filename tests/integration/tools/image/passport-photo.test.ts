@@ -318,8 +318,8 @@ describe("passport-photo/generate", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("returns 422 when jobId workspace does not exist", async () => {
-    const res = await app.inject({
+  function generateFor(jobId: string) {
+    return app.inject({
       method: "POST",
       url: "/api/v1/tools/image/passport-photo/generate",
       headers: {
@@ -327,7 +327,7 @@ describe("passport-photo/generate", () => {
         "content-type": "application/json",
       },
       payload: {
-        jobId: "00000000-0000-0000-0000-000000000000",
+        jobId,
         filename: "test.png",
         countryCode: "US",
         landmarks: {
@@ -344,9 +344,30 @@ describe("passport-photo/generate", () => {
         imageHeight: 150,
       },
     });
+  }
 
-    // 422 because the workspace directory won't exist for this fake jobId
-    expect(res.statusCode).toBe(422);
+  it("answers 410 ANALYSIS_EXPIRED when the analyze output is gone (#1674)", async () => {
+    // No analyze ever stored test_nobg.png for this job, the same state as
+    // one whose output expired between analyze and generate.
+    const res = await generateFor(randomUUID());
+
+    expect(res.statusCode).toBe(410);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("ANALYSIS_EXPIRED");
+    // The raw ENOENT carried the absolute data path; nothing of it leaks.
+    expect(res.body).not.toMatch(/ENOENT|outputs\//);
+  });
+
+  it("lets a storage fault reading the analyze output reach the error handler (#1674)", async () => {
+    // A directory where the PNG should be makes the read fail with EISDIR:
+    // the object exists but can't be read, which is the server's fault.
+    const jobId = randomUUID();
+    await putObject(`outputs/${jobId}/test_nobg.png/blocker`, Buffer.from("x"));
+
+    const res = await generateFor(jobId);
+
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).toBe("Internal server error");
   });
 });
 
