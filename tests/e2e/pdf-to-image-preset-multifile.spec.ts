@@ -59,7 +59,11 @@ test.describe("pdf-to-image conversion presets with multiple files (issue #632)"
     await expect(page.getByText("Files (2)")).toBeVisible();
     await page.getByTestId("preset-submit").click();
 
-    await expect(page.getByText(/All files failed processing/i)).toBeVisible({ timeout: 15_000 });
+    // The preview area's failed-state card repeats the message, so scope to
+    // the settings panel's form, which is what this test is about.
+    await expect(page.locator("form").getByText(/All files failed processing/i)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("a single PDF still uses the single-file route", async ({ loggedInPage: page }) => {

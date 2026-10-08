@@ -541,9 +541,10 @@ test.describe("GUI AI Tools", () => {
       await page.goto("/image/smart-crop");
       await uploadTestImage(page);
 
-      // Strategy buttons
-      await expect(page.getByRole("button", { name: "Attention" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Entropy" })).toBeVisible();
+      // Strategy buttons. Exact names: the hint icon beside them is a button
+      // whose aria-label is its help text, which starts with "Attention".
+      await expect(page.getByRole("button", { name: "Attention", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Entropy", exact: true })).toBeVisible();
 
       // Width/height inputs
       await expect(page.locator("#sc-width")).toBeVisible();
