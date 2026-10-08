@@ -52,7 +52,12 @@ class FakeXhr {
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   ontimeout: (() => void) | null = null;
-  upload: { onprogress: unknown; onload: unknown } = { onprogress: null, onload: null };
+  upload: {
+    onprogress: ((event: ProgressEvent) => void) | null;
+    onload: unknown;
+  } = { onprogress: null, onload: null };
+  /** A browser sends no upload events to a handler attached after send(). */
+  uploadHandlerAtSend = false;
   url = "";
   aborted = false;
 
@@ -70,7 +75,16 @@ class FakeXhr {
 
   setRequestHeader(_key: string, _value: string) {}
 
-  send(_body: FormData) {}
+  send(_body: FormData) {
+    this.uploadHandlerAtSend = this.upload.onprogress !== null;
+  }
+
+  /** Report upload bytes moving, as the browser does while the body is sent. */
+  uploadProgress(loaded: number, total: number) {
+    act(() => {
+      this.upload.onprogress?.(new ProgressEvent("progress", { loaded, total }));
+    });
+  }
 
   respond(status: number, body: unknown) {
     this.respondRaw(status, JSON.stringify(body));
@@ -923,23 +937,41 @@ const STALL_MS = 5 * 60_000;
  */
 function captureStallTimers() {
   const realSetTimeout = globalThis.setTimeout;
-  const stalls: (() => void)[] = [];
-  const spy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+  const realClearTimeout = globalThis.clearTimeout;
+  const stalls: { fire: () => void; cleared: boolean }[] = [];
+  const byHandle = new Map<unknown, (typeof stalls)[number]>();
+  const setSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
     handler: () => void,
     ms?: number,
   ) => {
-    if (ms === STALL_MS) stalls.push(handler);
-    return realSetTimeout(ms === STALL_MS ? () => {} : handler, ms === STALL_MS ? 0 : ms);
+    if (ms !== STALL_MS) return realSetTimeout(handler, ms);
+    const handle = realSetTimeout(() => {}, 0);
+    const stall = { fire: handler, cleared: false };
+    stalls.push(stall);
+    byHandle.set(handle, stall);
+    return handle;
   }) as typeof setTimeout);
+  const clearSpy = vi.spyOn(globalThis, "clearTimeout").mockImplementation(((
+    handle?: Parameters<typeof clearTimeout>[0],
+  ) => {
+    const stall = byHandle.get(handle);
+    if (stall) stall.cleared = true;
+    realClearTimeout(handle);
+  }) as typeof clearTimeout);
   return {
     /** Fire the most recently armed stall, as five quiet minutes would. */
     fireLatest() {
       const stall = stalls.at(-1);
       if (!stall) throw new Error("no stall timer armed");
-      act(() => stall());
+      act(() => stall.fire());
+    },
+    /** Every stall armed so far, in order, with whether it was cleared. */
+    all() {
+      return stalls;
     },
     restore() {
-      spy.mockRestore();
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
     },
   };
 }
@@ -1078,6 +1110,92 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
       xhr.respond(422, { error: "Object erasing failed" });
 
       expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+});
+
+/**
+ * #1959: the stall timer is armed before the upload starts, and only the
+ * progress stream used to reset it. A big image still uploading while the
+ * stream was quiet got called stalled, and since #1893 the stall also aborts
+ * the request, cutting off an upload that was still moving.
+ */
+describe("erase-object counts upload progress as a sign of life (#1959)", () => {
+  it("single file: pushes the stall back while upload bytes are moving", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      expect(xhr.uploadHandlerAtSend).toBe(true);
+      const armedBeforeUpload = stalls.all().at(-1);
+      expect(armedBeforeUpload?.cleared).toBe(false);
+
+      xhr.uploadProgress(1, 4);
+
+      expect(armedBeforeUpload?.cleared).toBe(true);
+      expect(stalls.all().at(-1)?.cleared).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      expect(useFileStore.getState().processing).toBe(true);
+
+      xhr.respond(200, GOOD_BODY);
+      expect(entry().status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: still stalls after five quiet minutes once the upload stops", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.uploadProgress(4, 4);
+
+      stalls.fireLatest();
+
+      expect(xhr.aborted).toBe(true);
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: upload progress after the run ended arms no new stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      });
+      const armed = stalls.all().length;
+
+      xhr.uploadProgress(4, 4);
+
+      expect(stalls.all()).toHaveLength(armed);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: pushes the stall back while upload bytes are moving", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const xhr = await submit();
+      expect(xhr.uploadHandlerAtSend).toBe(true);
+      const armedBeforeUpload = stalls.all().at(-1);
+      expect(armedBeforeUpload?.cleared).toBe(false);
+
+      xhr.uploadProgress(1, 4);
+
+      expect(armedBeforeUpload?.cleared).toBe(true);
+      expect(stalls.all().at(-1)?.cleared).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      expect(entry(0).status).toBe("processing");
     } finally {
       stalls.restore();
     }

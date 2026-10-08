@@ -49,6 +49,19 @@ interface ProgressHandlers {
   onStall: () => void;
 }
 
+/** A live progress subscription. */
+export interface ProgressSubscription {
+  /** End it: close the stream and drop the stall timer. Safe to call twice. */
+  stop: () => void;
+  /**
+   * Count something outside the stream as a sign of life and restart the stall
+   * timer, the way a heartbeat does. The request's upload progress calls it, so
+   * an image still uploading while the stream is quiet isn't called stalled
+   * (#1959). Does nothing once the subscription has ended.
+   */
+  touch: () => void;
+}
+
 /**
  * Subscribe to async (202) job progress with the same resilience as the
  * standard tool processor (PRs #203/#204). The original eraser opened a bare
@@ -56,16 +69,17 @@ interface ProgressHandlers {
  * flaky network, proxy buffering) the UI hung forever at the last percent
  * (~25%) even though the backend job had finished and saved its result.
  *
- * This reconnects on tab refocus -- the progress endpoint replays the terminal
+ * This reconnects on tab refocus (the progress endpoint replays the terminal
  * frame from Redis and, after that cache expires, from the durable job record,
- * so a job that completed while SSE was dead still resolves -- and arms a stall
- * timeout that fails gracefully instead of hanging. Returns a cleanup the
- * caller must invoke on sync completion, error, or unmount.
+ * so a job that completed while SSE was dead still resolves). It also arms a stall
+ * timeout that fails gracefully instead of hanging. The caller must `stop()`
+ * it on sync completion, error, or unmount, and should `touch()` it while the
+ * upload is moving.
  */
 export function subscribeEraseObjectJobProgress(
   clientJobId: string,
   handlers: ProgressHandlers,
-): () => void {
+): ProgressSubscription {
   let es: EventSource | null = null;
   let stall: ReturnType<typeof setTimeout> | null = null;
   let done = false;
@@ -87,6 +101,8 @@ export function subscribeEraseObjectJobProgress(
   };
 
   const resetStall = () => {
+    // A late touch after the run ended must not arm a stall that would end it twice.
+    if (done) return;
     if (stall) clearTimeout(stall);
     stall = setTimeout(() => {
       cleanup();
@@ -166,7 +182,7 @@ export function subscribeEraseObjectJobProgress(
   document.addEventListener("visibilitychange", onVisible);
   open();
   resetStall();
-  return cleanup;
+  return { stop: cleanup, touch: resetStall };
 }
 
 interface EraseObjectSettingsProps {
@@ -261,7 +277,7 @@ export function EraseObjectSettings({
         reject(err);
       };
 
-      const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
+      const subscription = subscribeEraseObjectJobProgress(clientJobId, {
         onProgress,
         onComplete: (r) => {
           applyResult(r);
@@ -271,6 +287,7 @@ export function EraseObjectSettings({
         onStall: () =>
           abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
       });
+      const stopProgress = subscription.stop;
       // Drops this file where it stands. The error only settles the promise:
       // the batch has already decided to write nothing more for it.
       onStoppable(() => {
@@ -288,6 +305,10 @@ export function EraseObjectSettings({
       formData.append("qualityMode", qualityMode);
 
       xhr.timeout = 600_000;
+      // The stall timer is armed before the upload starts, and on a quiet
+      // stream only this keeps it from cutting off an image that is still
+      // uploading (#1959). xhr.timeout still bounds the request as a whole.
+      xhr.upload.onprogress = () => subscription.touch();
       xhr.onload = () => {
         if (abandoned || xhr.status === 202) return;
         stopProgress();
@@ -414,7 +435,7 @@ export function EraseObjectSettings({
       xhr.abort();
     };
 
-    const stopProgress = subscribeEraseObjectJobProgress(clientJobId, {
+    const subscription = subscribeEraseObjectJobProgress(clientJobId, {
       onProgress: (percent) => {
         setProgressPhase("processing");
         setProgressPercent(15 + (percent / 100) * 85);
@@ -443,6 +464,7 @@ export function EraseObjectSettings({
         finishUi();
       },
     });
+    const stopProgress = subscription.stop;
     progressCleanupRef.current = stopProgress;
 
     const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -461,6 +483,9 @@ export function EraseObjectSettings({
 
     xhr.timeout = 600_000;
     xhr.upload.onprogress = (e) => {
+      // See the batch path: upload bytes moving keep the stall timer from
+      // cutting the upload off (#1959).
+      subscription.touch();
       if (e.lengthComputable) {
         setProgressPercent((e.loaded / e.total) * 15);
       }

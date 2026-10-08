@@ -29,10 +29,14 @@ class FakeEventSource {
   }
 }
 
-// Sign PDF's subscriber returns { stop, touch } since #1968; the shared cases
-// below only need the stop half.
+// Erase Object's and Sign PDF's subscribers return { stop, touch } (#1968,
+// #1959); the shared cases below only need the stop half.
 const subscribers = [
-  ["erase-object", subscribeEraseObjectJobProgress],
+  [
+    "erase-object",
+    (...args: Parameters<typeof subscribeEraseObjectJobProgress>) =>
+      subscribeEraseObjectJobProgress(...args).stop,
+  ],
   [
     "sign-pdf",
     (...args: Parameters<typeof subscribeSignPdfJobProgress>) =>
@@ -306,7 +310,12 @@ describe.each(subscribers)(
 // #1968: the stall timer is armed before the upload starts. touch() lets the
 // upload's own progress count as a sign of life, so a quiet stream can't cut
 // off a large PDF that is still uploading.
-describe("sign-pdf async progress: touch", () => {
+const touchSubscribers = [
+  ["erase-object", subscribeEraseObjectJobProgress],
+  ["sign-pdf", subscribeSignPdfJobProgress],
+] as const;
+
+describe.each(touchSubscribers)("%s async progress: touch", (_name, subscribe) => {
   beforeEach(() => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];
@@ -320,7 +329,7 @@ describe("sign-pdf async progress: touch", () => {
 
   it("restarts the stall timeout the way a heartbeat does", () => {
     const onStall = vi.fn();
-    const { stop, touch } = subscribeSignPdfJobProgress("job-touch", {
+    const { stop, touch } = subscribe("job-touch", {
       onComplete: vi.fn(),
       onFailed: vi.fn(),
       onStall,
@@ -338,7 +347,7 @@ describe("sign-pdf async progress: touch", () => {
 
   it("does nothing after stop", () => {
     const onStall = vi.fn();
-    const { stop, touch } = subscribeSignPdfJobProgress("job-touch-stopped", {
+    const { stop, touch } = subscribe("job-touch-stopped", {
       onComplete: vi.fn(),
       onFailed: vi.fn(),
       onStall,
@@ -353,7 +362,7 @@ describe("sign-pdf async progress: touch", () => {
 
   it("does nothing after the stall already ended the run", () => {
     const onStall = vi.fn();
-    const { touch } = subscribeSignPdfJobProgress("job-touch-stalled", {
+    const { touch } = subscribe("job-touch-stalled", {
       onComplete: vi.fn(),
       onFailed: vi.fn(),
       onStall,
