@@ -14,7 +14,7 @@ import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { parseFileResultsHeader, unpackBatchZip } from "@/lib/batch-zip";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
+import { CancelRefusedError, failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import {
   checkToolResult,
   FRAME_HANDLING_FAILED,
@@ -73,6 +73,8 @@ const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-e
 
 const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
+// What a run reads when its panel unmounted under it (#2125).
+const RUN_STOPPED = "Processing was interrupted. Run it again.";
 
 type DegradeTrigger = ToolRunDegradedProperties["trigger"];
 // After degrading a dead POST to the async path (#722), how long to wait for
@@ -160,7 +162,7 @@ export function useToolProcessor(toolId: string) {
     // like every other outcome (#1161). Reports whether it acted, like
     // cancelLocally: a stale closure refuses and the timer's caller falls
     // through to the single-run settle.
-    abandon: (message: string) => boolean;
+    abandon: (message: string, reason?: string) => boolean;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
@@ -703,6 +705,57 @@ export function useToolProcessor(toolId: string) {
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
     };
   }, [reconnectSSE]);
+
+  // The cleanup above aborts the request and closes the stream when the panel
+  // unmounts, which ends the run. It has to settle it too: left alone the store
+  // sits at `processing` for good, and a panel that remounts (rotating a phone
+  // across the layout breakpoint swaps the whole tree) shows a run that can
+  // never end (#2125). A ref, so the cleanup always sees the latest closures
+  // without an effect that re-runs, and so stops, mid-run.
+  const settleStoppedRunRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    settleStoppedRunRef.current = () => {
+      if (!activeJobIdRef.current) return;
+      // A store that no longer carries the run (Clear all, a reset) has nothing
+      // left to settle, and an error written now would land on whatever the
+      // user does next.
+      if (!useFileStore.getState().processing) return;
+      // The job outlives its observer: the request and stream are gone, and so
+      // is the handle that would cancel it. Ask the server to stop it, or the
+      // user is told to run it again while the first copy finishes (and, for a
+      // library file, saves). It reads the job id before the run is cleared.
+      void cancelCurrentJob().catch((err) => {
+        if (err instanceof CancelRefusedError) return;
+        reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, toolId);
+      });
+      const batchRun = batchRunRef.current;
+      if (batchRun) {
+        // failRun rethrows a teardown error by design, for callers in a timer.
+        // Out of an effect cleanup it would reach the app's error boundary.
+        try {
+          if (batchRun.abandon(RUN_STOPPED, "panel-unmounted")) return;
+        } catch (cause) {
+          reportRunEndFailure("Ending a tool run after its panel unmounted failed", cause, toolId);
+          // failRun got as far as clearing the job: the run is over.
+          if (!activeJobIdRef.current) return;
+        }
+      }
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(RUN_STOPPED),
+        () => setProcessing(false),
+        () => settleProcessingEntries(RUN_STOPPED),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+    };
+  });
+  useEffect(() => () => settleStoppedRunRef.current(), []);
 
   const processFiles = useCallback(
     (files: File[], settings: Record<string, unknown>, opts?: { skipLibrarySave?: boolean }) => {
@@ -1273,10 +1326,15 @@ export function useToolProcessor(toolId: string) {
         // A ZIP that won't unpack fails the run here, once, logged and
         // reported by unpackBatchZip (#1805). Anything else that throws is our
         // own code, and settleOrFail handles it.
+        // Set once a ZIP is in hand or being fetched: the run then finishes on
+        // its own, so an unmounted panel must not fail it and throw the
+        // results away (#2125).
+        let settling = false;
         const settleFromZip = async (
           zipBlob: Blob,
           { fileResults, fileNotes, reason, status }: ZipSettle,
         ) => {
+          settling = true;
           const extracted = await unpackBatchZip(zipBlob, { status, toolId });
           // The unpack awaits: a cancel or a newer run may have ended this
           // one meanwhile, and its writes would land on that run's state.
@@ -1376,6 +1434,7 @@ export function useToolProcessor(toolId: string) {
         // that arrived and won't settle fails once, without blaming the
         // network (#1805).
         const downloadAndSettle = async (result: Record<string, unknown>) => {
+          settling = true;
           const url = serverUrl(String(result.downloadUrl));
           const fileResults = (result.fileResults ?? {}) as Record<string, string>;
           const fileNotes = asNotesMap(result.fileNotes);
@@ -1433,9 +1492,10 @@ export function useToolProcessor(toolId: string) {
             failRun("Canceled", "canceled");
             return true;
           },
-          abandon: (message) => {
+          abandon: (message, reason = "unconfirmed") => {
             if (activeJobIdRef.current !== clientJobId) return false;
-            failRun(message, "unconfirmed");
+            if (settling) return true;
+            failRun(message, reason);
             return true;
           },
           onTerminal: (frame) => {
