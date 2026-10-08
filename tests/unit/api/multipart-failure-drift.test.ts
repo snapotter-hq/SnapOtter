@@ -86,7 +86,10 @@ function readSpelling(call: ts.CallExpression, sharedReaders: string[]): string 
   return null;
 }
 
-/** The function a node sits in, and the nearest try that catches a throw from it. */
+/**
+ * Where a throw from `node` goes: the nearest catching try in the same function, or
+ * else the function itself (whose callers then decide).
+ */
 function enclosing(node: ts.Node): {
   fn: ts.SignatureDeclaration | undefined;
   tryNode?: ts.TryStatement;
@@ -155,10 +158,8 @@ function check(name: string, src: string, config: Config = {}): Finding[] {
       const spelling = readSpelling(node, sharedReaders);
       if (spelling) {
         const { fn, tryNode } = enclosing(node);
-        const insideSharedReader = !!fn && sharedReaders.includes(nameOf(fn) ?? "");
-        const isCallToReader = sharedReaders.includes(spelling.replace("()", ""));
-        if (insideSharedReader && !isCallToReader) {
-          // The reader's own read: its callers are the ones checked.
+        if (fn && sharedReaders.includes(nameOf(fn) ?? "")) {
+          // A shared reader's own read, with no catch of its own: its callers are checked.
         } else if (tryNode?.catchClause) {
           if (!catchUses(tryNode.catchClause, helper)) {
             findings.push({
@@ -214,7 +215,7 @@ describe("multipart read failures go through multipartFailure (#1341, #2157)", (
   });
 
   it("still finds the reads it is meant to check", () => {
-    // A guard that parses nothing passes everything. 60 reads in 52 files today.
+    // A guard that parses nothing passes everything.
     let reads = 0;
     const filesWithReads = new Set<string>();
     for (const { name, src } of files) {
@@ -250,6 +251,10 @@ describe("multipart read failures go through multipartFailure (#1341, #2157)", (
       expect(file, `${name} no longer exists`).toBeDefined();
       for (const reader of readers) {
         expect(file?.src, `${name} no longer defines ${reader}`).toContain(`function ${reader}(`);
+        // Only this file's calls are checked, so the reader can't be exported.
+        expect(file?.src, `${reader} is exported; check its callers elsewhere`).not.toMatch(
+          new RegExp(`export\\s+(async\\s+)?function\\s+${reader}\\b`),
+        );
         const calls = (file?.src.split(`${reader}(`).length ?? 1) - 1;
         expect(calls, `${name} no longer calls ${reader}`).toBeGreaterThan(1);
       }
@@ -297,27 +302,36 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
   });
 
   it("flags the same regression in the real pdf-to-image.ts, which has spare calls", () => {
-    const real = files.find((f) => f.name === "tools/pdf-to-image.ts")?.src ?? "";
-    const catchBlock =
-      /(\} catch \(err\) \{\s*)const failure = multipartFailure\(err\);\s*return reply\.status\(failure\.status\)\.send\(failure\.body\);/;
-    // Break the merge route's catch (the one wrapping its own request.parts() loop).
-    const loopStart = real.indexOf("for await (const part of request.parts())");
-    const head = real.slice(0, loopStart);
-    const tail = real
-      .slice(loopStart)
-      .replace(
-        catchBlock,
-        '$1return reply.status(400).send({ error: "Failed to parse multipart request" });',
-      );
-    const mutated = head + tail;
-    expect(mutated).not.toBe(real);
-    const config = { sharedReaders: SHARED_READERS["tools/pdf-to-image.ts"] };
-    expect(check("tools/pdf-to-image.ts", real, config)).toEqual([]);
-    const findings = check("tools/pdf-to-image.ts", mutated, config);
-    expect(findings).toHaveLength(1);
-    expect(findings[0].what).toContain("request.parts()");
+    const name = "tools/pdf-to-image.ts";
+    const real = files.find((f) => f.name === name)?.src ?? "";
+    const config = { sharedReaders: SHARED_READERS[name] };
+
+    // Swap the catch of the first route that reads multipart inline (the batch route)
+    // for a hand-written 400. Found by position in the AST, so a reformat or a renamed
+    // variable can't move the break to a different route.
+    const sf = parse(name, real);
+    let catchBlock: ts.Block | undefined;
+    const find = (node: ts.Node) => {
+      if (
+        !catchBlock &&
+        ts.isCallExpression(node) &&
+        readSpelling(node, []) === "request.parts()"
+      ) {
+        catchBlock = enclosing(node).tryNode?.catchClause?.block;
+      }
+      ts.forEachChild(node, find);
+    };
+    find(sf);
+    if (!catchBlock) throw new Error("no route in pdf-to-image.ts reads multipart inline any more");
+    const handWritten =
+      '{ return reply.status(400).send({ error: "Failed to parse multipart request" }); }';
+    const mutated =
+      real.slice(0, catchBlock.getStart(sf)) + handWritten + real.slice(catchBlock.getEnd());
+
+    expect(check(name, real, config)).toEqual([]);
+    expect(check(name, mutated, config)).toHaveLength(1);
     // What the count-based check saw: still at least one helper call per read.
-    const calls = (s: string, n: string) => s.split(`${n}(`).length - 1;
+    const calls = (src: string, fn: string) => src.split(`${fn}(`).length - 1;
     expect(calls(mutated, "multipartFailure")).toBeGreaterThanOrEqual(
       calls(mutated, "request.parts"),
     );
@@ -362,6 +376,41 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
           for await (const part of request.parts()) { void part; }
         } finally {
           cleanup();
+        }
+      });
+    `;
+    expect(check("r.ts", src)).toHaveLength(1);
+  });
+
+  it("keeps climbing past a try/finally to a guarded try/catch around it", () => {
+    const src = `
+      app.post("/a", async (request, reply) => {
+        try {
+          try {
+            for await (const part of request.parts()) { void part; }
+          } finally {
+            cleanup();
+          }
+        } catch (err) {
+          const failure = multipartFailure(err);
+          return reply.status(failure.status).send(failure.body);
+        }
+      });
+    `;
+    expect(check("r.ts", src)).toEqual([]);
+  });
+
+  it("does not credit a read in the finally block of a guarded try", () => {
+    // A throw from a finally block is not caught by that try's own catch.
+    const src = `
+      app.post("/a", async (request, reply) => {
+        try {
+          await work();
+        } catch (err) {
+          const failure = multipartFailure(err);
+          return reply.status(failure.status).send(failure.body);
+        } finally {
+          for await (const part of request.parts()) { void part; }
         }
       });
     `;
@@ -421,6 +470,8 @@ describe("the multipart guard catches what counting could not (#2157)", () => {
     const handled: Handled = { how: "error handler", reads: 1 };
     expect(check("r.ts", one, { handled })).toEqual([]);
     expect(check("r.ts", two, { handled })).toHaveLength(1);
+    // A pin that is too high is as stale as one that is too low.
+    expect(check("r.ts", one, { handled: { how: "error handler", reads: 2 } })).toHaveLength(1);
   });
 
   it("requires the OCR helper, not multipartFailure, in the files mapped to it", () => {
