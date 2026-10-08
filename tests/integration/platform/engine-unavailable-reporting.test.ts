@@ -515,6 +515,62 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     });
   });
 
+  // #2179: single-file execute read only the finalize's resultPayload and
+  // answered 422 for every failed step, a server fault included. The failed
+  // step's status, code and hint now ride the payload next to its message.
+  it("pipeline execute answers a step's server fault with its status, code and hint (#2179)", async () => {
+    failInWorker("resize", engineDown());
+    const res = await post("/api/v1/pipeline/execute", [
+      pngPart("one.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: `Step 1: ${engineDown().message}`,
+      code: "ENGINE_UNAVAILABLE",
+      details: HINT,
+      completedSteps: [],
+    });
+  });
+
+  it("pipeline execute keeps the completed steps when a later step hits the fault (#2179)", async () => {
+    failInWorker("sharpen", engineDown());
+    const res = await post("/api/v1/pipeline/execute", [
+      pngPart("one.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [
+            { toolId: "resize", settings: { width: 50 } },
+            { toolId: "sharpen", settings: {} },
+          ],
+        }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(503);
+    const body = res.json();
+    expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    expect(body.error).toBe(`Step 2: ${engineDown().message}`);
+    expect(body.completedSteps).toHaveLength(1);
+  });
+
+  it("pipeline execute still answers 422 for a step that failed for another reason (#2179)", async () => {
+    failInWorker("resize", new Error("Resize ran out of road"));
+    const res = await post("/api/v1/pipeline/execute", [
+      pngPart("one.png"),
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+    ]);
+    expect(res.statusCode, res.body).toBe(422);
+    expect(res.json().error).toBe("Step 1: Resize ran out of road");
+    expect(res.json().code).toBeUndefined();
+  });
+
   it("pipeline batch names one shared reason that isn't a server fault", async () => {
     failInWorker("resize", new Error("Resize ran out of road"));
     const res = await post("/api/v1/pipeline/batch", [
