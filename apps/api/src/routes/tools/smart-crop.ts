@@ -1,10 +1,17 @@
 import { detectFaces } from "@snapotter/ai";
-import { SMART_CROP_FACE_PRESETS } from "@snapotter/shared";
+import { MAX_RESIZE_OUTPUT_DIMENSION, SMART_CROP_FACE_PRESETS } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
+
+// Sharp re-reads the buffers this tool hands between its own steps, and refuses one
+// over its default input limit (0x3FFF x 0x3FFF) with a bare Error that reaches the
+// worker as a server fault. Refuse the request instead (#2064).
+const MAX_STEP_PIXELS = MAX_RESIZE_OUTPUT_DIMENSION * MAX_RESIZE_OUTPUT_DIMENSION;
+
+const dimension = z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION);
 
 const settingsSchema = z
   .object({
@@ -17,8 +24,8 @@ const settingsSchema = z
         return v;
       }),
     strategy: z.enum(["attention", "entropy"]).default("attention"),
-    width: z.number().int().positive().optional(),
-    height: z.number().int().positive().optional(),
+    width: dimension.optional(),
+    height: dimension.optional(),
     padding: z.number().int().min(0).max(50).default(0),
     facePreset: z
       .enum(["closeup", "head-shoulders", "upper-body", "half-body"])
@@ -27,8 +34,24 @@ const settingsSchema = z
     threshold: z.number().int().min(0).max(255).default(30),
     padToSquare: z.boolean().default(false),
     padColor: z.string().default("#ffffff"),
-    targetSize: z.number().int().positive().optional(),
+    targetSize: dimension.optional(),
     quality: z.number().int().min(1).max(100).optional(),
+  })
+  .superRefine((s, ctx) => {
+    // Trim ignores width and height. Subject resizes to them through an oversized
+    // intermediate when padding is set, and face falls back to the same path when no
+    // face is found.
+    if (s.mode === "trim") return;
+    const scale = s.padding > 0 ? 1 + s.padding / 100 : 1;
+    const w = Math.round((s.width ?? 1080) * scale);
+    const h = Math.round((s.height ?? 1080) * scale);
+    if (w * h > MAX_STEP_PIXELS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["width"],
+        message: `Width and height${scale > 1 ? " with padding" : ""} must not exceed ${MAX_STEP_PIXELS} total pixels`,
+      });
+    }
   })
   .transform((s) => ({
     ...s,
