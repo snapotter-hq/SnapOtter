@@ -1,3 +1,4 @@
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import { beforeAll, describe, expect, it } from "vitest";
 import { settingsSchema as beautifySettingsSchema } from "../../../apps/api/src/lib/beautify/constants.js";
@@ -63,6 +64,14 @@ describe("Sharp-backed image settings schemas", () => {
     ["gif-tools", { loop: 1.5 }],
   ])("rejects non-integer dimensions or counts for %s", (toolId, settings) => {
     expect(parses(toolId, settings)).toBe(false);
+  });
+
+  it("bounds optimize-for-web max dimensions by the resize ceiling", () => {
+    expect(parses("optimize-for-web", { maxWidth: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("optimize-for-web", { maxHeight: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("optimize-for-web", { maxWidth: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("optimize-for-web", { maxHeight: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("optimize-for-web", { maxWidth: 100_000_001 })).toBe(false);
   });
 
   it("rejects a non-finite resize percentage", () => {

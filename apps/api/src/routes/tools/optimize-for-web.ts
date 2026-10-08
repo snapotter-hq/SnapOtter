@@ -1,5 +1,5 @@
 import { extname } from "node:path";
-import { optimizeForWeb } from "@snapotter/image-engine";
+import { MAX_RESIZE_OUTPUT_DIMENSION, optimizeForWeb } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
@@ -39,8 +39,8 @@ const FORMAT_EXTENSIONS: Record<string, string> = {
 const settingsSchema = z.object({
   format: z.enum(["webp", "jpeg", "avif", "png", "jxl"]).default("webp"),
   quality: z.number().int().min(1).max(100).default(80),
-  maxWidth: z.number().int().positive().optional(),
-  maxHeight: z.number().int().positive().optional(),
+  maxWidth: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+  maxHeight: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
   progressive: z.boolean().default(true),
   stripMetadata: z.boolean().default(true),
 });
