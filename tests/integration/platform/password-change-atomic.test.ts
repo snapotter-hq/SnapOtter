@@ -5,9 +5,9 @@
  * with the new password already in place and the old sessions still alive.
  * The user retried with the old password and got INVALID_PASSWORD.
  *
- * The failure is injected at the API-keys DELETE, the last statement of both
- * handlers, on the plain `db` handle and on the handle a transaction passes to
- * its callback, so the same test is meaningful whichever way the handler runs.
+ * The failure is injected at the sessions DELETE and at the API-keys DELETE in
+ * turn, on the plain `db` handle and on the handle a transaction passes to its
+ * callback, so the same test is meaningful whichever way the handler runs.
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,20 +16,21 @@ import { buildTestApp, createUserAndLogin, loginAsAdmin, type TestApp } from "..
 
 let testApp: TestApp;
 let adminToken: string;
-let failApiKeyDelete = false;
+/** The table whose DELETE throws while armed, or null for none. */
+let failDeleteOn: unknown = null;
 
 const uid = () => `pw_atomic_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
 type DeleteFn = (table: unknown) => unknown;
 
-/** Wraps a db or transaction handle so its DELETE on api_keys throws while armed. */
-function failingApiKeyDelete<T extends object>(handle: T): T {
+/** Wraps a db or transaction handle so its DELETE on the armed table throws. */
+function failingDelete<T extends object>(handle: T): T {
   return new Proxy(handle, {
     get(target, prop) {
       const value = Reflect.get(target, prop, target);
       if (prop !== "delete") return typeof value === "function" ? value.bind(target) : value;
       return (table: unknown) => {
-        if (failApiKeyDelete && table === schema.apiKeys) {
+        if (failDeleteOn !== null && table === failDeleteOn) {
           throw new Error("simulated lock timeout");
         }
         return (value as DeleteFn).call(target, table);
@@ -44,7 +45,7 @@ beforeAll(async () => {
 
   const realDelete = db.delete.bind(db) as DeleteFn;
   vi.spyOn(db, "delete").mockImplementation(((table: unknown) => {
-    if (failApiKeyDelete && table === schema.apiKeys) throw new Error("simulated lock timeout");
+    if (failDeleteOn !== null && table === failDeleteOn) throw new Error("simulated lock timeout");
     return realDelete(table);
   }) as unknown as typeof db.delete);
 
@@ -55,11 +56,7 @@ beforeAll(async () => {
   vi.spyOn(db, "transaction").mockImplementation(((
     cb: (tx: object) => Promise<unknown>,
     config?: unknown,
-  ) =>
-    realTransaction(
-      (tx) => cb(failingApiKeyDelete(tx)),
-      config,
-    )) as unknown as typeof db.transaction);
+  ) => realTransaction((tx) => cb(failingDelete(tx)), config)) as unknown as typeof db.transaction);
 }, 30_000);
 
 afterAll(async () => {
@@ -68,11 +65,11 @@ afterAll(async () => {
 }, 10_000);
 
 beforeEach(() => {
-  failApiKeyDelete = false;
+  failDeleteOn = null;
 });
 
 afterEach(() => {
-  failApiKeyDelete = false;
+  failDeleteOn = null;
 });
 
 async function loginAgain(username: string, password: string): Promise<string> {
@@ -112,83 +109,99 @@ async function apiKeyCount(userId: string): Promise<number> {
   return rows.length;
 }
 
+/** Each revoke statement in turn: the group is atomic, not just its last statement. */
+const REVOKES = [
+  ["api_keys", schema.apiKeys],
+  ["sessions", schema.sessions],
+] as const;
+
 describe("change-password is all-or-nothing (#2089)", () => {
-  it("keeps the old password, sessions and API keys when a revoke fails, then succeeds on retry", async () => {
-    const username = uid();
-    const { token, userId } = await createUserAndLogin(testApp.app, username);
-    const otherToken = await loginAgain(username, "Userpass1");
-    await createApiKey(token);
-    const hashBefore = await passwordHash(userId);
-    expect(await liveSessionCount(userId)).toBe(2);
+  it.each(REVOKES)(
+    "keeps the old password, sessions and keys when the %s delete fails, then succeeds on retry",
+    async (_name, failingTable) => {
+      const username = uid();
+      const { token, userId } = await createUserAndLogin(testApp.app, username);
+      const otherToken = await loginAgain(username, "Userpass1");
+      await createApiKey(token);
+      const hashBefore = await passwordHash(userId);
+      expect(await liveSessionCount(userId)).toBe(2);
 
-    failApiKeyDelete = true;
-    const failed = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/change-password",
-      headers: { authorization: `Bearer ${token}` },
-      payload: { currentPassword: "Userpass1", newPassword: "NewValid1" },
-    });
-    failApiKeyDelete = false;
+      failDeleteOn = failingTable;
+      const failed = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/change-password",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { currentPassword: "Userpass1", newPassword: "NewValid1" },
+      });
+      failDeleteOn = null;
 
-    expect(failed.statusCode).toBe(500);
-    expect(await passwordHash(userId)).toBe(hashBefore);
-    expect(await liveSessionCount(userId)).toBe(2);
-    expect(await apiKeyCount(userId)).toBe(1);
-    const stillWorks = await testApp.app.inject({
-      method: "GET",
-      url: "/api/auth/session",
-      headers: { authorization: `Bearer ${otherToken}` },
-    });
-    expect(stillWorks.statusCode).toBe(200);
+      expect(failed.statusCode).toBe(500);
+      expect(await passwordHash(userId)).toBe(hashBefore);
+      expect(await liveSessionCount(userId)).toBe(2);
+      expect(await apiKeyCount(userId)).toBe(1);
+      const stillWorks = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/session",
+        headers: { authorization: `Bearer ${otherToken}` },
+      });
+      expect(stillWorks.statusCode).toBe(200);
 
-    const retry = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/change-password",
-      headers: { authorization: `Bearer ${token}` },
-      payload: { currentPassword: "Userpass1", newPassword: "NewValid1" },
-    });
-    expect(retry.statusCode).toBe(200);
-    expect(await passwordHash(userId)).not.toBe(hashBefore);
-    expect(await liveSessionCount(userId)).toBe(1);
-    expect(await apiKeyCount(userId)).toBe(0);
-  });
+      const retry = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/change-password",
+        headers: { authorization: `Bearer ${token}` },
+        payload: { currentPassword: "Userpass1", newPassword: "NewValid1" },
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(await loginAgain(username, "NewValid1")).toBeTruthy();
+      expect(await loginAgain(username, "Userpass1")).toBeUndefined();
+      expect(await passwordHash(userId)).not.toBe(hashBefore);
+      expect(await liveSessionCount(userId)).toBe(1);
+      expect(await apiKeyCount(userId)).toBe(0);
+    },
+  );
 });
 
 describe("admin reset-password is all-or-nothing (#2089)", () => {
-  it("keeps the old password and sessions when a revoke fails, then succeeds on retry", async () => {
-    const username = uid();
-    const { token, userId } = await createUserAndLogin(testApp.app, username);
-    await createApiKey(token);
-    const hashBefore = await passwordHash(userId);
+  it.each(REVOKES)(
+    "keeps the old password, sessions and keys when the %s delete fails, then succeeds on retry",
+    async (_name, failingTable) => {
+      const username = uid();
+      const { token, userId } = await createUserAndLogin(testApp.app, username);
+      await createApiKey(token);
+      const hashBefore = await passwordHash(userId);
 
-    failApiKeyDelete = true;
-    const failed = await testApp.app.inject({
-      method: "POST",
-      url: `/api/auth/users/${userId}/reset-password`,
-      headers: { authorization: `Bearer ${adminToken}` },
-      payload: { newPassword: "ResetPass1" },
-    });
-    failApiKeyDelete = false;
+      failDeleteOn = failingTable;
+      const failed = await testApp.app.inject({
+        method: "POST",
+        url: `/api/auth/users/${userId}/reset-password`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { newPassword: "ResetPass1" },
+      });
+      failDeleteOn = null;
 
-    expect(failed.statusCode).toBe(500);
-    expect(await passwordHash(userId)).toBe(hashBefore);
-    expect(await liveSessionCount(userId)).toBe(1);
-    expect(await apiKeyCount(userId)).toBe(1);
-    const [row] = await db
-      .select({ must: schema.users.mustChangePassword })
-      .from(schema.users)
-      .where(eq(schema.users.id, userId));
-    expect(row?.must).toBe(false);
+      expect(failed.statusCode).toBe(500);
+      expect(await passwordHash(userId)).toBe(hashBefore);
+      expect(await liveSessionCount(userId)).toBe(1);
+      expect(await apiKeyCount(userId)).toBe(1);
+      const [row] = await db
+        .select({ must: schema.users.mustChangePassword })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId));
+      expect(row?.must).toBe(false);
 
-    const retry = await testApp.app.inject({
-      method: "POST",
-      url: `/api/auth/users/${userId}/reset-password`,
-      headers: { authorization: `Bearer ${adminToken}` },
-      payload: { newPassword: "ResetPass1" },
-    });
-    expect(retry.statusCode).toBe(200);
-    expect(await passwordHash(userId)).not.toBe(hashBefore);
-    expect(await liveSessionCount(userId)).toBe(0);
-    expect(await apiKeyCount(userId)).toBe(0);
-  });
+      const retry = await testApp.app.inject({
+        method: "POST",
+        url: `/api/auth/users/${userId}/reset-password`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { newPassword: "ResetPass1" },
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(await loginAgain(username, "ResetPass1")).toBeTruthy();
+      expect(await loginAgain(username, "Userpass1")).toBeUndefined();
+      expect(await passwordHash(userId)).not.toBe(hashBefore);
+      expect(await liveSessionCount(userId)).toBe(0);
+      expect(await apiKeyCount(userId)).toBe(0);
+    },
+  );
 });
