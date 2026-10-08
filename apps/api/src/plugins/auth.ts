@@ -910,23 +910,28 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const newHash = await hashPassword(body.newPassword);
 
-      await db
-        .update(schema.users)
-        .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
-        .where(eq(schema.users.id, authUser.id));
-
-      // Invalidate all other sessions for this user
+      // One transaction: if a revoke fails the old password stays in place, so
+      // the user is told the change failed and a retry with the old password
+      // works, instead of a new password beside surviving sessions and keys (#2089).
       const currentToken = extractToken(request);
-      if (currentToken) {
-        await db
-          .delete(schema.sessions)
-          .where(
-            and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)),
-          );
-      }
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.users)
+          .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
+          .where(eq(schema.users.id, authUser.id));
 
-      // Revoke all API keys - if credentials were compromised, keys must be rotated too
-      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+        // Invalidate all other sessions for this user
+        if (currentToken) {
+          await tx
+            .delete(schema.sessions)
+            .where(
+              and(eq(schema.sessions.userId, authUser.id), ne(schema.sessions.id, currentToken)),
+            );
+        }
+
+        // Revoke all API keys - if credentials were compromised, keys must be rotated too
+        await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+      });
 
       await auditFromRequest(request)("PASSWORD_CHANGED", {
         userId: authUser.id,
@@ -1277,16 +1282,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const newHash = await hashPassword(body.newPassword);
 
-      await db
-        .update(schema.users)
-        .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, id));
+      // One transaction, for the same reason as change-password (#2089).
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.users)
+          .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
+          .where(eq(schema.users.id, id));
 
-      // Invalidate all sessions for this user
-      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+        // Invalidate all sessions for this user
+        await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
 
-      // Revoke all API keys
-      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+        // Revoke all API keys
+        await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+      });
 
       await auditFromRequest(request)("PASSWORD_RESET", {
         adminId: admin.id,
