@@ -6,7 +6,13 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, ToolType } from "@/types/editor";
-import { captureDocumentContext, reportCaptureFailure } from "../stage-capture";
+import {
+  captureDocumentContext,
+  finishStroke,
+  readDocumentPixels,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 const PIXEL_BRUSH_TOOLS = new Set<ToolType>(["blur-brush", "sharpen-brush", "smudge"]);
 
@@ -53,7 +59,12 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
       }
       const workingCtx = capture.ctx;
 
-      const sourceSnapshot = workingCtx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+      const read = readDocumentPixels(workingCtx, canvasSize.width, canvasSize.height);
+      if (!read.ok) {
+        reportCaptureFailure(read.reason, captureMessages);
+        return;
+      }
+      const sourceSnapshot = read.imageData;
 
       // The stroke object starts fully transparent and only ever receives the pixels
       // the brush touches. Seeding it with the whole snapshot stacked an opaque copy
@@ -70,7 +81,11 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
       applyPixelBrush(workingCtx, strokeCtx, sourceSnapshot, x, y, canvasSize);
 
       const id = generateId();
-      const dataUrl = canvas.toDataURL();
+      const dataUrl = strokeToDataUrl(canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       const obj: CanvasObject = {
         id,
@@ -101,50 +116,53 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
     [stageRef, captureMessages],
   );
 
-  const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!strokeRef.current) return;
+  const handleMouseMove = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!strokeRef.current) return;
 
-    const { canvasSize, zoom, panOffset } = useEditorStore.getState();
+      const { canvasSize, zoom, panOffset } = useEditorStore.getState();
 
-    const stage = e.target.getStage();
-    if (!stage) return;
+      const stage = e.target.getStage();
+      if (!stage) return;
 
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
 
-    const x = Math.floor((pointer.x - panOffset.x) / zoom);
-    const y = Math.floor((pointer.y - panOffset.y) / zoom);
+      const x = Math.floor((pointer.x - panOffset.x) / zoom);
+      const y = Math.floor((pointer.y - panOffset.y) / zoom);
 
-    const { strokeCtx, workingCtx, sourceSnapshot, canvas, objectId } = strokeRef.current;
+      const { strokeCtx, workingCtx, sourceSnapshot, canvas, objectId } = strokeRef.current;
 
-    applyPixelBrush(workingCtx, strokeCtx, sourceSnapshot, x, y, canvasSize);
+      applyPixelBrush(workingCtx, strokeCtx, sourceSnapshot, x, y, canvasSize);
 
-    // Update source snapshot for smudge continuity
-    const updatedData = workingCtx.getImageData(0, 0, canvasSize.width, canvasSize.height);
-    strokeRef.current.sourceSnapshot = updatedData;
-    strokeRef.current.lastX = x;
-    strokeRef.current.lastY = y;
+      // Update source snapshot for smudge continuity. A document too big to read
+      // again ends the stroke where it is rather than throwing out of the handler.
+      const updatedData = readDocumentPixels(workingCtx, canvasSize.width, canvasSize.height);
+      if (!updatedData) {
+        strokeRef.current = null;
+        if (finishStroke(objectId, canvas, captureMessages)) {
+          reportCaptureFailure("no-context", captureMessages);
+        }
+        return;
+      }
+      strokeRef.current.sourceSnapshot = updatedData;
+      strokeRef.current.lastX = x;
+      strokeRef.current.lastY = y;
 
-    // Use canvas element directly as image source during the stroke instead of
-    // converting to a data URL on every mouse move (major perf fix).
-    useEditorStore
-      .getState()
-      .updateObject(objectId, { image: canvas } as unknown as Record<string, unknown>);
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    if (strokeRef.current) {
-      const { canvas, objectId } = strokeRef.current;
-      const dataUrl = canvas.toDataURL();
+      // Use canvas element directly as image source during the stroke instead of
+      // converting to a data URL on every mouse move (major perf fix).
       useEditorStore
         .getState()
-        .updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<
-          string,
-          unknown
-        >);
-    }
+        .updateObject(objectId, { image: canvas } as unknown as Record<string, unknown>);
+    },
+    [captureMessages],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    const stroke = strokeRef.current;
     strokeRef.current = null;
-  }, []);
+    if (stroke) finishStroke(stroke.objectId, stroke.canvas, captureMessages);
+  }, [captureMessages]);
 
   return { handleMouseDown, handleMouseMove, handleMouseUp };
 }

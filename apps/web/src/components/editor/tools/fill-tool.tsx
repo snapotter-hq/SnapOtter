@@ -6,7 +6,12 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
-import { captureDocumentContext, reportCaptureFailure } from "../stage-capture";
+import {
+  captureDocumentContext,
+  readDocumentPixels,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 function colorDistance(
   r1: number,
@@ -171,14 +176,22 @@ export function useFillTool(stageRef: React.RefObject<Konva.Stage | null>) {
       }
       const { ctx } = capture;
 
-      const imageData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+      const imageData = readDocumentPixels(ctx, canvasSize.width, canvasSize.height);
+      if (!imageData) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
       const [fillR, fillG, fillB] = hexToRgb(foregroundColor);
 
       floodFill(imageData, x, y, fillR, fillG, fillB, fillTolerance, fillContiguous);
 
       // Put the modified data back and create an image object
       ctx.putImageData(imageData, 0, 0);
-      const dataUrl = ctx.canvas.toDataURL();
+      const dataUrl = strokeToDataUrl(ctx.canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       const obj: CanvasObject = {
         id: generateId(),

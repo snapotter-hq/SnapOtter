@@ -1,6 +1,7 @@
 // apps/web/src/components/editor/stage-capture.ts
 import type Konva from "konva";
 import { toast } from "sonner";
+import { useEditorStore } from "@/stores/editor-store";
 
 /**
  * Capture the editor document as a flat HTMLCanvasElement at document-pixel
@@ -135,6 +136,42 @@ export function classifyCaptureError(err: unknown): CaptureFailure | null {
   if (err instanceof DOMException && err.name === "SecurityError") return "tainted";
   if (isCanvasSizeError(err)) return "no-context";
   return null;
+}
+
+/**
+ * The stroke canvas as a data URL, or null when it's past the browser's limit:
+ * Chromium and WebKit answer "data:," there instead of throwing, and that string
+ * would become an object's `src` that never renders (#2141).
+ */
+export function strokeToDataUrl(canvas: HTMLCanvasElement): string | null {
+  try {
+    const url = canvas.toDataURL();
+    return url === "data:," ? null : url;
+  } catch (err) {
+    if (isCanvasSizeError(err)) return null;
+    throw err;
+  }
+}
+
+/**
+ * End a brush stroke: swap the object's live canvas for its encoded PNG. When the
+ * canvas can't be encoded the object would render nothing, so it is removed and the
+ * user told. Returns whether the stroke was kept.
+ */
+export function finishStroke(
+  objectId: string,
+  canvas: HTMLCanvasElement,
+  messages: CaptureFailureMessages,
+): boolean {
+  const dataUrl = strokeToDataUrl(canvas);
+  const { updateObject, removeObjects } = useEditorStore.getState();
+  if (!dataUrl) {
+    removeObjects([objectId]);
+    reportCaptureFailure("no-context", messages);
+    return false;
+  }
+  updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<string, unknown>);
+  return true;
 }
 
 /**

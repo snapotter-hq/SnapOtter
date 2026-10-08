@@ -6,7 +6,13 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
-import { captureDocumentContext, reportCaptureFailure } from "../stage-capture";
+import {
+  captureDocumentContext,
+  finishStroke,
+  readDocumentPixels,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 interface StampState {
   objectId: string;
@@ -65,7 +71,11 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
         return;
       }
 
-      const sourceSnapshot = capture.ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+      const sourceSnapshot = readDocumentPixels(capture.ctx, canvasSize.width, canvasSize.height);
+      if (!sourceSnapshot) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       // Create an offscreen canvas for the clone output
       const canvas = document.createElement("canvas");
@@ -96,7 +106,11 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
       paintDab(ctx, sourceSnapshot, x, y, offsetX, offsetY, brushSize, brushOpacity, canvasSize);
 
       const id = generateId();
-      const dataUrl = canvas.toDataURL();
+      const dataUrl = strokeToDataUrl(canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       const obj: CanvasObject = {
         id,
@@ -155,18 +169,10 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    if (stampRef.current) {
-      const { canvas, objectId } = stampRef.current;
-      const dataUrl = canvas.toDataURL();
-      useEditorStore
-        .getState()
-        .updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<
-          string,
-          unknown
-        >);
-    }
+    const stamp = stampRef.current;
     stampRef.current = null;
-  }, []);
+    if (stamp) finishStroke(stamp.objectId, stamp.canvas, captureMessages);
+  }, [captureMessages]);
 
   return { handleMouseDown, handleMouseMove, handleMouseUp };
 }

@@ -6,7 +6,12 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject, ToolType } from "@/types/editor";
-import { captureDocumentContext, reportCaptureFailure } from "../stage-capture";
+import {
+  captureDocumentContext,
+  finishStroke,
+  reportCaptureFailure,
+  strokeToDataUrl,
+} from "../stage-capture";
 
 const DODGE_BURN_TOOLS = new Set<ToolType>(["dodge", "burn", "sponge"]);
 
@@ -139,7 +144,11 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
       applyBrushDab(workingCtx, strokeCtx, x, y, canvasSize);
 
       const id = generateId();
-      const dataUrl = canvas.toDataURL();
+      const dataUrl = strokeToDataUrl(canvas);
+      if (!dataUrl) {
+        reportCaptureFailure("no-context", captureMessages);
+        return;
+      }
 
       const obj: CanvasObject = {
         id,
@@ -188,18 +197,10 @@ export function useDodgeBurnTool(stageRef: React.RefObject<Konva.Stage | null>) 
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    if (strokeRef.current) {
-      const { canvas, objectId } = strokeRef.current;
-      const dataUrl = canvas.toDataURL();
-      useEditorStore
-        .getState()
-        .updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<
-          string,
-          unknown
-        >);
-    }
+    const stroke = strokeRef.current;
     strokeRef.current = null;
-  }, []);
+    if (stroke) finishStroke(stroke.objectId, stroke.canvas, captureMessages);
+  }, [captureMessages]);
 
   return { handleMouseDown, handleMouseMove, handleMouseUp };
 }

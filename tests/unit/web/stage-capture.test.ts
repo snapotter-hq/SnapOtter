@@ -3,6 +3,7 @@ import {
   captureDocumentContext,
   classifyCaptureError,
   readDocumentPixels,
+  strokeToDataUrl,
 } from "../../../apps/web/src/components/editor/stage-capture";
 
 type Stage = Parameters<typeof captureDocumentContext>[0];
@@ -181,5 +182,33 @@ describe("classifyCaptureError", () => {
   it("leaves a bug alone", () => {
     expect(classifyCaptureError(new TypeError("Cannot read properties of null"))).toBeNull();
     expect(classifyCaptureError("not even an error")).toBeNull();
+  });
+});
+
+describe("strokeToDataUrl (#2141)", () => {
+  const canvasWith = (toDataURL: () => string) => ({ toDataURL }) as unknown as HTMLCanvasElement;
+
+  it("returns the data URL", () => {
+    expect(strokeToDataUrl(canvasWith(() => "data:image/png;base64,AAAA"))).toBe(
+      "data:image/png;base64,AAAA",
+    );
+  });
+
+  it("returns null for the empty URL a canvas past the browser's limit gives back", () => {
+    expect(strokeToDataUrl(canvasWith(() => "data:,"))).toBeNull();
+  });
+
+  it("returns null when encoding fails on size", () => {
+    const canvas = canvasWith(() => {
+      throw new RangeError("Invalid string length");
+    });
+    expect(strokeToDataUrl(canvas)).toBeNull();
+  });
+
+  it("lets an error that isn't about canvas size propagate", () => {
+    const canvas = canvasWith(() => {
+      throw new TypeError("boom");
+    });
+    expect(() => strokeToDataUrl(canvas)).toThrow(TypeError);
   });
 });
