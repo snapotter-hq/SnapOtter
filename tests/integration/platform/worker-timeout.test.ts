@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { SafeError } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Injects a storage fault into the worker's output write for one job, standing
@@ -137,6 +138,20 @@ registerToolProcessFn({
   },
 });
 
+// A tool that ignores the signal and fails on a storage fault after the
+// deadline, so the job ends as a timeout or a cancel that the fault raced.
+registerToolProcessFn({
+  toolId: "timeout-storage-fault",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async () => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    throw new SafeError("The server's storage is full.", {
+      statusCode: 503,
+      code: "storage-full",
+    });
+  },
+});
+
 // Ensure workspace dir exists (test-server.ts normally does this, but
 // we bypass it to avoid loading the full app).
 const { mkdirSync } = await import("node:fs");
@@ -217,6 +232,83 @@ describe("Worker timeout classification", () => {
     expect(parsed.error).not.toBe("Canceled");
     expect(parsed.jobId).toBe(jobId);
   }, 25_000);
+
+  it("does not stamp a storage fault's code or status on a job that timed out (#2210)", async () => {
+    // The row says the job timed out; a client replaying it must not also be
+    // told it was a full volume, which the timeout never established.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-storage-fault",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    let finalRow: Record<string, unknown> | undefined;
+    for (let i = 0; i < 150; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalRow = row as Record<string, unknown>;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    expect(finalRow?.status).toBe("failed");
+    const error = finalRow?.error as { message: string; code?: string; httpStatus?: number };
+    expect(error.message).toMatch(/timed out after 1s/i);
+    expect(error.code).toBeUndefined();
+    expect(error.httpStatus).toBeUndefined();
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+    const frame = JSON.parse(cached ?? "{}");
+    expect(frame.error).toMatch(/timed out after 1s/i);
+    expect(frame.code).toBeUndefined();
+    expect(frame.httpStatus).toBeUndefined();
+  }, 30_000);
+
+  it("does not stamp a storage fault's code or status on a job the user canceled (#2210)", async () => {
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-storage-fault",
+      userId: null,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+    });
+
+    // Past the 1s deadline, before the tool's 2.5s are up.
+    await new Promise((r) => setTimeout(r, 1_700));
+    expect(await requestCancel(jobId)).toBe(true);
+
+    let finalRow: Record<string, unknown> | undefined;
+    for (let i = 0; i < 150; i++) {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      if (row && row.status !== "processing" && row.status !== "queued") {
+        finalRow = row as Record<string, unknown>;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    expect(finalRow?.status).toBe("canceled");
+    const error = finalRow?.error as { code?: string; httpStatus?: number };
+    expect(error.code).toBeUndefined();
+    expect(error.httpStatus).toBeUndefined();
+  }, 30_000);
 
   it("keeps the result of a handler that ignores the signal and finishes after the timeout (#2092)", async () => {
     // The post-handler cancel guard is for user cancels. A timeout abort must
