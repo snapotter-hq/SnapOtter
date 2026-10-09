@@ -5343,6 +5343,8 @@ export const ar: TranslationKeys = {
     noSteps: "ملف Pipeline لا يحتوي على خطوات",
     importFailed: "فشل الاستيراد",
     couldNotRead: "تعذرت قراءة ملف Pipeline",
+    importListRefreshFailed:
+      "تم استيراد Pipeline، لكن القائمة المحفوظة لم تتحدّث. أعد تحميل الصفحة لرؤيته.",
     fileCount: "{count} ملف",
     fileCountPlural: "{count} ملفات",
     importFromLibrary: "استيراد من المكتبة",

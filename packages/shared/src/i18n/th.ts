@@ -5308,6 +5308,7 @@ export const th: TranslationKeys = {
     noSteps: "ไฟล์ Pipeline ไม่มีขั้นตอน",
     importFailed: "นำเข้าล้มเหลว",
     couldNotRead: "ไม่สามารถอ่านไฟล์ Pipeline",
+    importListRefreshFailed: "นำเข้า Pipeline แล้ว แต่รายการที่บันทึกไม่ได้รีเฟรช โหลดหน้าใหม่เพื่อดู",
     fileCount: "{count} ไฟล์",
     fileCountPlural: "{count} ไฟล์",
     importFromLibrary: "นำเข้าจากไลบรารี",

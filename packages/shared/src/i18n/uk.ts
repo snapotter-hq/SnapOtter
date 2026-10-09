@@ -5400,6 +5400,8 @@ export const uk: TranslationKeys = {
     noSteps: "У файлі Pipeline немає кроків",
     importFailed: "Імпорт не вдався",
     couldNotRead: "Не вдалося прочитати файл Pipeline",
+    importListRefreshFailed:
+      "Pipeline імпортовано, але список збережених не оновився. Оновіть сторінку, щоб його побачити.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлів",
     importFromLibrary: "Імпорт із бібліотеки",

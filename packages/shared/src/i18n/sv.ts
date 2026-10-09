@@ -5389,6 +5389,8 @@ export const sv: TranslationKeys = {
     noSteps: "Pipelinefil har inga steg",
     importFailed: "Import misslyckades",
     couldNotRead: "Kunde inte läsa pipelinefil",
+    importListRefreshFailed:
+      "Pipelinen importerades, men den sparade listan uppdaterades inte. Ladda om sidan för att se den.",
     fileCount: "{count} fil",
     fileCountPlural: "{count} filer",
     importFromLibrary: "Importera från bibliotek",

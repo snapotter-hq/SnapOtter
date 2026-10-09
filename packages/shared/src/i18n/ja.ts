@@ -5339,6 +5339,8 @@ export const ja: TranslationKeys = {
     noSteps: "Pipelineファイルにステップがありません",
     importFailed: "インポートに失敗しました",
     couldNotRead: "Pipelineファイルを読み取れませんでした",
+    importListRefreshFailed:
+      "Pipelineをインポートしましたが、保存済みリストが更新されませんでした。ページを再読み込みすると表示されます。",
     fileCount: "{count}ファイル",
     fileCountPlural: "{count}ファイル",
     importFromLibrary: "ライブラリからインポート",

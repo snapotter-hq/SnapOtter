@@ -5376,6 +5376,8 @@ export const vi: TranslationKeys = {
     noSteps: "Tệp Pipeline không có bước nào",
     importFailed: "Nhập thất bại",
     couldNotRead: "Không thể đọc tệp Pipeline",
+    importListRefreshFailed:
+      "Đã nhập Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem.",
     fileCount: "{count} tệp",
     fileCountPlural: "{count} tệp",
     importFromLibrary: "Nhập từ thư viện",

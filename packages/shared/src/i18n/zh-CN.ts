@@ -5086,6 +5086,7 @@ export const zhCN: TranslationKeys = {
     noSteps: "Pipeline 文件没有步骤",
     importFailed: "导入失败",
     couldNotRead: "无法读取 Pipeline 文件",
+    importListRefreshFailed: "已导入 Pipeline，但已保存列表未刷新。请刷新页面查看。",
     fileCount: "{count} 个文件",
     fileCountPlural: "{count} 个文件",
     importFromLibrary: "从库中导入",

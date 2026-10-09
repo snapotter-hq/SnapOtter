@@ -5086,6 +5086,7 @@ export const zhTW: TranslationKeys = {
     noSteps: "Pipeline檔案沒有步驟",
     importFailed: "匯入失敗",
     couldNotRead: "無法讀取Pipeline檔案",
+    importListRefreshFailed: "已匯入Pipeline，但已儲存清單未重新整理。請重新載入頁面查看。",
     fileCount: "{count}個檔案",
     fileCountPlural: "{count}個檔案",
     importFromLibrary: "從程式庫匯入",

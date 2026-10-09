@@ -5402,6 +5402,8 @@ export const ru: TranslationKeys = {
     noSteps: "В файле Pipeline нет шагов",
     importFailed: "Импорт не удался",
     couldNotRead: "Не удалось прочитать файл Pipeline",
+    importListRefreshFailed:
+      "Pipeline импортирован, но список сохранённых не обновился. Обновите страницу, чтобы увидеть его.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлов",
     importFromLibrary: "Импорт из библиотеки",
