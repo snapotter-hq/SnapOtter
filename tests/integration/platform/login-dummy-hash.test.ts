@@ -2,10 +2,11 @@
  * A login for a username that doesn't exist has to cost what a wrong password for a real
  * user costs, or response time tells a caller which usernames exist. The hash an unknown
  * user is checked against used to be built on the first such login, so that one request
- * ran an extra scrypt computation (#2254). It is built when the auth routes register now.
+ * ran an extra scrypt computation (#2254). It is a constant now, so there is nothing to
+ * build.
  *
- * This lives in its own file, with no earlier unknown-user login, so nothing else warms
- * the hash before the first measurement.
+ * This lives in its own file, with no earlier unknown-user login, so the first
+ * measurement is the first unknown-user login this process sees.
  */
 
 import { randomBytes } from "node:crypto";
