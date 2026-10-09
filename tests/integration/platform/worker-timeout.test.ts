@@ -7,7 +7,44 @@
  * all dynamic imports capture the override.
  */
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Injects a storage fault into the worker's output write for one job, standing
+// in for rotated S3 credentials or a full disk that hit after the deadline
+// (#2144). Scoped by key prefix so every other write runs for real.
+const outputWriteFault = vi.hoisted(() => ({ prefix: null as string | null }));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      if (outputWriteFault.prefix && key.startsWith(outputWriteFault.prefix)) {
+        throw new Error("injected storage outage");
+      }
+      return actual.putObject(key, data);
+    },
+  };
+});
+
+// What the worker's failed listener hands the Sentry path, per job, so a test
+// can tell a report of the real fault from a synthesized timeout error.
+const reported = vi.hoisted(() => [] as Array<{ jobId?: string; message: string }>);
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (err: unknown, ctx: Parameters<typeof actual.reportError>[1]) => {
+      reported.push({
+        jobId: ctx.jobId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return actual.reportError(err, ctx);
+    },
+  };
+});
 
 // Override timeout BEFORE any API module is loaded (static imports
 // above are vitest-only and do not trigger config.ts).
@@ -23,6 +60,7 @@ const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js")
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
+const { logger } = await import("../../../apps/api/src/lib/logger.js");
 const { listObjects, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
 const { env } = await import("../../../apps/api/src/config.js");
@@ -216,4 +254,68 @@ describe("Worker timeout classification", () => {
     expect(finalRow?.attempts).toBe(1);
     expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
   }, 25_000);
+
+  it("keeps a storage fault after the deadline as its own error, not a timeout (#2144)", async () => {
+    // The handler ignored the signal and returned after the 1s deadline, then
+    // the output write hit a real storage fault. The signal still reads
+    // "timeout", but the fault has to keep its own message, error log and
+    // Sentry report: telling the user the job merely took too long hides an
+    // outage, and a retry would not help.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    outputWriteFault.prefix = `outputs/${jobId}/`;
+    const errorLog = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-ignores-signal",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId);
+      expect(finalRow?.status).toBe("failed");
+      // A real fault is retried like any other (image pool: 2 attempts).
+      expect(finalRow?.attempts).toBe(2);
+      const error = finalRow?.error as { message: string };
+      expect(error.message).toBe("injected storage outage");
+
+      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+      expect(JSON.parse(cached ?? "{}").error).toBe("injected storage outage");
+
+      // The fault reached the error log under its own message, once per attempt.
+      const logged = errorLog.mock.calls
+        .filter(
+          ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+        )
+        .map(([ctx]) => (ctx as { err: Error }).err.message);
+      expect(new Set(logged)).toEqual(new Set(["injected storage outage"]));
+
+      // And the Sentry path got the fault itself, not a synthesized timeout error.
+      const reports = reported.filter((r) => r.jobId === jobId).map((r) => r.message);
+      expect(reports).not.toHaveLength(0);
+      expect(new Set(reports)).toEqual(new Set(["injected storage outage"]));
+    } finally {
+      outputWriteFault.prefix = null;
+      errorLog.mockRestore();
+    }
+  }, 25_000);
 });
+
+/** Poll the job row until it leaves queued/processing; undefined after ~20s. */
+async function terminalJobRow(jobId: string): Promise<Record<string, unknown> | undefined> {
+  for (let i = 0; i < 100; i++) {
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    if (row && row.status !== "processing" && row.status !== "queued") {
+      return row as Record<string, unknown>;
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return undefined;
+}

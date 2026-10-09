@@ -447,6 +447,10 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect((await terminalRow(jobId)).status).toBe("canceled");
     expect((await terminalRow(clientJobId)).status).toBe("canceled");
+    // The output the hook let through must not stay downloadable or get adopted
+    // by job reconciliation: the row settles with no outputRefs, so nothing
+    // else would ever remove it (#2144).
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
   });
 
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
