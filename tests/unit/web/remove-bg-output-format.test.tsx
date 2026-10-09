@@ -97,6 +97,145 @@ describe("remove-background Phase 1 request (#2077)", () => {
   });
 });
 
+// Edge smoothing and decontamination are sidecar options: only a new removal can
+// apply them. Changing them after a result leaves the download as it was, so the
+// panel says so and offers to run again (#2112).
+describe("remove-background refinements changed after the first run (#2112)", () => {
+  const stale = () => screen.queryByTestId("remove-background-refine-stale");
+
+  /** Runs the removal with the defaults and lands its result. */
+  async function runAndLand(view: ReturnType<typeof render>) {
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+  }
+
+  async function openEffects() {
+    fireEvent.click(await screen.findByText(en.toolSettings["remove-bg"].effects));
+  }
+
+  it("says nothing while the settings still match the run", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("offers to run again once edge smoothing changes", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+  });
+
+  it("offers to run again once decontamination changes, and stops when it is changed back", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    expect(stale()).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("runs the removal again with the new values and settles the notice when it lands", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(2));
+    const [, settings, options] = deployment.processFiles.mock.calls[1];
+    expect(settings).toMatchObject({ edgeRefine: 2, decontaminate: true });
+    expect(options).toEqual({ skipLibrarySave: true });
+
+    // Land the second run: the notice clears while the controls match the new run,
+    // and reappears if a control is moved back to its default.
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "0" },
+    });
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("disables the re-run button while effects are rendering and clears a prior effects error on re-run", async () => {
+    let settleEffects!: (response: unknown) => void;
+    const fetch = vi.fn().mockReturnValue(new Promise((resolve) => (settleEffects = resolve)));
+    vi.stubGlobal("fetch", fetch);
+
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("remove-background-rerun")).toBeDisabled();
+
+    await act(async () => {
+      settleEffects({ ok: false, status: 500, json: async () => ({ error: "composite failed" }) });
+    });
+    expect(await screen.findByText("composite failed")).toBeVisible();
+    expect(screen.getByTestId("remove-background-rerun")).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+    expect(screen.queryByText("composite failed")).toBeNull();
+  });
+
+  it("still offers to run again for a result restored after a remount", async () => {
+    // Crossing the mobile/desktop layout breakpoint remounts the panel while
+    // the result stays loaded; the run's own values are gone, so the defaults
+    // are assumed and any refinement set afterwards counts as a change.
+    const first = render(<RemoveBgSettings />);
+    await runAndLand(first);
+    first.unmount();
+
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "1" },
+    });
+
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("does not react to settings Phase 2 can apply itself", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(screen.getByText(en.toolSettings["remove-background"].blurBackground));
+
+    expect(stale()).not.toBeInTheDocument();
+  });
+});
+
 describe("remove-background output format routing (#720)", () => {
   it("uses the plain (Phase 1) download for the default PNG output", async () => {
     render(<RemoveBgSettings />);

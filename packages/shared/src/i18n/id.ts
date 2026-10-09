@@ -1906,6 +1906,8 @@ export const id: TranslationKeys = {
       effectsProcessingFailed: "Pemrosesan efek gagal",
       effectsExpired:
         "Penghapusan latar belakang sebelumnya sudah kedaluwarsa, jadi sedang dijalankan ulang. Terapkan efek setelah selesai.",
+      refineChanged:
+        "Penghalusan tepi dan dekontaminasi warna diterapkan saat latar belakang dihapus. Jalankan lagi untuk memakai pengaturan baru.",
     },
     "remove-gif-background": {
       quality: "Kualitas",

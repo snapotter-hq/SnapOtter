@@ -1846,6 +1846,8 @@ export const ko: TranslationKeys = {
       effectsProcessingFailed: "효과 처리에 실패했습니다",
       effectsExpired:
         "이전 배경 제거가 만료되어 다시 실행하고 있습니다. 완료되면 효과를 적용하세요.",
+      refineChanged:
+        "가장자리 다듬기와 색 오염 제거는 배경을 제거할 때 적용됩니다. 새 설정을 사용하려면 다시 실행하세요.",
     },
     "remove-gif-background": {
       quality: "품질",
