@@ -19,30 +19,31 @@ export function FindDuplicatesSettings() {
   const {
     results,
     scanning,
+    error,
     bestOverrides,
     setResults,
     setScanning,
+    setError,
     reset: resetDuplicates,
   } = useDuplicateStore();
 
   const [preset, setPreset] = useState<Preset | null>("similar");
   const [threshold, setThreshold] = useState(8);
-  const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const mountedRef = useRef(false);
 
+  // New files mean new results. A mount keeps a scan that is still out, though: the
+  // panel remounts when the window crosses the layout breakpoint, and the scan, its
+  // results and its error all live in the store, so wiping them there threw away a
+  // scan the user had started (#2314). The page resets the store on tool entry.
   // biome-ignore lint/correctness/useExhaustiveDependencies: files is a store value that triggers reset when changed
   useEffect(() => {
+    const firstRun = !mountedRef.current;
+    mountedRef.current = true;
+    if (firstRun && useDuplicateStore.getState().scanning) return;
     resetDuplicates();
-    setError(null);
     setUploadProgress(0);
   }, [files, resetDuplicates]);
-
-  useEffect(() => {
-    return () => {
-      xhrRef.current?.abort();
-    };
-  }, []);
 
   const handlePreset = (p: Preset) => {
     setPreset(p);
@@ -71,8 +72,15 @@ export function FindDuplicatesSettings() {
     }
     formData.append("threshold", String(threshold));
 
+    // The scan is not aborted when the panel unmounts: it finishes in the
+    // background and lands in the store. Its answer is only taken while the files
+    // it was sent for are still loaded (#2314).
+    const sentFiles = files;
+    const stillLoaded = () => {
+      const now = useFileStore.getState().files;
+      return now.length === sentFiles.length && now.every((f, i) => f === sentFiles[i]);
+    };
     const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
@@ -81,7 +89,7 @@ export function FindDuplicatesSettings() {
     };
 
     xhr.onload = () => {
-      xhrRef.current = null;
+      if (!stillLoaded()) return;
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data: DuplicateResult = JSON.parse(xhr.responseText);
@@ -108,13 +116,13 @@ export function FindDuplicatesSettings() {
     };
 
     xhr.onerror = () => {
-      xhrRef.current = null;
+      if (!stillLoaded()) return;
       setError(t.toolSettings["find-duplicates"].networkErrorUpload);
       setScanning(false);
     };
 
     xhr.ontimeout = () => {
-      xhrRef.current = null;
+      if (!stillLoaded()) return;
       setError(t.toolSettings["find-duplicates"].requestTimedOut);
       setScanning(false);
     };
