@@ -17,6 +17,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 // area (a phone) gets a smaller one that fits the page to its width (#2190).
 const RENDER_SCALE = 1.5;
 const ROOT_PADDING = 32; // the root's p-4, both sides
+// Cap on the page bitmap (device pixels), so a high-DPR screen can't ask for a
+// canvas the browser refuses to allocate.
+const MAX_CANVAS_PIXELS = 16_777_216;
 const EXPORT_QUALITY = 2; // raster the baked PNG at ~2x page points for crispness
 const KONVA_CONTAINER_ID = "sign-konva-container";
 
@@ -54,10 +57,11 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
 ) {
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
-  // The on-screen scale, decided once per document from the area's width and then
-  // kept: a signature's pixel position was set against the page as drawn, so every
-  // page of the document has to be drawn at the same scale.
-  const scaleRef = useRef<number | null>(null);
+  // Each page's on-screen scale, decided the first time the page is drawn from the
+  // area's width and then kept: a signature's pixel position was set against the
+  // page as drawn, so revisiting a page has to draw it at the same scale. Pages of
+  // different sizes (a landscape sheet in a portrait document) each fit the width.
+  const scalesRef = useRef<Map<number, number>>(new Map());
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const layerRef = useRef<Konva.Layer | null>(null);
@@ -86,7 +90,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     let cancelled = false;
     setDocReady(false);
     setLoadFailed(false);
-    scaleRef.current = null;
+    scalesRef.current.clear();
     for (const placed of placementsRef.current) placed.node.destroy();
     placementsRef.current = [];
     pageMetaRef.current.clear();
@@ -129,16 +133,33 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       const pdfPage = await doc.getPage(page + 1);
       if (cancelled) return;
       const ptsViewport = pdfPage.getViewport({ scale: 1 });
-      if (scaleRef.current === null) {
+      let scale = scalesRef.current.get(page);
+      if (scale === undefined) {
         const available = (rootRef.current?.clientWidth ?? 0) - ROOT_PADDING;
-        scaleRef.current =
+        scale =
           available > 0 ? Math.min(RENDER_SCALE, available / ptsViewport.width) : RENDER_SCALE;
+        scalesRef.current.set(page, scale);
       }
-      const viewport = pdfPage.getViewport({ scale: scaleRef.current });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      const viewport = pdfPage.getViewport({ scale });
+      // Everything else works in CSS pixels (the stage, the placement math); only
+      // the bitmap gets the screen's pixel ratio, or text on a phone is a blur.
+      const ratio = Math.max(
+        1,
+        Math.min(
+          window.devicePixelRatio || 1,
+          Math.sqrt(MAX_CANVAS_PIXELS / (viewport.width * viewport.height)),
+        ),
+      );
+      canvas.width = Math.floor(viewport.width * ratio);
+      canvas.height = Math.floor(viewport.height * ratio);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
       setSize({ w: viewport.width, h: viewport.height });
-      await pdfPage.render({ canvas, viewport }).promise;
+      await pdfPage.render({
+        canvas,
+        viewport,
+        transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
+      }).promise;
       if (cancelled) return;
 
       pageMetaRef.current.set(page, {

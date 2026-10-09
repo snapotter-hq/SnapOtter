@@ -154,7 +154,10 @@ test.describe("@mobile Sign PDF on a phone", () => {
   }) => {
     await page.goto("/pdf/sign-pdf");
     const chooser = page.waitForEvent("filechooser");
-    await page.locator("[class*='border-dashed']").first().click();
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
     await (await chooser).setFiles(SIGN_PDF_FIXTURE);
 
     const canvas = page.getByTestId("sign-pdf-canvas");
