@@ -5,15 +5,17 @@ import Papa, { type ParseError, type ParseResult } from "papaparse";
 // the column's cells vanish while meta.fields still lists it (#2096). The NULs make
 // a collision with a real header practically impossible.
 const PROTO_HEADER = "\u0000proto\u0000";
-const restoreHeader = (field: string) =>
-  field.startsWith(PROTO_HEADER) ? `__proto__${field.slice(PROTO_HEADER.length)}` : field;
 
 /**
  * Parse CSV text with a header row into rows keyed by header. Same options and
  * result as `Papa.parse(text, { header: true, skipEmptyLines: true })`, except the
  * rows have no prototype: every header, `__proto__` included, is an own property,
- * and a key a row lacks never reads an inherited member. A duplicated `__proto__`
- * header is renamed the way Papa renames any other duplicate (`__proto___1`).
+ * and a key a row lacks never reads an inherited member.
+ *
+ * Papa renames a duplicated header to `name_1`, `name_2`, ... skipping names a real
+ * column has. The `__proto__` copies get the same treatment here (`__proto__`, then
+ * `__proto___1`, ...), done by hand because Papa checks its candidates against the
+ * raw header names, not against what the sentinel restores to.
  */
 export function parseCsvWithHeader(text: string): ParseResult<Record<string, unknown>> {
   const parsed = Papa.parse<Record<string, unknown>>(text, {
@@ -21,13 +23,41 @@ export function parseCsvWithHeader(text: string): ParseResult<Record<string, unk
     skipEmptyLines: true,
     transformHeader: (header) => (header === "__proto__" ? PROTO_HEADER : header),
   });
+
+  const sentinelFields = parsed.meta.fields ?? [];
+  const taken = new Set(sentinelFields.filter((field) => !field.startsWith(PROTO_HEADER)));
+  const names = new Map<string, string>();
+  for (const field of sentinelFields) {
+    if (!field.startsWith(PROTO_HEADER) || names.has(field)) continue;
+    let name = "__proto__";
+    for (let n = 1; taken.has(name); n++) name = `__proto___${n}`;
+    taken.add(name);
+    names.set(field, name);
+  }
+  const restore = (key: string) => names.get(key) ?? key;
+
   const data = parsed.data.map((row) => {
     const out: Record<string, unknown> = Object.create(null);
-    for (const [key, value] of Object.entries(row)) out[restoreHeader(key)] = value;
+    for (const [key, value] of Object.entries(row)) out[restore(key)] = value;
     return out;
   });
-  const fields = parsed.meta.fields?.map(restoreHeader);
-  return { ...parsed, data, meta: { ...parsed.meta, ...(fields && { fields }) } };
+  const renamedHeaders = parsed.meta.renamedHeaders
+    ? Object.fromEntries(
+        Object.entries(parsed.meta.renamedHeaders).map(([renamed, original]) => [
+          restore(renamed),
+          restore(original),
+        ]),
+      )
+    : undefined;
+  return {
+    ...parsed,
+    data,
+    meta: {
+      ...parsed.meta,
+      ...(parsed.meta.fields && { fields: sentinelFields.map(restore) }),
+      ...(renamedHeaders && { renamedHeaders }),
+    },
+  };
 }
 
 /**
