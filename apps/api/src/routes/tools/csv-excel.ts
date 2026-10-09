@@ -60,7 +60,7 @@ export function registerCsvExcel(app: FastifyInstance) {
         header: false,
         skipEmptyLines: true,
       });
-      const parseFailure = csvParseFailure(parsed.errors);
+      const parseFailure = csvParseFailure(parsed);
       if (parseFailure) {
         throw new InputValidationError(`CSV parse failed: ${parseFailure}`);
       }

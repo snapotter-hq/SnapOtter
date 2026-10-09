@@ -109,6 +109,27 @@ describe("split-csv (pure JS, no skipIf)", () => {
     expect(res.statusCode).toBe(400);
   }, 30_000);
 
+  it.each([
+    ["a file with only newlines", "blank.csv", "\r\n\r\n"],
+    ["a header-only file", "header-only.csv", "email\r\n"],
+  ])(
+    "answers 400, not 422, for %s (#2099)",
+    async (_label, filename, content) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename, contentType: "text/csv", content: Buffer.from(content) },
+        { name: "settings", content: JSON.stringify({}) },
+      ]);
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/tools/files/split-csv",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+      expect(res.statusCode).toBe(400);
+    },
+    30_000,
+  );
+
   it("splits a TSV file correctly with rowsPerFile 1", async () => {
     const { body: tsvBody, contentType: tsvCt } = createMultipartPayload([
       {

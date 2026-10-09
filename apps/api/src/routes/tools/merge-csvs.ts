@@ -27,7 +27,7 @@ export function registerMergeCsvs(app: FastifyInstance) {
         header: true,
         skipEmptyLines: true,
       });
-      const firstFailure = csvParseFailure(firstResult.errors);
+      const firstFailure = csvParseFailure(firstResult);
       if (firstFailure) {
         throw new InputValidationError(`CSV parse failed: ${firstFailure}`);
       }
@@ -45,7 +45,7 @@ export function registerMergeCsvs(app: FastifyInstance) {
           header: true,
           skipEmptyLines: true,
         });
-        const failure = csvParseFailure(result.errors);
+        const failure = csvParseFailure(result);
         if (failure) {
           throw new InputValidationError(`CSV parse failed in ${input.filename}: ${failure}`);
         }

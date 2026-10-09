@@ -127,6 +127,11 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(JSON.parse(dl.payload)).toEqual([{ email: "a@x.io" }, { email: "b@x.io" }]);
   }, 30_000);
 
+  it("refuses a CSV with no rows (#2099)", async () => {
+    const res = await runTool("blank.csv", Buffer.from("\r\n\r\n"));
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
   it("still refuses a CSV with a real parse error (#2099)", async () => {
     const res = await runTool("broken.csv", Buffer.from('a,b\r\n"unterminated,1'));
     expect(res.statusCode).toBe(400);

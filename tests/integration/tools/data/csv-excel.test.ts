@@ -79,6 +79,17 @@ describe("csv-excel (pure JS, no skipIf)", () => {
     expect(sst).toContain("b@x.io");
   }, 30_000);
 
+  it("still refuses data the comma fallback would split (#2099)", async () => {
+    // "sales / 1,200 / 2,400" would otherwise become a sheet of 1 | 200.
+    const res = await runTool("sales.csv", Buffer.from("sales\n1,200\n2,400\n3,600\n"));
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
+  it("refuses a file with no rows (#2099)", async () => {
+    const res = await runTool("blank.csv", Buffer.from("\r\n\r\n"));
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
   it("converts TSV to XLSX with PK magic", async () => {
     const res = await runTool("tiny.tsv", TSV);
     expect(res.statusCode).toBe(200);

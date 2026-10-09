@@ -30,13 +30,13 @@ export function registerSplitCsv(app: FastifyInstance) {
         header: false,
         skipEmptyLines: true,
       });
-      const parseFailure = csvParseFailure(parsed.errors);
+      const parseFailure = csvParseFailure(parsed);
       if (parseFailure) {
         throw new InputValidationError(`CSV parse failed: ${parseFailure}`);
       }
       const allRows = parsed.data;
       if (allRows.length === 0) {
-        throw new Error("CSV file is empty");
+        throw new InputValidationError("CSV file is empty");
       }
 
       // Always treat row 0 as the header; keepHeader only controls whether it is
@@ -44,7 +44,7 @@ export function registerSplitCsv(app: FastifyInstance) {
       const header = allRows[0];
       const dataRows = allRows.slice(1);
       if (dataRows.length === 0) {
-        throw new Error("No data rows to split");
+        throw new InputValidationError("No data rows to split");
       }
 
       // Chunk data rows
