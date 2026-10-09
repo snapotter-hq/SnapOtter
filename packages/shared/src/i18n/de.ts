@@ -5554,6 +5554,8 @@ export const de: TranslationKeys = {
     filesSelected: "{count} Dateien ausgewählt",
     dropToAdd: "Ablegen, um Dateien hinzuzufügen",
     dropToReplace: "Ablegen, um Datei zu ersetzen",
+    ignoredWhileRunning:
+      "Es läuft gerade eine Verarbeitung. Warten Sie, bis sie fertig ist, bevor Sie Dateien hinzufügen.",
     reorderHint:
       "Miniaturen zum Neuordnen ziehen oder die Reihenfolge umkehren, bevor du startest.",
   },

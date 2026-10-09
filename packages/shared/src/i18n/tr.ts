@@ -5523,6 +5523,7 @@ export const tr: TranslationKeys = {
     filesSelected: "{count} dosya seçildi",
     dropToAdd: "Dosya eklemek için bırakın",
     dropToReplace: "Dosyayı değiştirmek için bırakın",
+    ignoredWhileRunning: "İşlem devam ediyor. Dosya eklemeden önce bitmesini bekleyin.",
     reorderHint:
       "Çalıştırmadan önce sıralamak için küçük resimleri sürükleyin veya sırayı tersine çevirin.",
   },

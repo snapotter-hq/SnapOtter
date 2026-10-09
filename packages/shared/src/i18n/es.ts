@@ -5526,6 +5526,8 @@ export const es: TranslationKeys = {
     filesSelected: "{count} archivos seleccionados",
     dropToAdd: "Suelta para agregar archivos",
     dropToReplace: "Suelta para reemplazar archivo",
+    ignoredWhileRunning:
+      "Hay una ejecución en curso. Espera a que termine antes de agregar archivos.",
     reorderHint: "Arrastra las miniaturas para reordenar, o invierte el orden, antes de ejecutar.",
   },
   reviewPanel: {

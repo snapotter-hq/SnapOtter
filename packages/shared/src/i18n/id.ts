@@ -5513,6 +5513,7 @@ export const id: TranslationKeys = {
     filesSelected: "{count} file dipilih",
     dropToAdd: "Lepas untuk menambahkan file",
     dropToReplace: "Lepas untuk mengganti file",
+    ignoredWhileRunning: "Proses sedang berjalan. Tunggu hingga selesai sebelum menambahkan file.",
     reorderHint:
       "Seret gambar mini untuk mengurutkan ulang, atau balik urutannya, sebelum menjalankan.",
   },

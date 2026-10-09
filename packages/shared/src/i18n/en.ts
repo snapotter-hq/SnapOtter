@@ -5439,6 +5439,7 @@ export const en = {
     filesSelected: "{count} files selected",
     dropToAdd: "Drop to add files",
     dropToReplace: "Drop to replace file",
+    ignoredWhileRunning: "A run is in progress. Wait for it to finish before adding files.",
     reorderHint: "Drag the thumbnails to reorder, or reverse the order, before running.",
   },
   reviewPanel: {

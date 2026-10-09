@@ -5525,6 +5525,7 @@ export const ru: TranslationKeys = {
     filesSelected: "Выбрано файлов: {count}",
     dropToAdd: "Отпустите, чтобы добавить файлы",
     dropToReplace: "Отпустите, чтобы заменить файл",
+    ignoredWhileRunning: "Идёт обработка. Дождитесь её завершения, прежде чем добавлять файлы.",
     reorderHint: "Перетащите миниатюры, чтобы изменить порядок, или обратите его, перед запуском.",
   },
   reviewPanel: {

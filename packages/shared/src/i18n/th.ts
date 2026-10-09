@@ -5430,6 +5430,7 @@ export const th: TranslationKeys = {
     filesSelected: "เลือกแล้ว {count} ไฟล์",
     dropToAdd: "วางเพื่อเพิ่มไฟล์",
     dropToReplace: "วางเพื่อแทนที่ไฟล์",
+    ignoredWhileRunning: "กำลังประมวลผลอยู่ รอให้เสร็จก่อนเพิ่มไฟล์",
     reorderHint: "ลากภาพขนาดย่อเพื่อจัดเรียงใหม่ หรือกลับลำดับ ก่อนเรียกใช้",
   },
   reviewPanel: {

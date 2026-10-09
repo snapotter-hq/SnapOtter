@@ -5208,6 +5208,7 @@ export const zhCN: TranslationKeys = {
     filesSelected: "已选择 {count} 个文件",
     dropToAdd: "放下以添加文件",
     dropToReplace: "放下以替换文件",
+    ignoredWhileRunning: "正在运行。请等待完成后再添加文件。",
     reorderHint: "运行前可拖动缩略图重新排序，或反转顺序。",
   },
   reviewPanel: {

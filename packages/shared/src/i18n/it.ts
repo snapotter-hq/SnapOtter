@@ -5532,6 +5532,7 @@ export const it: TranslationKeys = {
     filesSelected: "{count} file selezionati",
     dropToAdd: "Rilascia per aggiungere file",
     dropToReplace: "Rilascia per sostituire il file",
+    ignoredWhileRunning: "Elaborazione in corso. Attendi che finisca prima di aggiungere file.",
     reorderHint: "Trascina le miniature per riordinarle, o inverti l'ordine, prima di eseguire.",
   },
   reviewPanel: {

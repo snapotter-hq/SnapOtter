@@ -43,6 +43,7 @@ import type { PreviewTransform } from "@/components/tools/rotate-settings";
 import { SignCanvas, type SignCanvasRef } from "@/components/tools/sign-canvas";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { useIntakeGuard } from "@/hooks/use-intake-guard";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { recordRecentTool } from "@/hooks/use-recent-tools";
@@ -469,6 +470,9 @@ export function ToolPage() {
     [toolAcceptExts, t.toolPage.acceptDescription],
   );
 
+  // Drops and pastes are turned away, with a message, while a run is in flight (#2108).
+  const { running: runInFlight, allowIntake } = useIntakeGuard();
+
   const handleFiles = useCallback(
     (newFiles: File[]) => {
       setEraserSliderInitPos(null);
@@ -495,6 +499,7 @@ export function ToolPage() {
   }, [reset]);
 
   const handleAddMore = useCallback(() => {
+    if (!allowIntake()) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
@@ -509,16 +514,20 @@ export function ToolPage() {
       if (newFiles.length > 0) addFiles(newFiles);
     };
     input.click();
-  }, [addFiles, toolAccept, toolFileFilter, acceptsAnyFile]);
+  }, [addFiles, toolAccept, toolFileFilter, acceptsAnyFile, allowIntake]);
 
   // Page-level drag handlers (active when a file is already loaded)
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current++;
-    if (e.dataTransfer.types.includes("Files")) {
-      setIsDraggingOver(true);
-    }
-  }, []);
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      dragCounter.current++;
+      // No "drop to replace" overlay over a run: the drop would be turned away (#2108).
+      if (e.dataTransfer.types.includes("Files") && !runInFlight) {
+        setIsDraggingOver(true);
+      }
+    },
+    [runInFlight],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -538,13 +547,14 @@ export function ToolPage() {
       if (droppedFiles.length === 0) return;
       const validFiles = toolFileFilter ? droppedFiles.filter(toolFileFilter) : droppedFiles;
       if (validFiles.length === 0) return;
+      if (!allowIntake()) return;
       if (isMultiFileTool) {
         addFiles(validFiles);
       } else {
         setFiles(validFiles);
       }
     },
-    [toolFileFilter, addFiles, setFiles, isMultiFileTool],
+    [toolFileFilter, addFiles, setFiles, isMultiFileTool, allowIntake],
   );
 
   // Document-level paste handler (skip for generator tools that don't accept file input)
@@ -567,6 +577,7 @@ export function ToolPage() {
         e.preventDefault();
         const filtered = toolFileFilter ? pastedFiles.filter(toolFileFilter) : pastedFiles;
         if (filtered.length > 0) {
+          if (!allowIntake()) return;
           if (isMultiFileTool) addFiles(filtered);
           else setFiles(filtered);
         }
@@ -575,7 +586,14 @@ export function ToolPage() {
 
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [toolFileFilter, isMultiFileTool, addFiles, setFiles, registryEntry?.displayMode]);
+  }, [
+    toolFileFilter,
+    isMultiFileTool,
+    addFiles,
+    setFiles,
+    registryEntry?.displayMode,
+    allowIntake,
+  ]);
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;

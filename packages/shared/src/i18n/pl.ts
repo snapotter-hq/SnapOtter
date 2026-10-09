@@ -5530,6 +5530,7 @@ export const pl: TranslationKeys = {
     filesSelected: "Wybrano plików: {count}",
     dropToAdd: "Upuść, aby dodać pliki",
     dropToReplace: "Upuść, aby zastąpić plik",
+    ignoredWhileRunning: "Trwa przetwarzanie. Poczekaj, aż się zakończy, zanim dodasz pliki.",
     reorderHint:
       "Przeciągnij miniatury, aby zmienić kolejność, lub odwróć kolejność przed uruchomieniem.",
   },

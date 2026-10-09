@@ -5462,6 +5462,7 @@ export const ja: TranslationKeys = {
     filesSelected: "{count}ファイルを選択済み",
     dropToAdd: "ファイルを追加するにはドロップ",
     dropToReplace: "ファイルを置き換えるにはドロップ",
+    ignoredWhileRunning: "実行中です。ファイルを追加するには、完了するまでお待ちください。",
     reorderHint: "実行する前に、サムネイルをドラッグして並べ替えるか、順序を逆にできます。",
   },
   reviewPanel: {

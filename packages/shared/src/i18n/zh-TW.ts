@@ -5208,6 +5208,7 @@ export const zhTW: TranslationKeys = {
     filesSelected: "已選取{count}個檔案",
     dropToAdd: "放下以新增檔案",
     dropToReplace: "放下以取代檔案",
+    ignoredWhileRunning: "正在執行。請等待完成後再新增檔案。",
     reorderHint: "執行前可拖曳縮圖重新排序，或反轉順序。",
   },
   reviewPanel: {

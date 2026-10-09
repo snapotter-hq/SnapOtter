@@ -5535,6 +5535,8 @@ export const nl: TranslationKeys = {
     filesSelected: "{count} bestanden geselecteerd",
     dropToAdd: "Laat los om bestanden toe te voegen",
     dropToReplace: "Laat los om bestand te vervangen",
+    ignoredWhileRunning:
+      "Er loopt een verwerking. Wacht tot die klaar is voordat je bestanden toevoegt.",
     reorderHint: "Sleep de miniaturen om te herordenen, of keer de volgorde om, voordat je start.",
   },
   reviewPanel: {

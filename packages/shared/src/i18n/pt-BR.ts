@@ -5530,6 +5530,8 @@ export const ptBR: TranslationKeys = {
     filesSelected: "{count} arquivos selecionados",
     dropToAdd: "Solte para adicionar arquivos",
     dropToReplace: "Solte para substituir arquivo",
+    ignoredWhileRunning:
+      "Há uma execução em andamento. Aguarde o término antes de adicionar arquivos.",
     reorderHint: "Arraste as miniaturas para reordenar, ou inverta a ordem, antes de executar.",
   },
   reviewPanel: {

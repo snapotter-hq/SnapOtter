@@ -5499,6 +5499,7 @@ export const vi: TranslationKeys = {
     filesSelected: "Đã chọn {count} tệp",
     dropToAdd: "Thả để thêm tệp",
     dropToReplace: "Thả để thay thế tệp",
+    ignoredWhileRunning: "Đang xử lý. Hãy đợi hoàn tất trước khi thêm tệp.",
     reorderHint: "Kéo các hình thu nhỏ để sắp xếp lại, hoặc đảo ngược thứ tự, trước khi chạy.",
   },
   reviewPanel: {

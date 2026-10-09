@@ -5512,6 +5512,7 @@ export const sv: TranslationKeys = {
     filesSelected: "{count} filer valda",
     dropToAdd: "Släpp för att lägga till filer",
     dropToReplace: "Släpp för att ersätta fil",
+    ignoredWhileRunning: "En körning pågår. Vänta tills den är klar innan du lägger till filer.",
     reorderHint: "Dra miniatyrerna för att ändra ordning, eller vänd ordningen, innan du kör.",
   },
   reviewPanel: {

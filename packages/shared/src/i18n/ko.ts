@@ -5427,6 +5427,7 @@ export const ko: TranslationKeys = {
     filesSelected: "{count}개 파일 선택됨",
     dropToAdd: "파일을 추가하려면 놓기",
     dropToReplace: "파일을 교체하려면 놓기",
+    ignoredWhileRunning: "실행 중입니다. 파일을 추가하려면 완료될 때까지 기다리세요.",
     reorderHint: "실행하기 전에 썸네일을 드래그하여 순서를 변경하거나 순서를 뒤집으세요.",
   },
   reviewPanel: {

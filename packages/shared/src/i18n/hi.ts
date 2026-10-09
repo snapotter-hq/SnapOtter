@@ -5296,6 +5296,7 @@ export const hi: TranslationKeys = {
     filesSelected: "{count} फाइलें चुनी गईं",
     dropToAdd: "फाइलें जोड़ने के लिए छोड़ें",
     dropToReplace: "फाइल बदलने के लिए छोड़ें",
+    ignoredWhileRunning: "प्रोसेसिंग चल रही है। फाइलें जोड़ने से पहले उसके पूरा होने की प्रतीक्षा करें।",
     reorderHint: "चलाने से पहले क्रम बदलने के लिए थंबनेल खींचें, या क्रम उलटें।",
   },
   reviewPanel: {
