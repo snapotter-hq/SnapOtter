@@ -22,6 +22,34 @@ const capture = vi.hoisted(() => ({
   blob: new Blob(["x"]) as Blob | null,
   throwOnEncode: null as Error | null,
   ratios: [] as number[],
+  // jsdom has no 2D context. The file is built on a canvas the dialog creates, so
+  // that canvas is faked too; `giveContext: false` is the browser past its limit.
+  giveContext: true,
+}));
+
+const fakeCanvas = vi.hoisted(() => (width: number, height: number) => ({
+  width,
+  height,
+  // A healthy canvas: the dead-canvas probe reads back an opaque pixel.
+  getContext: () =>
+    capture.giveContext
+      ? {
+          fillStyle: "",
+          fillRect: () => {},
+          drawImage: () => {},
+          createImageData: () => ({ data: new Uint8ClampedArray(4) }),
+          getImageData: () => ({ data: new Uint8ClampedArray([255, 0, 255, 255]) }),
+          putImageData: () => {},
+        }
+      : null,
+  toDataURL: () => {
+    if (capture.throwOnEncode) throw capture.throwOnEncode;
+    return capture.dataUrl;
+  },
+  toBlob: (cb: (blob: Blob | null) => void) => {
+    if (capture.throwOnEncode) throw capture.throwOnEncode;
+    cb(capture.blob);
+  },
 }));
 
 // By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
@@ -41,18 +69,7 @@ vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
     if (Math.floor(w * ratio) < 1 || Math.floor(h * ratio) < 1) {
       throw new DOMException("The object is in an invalid state.", "InvalidStateError");
     }
-    return {
-      width: 10,
-      height: 10,
-      toDataURL: () => {
-        if (capture.throwOnEncode) throw capture.throwOnEncode;
-        return capture.dataUrl;
-      },
-      toBlob: (cb: (blob: Blob | null) => void) => {
-        if (capture.throwOnEncode) throw capture.throwOnEncode;
-        cb(capture.blob);
-      },
-    };
+    return fakeCanvas(Math.floor(w * ratio), Math.floor(h * ratio));
   },
 }));
 
@@ -71,7 +88,13 @@ beforeEach(() => {
   capture.blob = new Blob(["x"]);
   capture.throwOnEncode = null;
   capture.ratios = [];
+  capture.giveContext = true;
   useEditorStore.setState({ markClean, isDirty: true, canvasSize: { width: 1920, height: 1080 } });
+  const realCreate = document.createElement.bind(document);
+  vi.spyOn(document, "createElement").mockImplementation(((tag: string) =>
+    tag === "canvas"
+      ? (fakeCanvas(0, 0) as unknown as HTMLCanvasElement)
+      : realCreate(tag)) as typeof document.createElement);
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => ({
@@ -87,6 +110,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -215,13 +239,17 @@ describe("a size that rounds to 0 px (#2140)", () => {
     render(<ExportDialog onClose={() => {}} />);
     fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "1" } });
     expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+    const before = capture.ratios.length;
+    clickExport();
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+    // The estimate now waits for typing to stop (#2174), so the 1 px capture to check
+    // is the export's own.
+    expect(capture.ratios.length).toBeGreaterThan(before);
     for (const ratio of capture.ratios) {
       expect(Math.floor(800 * ratio)).toBeGreaterThanOrEqual(1);
       expect(Math.floor(200 * ratio)).toBeGreaterThanOrEqual(1);
     }
-    clickExport();
-    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
-    expect(toastError).not.toHaveBeenCalled();
   });
 
   it("opens on a document far wider than the 200 px thumbnail is tall", () => {
@@ -238,7 +266,12 @@ describe("a size that rounds to 0 px (#2140)", () => {
 });
 
 describe("a 2D context the browser won't give (#2140)", () => {
-  // jsdom's canvas has no 2D context, which is the same branch a browser at its limit takes.
+  // A null 2D context on the canvas the file is built on is the same branch a
+  // browser at its limit takes.
+  beforeEach(() => {
+    capture.giveContext = false;
+  });
+
   it("reports the white-background JPEG path instead of returning silently", async () => {
     render(<ExportDialog onClose={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "JPEG" }));

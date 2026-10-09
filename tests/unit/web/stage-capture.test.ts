@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   captureDocumentContext,
+  captureHasPixels,
   classifyCaptureError,
   readDocumentPixels,
   strokeToDataUrl,
@@ -122,6 +123,32 @@ describe("captureDocumentContext", () => {
     expect(() => captureDocumentContext(stage, 200, 150)).toThrow();
     expect(stage.size).toHaveBeenLastCalledWith({ width: 800, height: 600 });
     expect(stage.position).toHaveBeenLastCalledWith({ x: 10, y: 20 });
+  });
+});
+
+// The export dialog draws a capture into a smaller canvas once the aspect lock is off,
+// and a dead capture would make that file blank instead of failing (#2174).
+describe("captureHasPixels", () => {
+  const has = (ctx: unknown) => captureHasPixels(canvasOf(ctx) as unknown as HTMLCanvasElement);
+
+  it("says yes for a canvas that keeps what is written to it, and puts the pixel back", () => {
+    const { ctx, pixel } = fakeContext();
+    expect(has(ctx)).toBe(true);
+    expect([...pixel()]).toEqual([10, 20, 30, 255]);
+  });
+
+  it("says no for a canvas past the browser's limit", () => {
+    expect(has(fakeContext({ alive: false }).ctx)).toBe(false);
+  });
+
+  it("says no when the browser gives no 2D context", () => {
+    expect(has(null)).toBe(false);
+  });
+
+  it("lets a tainted read throw, so the caller reports it as tainted", () => {
+    const tainted = new DOMException("tainted", "SecurityError");
+    const { ctx } = fakeContext({ alive: true, readThrows: tainted });
+    expect(() => has(ctx)).toThrow(tainted);
   });
 });
 

@@ -1,7 +1,13 @@
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 // apps/web/src/components/editor/common/export-dialog.tsx
 
-import { ANALYTICS_EVENTS, apiToolPath, SafeError } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  apiToolPath,
+  type EditorExportedProperties,
+  SafeError,
+} from "@snapotter/shared";
+import type Konva from "konva";
 import {
   Check,
   ClipboardCopy,
@@ -14,11 +20,12 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import {
+  type CaptureFailure,
   type CaptureFailureMessages,
   captureDocumentCanvas,
+  captureHasPixels,
   classifyCaptureError,
   reportCaptureFailure,
 } from "@/components/editor/stage-capture";
@@ -61,9 +68,9 @@ const FORMAT_OPTIONS: {
   { value: "jxl", label: "JXL", supportsTransparency: true, needsServerConvert: true },
 ];
 
-// A capture whose width or height rounds to 0 px throws InvalidStateError (typing
-// "1" into the width of a wide image does exactly that). Never ask for less than
-// 1 px on the shorter side.
+// A capture whose width or height rounds to 0 px throws InvalidStateError. The 200 px
+// thumbnail of a very wide or tall document asks for exactly that (on 40000x100 the
+// short side would be 0.5 px), so never ask for less than 1 px on the shorter side.
 function atLeastOnePixel(ratio: number, width: number, height: number): number {
   return Math.max(ratio, 1 / Math.min(width, height));
 }
@@ -79,6 +86,74 @@ function getMimeType(format: ExportFormat): string {
     jxl: "image/jxl",
   };
   return mimes[format];
+}
+
+// How long the size estimate waits after the last change before it captures and
+// encodes the whole document again. On every keystroke it cost a full render and
+// captured half-typed sizes (#2174). The 200 px thumbnail stays immediate.
+const ESTIMATE_DEBOUNCE_MS = 300;
+
+type ExportFailureReason = NonNullable<EditorExportedProperties["reason"]>;
+
+// The canvas the file is made from: exactly `width` x `height` (at least 1 px a
+// side), on white unless the format keeps transparency. The two axes scale on their
+// own once the aspect lock is off (#2174): the document is captured at the larger of
+// the two ratios, so neither axis is upsampled, then drawn into the requested size.
+// A capture that already is that size, for a format that keeps transparency, is used
+// as it is. Null means the browser can't back a canvas that big; a capture or encode
+// that fails on size throws, and classifyCaptureError tells the two kinds apart.
+function renderExportCanvas(
+  stage: Konva.Stage,
+  canvasSize: { width: number; height: number },
+  settings: Pick<ExportSettings, "width" | "height" | "format" | "transparent">,
+): HTMLCanvasElement | null {
+  const width = Math.max(1, Math.round(settings.width));
+  const height = Math.max(1, Math.round(settings.height));
+  const captured = captureDocumentCanvas(
+    stage,
+    canvasSize.width,
+    canvasSize.height,
+    Math.max(width / canvasSize.width, height / canvasSize.height),
+  );
+  const opaque = !settings.transparent || settings.format === "jpeg";
+  if (!opaque && captured.width === width && captured.height === height) return captured;
+  // With the lock off the capture can be much bigger than the file. Past the browser's
+  // limit it still comes back and draws nothing, so the file built from it would encode
+  // fine but blank, slipping past the "data:," check (#2140).
+  if (!captureHasPixels(captured)) return null;
+  const out = document.createElement("canvas");
+  out.width = width;
+  out.height = height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return null;
+  if (opaque) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.drawImage(captured, 0, 0, width, height);
+  return out;
+}
+
+// The encoded size, read off the data URL's base64 payload (to within the two bytes of
+// padding, which a label in KB never shows). No fetch, so an estimate that started
+// earlier can't land after a newer one.
+function dataUrlBytes(dataUrl: string): number {
+  return Math.floor(((dataUrl.length - dataUrl.indexOf(",") - 1) * 3) / 4);
+}
+
+// A tainted or over-limit canvas can't be encoded. The preview just goes blank;
+// Export and Copy are where the user is told why. Anything else is a bug and is
+// reported, never rethrown: a throw would reach the route ErrorBoundary from a
+// passive effect (#2140).
+function reportPreviewFailure(err: unknown): void {
+  if (classifyCaptureError(err)) return;
+  console.error("Export preview failed:", err);
+  void import("@/lib/analytics").then(({ captureHandledError }) =>
+    captureHandledError(
+      new SafeError("Could not render the export preview", { kind: "bug", cause: err }),
+      { error_class: "bug", tool_id: "editor-export" },
+    ),
+  );
 }
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
@@ -102,109 +177,102 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const aspectRatio = canvasSize.width / canvasSize.height;
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Issue #6: Use Konva stage ref for proper export instead of DOM query
-  const generatePreview = useCallback(() => {
+  // For server-convert formats the Canvas API cannot produce a preview, so the
+  // thumbnail and the estimate fall back to PNG.
+  const previewMime = useMemo(() => {
+    const option = FORMAT_OPTIONS.find((o) => o.value === settings.format);
+    return option?.needsServerConvert ? "image/png" : getMimeType(settings.format);
+  }, [settings.format]);
+
+  // The 200 px thumbnail is cheap, so it follows format and quality at once.
+  useEffect(() => {
     const stage = editorStageRefHolder.current;
     if (!stage) return;
-
     const maxPreview = 200;
     const scale = atLeastOnePixel(
       Math.min(maxPreview / canvasSize.width, maxPreview / canvasSize.height),
       canvasSize.width,
       canvasSize.height,
     );
-
-    // For server-convert formats the Canvas API cannot produce a preview,
-    // so fall back to PNG for the thumbnail.
-    const fmtOpt = FORMAT_OPTIONS.find((o) => o.value === settings.format);
-    const previewMime = fmtOpt?.needsServerConvert ? "image/png" : getMimeType(settings.format);
-
-    // A tainted or over-limit canvas can't be encoded. The preview just goes blank;
-    // Export and Copy are where the user is told why. A throw here would reach the
-    // route ErrorBoundary from a passive effect (#2140).
     let url: string;
-    let fullUrl: string;
     try {
       url = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, scale).toDataURL(
         previewMime,
         settings.quality / 100,
       );
-      const pixelRatio = atLeastOnePixel(
-        settings.width / canvasSize.width,
-        canvasSize.width,
-        canvasSize.height,
-      );
-      fullUrl = captureDocumentCanvas(
-        stage,
-        canvasSize.width,
-        canvasSize.height,
-        pixelRatio,
-      ).toDataURL(previewMime, settings.quality / 100);
     } catch (err) {
-      // Never rethrow from here: a thumbnail isn't worth the editor. Known capture
-      // failures are explained by Export and Copy; anything else is reported.
-      if (!classifyCaptureError(err)) {
-        console.error("Export preview failed:", err);
-        void import("@/lib/analytics").then(({ captureHandledError }) =>
-          captureHandledError(
-            new SafeError("Could not render the export preview", { kind: "bug", cause: err }),
-            { error_class: "bug", tool_id: "editor-export" },
-          ),
-        );
-      }
+      reportPreviewFailure(err);
       setPreviewUrl(null);
-      setEstimatedSize(null);
       return;
     }
     setPreviewUrl(url === "data:," ? null : url);
+  }, [canvasSize, previewMime, settings.quality]);
 
-    if (fullUrl === "data:,") {
-      setEstimatedSize(null);
+  // The size estimate renders and encodes the whole document at the requested size.
+  // The first one shows with the dialog; after that it waits until the settings have
+  // stopped changing (#2174).
+  const estimatedOnce = useRef(false);
+  useEffect(() => {
+    const estimate = () => {
+      const stage = editorStageRefHolder.current;
+      if (!stage) return;
+      let fullUrl: string;
+      try {
+        const canvas = renderExportCanvas(stage, canvasSize, {
+          width: settings.width,
+          height: settings.height,
+          format: settings.format,
+          transparent: settings.transparent,
+        });
+        fullUrl = canvas ? canvas.toDataURL(previewMime, settings.quality / 100) : "data:,";
+      } catch (err) {
+        reportPreviewFailure(err);
+        setEstimatedSize(null);
+        return;
+      }
+      setEstimatedSize(fullUrl === "data:," ? null : dataUrlBytes(fullUrl));
+    };
+    if (!estimatedOnce.current) {
+      estimatedOnce.current = true;
+      estimate();
       return;
     }
-    fetch(fullUrl)
-      .then((res) => res.blob())
-      .then((blob) => setEstimatedSize(blob.size))
-      .catch(() => setEstimatedSize(null));
-  }, [canvasSize, settings.format, settings.quality, settings.width]);
+    later(estimate, ESTIMATE_DEBOUNCE_MS, "estimate");
+  }, [
+    later,
+    canvasSize,
+    previewMime,
+    settings.width,
+    settings.height,
+    settings.format,
+    settings.transparent,
+    settings.quality,
+  ]);
 
-  // Generate preview thumbnail on format/transparency change
-  useEffect(() => {
-    generatePreview();
-  }, [generatePreview]);
-
-  // Handle width change with aspect lock
+  // Width and height follow each other while the lock is on. The derived side never
+  // rounds below 1 px: a 1 px width on a wide document used to make the height 0.
   const handleWidthChange = useCallback(
     (w: number) => {
-      const newWidth = Math.max(1, w);
-      if (settings.lockAspect) {
-        setSettings((prev) => ({
-          ...prev,
-          width: newWidth,
-          height: Math.round(newWidth / aspectRatio),
-        }));
-      } else {
-        setSettings((prev) => ({ ...prev, width: newWidth }));
-      }
+      const width = Math.max(1, w);
+      setSettings((prev) =>
+        prev.lockAspect
+          ? { ...prev, width, height: Math.max(1, Math.round(width / aspectRatio)) }
+          : { ...prev, width },
+      );
     },
-    [settings.lockAspect, aspectRatio],
+    [aspectRatio],
   );
 
-  // Handle height change with aspect lock
   const handleHeightChange = useCallback(
     (h: number) => {
-      const newHeight = Math.max(1, h);
-      if (settings.lockAspect) {
-        setSettings((prev) => ({
-          ...prev,
-          height: newHeight,
-          width: Math.round(newHeight * aspectRatio),
-        }));
-      } else {
-        setSettings((prev) => ({ ...prev, height: newHeight }));
-      }
+      const height = Math.max(1, h);
+      setSettings((prev) =>
+        prev.lockAspect
+          ? { ...prev, height, width: Math.max(1, Math.round(height * aspectRatio)) }
+          : { ...prev, height },
+      );
     },
-    [settings.lockAspect, aspectRatio],
+    [aspectRatio],
   );
 
   const captureMessages = useMemo<CaptureFailureMessages>(
@@ -223,217 +291,152 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   }, [captureMessages]);
 
   // Run a capture-and-encode step. A tainted or over-limit canvas is reported to
-  // the user and answers `false`; any other error is a bug and propagates.
+  // the user and answered as the reason; any other error is a bug and propagates.
   const guardCapture = useCallback(
-    (step: () => void): boolean => {
+    (step: () => void): CaptureFailure | null => {
       try {
         step();
-        return true;
+        return null;
       } catch (err) {
         const reason = classifyCaptureError(err);
         if (!reason) throw err;
         reportCaptureFailure(reason, captureMessages);
-        return false;
+        return reason;
       }
     },
     [captureMessages],
   );
 
-  // Issue #6: Export using Konva stage.toDataURL for correct output
+  // Export through the Konva stage. editor_exported is sent once per attempt, when
+  // the outcome is known (#2174): it used to fire on the click, so a canvas the
+  // browser couldn't encode or a server error still counted as an export.
   const handleExport = useCallback(() => {
-    import("@/lib/analytics").then(({ track }) =>
-      track(ANALYTICS_EVENTS.EDITOR_EXPORTED, { output_format: settings.format }),
-    );
-    const stage = editorStageRefHolder.current;
-    if (!stage) return;
-
-    guardCapture(() => {
-      const pixelRatio = atLeastOnePixel(
-        settings.width / canvasSize.width,
-        canvasSize.width,
-        canvasSize.height,
+    const report = (status: "completed" | "failed", reason?: ExportFailureReason) => {
+      const properties = {
+        output_format: settings.format,
+        status,
+        ...(reason ? { reason } : {}),
+      } satisfies EditorExportedProperties;
+      void import("@/lib/analytics").then(({ track }) =>
+        track(ANALYTICS_EVENTS.EDITOR_EXPORTED, properties),
       );
+    };
+    const stage = editorStageRefHolder.current;
+    if (!stage) {
+      report("failed", "no-stage");
+      return;
+    }
+    const download = (href: string) => {
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `export.${settings.format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      markClean();
+      report("completed");
+    };
+    const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
 
-      // Server-side convert for formats the Canvas API cannot produce
-      const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
-      if (formatOption?.needsServerConvert) {
-        let stageCanvas: HTMLCanvasElement;
-        if (!settings.transparent || settings.format === "jpeg") {
-          const raw = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height, pixelRatio);
-          const exportCanvas = document.createElement("canvas");
-          exportCanvas.width = raw.width;
-          exportCanvas.height = raw.height;
-          const ctx = exportCanvas.getContext("2d");
-          if (!ctx) {
-            reportEmptyExport();
-            return;
-          }
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-          ctx.drawImage(raw, 0, 0);
-          stageCanvas = exportCanvas;
-        } else {
-          stageCanvas = captureDocumentCanvas(
-            stage,
-            canvasSize.width,
-            canvasSize.height,
-            pixelRatio,
-          );
-        }
-
-        stageCanvas.toBlob(async (blob) => {
-          if (!blob || blob.size === 0) {
-            reportEmptyExport();
-            return;
-          }
-          const formData = new FormData();
-          formData.append("file", blob, "export.png");
-          formData.append(
-            "settings",
-            JSON.stringify({ format: settings.format, quality: settings.quality }),
-          );
-          try {
-            const res = await fetch(appUrl(apiToolPath("convert")), {
-              method: "POST",
-              body: formData,
-            });
-            if (!res.ok) throw new Error("Server convert failed");
-            const json = resolveServerUrls(await res.json());
-            if (json.downloadUrl) {
-              const a = document.createElement("a");
-              a.href = json.downloadUrl;
-              a.download = `export.${settings.format}`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              markClean();
-            }
-          } catch (err) {
-            console.error("Server-side export failed:", err);
-          }
-        }, "image/png");
-        return;
-      }
-
-      let dataUrl: string;
-
-      if (!settings.transparent || settings.format === "jpeg") {
-        // Create canvas with white background for non-transparent exports
-        const stageCanvas = captureDocumentCanvas(
-          stage,
-          canvasSize.width,
-          canvasSize.height,
-          pixelRatio,
-        );
-        const exportCanvas = document.createElement("canvas");
-        exportCanvas.width = stageCanvas.width;
-        exportCanvas.height = stageCanvas.height;
-        const ctx = exportCanvas.getContext("2d");
-        if (!ctx) {
+    let failure: CaptureFailure | null;
+    try {
+      failure = guardCapture(() => {
+        const canvas = renderExportCanvas(stage, canvasSize, settings);
+        if (!canvas) {
           reportEmptyExport();
+          report("failed", "no-context");
           return;
         }
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-        ctx.drawImage(stageCanvas, 0, 0);
-        dataUrl = exportCanvas.toDataURL(
-          getMimeType(settings.format),
-          settings.format === "png" ? undefined : settings.quality / 100,
-        );
-      } else {
-        dataUrl = captureDocumentCanvas(
-          stage,
-          canvasSize.width,
-          canvasSize.height,
-          pixelRatio,
-        ).toDataURL(
-          getMimeType(settings.format),
-          settings.format === "png" ? undefined : settings.quality / 100,
-        );
-      }
 
-      if (dataUrl === "data:,") {
-        reportEmptyExport();
-        return;
-      }
-
-      const formatOpt = FORMAT_OPTIONS.find((f) => f.value === settings.format);
-      if (formatOpt?.needsServerConvert) {
-        fetch(dataUrl)
-          .then((res) => res.blob())
-          .then(async (pngBlob) => {
+        // Formats the Canvas API cannot encode go to the server as PNG.
+        if (formatOption?.needsServerConvert) {
+          canvas.toBlob(async (blob) => {
+            if (!blob || blob.size === 0) {
+              reportEmptyExport();
+              report("failed", "no-context");
+              return;
+            }
             const formData = new FormData();
-            formData.append("file", pngBlob, "export.png");
+            formData.append("file", blob, "export.png");
             formData.append(
               "settings",
               JSON.stringify({ format: settings.format, quality: settings.quality }),
             );
-            const res = await fetch(appUrl(apiToolPath("convert")), {
-              method: "POST",
-              body: formData,
-            });
-            if (!res.ok) throw new Error("Server conversion failed");
-            const json = resolveServerUrls(await res.json());
-            if (json.downloadUrl) {
-              const a = document.createElement("a");
-              a.href = json.downloadUrl;
-              a.download = `export.${settings.format}`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              markClean();
+            try {
+              const res = await fetch(appUrl(apiToolPath("convert")), {
+                method: "POST",
+                body: formData,
+              });
+              if (!res.ok) throw new Error("Server convert failed");
+              const json = resolveServerUrls(await res.json());
+              // A conversion that outlives the server's sync wait answers 202 with no
+              // file yet, and the dialog doesn't follow the job (#2171).
+              if (!json.downloadUrl) {
+                console.error("Server-side export answered before the file was ready");
+                report("failed", "server-pending");
+                return;
+              }
+              download(json.downloadUrl);
+            } catch (err) {
+              console.error("Server-side export failed:", err);
+              report("failed", "server-convert");
             }
-          })
-          .catch((err) => {
-            console.error("Export failed:", err);
-          });
-      } else {
+          }, "image/png");
+          return;
+        }
+
+        const dataUrl = canvas.toDataURL(
+          getMimeType(settings.format),
+          settings.format === "png" ? undefined : settings.quality / 100,
+        );
+        if (dataUrl === "data:,") {
+          reportEmptyExport();
+          report("failed", "no-context");
+          return;
+        }
         fetch(dataUrl)
           .then((res) => res.blob())
           .then((blob) => {
             if (blob.size === 0) {
               reportEmptyExport();
+              report("failed", "no-context");
               return;
             }
             const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `export.${settings.format}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            download(url);
             URL.revokeObjectURL(url);
-            markClean();
           })
           .catch((err) => {
             console.error("Export failed:", err);
+            report("failed", "download");
           });
-      }
-    });
+      });
+    } catch (err) {
+      // Not a capture failure: a bug. It still propagates, but the attempt is counted.
+      report("failed", "bug");
+      throw err;
+    }
+    if (failure) report("failed", failure);
   }, [settings, canvasSize, markClean, reportEmptyExport, guardCapture]);
 
-  // Issue #6: Copy to clipboard using Konva stage
+  // Copy a transparent PNG at the requested size through the Konva stage.
   const handleCopyToClipboard = useCallback(async () => {
     const stage = editorStageRefHolder.current;
     if (!stage) return;
 
-    const pixelRatio = atLeastOnePixel(
-      settings.width / canvasSize.width,
-      canvasSize.width,
-      canvasSize.height,
-    );
     let dataUrl = "";
-    const captured = guardCapture(() => {
-      dataUrl = captureDocumentCanvas(
-        stage,
-        canvasSize.width,
-        canvasSize.height,
-        pixelRatio,
-      ).toDataURL("image/png");
+    const failure = guardCapture(() => {
+      const canvas = renderExportCanvas(stage, canvasSize, {
+        width: settings.width,
+        height: settings.height,
+        format: "png",
+        transparent: true,
+      });
+      dataUrl = canvas ? canvas.toDataURL("image/png") : "data:,";
     });
-    if (!captured || dataUrl === "data:,") {
+    if (failure || dataUrl === "data:,") {
       // An over-limit canvas copies as an empty image while the button says copied.
-      if (captured) reportEmptyExport();
+      if (!failure) reportEmptyExport();
       setCopyStatus("failed");
       later(() => setCopyStatus("idle"), 2000, "copyStatus");
       return;
