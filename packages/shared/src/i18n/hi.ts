@@ -5411,6 +5411,7 @@ export const hi: TranslationKeys = {
     passwordNeedsDigit: "पासवर्ड में एक संख्या होनी चाहिए।",
     passwordNeedsSpecial: "पासवर्ड में एक विशेष वर्ण होना चाहिए।",
     passwordNoControlCharacters: "पासवर्ड में नियंत्रण वर्ण नहीं होने चाहिए।",
+    passwordTooLong: "पासवर्ड अधिकतम {maxLength} वर्णों का होना चाहिए।",
     tooManyRequests: "बहुत अधिक प्रयास। एक मिनट रुककर फिर से प्रयास करें।",
     escalationDenied: "इसके लिए आपकी भूमिका से अधिक पहुंच चाहिए।",
     featureNotLicensed: "इसके लिए एंटरप्राइज़ लाइसेंस आवश्यक है।",

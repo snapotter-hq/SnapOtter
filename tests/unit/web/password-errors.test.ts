@@ -4,7 +4,7 @@
  * never passes the server's English `error` through.
  */
 
-import { en, PASSWORD_RULES } from "@snapotter/shared";
+import { en, PASSWORD_MAX_LENGTH, PASSWORD_RULES } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import { passwordErrorMessage, passwordErrorMessages } from "@/lib/password-errors";
 
@@ -15,6 +15,7 @@ describe("passwordErrorMessage (#1446)", () => {
         code: "VALIDATION_ERROR",
         rule,
         minLength: 10,
+        maxLength: 1024,
       });
       expect(message, rule).toEqual(expect.any(String));
     }
@@ -33,6 +34,22 @@ describe("passwordErrorMessage (#1446)", () => {
   ])("returns null for %s", (_label, status, body) => {
     expect(passwordErrorMessage(en, status, { ...body, error: "Server English" } as never)).toBe(
       null,
+    );
+  });
+
+  it("names the maximum length for a password that is too long (#2037)", () => {
+    expect(
+      passwordErrorMessage(en, 400, {
+        code: "VALIDATION_ERROR",
+        rule: "maxLength",
+        maxLength: 1024,
+      }),
+    ).toBe(en.errors.passwordTooLong.replace("{maxLength}", "1024"));
+  });
+
+  it("falls back to the shared limit when the response carries no maximum", () => {
+    expect(passwordErrorMessage(en, 400, { code: "VALIDATION_ERROR", rule: "maxLength" })).toBe(
+      en.errors.passwordTooLong.replace("{maxLength}", String(PASSWORD_MAX_LENGTH)),
     );
   });
 

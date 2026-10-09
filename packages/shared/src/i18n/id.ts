@@ -5631,6 +5631,7 @@ export const id: TranslationKeys = {
     passwordNeedsDigit: "Kata sandi harus mengandung angka.",
     passwordNeedsSpecial: "Kata sandi harus mengandung karakter khusus.",
     passwordNoControlCharacters: "Kata sandi tidak boleh mengandung karakter kontrol.",
+    passwordTooLong: "Kata sandi maksimal {maxLength} karakter.",
     tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
     escalationDenied: "Tindakan itu memerlukan akses lebih dari yang dimiliki peran Anda.",
     featureNotLicensed: "Ini memerlukan lisensi enterprise.",

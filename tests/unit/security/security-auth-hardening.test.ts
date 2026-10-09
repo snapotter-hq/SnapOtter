@@ -3,7 +3,8 @@
  *
  * These tests verify that:
  * - Rate limit and login attempt defaults were lowered to secure values
- * - Auth Zod schemas enforce max length on username/password fields
+ * - Auth Zod schemas enforce max length on username and on the login password;
+ *   a new or current password's length is judged by the handlers so a refusal can say why (#2037)
  * - New storage env vars have correct defaults
  */
 import { describe, expect, it, vi } from "vitest";
@@ -117,20 +118,20 @@ describe("Security: loginSchema max lengths", () => {
 });
 
 describe("Security: changePasswordSchema max lengths", () => {
-  it("rejects oversized currentPassword", () => {
+  it("leaves an oversized currentPassword to the handler, which answers incorrect (#2037)", () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: "a".repeat(1025),
       newPassword: "ValidPass1",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
-  it("rejects oversized newPassword", () => {
+  it("leaves a new password's length to validatePasswordStrength (#2037)", () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: "ValidPass1",
       newPassword: "a".repeat(1025),
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 
@@ -146,24 +147,21 @@ describe("Security: registerSchema max lengths", () => {
     }
   });
 
-  it("rejects password longer than 1024 chars", () => {
+  it("leaves a new password's length to validatePasswordStrength (#2037)", () => {
     const result = registerSchema.safeParse({
       username: "testuser",
       password: "a".repeat(1025),
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 
 describe("Security: resetPasswordSchema max lengths", () => {
-  it("rejects newPassword longer than 1024 chars", () => {
+  it("leaves newPassword's length to validatePasswordStrength (#2037)", () => {
     const result = resetPasswordSchema.safeParse({
       newPassword: "a".repeat(1025),
     });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.some((i) => i.message === "Password too long")).toBe(true);
-    }
+    expect(result.success).toBe(true);
   });
 });
 

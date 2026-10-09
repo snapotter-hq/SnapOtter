@@ -5556,6 +5556,7 @@ export const en = {
     passwordNeedsDigit: "Password must contain a number.",
     passwordNeedsSpecial: "Password must contain a special character.",
     passwordNoControlCharacters: "Password must not contain control characters.",
+    passwordTooLong: "Password must be at most {maxLength} characters.",
     tooManyRequests: "Too many attempts. Wait a minute and try again.",
     escalationDenied: "That needs more access than your role has.",
     featureNotLicensed: "This needs an enterprise license.",

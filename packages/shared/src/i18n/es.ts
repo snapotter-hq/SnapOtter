@@ -5645,6 +5645,7 @@ export const es: TranslationKeys = {
     passwordNeedsDigit: "La contraseña debe contener un número.",
     passwordNeedsSpecial: "La contraseña debe contener un carácter especial.",
     passwordNoControlCharacters: "La contraseña no puede contener caracteres de control.",
+    passwordTooLong: "La contraseña no puede tener más de {maxLength} caracteres.",
     tooManyRequests: "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
     escalationDenied: "Eso requiere más acceso del que tiene tu rol.",
     featureNotLicensed: "Esto requiere una licencia empresarial.",

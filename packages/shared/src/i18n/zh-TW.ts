@@ -5322,6 +5322,7 @@ export const zhTW: TranslationKeys = {
     passwordNeedsDigit: "密碼必須包含一個數字。",
     passwordNeedsSpecial: "密碼必須包含一個特殊字元。",
     passwordNoControlCharacters: "密碼不能包含控制字元。",
+    passwordTooLong: "密碼長度最多只能有 {maxLength} 個字元。",
     tooManyRequests: "嘗試次數過多。請等待一分鐘後再試一次。",
     escalationDenied: "此操作需要超出您角色的權限。",
     featureNotLicensed: "這需要企業版授權。",

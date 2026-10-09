@@ -5544,6 +5544,7 @@ export const th: TranslationKeys = {
     passwordNeedsDigit: "รหัสผ่านต้องมีตัวเลข",
     passwordNeedsSpecial: "รหัสผ่านต้องมีอักขระพิเศษ",
     passwordNoControlCharacters: "รหัสผ่านต้องไม่มีอักขระควบคุม",
+    passwordTooLong: "รหัสผ่านต้องมีไม่เกิน {maxLength} ตัวอักษร",
     tooManyRequests: "ลองหลายครั้งเกินไป รอหนึ่งนาทีแล้วลองอีกครั้ง",
     escalationDenied: "การดำเนินการนี้ต้องใช้สิทธิ์มากกว่าที่บทบาทของคุณมี",
     featureNotLicensed: "ต้องใช้ใบอนุญาตระดับองค์กร",

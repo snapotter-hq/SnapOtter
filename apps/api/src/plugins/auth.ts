@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
+  PASSWORD_MAX_LENGTH,
   type PasswordRule,
   SafeError,
   USERNAME_MAX_LENGTH,
@@ -150,7 +151,7 @@ export function computeKeyPrefix(rawKey: string): string {
 /**
  * The password-policy rules a password broke. `rules` lists every one, so the
  * client can show them all at once; `rule` is the first, kept for clients that
- * read a single rule. `rule`, `rules` (and `minLength`) travel in the 400 so a
+ * read a single rule. `rule`, `rules` (and `minLength` or `maxLength`) travel in the 400 so a
  * client can word the failure in its own language; it can't read the policy
  * itself before the user has a usable password (#1446, #1569).
  */
@@ -159,9 +160,20 @@ interface PasswordRuleFailure {
   rule: PasswordRule;
   rules: PasswordRule[];
   minLength?: number;
+  maxLength?: number;
 }
 
 async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
+  // Before normalizing: the cap bounds the work every later step does, and the
+  // request schemas leave the length to this check so a refusal can say why (#2037).
+  if (typed.length > PASSWORD_MAX_LENGTH) {
+    return {
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: PASSWORD_MAX_LENGTH,
+    };
+  }
   // The rules judge the text that will be hashed, not the spelling it was typed in (#2056).
   const password = normalizePassword(typed);
   // A control character can be saved but never typed back: login refuses NUL
@@ -226,13 +238,14 @@ async function validatePasswordStrength(typed: string): Promise<PasswordRuleFail
 }
 
 /** The 400 body for a password that broke the policy. */
-function weakPasswordBody({ message, rule, rules, minLength }: PasswordRuleFailure) {
+function weakPasswordBody({ message, rule, rules, minLength, maxLength }: PasswordRuleFailure) {
   return {
     error: message,
     code: "VALIDATION_ERROR",
     rule,
     rules,
     ...(minLength !== undefined && { minLength }),
+    ...(maxLength !== undefined && { maxLength }),
   };
 }
 
@@ -250,17 +263,19 @@ function validateUsername(username: string): string | null {
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required").max(255, "Username too long"),
-  password: z.string().min(1, "Password is required").max(1024, "Password too long"),
+  password: z.string().min(1, "Password is required").max(PASSWORD_MAX_LENGTH, "Password too long"),
 });
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required").max(1024, "Password too long"),
-  newPassword: z.string().min(1, "New password is required").max(1024, "Password too long"),
+  // Longer than the cap can't be the current password; the handler says so as
+  // "incorrect" instead of a schema failure with no reason (#2037).
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(1, "New password is required"),
 });
 
 export const registerSchema = z.object({
   username: z.string().min(1, "Username is required").max(255, "Username too long"),
-  password: z.string().min(1, "Password is required").max(1024, "Password too long"),
+  password: z.string().min(1, "Password is required"),
   role: z.string().optional(),
   team: z.string().optional(),
 });
@@ -271,7 +286,7 @@ const updateUserSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  newPassword: z.string().min(1, "New password is required").max(1024, "Password too long"),
+  newPassword: z.string().min(1, "New password is required"),
 });
 
 // ── Request helpers ───────────────────────────────────────────────
@@ -988,7 +1003,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const { valid } = await verifyUserPassword(body.currentPassword, user.passwordHash);
+      const valid =
+        body.currentPassword.length <= PASSWORD_MAX_LENGTH &&
+        (await verifyUserPassword(body.currentPassword, user.passwordHash)).valid;
       if (!valid) {
         return reply
           .status(401)

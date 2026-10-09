@@ -1313,6 +1313,61 @@ describe("Admin user-management guards", () => {
     });
   });
 
+  it("change-password names the maximum length for a password over 1024 characters (#2037)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), `Aa1${"a".repeat(1022)}`);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must be at most 1024 characters",
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: 1024,
+    });
+  });
+
+  it("change-password answers an over-long current password as incorrect, not a schema failure (#2037)", async () => {
+    const user = await loggedInUser();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/change-password",
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { currentPassword: "a".repeat(1025), newPassword: "ValidPass2" },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body)).toMatchObject({ code: "INVALID_PASSWORD" });
+  });
+
+  it("register names the maximum length too, and accepts a password of exactly 1024", async () => {
+    const tooLong = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `max_${Date.now()}`, password: `Aa1${"a".repeat(1022)}` },
+    });
+    expect(tooLong.statusCode).toBe(400);
+    expect(JSON.parse(tooLong.body)).toMatchObject({ rule: "maxLength", maxLength: 1024 });
+
+    const exactName = `max_ok_${Date.now()}`;
+    const exactPassword = `Aa1${"a".repeat(1021)}`;
+    const exact = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: exactName, password: exactPassword },
+    });
+    expect(exact.statusCode, exact.body).toBe(201);
+
+    // What the policy accepts the login schema must accept too.
+    const signIn = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: exactName, password: exactPassword },
+    });
+    expect(signIn.statusCode, signIn.body).toBe(200);
+  });
+
   it("register refuses a control character in the password", async () => {
     const res = await testApp.app.inject({
       method: "POST",

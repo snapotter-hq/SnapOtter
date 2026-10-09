@@ -1,4 +1,9 @@
-import { isPasswordRule, type PasswordRule, type TranslationKeys } from "@snapotter/shared";
+import {
+  isPasswordRule,
+  PASSWORD_MAX_LENGTH,
+  type PasswordRule,
+  type TranslationKeys,
+} from "@snapotter/shared";
 import { format } from "@/lib/format";
 
 /** The parts of a failed password-change response the message depends on. */
@@ -7,9 +12,14 @@ export interface PasswordErrorBody {
   rule?: unknown;
   rules?: unknown;
   minLength?: unknown;
+  maxLength?: unknown;
 }
 
-function ruleMessage(t: TranslationKeys, rule: PasswordRule, minLength: unknown): string | null {
+function ruleMessage(
+  t: TranslationKeys,
+  rule: PasswordRule,
+  { minLength, maxLength }: Pick<PasswordErrorBody, "minLength" | "maxLength">,
+): string | null {
   switch (rule) {
     case "minLength":
       return typeof minLength === "number"
@@ -25,6 +35,10 @@ function ruleMessage(t: TranslationKeys, rule: PasswordRule, minLength: unknown)
       return t.errors.passwordNeedsSpecial;
     case "controlCharacter":
       return t.errors.passwordNoControlCharacters;
+    case "maxLength":
+      return format(t.errors.passwordTooLong, {
+        maxLength: typeof maxLength === "number" ? maxLength : PASSWORD_MAX_LENGTH,
+      });
     default: {
       // A rule added to PASSWORD_RULES without a message fails to compile here.
       const unhandled: never = rule;
@@ -50,7 +64,7 @@ export function passwordErrorMessage(
   if (body.code === "INVALID_PASSWORD") return t.settings.security.currentPasswordIncorrect;
   if (body.code === "OIDC_NO_PASSWORD") return t.auth.passwordManagedByProvider;
   if (body.code === "VALIDATION_ERROR" && isPasswordRule(body.rule)) {
-    return ruleMessage(t, body.rule, body.minLength);
+    return ruleMessage(t, body.rule, body);
   }
   return null;
 }
@@ -69,7 +83,7 @@ export function passwordErrorMessages(
   if (body.code === "VALIDATION_ERROR" && Array.isArray(body.rules)) {
     const messages = body.rules
       .filter(isPasswordRule)
-      .map((rule) => ruleMessage(t, rule, body.minLength))
+      .map((rule) => ruleMessage(t, rule, body))
       .filter((message): message is string => message !== null);
     if (messages.length > 0) return messages;
   }

@@ -11,7 +11,16 @@ export const PASSWORD_RULES = [
   "digit",
   "special",
   "controlCharacter",
+  "maxLength",
 ] as const;
+
+/**
+ * The longest password the server accepts, in UTF-16 code units like the
+ * request schemas. Anything the policy lets a user set has to pass the login
+ * schema's cap too, so both use this one constant. The cap bounds the
+ * normalizing and rule checks a password goes through before it is hashed.
+ */
+export const PASSWORD_MAX_LENGTH = 1024;
 
 export type PasswordRule = (typeof PASSWORD_RULES)[number];
 

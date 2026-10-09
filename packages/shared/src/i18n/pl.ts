@@ -5649,6 +5649,7 @@ export const pl: TranslationKeys = {
     passwordNeedsDigit: "Hasło musi zawierać cyfrę.",
     passwordNeedsSpecial: "Hasło musi zawierać znak specjalny.",
     passwordNoControlCharacters: "Hasło nie może zawierać znaków sterujących.",
+    passwordTooLong: "Hasło jest za długie (maksimum: {maxLength}).",
     tooManyRequests: "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
     escalationDenied: "To wymaga szerszego dostępu, niż ma twoja rola.",
     featureNotLicensed: "Wymaga to licencji enterprise.",

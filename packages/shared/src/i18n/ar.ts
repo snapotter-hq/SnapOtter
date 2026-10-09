@@ -5581,6 +5581,7 @@ export const ar: TranslationKeys = {
     passwordNeedsDigit: "يجب أن تحتوي كلمة المرور على رقم.",
     passwordNeedsSpecial: "يجب أن تحتوي كلمة المرور على حرف خاص.",
     passwordNoControlCharacters: "يجب ألا تحتوي كلمة المرور على أحرف تحكم.",
+    passwordTooLong: "يجب ألا يزيد عدد أحرف كلمة المرور عن {maxLength}.",
     tooManyRequests: "محاولات كثيرة جدًا. انتظر دقيقة ثم حاول مرة أخرى.",
     escalationDenied: "يتطلب هذا صلاحيات أعلى من صلاحيات دورك.",
     featureNotLicensed: "يتطلب هذا ترخيص المؤسسات.",
