@@ -41,7 +41,7 @@ vi.mock("@sentry/react", () => ({
   captureException: mockCaptureException,
   captureReactException: vi.fn(),
   setTag: vi.fn(),
-  withScope: vi.fn(),
+  withScope: (fn: (scope: { setTags: () => void }) => unknown) => fn({ setTags: vi.fn() }),
 }));
 
 const ON = {
@@ -242,6 +242,21 @@ describe("analytics lifecycle (#2197)", () => {
       expect(mockSentryInit).toHaveBeenCalledTimes(1);
     });
 
+    it("reports the init failure to Sentry once, however often it retries", async () => {
+      mockPosthogInit.mockImplementationOnce(() => {
+        throw new Error("posthog-js chunk failed");
+      });
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+
+      const reports = mockCaptureException.mock.calls.filter(
+        ([e]) => (e as Error).message === "PostHog failed to start",
+      );
+      expect(reports).toHaveLength(1);
+    });
+
     it("still stops everything on an opt-out", async () => {
       await mod.applyInstanceAnalytics(ON);
       await settle();
@@ -251,6 +266,25 @@ describe("analytics lifecycle (#2197)", () => {
       expect(mod.isTelemetryEnabled()).toBe(false);
       expect(client?.close).toHaveBeenCalled();
     });
+  });
+
+  // #2217 review: an opt-out between an "on" and its start finishing cleared
+  // the flag, and a second "on" joining that start never set it again.
+  it("ends on when on, off, on all arrive while PostHog loads", async () => {
+    const first = mod.applyInstanceAnalytics(ON);
+    const off = mod.applyInstanceAnalytics(OFF);
+    const again = mod.applyInstanceAnalytics(ON);
+    await Promise.all([first, off, again]);
+    await settle();
+
+    expect(mod.isTelemetryEnabled()).toBe(true);
+    expect(mod.isAnalyticsActive()).toBe(true);
+    const options = (mockSentryInit.mock.calls.at(-1) as unknown[])[0] as {
+      beforeSend: (e: unknown) => unknown;
+    };
+    expect(
+      options.beforeSend({ exception: { values: [{ type: "TypeError", value: "x" }] } }),
+    ).not.toBeNull();
   });
 
   it("optIn() after optOut() brings Sentry back too", async () => {

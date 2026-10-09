@@ -3,6 +3,7 @@ import {
   httpStatusTag,
   isSafeMessageError,
   resolvePostHogClientHosts,
+  SafeError,
 } from "@snapotter/shared";
 import { appUrl } from "./app-url";
 import { discardEarlyErrors, flushEarlyErrors } from "./early-errors";
@@ -19,6 +20,10 @@ let starting: Promise<void> | null = null;
 // optOut() closes Sentry; the config is kept so a re-enable can restart it.
 let sentryConfig: AnalyticsConfig | null = null;
 let sentryRunning = false;
+// posthog.init threw (as opposed to the chunk failing to load), reported to
+// Sentry once per tab (#2217).
+let posthogInitFailure: unknown = null;
+let posthogInitReported = false;
 
 // Only these keys may leave the browser per event, and only as primitives.
 const ALLOWED: Record<string, ReadonlySet<string>> = {
@@ -58,6 +63,12 @@ export function initAnalytics(config: AnalyticsConfig): Promise<void> {
   if (!config.enabled) return Promise.resolve();
   wanted = true;
   if (initialized) return Promise.resolve();
+  // The instance allows telemetry, so this tab does: Sentry's beforeSend
+  // reads this. Set here, for a new start and for an answer that joins one in
+  // flight, since an opt-out in between cleared it. PostHog starting is a
+  // separate question; tying the two made a PostHog that failed to load
+  // silence Sentry too (#2217). track() checks for a live PostHog itself.
+  enabled = true;
   // One start at a time: refetches build a new config object each time, so
   // without this two starts could both reach posthog.init and Sentry.init.
   starting ??= startAnalytics(config).finally(() => {
@@ -69,18 +80,15 @@ export function initAnalytics(config: AnalyticsConfig): Promise<void> {
 async function startAnalytics(config: AnalyticsConfig): Promise<void> {
   // Before any await, so an opt-out mid-start can't leave optIn() without it.
   if (config.sentryDsnWeb) sentryConfig = config;
-  // The instance allows telemetry, so this tab does: Sentry's beforeSend
-  // reads this. PostHog starting is a separate question; tying the two made a
-  // PostHog that failed to load silence Sentry too (#2217). track() checks
-  // for a live PostHog itself.
-  enabled = true;
   if (!config.posthogApiKey) {
     // Web-DSN-only bake: no PostHog key, so skip the PostHog SDK entirely
     // (mirrors the API guard) instead of feeding it an empty key.
     initialized = true;
   } else {
+    let chunkLoaded = false;
     try {
       const posthogJs = (await import("posthog-js")).default;
+      chunkLoaded = true;
       if (!wanted) return; // opted out while the SDK loaded
       // In proxy mode api_host is this instance's own /ingest (first-party, so
       // ad blockers don't drop events) and ui_host points at real PostHog;
@@ -161,6 +169,9 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
     } catch (err) {
       // Left uninitialized, so the next answer that says on tries again.
       console.warn("[analytics] PostHog init failed:", err);
+      // A chunk that won't load is the network or an ad blocker; posthog.init
+      // throwing is ours, so Sentry should hear about it.
+      if (chunkLoaded) posthogInitFailure = err;
     }
   }
 
@@ -197,6 +208,13 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
 
   // startSentry() itself stops short if the tab was opted out by now.
   if (sentryConfig) await startSentry(sentryConfig);
+  if (posthogInitFailure && !posthogInitReported && wanted) {
+    // Once per tab: a failing init retries on every focus refetch.
+    posthogInitReported = true;
+    void captureHandledError(
+      new SafeError("PostHog failed to start", { kind: "bug", cause: posthogInitFailure }),
+    );
+  }
 
   // Replay crashes captured before Sentry was ready. Not after an opt-out:
   // optOut() already threw the buffer away (#2197).
