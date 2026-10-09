@@ -390,6 +390,18 @@ export async function ensureDefaultAdmin(): Promise<void> {
       "DEFAULT_PASSWORD must not contain control characters (a trailing newline from a quoted compose or .env value is the usual cause)",
     );
   }
+  // Login refuses an empty password and one past the cap, so either makes an
+  // admin nobody can sign in as (#2307). An empty value reaches here from a
+  // bare-metal `DEFAULT_PASSWORD=` line; the Docker entrypoint turns it into the
+  // default instead.
+  if (env.DEFAULT_PASSWORD.length === 0) {
+    throw new Error("DEFAULT_PASSWORD must not be empty; sign-in refuses an empty password");
+  }
+  if (env.DEFAULT_PASSWORD.length > PASSWORD_MAX_LENGTH) {
+    throw new Error(
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters; sign-in refuses a longer password`,
+    );
+  }
 
   const id = randomUUID();
   const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));

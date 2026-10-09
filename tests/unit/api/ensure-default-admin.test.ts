@@ -1,3 +1,4 @@
+import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // A DEFAULT_PASSWORD that browsers cannot type creates an admin nobody can sign
@@ -55,6 +56,36 @@ describe("ensureDefaultAdmin", () => {
     expect(store.values).not.toHaveBeenCalled();
   });
 
+  it("refuses to create the admin when DEFAULT_PASSWORD is longer than login accepts (#2307)", async () => {
+    env.DEFAULT_PASSWORD = "a".repeat(PASSWORD_MAX_LENGTH + 1);
+
+    await expect(ensureDefaultAdmin()).rejects.toThrow(
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters`,
+    );
+    expect(store.values).not.toHaveBeenCalled();
+  });
+
+  it("refuses to create the admin when DEFAULT_PASSWORD is empty (#2307)", async () => {
+    env.DEFAULT_PASSWORD = "";
+
+    await expect(ensureDefaultAdmin()).rejects.toThrow("DEFAULT_PASSWORD must not be empty");
+    expect(store.values).not.toHaveBeenCalled();
+  });
+
+  it("counts characters in UTF-16 units like the login schema, so 513 emoji are over the limit", async () => {
+    env.DEFAULT_PASSWORD = "\u{1F600}".repeat(PASSWORD_MAX_LENGTH / 2 + 1);
+
+    await expect(ensureDefaultAdmin()).rejects.toThrow("DEFAULT_PASSWORD must be at most");
+  });
+
+  it("creates the admin for a DEFAULT_PASSWORD of exactly the longest length login accepts", async () => {
+    env.DEFAULT_PASSWORD = "a".repeat(PASSWORD_MAX_LENGTH);
+
+    await ensureDefaultAdmin();
+
+    expect(store.values).toHaveBeenCalledTimes(1);
+  });
+
   it("creates the admin for a password with no control characters", async () => {
     env.DEFAULT_PASSWORD = "pässwörd with spaces-密码";
 
@@ -65,7 +96,7 @@ describe("ensureDefaultAdmin", () => {
 
   it("leaves an established install alone, whatever DEFAULT_PASSWORD holds", async () => {
     store.users = [{ id: "existing-admin" }];
-    env.DEFAULT_PASSWORD = "stale-value\n";
+    env.DEFAULT_PASSWORD = `stale-value\n${"a".repeat(PASSWORD_MAX_LENGTH)}`;
 
     await expect(ensureDefaultAdmin()).resolves.toBeUndefined();
     expect(store.values).not.toHaveBeenCalled();
