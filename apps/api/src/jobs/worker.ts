@@ -20,10 +20,11 @@
  * "canceled" and are never retried. Terminal DB writes and SSE frames
  * are deferred until the final attempt so intermediate retries stay
  * invisible to the client. A user cancel is also recorded on its own
- * signal (cancel.ts userCancelSignal), which the writes after the handler
- * wait on: a cancel that lands after the deadline can't re-abort the job's
- * controller, and a deadline alone must not discard a result the handler
- * went on to return (#2144).
+ * signal (cancel.ts userCancelSignal): the streamed uploads after the
+ * handler take that signal and the buffered writes re-check
+ * wasUserCanceled, since a cancel that lands after the deadline can't
+ * re-abort the job's controller, and a deadline alone must not discard a
+ * result the handler went on to return (#2144).
  */
 import { createReadStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
@@ -374,10 +375,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     // Register for cooperative cancellation
     const ac = registerCancelable(jobId);
     const signal = ac.signal;
-    // Fires on a user cancel only, never on the deadline (#2144). The writes
-    // after the handler wait on this one: a handler that ignored the signal and
-    // returned after the deadline has a finished result worth keeping, while a
-    // user cancel still has to stop the upload.
+    // Fires on a user cancel only, never on the deadline (#2144). The streamed
+    // uploads after the handler take this signal (the buffered writes re-check
+    // wasUserCanceled instead): a handler that ignored the signal and returned
+    // after the deadline has a finished result worth keeping, while a user
+    // cancel still has to stop the upload.
     const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
@@ -388,11 +390,9 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     // Per-job scratch directory
     const scratchDir = join(scratchRoot(), jobId);
 
-    // How far the job got, for the catch below (#2144): once the handler has
-    // returned, the deadline can't be the cause of a later error, and once an
-    // output was written a cancel has to take it back.
+    // Read by the catch below (#2144): once the handler has returned, the
+    // deadline can't be the cause of a later error.
     let handlerReturned = false;
-    let outputsWritten = false;
 
     try {
       await mkdir(scratchDir, { recursive: true });
@@ -578,7 +578,6 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
-      outputsWritten = true;
       if (resultBuffer) {
         await putObject(primaryKey, resultBuffer);
       } else if (resultStreamPath) {
@@ -685,6 +684,16 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         },
       );
 
+      // The deadline fired under a handler that kept going, and the row now
+      // carries the result it returned. Nothing else records the overrun, so
+      // this line is what an operator tuning JOB_TIMEOUT_*_S has (#2144).
+      if (signal.aborted && signal.reason === "timeout") {
+        logger.warn(
+          { jobId, toolId: data.toolId, timeoutMs, durationMs },
+          "handler returned after the job deadline; result kept",
+        );
+      }
+
       // Record Prometheus metrics
       jobsTotal.inc({ pool: data.pool, status: "completed" });
       jobDuration.observe({ pool: data.pool }, durationMs / 1000);
@@ -761,19 +770,28 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       const maxAttempts = job.opts.attempts ?? 1;
       const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
 
-      // A cancel caught after the output was written (#2144): the row settles
-      // with no outputRefs, but the download route serves by key and job
-      // reconciliation adopts stray outputs, so take them back here. Best
-      // effort: the terminal write below must land either way.
-      if (isCanceled && outputsWritten) {
+      // A canceled job may have written its output already, in this attempt or
+      // in an earlier one that lost its completion commit (output keys are per
+      // job, not per attempt). The row settles with no outputRefs, but the
+      // download route serves by key and job reconciliation adopts stray
+      // outputs, so take the prefix back on every cancel; for a job that wrote
+      // nothing it is one cheap no-op. Best effort: the terminal write below
+      // must land either way (#2144).
+      if (isCanceled) {
+        const prefix = `outputs/${jobId}/`;
         try {
-          await deletePrefix(`outputs/${jobId}/`);
+          await deletePrefix(prefix);
         } catch (cleanupErr) {
           logger.error(
-            { err: cleanupErr, jobId, toolId: data.toolId },
-            "canceled job output cleanup failed",
+            { err: cleanupErr, jobId, toolId: data.toolId, prefix },
+            "canceled job output cleanup failed; outputs stay downloadable until the storage sweep",
           );
-          void reportError(cleanupErr, { source: "worker", pool: data.pool, jobId });
+          void reportError(cleanupErr, {
+            source: "worker",
+            pool: data.pool,
+            toolId: data.toolId,
+            jobId,
+          });
         }
       }
 

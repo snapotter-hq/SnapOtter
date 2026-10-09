@@ -29,6 +29,10 @@ const outputWriteHook = vi.hoisted(() => ({
   after: null as (() => Promise<void>) | null,
 }));
 
+// Fails the worker's output cleanup for one job (#2144), standing in for a
+// storage outage that hits after the cancel landed.
+const cleanupFault = vi.hoisted(() => ({ prefix: null as string | null }));
+
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
@@ -43,8 +47,34 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
         await run?.();
       }
     },
+    deletePrefix: async (prefix: string) => {
+      if (prefix === cleanupFault.prefix) throw new Error("injected cleanup outage");
+      return actual.deletePrefix(prefix);
+    },
   };
 });
+
+// What the worker hands the Sentry path, per job, so a swallowed cleanup fault
+// can be shown to have been reported.
+const reported = vi.hoisted(() => [] as Array<{ jobId?: string; message: string }>);
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (err: unknown, ctx: Parameters<typeof actual.reportError>[1]) => {
+      reported.push({
+        jobId: ctx.jobId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return actual.reportError(err, ctx);
+    },
+  };
+});
+
+// Fails the completion commit once for one job (#2144), so the first attempt's
+// output stays in storage and the retry is what a cancel then reaches.
+const completionFault = vi.hoisted(() => ({ jobId: null as string | null }));
 
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
@@ -55,6 +85,16 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
         throw new Error("injected alias-write outage");
       }
       return actual.cancelSingleJobGuarded(args);
+    },
+    updateSingleFileProgressAtomically: async (
+      frame: Parameters<typeof actual.updateSingleFileProgressAtomically>[0],
+      commit: Parameters<typeof actual.updateSingleFileProgressAtomically>[1],
+    ) => {
+      if (frame.jobId === completionFault.jobId) {
+        completionFault.jobId = null;
+        throw new Error("injected completion outage");
+      }
+      return actual.updateSingleFileProgressAtomically(frame, commit);
     },
   };
 });
@@ -81,6 +121,7 @@ import {
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
@@ -89,16 +130,18 @@ import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory
 const passthroughSchema = { parse: (v: unknown) => v } as never;
 
 interface RunSettings {
-  mode: "fast" | "slow" | "ignore-abort";
+  mode: "fast" | "slow" | "ignore-abort" | "retry-slow";
   tag: string;
 }
 
 // Behavior keyed on settings: fast returns instantly, slow waits on the
 // worker's abort signal, so a cancel has a real running target. ignore-abort
 // stands in for a handler that never reads the signal (Erase Object, #2092):
-// it notices the abort only to finish a beat later and return a result anyway. Every
-// invocation records its tag, so "this run never started" is a positive
-// assertion instead of a timing guess.
+// it notices the abort only to finish a beat later and return a result anyway.
+// retry-slow is fast on its first run and slow from the second on, so a cancel
+// can reach the retry of a job whose first attempt already wrote its output
+// (#2144). Every invocation records its tag, so "this run never started" is a
+// positive assertion instead of a timing guess.
 const invoked: string[] = [];
 registerToolProcessFn({
   toolId: "wt-single-cancel",
@@ -111,7 +154,8 @@ registerToolProcessFn({
   ) => {
     const { mode, tag } = settings as RunSettings;
     invoked.push(tag);
-    if (mode === "slow") {
+    const isRetry = invoked.filter((t) => t === tag).length > 1;
+    if (mode === "slow" || (mode === "retry-slow" && isRetry)) {
       await new Promise<void>((resolve, reject) => {
         const signal = ctx?.signal;
         if (!signal) {
@@ -222,7 +266,7 @@ async function createOwner(): Promise<string> {
 }
 
 interface EnqueueOpts {
-  mode: "fast" | "slow" | "ignore-abort";
+  mode: RunSettings["mode"];
   tag: string;
   clientJobId?: string;
   userId?: string | null;
@@ -440,6 +484,8 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const jobId = randomUUID();
     outputWriteHook.prefix = `outputs/${jobId}/`;
     outputWriteHook.after = async () => {
+      // The write landed, so the cleanup below has something to take back.
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
       expect(await requestCancel(clientJobId)).toBe(true);
       await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
     };
@@ -450,6 +496,67 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     // The output the hook let through must not stay downloadable or get adopted
     // by job reconciliation: the row settles with no outputRefs, so nothing
     // else would ever remove it (#2144).
+    expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("still settles canceled, and reports, when the output cleanup fails (#2144)", async () => {
+    // A storage outage during the cleanup must not turn a user cancel into a
+    // retried failure: the terminal write lands, the client gets its frame,
+    // and the fault is logged and reported. The leftover output is the known
+    // cost, swept by storage retention.
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    cleanupFault.prefix = `outputs/${jobId}/`;
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      expect(await requestCancel(clientJobId)).toBe(true);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({ mode: "fast", tag: "cleanup-fault", clientJobId, jobId });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      expect((await terminalFrame(clientJobId)).error).toBe("Canceled");
+
+      const cleanupLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) =>
+          msg ===
+            "canceled job output cleanup failed; outputs stay downloadable until the storage sweep" &&
+          (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(cleanupLogs).toHaveLength(1);
+      expect(reported.filter((r) => r.jobId === jobId).map((r) => r.message)).toContain(
+        "injected cleanup outage",
+      );
+      // The fault was real: the output is still there.
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+    } finally {
+      cleanupFault.prefix = null;
+      errorLog.mockRestore();
+    }
+  });
+
+  it("removes an earlier attempt's output when the retry is the one canceled (#2144)", async () => {
+    // Output keys are per job, not per attempt. Attempt 1 wrote its output and
+    // then lost the completion commit; the retry is canceled mid-handler,
+    // having written nothing. The cleanup must still take attempt 1's file.
+    const jobId = randomUUID();
+    completionFault.jobId = jobId;
+    await enqueueSingleRun({ mode: "retry-slow", tag: "retry-hole", jobId });
+    await waitFor(async () =>
+      invoked.filter((t) => t === "retry-hole").length === 2 ? true : undefined,
+    );
+    expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+
+    expect(await requestCancel(jobId)).toBe(true);
+
+    const row = await terminalRow(jobId);
+    expect(row.status).toBe("canceled");
+    expect(row.attempts).toBe(2);
     expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
   });
 

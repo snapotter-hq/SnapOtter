@@ -37,9 +37,9 @@ const cancelables = new Map<string, AbortController>();
 // A second controller per job that only a user cancel aborts. The job's own
 // signal can't carry this alone: once the worker timeout has aborted that
 // controller, a later cancel's abort() is a no-op and the reason stays
-// "timeout" (#2092). The writes after the handler wait on this one, so a
-// deadline that already fired can't discard a finished result while a user
-// cancel still stops the upload (#2144).
+// "timeout" (#2092). The worker's streamed uploads after the handler take this
+// signal, so a deadline that already fired can't discard a finished result
+// while a user cancel still stops the upload (#2144).
 const userCancels = new Map<string, AbortController>();
 
 export function registerCancelable(jobId: string): AbortController {
