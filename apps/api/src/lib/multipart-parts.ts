@@ -78,7 +78,9 @@ function formatLimit(bytes: number): string {
  * around their read loop answer with this rather than a hard-coded 400, so a
  * client can tell "too big" from "malformed" (#1341). The limit comes from the
  * error (busboy's and putObjectStream's both carry it), falling back to
- * MAX_UPLOAD_SIZE_MB.
+ * MAX_UPLOAD_SIZE_MB. With neither (an unlimited instance, where
+ * @fastify/multipart still caps request.file() at the body limit without
+ * saying so), the answer names no number rather than a false one (#2225).
  *
  * A server-side fault (a 5xx: the workspace cap, the disk floor, a full or
  * read-only volume, an S3 outage) is thrown back instead. Those aren't the
@@ -97,7 +99,12 @@ export function multipartFailure(
       typeof e.limitBytes === "number" ? e.limitBytes : env.MAX_UPLOAD_SIZE_MB * MIB;
     return {
       status: 413,
-      body: { error: `File exceeds the ${formatLimit(limitBytes)} upload limit` },
+      body: {
+        error:
+          limitBytes > 0
+            ? `File exceeds the ${formatLimit(limitBytes)} upload limit`
+            : "File exceeds the upload limit",
+      },
     };
   }
   return {

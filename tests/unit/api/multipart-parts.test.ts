@@ -15,6 +15,7 @@ import { PassThrough } from "node:stream";
 import { SafeError } from "@snapotter/shared";
 import type { FastifyRequest } from "fastify";
 import { describe, expect, it } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import {
   multipartFailure,
   multipartParts,
@@ -513,6 +514,28 @@ describe("multipartFailure (#1341)", () => {
       status: 413,
       body: { error: "File exceeds the 10 MB upload limit" },
     });
+  });
+
+  // #2225: MAX_UPLOAD_SIZE_MB=0 (unlimited, the Docker image's default) leaves
+  // the fallback nothing to name. @fastify/multipart still caps request.file()
+  // at the body limit and throws without saying so; the answer read "the 0 KB
+  // upload limit".
+  it("names no number when neither the error nor MAX_UPLOAD_SIZE_MB sets a limit", () => {
+    const configured = env.MAX_UPLOAD_SIZE_MB;
+    env.MAX_UPLOAD_SIZE_MB = 0;
+    try {
+      const unnamed = Object.assign(new Error("request file too large"), { statusCode: 413 });
+      expect(multipartFailure(unnamed)).toEqual({
+        status: 413,
+        body: { error: "File exceeds the upload limit" },
+      });
+
+      // A cap the error carries is still named on an unlimited instance.
+      const named = Object.assign(new Error("too large"), { statusCode: 413, limitBytes: 1024 });
+      expect(multipartFailure(named).body).toEqual({ error: "File exceeds the 1 KB upload limit" });
+    } finally {
+      env.MAX_UPLOAD_SIZE_MB = configured;
+    }
   });
 
   it("keeps any other parse failure a 400, with internal paths stripped", () => {

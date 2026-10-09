@@ -1,5 +1,5 @@
 import { SafeError } from "@snapotter/shared";
-import Fastify from "fastify";
+import Fastify, { errorCodes, type FastifyRequest, type FastifyServerOptions } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const reportError = vi.hoisted(() => vi.fn());
@@ -8,7 +8,9 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   return { ...actual, reportError };
 });
 
+import { env } from "../../../apps/api/src/config.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+import { registerUpload } from "../../../apps/api/src/plugins/upload.js";
 
 beforeEach(() => {
   reportError.mockReset();
@@ -145,21 +147,20 @@ describe("a storage fault reaching the handler", () => {
 });
 
 // #2225: the library upload, save and preview routes let an over-limit file's
-// error escape their multipart read to this handler, which passed busboy's
+// error escape their multipart read to this handler, which passed its
 // "request file too large" through, while every route that catches the same
 // error answers through multipartFailure() and names the limit. One condition,
 // one wording: the handler answers the way multipartFailure() does.
 describe("an over-limit multipart file reaching the handler", () => {
-  const fileTooLarge = (extra: Record<string, unknown> = {}) =>
-    Object.assign(new Error("request file too large"), {
-      statusCode: 413,
-      code: "FST_REQ_FILE_TOO_LARGE",
-      ...extra,
-    });
-
   it("answers 413 with multipartFailure()'s body, naming the limit that fired", async () => {
     // multipartParts() puts the cap that fired on the error (#1341).
-    const app = await appThrowing(() => fileTooLarge({ limitBytes: 5 * 1024 * 1024 }));
+    const app = await appThrowing(() =>
+      Object.assign(new Error("request file too large"), {
+        statusCode: 413,
+        code: "FST_REQ_FILE_TOO_LARGE",
+        limitBytes: 5 * 1024 * 1024,
+      }),
+    );
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(413);
@@ -168,70 +169,111 @@ describe("an over-limit multipart file reaching the handler", () => {
     await app.close();
   });
 
-  it("names MAX_UPLOAD_SIZE_MB for the plugin's own error, which carries no limit", async () => {
-    // @fastify/multipart's RequestFileTooLargeError, which request.file()
-    // callers still get, has the code and status but no limitBytes. The
-    // plugin's fileSize is MAX_UPLOAD_SIZE_MB, 10 here (vitest.config.ts).
-    const app = await appThrowing(() => fileTooLarge());
+  // Only the over-limit file gets that answer. Fastify's own 413 for a body
+  // over bodyLimit isn't a file over the upload limit. (The storage quota's
+  // 413 never comes through here: the route sends it, code and all.)
+  it.each([
+    [
+      "a 413 with no code",
+      () => Object.assign(new Error("Too large"), { statusCode: 413 }),
+      "Too large",
+    ],
+    [
+      "Fastify's body-limit 413",
+      () => new errorCodes.FST_ERR_CTP_BODY_TOO_LARGE(),
+      "Request body is too large",
+    ],
+  ])("leaves %s alone", async (_label, makeError, message) => {
+    const app = await appThrowing(makeError);
     const res = await app.inject({ method: "GET", url: "/boom" });
 
     expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 10 MB upload limit" });
+    expect(JSON.parse(res.body)).toEqual({ error: message, details: message });
     await app.close();
   });
 
-  it("leaves a 413 that isn't the file-size one alone", async () => {
-    // The storage quota answers 413 with its own code; the panel keys on it.
-    const app = await appThrowing(() =>
-      Object.assign(new Error("Storage quota exceeded"), { statusCode: 413 }),
-    );
-    const res = await app.inject({ method: "GET", url: "/boom" });
+  // Reads through the real upload plugin, which index.ts registers ahead of
+  // this handler, so the error is the one a route actually gets.
+  describe("from a real read", () => {
+    const boundary = "----HandlerBoundary2225";
 
-    expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toEqual({
-      error: "Storage quota exceeded",
-      details: "Storage quota exceeded",
-    });
-    await app.close();
-  });
+    async function upload(
+      read: (request: FastifyRequest) => Promise<unknown>,
+      fileBytes: number,
+      options: FastifyServerOptions = {},
+    ) {
+      const app = Fastify({ logger: false, ...options });
+      await registerUpload(app);
+      registerErrorHandler(app);
+      app.post("/upload", async (request) => {
+        await read(request);
+        return { ok: true };
+      });
+      try {
+        return await app.inject({
+          method: "POST",
+          url: "/upload",
+          headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+          body: Buffer.concat([
+            Buffer.from(
+              `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.bin"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+            ),
+            Buffer.alloc(fileBytes, 1),
+            Buffer.from(`\r\n--${boundary}--\r\n`),
+          ]),
+        });
+      } finally {
+        await app.close();
+      }
+    }
 
-  it("answers a real over-limit read that a route lets escape the same way", async () => {
-    // The shape of the library upload routes: iterate request.parts() with no
-    // try/catch of their own, so the 413 reaches the handler (pinned by
-    // tests/unit/api/multipart-failure-drift.test.ts).
-    const { registerUpload } = await import("../../../apps/api/src/plugins/upload.js");
-    const app = Fastify({ logger: false });
-    await registerUpload(app);
-    registerErrorHandler(app);
-    app.post("/upload", async (request) => {
-      for await (const part of request.parts({ limits: { fileSize: 1024 } })) {
-        if (part.type === "file") {
-          for await (const _chunk of part.file) {
-            // drain
+    it("names a route's own cap for request.parts()", async () => {
+      // The library upload routes iterate request.parts() with no catch of
+      // their own, so the 413 reaches the handler (pinned by
+      // tests/unit/api/multipart-failure-drift.test.ts).
+      const res = await upload(async (request) => {
+        for await (const part of request.parts({ limits: { fileSize: 1024 } })) {
+          if (part.type === "file") {
+            for await (const _chunk of part.file) {
+              // drain
+            }
           }
         }
+      }, 4096);
+
+      expect(res.statusCode).toBe(413);
+      expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 1 KB upload limit" });
+      expect(reportError).not.toHaveBeenCalled();
+    });
+
+    it("names MAX_UPLOAD_SIZE_MB for request.file(), whose error carries no limit", async () => {
+      // How /api/v1/preview reads. The plugin caps request.file() at
+      // MAX_UPLOAD_SIZE_MB, 10 here (vitest.config.ts).
+      const res = await upload(
+        async (request) => (await request.file())?.toBuffer(),
+        11 * 1024 * 1024,
+      );
+
+      expect(res.statusCode).toBe(413);
+      expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 10 MB upload limit" });
+    });
+
+    it("names no number for request.file() on an unlimited instance", async () => {
+      // MAX_UPLOAD_SIZE_MB=0 (the Docker image's default) leaves the plugin's
+      // cap at Fastify's bodyLimit (1 GiB in index.ts, 2 KiB here), and its
+      // error doesn't say so. The answer read "the 0 KB upload limit".
+      const configured = env.MAX_UPLOAD_SIZE_MB;
+      env.MAX_UPLOAD_SIZE_MB = 0;
+      try {
+        const res = await upload(async (request) => (await request.file())?.toBuffer(), 4096, {
+          bodyLimit: 2048,
+        });
+
+        expect(res.statusCode).toBe(413);
+        expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the upload limit" });
+      } finally {
+        env.MAX_UPLOAD_SIZE_MB = configured;
       }
-      return { ok: true };
     });
-    await app.ready();
-
-    const boundary = "----HandlerBoundary2225";
-    const body = Buffer.concat([
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.bin"\r\nContent-Type: application/octet-stream\r\n\r\n`,
-      ),
-      Buffer.alloc(4096, 1),
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ]);
-    const res = await app.inject({
-      method: "POST",
-      url: "/upload",
-      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(413);
-    expect(JSON.parse(res.body)).toEqual({ error: "File exceeds the 1 KB upload limit" });
-    await app.close();
   });
 });

@@ -36,9 +36,10 @@ export function registerErrorHandler(app: FastifyInstance): void {
     }
     // An over-limit file whose error escaped a route's multipart read (the
     // library upload, save and preview routes let it) answers the way routes
-    // that catch it do: 413 naming the limit, instead of busboy's "request
-    // file too large" (#2225). Only that one error; the storage quota's 413
-    // carries its own message and code.
+    // that catch it do: 413 naming the limit, not the bare "request file too
+    // large" (#2225). Keyed on the code as well as the status, because
+    // Fastify's own 413 for a body over bodyLimit isn't a file over the
+    // upload limit.
     if (statusCode === 413 && (error as { code?: unknown }).code === "FST_REQ_FILE_TOO_LARGE") {
       const failure = multipartFailure(error);
       reply.status(failure.status).send(failure.body);
