@@ -25,6 +25,7 @@ import {
   type CaptureFailure,
   type CaptureFailureMessages,
   captureDocumentCanvas,
+  captureHasPixels,
   classifyCaptureError,
   reportCaptureFailure,
 } from "@/components/editor/stage-capture";
@@ -67,9 +68,9 @@ const FORMAT_OPTIONS: {
   { value: "jxl", label: "JXL", supportsTransparency: true, needsServerConvert: true },
 ];
 
-// A capture whose width or height rounds to 0 px throws InvalidStateError (typing
-// "1" into the width of a wide image does exactly that). Never ask for less than
-// 1 px on the shorter side.
+// A capture whose width or height rounds to 0 px throws InvalidStateError. The 200 px
+// thumbnail of a very wide or tall document asks for exactly that (on 40000x100 the
+// short side would be 0.5 px), so never ask for less than 1 px on the shorter side.
 function atLeastOnePixel(ratio: number, width: number, height: number): number {
   return Math.max(ratio, 1 / Math.min(width, height));
 }
@@ -115,6 +116,12 @@ function renderExportCanvas(
   );
   const opaque = !settings.transparent || settings.format === "jpeg";
   if (!opaque && captured.width === width && captured.height === height) return captured;
+  // With the lock off the capture can be much bigger than the file. Past the browser's
+  // limit it still comes back, draws nothing, and the file built from it would encode
+  // fine but blank, slipping past the "data:," check (#2140). Fail it the same way.
+  if (!captureHasPixels(captured)) {
+    throw new DOMException("The capture has no pixels behind it", "InvalidStateError");
+  }
   const out = document.createElement("canvas");
   out.width = width;
   out.height = height;
@@ -128,6 +135,13 @@ function renderExportCanvas(
   }
   ctx.drawImage(captured, 0, 0, width, height);
   return out;
+}
+
+// The encoded size, read off the data URL's base64 payload (to within the two bytes of
+// padding, which a label in KB never shows). No fetch, so an estimate that started
+// earlier can't land after a newer one.
+function dataUrlBytes(dataUrl: string): number {
+  return Math.floor(((dataUrl.length - dataUrl.indexOf(",") - 1) * 3) / 4);
 }
 
 // A tainted or over-limit canvas can't be encoded. The preview just goes blank;
@@ -218,14 +232,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         setEstimatedSize(null);
         return;
       }
-      if (fullUrl === "data:,") {
-        setEstimatedSize(null);
-        return;
-      }
-      fetch(fullUrl)
-        .then((res) => res.blob())
-        .then((blob) => setEstimatedSize(blob.size))
-        .catch(() => setEstimatedSize(null));
+      setEstimatedSize(fullUrl === "data:," ? null : dataUrlBytes(fullUrl));
     };
     if (!estimatedOnce.current) {
       estimatedOnce.current = true;

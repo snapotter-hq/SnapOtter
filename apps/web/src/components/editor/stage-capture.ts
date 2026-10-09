@@ -92,6 +92,16 @@ function canvasIsDead(ctx: CanvasRenderingContext2D): boolean {
   return alpha !== 255;
 }
 
+/**
+ * Whether a captured canvas has pixels behind it. Past the browser's limit the capture
+ * still comes back and draws nothing (see canvasIsDead), so anything drawn from it is
+ * blank rather than failing. A tainted capture throws SecurityError here, like any read.
+ */
+export function captureHasPixels(canvas: HTMLCanvasElement): boolean {
+  const ctx = canvas.getContext("2d");
+  return ctx !== null && !canvasIsDead(ctx);
+}
+
 // What a browser throws when a canvas is too big to read back: RangeError from the
 // pixel buffer in Chromium, IndexSizeError for an empty source, InvalidStateError
 // from WebKit (a live canvas whose buffer can't be allocated) and from Firefox past

@@ -30,8 +30,18 @@ const capture = vi.hoisted(() => ({
 const fakeCanvas = vi.hoisted(() => (width: number, height: number) => ({
   width,
   height,
+  // A healthy canvas: the dead-canvas probe reads back an opaque pixel.
   getContext: () =>
-    capture.giveContext ? { fillStyle: "", fillRect: () => {}, drawImage: () => {} } : null,
+    capture.giveContext
+      ? {
+          fillStyle: "",
+          fillRect: () => {},
+          drawImage: () => {},
+          createImageData: () => ({ data: new Uint8ClampedArray(4) }),
+          getImageData: () => ({ data: new Uint8ClampedArray([255, 0, 255, 255]) }),
+          putImageData: () => {},
+        }
+      : null,
   toDataURL: () => {
     if (capture.throwOnEncode) throw capture.throwOnEncode;
     return capture.dataUrl;
@@ -229,13 +239,17 @@ describe("a size that rounds to 0 px (#2140)", () => {
     render(<ExportDialog onClose={() => {}} />);
     fireEvent.change(screen.getAllByRole("spinbutton")[0], { target: { value: "1" } });
     expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+    const before = capture.ratios.length;
+    clickExport();
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+    // The estimate now waits for typing to stop (#2174), so the 1 px capture to check
+    // is the export's own.
+    expect(capture.ratios.length).toBeGreaterThan(before);
     for (const ratio of capture.ratios) {
       expect(Math.floor(800 * ratio)).toBeGreaterThanOrEqual(1);
       expect(Math.floor(200 * ratio)).toBeGreaterThanOrEqual(1);
     }
-    clickExport();
-    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
-    expect(toastError).not.toHaveBeenCalled();
   });
 
   it("opens on a document far wider than the 200 px thumbnail is tall", () => {
