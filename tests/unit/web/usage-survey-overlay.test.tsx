@@ -24,10 +24,16 @@ vi.mock("@/lib/api", async (importOriginal) => {
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth }));
 
+// A PostHog-baked instance by default; the Sentry-only case clears the key.
+const analyticsConfig = vi.hoisted(() => ({ enabled: true, posthogApiKey: "phc_test" }));
+
 vi.mock("@/stores/analytics-store", () => ({
   useAnalyticsStore: (
-    selector: (state: { config: { enabled: boolean }; configLoaded: boolean }) => unknown,
-  ) => selector({ config: { enabled: true }, configLoaded: true }),
+    selector: (state: {
+      config: { enabled: boolean; posthogApiKey: string };
+      configLoaded: boolean;
+    }) => unknown,
+  ) => selector({ config: analyticsConfig, configLoaded: true }),
 }));
 
 import { UsageSurveyOverlay } from "@/components/onboarding/usage-survey-overlay";
@@ -37,6 +43,8 @@ import { UsageSurveyOverlay } from "@/components/onboarding/usage-survey-overlay
 const PROCESSED = { "onboarding.firstProcessedAt": "2026-01-01T00:00:00Z" };
 
 afterEach(() => {
+  analyticsConfig.enabled = true;
+  analyticsConfig.posthogApiKey = "phc_test";
   cleanup();
   submitFeedback.mockClear();
   trackFeedbackPromptShown.mockClear();
@@ -87,6 +95,18 @@ describe("UsageSurveyOverlay", () => {
   it("stays hidden until the instance's first processing has completed", async () => {
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     answerSettingsLater({});
+
+    renderOverlay();
+
+    await settingsReadSettled();
+    expect(screen.queryByText("How are you using SnapOtter?")).toBeNull();
+    expect(trackFeedbackPromptShown).not.toHaveBeenCalled();
+  });
+
+  it("isn't offered on a Sentry-only instance, where its answers can't be recorded (#2220)", async () => {
+    analyticsConfig.posthogApiKey = "";
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    answerSettingsLater(PROCESSED);
 
     renderOverlay();
 

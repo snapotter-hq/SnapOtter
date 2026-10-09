@@ -12,6 +12,7 @@ import { useFuseSearch } from "@/hooks/use-fuse-search.js";
 import { usePageTitle } from "@/hooks/use-page-title.js";
 import { useRecentTools } from "@/hooks/use-recent-tools.js";
 import { useTypeToSearch } from "@/hooks/use-type-to-search.js";
+import { canRecordFeedback } from "@/lib/feedback";
 import type { FeedbackPromptVariant } from "@/lib/feedback.js";
 import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
@@ -55,7 +56,9 @@ export function HomePage() {
   const fetchPins = usePinnedToolsStore((s) => s.fetch);
   const analyticsConfig = useAnalyticsStore((s) => s.config);
   const analyticsConfigLoaded = useAnalyticsStore((s) => s.configLoaded);
-  const analyticsOn = analyticsConfigLoaded && analyticsConfig?.enabled === true;
+  // In-app request dialog only where the request can be recorded; elsewhere
+  // the GitHub Discussions link (#2220).
+  const analyticsOn = analyticsConfigLoaded && canRecordFeedback(analyticsConfig);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestVariant, setRequestVariant] = useState<FeedbackPromptVariant>("search-empty-v1");
   // Tracks whether the request dialog was submitted, so closing it counts as a

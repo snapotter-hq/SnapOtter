@@ -63,6 +63,25 @@ describe("ToolFeedbackPrompt", () => {
     expect(screen.getByRole("button", { name: "Worked well" })).toBeDefined();
   });
 
+  it("does not render on a Sentry-only instance, where feedback can't be recorded (#2220)", () => {
+    useAnalyticsStore.setState({
+      configLoaded: true,
+      config: {
+        enabled: true,
+        posthogApiKey: "",
+        posthogHost: "",
+        sentryDsn: "https://key@sentry.example/1",
+        sentryDsnWeb: "https://key@sentry.example/1",
+        posthogSampleRate: 1,
+        instanceId: "instance",
+      },
+    });
+
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    expect(screen.queryByText("How did this tool work?")).toBeNull();
+  });
+
   it("does not render when analytics is disabled", () => {
     useAnalyticsStore.setState({
       configLoaded: true,

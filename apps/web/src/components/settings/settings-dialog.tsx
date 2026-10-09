@@ -53,7 +53,7 @@ import {
   formatHeaders,
 } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
-import { shouldShowInstallFeedbackCard } from "@/lib/feedback";
+import { canRecordFeedback, shouldShowInstallFeedbackCard } from "@/lib/feedback";
 import { format, plural } from "@/lib/format";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { logout } from "@/lib/logout";
@@ -657,7 +657,7 @@ export function SystemSection() {
     settings,
     role,
     analyticsConfigLoaded,
-    analyticsEnabled: Boolean(analyticsConfig?.enabled),
+    analyticsEnabled: canRecordFeedback(analyticsConfig),
   });
 
   return (

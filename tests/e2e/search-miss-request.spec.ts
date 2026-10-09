@@ -30,7 +30,17 @@ test.describe("search-miss tool request", () => {
     await page.route("**/api/v1/config/analytics", async (route) => {
       const response = await route.fetch();
       const body = await response.json();
-      await route.fulfill({ json: { ...body, enabled: true } });
+      // A PostHog key too: the in-app request is only offered where it can be
+      // recorded (#2220). The host is a closed local port, so the client SDK's
+      // requests go nowhere.
+      await route.fulfill({
+        json: {
+          ...body,
+          enabled: true,
+          posthogApiKey: "phc_e2e",
+          posthogHost: "http://127.0.0.1:9",
+        },
+      });
     });
 
     await page.goto("/");

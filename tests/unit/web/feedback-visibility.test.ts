@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRecordFeedback,
   parseMigrationMarker,
   shouldShowInstallFeedbackCard,
   shouldShowMigrationBanner,
@@ -216,5 +217,23 @@ describe("parseMigrationMarker", () => {
     expect(parseMigrationMarker(undefined)).toBeNull();
     expect(parseMigrationMarker("not json")).toBeNull();
     expect(parseMigrationMarker(JSON.stringify({ status: "bogus" }))).toBeNull();
+  });
+});
+
+describe("canRecordFeedback (#2220)", () => {
+  const base = {
+    posthogHost: "",
+    sentryDsn: "",
+    sentryDsnWeb: "",
+    posthogSampleRate: 1,
+    instanceId: "",
+  };
+
+  it("is true only with telemetry on and a PostHog key", () => {
+    expect(canRecordFeedback({ ...base, enabled: true, posthogApiKey: "phc_x" })).toBe(true);
+    expect(canRecordFeedback({ ...base, enabled: true, posthogApiKey: "" })).toBe(false);
+    expect(canRecordFeedback({ ...base, enabled: false, posthogApiKey: "phc_x" })).toBe(false);
+    expect(canRecordFeedback(null)).toBe(false);
+    expect(canRecordFeedback(undefined)).toBe(false);
   });
 });

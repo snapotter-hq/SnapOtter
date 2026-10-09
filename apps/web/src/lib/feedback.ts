@@ -12,7 +12,11 @@ import type {
   FeedbackType,
   FeedbackUsageType,
 } from "@snapotter/shared";
-import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  type AnalyticsConfig,
+  ONBOARDING_FIRST_PROCESSED_KEY,
+} from "@snapotter/shared";
 import { track } from "@/lib/analytics";
 import { apiPost } from "@/lib/api";
 
@@ -78,6 +82,17 @@ interface InstallFeedbackVisibilityOptions {
   analyticsConfigLoaded: boolean;
   analyticsEnabled: boolean;
   now?: number;
+}
+
+/**
+ * Whether an answer to a feedback prompt or survey has anywhere to be
+ * recorded. Feedback lives only in PostHog events, so telemetry being on isn't
+ * enough: a Sentry-only instance is on with no PostHog key, and the server
+ * declines what it's sent there (#2198). Prompts that can't be recorded aren't
+ * shown (#2220).
+ */
+export function canRecordFeedback(config: AnalyticsConfig | null | undefined): boolean {
+  return Boolean(config?.enabled && config.posthogApiKey);
 }
 
 export function surveyIdForSource(source: FeedbackSource): FeedbackSurveyId {

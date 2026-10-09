@@ -2,6 +2,7 @@ import { MessageSquare, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import {
+  canRecordFeedback,
   type FeedbackErrorCategory,
   type FeedbackSentiment,
   promptVariantForSource,
@@ -100,17 +101,19 @@ export function ToolFeedbackPrompt({
   const [thanks, setThanks] = useState(false);
   const source = jobStatus === "failed" ? "failed_job" : "tool_result";
 
+  const recordable = analyticsLoaded && canRecordFeedback(analyticsConfig);
+
   useEffect(() => {
-    if (!analyticsLoaded || !analyticsConfig?.enabled) return;
+    if (!recordable) return;
     const show = shouldShowPrompt(toolId);
     if (show) {
       markPromptShown();
       trackFeedbackPromptShown(source);
     }
     setVisible(show);
-  }, [analyticsLoaded, analyticsConfig?.enabled, toolId, source]);
+  }, [recordable, toolId, source]);
 
-  if (!analyticsLoaded || !analyticsConfig?.enabled) return null;
+  if (!recordable) return null;
   if (!visible && !thanks && !dialogOpen) return null;
 
   async function handleQuickSentiment(sentiment: FeedbackSentiment) {

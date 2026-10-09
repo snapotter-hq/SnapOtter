@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPut } from "@/lib/api";
 import { AUTH_GUARD_UNGATED_PATHS } from "@/lib/auth-routes";
 import {
+  canRecordFeedback,
   type FeedbackDiscoverySource,
   type FeedbackDismissKind,
   type FeedbackPriorTool,
@@ -89,7 +90,7 @@ export function UsageSurveyOverlay() {
       settings,
       role,
       analyticsConfigLoaded,
-      analyticsEnabled: Boolean(analyticsConfig?.enabled),
+      analyticsEnabled: canRecordFeedback(analyticsConfig),
     });
 
   // A non-modal prompt must not trap focus (that is what made the old overlay
