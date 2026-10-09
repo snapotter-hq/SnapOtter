@@ -1911,6 +1911,8 @@ export const it: TranslationKeys = {
       effectsProcessingFailed: "Elaborazione degli effetti non riuscita",
       effectsExpired:
         "La rimozione dello sfondo precedente è scaduta, quindi viene eseguita di nuovo. Applica gli effetti quando ha finito.",
+      refineChanged:
+        "La levigatura dei bordi e la decontaminazione del colore vengono applicate quando lo sfondo viene rimosso. Eseguila di nuovo per usare le nuove impostazioni.",
     },
     "remove-gif-background": {
       quality: "Qualità",

@@ -713,6 +713,13 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // swapping files (during the run or after it) must not leave the download
   // and effects acting on another file's job (#2107).
   const [bgResultFile, setBgResultFile] = useState<File | null>(null);
+  // The refinements the last single-file removal ran with. They are sidecar
+  // options that Phase 2 cannot apply, so a change after the result needs a new
+  // removal, and the panel says so (#2112).
+  const [removalRefine, setRemovalRefine] = useState<{
+    edgeRefine: number;
+    decontaminate: boolean;
+  } | null>(null);
   const runFileRef = useRef<File | null>(null);
   const [applyingEffects, setApplyingEffects] = useState(false);
   const [effectsError, setEffectsError] = useState<string | null>(null);
@@ -772,6 +779,17 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     Boolean(downloadUrl) &&
     files.length === 1 &&
     files[0] === bgResultFile;
+
+  // The result was made with different refinements than the controls now show.
+  // After a remount (the mobile settings sheet closing) the run's own values are
+  // gone while the result stays loaded, so the defaults are assumed: a refinement
+  // set afterwards may offer a re-run that was not strictly needed, which costs
+  // a click, where saying nothing would repeat the silent no-op.
+  const ranWith = removalRefine ?? { edgeRefine: 0, decontaminate: false };
+  const refineChanged =
+    bgRemoved &&
+    (Number(settings.edgeRefine ?? 0) !== ranWith.edgeRefine ||
+      Boolean(settings.decontaminate) !== ranWith.decontaminate);
 
   // Whether the user has configured any compositing effect.
   const hasEffectsToApply =
@@ -896,6 +914,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     if (settings.edgeRefine != null) phase1Settings.edgeRefine = settings.edgeRefine;
     if (settings.decontaminate != null) phase1Settings.decontaminate = settings.decontaminate;
     runFileRef.current = files[0] ?? null;
+    setRemovalRefine({
+      edgeRefine: Number(settings.edgeRefine ?? 0),
+      decontaminate: Boolean(settings.decontaminate),
+    });
     processFiles(files, phase1Settings, { skipLibrarySave: true });
   };
 
@@ -1090,6 +1112,27 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
           library; otherwise a plain instant download with no save needed. */}
       {bgRemoved && files.length <= 1 && (
         <div className="space-y-2">
+          {refineChanged && (
+            <div className="space-y-1.5 rounded-lg bg-muted px-3 py-2">
+              <p
+                data-testid="remove-background-refine-stale"
+                className="text-xs text-muted-foreground"
+              >
+                {t.toolSettings["remove-background"].refineChanged}
+              </p>
+              <button
+                type="button"
+                data-testid="remove-background-rerun"
+                onClick={handleRemoveBg}
+                // Mid-request it would drop the result the effects request is
+                // still rendering from.
+                disabled={applyingEffects}
+                className="w-full py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {t.toolSettings["remove-background"].submit}
+              </button>
+            </div>
+          )}
           {needsEffectsRequest ? (
             <button
               type="button"

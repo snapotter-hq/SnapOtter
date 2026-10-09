@@ -1918,6 +1918,8 @@ export const de: TranslationKeys = {
       effectsProcessingFailed: "Verarbeitung der Effekte fehlgeschlagen",
       effectsExpired:
         "Die frühere Hintergrundentfernung ist abgelaufen und wird daher erneut ausgeführt. Wenden Sie die Effekte an, sobald sie fertig ist.",
+      refineChanged:
+        "Kantenglättung und Farbdekontamination werden beim Entfernen des Hintergrunds angewendet. Führen Sie die Entfernung erneut aus, um die neuen Einstellungen zu verwenden.",
     },
     "remove-gif-background": {
       quality: "Qualität",
