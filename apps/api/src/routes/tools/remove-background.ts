@@ -49,7 +49,10 @@ import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-const hexColor = z.string().regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
+const hexColor = z
+  .string()
+  .trim()
+  .regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
 
 const BACKGROUND_TYPES = ["transparent", "color", "gradient", "blur", "image"] as const;
 
@@ -75,22 +78,19 @@ function requireBackgroundColors(
   },
   ctx: z.RefinementCtx,
 ) {
-  if (s.backgroundType === "color" && !s.backgroundColor) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["backgroundColor"],
-      message: "A color background needs backgroundColor",
-    });
-  }
-  if (s.backgroundType === "gradient") {
-    for (const key of ["gradientColor1", "gradientColor2"] as const) {
-      if (!s[key]) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [key],
-          message: "A gradient background needs gradientColor1 and gradientColor2",
-        });
-      }
+  const needs: Array<"backgroundColor" | "gradientColor1" | "gradientColor2"> =
+    s.backgroundType === "color"
+      ? ["backgroundColor"]
+      : s.backgroundType === "gradient"
+        ? ["gradientColor1", "gradientColor2"]
+        : [];
+  for (const key of needs) {
+    if (s[key] === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `A ${s.backgroundType} background needs ${key}`,
+      });
     }
   }
 }
@@ -424,7 +424,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
       }
 
       // Without the file this type falls through to a transparent result (#2075).
-      if (settings.backgroundType === "image" && !bgImageBuffer) {
+      if (settings.backgroundType === "image" && !bgImageBuffer?.length) {
         return reply.status(400).send({
           error: "Invalid settings",
           details: "backgroundType: An image background needs a backgroundImage file",

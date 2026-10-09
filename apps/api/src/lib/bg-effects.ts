@@ -15,6 +15,7 @@ export const HEX_COLOR_PATTERN = /^#?(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 /** Lower-case `#rrggbb` for any string HEX_COLOR_PATTERN accepts. */
 export function normalizeHexColor(color: string): string {
+  if (!HEX_COLOR_PATTERN.test(color)) throw new Error(`Not a hex color: ${color}`);
   let hex = color.replace("#", "").toLowerCase();
   if (hex.length === 3) hex = [...hex].map((c) => c + c).join("");
   return `#${hex}`;
@@ -246,7 +247,17 @@ export async function applyEffects(
     subject = await addDropShadow(subject, shadowOpacity);
   }
 
-  // Step 2: Build the background layer
+  // Step 2: Build the background layer. A background that names a type but not
+  // what it needs fails here rather than coming back transparent (#2075).
+  if (bgType === "image" && !settings.backgroundImageBuffer) {
+    throw new Error("An image background needs a background image");
+  }
+  if (bgType === "color" && !settings.backgroundColor) {
+    throw new Error("A color background needs a color");
+  }
+  if (bgType === "gradient" && !(settings.gradientColor1 && settings.gradientColor2)) {
+    throw new Error("A gradient background needs two colors");
+  }
   let background: Buffer | null = null;
 
   if (bgType === "image" && settings.backgroundImageBuffer) {

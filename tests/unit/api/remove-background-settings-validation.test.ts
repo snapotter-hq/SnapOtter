@@ -23,7 +23,7 @@ describe("remove-background settings validation (#2075)", () => {
     );
   });
 
-  it.each(["red", "#FF", "#FF00", "#GGGGGG", "#FF00000", "", " #FF0000", 'red"/><x'])(
+  it.each(["red", "#FF", "#FF00", "#GGGGGG", "#FF00000", "", 'red"/><x'])(
     "rejects the malformed color %j everywhere a color is read",
     (c) => {
       expect(accepts({ backgroundType: "color", backgroundColor: c })).toBe(false);
@@ -35,6 +35,10 @@ describe("remove-background settings validation (#2075)", () => {
       ).toBe(false);
     },
   );
+
+  it("trims whitespace around a typed color", () => {
+    expect(accepts({ backgroundType: "color", backgroundColor: " #FF0000 " })).toBe(true);
+  });
 
   it("requires a color for a color background", () => {
     expect(accepts({ backgroundType: "color" })).toBe(false);

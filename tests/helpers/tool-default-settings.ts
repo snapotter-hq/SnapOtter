@@ -38,6 +38,12 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "convert-spreadsheet": { format: "ods" },
   "content-aware-resize": { width: 50 },
   "ai-canvas-expand": { extendRight: 32 },
+  // Colors the pairwise lane needs to reach the color and gradient background types (#2075).
+  "remove-background": {
+    backgroundColor: "#ffffff",
+    gradientColor1: "#000000",
+    gradientColor2: "#ffffff",
+  },
   // Generated matrices validate route/format contracts, not long-running OCR
   // execution. Request the optional tier so model-free test environments fail
   // cleanly at ingress instead of saturating their shared CPUs with Tesseract.

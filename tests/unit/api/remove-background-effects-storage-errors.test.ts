@@ -169,7 +169,9 @@ describe("remove-background effects: reading the stored mask and original", () =
     );
     putObject.mockResolvedValue(undefined);
     app = await buildApp();
-    const res = await app.inject(effectsRequest({ ...settings, backgroundType: "color" }));
+    const res = await app.inject(
+      effectsRequest({ ...settings, backgroundType: "color", backgroundColor: "#ff0000" }),
+    );
     expect(res.statusCode).toBe(200);
     expect(res.json().downloadUrl).toContain("/api/v1/download/job/");
     expect(putObject).toHaveBeenCalledTimes(1);

@@ -7,6 +7,7 @@ import {
   compositeOnColor,
   compositeOnImage,
   createGradientBackground,
+  normalizeHexColor,
 } from "../../../apps/api/src/lib/bg-effects.js";
 
 async function createTestImage(
@@ -496,5 +497,44 @@ describe("applyEffects", () => {
       gradientColor2: "#0000ff",
     });
     expect(short.equals(long)).toBe(true);
+  });
+  it("renders gradient stops written without the hash", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const bare = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "ff0000",
+      gradientColor2: "0000ff",
+    });
+    const hashed = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+    });
+    expect(bare.equals(hashed)).toBe(true);
+  });
+
+  it.each([
+    ["an image background with no image", { backgroundType: "image" }],
+    ["a color background with no color", { backgroundType: "color" }],
+    ["a gradient with one stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
+  ])("throws for %s instead of returning a transparent result", async (_label, settings) => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    await expect(applyEffects(subject, original, settings)).rejects.toThrow(/needs/);
+  });
+});
+
+describe("normalizeHexColor", () => {
+  it.each([
+    ["#FF5500", "#ff5500"],
+    ["F50", "#ff5500"],
+    ["#f50", "#ff5500"],
+  ])("%s -> %s", (input, expected) => {
+    expect(normalizeHexColor(input)).toBe(expected);
+  });
+
+  it.each(["red", "#ff", "#ff00000", "", "#ff0000 "])("throws on %j", (input) => {
+    expect(() => normalizeHexColor(input)).toThrow(/Not a hex color/);
   });
 });

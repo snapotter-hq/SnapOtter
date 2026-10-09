@@ -21,14 +21,14 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 | file | file | Yes | - | Image file (multipart) |
 | model | string | No | - | AI model variant to use |
 | backgroundType | string | No | `"transparent"` | One of: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | - | Hex color for solid background |
-| gradientColor1 | string | No | - | First gradient color |
-| gradientColor2 | string | No | - | Second gradient color |
+| backgroundColor | string | Required when `backgroundType` is `color` | - | Hex color: `#RRGGBB` or `#RGB` (the `#` is optional) |
+| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | First gradient color, hex like `backgroundColor` |
+| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | Second gradient color, hex like `backgroundColor` |
 | gradientAngle | number | No | - | Gradient angle in degrees |
-| blurEnabled | boolean | No | - | Enable background blur effect |
+| blurEnabled | boolean | No | - | Blur the original background behind the subject (`backgroundType: "blur"` implies it) |
 | blurIntensity | number | No | - | Blur intensity (0-100) |
 | shadowEnabled | boolean | No | - | Enable drop shadow on subject |
-| shadowOpacity | number | No | - | Shadow opacity (0-100) |
+| shadowOpacity | number | No | `35` | Shadow opacity (0-100), used when `shadowEnabled` is true |
 | outputFormat | string | No | - | Output format: `png`, `webp`, or `avif` |
 | edgeRefine | integer | No | - | Edge refinement level (0-3) |
 | decontaminate | boolean | No | - | Remove color bleed from edges |
@@ -98,9 +98,9 @@ Re-applies background effects without re-running the AI model. Uses cached mask 
 | jobId | string | Yes | Job ID from Phase 1 |
 | filename | string | Yes | Original filename from Phase 1 |
 | backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | No | Hex color for solid background |
-| gradientColor1 | string | No | First gradient color |
-| gradientColor2 | string | No | Second gradient color |
+| backgroundColor | string | Required for `color` | Hex color, `#RRGGBB` or `#RGB` |
+| gradientColor1 | string | Required for `gradient` | First gradient color (hex) |
+| gradientColor2 | string | Required for `gradient` | Second gradient color (hex) |
 | gradientAngle | number | No | Gradient angle in degrees |
 | blurEnabled | boolean | No | Enable background blur |
 | blurIntensity | number | No | Blur intensity (0-100) |
