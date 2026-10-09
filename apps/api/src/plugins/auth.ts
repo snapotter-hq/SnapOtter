@@ -366,6 +366,16 @@ export async function ensureDefaultAdmin(): Promise<void> {
   const existingUsers = await db.select().from(schema.users);
   if (existingUsers.length > 0) return;
 
+  // Checked here, not in the env schema: an install that already has its admin
+  // never uses this value and must keep booting with a stale one. Browsers strip
+  // LF and CR from password inputs and login refuses NUL, so an admin created
+  // from such a value could never sign in (#2085).
+  if (/\p{Cc}/u.test(env.DEFAULT_PASSWORD)) {
+    throw new Error(
+      "DEFAULT_PASSWORD must not contain control characters (a trailing newline from a quoted compose or .env value is the usual cause)",
+    );
+  }
+
   const id = randomUUID();
   const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));
 
