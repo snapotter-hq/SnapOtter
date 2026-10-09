@@ -82,7 +82,7 @@ class FakeXhr {
     this.uploadHandlerAtSend = this.upload.onprogress !== null;
   }
 
-  /** The whole body is with the server; it hasn't answered yet. */
+  /** The browser finished sending the body; the server hasn't answered yet. */
   uploadFinished() {
     act(() => {
       (this.upload.onload as (() => void) | null)?.();
@@ -92,7 +92,9 @@ class FakeXhr {
   /** Report upload bytes moving, as the browser does while the body is sent. */
   uploadProgress(loaded: number, total: number) {
     act(() => {
-      this.upload.onprogress?.(new ProgressEvent("progress", { loaded, total }));
+      this.upload.onprogress?.(
+        new ProgressEvent("progress", { loaded, total, lengthComputable: true }),
+      );
     });
   }
 
@@ -1442,8 +1444,8 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
-  // The server has the whole body but hasn't answered: it may still be decoding,
-  // and will enqueue. Aborting would leave that job running with nothing to cancel
+  // The browser has sent the whole body and the server hasn't answered: it may be
+  // reading or decoding it, and will enqueue. Aborting would leave that job running with nothing to cancel
   // it by, so the request stays open and the cancel goes out on the 202 (#2136).
   it("keeps the request after the upload finished and cancels when the 202 arrives (#2136)", async () => {
     const { unmount } = renderPanel(3);
@@ -1469,6 +1471,35 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     // The stopped batch stays stopped: nothing else goes out, nothing lands.
     expect(FakeXhr.instances).toHaveLength(1);
     expect(entry(0).processedUrl).toBeNull();
+  });
+
+  // Firefox fires upload.onload only once the answer starts, so the last upload
+  // progress event is all the batch has to go on.
+  it("treats the final upload progress event as the upload being done (#2136)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.uploadProgress(100, 100);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(first.aborted).toBe(false);
+    first.respond(202, { jobId: "queued", async: true });
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+  });
+
+  it("aborts when the upload progress shows the body is only partly sent (#2136)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.uploadProgress(40, 100);
+
+    unmount();
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(first.aborted).toBe(true);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
   it("sends no cancel when the answer to a stopped, uploaded file is not a 202 (#2136)", async () => {
@@ -1698,6 +1729,19 @@ describe("erase-object single file: leaving the page mid-run (#1975)", () => {
       ),
     );
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats the final upload progress event as the upload being done (#2136)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.uploadProgress(100, 100);
+
+    moveToAnotherTool();
+    await act(async () => {});
+
+    expect(xhr.aborted).toBe(false);
+    xhr.respond(202, { jobId: "job-1", async: true });
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
   });
 
   it("sends no cancel when the answer to a stopped, uploaded file is not a 202 (#2136)", async () => {

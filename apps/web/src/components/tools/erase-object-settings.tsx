@@ -288,7 +288,8 @@ export function EraseObjectSettings({
       // Set once the server has answered 202: from then on a job exists for
       // this file, and dropping the file has to cancel it (#2093).
       let accepted = false;
-      // The whole body is with the server; set before any answer. A stop in the
+      // The browser finished sending the body (the last progress event or
+      // upload.onload, whichever it fires first). A stop in the
       // window after that and before the 202 can't abort: the server may still be
       // validating and decoding, and will enqueue a job nothing could cancel. The
       // request stays open and the cancel goes out when the 202 arrives (#2136).
@@ -318,10 +319,11 @@ export function EraseObjectSettings({
       // the batch has already decided to write nothing more for it.
       onStoppable(() => {
         // First, so a teardown step that throws can't leave the job running.
+        const keepRequest = uploadDone && !accepted;
+        if (keepRequest) cancelOnAnswer = true;
         if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
         stopProgress();
-        if (uploadDone && !accepted) {
-          cancelOnAnswer = true;
+        if (keepRequest) {
           abandoned = true;
           reject(new Error("Erase Object batch stopped"));
           return;
@@ -342,7 +344,12 @@ export function EraseObjectSettings({
       // The stall timer is armed before the upload starts, and on a quiet
       // stream only this keeps it from cutting off an image that is still
       // uploading (#1959). xhr.timeout still bounds the request as a whole.
-      xhr.upload.onprogress = () => subscription.touch();
+      xhr.upload.onprogress = (e) => {
+        subscription.touch();
+        // Firefox fires upload.onload only once the answer starts, so the last
+        // progress event is the only signal there that the body is with the server.
+        if (e.lengthComputable && e.loaded >= e.total) uploadDone = true;
+      };
       xhr.upload.onload = () => {
         uploadDone = true;
       };
@@ -601,11 +608,17 @@ export function EraseObjectSettings({
       // cutting the upload off (#1959).
       subscription.touch();
       if (e.lengthComputable) {
-        setProgressPercent((e.loaded / e.total) * 15);
+        // Firefox fires upload.onload only once the answer starts, so the last
+        // progress event is the only signal there that the body is with the server.
+        if (e.loaded >= e.total) uploadDone = true;
+        if (!abandoned) setProgressPercent((e.loaded / e.total) * 15);
       }
     };
     xhr.upload.onload = () => {
       uploadDone = true;
+      // Firefox fires this after a stop, once the answer starts: the run is over,
+      // and a new one may be on the panel by now.
+      if (abandoned) return;
       setProgressPhase("processing");
       setProgressPercent(15);
     };
