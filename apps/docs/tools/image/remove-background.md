@@ -89,7 +89,7 @@ Re-applies background effects without re-running the AI model. Uses cached mask 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | settings | JSON | Yes | - | JSON with effect settings (see below) |
-| backgroundImage | file | No | - | Custom background image (when backgroundType is `image`) |
+| backgroundImage | file | Required when `backgroundType` is `image` | - | Custom background image |
 
 #### Settings JSON fields {#settings-json-fields}
 
