@@ -123,7 +123,16 @@ export function StitchSettings() {
                 ),
               );
             } catch {
-              reject(new Error(formatMessage(t.errors.failedWithStatus, { status: xhr.status })));
+              reject(
+                new Error(
+                  failedAnswerMessage(
+                    t,
+                    null,
+                    xhr.status,
+                    formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+                  ),
+                ),
+              );
             }
           }
         };

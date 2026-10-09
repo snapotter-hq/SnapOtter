@@ -163,7 +163,16 @@ export function CollageSettings() {
                 ),
               );
             } catch {
-              reject(new Error(format(t.errors.failedWithStatus, { status: xhr.status })));
+              reject(
+                new Error(
+                  failedAnswerMessage(
+                    t,
+                    null,
+                    xhr.status,
+                    format(t.errors.failedWithStatus, { status: xhr.status }),
+                  ),
+                ),
+              );
             }
           }
         };
