@@ -5661,6 +5661,7 @@ export const nl: TranslationKeys = {
     passwordTooLong: "Het wachtwoord mag maximaal {maxLength} tekens lang zijn.",
     passwordTooLongAdminReset:
       "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordNoInvalidCharacters: "Het wachtwoord mag geen ongeldige tekens bevatten.",
     tooManyRequests: "Te veel pogingen. Wacht een minuut en probeer het opnieuw.",
     escalationDenied: "Daarvoor heb je meer rechten nodig dan je rol heeft.",
     featureNotLicensed: "Hiervoor is een enterprise-licentie nodig.",

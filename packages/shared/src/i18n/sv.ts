@@ -5636,6 +5636,7 @@ export const sv: TranslationKeys = {
     passwordTooLong: "Lösenordet får vara högst {maxLength} tecken långt.",
     passwordTooLongAdminReset:
       "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordNoInvalidCharacters: "Lösenordet får inte innehålla ogiltiga tecken.",
     tooManyRequests: "För många försök. Vänta en minut och försök igen.",
     escalationDenied: "Det kräver mer åtkomst än din roll har.",
     featureNotLicensed: "Det här kräver en enterprise-licens.",

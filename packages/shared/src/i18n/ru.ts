@@ -5650,6 +5650,7 @@ export const ru: TranslationKeys = {
     passwordTooLong: "Пароль слишком длинный (максимум: {maxLength}).",
     passwordTooLongAdminReset:
       "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordNoInvalidCharacters: "Пароль не должен содержать недопустимые символы.",
     tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
     escalationDenied: "Для этого нужно больше прав, чем есть у вашей роли.",
     featureNotLicensed: "Для этого нужна корпоративная лицензия.",

@@ -279,6 +279,17 @@ describe("validatePasswordStrength, default policy", () => {
     expect(failure?.rules).toEqual(["controlCharacter"]);
   });
 
+  it("refuses a lone UTF-16 surrogate before policy rules, while accepting a valid surrogate pair (#2170)", async () => {
+    expect((await validatePasswordStrength("MyPass12\uD800"))?.rule).toBe("invalidCharacter");
+    expect((await validatePasswordStrength("MyPass12\uDC00"))?.rule).toBe("invalidCharacter");
+    expect((await validatePasswordStrength("MyPass12\uDC00\uD800"))?.rule).toBe("invalidCharacter");
+
+    const failure = await validatePasswordStrength("ab\uD800");
+    expect(failure?.rules).toEqual(["invalidCharacter"]);
+
+    expect(await validatePasswordStrength("MyPass12\u{1F600}")).toBeNull();
+  });
+
   it("counts a halfwidth katakana password the way it is hashed, not as typed (#2056)", async () => {
     // Four halfwidth kana with a voiced mark are 8 characters as typed and 4
     // once normalized: that is what gets hashed, so that is what is counted.

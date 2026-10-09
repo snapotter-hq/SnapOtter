@@ -5563,6 +5563,7 @@ export const en = {
     passwordTooLong: "Password must be at most {maxLength} characters.",
     passwordTooLongAdminReset:
       "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordNoInvalidCharacters: "Password must not contain invalid characters.",
     tooManyRequests: "Too many attempts. Wait a minute and try again.",
     escalationDenied: "That needs more access than your role has.",
     featureNotLicensed: "This needs an enterprise license.",

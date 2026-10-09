@@ -5683,6 +5683,7 @@ export const de: TranslationKeys = {
     passwordTooLong: "Das Passwort darf höchstens {maxLength} Zeichen lang sein.",
     passwordTooLongAdminReset:
       "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordNoInvalidCharacters: "Das Passwort darf keine ungültigen Zeichen enthalten.",
     tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
     escalationDenied: "Dafür reichen die Rechte Ihrer Rolle nicht aus.",
     featureNotLicensed: "Dafür ist eine Enterprise-Lizenz erforderlich.",

@@ -5649,6 +5649,7 @@ export const uk: TranslationKeys = {
     passwordTooLong: "Пароль задовгий (максимум: {maxLength}).",
     passwordTooLongAdminReset:
       "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordNoInvalidCharacters: "Пароль не має містити недопустимі символи.",
     tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
     escalationDenied: "Для цього потрібно більше прав, ніж має ваша роль.",
     featureNotLicensed: "Для цього потрібна корпоративна ліцензія.",

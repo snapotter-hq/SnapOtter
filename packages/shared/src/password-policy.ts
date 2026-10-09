@@ -12,6 +12,7 @@ export const PASSWORD_RULES = [
   "special",
   "controlCharacter",
   "maxLength",
+  "invalidCharacter",
 ] as const;
 
 /**

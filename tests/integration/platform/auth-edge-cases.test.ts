@@ -7,6 +7,8 @@ import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { authAttempts } from "../../../apps/api/src/lib/metrics.js";
+import { normalizePassword } from "../../../apps/api/src/lib/password-form.js";
+import { hashPassword } from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -1479,13 +1481,14 @@ describe("Admin user-management guards", () => {
     ["a lone high surrogate", "Abcdefg1\uD800"],
     ["a lone low surrogate", "Abcdefg1\uDC00"],
     ["a high surrogate followed by a letter", "Abcdefg1\uD800x"],
+    ["reversed surrogates (low before high)", "Abcdefg1\uDC00\uD800"],
   ])("change-password refuses %s and names the rule (#2170)", async (_label, newPassword) => {
     const res = await sendChangePassword(await loggedInUser(), newPassword);
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body)).toMatchObject({
       code: "VALIDATION_ERROR",
-      error: "Password must not contain invalid characters",
+      error: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
       rule: "invalidCharacter",
       rules: ["invalidCharacter"],
     });
@@ -1504,6 +1507,28 @@ describe("Admin user-management guards", () => {
       rule: "invalidCharacter",
       rules: ["invalidCharacter"],
     });
+  });
+
+  // Setting one is refused, but signing in is not touched: an account whose password
+  // was set with a lone surrogate before the fix must still reach its owner. At login
+  // the surrogate compares as U+FFFD (Node's UTF-8 replaces it), which is why setting
+  // one is refused at all. A later hardening of login with the same check would lock
+  // these accounts out, so this pins the asymmetry.
+  it("an account already holding a lone-surrogate password can still sign in (#2170)", async () => {
+    const { username, id } = await createUser();
+    const stored = "Abcdefg1\uD800";
+    await db
+      .update(schema.users)
+      .set({ passwordHash: await hashPassword(normalizePassword(stored)) })
+      .where(eq(schema.users.id, id));
+
+    const token = await loginAs(username, stored);
+    expect(token).toEqual(expect.any(String));
+    // The weakness the refusal exists for: the same hash opens with U+FFFD.
+    expect(await loginAs(username, "Abcdefg1\uFFFD")).toEqual(expect.any(String));
+    // And the signed-in owner can rotate away from that legacy password.
+    const rotate = await sendChangePassword({ password: stored, token }, "CleanPass1");
+    expect(rotate.statusCode, rotate.body).toBe(200);
   });
 
   it("still accepts a surrogate pair, which is a real character (#2170)", async () => {
