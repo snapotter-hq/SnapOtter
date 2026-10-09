@@ -208,7 +208,7 @@ describe("smart-crop sidecar-free processing", () => {
       );
 
       // The error class doesn't survive the queue, so the row's httpStatus is what
-      // marks a rejected input. A server fault would also log "tool job failed".
+      // marks a rejected input. A server fault would also be logged at error level.
       const [row] = await db
         .select({ status: schema.jobs.status, error: schema.jobs.error })
         .from(schema.jobs)
@@ -218,10 +218,10 @@ describe("smart-crop sidecar-free processing", () => {
         httpStatus: 400,
         message: expect.stringContaining("too small to trim (2 x 2 pixels)"),
       });
-      expect(errorSpy).not.toHaveBeenCalledWith(
-        expect.objectContaining({ jobId }),
-        "tool job failed",
+      const errorLogsForJob = errorSpy.mock.calls.filter(
+        ([bindings]) => (bindings as { jobId?: unknown } | undefined)?.jobId === jobId,
       );
+      expect(errorLogsForJob).toEqual([]);
     } finally {
       errorSpy.mockRestore();
     }
