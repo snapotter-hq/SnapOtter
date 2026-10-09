@@ -5649,6 +5649,7 @@ export const ptBR: TranslationKeys = {
     passwordNeedsSpecial: "A senha deve conter um caractere especial.",
     passwordNoControlCharacters: "A senha não pode conter caracteres de controle.",
     passwordTooLong: "A senha deve ter no máximo {maxLength} caracteres.",
+    passwordNoInvalidCharacters: "A senha não pode conter caracteres inválidos.",
     tooManyRequests: "Muitas tentativas. Aguarde um minuto e tente novamente.",
     escalationDenied: "Isso exige mais acesso do que sua função tem.",
     featureNotLicensed: "Isso requer uma licença empresarial.",

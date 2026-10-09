@@ -5668,6 +5668,7 @@ export const fr: TranslationKeys = {
     passwordNeedsSpecial: "Le mot de passe doit contenir un caractère spécial.",
     passwordNoControlCharacters: "Le mot de passe ne doit pas contenir de caractères de contrôle.",
     passwordTooLong: "Le mot de passe ne doit pas dépasser {maxLength} caractères.",
+    passwordNoInvalidCharacters: "Le mot de passe ne doit pas contenir de caractères non valides.",
     tooManyRequests: "Trop de tentatives. Patientez une minute puis réessayez.",
     escalationDenied: "Cette action demande plus de droits que n'en a votre rôle.",
     featureNotLicensed: "Cette fonction nécessite une licence entreprise.",

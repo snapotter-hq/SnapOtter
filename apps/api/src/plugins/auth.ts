@@ -186,6 +186,18 @@ async function validatePasswordStrength(typed: string): Promise<PasswordRuleFail
       rules: ["controlCharacter"],
     };
   }
+  // A lone UTF-16 surrogate can't be encoded. Node's UTF-8 turns each one into
+  // U+FFFD before the hash sees it, so "\uD800" x8 and "\uFFFD" x8 hash alike and
+  // every string of lone surrogates of that length would log in. Only an API
+  // client can send one; a browser form can't produce it (#2170). With the u flag
+  // a valid surrogate pair is one astral code point, so only a lone one matches.
+  if (/\p{Cs}/u.test(password)) {
+    return {
+      message: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    };
+  }
 
   const minLength = await getSettingNumber("passwordMinLength", 8);
   const requireUpper = await getSettingString("passwordRequireUppercase", "true");
@@ -570,6 +582,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (body.username.includes("\x00") || body.password.includes("\x00")) {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
+      // Login does not apply the password policy, and a lone surrogate is not
+      // refused here either, on purpose: an account whose password was set with one
+      // before #2170 must still sign in. It compares as U+FFFD, which is why setting
+      // one is refused (validatePasswordStrength). Don't add the check here.
 
       const audit = auditFromRequest(request);
       const redis = sharedRedis();

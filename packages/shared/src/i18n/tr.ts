@@ -5643,6 +5643,7 @@ export const tr: TranslationKeys = {
     passwordNeedsSpecial: "Parola bir özel karakter içermelidir.",
     passwordNoControlCharacters: "Parola kontrol karakterleri içermemelidir.",
     passwordTooLong: "Parola en fazla {maxLength} karakter olmalıdır.",
+    passwordNoInvalidCharacters: "Parola geçersiz karakterler içermemelidir.",
     tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
     escalationDenied: "Bu işlem, rolünüzün sahip olduğundan daha fazla erişim gerektirir.",
     featureNotLicensed: "Bunun için kurumsal lisans gerekir.",
