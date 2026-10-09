@@ -218,11 +218,13 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
           method: "DELETE",
           url: `/api/v1/enterprise/users/${y.id}/purge`,
           headers: { authorization: `Bearer ${x.token}` },
+          payload: { confirm: true },
         }),
         testApp.app.inject({
           method: "DELETE",
           url: `/api/v1/enterprise/users/${x.id}/purge`,
           headers: { authorization: `Bearer ${y.token}` },
+          payload: { confirm: true },
         }),
       ]),
     );
