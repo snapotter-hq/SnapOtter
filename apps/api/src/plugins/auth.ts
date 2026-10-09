@@ -939,7 +939,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // the user is told the change failed and a retry with the old password
       // works, instead of a new password beside surviving sessions and keys (#2089).
       const currentToken = extractToken(request);
-      await db.transaction(async (tx) => {
+      const outcome = await db.transaction(async (tx) => {
+        // Lock the row and check the password is still the one just verified.
+        // Two requests that both proved the old password otherwise both
+        // write, and the first caller is told a change succeeded that the
+        // second one overwrote (#2127). The lock also orders the revokes below
+        // after any concurrent change has committed.
+        const [locked] = await tx
+          .select({ passwordHash: schema.users.passwordHash })
+          .from(schema.users)
+          .where(eq(schema.users.id, authUser.id))
+          .for("update");
+        if (locked?.passwordHash !== user.passwordHash) return "changed" as const;
+
         await tx
           .update(schema.users)
           .set({ passwordHash: newHash, mustChangePassword: false, updatedAt: new Date() })
@@ -956,7 +968,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
         // Revoke all API keys - if credentials were compromised, keys must be rotated too
         await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, authUser.id));
+        return "changed-here" as const;
       });
+
+      if (outcome === "changed") {
+        return reply.status(409).send({
+          error: "Your password was changed by another request. Sign in with the new password.",
+          code: "PASSWORD_CHANGED",
+        });
+      }
 
       await auditFromRequest(request)("PASSWORD_CHANGED", {
         userId: authUser.id,
