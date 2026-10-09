@@ -348,7 +348,7 @@ At least one extend direction must be greater than 0.
 | `sensitivity` | number (0-1) | `0.5` | Face detection threshold |
 | `threshold` | integer (0-255) | `30` | Background detection threshold (trim mode) |
 | `padToSquare` | boolean | `false` | Pad trimmed result to a square |
-| `padColor` | string | `"#ffffff"` | Background color for square padding |
+| `padColor` | string (`#rrggbb`) | `"#ffffff"` | Background color for square padding |
 | `targetSize` | integer | - | Target size for padded output (pixels) |
 | `quality` | integer (1-100) | - | Output quality |
 

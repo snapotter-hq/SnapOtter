@@ -17,6 +17,10 @@ const MAX_STEP_PIXELS = 0x3fff * 0x3fff;
 
 const dimension = z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION);
 
+// processTrim slices this into three hex pairs, so anything else used to reach
+// Sharp as NaN (a bare Error) or as the wrong colour with a 200 (#2201).
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a six-digit hex color like #ffffff");
+
 const settingsSchema = z
   .object({
     mode: z
@@ -37,7 +41,7 @@ const settingsSchema = z
     sensitivity: z.number().min(0).max(1).default(0.5),
     threshold: z.number().int().min(0).max(255).default(30),
     padToSquare: z.boolean().default(false),
-    padColor: z.string().default("#ffffff"),
+    padColor: hexColor.default("#ffffff"),
     targetSize: dimension.optional(),
     quality: z.number().int().min(1).max(100).optional(),
   })

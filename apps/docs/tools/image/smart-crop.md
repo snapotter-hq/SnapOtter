@@ -28,7 +28,7 @@ Smart subject-aware, face-aware, or trim-based cropping. Uses Sharp's attention/
 | sensitivity | number | No | `0.5` | Face detection sensitivity (0-1) |
 | threshold | integer | No | `30` | Trim mode threshold for background detection (0-255) |
 | padToSquare | boolean | No | `false` | Pad trimmed result to a square |
-| padColor | string | No | `"#ffffff"` | Background color for padding |
+| padColor | string | No | `"#ffffff"` | Background color for padding, as six-digit hex (`#rrggbb`) |
 | targetSize | integer | No | - | Target size for padded output (pixels) |
 | quality | integer | No | - | Output quality (1-100) |
 
