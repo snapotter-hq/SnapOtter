@@ -1,8 +1,36 @@
+import { readFileSync } from "node:fs";
 import { createNewDocument, expect, test } from "./helpers";
+
+// Width and height from a PNG's IHDR chunk, which always follows the 8-byte signature.
+function pngSize(file: string): [number, number] {
+  const png = readFileSync(file);
+  return [png.readUInt32BE(16), png.readUInt32BE(20)];
+}
 
 test.describe("Editor Export", () => {
   test.beforeEach(async ({ editorPage: page }) => {
     await createNewDocument(page);
+  });
+
+  // The unit tests stand a fake canvas in for jsdom; this checks that a real browser
+  // writes a file of exactly the typed size with the lock off, which used to come
+  // out at the width's aspect (#2174).
+  test("exports at the typed width and height with the lock off", async ({ editorPage: page }) => {
+    await page.keyboard.press("Control+Shift+s");
+    await expect(page.getByText("Export Image")).toBeVisible();
+
+    await page.getByRole("button", { name: "Unlock aspect ratio" }).click();
+    const [width, height] = await page.locator('input[type="number"]').all();
+    await width.fill("300");
+    await height.fill("100");
+    await expect(width).toHaveValue("300");
+    await expect(height).toHaveValue("100");
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export", exact: true }).click();
+    const file = await (await download).path();
+    expect(file).toBeTruthy();
+    expect(pngSize(file as string)).toEqual([300, 100]);
   });
 
   test("export dialog opens via Ctrl+Shift+S", async ({ editorPage: page }) => {

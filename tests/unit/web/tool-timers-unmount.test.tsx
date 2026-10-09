@@ -50,8 +50,14 @@ vi.mock("@/components/tools/document-view", () => ({ DocumentView: () => null })
 // The export dialog reads the Konva stage through this holder; a stand-in
 // stage plus a stubbed capture is all the copy path touches.
 vi.mock("@/components/editor/editor-canvas", () => ({ editorStageRefHolder: { current: {} } }));
+// The copy renders at the document's own size, and a capture that already is that
+// size is used as it is, so no second (jsdom-less) canvas is ever needed here.
 vi.mock("@/components/editor/stage-capture", () => ({
-  captureDocumentCanvas: () => ({ toDataURL: () => "data:image/png;base64,AA==" }),
+  captureDocumentCanvas: () => ({
+    width: 1920,
+    height: 1080,
+    toDataURL: () => "data:image/png;base64,AA==",
+  }),
 }));
 
 vi.mock("qr-code-styling", () => ({
