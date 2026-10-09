@@ -210,7 +210,10 @@ export function OrganizePdfCanvas() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    // h-full, not flex-1: the parent centres its child in a row, so flex-1 sized the
+    // root to its content and the grid's own scroller below never kicked in. The
+    // page grid grew over the settings controls instead (#2191).
+    <div className="flex h-full w-full min-w-0 flex-col min-h-0">
       <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-border">
         <p className="text-xs text-muted-foreground">{s.dragHint}</p>
         <button
