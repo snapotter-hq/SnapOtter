@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
+import { isStorableJson } from "../lib/storable-json.js";
 import { requireAuth } from "../plugins/auth.js";
 
 const putSchema = z.record(z.string(), z.unknown());
@@ -47,6 +48,12 @@ export async function preferencesRoutes(app: FastifyInstance): Promise<void> {
       const parsed = putSchema.safeParse(request.body ?? {});
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid preferences body" });
+      }
+      if (!isStorableJson(parsed.data)) {
+        return reply.status(400).send({
+          error: "Preferences can't contain NUL characters or unpaired surrogates",
+          code: "VALIDATION_ERROR",
+        });
       }
 
       for (const [key, value] of Object.entries(parsed.data)) {

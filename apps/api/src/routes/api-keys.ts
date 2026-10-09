@@ -12,6 +12,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
+import { isStorableJson } from "../lib/storable-json.js";
 import {
   getEffectivePermissions,
   hasEffectivePermission,
@@ -84,6 +85,12 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
         });
       }
       const body = parsed.data;
+      if (!isStorableJson(body)) {
+        return reply.status(400).send({
+          error: "API key fields can't contain NUL characters or unpaired surrogates",
+          code: "VALIDATION_ERROR",
+        });
+      }
       const name = body.name?.trim() || "Default API Key";
 
       const scoped = await deriveApiKeyPermissionsForCreate(user, body.permissions);

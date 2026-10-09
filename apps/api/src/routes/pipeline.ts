@@ -64,7 +64,7 @@ import { isUniqueViolation } from "../lib/pg-errors.js";
 import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
-import { toStorableJson } from "../lib/storable-json.js";
+import { isStorableJson, toStorableJson } from "../lib/storable-json.js";
 import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -862,6 +862,13 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       }
 
       const { name, description, steps } = result.data;
+
+      if (!isStorableJson({ name, description, steps })) {
+        return reply.status(400).send({
+          error: "A pipeline can't contain NUL characters or unpaired surrogates",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       // Validate all tool IDs exist
       for (let i = 0; i < steps.length; i++) {

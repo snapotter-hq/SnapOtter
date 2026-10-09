@@ -36,3 +36,21 @@ export function toStorableJson<T>(value: T): T {
   }
   return value;
 }
+
+/**
+ * True when every key and string in a parsed JSON value can be stored as
+ * Postgres jsonb (#2184): no U+0000 and no unpaired surrogate, at any depth.
+ * Routes that keep what the client sent and read it back as data use this to
+ * answer 400 instead of silently rewriting it the way toStorableJson does.
+ */
+export function isStorableJson(value: unknown): boolean {
+  if (typeof value === "string") return isStorableString(value);
+  if (Array.isArray(value)) return value.every(isStorableJson);
+  if (value && typeof value === "object") {
+    return Object.entries(value).every(([k, v]) => isStorableString(k) && isStorableJson(v));
+  }
+  return true;
+}
+
+const isStorableString = (s: string): boolean =>
+  !s.includes("\0") && (s as string & { isWellFormed(): boolean }).isWellFormed();
