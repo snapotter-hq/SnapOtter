@@ -221,6 +221,12 @@ describe("a hash made before normalization", () => {
 describe("a wrong password costs the same for a real and an unknown user", () => {
   // A miss on an unknown user pays scrypt against a dummy hash so response time does not
   // reveal whether the username exists. Trying a second spelling must not break that.
+  // The dummy hash an unknown user is checked against is built on first use; do that
+  // before counting, or the first unknown-user login would show an extra computation.
+  beforeAll(async () => {
+    await login(uid(), "Warm-up-1");
+  });
+
   async function scryptRuns(username: string, password: string): Promise<number> {
     const before = scrypts.calls;
     expect((await login(username, password)).status).toBe(401);
