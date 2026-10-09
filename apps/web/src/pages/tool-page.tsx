@@ -977,8 +977,8 @@ export function ToolPage() {
     }
 
     const conversionCompleteCard = (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
             <CheckCircle2 className="h-8 w-8 text-success-ink" />
           </div>

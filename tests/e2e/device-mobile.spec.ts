@@ -262,6 +262,13 @@ test.describe("@mobile Small phones keep the settings controls tappable", () => 
       .click({ trial: true, timeout: 5_000 });
   }
 
+  // The bars stack above the preview, so a view that still spills under one passes
+  // the trial clicks. These check that the view itself stays between the bars.
+  async function headerBottom(page: import("@playwright/test").Page) {
+    const header = await page.locator("#main-content h1").locator("xpath=..").boundingBox();
+    return (header?.y ?? 0) + (header?.height ?? 0);
+  }
+
   test.describe("QR code preview", () => {
     test.use({ viewport: { width: 360, height: 560 } });
 
@@ -270,6 +277,10 @@ test.describe("@mobile Small phones keep the settings controls tappable", () => 
       await expect(page.getByTestId("qr-preview")).toBeVisible({ timeout: 15_000 });
 
       await expectControlsTappable(page);
+      const preview = await page.getByTestId("qr-preview").boundingBox();
+      expect((preview?.y ?? -1) + 1).toBeGreaterThanOrEqual(await headerBottom(page));
+      // Nothing is cut off sideways: the code fits the 360px width.
+      expect((preview?.x ?? -1) + (preview?.width ?? Infinity)).toBeLessThanOrEqual(360);
     });
   });
 
@@ -302,6 +313,20 @@ test.describe("@mobile Small phones keep the settings controls tappable", () => 
       await expect(page.locator("[role='dialog']")).toBeHidden();
 
       await expectControlsTappable(page);
+      // The card starts below the header and its last button can be scrolled to
+      // above the peek bar, instead of being clipped or covered.
+      const message = await page
+        .getByText(/could not decode this image/i)
+        .first()
+        .boundingBox();
+      expect((message?.y ?? -1) + 1).toBeGreaterThanOrEqual(await headerBottom(page));
+      const lastButton = page
+        .getByRole("button", { name: /report an issue|report issue/i })
+        .first();
+      await lastButton.scrollIntoViewIfNeeded();
+      const last = await lastButton.boundingBox();
+      const peek = await page.getByRole("button", { name: "Process", exact: true }).boundingBox();
+      expect((last?.y ?? Infinity) + (last?.height ?? 0)).toBeLessThanOrEqual((peek?.y ?? 0) + 1);
     });
   });
 });

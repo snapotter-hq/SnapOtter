@@ -183,9 +183,11 @@ describe("NonNativePreview source fetch (#1286)", () => {
     const { container } = await generate();
 
     const video = container.querySelector("video");
-    expect(video?.className).toContain("max-h-full");
-    expect(video?.parentElement?.className).toContain("h-full");
-    expect(video?.parentElement?.className).not.toContain("flex-1");
+    expect(video?.classList.contains("max-h-full")).toBe(true);
+    // classList, not a substring match: "max-h-full" contains "h-full" and a wrapper
+    // with only that would still overflow.
+    expect(video?.parentElement?.classList.contains("h-full")).toBe(true);
+    expect(video?.parentElement?.classList.contains("flex-1")).toBe(false);
   });
 
   it("still sends a source that fetched fine", async () => {

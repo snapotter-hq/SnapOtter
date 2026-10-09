@@ -182,8 +182,8 @@ export function NonNativePreview({
   // Idle state: file info + generate button
   if (state === "idle") {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -209,8 +209,8 @@ export function NonNativePreview({
   if (state === "generating") {
     const previewMessages = t.toolPage.previewProgressMessages;
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs w-full">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs w-full">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -238,8 +238,8 @@ export function NonNativePreview({
   // Error state: retry button
   if (state === "error") {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center p-8 max-w-xs">
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <IconComponent className="h-8 w-8 text-muted-foreground" />
           </div>

@@ -114,15 +114,15 @@ export function QrGeneratePreview() {
     // phone), and m-auto centres them only while they do, so the top is never
     // clipped and nothing spills over the settings controls (#2192).
     <div className="flex h-full w-full flex-col overflow-auto">
-      <div className="m-auto flex flex-col items-center gap-4 p-2">
+      <div className="m-auto flex max-w-full flex-col items-center gap-4">
         <div
-          className="rounded-xl border border-border p-6 shadow-sm"
+          className="max-w-full rounded-xl border border-border p-6 shadow-sm"
           style={store.bgTransparent ? { background: CHECKER_BG } : undefined}
         >
           <div
             ref={containerRef}
             data-testid="qr-preview"
-            className="flex items-center justify-center"
+            className="flex items-center justify-center [&_canvas]:h-auto [&_canvas]:max-w-full"
           />
         </div>
         {isEmpty && (
