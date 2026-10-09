@@ -827,7 +827,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             durationMs,
             error: {
               message: friendlyError(finalError),
-              ...validationErrorFields(err),
+              // The fault's own code and status belong on a job that failed
+              // on it; a timeout or a cancel that one raced is not that
+              // failure, and its row says so (#2210).
+              ...(!isCanceled && !isTimeout && validationErrorFields(err)),
               ...(!isCanceled && !isTimeout && failureStatus(err)),
             },
           })
@@ -893,7 +896,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             phase: "failed",
             percent: 0,
             error: friendlyError(finalError),
-            ...validationErrorFields(err),
+            ...(!isTimeout && validationErrorFields(err)),
             ...(!isTimeout && failureStatus(err)),
           });
         }
