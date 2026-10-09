@@ -11,6 +11,7 @@
  * already pin at the source.
  */
 import { randomUUID } from "node:crypto";
+import { SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import {
   afterAll,
@@ -569,6 +570,96 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     expect(res.statusCode, res.body).toBe(422);
     expect(res.json().error).toBe("Step 1: Resize ran out of road");
     expect(res.json().code).toBeUndefined();
+  });
+
+  // #2210: the worker recorded a status on a failed row only for input errors,
+  // so a step that died on a storage SafeError (a full workspace, an unwritable
+  // volume) came back 422 from every route that reads the row.
+  describe("a storage fault inside the worker keeps its status and code (#2210)", () => {
+    const storageFull = () =>
+      new SafeError("The server's storage is full.", {
+        statusCode: 503,
+        code: "storage-full",
+      });
+    const resizePipeline = {
+      name: "pipeline",
+      content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+    };
+
+    it("pipeline execute answers 503 with the code", async () => {
+      failInWorker("resize", storageFull());
+      const res = await post("/api/v1/pipeline/execute", [pngPart("one.png"), resizePipeline]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({
+        error: `Step 1: ${storageFull().message}`,
+        code: "storage-full",
+      });
+    });
+
+    it("the single-file tool route answers 503 with the code instead of Processing failed", async () => {
+      failInWorker("resize", storageFull());
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({ error: storageFull().message, code: "storage-full" });
+    });
+
+    it("a batch whose every file hits it answers the shared status and code", async () => {
+      failInWorker("resize", storageFull());
+      const res = await post("/api/v1/tools/image/resize/batch", [
+        pngPart("a.png"),
+        pngPart("b.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({ code: "storage-full" });
+    });
+
+    it("keeps the status on the failed job row", async () => {
+      failInWorker("resize", storageFull());
+      const clientJobId = randomUUID();
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+
+      const [row] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, res.json().jobId ?? clientJobId));
+      expect(row?.error).toMatchObject({ code: "storage-full", httpStatus: 503 });
+    });
+
+    it("keeps the single-file 422 for a SafeError that is not a server fault", async () => {
+      failInWorker(
+        "resize",
+        new SafeError("That setting is not allowed.", { statusCode: 400, code: "BAD_SETTING" }),
+      );
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(422);
+      expect(res.json().code).toBeUndefined();
+    });
+
+    it("keeps the single-file 422 for a plain error with no status", async () => {
+      failInWorker("resize", new Error("Resize ran out of road"));
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+      ]);
+
+      expect(res.statusCode, res.body).toBe(422);
+    });
   });
 
   it("pipeline batch names one shared reason that isn't a server fault", async () => {
