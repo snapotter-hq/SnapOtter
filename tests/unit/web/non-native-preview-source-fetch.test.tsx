@@ -168,6 +168,26 @@ describe("NonNativePreview source fetch (#1286)", () => {
     },
   );
 
+  // #2192: the video's max-h-full needs a definite height to cap against. With a
+  // flex-1 wrapper a portrait video overflowed the preview area on a phone and
+  // covered the Settings button and the peek bar.
+  it("puts the ready video in a box with a definite height", async () => {
+    stubFetch(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        blob: () => Promise.resolve(new Blob(["mkv"], { type: "video/x-matroska" })),
+      }),
+    );
+
+    const { container } = await generate();
+
+    const video = container.querySelector("video");
+    expect(video?.className).toContain("max-h-full");
+    expect(video?.parentElement?.className).toContain("h-full");
+    expect(video?.parentElement?.className).not.toContain("flex-1");
+  });
+
   it("still sends a source that fetched fine", async () => {
     const fetchMock = stubFetch(() =>
       Promise.resolve({

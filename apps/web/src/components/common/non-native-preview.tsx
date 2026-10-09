@@ -286,7 +286,9 @@ export function NonNativePreview({
       );
     }
     return (
-      <div className="flex-1 flex items-center justify-center p-2">
+      // h-full, not flex-1: the video's max-h-full needs a definite height to cap
+      // against, or a portrait video overflows the preview area (#2192).
+      <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-2">
         {/* biome-ignore lint/a11y/useMediaCaption: preview video player */}
         <video controls className="max-h-full max-w-full rounded-md" src={previewUrl} />
       </div>
