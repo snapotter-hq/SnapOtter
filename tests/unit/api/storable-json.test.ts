@@ -128,4 +128,15 @@ describe("isStorableJson", () => {
     expect(isStorableJson({ [`k${HIGH}`]: 1 })).toBe(false);
     expect(isStorableJson([`x${HIGH}`])).toBe(false);
   });
+
+  it("walks 20000 levels of nesting without overflowing the stack", () => {
+    const nest = (leaf: string) =>
+      JSON.parse(`${'{"a":['.repeat(10_000)}${JSON.stringify(leaf)}${"]}".repeat(10_000)}`);
+    expect(isStorableJson(nest("fine"))).toBe(true);
+    expect(isStorableJson(nest(`x${NUL}`))).toBe(false);
+  });
+
+  it("sees a NUL under a __proto__ key that JSON.parse kept as a normal key", () => {
+    expect(isStorableJson(JSON.parse(`{"a":{"__proto__":"x\\u0000"}}`))).toBe(false);
+  });
 });

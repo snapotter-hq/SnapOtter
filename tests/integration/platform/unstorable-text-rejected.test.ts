@@ -4,9 +4,6 @@
  * surrogate). They answered 500, or a bare-catch 409 that blamed a conflict.
  * They now answer 400 and say why. #2177 covers the job rows, where the stored
  * copy is bookkeeping and is sanitized instead.
- *
- * Status and code only: the test server skips the production error handler
- * (#1243), so a 500 body here is Fastify's default, SQL text included.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -50,6 +47,11 @@ describe("preferences refuse text Postgres cannot store", () => {
     expectRejected(await put(payload));
   });
 
+  it("saves a deeply nested value instead of overflowing the stack", async () => {
+    const deep = JSON.parse(`${'{"a":'.repeat(5000)}1${"}".repeat(5000)}`);
+    expect((await put({ deep })).statusCode).toBe(200);
+  });
+
   it("stores nothing from a refused body, even the valid keys beside the bad one", async () => {
     expectRejected(await put({ okKey: "fine", [`bad${NUL}`]: "x" }));
 
@@ -75,6 +77,7 @@ describe("saved pipelines refuse text Postgres cannot store", () => {
     ["a lone surrogate in a step's settings", { name: "p", steps: [step({ angle: LONE_HIGH })] }],
     ["a NUL in a setting's key", { name: "p", steps: [step({ [`a${NUL}b`]: 1 })] }],
     ["a NUL in the name", { name: `p${NUL}q`, steps: [step({ angle: 90 })] }],
+    ["a lone surrogate in the name", { name: `p${LONE_HIGH}`, steps: [step({ angle: 90 })] }],
     [
       "a NUL in the description",
       { name: "p", description: `d${NUL}`, steps: [step({ angle: 90 })] },
@@ -85,13 +88,13 @@ describe("saved pipelines refuse text Postgres cannot store", () => {
 
   it("still saves a pipeline and keeps its settings as sent", async () => {
     const res = await save({ name: "kept-as-sent", steps: [step({ angle: 90 })] });
-    expect([200, 201]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(201);
 
     const list = await app.inject({ method: "GET", url: "/api/v1/pipeline/list", headers: auth() });
     const saved = JSON.parse(list.body).pipelines.find(
       (p: { name: string }) => p.name === "kept-as-sent",
     );
-    expect(saved.steps[0].settings).toMatchObject({ angle: 90 });
+    expect(saved.steps[0].settings).toEqual({ angle: 90 });
   });
 });
 
@@ -102,8 +105,16 @@ describe("API-key names refuse text Postgres cannot store", () => {
   it.each([
     ["a NUL in the name", { name: `k${NUL}ey` }],
     ["a lone surrogate in the name", { name: `k${LONE_HIGH}` }],
-  ])("answers 400 for %s, not a misleading 409", async (_name, payload) => {
+  ])("answers 400 for %s, not a stored key or a misleading 409", async (_name, payload) => {
     expectRejected(await create(payload));
+  });
+
+  it("creates no key and no half-written audit trail for a refused name", async () => {
+    expectRejected(await create({ name: `ghost${LONE_HIGH}` }));
+
+    const list = await app.inject({ method: "GET", url: "/api/v1/api-keys", headers: auth() });
+    const names = JSON.parse(list.body).apiKeys.map((k: { name: string }) => k.name);
+    expect(names.some((n: string) => n.startsWith("ghost"))).toBe(false);
   });
 
   it("still creates a key with an ordinary name", async () => {
