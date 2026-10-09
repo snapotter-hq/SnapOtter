@@ -69,12 +69,15 @@ export function initAnalytics(config: AnalyticsConfig): Promise<void> {
 async function startAnalytics(config: AnalyticsConfig): Promise<void> {
   // Before any await, so an opt-out mid-start can't leave optIn() without it.
   if (config.sentryDsnWeb) sentryConfig = config;
+  // The instance allows telemetry, so this tab does: Sentry's beforeSend
+  // reads this. PostHog starting is a separate question; tying the two made a
+  // PostHog that failed to load silence Sentry too (#2217). track() checks
+  // for a live PostHog itself.
+  enabled = true;
   if (!config.posthogApiKey) {
     // Web-DSN-only bake: no PostHog key, so skip the PostHog SDK entirely
-    // (mirrors the API guard) instead of feeding it an empty key. Still mark
-    // the module live so the Sentry beforeSend gate below stays active.
+    // (mirrors the API guard) instead of feeding it an empty key.
     initialized = true;
-    enabled = true;
   } else {
     try {
       const posthogJs = (await import("posthog-js")).default;
@@ -155,8 +158,8 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           },
         }) ?? null;
       initialized = true;
-      enabled = true;
     } catch (err) {
+      // Left uninitialized, so the next answer that says on tries again.
       console.warn("[analytics] PostHog init failed:", err);
     }
   }
