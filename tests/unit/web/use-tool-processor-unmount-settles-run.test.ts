@@ -2,6 +2,7 @@
 
 import { act, renderHook } from "@testing-library/react";
 import AdmZip from "adm-zip";
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/image-preview", () => ({
@@ -192,6 +193,188 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
       "batch_processed",
       expect.objectContaining({ status: "failed", reason: "panel-unmounted" }),
     );
+  });
+
+  // #2151: every conversion preset shares one panel that reads its tool id from
+  // the route, so moving between presets changes the hook's toolId without an
+  // unmount. That re-runs the effect that aborts the request and closes the
+  // stream, and it has to settle the run it stops just as an unmount does.
+  describe("a tool id change under the same panel (#2151)", () => {
+    function startAsyncRun(hook: { result: { current: ReturnType<typeof useToolProcessor> } }) {
+      const file = image("photo.png");
+      useFileStore.getState().setFiles([file]);
+      act(() => {
+        hook.result.current.processFiles([file], {});
+      });
+      act(() => {
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+        xhrs[0].onload?.();
+      });
+    }
+
+    it("settles a run being followed over the progress stream", () => {
+      const hook = renderHook(({ toolId }) => useToolProcessor(toolId), {
+        initialProps: { toolId: "jpg-to-png" },
+      });
+      startAsyncRun(hook);
+      expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+
+      hook.rerender({ toolId: "png-to-webp" });
+
+      expect(xhrs[0].abort).toHaveBeenCalled();
+      expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+      const state = useFileStore.getState();
+      expect(state.processing).toBe(false);
+      expect(state.error).toBe(INTERRUPTED);
+      expect(state.entries[0]).toMatchObject({ status: "failed", error: INTERRUPTED });
+      expect(state.activeJobId).toBeNull();
+      expect(cancelPosts()).toHaveLength(1);
+
+      hook.unmount();
+      // The unmount that follows has nothing left to settle.
+      expect(cancelPosts()).toHaveLength(1);
+    });
+
+    it("settles a single-file run still uploading", () => {
+      const file = image("photo.png");
+      useFileStore.getState().setFiles([file]);
+      const hook = renderHook(({ toolId }) => useToolProcessor(toolId), {
+        initialProps: { toolId: "jpg-to-png" },
+      });
+      act(() => {
+        hook.result.current.processFiles([file], {});
+      });
+      expect(useFileStore.getState().processing).toBe(true);
+
+      hook.rerender({ toolId: "png-to-webp" });
+
+      expect(xhrs[0].abort).toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(cancelPosts()).toHaveLength(1);
+    });
+
+    it("settles a batch in flight", () => {
+      const files = [image("one.png"), image("two.png")];
+      useFileStore.getState().setFiles(files);
+      const hook = renderHook(({ toolId }) => useToolProcessor(toolId), {
+        initialProps: { toolId: "jpg-to-png" },
+      });
+      act(() => {
+        void hook.result.current.processAllFiles(files, {});
+      });
+
+      hook.rerender({ toolId: "png-to-webp" });
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+      expect(vi.mocked(track)).toHaveBeenCalledWith(
+        "batch_processed",
+        expect.objectContaining({ tool_id: "jpg-to-png", reason: "panel-unmounted" }),
+      );
+    });
+
+    it("drops a batch's ZIP that arrives after the page reset the store for the next tool", async () => {
+      vi.useRealTimers();
+      const zip = new AdmZip();
+      zip.addFile("one_resize.png", Buffer.from([1, 2, 3, 4]));
+      zip.addFile("two_resize.png", Buffer.from([5, 6]));
+      const bytes = new Uint8Array(zip.toBuffer());
+      let deliverZip: (blob: Blob) => void = () => {};
+      const download = new Promise<Blob>((resolve) => {
+        deliverZip = resolve;
+      });
+      fetchMock.mockImplementation(async (url: string) =>
+        url === CANCEL_URL
+          ? new Response(JSON.stringify({ canceled: false }))
+          : { ok: true, status: 200, blob: () => download },
+      );
+      const files = [image("one.png"), image("two.png")];
+      useFileStore.getState().setFiles(files);
+      const hook = renderHook(
+        ({ toolId }) => {
+          const processor = useToolProcessor(toolId);
+          // biome-ignore lint/correctness/useExhaustiveDependencies: toolId is the trigger, as on the tool page
+          useEffect(() => {
+            useFileStore.getState().reset();
+          }, [toolId]);
+          return processor;
+        },
+        { initialProps: { toolId: "jpg-to-png" } },
+      );
+      act(() => {
+        void hook.result.current.processAllFiles(files, {});
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].onerror?.();
+      });
+      act(() => {
+        MockEventSource.instances.at(-1)?.onmessage?.({
+          data: JSON.stringify({
+            type: "batch",
+            jobId: JOB_ID,
+            status: "completed",
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: 0,
+            errors: [],
+            result: {
+              jobId: JOB_ID,
+              downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+              zipFilename: "batch-resize.zip",
+              fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+              processedSize: bytes.length,
+            },
+          }),
+        } as MessageEvent);
+      });
+
+      hook.rerender({ toolId: "png-to-webp" });
+      deliverZip(new Blob([bytes.slice().buffer], { type: "application/zip" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const state = useFileStore.getState();
+      expect(state.entries).toHaveLength(0);
+      expect(state.batchZipBlob).toBeNull();
+      expect(state.processing).toBe(false);
+      expect(state.activeJobId).toBeNull();
+      expect(vi.mocked(track)).not.toHaveBeenCalledWith(
+        "batch_processed",
+        expect.objectContaining({ status: "completed" }),
+      );
+      // Nothing is left for the unmount that follows to cancel again.
+      hook.unmount();
+      expect(cancelPosts()).toHaveLength(1);
+    });
+
+    // The tool page resets the file store in an effect keyed on the tool id. React
+    // runs every cleanup before any effect body, so the settle goes first and the
+    // reset has the last word: the next tool starts from a clean store.
+    it("leaves a clean store once the tool page's reset has run after it", () => {
+      const hook = renderHook(
+        ({ toolId }) => {
+          const processor = useToolProcessor(toolId);
+          // biome-ignore lint/correctness/useExhaustiveDependencies: toolId is the trigger, as on the tool page
+          useEffect(() => {
+            useFileStore.getState().reset();
+          }, [toolId]);
+          return processor;
+        },
+        { initialProps: { toolId: "jpg-to-png" } },
+      );
+      startAsyncRun(hook);
+
+      hook.rerender({ toolId: "png-to-webp" });
+
+      const state = useFileStore.getState();
+      expect(cancelPosts()).toHaveLength(1);
+      expect(state.entries).toHaveLength(0);
+      expect(state.error).toBeNull();
+      expect(state.processing).toBe(false);
+      expect(state.activeJobId).toBeNull();
+    });
   });
 
   it("leaves the store alone when no run is in flight", () => {

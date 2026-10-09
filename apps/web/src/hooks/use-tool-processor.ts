@@ -683,35 +683,12 @@ export function useToolProcessor(toolId: string) {
     reconnectSSERef.current = reconnectSSE;
   }, [reconnectSSE]);
 
-  // Reconnect SSE when tab becomes visible again (mobile tab recovery)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") return;
-      if (!activeJobIdRef.current) return;
-      if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-        return;
-      }
-      setTimeout(() => reconnectSSE(), 500);
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) xhrRef.current.abort();
-      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
-      if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
-    };
-  }, [reconnectSSE]);
-
-  // The cleanup above aborts the request and closes the stream when the panel
-  // unmounts, which ends the run. It has to settle it too: left alone the store
-  // sits at `processing` for good, and a panel that remounts (rotating a phone
-  // across the layout breakpoint swaps the whole tree) shows a run that can
-  // never end (#2125). A ref, so the cleanup always sees the latest closures
-  // without an effect that re-runs, and so stops, mid-run.
+  // The cleanup of the effect below aborts the request and closes the stream,
+  // which ends the run. It has to settle it too: left alone the store sits at
+  // `processing` for good, and a panel that remounts (rotating a phone across the
+  // layout breakpoint swaps the whole tree) shows a run that can never end
+  // (#2125). A ref, so the cleanup runs the closures committed for the run it is
+  // stopping, not whatever the next render brings.
   const settleStoppedRunRef = useRef<() => void>(() => {});
   useEffect(() => {
     settleStoppedRunRef.current = () => {
@@ -755,7 +732,34 @@ export function useToolProcessor(toolId: string) {
       }
     };
   });
-  useEffect(() => () => settleStoppedRunRef.current(), []);
+  // Reconnect SSE when tab becomes visible again (mobile tab recovery)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!activeJobIdRef.current) return;
+      if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
+        return;
+      }
+      setTimeout(() => reconnectSSE(), 500);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (eventSourceRef.current) eventSourceRef.current.close();
+      if (xhrRef.current) xhrRef.current.abort();
+      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+      if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
+      // This runs on unmount, but also whenever reconnectSSE changes, which it
+      // does with the tool id: the conversion presets share one panel that reads
+      // the id from the route, so moving between them stops a run without an
+      // unmount (#2151). Whatever stopped it, the run is over, so settle it; a
+      // batch whose ZIP is already in hand is the one thing left to finish.
+      settleStoppedRunRef.current();
+    };
+  }, [reconnectSSE]);
 
   const processFiles = useCallback(
     (files: File[], settings: Record<string, unknown>, opts?: { skipLibrarySave?: boolean }) => {
@@ -1239,6 +1243,19 @@ export function useToolProcessor(toolId: string) {
           setProgress(IDLE_PROGRESS);
         };
 
+        // A batch whose ZIP is already in hand is left to finish when its panel
+        // unmounts (#2125). If the tool changed, the page reset the file store
+        // after that cleanup, so the results belong to a tool the user left and
+        // would land on the next one's empty store, and its leave guard would
+        // offer a ZIP from a tool they are no longer on (#2151). Ends such a run
+        // without a write. A store that still carries the run is untouched.
+        const storeWasReset = () => {
+          if (useFileStore.getState().processing) return false;
+          releaseRun();
+          clearActiveJob();
+          return true;
+        };
+
         // Tear down the run without touching the outcome state; callers set
         // the result first. Each write gets its own guard, and the
         // first throw is returned for the caller to rethrow once the run's
@@ -1339,6 +1356,7 @@ export function useToolProcessor(toolId: string) {
           // The unpack awaits: a cancel or a newer run may have ended this
           // one meanwhile, and its writes would land on that run's state.
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (!extracted) {
             failRun("Batch processing failed", reason);
             return;
@@ -1461,6 +1479,7 @@ export function useToolProcessor(toolId: string) {
             }
           }
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (refusedStatus !== null) {
             failRun(
               refusedStatus === 404
