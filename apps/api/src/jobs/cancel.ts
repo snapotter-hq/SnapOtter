@@ -34,25 +34,40 @@ import { bullPrefix, POOLS } from "./types.js";
 
 const cancelables = new Map<string, AbortController>();
 
-// Jobs a user asked to cancel. The abort signal can't carry this alone: once the
-// worker timeout has aborted the controller, a later cancel's abort() is a no-op
-// and the reason stays "timeout" (#2092).
-const userCanceled = new Set<string>();
+// A second controller per job that only a user cancel aborts. The job's own
+// signal can't carry this alone: once the worker timeout has aborted that
+// controller, a later cancel's abort() is a no-op and the reason stays
+// "timeout" (#2092). The writes after the handler wait on this one, so a
+// deadline that already fired can't discard a finished result while a user
+// cancel still stops the upload (#2144).
+const userCancels = new Map<string, AbortController>();
 
 export function registerCancelable(jobId: string): AbortController {
   const ac = new AbortController();
   cancelables.set(jobId, ac);
+  userCancels.set(jobId, new AbortController());
   return ac;
 }
 
 export function unregisterCancelable(jobId: string): void {
   cancelables.delete(jobId);
-  userCanceled.delete(jobId);
+  userCancels.delete(jobId);
 }
 
 /** True once a user cancel reached this worker for the job, whatever else aborted it. */
 export function wasUserCanceled(jobId: string): boolean {
-  return userCanceled.has(jobId);
+  return userCancels.get(jobId)?.signal.aborted === true;
+}
+
+/**
+ * The signal only a user cancel fires, for writes that must outlive the job
+ * deadline. The job has to be registered: the worker takes this right after
+ * registerCancelable, so a miss is a programming error, not a job state.
+ */
+export function userCancelSignal(jobId: string): AbortSignal {
+  const ac = userCancels.get(jobId);
+  if (!ac) throw new Error(`Job ${jobId} is not registered for cancellation`);
+  return ac.signal;
 }
 
 // ── Pub/sub listener ────────────────────────────────────────────
@@ -70,7 +85,7 @@ export async function startCancelListener(): Promise<void> {
   subscriber.on("message", (_channel: string, message: string) => {
     const ac = cancelables.get(message);
     if (ac) {
-      userCanceled.add(message);
+      userCancels.get(message)?.abort();
       ac.abort();
       cancelables.delete(message);
     }

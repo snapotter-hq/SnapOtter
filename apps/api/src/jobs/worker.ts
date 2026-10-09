@@ -19,7 +19,11 @@
  * retried per the queue's attempts policy; canceled jobs get status
  * "canceled" and are never retried. Terminal DB writes and SSE frames
  * are deferred until the final attempt so intermediate retries stay
- * invisible to the client.
+ * invisible to the client. A user cancel is also recorded on its own
+ * signal (cancel.ts userCancelSignal), which the writes after the handler
+ * wait on: a cancel that lands after the deadline can't re-abort the job's
+ * controller, and a deadline alone must not discard a result the handler
+ * went on to return (#2144).
  */
 import { createReadStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
@@ -62,6 +66,7 @@ import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
 import {
   copyObjectToFile,
+  deletePrefix,
   getObjectBuffer,
   getObjectSize,
   getObjectStream,
@@ -97,7 +102,12 @@ import {
   runAiToolJob,
 } from "./ai-handlers.js";
 import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-progress.js";
-import { registerCancelable, unregisterCancelable, wasUserCanceled } from "./cancel.js";
+import {
+  registerCancelable,
+  unregisterCancelable,
+  userCancelSignal,
+  wasUserCanceled,
+} from "./cancel.js";
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
@@ -364,6 +374,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     // Register for cooperative cancellation
     const ac = registerCancelable(jobId);
     const signal = ac.signal;
+    // Fires on a user cancel only, never on the deadline (#2144). The writes
+    // after the handler wait on this one: a handler that ignored the signal and
+    // returned after the deadline has a finished result worth keeping, while a
+    // user cancel still has to stop the upload.
+    const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
     const timeoutMs = timeoutMsFor(data.pool);
@@ -372,6 +387,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
     // Per-job scratch directory
     const scratchDir = join(scratchRoot(), jobId);
+
+    // How far the job got, for the catch below (#2144): once the handler has
+    // returned, the deadline can't be the cause of a later error, and once an
+    // output was written a cancel has to take it back.
+    let handlerReturned = false;
+    let outputsWritten = false;
 
     try {
       await mkdir(scratchDir, { recursive: true });
@@ -461,6 +482,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       if (hasAiPathJobHandler(data.toolId)) {
         if (!pathInput) throw new Error(`No path-backed input for ${data.toolId}`);
         const aiResult = await runAiPathToolJob(data, pathInput, ctx);
+        handlerReturned = true;
         resultBuffer = aiResult.buffer;
         resultSize = aiResult.buffer.length;
         resultFilename = aiResult.filename;
@@ -470,6 +492,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       } else if (hasAiJobHandler(data.toolId)) {
         if (!inputBuffer) throw new Error(`No buffered input for ${data.toolId}`);
         const aiResult = await runAiToolJob(data, inputBuffer, ctx);
+        handlerReturned = true;
         resultBuffer = aiResult.buffer;
         resultSize = aiResult.buffer.length;
         resultFilename = aiResult.filename;
@@ -489,6 +512,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           signal,
           report,
         });
+        handlerReturned = true;
 
         // Resolve buffer OR scratchPath for the primary output. Over-cap
         // scratch files stay on disk and stream to storage below.
@@ -554,11 +578,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
+      outputsWritten = true;
       if (resultBuffer) {
         await putObject(primaryKey, resultBuffer);
       } else if (resultStreamPath) {
         resultSize = await putObjectStream(primaryKey, createReadStream(resultStreamPath), {
-          signal,
+          signal: userCancel,
         });
       }
       const outputRefs: string[] = [primaryKey];
@@ -576,7 +601,9 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           } else if (extra.scratchPath) {
             // Over-cap extra: streamed as-is. The producer scrub needs bytes in
             // memory, and no real PDF reaches the buffering cap.
-            await putObjectStream(extraKey, createReadStream(extra.scratchPath), { signal });
+            await putObjectStream(extraKey, createReadStream(extra.scratchPath), {
+              signal: userCancel,
+            });
           }
           outputRefs.push(extraKey);
         }
@@ -695,7 +722,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // A user cancel wins over a deadline that fired first: abort() on an already
       // aborted controller leaves the reason as "timeout".
       const isCanceled = wasUserCanceled(jobId) || (signal.aborted && signal.reason !== "timeout");
-      const isTimeout = !isCanceled && signal.aborted && signal.reason === "timeout";
+      // The deadline is the cause only while the handler was still running when
+      // it fired. A handler that ignored the signal and returned anyway is
+      // followed by storage and database writes whose faults carry their own
+      // message, error log and report (#2144).
+      const isTimeout =
+        !isCanceled && !handlerReturned && signal.aborted && signal.reason === "timeout";
       const errorMessage = err instanceof Error ? err.message : String(err);
       const finalError = isCanceled
         ? "Canceled"
@@ -728,6 +760,22 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       const maxAttempts = job.opts.attempts ?? 1;
       const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
+
+      // A cancel caught after the output was written (#2144): the row settles
+      // with no outputRefs, but the download route serves by key and job
+      // reconciliation adopts stray outputs, so take them back here. Best
+      // effort: the terminal write below must land either way.
+      if (isCanceled && outputsWritten) {
+        try {
+          await deletePrefix(`outputs/${jobId}/`);
+        } catch (cleanupErr) {
+          logger.error(
+            { err: cleanupErr, jobId, toolId: data.toolId },
+            "canceled job output cleanup failed",
+          );
+          void reportError(cleanupErr, { source: "worker", pool: data.pool, jobId });
+        }
+      }
 
       const progressJobId = data.clientJobId ?? jobId;
 

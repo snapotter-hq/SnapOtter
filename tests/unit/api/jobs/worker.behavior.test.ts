@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const objectStorageMocks = vi.hoisted(() => ({
   copyObjectToFile: vi.fn(),
+  deletePrefix: vi.fn(),
   getObjectBuffer: vi.fn(),
   getObjectSize: vi.fn(),
   // Stands in for the real predicate (covered in object-storage-fault.test.ts):
@@ -126,6 +127,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
     registerCancelable: vi.fn(() => new AbortController()),
     unregisterCancelable: vi.fn(),
+    userCancelSignal: vi.fn(() => new AbortController().signal),
     wasUserCanceled: vi.fn(() => false),
   }));
 
