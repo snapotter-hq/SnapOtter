@@ -764,8 +764,14 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   }, [settings._bgImageFile]);
 
   const hasFile = files.length > 0;
+  // A result counts while its file is the one loaded and the processor still
+  // holds it: Undo clears the processed URL and has to take Phase 2 with it.
   const bgRemoved =
-    bgJobId !== null && !processing && files.length === 1 && files[0] === bgResultFile;
+    bgJobId !== null &&
+    !processing &&
+    Boolean(downloadUrl) &&
+    files.length === 1 &&
+    files[0] === bgResultFile;
 
   // Whether the user has configured any compositing effect.
   const hasEffectsToApply =

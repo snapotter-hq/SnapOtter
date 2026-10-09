@@ -89,6 +89,18 @@ describe("remove-background result after the files change (#2107)", () => {
     expect(download()).not.toBeInTheDocument();
   });
 
+  it("takes the result away when Undo clears it", async () => {
+    useFileStore.getState().setFiles([png("a.png")]);
+    const { rerender } = render(<RemoveBgSettings />);
+    expect(await screen.findByTestId("remove-background-download")).toBeInTheDocument();
+
+    // Undo drops the entry's processed URL; the processor reports none.
+    processor.downloadUrl = null;
+    rerender(<RemoveBgSettings />);
+
+    expect(download()).not.toBeInTheDocument();
+  });
+
   it("keeps the finished result while the same file stays loaded", async () => {
     const a = png("a.png");
     useFileStore.getState().setFiles([a]);
