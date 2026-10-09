@@ -97,6 +97,12 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           api_host: apiHost,
           ...(uiHost ? { ui_host: uiHost } : {}),
           autocapture: false,
+          // Send each event when it's captured. Batching holds events for up
+          // to 3 s and flushes the batch by timer or sendBeacon on page hide
+          // whether or not the tab opted out meanwhile, and posthog-js has no
+          // public way to drop it (#2216). SnapOtter sends few events, so one
+          // request each costs little.
+          request_batching: false,
           // Unset, posthog-js obeys the PostHog project's server-side capture
           // toggles, which stay on for the public sites, so a self-hosted
           // instance would report every click and dead click (#1022). Set them
@@ -121,6 +127,11 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
           // SDK-generated events never pass through track()'s allowlist, so the
           // invariant is enforced here too.
           before_send: (event) => {
+            // The same runtime gate Sentry's beforeSend has: once the tab is
+            // opted out, nothing is captured, including the events posthog-js
+            // makes on its own ($pageview, $pageleave, web vitals), even if
+            // opt_out_capturing() itself failed (#2216).
+            if (!enabled) return null;
             const props = event?.properties;
             if (props) {
               const strip = (u: unknown) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
@@ -336,8 +347,9 @@ export function optOut(): void {
   discardEarlyErrors();
   try {
     posthog?.opt_out_capturing();
-  } catch {
-    // ignore
+  } catch (err) {
+    // before_send still drops everything new; say why capture wasn't stopped.
+    console.warn("[analytics] PostHog opt-out failed:", err);
   }
   sentryRunning = false;
   void import("@sentry/react")

@@ -3,6 +3,7 @@
 // Runs the REAL posthog-js (no mock) and watches every way it can send:
 // fetch, XMLHttpRequest and navigator.sendBeacon. An instance-wide opt-out
 // must stop all egress (#423), including events PostHog already queued (#2216).
+import { gunzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@sentry/react", () => ({
@@ -27,9 +28,21 @@ const ON = {
 /** Every URL posthog-js tried to reach, with the transport it used. */
 const sent: Array<{ via: string; url: string; body: string }> = [];
 
+/** The request body as text: posthog-js gzips event batches. */
 function bodyText(body: unknown): string {
   if (typeof body === "string") return body;
   if (body instanceof Blob) return "[blob]";
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    const bytes =
+      body instanceof ArrayBuffer
+        ? Buffer.from(body)
+        : Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+    try {
+      return gunzipSync(bytes).toString("utf8");
+    } catch {
+      return bytes.toString("utf8");
+    }
+  }
   return body == null ? "" : String(body);
 }
 
@@ -68,7 +81,14 @@ beforeEach(() => {
   });
 });
 
+/** This test's analytics module, opted out afterwards so the next test starts quiet. */
+let current: { optOut: () => void } | null = null;
+
 afterEach(() => {
+  // posthog-js instances outlive vi.resetModules(); a live one from an earlier
+  // test would answer a later test's pagehide with its own $pageleave.
+  current?.optOut();
+  current = null;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   try {
@@ -89,6 +109,7 @@ const pastFlush = () => new Promise((r) => setTimeout(r, 3500));
 async function startedTab() {
   vi.resetModules();
   const mod = await import("../../../apps/web/src/lib/analytics");
+  current = mod;
   await mod.applyInstanceAnalytics(ON);
   // Let the start's own events (the initial pageview) go out first.
   await pastFlush();
@@ -105,10 +126,15 @@ describe("real posthog-js after an analytics opt-out (#2216)", () => {
     expect(eventRequests().length).toBeGreaterThan(0);
   }, 20_000);
 
-  it("never sends an event that was still queued when the opt-out came", async () => {
+  it("holds nothing captured before an opt-out to send after it", async () => {
     const mod = await startedTab();
     mod.track("tool_opened", { tool_id: "resize" });
+    // A send already under way (posthog-js gzips the body asynchronously)
+    // has left; what matters is nothing held back to go later.
+    await new Promise((r) => setTimeout(r, 100));
     await mod.applyInstanceAnalytics({ ...ON, enabled: false });
+    // Only what leaves after the opt-out counts.
+    sent.length = 0;
 
     await pastFlush();
     // Leaving the page flushes whatever is queued by sendBeacon.
@@ -128,6 +154,7 @@ describe("real posthog-js after an analytics opt-out (#2216)", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await mod.applyInstanceAnalytics({ ...ON, enabled: false });
+    sent.length = 0;
     // An SPA navigation makes posthog-js capture a $pageview on its own.
     window.history.pushState({}, "", "/image/resize");
     await pastFlush();
