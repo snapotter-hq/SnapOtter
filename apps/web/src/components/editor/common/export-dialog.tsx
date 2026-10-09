@@ -100,12 +100,13 @@ type ExportFailureReason = NonNullable<EditorExportedProperties["reason"]>;
 // own once the aspect lock is off (#2174): the document is captured at the larger of
 // the two ratios, so neither axis is upsampled, then drawn into the requested size.
 // A capture that already is that size, for a format that keeps transparency, is used
-// as it is.
+// as it is. Null means the browser can't back a canvas that big; a capture or encode
+// that fails on size throws, and classifyCaptureError tells the two kinds apart.
 function renderExportCanvas(
   stage: Konva.Stage,
   canvasSize: { width: number; height: number },
   settings: Pick<ExportSettings, "width" | "height" | "format" | "transparent">,
-): HTMLCanvasElement {
+): HTMLCanvasElement | null {
   const width = Math.max(1, Math.round(settings.width));
   const height = Math.max(1, Math.round(settings.height));
   const captured = captureDocumentCanvas(
@@ -117,18 +118,14 @@ function renderExportCanvas(
   const opaque = !settings.transparent || settings.format === "jpeg";
   if (!opaque && captured.width === width && captured.height === height) return captured;
   // With the lock off the capture can be much bigger than the file. Past the browser's
-  // limit it still comes back, draws nothing, and the file built from it would encode
-  // fine but blank, slipping past the "data:," check (#2140). Fail it the same way.
-  if (!captureHasPixels(captured)) {
-    throw new DOMException("The capture has no pixels behind it", "InvalidStateError");
-  }
+  // limit it still comes back and draws nothing, so the file built from it would encode
+  // fine but blank, slipping past the "data:," check (#2140).
+  if (!captureHasPixels(captured)) return null;
   const out = document.createElement("canvas");
   out.width = width;
   out.height = height;
   const ctx = out.getContext("2d");
-  // Past the browser's canvas limit the context comes back null: the same failure
-  // classifyCaptureError reports for a capture that throws on size.
-  if (!ctx) throw new DOMException("2D context unavailable", "InvalidStateError");
+  if (!ctx) return null;
   if (opaque) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
@@ -221,12 +218,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       if (!stage) return;
       let fullUrl: string;
       try {
-        fullUrl = renderExportCanvas(stage, canvasSize, {
+        const canvas = renderExportCanvas(stage, canvasSize, {
           width: settings.width,
           height: settings.height,
           format: settings.format,
           transparent: settings.transparent,
-        }).toDataURL(previewMime, settings.quality / 100);
+        });
+        fullUrl = canvas ? canvas.toDataURL(previewMime, settings.quality / 100) : "data:,";
       } catch (err) {
         reportPreviewFailure(err);
         setEstimatedSize(null);
@@ -344,6 +342,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     try {
       failure = guardCapture(() => {
         const canvas = renderExportCanvas(stage, canvasSize, settings);
+        if (!canvas) {
+          reportEmptyExport();
+          report("failed", "no-context");
+          return;
+        }
 
         // Formats the Canvas API cannot encode go to the server as PNG.
         if (formatOption?.needsServerConvert) {
@@ -423,12 +426,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
     let dataUrl = "";
     const failure = guardCapture(() => {
-      dataUrl = renderExportCanvas(stage, canvasSize, {
+      const canvas = renderExportCanvas(stage, canvasSize, {
         width: settings.width,
         height: settings.height,
         format: "png",
         transparent: true,
-      }).toDataURL("image/png");
+      });
+      dataUrl = canvas ? canvas.toDataURL("image/png") : "data:,";
     });
     if (failure || dataUrl === "data:,") {
       // An over-limit canvas copies as an empty image while the button says copied.
