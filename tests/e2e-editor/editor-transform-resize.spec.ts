@@ -1,4 +1,78 @@
-import { createNewDocument, expect, selectTool, test } from "./helpers";
+import type { Page } from "@playwright/test";
+import { createNewDocument, expect, loadTestImage, selectTool, test } from "./helpers";
+
+type StageView = {
+  Konva?: {
+    stages: Array<{
+      find(selector: string): Array<{
+        id(): string;
+        image(): CanvasImageSource | undefined;
+        width(): number;
+        height(): number;
+      }>;
+    }>;
+  };
+};
+
+// One pixel of the source image's own bitmap, drawn at the size the editor shows it.
+// The source node is the one Konva Image without a store id. Answers null until the
+// node has a bitmap, so callers poll: the store swaps the image in after it commits.
+function readSourcePixel(page: Page, x: number, y: number): Promise<number[] | null> {
+  return page.evaluate(
+    ({ x, y }) => {
+      const stage = (window as unknown as StageView).Konva?.stages[0];
+      const node = stage?.find("Image").find((n) => !n.id() && n.image());
+      const source = node?.image();
+      if (!node || !source) return null;
+      const scratch = document.createElement("canvas");
+      scratch.width = node.width();
+      scratch.height = node.height();
+      const ctx = scratch.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(source, 0, 0, node.width(), node.height());
+      return Array.from(ctx.getImageData(x, y, 1, 1).data);
+    },
+    { x, y },
+  );
+}
+
+// The unit tests stand a fake canvas in for jsdom. This is the real-browser check that
+// the fill lands under the image and nowhere else, and that the hex field only ever
+// commits a color the picker can hold (#2068). The fixture is a flat rgb(255,100,50)
+// 200x150 image; grown to 400x150 centered it sits at x 100..299.
+test.describe("Canvas Size background color in a real browser (#2068)", () => {
+  test("growing the canvas paints the color into the added room only", async ({
+    editorPage: page,
+  }) => {
+    await loadTestImage(page);
+    const dims = page.locator('[data-testid="status-dimensions"]');
+    await expect(dims).toHaveText(/^200 x 150 px$/, { timeout: 15_000 });
+
+    await page.click('[data-testid="menu-image"]');
+    await page.click('[data-testid="menu-item-canvas-size"]');
+    await expect(page.locator("#canvas-w")).toBeVisible();
+
+    const hex = page.getByTestId("canvas-fill-hex");
+    await hex.fill("112233");
+    await expect(page.locator("#canvas-fill")).toHaveValue("#112233");
+    await hex.fill("red");
+    await hex.blur();
+    await expect(hex).toHaveValue("#112233");
+
+    await page.locator("#canvas-w").fill("400");
+    await page.locator("button").filter({ hasText: "Apply" }).click();
+    await expect(dims).toHaveText(/^400 x 150 px$/);
+    await expect(page.locator("#canvas-w")).toHaveCount(0);
+    await expect(page.getByText("Something went wrong")).toHaveCount(0);
+
+    await expect
+      .poll(() => readSourcePixel(page, 10, 75), { timeout: 15_000 })
+      .toEqual([17, 34, 51, 255]);
+    expect(await readSourcePixel(page, 389, 75)).toEqual([17, 34, 51, 255]);
+    expect(await readSourcePixel(page, 150, 75)).toEqual([255, 100, 50, 255]);
+    expect(await readSourcePixel(page, 299, 75)).toEqual([255, 100, 50, 255]);
+  });
+});
 
 test.describe("Editor Transform and Resize", () => {
   test.beforeEach(async ({ editorPage: page }) => {

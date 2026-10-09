@@ -33,6 +33,15 @@ export function hexToRgba(hex: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
+// The one form an <input type="color"> can hold, so the only fill the store paints.
+// Everything else is refused up front rather than handed to the canvas, which paints
+// black for a fillStyle it can't parse and says nothing.
+export function isHexColor(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value);
+}
+
+const INVALID_FILL_MESSAGE = "Canvas background must be a #rrggbb color";
+
 export function dashStyleToArray(
   style: StrokeDashStyle,
   strokeWidth: number,
@@ -170,7 +179,9 @@ function rebakeSourceRaster(
 
 // Rebake the source bitmap onto a canvas of a different size. The image keeps its
 // current drawn size (`width` x `height`) and lands at (offsetX, offsetY), so growing
-// the canvas adds transparent room and shrinking it crops, never scales.
+// the canvas adds room and shrinking it crops, never scales. The added room takes
+// `fill` when one is given and stays transparent otherwise; the image's own rectangle
+// is cleared first, so its transparency survives either way (#2068).
 function rebakeSourceIntoCanvas(
   url: string,
   width: number,
@@ -179,10 +190,21 @@ function rebakeSourceIntoCanvas(
   newHeight: number,
   offsetX: number,
   offsetY: number,
+  fill?: string,
 ): Promise<string> {
-  return renderSourceBitmap(url, newWidth, newHeight, (ctx, img) =>
-    ctx.drawImage(img, offsetX, offsetY, width, height),
-  );
+  // Checked again where the fillStyle assignment lives, so the next caller gets the
+  // same refusal instead of a black room.
+  if (fill !== undefined && !isHexColor(fill)) {
+    return Promise.reject(new Error(INVALID_FILL_MESSAGE));
+  }
+  return renderSourceBitmap(url, newWidth, newHeight, (ctx, img) => {
+    if (fill) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, newWidth, newHeight);
+      ctx.clearRect(offsetX, offsetY, width, height);
+    }
+    ctx.drawImage(img, offsetX, offsetY, width, height);
+  });
 }
 
 // Rebake the source bitmap down to the crop rectangle. The crop is in canvas
@@ -251,7 +273,6 @@ function rebakeThenSetSource(
 
 // Extended store state with additional fields/methods not yet in the shared interface
 interface EditorStateExtensions {
-  canvasBackground: string;
   commitHistory: (action: HistoryAction) => void;
   batchNudge: (objectIds: string[], dx: number, dy: number) => void;
   updateLayerThumbnail: (layerId: string, thumbnailDataUrl: string) => void;
@@ -361,9 +382,6 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       zoom: 1,
       panOffset: { x: 0, y: 0 },
       cursorPosition: { x: 0, y: 0 },
-
-      // --- Canvas background (used when canvas is resized larger) ---
-      canvasBackground: "#ffffff",
 
       // --- Image ---
       sourceImageUrl: null,
@@ -551,8 +569,14 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         });
       },
 
-      resizeCanvas: (width, height, anchor, fill) =>
-        enqueueRebake(async () => {
+      resizeCanvas: (width, height, anchor, fill) => {
+        // Refuse anything but #rrggbb before the job is queued or anything decodes: it
+        // is the one form the picker can hold, and an unparseable fillStyle would paint
+        // the added room black with no error anywhere.
+        if (fill !== undefined && !isHexColor(fill)) {
+          return Promise.reject(new Error(INVALID_FILL_MESSAGE));
+        }
+        return enqueueRebake(async () => {
           const { canvasSize, sourceImageUrl } = get();
           const dw = width - canvasSize.width;
           const dh = height - canvasSize.height;
@@ -588,6 +612,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
               height,
               offsetX,
               offsetY,
+              fill,
             );
             // The user loaded, rotated or resized something else while this decoded.
             if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
@@ -598,7 +623,6 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             canvasSize: { width, height },
             sourceImageSize: { width, height },
             ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-            ...(fill ? { canvasBackground: fill } : {}),
             objects:
               offsetX !== 0 || offsetY !== 0
                 ? objects.map((obj) => {
@@ -625,7 +649,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             lastAction: { id: "resizeCanvas" },
             _historyVersion: get()._historyVersion + 1,
           });
-        }),
+        });
+      },
 
       resizeImage: (width, height, resample) => {
         void resample; // accepted for future server-side resize; client-side scales objects only

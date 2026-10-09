@@ -454,6 +454,8 @@ export interface EditorState {
   setZoom: (zoom: number) => void;
   setPanOffset: (offset: { x: number; y: number }) => void;
   loadImage: (url: string, width: number, height: number) => void;
+  // `fill` is a #rrggbb color painted into the added room when the canvas grows;
+  // omitted, the room stays transparent. Anything else is refused.
   resizeCanvas: (
     width: number,
     height: number,

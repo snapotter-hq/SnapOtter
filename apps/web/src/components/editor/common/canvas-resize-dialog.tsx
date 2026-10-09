@@ -1,10 +1,12 @@
+import { SafeError } from "@snapotter/shared";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useEditorStore } from "@/stores/editor-store";
+import { isHexColor, useEditorStore } from "@/stores/editor-store";
 import type { AnchorPosition } from "@/types/editor";
 
 // ---------------------------------------------------------------------------
@@ -38,15 +40,32 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   const [width, setWidth] = useState(canvasSize.width);
   const [height, setHeight] = useState(canvasSize.height);
   const [anchor, setAnchor] = useState<AnchorPosition>("center");
+  // `fill` is always a #rrggbb color, the one form the picker can hold and the store
+  // will paint. `draft` is the text box while it is being edited: a valid entry
+  // commits as it is typed, and blur, a pick or a reopen drops the draft so the box
+  // shows the committed color again, as in the color panel's hex field (#2068).
   const [fill, setFill] = useState("#ffffff");
+  const [draft, setDraft] = useState<string | null>(null);
   // Resizes queue behind each other now, so a second click would commit a second,
   // identical resize (and another full-size bitmap in undo history).
   const [applying, setApplying] = useState(false);
+
+  const handleFillPick = (value: string) => {
+    setFill(value);
+    setDraft(null);
+  };
+
+  const handleFillTextChange = (raw: string) => {
+    setDraft(raw);
+    const candidate = raw.startsWith("#") ? raw : `#${raw}`;
+    if (isHexColor(candidate)) setFill(candidate.toLowerCase());
+  };
 
   useEffect(() => {
     if (open) {
       setWidth(canvasSize.width);
       setHeight(canvasSize.height);
+      setDraft(null);
     }
   }, [open, canvasSize]);
 
@@ -55,7 +74,14 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
     try {
       await resizeCanvas(width, height, anchor, fill);
       onClose();
-    } catch {
+    } catch (err) {
+      // A refused color or a rebake that failed. A toast alone leaves nothing to debug
+      // from, so log and report it the way runEditorAction does for rotate and flip.
+      console.error("Canvas resize failed", err);
+      void captureHandledError(
+        new SafeError("Editor could not resize the canvas", { kind: "operational", cause: err }),
+        { error_class: "operational" },
+      );
       toast.error(t.common.somethingWentWrong);
     } finally {
       setApplying(false);
@@ -175,13 +201,18 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
               id="canvas-fill"
               type="color"
               value={fill}
-              onChange={(e) => setFill(e.target.value)}
+              onChange={(e) => handleFillPick(e.target.value)}
               className="h-7 w-7 cursor-pointer rounded border border-border"
             />
             <input
               type="text"
-              value={fill}
-              onChange={(e) => setFill(e.target.value)}
+              value={draft ?? fill}
+              onChange={(e) => handleFillTextChange(e.target.value)}
+              onBlur={() => setDraft(null)}
+              maxLength={7}
+              spellCheck={false}
+              aria-label={t.a11y.hexColorValue}
+              data-testid="canvas-fill-hex"
               className={cn(
                 "h-7 w-20 rounded border border-border bg-card px-1.5 text-xs text-foreground",
                 "focus:border-ring focus:outline-none",

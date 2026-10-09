@@ -104,7 +104,6 @@ describe("editor store branch helpers", () => {
 
     state().resizeCanvas(2000, 1100, "bottom-right", "#abcdef");
 
-    expect(state().canvasBackground).toBe("#abcdef");
     expect(state().objects[0].attrs).toMatchObject({ x: 90, y: 40 });
     expect((state().objects[1].attrs as { points: number[] }).points).toEqual([80, 20, 90, 30]);
   });
