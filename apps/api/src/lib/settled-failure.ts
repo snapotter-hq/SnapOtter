@@ -33,8 +33,9 @@ export interface SettledFailureResponse {
  * rejection it already holds instead of replacing it with a database error.
  *
  * A row still in flight is read again for a short while. A finalize that died
- * by stall or crash is settled only by the worker's failed handler, which
- * doesn't await its write, so its rejection can reach the route first (#2209).
+ * by stall (or crashed on another replica) is settled only by the worker's
+ * failed handler, which doesn't await its write, so its rejection can reach
+ * the route first (#2209).
  * The wait is bounded so a rejection with no reason behind it still rethrows
  * promptly.
  */

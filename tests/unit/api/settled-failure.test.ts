@@ -79,7 +79,8 @@ describe("settledFailureResponse (#2180)", () => {
     const started = Date.now();
 
     expect(await settledFailureResponse("parent", log)).toBeNull();
-    expect(state.reads).toBeGreaterThan(1);
+    // The first read, then one per retry.
+    expect(state.reads).toBe(11);
     expect(Date.now() - started).toBeLessThan(2_000);
   });
 
