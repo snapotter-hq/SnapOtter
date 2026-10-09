@@ -1383,6 +1383,47 @@ describe("Admin user-management guards", () => {
     });
   });
 
+  // A lone UTF-16 surrogate can't be encoded: Node's UTF-8 turns each one into
+  // U+FFFD before scrypt sees it, so "\uD800" x8 and "\uFFFD" x8 hashed alike and
+  // every string of lone surrogates of that length logged in (#2170). Only an API
+  // client can send one; a browser form can't produce it.
+  it.each([
+    ["a lone high surrogate", "Abcdefg1\uD800"],
+    ["a lone low surrogate", "Abcdefg1\uDC00"],
+    ["a high surrogate followed by a letter", "Abcdefg1\uD800x"],
+  ])("change-password refuses %s and names the rule (#2170)", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must not contain invalid characters",
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    });
+  });
+
+  it("register refuses a lone surrogate in the password (#2170)", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `sur_${Date.now()}`, password: "Abcdefg1\uD800" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    });
+  });
+
+  it("still accepts a surrogate pair, which is a real character (#2170)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "Abcdefg1\u{1F600}");
+
+    expect(res.statusCode, res.body).toBe(200);
+  });
+
   it("lets a user sign in with the non-Latin password they just set", async () => {
     const { username, password } = await createUser();
     const token = await loginAs(username, password);
