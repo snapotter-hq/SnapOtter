@@ -78,6 +78,14 @@ function mfaFailureMessage(
   return { message: t.auth.mfaInvalidCode, clearCode: true, restart: false };
 }
 
+/**
+ * A code the server could accept: a 6-digit TOTP or an 8-character hex
+ * recovery code. Anything else is a certain INVALID_CODE that would still
+ * burn one of the challenge's few attempts, so Verify stays disabled (#2050).
+ */
+const MFA_CODE_SHAPE = /^(\d{6}|[0-9a-f]{8})$/;
+const RECOVERY_CODE_SHAPE = /^[0-9a-f]{8}$/;
+
 function QrCode({ uri }: { uri: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -239,6 +247,8 @@ export function LoginPage() {
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
   const [mfaToken, setMfaToken] = useState("");
   const [mfaCode, setMfaCode] = useState("");
+  // A recovery code the server just refused stays on screen; Verify waits for an edit.
+  const [rejectedMfaCode, setRejectedMfaCode] = useState("");
   const [mfaLoading, setMfaLoading] = useState(false);
   const mfaInputRef = useRef<HTMLInputElement>(null);
   const [showMfaEnrollment, setShowMfaEnrollment] = useState(false);
@@ -384,6 +394,8 @@ export function LoginPage() {
     later(() => document.getElementById("username")?.focus(), 100);
   };
 
+  const mfaCodeReady = MFA_CODE_SHAPE.test(mfaCode) && mfaCode !== rejectedMfaCode;
+
   const handleMfaComplete = async () => {
     setMfaLoading(true);
     setError("");
@@ -407,7 +419,10 @@ export function LoginPage() {
           return;
         }
         setError(message);
-        if (clearCode) setMfaCode("");
+        // A TOTP rotates, so clear it; a recovery code doesn't, and the user
+        // needs to see what they typed to spot the character they got wrong.
+        if (clearCode && !RECOVERY_CODE_SHAPE.test(mfaCode)) setMfaCode("");
+        else if (clearCode) setRejectedMfaCode(mfaCode);
         return;
       }
       const data = await res.json();
@@ -645,15 +660,26 @@ export function LoginPage() {
               <input
                 ref={mfaInputRef}
                 type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={8}
+                // Room for a pasted code with a separator or a stray space: the
+                // browser cuts to maxLength before onChange runs, so 8 would lose
+                // the tail of "A3F9-C01B" (#2050). The server's limit is 20.
+                maxLength={20}
                 autoComplete="one-time-code"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 placeholder="000000"
                 value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, ""))}
+                aria-invalid={/[^0-9a-f]/.test(mfaCode) || undefined}
+                // A TOTP is 6 digits; a recovery code is 8 lowercase hex characters,
+                // so the keyboard can't be numeric. Separators and capitals are
+                // forgiven; a character that can't be in a code stays visible so a
+                // typo isn't silently dropped.
+                onChange={(e) => setMfaCode(e.target.value.toLowerCase().replace(/[\s-]/g, ""))}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !mfaLoading && mfaCode.length >= 6) handleMfaComplete();
+                  if (e.key === "Enter" && !mfaLoading && mfaCodeReady) {
+                    handleMfaComplete();
+                  }
                 }}
                 className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -661,7 +687,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={handleMfaComplete}
-                disabled={mfaLoading || mfaCode.length < 6}
+                disabled={mfaLoading || !mfaCodeReady}
                 className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {mfaLoading ? t.auth.verifying : t.auth.verify}

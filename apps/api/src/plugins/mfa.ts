@@ -52,8 +52,17 @@ const disableSchema = z.object({
 
 // ── Recovery code helpers ─────────────────────────────────────────
 
+/**
+ * What a person types for a TOTP or recovery code, reduced to what is stored:
+ * lowercase, no spaces or dashes. Used on both sides of the hash so a code
+ * copied down as "A3F9-C01B" matches the stored "a3f9c01b" (#2050).
+ */
+export function normalizeMfaCode(code: string): string {
+  return code.toLowerCase().replace(/[\s-]/g, "");
+}
+
 export function hashRecoveryCodes(codes: string[]): string {
-  return codes.map((c) => createHash("sha256").update(c).digest("hex")).join(",");
+  return codes.map((c) => createHash("sha256").update(normalizeMfaCode(c)).digest("hex")).join(",");
 }
 
 export function verifyRecoveryCode(
@@ -61,7 +70,7 @@ export function verifyRecoveryCode(
   hashList: string,
 ): { valid: boolean; remaining: string } {
   const hashes = hashList.split(",");
-  const codeHash = createHash("sha256").update(code).digest("hex");
+  const codeHash = createHash("sha256").update(normalizeMfaCode(code)).digest("hex");
   const idx = hashes.indexOf(codeHash);
   if (idx === -1) return { valid: false, remaining: hashList };
   hashes.splice(idx, 1);
@@ -402,7 +411,17 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { mfaToken, code } = parsed.data;
+      const { mfaToken } = parsed.data;
+      // One normalization for both kinds of code, so "123 456" and "A3F9-C01B"
+      // behave the same as what the form sends. A code that is empty once
+      // cleaned up can't be valid, so it is refused without costing an attempt.
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "MFA token and code are required",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       // Look up the pending MFA challenge in Redis
       const redis = sharedRedis();

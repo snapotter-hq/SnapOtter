@@ -725,6 +725,79 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
     expect(remaining).toHaveLength(recoveryCodes.length - 1);
   });
 
+  it("accepts a recovery code typed in capitals with a dash (#2050)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri, recoveryCodes } = JSON.parse(enrollRes.body);
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode(uri) },
+    });
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const stored: string = recoveryCodes[0];
+    const typed = `${stored.slice(0, 4)}-${stored.slice(4)}`.toUpperCase();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: typed },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).token).toBeDefined();
+  });
+
+  it("accepts a TOTP typed with a space, and refuses an empty code without costing an attempt (#2050)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode(uri) },
+    });
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    // Whitespace and dashes only: nothing left to check, so a 400, not a 401.
+    // More than the 5 failed attempts that would burn the challenge.
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+    }
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: `${code.slice(0, 3)} ${code.slice(3)}` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
   it("burns the last remaining recovery code to an empty stored list", async () => {
     // Enroll a fresh user, then overwrite its stored recovery hash with a
     // single known code so the consume path collapses to the empty-string

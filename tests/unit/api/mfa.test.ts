@@ -120,6 +120,21 @@ describe("MFA", () => {
       expect(result.valid).toBe(true);
     });
 
+    it("accepts a recovery code typed in capitals or with separators (#2050)", () => {
+      const hashList = hashRecoveryCodes(["a3f9c01b", "bbbb2222"]);
+
+      for (const typed of ["A3F9C01B", "a3f9-c01b", " A3F9 C01B ", "A3F9-c01B"]) {
+        expect(verifyRecoveryCode(typed, hashList).valid, typed).toBe(true);
+      }
+    });
+
+    it("still rejects a code that differs after normalizing", () => {
+      const hashList = hashRecoveryCodes(["a3f9c01b"]);
+
+      expect(verifyRecoveryCode("a3f9c01c", hashList).valid).toBe(false);
+      expect(verifyRecoveryCode("A3F9-C01", hashList).valid).toBe(false);
+    });
+
     it("rejects an invalid recovery code", () => {
       const codes = ["aaaa1111", "bbbb2222"];
       const hashList = hashRecoveryCodes(codes);
