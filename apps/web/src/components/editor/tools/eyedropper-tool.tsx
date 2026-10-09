@@ -10,45 +10,7 @@ import {
   type DocumentContext,
   reportCaptureFailure,
 } from "../stage-capture";
-
-/**
- * Sample a single pixel or averaged region from a canvas context at (x, y).
- * Returns hex color string.
- */
-function samplePixelColor(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  sampleSize: SampleSize,
-): string {
-  const half = Math.floor(sampleSize / 2);
-  const startX = x - half;
-  const startY = y - half;
-
-  const imageData = ctx.getImageData(startX, startY, sampleSize, sampleSize);
-  const data = imageData.data;
-  const pixelCount = sampleSize * sampleSize;
-
-  let rSum = 0;
-  let gSum = 0;
-  let bSum = 0;
-
-  for (let i = 0; i < pixelCount; i++) {
-    rSum += data[i * 4];
-    gSum += data[i * 4 + 1];
-    bSum += data[i * 4 + 2];
-  }
-
-  const r = Math.round(rSum / pixelCount);
-  const g = Math.round(gSum / pixelCount);
-  const b = Math.round(bSum / pixelCount);
-
-  return rgbToHex(r, g, b);
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
-}
+import { samplePixelColor } from "./eyedropper-sample";
 
 interface UseEyedropperToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>;
