@@ -42,7 +42,7 @@
         }
       },
       "packages": {
-        "common": ["rembg==2.0.62"],
+        "common": ["rembg==2.0.69"],
         "amd64": ["onnxruntime-gpu==1.20.2", "mediapipe>=0.10.21"],
         "arm64": ["onnxruntime==1.20.1", "mediapipe>=0.10.18"]
       },
