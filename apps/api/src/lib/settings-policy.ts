@@ -238,6 +238,17 @@ export async function validateSettingsRuntimeConstraints(
     };
   }
 
+  // The login route only enforces SSO when the feature is licensed, so saving
+  // the setting without it would report "saved" and change nothing (#2298).
+  if (enforcesSso && !(await isEnterpriseFeatureEnabled("sso_enforcement"))) {
+    return {
+      success: false,
+      statusCode: 403,
+      error: "SSO enforcement requires an enterprise license",
+      code: "FEATURE_NOT_LICENSED",
+    };
+  }
+
   return { success: true };
 }
 
