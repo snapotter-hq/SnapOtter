@@ -18,6 +18,8 @@ const MockPostHog = vi.hoisted(() =>
   })),
 );
 
+const mockLogWarn = vi.hoisted(() => vi.fn());
+
 const mockSentryCapture = vi.hoisted(() => vi.fn());
 const mockSentryClose = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockSentryInit = vi.hoisted(() => vi.fn());
@@ -56,6 +58,10 @@ vi.mock("drizzle-orm", () => ({
   eq: () => "mocked-eq",
 }));
 
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: { warn: mockLogWarn, info: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 vi.mock("posthog-node", () => ({
   PostHog: MockPostHog,
 }));
@@ -85,6 +91,7 @@ beforeEach(async () => {
   mockSentryClose.mockClear();
   mockSentryInit.mockClear();
   mockSentryWithScope.mockClear();
+  mockLogWarn.mockClear();
 
   vi.resetModules();
   mod = await import("../../../apps/api/src/lib/analytics.js");
@@ -115,6 +122,33 @@ describe("initAnalytics", () => {
       flushAt: 20,
       flushInterval: 30000,
     });
+  });
+
+  it("says so in the log when PostHog fails to start, and still doesn't throw (#2221)", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    const failure = new Error("posthog constructor blew up");
+    MockPostHog.mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    await expect(mod.initAnalytics()).resolves.toBeUndefined();
+
+    expect(mockLogWarn).toHaveBeenCalledOnce();
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: failure }),
+      expect.stringContaining("PostHog"),
+    );
+    // No client, so feedback is declined rather than silently dropped (#2198).
+    expect(mod.hasFeedbackSink()).toBe(false);
+  });
+
+  it("logs nothing when PostHog starts", async () => {
+    bakedConfig.enabled = true;
+    bakedConfig.posthogApiKey = "phc_test_key";
+    await mod.initAnalytics();
+
+    expect(mockLogWarn).not.toHaveBeenCalled();
   });
 
   it("does not initialize sentry (moved to preload)", async () => {
