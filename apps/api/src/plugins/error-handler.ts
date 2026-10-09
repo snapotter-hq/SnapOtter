@@ -2,6 +2,7 @@ import { isSafeMessageError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { reportError } from "../lib/error-report.js";
 import { stripInternalPaths } from "../lib/errors.js";
+import { multipartFailure } from "../lib/multipart-parts.js";
 
 /**
  * Renders every error that escapes a route. A 4xx keeps its message; a 5xx is
@@ -32,6 +33,16 @@ export function registerErrorHandler(app: FastifyInstance): void {
       });
     } else {
       request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
+    }
+    // An over-limit file whose error escaped a route's multipart read (the
+    // library upload, save and preview routes let it) answers the way routes
+    // that catch it do: 413 naming the limit, instead of busboy's "request
+    // file too large" (#2225). Only that one error; the storage quota's 413
+    // carries its own message and code.
+    if (statusCode === 413 && (error as { code?: unknown }).code === "FST_REQ_FILE_TOO_LARGE") {
+      const failure = multipartFailure(error);
+      reply.status(failure.status).send(failure.body);
+      return;
     }
     const safe = isSafeMessageError(error) && error.statusCode !== undefined;
     reply.status(statusCode).send({
