@@ -1912,6 +1912,8 @@ export const ptBR: TranslationKeys = {
       effectsProcessingFailed: "Falha no processamento dos efeitos",
       effectsExpired:
         "A remoção de fundo anterior expirou, então está sendo executada de novo. Aplique os efeitos quando terminar.",
+      refineChanged:
+        "A suavização de bordas e a descontaminação de cor são aplicadas quando o fundo é removido. Execute novamente para usar as novas configurações.",
     },
     "remove-gif-background": {
       quality: "Qualidade",

@@ -1908,6 +1908,8 @@ export const vi: TranslationKeys = {
       effectsProcessingFailed: "Xử lý hiệu ứng thất bại",
       effectsExpired:
         "Lần xóa nền trước đã hết hạn nên đang được chạy lại. Hãy áp dụng hiệu ứng khi xong.",
+      refineChanged:
+        "Làm mịn viền và khử nhiễm màu được áp dụng khi xóa nền. Hãy chạy lại để dùng các cài đặt mới.",
     },
     "remove-gif-background": {
       quality: "Chất lượng",

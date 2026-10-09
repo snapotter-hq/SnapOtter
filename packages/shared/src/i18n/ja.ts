@@ -1865,6 +1865,8 @@ export const ja: TranslationKeys = {
       effectsProcessingFailed: "エフェクトの処理に失敗しました",
       effectsExpired:
         "以前の背景除去の有効期限が切れたため、再実行しています。完了したらエフェクトを適用してください。",
+      refineChanged:
+        "エッジの平滑化と色の汚染除去は、背景を削除するときに適用されます。新しい設定を使うには、もう一度実行してください。",
     },
     "remove-gif-background": {
       quality: "品質",

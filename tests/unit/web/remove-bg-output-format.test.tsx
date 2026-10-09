@@ -97,6 +97,105 @@ describe("remove-background Phase 1 request (#2077)", () => {
   });
 });
 
+// Edge smoothing and decontamination are sidecar options: only a new removal can
+// apply them. Changing them after a result leaves the download as it was, so the
+// panel says so and offers to run again (#2112).
+describe("remove-background refinements changed after the first run (#2112)", () => {
+  const stale = () => screen.queryByTestId("remove-background-refine-stale");
+
+  /** Runs the removal with the defaults and lands its result. */
+  async function runAndLand(view: ReturnType<typeof render>) {
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+  }
+
+  async function openEffects() {
+    fireEvent.click(await screen.findByText(en.toolSettings["remove-bg"].effects));
+  }
+
+  it("says nothing while the settings still match the run", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("offers to run again once edge smoothing changes", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+  });
+
+  it("offers to run again once decontamination changes, and stops when it is changed back", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    expect(stale()).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("runs the removal again with the new values", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(2));
+    const [, settings, options] = deployment.processFiles.mock.calls[1];
+    expect(settings).toMatchObject({ edgeRefine: 2, decontaminate: true });
+    expect(options).toEqual({ skipLibrarySave: true });
+  });
+
+  it("still offers to run again for a result restored after a remount", async () => {
+    // The mobile settings sheet unmounts the panel while the result stays loaded;
+    // the run's own values are gone, so the defaults are assumed and any
+    // refinement set afterwards counts as a change.
+    const first = render(<RemoveBgSettings />);
+    await runAndLand(first);
+    first.unmount();
+
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "1" },
+    });
+
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("does not react to settings Phase 2 can apply itself", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+    await openEffects();
+
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+
+    expect(stale()).not.toBeInTheDocument();
+  });
+});
+
 describe("remove-background output format routing (#720)", () => {
   it("uses the plain (Phase 1) download for the default PNG output", async () => {
     render(<RemoveBgSettings />);

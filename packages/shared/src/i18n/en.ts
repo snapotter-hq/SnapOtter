@@ -1854,6 +1854,8 @@ export const en = {
       effectsProcessingFailed: "Effects processing failed",
       effectsExpired:
         "The earlier background removal expired, so it is being run again. Apply the effects once it's done.",
+      refineChanged:
+        "Edge smoothing and color decontamination are applied when the background is removed. Run it again to use the new settings.",
     },
     "remove-gif-background": {
       quality: "Quality",
