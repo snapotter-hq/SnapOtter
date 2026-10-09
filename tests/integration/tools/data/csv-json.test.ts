@@ -127,6 +127,31 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(JSON.parse(dl.payload)).toEqual([{ email: "a@x.io" }, { email: "b@x.io" }]);
   }, 30_000);
 
+  it("keeps a column headed __proto__ in CSV-to-JSON (#2096)", async () => {
+    const res = await runTool("proto.csv", Buffer.from("__proto__,x\r\n5,1"));
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    // Parsed JSON would hide it behind the prototype setter, so compare the text.
+    expect(dl.payload.replace(/\s/g, "")).toBe('[{"__proto__":"5","x":"1"}]');
+  }, 30_000);
+
+  it("round-trips a __proto__ column through JSON-to-CSV and back (#2096)", async () => {
+    const toCsv = await runTool("proto.json", Buffer.from('[{"__proto__": 5, "x": 1}]'));
+    const csv = (
+      await testApp.app.inject({ method: "GET", url: JSON.parse(toCsv.body).downloadUrl })
+    ).payload;
+    expect(csv).toBe("__proto__,x\r\n5,1");
+
+    const back = await runTool("proto.csv", Buffer.from(csv));
+    const json = (
+      await testApp.app.inject({ method: "GET", url: JSON.parse(back.body).downloadUrl })
+    ).payload;
+    expect(json.replace(/\s/g, "")).toBe('[{"__proto__":"5","x":"1"}]');
+  }, 30_000);
+
   it("refuses a CSV with no rows (#2099)", async () => {
     const res = await runTool("blank.csv", Buffer.from("\r\n\r\n"));
     expect(res.statusCode).toBe(400);
