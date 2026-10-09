@@ -279,8 +279,12 @@ test.describe("@mobile Small phones keep the settings controls tappable", () => 
       await expectControlsTappable(page);
       const preview = await page.getByTestId("qr-preview").boundingBox();
       expect((preview?.y ?? -1) + 1).toBeGreaterThanOrEqual(await headerBottom(page));
-      // Nothing is cut off sideways: the code fits the 360px width.
-      expect((preview?.x ?? -1) + (preview?.width ?? Infinity)).toBeLessThanOrEqual(360);
+      // Nothing is cut off sideways: the code fits its scroll box without scrolling.
+      const overflowX = await page.getByTestId("qr-preview").evaluate((el) => {
+        const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+        return scroller ? scroller.scrollWidth - scroller.clientWidth : -1;
+      });
+      expect(overflowX).toBe(0);
     });
   });
 

@@ -748,13 +748,20 @@ export function ToolPage() {
             <Suspense
               fallback={<div className="text-sm text-muted-foreground">{t.common.loading}</div>}
             >
-              <WaveformPlayer
-                src={audioSrc}
-                // audioSrc falls back to the original, and only a result claims.
-                onDownload={playerDownloadClaim(processedUrl, () =>
-                  useFileStore.getState().claimSelected(),
-                )}
-              />
+              {/* Scrolls inside the image area when the player doesn't fit (a phone
+                  in landscape), centred only while it does, so its play button
+                  never ends up under the z-20 bars (#2192). */}
+              <div className="flex min-h-0 max-h-full w-full overflow-auto">
+                <div className="m-auto w-full">
+                  <WaveformPlayer
+                    src={audioSrc}
+                    // audioSrc falls back to the original, and only a result claims.
+                    onDownload={playerDownloadClaim(processedUrl, () =>
+                      useFileStore.getState().claimSelected(),
+                    )}
+                  />
+                </div>
+              </div>
             </Suspense>
           );
         }
@@ -1370,7 +1377,9 @@ export function ToolPage() {
           {/* Main area: image viewer (full height) */}
           <section
             aria-label={t.a11y.imageArea}
-            className="flex-1 flex flex-col min-h-0 min-w-0"
+            // An inset focus ring: the default outline is drawn outside the section,
+            // under the z-20 header and peek bar and the clipped sides (#2192).
+            className="flex-1 flex flex-col min-h-0 min-w-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
             onKeyDown={hasBatchUi ? handleImageKeyDown : undefined}
             tabIndex={hasBatchUi ? 0 : undefined}
           >
