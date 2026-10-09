@@ -8,7 +8,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from "@snapotter/shared";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
@@ -19,6 +19,7 @@ import { auditFromRequest, sanitizeAuditInput } from "../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { isHttpsUrl } from "../lib/env.js";
 import { reportError } from "../lib/error-report.js";
+import { assertNotLastAdmin, LastAdminError } from "../lib/last-admin.js";
 import {
   checkLoginThrottle,
   clearLoginFailures,
@@ -1300,20 +1301,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             });
           }
 
-          // Last admin protection
-          if (user.role === "admin" && body.role !== "admin") {
-            const [adminCount] = await db
-              .select({ count: sql<number>`COUNT(*)` })
-              .from(schema.users)
-              .where(eq(schema.users.role, "admin"));
-            if (adminCount && adminCount.count <= 1) {
-              return reply.status(400).send({
-                error: "Cannot demote the last admin",
-                code: "LAST_ADMIN",
-              });
-            }
-          }
-
           updates.role = body.role;
         }
       }
@@ -1338,13 +1325,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // the new role in place while the old sessions keep the old permissions
       // (#2126).
       const roleChanged = Boolean(updates.role && updates.role !== user.role);
-      await db.transaction(async (tx) => {
-        await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
-        // Invalidate all sessions when role changes to force re-login with new permissions
-        if (roleChanged) {
-          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      try {
+        await db.transaction(async (tx) => {
+          // Last admin protection, under the lock every admin removal shares (#2231).
+          if (updates.role && updates.role !== "admin") await assertNotLastAdmin(tx, id);
+          await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
+          // Invalidate all sessions when role changes to force re-login with new permissions
+          if (roleChanged) {
+            await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+          }
+        });
+      } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply.status(400).send({
+            error: "Cannot demote the last admin",
+            code: "LAST_ADMIN",
+          });
         }
-      });
+        throw err;
+      }
       if (roleChanged) {
         request.log.info(
           { targetUserId: id, oldRole: user.role, newRole: updates.role },
@@ -1459,24 +1458,41 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // The FK cascade below drops the user's user_files rows but not what they
-      // point at, so clear the stored files, thumbnails, and previews first (#1405).
       // Loaded here rather than at the top: it reaches the preview route and the
       // logger, which the auth plugin otherwise has no need to pull in.
       const { deleteLibraryFileStorage } = await import("../lib/library-cleanup.js");
-      const libraryFiles = await db
-        .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
-        .from(schema.userFiles)
-        .where(eq(schema.userFiles.userId, id));
-      for (const file of libraryFiles) {
-        await deleteLibraryFileStorage(file);
+      try {
+        await db.transaction(async (tx) => {
+          // Last admin protection, under the lock every admin removal shares:
+          // two admins deleting each other each saw the other still there (#2231).
+          // It runs before the storage cleanup, so a refused delete keeps the files.
+          await assertNotLastAdmin(tx, id);
+
+          // The FK cascade below drops the user's user_files rows but not what they
+          // point at, so clear the stored files, thumbnails, and previews first (#1405).
+          const libraryFiles = await tx
+            .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
+            .from(schema.userFiles)
+            .where(eq(schema.userFiles.userId, id));
+          for (const file of libraryFiles) {
+            await deleteLibraryFileStorage(file);
+          }
+
+          // Delete associated sessions
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+
+          // Delete the user (cascades to api_keys and user_files via FK)
+          await tx.delete(schema.users).where(eq(schema.users.id, id));
+        });
+      } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply.status(400).send({
+            error: "Cannot delete the last admin",
+            code: "LAST_ADMIN",
+          });
+        }
+        throw err;
       }
-
-      // Delete associated sessions
-      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
-
-      // Delete the user (cascades to api_keys and user_files via FK)
-      await db.delete(schema.users).where(eq(schema.users.id, id));
 
       await auditFromRequest(request)("USER_DELETED", {
         adminId: admin.id,

@@ -1,11 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
 import { isUniqueViolation, uniqueViolationConstraint } from "../../lib/pg-errors.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
 import { userLimitReached } from "../../lib/user-limit.js";
@@ -92,6 +93,11 @@ async function updateScimUser(
   revokeSessions: boolean,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // A deactivation (or any role change away from admin) can't leave the
+    // instance without an admin; checked under the shared lock (#2231).
+    if (typeof updates.role === "string" && updates.role !== "admin") {
+      await assertNotLastAdmin(tx, id);
+    }
     await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
     if (revokeSessions) {
       await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
@@ -229,24 +235,6 @@ function warnMemberSync(
       "SCIM group sync moved users out of another team; users belong to one team",
     );
   }
-}
-
-async function rejectLastActiveAdminDeactivation(
-  user: { role: string },
-  reply: FastifyReply,
-): Promise<boolean> {
-  if (user.role !== "admin") return false;
-
-  const [result] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(schema.users)
-    .where(eq(schema.users.role, "admin"));
-  if (result && result.count <= 1) {
-    reply.status(409).send(scimError(409, "Cannot deactivate the last active administrator"));
-    return true;
-  }
-
-  return false;
 }
 
 function scimActiveValue(value: unknown): boolean {
@@ -795,8 +783,6 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const active = body.active ?? true;
       const emails = body.emails ?? undefined;
 
-      if (!active && (await rejectLastActiveAdminDeactivation(existing, reply))) return;
-
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
       if (userName && userName !== existing.username) {
@@ -836,6 +822,11 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       try {
         await updateScimUser(id, updates, revokeSessions);
       } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply
+            .status(409)
+            .send(scimError(409, "Cannot deactivate the last active administrator"));
+        }
         if (isUniqueViolation(err)) {
           return reply.status(409).send(userUpdateConflict(err, request.log));
         }
@@ -890,19 +881,6 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const normalized = normalizeUserOps(parsed.data.Operations);
       if (!normalized.ok) return scimInvalid(request, reply, normalized);
       const operations = normalized.data;
-      const deactivatesUser = operations.some((op) => {
-        const opType = op.op.toLowerCase();
-        if (opType !== "replace" && opType !== "add") return false;
-        if (op.path === "active") return !scimActiveValue(op.value);
-        if (!op.path && typeof op.value === "object" && op.value !== null && "active" in op.value) {
-          return !scimActiveValue((op.value as Record<string, unknown>).active);
-        }
-        return false;
-      });
-      if (deactivatesUser && (await rejectLastActiveAdminDeactivation(existing, reply))) {
-        return;
-      }
-
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       let revokeSessions = false;
 
@@ -970,6 +948,11 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       try {
         await updateScimUser(id, updates, revokeSessions);
       } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply
+            .status(409)
+            .send(scimError(409, "Cannot deactivate the last active administrator"));
+        }
         if (isUniqueViolation(err)) {
           return reply.status(409).send(userUpdateConflict(err, request.log));
         }
@@ -1013,27 +996,37 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send(scimError(404, "User not found"));
       }
 
-      if (await rejectLastActiveAdminDeactivation(user, reply)) return;
-
       // One transaction: a deprovision whose revoke failed would leave a
       // disabled user with live sessions or API keys (#2126).
-      await db.transaction(async (tx) => {
-        // Soft-delete: preserve original role so reactivation can restore it
-        await tx
-          .update(schema.users)
-          .set({
-            role: canonicalDisabledScimRole(user.role),
-            passwordHash: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.users.id, id));
+      try {
+        await db.transaction(async (tx) => {
+          // Not the last admin, under the lock every admin removal shares (#2231).
+          await assertNotLastAdmin(tx, id);
 
-        // Revoke all sessions
-        await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+          // Soft-delete: preserve original role so reactivation can restore it
+          await tx
+            .update(schema.users)
+            .set({
+              role: canonicalDisabledScimRole(user.role),
+              passwordHash: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.users.id, id));
 
-        // Revoke all API keys
-        await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
-      });
+          // Revoke all sessions
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+
+          // Revoke all API keys
+          await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+        });
+      } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply
+            .status(409)
+            .send(scimError(409, "Cannot deactivate the last active administrator"));
+        }
+        throw err;
+      }
 
       await auditLog(
         request.log,
