@@ -9,7 +9,7 @@ import {
   USERNAME_PATTERN,
 } from "@snapotter/shared";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
-import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
@@ -98,7 +98,7 @@ async function verifyUserPassword(
  * overwrite a password changed in the meantime.
  */
 async function upgradeLegacyPasswordHash(
-  log: FastifyBaseLogger,
+  request: FastifyRequest,
   userId: string,
   verifiedHash: string,
   password: string,
@@ -110,7 +110,15 @@ async function upgradeLegacyPasswordHash(
       .set({ passwordHash: upgraded })
       .where(and(eq(schema.users.id, userId), eq(schema.users.passwordHash, verifiedHash)));
   } catch (err) {
-    log.warn({ err, userId }, "Could not upgrade a password hash to its normalized form");
+    request.log.warn({ err, userId }, "Could not upgrade a password hash to its normalized form");
+    // request.log has no Sentry bridge, and a fault that persists leaves the other
+    // spelling of this password failing for good, so it has to be seen (#2056).
+    void reportError(err, {
+      source: "http",
+      route: request.routeOptions?.url,
+      method: request.method,
+      subsystem: "password-hash-upgrade",
+    });
   }
 }
 
@@ -189,7 +197,12 @@ async function validatePasswordStrength(typed: string): Promise<PasswordRuleFail
   // Characters, not UTF-16 code units: an astral character is two units, so four
   // of them used to meet a minimum of 8 (#2057). Code points are what NIST SP
   // 800-63B counts. It only runs when a password is set, so it locks nobody out.
-  if ([...password].length < minLength)
+  // The count is the smaller of the composed form and the NFKC form: the composed
+  // form so a letter typed as a base plus a combining mark is one character, and
+  // the NFKC form so a compatibility character that expands (U+FDFA becomes 18)
+  // is not credited for the letters it turns into (#2056).
+  const length = Math.min([...typed.normalize("NFC")].length, [...password].length);
+  if (length < minLength)
     broken.push({
       rule: "minLength",
       message: `Password must be at least ${minLength} characters`,
@@ -612,10 +625,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 
-      if (legacy) {
-        await upgradeLegacyPasswordHash(request.log, user.id, user.passwordHash, body.password);
-      }
-
       // A correct password ends the failed-guess episode, whatever the
       // branches below decide about the session: the caller proved the
       // password, so the disabled 403 and the MFA paths all clear the window.
@@ -632,6 +641,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           reason: "disabled_user",
         });
         return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
+      }
+
+      // Before the MFA branch, which never sees the password again.
+      if (legacy) {
+        await upgradeLegacyPasswordHash(request, user.id, user.passwordHash, body.password);
       }
 
       // Two failures used to share one silent catch here and they want

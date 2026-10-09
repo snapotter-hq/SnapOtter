@@ -136,21 +136,50 @@ describe("a password set on one keyboard works from another", () => {
     expect((await login(username, "Пароль-\u0439\u0451лка2")).status).toBe(401);
   });
 
-  it("applies the strength rules to the normalized text", async () => {
-    // Five ligatures count as ten letters once normalized, so this meets a minimum of 12.
-    await setSetting("passwordMinLength", "12");
-    try {
-      const username = uid();
-      const res = await testApp.app.inject({
+  it("judges the character classes on the normalized text", async () => {
+    // A superscript two is not a digit, but it is the digit 2 once normalized.
+    const username = await registerUser("Abcdefg\u00b2");
+
+    expect((await login(username, "Abcdefg\u00b2")).status).toBe(200);
+    expect((await login(username, "Abcdefg2")).status).toBe(200);
+  });
+
+  describe("the minimum length", () => {
+    async function register(password: string) {
+      return testApp.app.inject({
         method: "POST",
         url: "/api/auth/register",
         headers: { authorization: `Bearer ${adminToken}` },
-        payload: { username, password: "\ufb01\ufb01\ufb01\ufb01\ufb01Ab1" },
+        payload: { username: uid(), password },
       });
-      expect(res.statusCode).toBe(201);
-    } finally {
-      await clearSetting("passwordMinLength");
     }
+
+    it("is not met by a character that expands when normalized", async () => {
+      // U+FDFA is one character and eighteen once normalized.
+      const res = await register("\ufdfaAa1");
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 8 });
+    });
+
+    it("counts a letter typed as a base plus a combining mark as one character", async () => {
+      const composedLength = [...COMPOSED].length;
+      expect([...DECOMPOSED].length).toBeGreaterThan(composedLength);
+      await setSetting("passwordMinLength", String(composedLength + 1));
+      try {
+        expect((await register(COMPOSED)).statusCode).toBe(400);
+        // Two combining marks must not push it over the line.
+        expect((await register(DECOMPOSED)).statusCode).toBe(400);
+      } finally {
+        await clearSetting("passwordMinLength");
+      }
+      await setSetting("passwordMinLength", String(composedLength));
+      try {
+        expect((await register(DECOMPOSED)).statusCode).toBe(201);
+      } finally {
+        await clearSetting("passwordMinLength");
+      }
+    });
   });
 });
 
@@ -170,6 +199,31 @@ describe("change-password", () => {
     expect((await login(username, "Nouveau-\u0439\u0451-9")).status).toBe(200);
     expect((await login(username, "Nouveau-\u0438\u0306\u0435\u0308-9")).status).toBe(200);
     expect((await login(username, COMPOSED)).status).toBe(401);
+  });
+});
+
+describe("reset-password", () => {
+  it("stores what an admin sets in normalized form", async () => {
+    const username = await registerUser("Initial-pass-1");
+    const [row] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.username, username));
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: `/api/auth/users/${row.id}/reset-password`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { newPassword: DECOMPOSED },
+    });
+    expect(res.statusCode).toBe(200);
+    await db
+      .update(schema.users)
+      .set({ mustChangePassword: false })
+      .where(eq(schema.users.username, username));
+
+    expect((await login(username, COMPOSED)).status).toBe(200);
+    expect((await login(username, DECOMPOSED)).status).toBe(200);
   });
 });
 
@@ -206,7 +260,14 @@ describe("a hash made before normalization", () => {
 
   it("is still checked as the current password by change-password", async () => {
     const username = await legacyUser(DECOMPOSED);
+    // A session that predates the upgrade: sign in, then put the old hash back, so
+    // change-password has to find the password through the raw-text fallback.
     const { token } = await login(username, DECOMPOSED);
+    await db
+      .update(schema.users)
+      .set({ passwordHash: await hashPassword(DECOMPOSED) })
+      .where(eq(schema.users.username, username));
+    const before = scrypts.calls;
 
     const res = await testApp.app.inject({
       method: "POST",
@@ -214,7 +275,10 @@ describe("a hash made before normalization", () => {
       headers: { authorization: `Bearer ${token}` },
       payload: { currentPassword: DECOMPOSED, newPassword: "Brand-new-pass-1" },
     });
+
     expect(res.statusCode).toBe(200);
+    // Two checks of the current password (normalized, then as typed) plus one hash of the new one.
+    expect(scrypts.calls - before).toBe(3);
   });
 });
 
