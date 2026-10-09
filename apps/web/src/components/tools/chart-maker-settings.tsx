@@ -129,9 +129,6 @@ export function ChartMakerSettings() {
         <p className="text-xs text-muted-foreground" data-testid="chart-maker-rows-skipped">
           {format(t.toolSettings["chart-maker"].rowsSkipped, {
             charted: currentEntry.resultNotes.chartRows.charted,
-            total:
-              currentEntry.resultNotes.chartRows.charted +
-              currentEntry.resultNotes.chartRows.skipped,
             skipped: currentEntry.resultNotes.chartRows.skipped,
           })}
         </p>

@@ -3346,7 +3346,7 @@ export const it: TranslationKeys = {
       kindLine: "Linea",
       kindPie: "Torta",
       rowsSkipped:
-        "Righe nel grafico: {charted} su {total}. Saltate perché la colonna dei valori non conteneva un numero: {skipped}.",
+        "Righe nel grafico: {charted}. Saltate perché la colonna dei valori non conteneva un numero: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modello",

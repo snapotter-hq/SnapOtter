@@ -3346,7 +3346,7 @@ export const ptBR: TranslationKeys = {
       kindLine: "Linhas",
       kindPie: "Pizza",
       rowsSkipped:
-        "Linhas no gráfico: {charted} de {total}. Ignoradas porque a coluna de valores não tinha um número: {skipped}.",
+        "Linhas no gráfico: {charted}. Ignoradas porque a coluna de valores não tinha um número: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modelo",

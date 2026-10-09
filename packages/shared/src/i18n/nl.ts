@@ -3354,7 +3354,7 @@ export const nl: TranslationKeys = {
       kindLine: "Lijn",
       kindPie: "Taart",
       rowsSkipped:
-        "Rijen in de grafiek: {charted} van {total}. Overgeslagen omdat de waardekolom geen getal bevatte: {skipped}.",
+        "Rijen in de grafiek: {charted}. Overgeslagen omdat de waardekolom geen getal bevatte: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",

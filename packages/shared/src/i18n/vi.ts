@@ -3335,8 +3335,7 @@ export const vi: TranslationKeys = {
       kindBar: "Cột",
       kindLine: "Đường",
       kindPie: "Tròn",
-      rowsSkipped:
-        "Số hàng được vẽ: {charted}/{total}. Bị bỏ qua vì cột giá trị không có số: {skipped}.",
+      rowsSkipped: "Số hàng được vẽ: {charted}. Bị bỏ qua vì cột giá trị không có số: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Mô hình",

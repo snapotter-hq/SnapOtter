@@ -3335,7 +3335,7 @@ export const es: TranslationKeys = {
       kindLine: "Línea",
       kindPie: "Circular",
       rowsSkipped:
-        "Filas representadas: {charted} de {total}. Omitidas porque la columna de valores no tenía un número: {skipped}.",
+        "Filas representadas: {charted}. Omitidas porque la columna de valores no tenía un número: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modelo",

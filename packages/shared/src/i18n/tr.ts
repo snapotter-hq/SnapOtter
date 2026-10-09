@@ -3344,7 +3344,7 @@ export const tr: TranslationKeys = {
       kindLine: "Çizgi",
       kindPie: "Pasta",
       rowsSkipped:
-        "Grafiğe eklenen satırlar: {charted}/{total}. Değer sütununda sayı olmadığı için atlananlar: {skipped}.",
+        "Grafiğe eklenen satırlar: {charted}. Değer sütununda sayı olmadığı için atlananlar: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",

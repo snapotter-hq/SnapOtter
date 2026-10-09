@@ -41,7 +41,7 @@ describe("Chart Maker says when rows were left out (#2060)", () => {
     render(<ChartMakerSettings />);
 
     expect(screen.getByTestId("chart-maker-rows-skipped")).toHaveTextContent(
-      "Rows charted: 4 of 6. Skipped because the value column had no number: 2.",
+      "Rows charted: 4. Skipped because the value column had no number: 2.",
     );
   });
 

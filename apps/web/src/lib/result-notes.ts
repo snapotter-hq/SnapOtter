@@ -56,5 +56,5 @@ export function parseFileNotesHeader(header: string | null): Record<string, unkn
 
 /** A result worth flagging: scaled down to fit, or short of its size target. */
 export function hasResultWarning(notes: ResultNotes | null | undefined): boolean {
-  return notes?.resizedTo != null || notes?.targetMet === false || notes?.chartRows != null;
+  return notes?.resizedTo != null || notes?.targetMet === false;
 }

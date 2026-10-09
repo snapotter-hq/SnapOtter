@@ -197,6 +197,15 @@ function toCell(value: unknown): string {
 }
 
 /**
+ * Rows a parse dropped because their value cell held text that isn't a number
+ * (#2060). Blank cells don't count: spreadsheet exports trail them, and a
+ * blank was never a value.
+ */
+export interface SkippedRows {
+  unreadable: number;
+}
+
+/**
  * Work out which column holds the labels and which holds the numbers, then
  * read the points off.
  *
@@ -209,14 +218,6 @@ function toCell(value: unknown): string {
  * is genuinely ambiguous, and picking left would break the far more common
  * leading-id shape instead.
  */
-/**
- * Rows a parse dropped because their value cell held text that isn't a number
- * (#2060). Blank cells don't count: spreadsheet exports trail them, and a
- * blank was never a value.
- */
-export interface SkippedRows {
-  unreadable: number;
-}
 
 function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoint[] {
   if (rows.length === 0) return [];

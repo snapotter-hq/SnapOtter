@@ -3338,7 +3338,7 @@ export const id: TranslationKeys = {
       kindLine: "Garis",
       kindPie: "Pai",
       rowsSkipped:
-        "Baris yang digambar: {charted} dari {total}. Dilewati karena kolom nilai tidak berisi angka: {skipped}.",
+        "Baris yang digambar: {charted}. Dilewati karena kolom nilai tidak berisi angka: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",

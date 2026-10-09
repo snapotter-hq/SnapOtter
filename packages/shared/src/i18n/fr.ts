@@ -3358,7 +3358,7 @@ export const fr: TranslationKeys = {
       kindLine: "Ligne",
       kindPie: "Secteurs",
       rowsSkipped:
-        "Lignes représentées : {charted} sur {total}. Ignorées car la colonne des valeurs ne contenait pas de nombre : {skipped}.",
+        "Lignes représentées : {charted}. Ignorées car la colonne des valeurs ne contenait pas de nombre : {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modèle",

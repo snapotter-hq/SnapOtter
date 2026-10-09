@@ -10,7 +10,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// #2060: Chart Maker's rows left out ride the same notes and count as a warning.
+// #2060: Chart Maker's rows left out ride the same notes. The panel says so;
+// the thumbnail badge's text only covers compress's cases, so it isn't one.
 describe("pickResultNotes: chart rows", () => {
   it("keeps the counts and nothing malformed", () => {
     expect(pickResultNotes({ jobId: "x", chartRows: { charted: 4, skipped: 2 } })).toEqual({
@@ -19,8 +20,8 @@ describe("pickResultNotes: chart rows", () => {
     expect(pickResultNotes({ chartRows: { charted: 4 } })).toBeNull();
   });
 
-  it("flags them as a warning", () => {
-    expect(hasResultWarning({ chartRows: { charted: 4, skipped: 2 } })).toBe(true);
+  it("doesn't put a resize badge on them", () => {
+    expect(hasResultWarning({ chartRows: { charted: 4, skipped: 2 } })).toBe(false);
   });
 });
 
