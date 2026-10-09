@@ -1,11 +1,12 @@
 /**
  * Unit tests for auth route helper functions and validation logic.
  *
- * Tests getAuthUser, requireAuth, requireAdmin, validatePasswordStrength,
- * validateUsername, isPublicRoute, and extractToken -- all extracted from
- * apps/api/src/plugins/auth.ts.
+ * Tests getAuthUser, requireAuth, requireAdmin, validatePasswordStrength and
+ * validateUsername (the real exports of apps/api/src/plugins/auth.ts, #2039),
+ * plus isPublicRoute, which is reproduced here.
  */
-import { describe, expect, it, vi } from "vitest";
+import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock DB to avoid SQLite connection
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -48,6 +49,20 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   },
 }));
 
+// The password policy reads its settings through these helpers; a map stands in
+// for the settings table so the defaults and a changed policy can both be tried.
+const policy = vi.hoisted(() => ({ values: new Map<string, string>() }));
+
+vi.mock("../../../apps/api/src/lib/settings-helpers.js", () => ({
+  getSettingString: async (key: string, fallback = "") => policy.values.get(key) ?? fallback,
+  getSettingNumber: async (key: string, fallback = 0) => {
+    const number = Number(policy.values.get(key));
+    return policy.values.has(key) && !Number.isNaN(number) ? number : fallback;
+  },
+  getSettingStrict: async (key: string) => policy.values.get(key),
+  setSettingIfAbsent: async () => {},
+}));
+
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
   auditLog: vi.fn(),
 }));
@@ -58,8 +73,14 @@ import {
   hashPassword,
   requireAdmin,
   requireAuth,
+  validatePasswordStrength,
+  validateUsername,
   verifyPassword,
 } from "../../../apps/api/src/plugins/auth.js";
+
+beforeEach(() => {
+  policy.values.clear();
+});
 
 // ── getAuthUser ─────────────────────────────────────────────────────────
 
@@ -210,59 +231,123 @@ describe("computeKeyPrefix (additional coverage)", () => {
   });
 });
 
-// ── Password strength validation (reproduced logic) ────────────────────
+// ── Password strength validation (the real function) ──────────────────
 
-// Reproduce the validation function from auth.ts since it's not exported
-function validatePasswordStrength(password: string): string | null {
-  const rules = "Password must be at least 8 characters with uppercase, lowercase, and a number";
-  if (password.length < 8) return rules;
-  if (!/[A-Z]/.test(password)) return rules;
-  if (!/[a-z]/.test(password)) return rules;
-  if (!/[0-9]/.test(password)) return rules;
-  return null;
-}
+const rulesOf = async (password: string) => (await validatePasswordStrength(password))?.rules ?? [];
 
-describe("validatePasswordStrength", () => {
-  it("accepts valid password", () => {
-    expect(validatePasswordStrength("MyPass12")).toBeNull();
+describe("validatePasswordStrength, default policy", () => {
+  it("accepts valid password", async () => {
+    expect(await validatePasswordStrength("MyPass12")).toBeNull();
   });
 
-  it("rejects password shorter than 8 chars", () => {
-    expect(validatePasswordStrength("Ab1")).not.toBeNull();
+  it("rejects password shorter than 8 chars", async () => {
+    expect(await rulesOf("Ab1")).toEqual(["minLength"]);
   });
 
-  it("rejects password without uppercase", () => {
-    expect(validatePasswordStrength("lowercase1")).not.toBeNull();
+  it("rejects password without uppercase", async () => {
+    expect(await rulesOf("lowercase1")).toEqual(["uppercase"]);
   });
 
-  it("rejects password without lowercase", () => {
-    expect(validatePasswordStrength("UPPERCASE1")).not.toBeNull();
+  it("rejects password without lowercase", async () => {
+    expect(await rulesOf("UPPERCASE1")).toEqual(["lowercase"]);
   });
 
-  it("rejects password without number", () => {
-    expect(validatePasswordStrength("NoNumberHere")).not.toBeNull();
+  it("rejects password without number", async () => {
+    expect(await rulesOf("NoNumberHere")).toEqual(["digit"]);
   });
 
-  it("accepts password with special characters", () => {
-    expect(validatePasswordStrength("Sp3c!al@")).toBeNull();
+  it("accepts password with special characters", async () => {
+    expect(await validatePasswordStrength("Sp3c!al@")).toBeNull();
   });
 
-  it("rejects empty string", () => {
-    expect(validatePasswordStrength("")).not.toBeNull();
+  it("rejects empty string", async () => {
+    expect((await rulesOf("")).length).toBeGreaterThan(0);
+  });
+
+  it("lists every broken rule at once, first one as `rule`", async () => {
+    const failure = await validatePasswordStrength("abc");
+
+    expect(failure?.rules).toEqual(["minLength", "uppercase", "digit"]);
+    expect(failure?.rule).toBe("minLength");
+    expect(failure?.minLength).toBe(8);
+  });
+
+  it("refuses a control character before anything else, even on a password that breaks other rules", async () => {
+    expect((await validatePasswordStrength("MyPass12\t"))?.rule).toBe("controlCharacter");
+
+    const failure = await validatePasswordStrength("ab\t");
+    expect(failure?.rules).toEqual(["controlCharacter"]);
+  });
+
+  it("counts a halfwidth katakana password the way it is hashed, not as typed (#2056)", async () => {
+    // Four halfwidth kana with a voiced mark are 8 characters as typed and 4
+    // once normalized: that is what gets hashed, so that is what is counted.
+    expect(await rulesOf(`${"\uff76\uff9e".repeat(4)}Aa1`)).toEqual(["minLength"]);
+  });
+
+  it("refuses a password over the shared maximum and names the limit", async () => {
+    const failure = await validatePasswordStrength(`Aa1${"a".repeat(PASSWORD_MAX_LENGTH)}`);
+
+    expect(failure?.rule).toBe("maxLength");
+    expect(failure?.maxLength).toBe(PASSWORD_MAX_LENGTH);
+  });
+
+  it("accepts a password of exactly the shared maximum", async () => {
+    expect(await validatePasswordStrength(`Aa1${"a".repeat(PASSWORD_MAX_LENGTH - 3)}`)).toBeNull();
   });
 });
 
-// ── Username validation (reproduced logic) ─────────────────────────────
+describe("validatePasswordStrength, a changed policy (#2039)", () => {
+  it("follows the configured minimum length", async () => {
+    policy.values.set("passwordMinLength", "12");
 
-function validateUsername(username: string): string | null {
-  if (username.length < 3 || username.length > 50) {
-    return "Username must be between 3 and 50 characters";
-  }
-  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-    return "Username can only contain letters, numbers, dots, hyphens, and underscores";
-  }
-  return null;
-}
+    const failure = await validatePasswordStrength("MyPass12");
+
+    expect(failure?.rules).toEqual(["minLength"]);
+    expect(failure?.minLength).toBe(12);
+  });
+
+  it("accepts anything once every rule is off and the minimum is 1", async () => {
+    policy.values.set("passwordMinLength", "1");
+    for (const rule of ["Uppercase", "Lowercase", "Digit"]) {
+      policy.values.set(`passwordRequire${rule}`, "false");
+    }
+
+    expect(await validatePasswordStrength("a")).toBeNull();
+    expect(await validatePasswordStrength("!")).toBeNull();
+  });
+
+  it("requires a special character only when the switch is exactly true", async () => {
+    expect(await validatePasswordStrength("MyPass12")).toBeNull();
+
+    policy.values.set("passwordRequireSpecial", "true");
+    expect(await rulesOf("MyPass12")).toEqual(["special"]);
+    expect(await validatePasswordStrength("MyPass12!")).toBeNull();
+  });
+
+  it.each([
+    ["Uppercase", "lowercase1", "uppercase"],
+    ["Lowercase", "UPPERCASE1", "lowercase"],
+    ["Digit", "NoNumberHere", "digit"],
+  ])(
+    "keeps the %s rule on for a stored value that isn't exactly false, and off for false (#2026)",
+    async (key, password, rule) => {
+      policy.values.set(`passwordRequire${key}`, "FALSE");
+      expect(await rulesOf(password)).toEqual([rule]);
+
+      policy.values.set(`passwordRequire${key}`, "false");
+      expect(await rulesOf(password)).toEqual([]);
+    },
+  );
+
+  it("falls back to the default minimum for a stored value that isn't a number", async () => {
+    policy.values.set("passwordMinLength", "lots");
+
+    expect((await validatePasswordStrength("Ab1"))?.minLength).toBe(8);
+  });
+});
+
+// ── Username validation (the real function) ───────────────────────────
 
 describe("validateUsername", () => {
   it("accepts valid usernames", () => {

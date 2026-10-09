@@ -1,26 +1,19 @@
 /**
- * Unit tests for username validation rules.
- *
- * The validateUsername function is not exported from auth.ts,
- * so we reproduce its logic here to test the rules directly.
+ * Unit tests for username validation rules, run against the real
+ * validateUsername exported from apps/api/src/plugins/auth.ts (#2039).
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-/**
- * Reproduce the validateUsername logic from apps/api/src/plugins/auth.ts
- * so we can unit-test the rules without importing the module (which
- * transitively opens a SQLite connection).
- */
-function validateUsername(username: string): string | null {
-  if (username.length < 3 || username.length > 50) {
-    return "Username must be between 3 and 50 characters";
-  }
-  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
-    return "Username can only contain letters, numbers, dots, hyphens, and underscores";
-  }
-  return null;
-}
+// auth.ts opens a database connection when it loads; the validator never uses it.
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {},
+  pool: {},
+  closeDb: async () => {},
+  schema: {},
+}));
+
+import { validateUsername } from "../../../apps/api/src/plugins/auth.js";
 
 describe("validateUsername", () => {
   describe("valid usernames", () => {
