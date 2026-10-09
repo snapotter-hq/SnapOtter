@@ -6,9 +6,12 @@
  * detection so the route exercises real processing without Python sidecars.
  */
 
+import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { waitForJob } from "../../../../apps/api/src/jobs/enqueue.js";
+import { logger } from "../../../../apps/api/src/lib/logger.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -178,31 +181,50 @@ describe("smart-crop sidecar-free processing", () => {
   it("fails a trim of a 2 x 2 image as rejected input, not a server fault", async () => {
     // Sharp cannot trim a side under 3 pixels and used to throw a bare Error that
     // the worker reported as a bug (#2202).
-    const tiny = await sharp({
-      create: { width: 2, height: 2, channels: 3, background: "#ff0000" },
-    })
-      .png()
-      .toBuffer();
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "tiny.png", contentType: "image/png", content: tiny },
-      { name: "settings", content: JSON.stringify({ mode: "trim" }) },
-    ]);
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/smart-crop",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      const tiny = await sharp({
+        create: { width: 2, height: 2, channels: 3, background: "#ff0000" },
+      })
+        .png()
+        .toBuffer();
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "tiny.png", contentType: "image/png", content: tiny },
+        { name: "settings", content: JSON.stringify({ mode: "trim" }) },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/smart-crop",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
 
-    // A long tool answers 202 and the worker's ToolInputError fails the job with
-    // its message; a sync answer carries the same message as a 400.
-    expect([202, 400]).toContain(res.statusCode);
-    const parsed = JSON.parse(res.body);
-    if (res.statusCode === 400) {
-      expect(parsed.error).toMatch(/too small to trim/);
-      return;
+      // smart-crop is a long tool: the route answers 202 without waiting, so the
+      // verdict lives on the job.
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await expect(waitForJob("ai", jobId, 20_000)).rejects.toThrow(
+        /too small to trim \(2 x 2 pixels\)/,
+      );
+
+      // The error class doesn't survive the queue, so the row's httpStatus is what
+      // marks a rejected input. A server fault would also log "tool job failed".
+      const [row] = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        httpStatus: 400,
+        message: expect.stringContaining("too small to trim (2 x 2 pixels)"),
+      });
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ jobId }),
+        "tool job failed",
+      );
+    } finally {
+      errorSpy.mockRestore();
     }
-    await expect(waitForJob("ai", parsed.jobId, 20_000)).rejects.toThrow(/too small to trim/);
   });
 
   it("rejects malformed JSON and invalid setting ranges before enqueueing", async () => {
