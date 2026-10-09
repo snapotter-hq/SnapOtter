@@ -58,7 +58,7 @@ export function registerImageToBase64(app: FastifyInstance) {
     "/api/v1/tools/image/image-to-base64",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const files: Array<{ buffer: Buffer; filename: string }> = [];
-      let settings = {};
+      let settingsRaw = "";
 
       try {
         const parts = request.parts();
@@ -73,11 +73,7 @@ export function registerImageToBase64(app: FastifyInstance) {
               filename: basename(part.filename ?? "image"),
             });
           } else if (part.fieldname === "settings") {
-            try {
-              settings = JSON.parse(part.value as string);
-            } catch {
-              // ignore invalid JSON, use defaults
-            }
+            settingsRaw = part.value as string;
           }
         }
       } catch (err) {
@@ -87,6 +83,16 @@ export function registerImageToBase64(app: FastifyInstance) {
 
       if (files.length === 0) {
         return reply.status(400).send({ error: "No image files provided" });
+      }
+
+      // An empty field means the defaults, like the tool factory; anything
+      // else has to parse, or a mistyped settings string would silently
+      // produce a default-encoded result that looks right and isn't (#2224).
+      let settings: unknown;
+      try {
+        settings = settingsRaw ? JSON.parse(settingsRaw) : {};
+      } catch {
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
       const parsed = settingsSchema.safeParse(settings);
