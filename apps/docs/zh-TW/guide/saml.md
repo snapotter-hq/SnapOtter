@@ -1,8 +1,9 @@
 ---
 description: "為 SnapOtter 設定 SAML 2.0 單一登入。針對 Okta、Azure AD / Entra ID、Google Workspace 及其他 SAML 身分供應商的逐步指南。"
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 8816672cd13a
+i18n_output_hash: 3c59fdf86395
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ services:
 2. 在 **Admin Settings > Security** 中，開啟 **SSO Enforcement**。
 3. 設定一個 **break-glass 使用者名稱**：這是唯一在 IdP 無法連線時仍可用密碼登入以進行緊急存取的本機帳號。
 
-當 SSO 強制啟用時，任何本機登入嘗試（break-glass 使用者除外）都會回傳 403 錯誤，訊息為「Local password login is disabled. Please use SSO.」
+當 SSO 強制啟用時，只有 break-glass 使用者可以使用本機密碼登入。其他任何本機登入嘗試都會被拒絕，並回傳與密碼錯誤相同的 401「Invalid credentials」，即使密碼正確也是如此，並且會計入登入限流。
 
 ::: tip 
 在啟用 SSO 強制之前，一律要先設定 break-glass 使用者名稱。若沒有它，當你的 IdP 停機時，你可能會被鎖在 SnapOtter 之外。

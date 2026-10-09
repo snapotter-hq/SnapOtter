@@ -1,8 +1,9 @@
 ---
 description: "Skonfiguruj logowanie jednokrotne SAML 2.0 dla SnapOtter. Przewodniki krok po kroku dla Okta, Azure AD / Entra ID, Google Workspace i innych dostawców tożsamości SAML."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 7da57fbad7c8
+i18n_output_hash: c8459f961f5e
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Jeśli chcesz wymagać, aby wszyscy użytkownicy logowali się przez SAML (lub O
 2. W **Admin Settings > Security** przełącz **SSO Enforcement** na włączone.
 3. Ustaw **break-glass username**: to jedno lokalne konto, które nadal może logować się hasłem, na wypadek awaryjnego dostępu, gdy dostawca tożsamości jest nieosiągalny.
 
-Gdy wymuszanie SSO jest aktywne, każda próba lokalnego logowania (poza użytkownikiem break-glass) zwraca błąd 403 z komunikatem „Local password login is disabled. Please use SSO.”
+Gdy wymuszanie SSO jest aktywne, tylko użytkownik break-glass może logować się lokalnym hasłem. Każda inna próba lokalnego logowania jest odrzucana tym samym błędem 401 „Invalid credentials”, który dostaje błędne hasło, nawet gdy hasło jest poprawne, i wlicza się do limitu prób logowania.
 
 ::: tip 
 Zawsze skonfiguruj break-glass username przed włączeniem wymuszania SSO. Bez niego możesz zostać zablokowany poza SnapOtter, jeśli Twój dostawca tożsamości ulegnie awarii.

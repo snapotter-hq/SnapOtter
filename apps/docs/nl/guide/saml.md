@@ -1,8 +1,9 @@
 ---
 description: "Stel SAML 2.0 Single Sign-On in voor SnapOtter. Stapsgewijze handleidingen voor Okta, Azure AD / Entra ID, Google Workspace en andere SAML-identiteitsproviders."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: 046e75acd88e
+i18n_output_hash: 97c39ccb83fe
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Als je wilt vereisen dat alle gebruikers via SAML (of OIDC) inloggen en lokale w
 2. Zet in **Admin Settings > Security** de schakelaar **SSO Enforcement** aan.
 3. Stel een **break-glass-gebruikersnaam** in: dit is het ene lokale account dat nog steeds met een wachtwoord kan inloggen, voor noodtoegang als de IdP onbereikbaar is.
 
-Wanneer SSO-afdwinging actief is, retourneert elke lokale inlogpoging (behalve voor de break-glass-gebruiker) een 403-fout met de melding "Local password login is disabled. Please use SSO."
+Wanneer SSO-afdwinging actief is, kan alleen de break-glass-gebruiker inloggen met een lokaal wachtwoord. Elke andere lokale inlogpoging wordt geweigerd met dezelfde 401 "Invalid credentials" die een fout wachtwoord krijgt, ook als het wachtwoord klopt, en telt mee voor de inlogbeperking.
 
 ::: tip 
 Configureer altijd een break-glass-gebruikersnaam voordat je SSO-afdwinging inschakelt. Zonder deze kun je buitengesloten raken van SnapOtter als je IdP uitvalt.

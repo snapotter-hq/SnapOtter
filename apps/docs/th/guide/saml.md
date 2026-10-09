@@ -1,8 +1,9 @@
 ---
 description: "ตั้งค่า SAML 2.0 Single Sign-On สำหรับ SnapOtter คู่มือทีละขั้นตอนสำหรับ Okta, Azure AD / Entra ID, Google Workspace และผู้ให้บริการข้อมูลประจำตัว SAML อื่น ๆ"
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: c6a0d84adefa
+i18n_output_hash: 994c3d08cd26
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ IdP บางรายสามารถนำเข้า SP metadata URL ไ�
 2. ใน **Admin Settings > Security** เปิดสวิตช์ **SSO Enforcement**
 3. ตั้งค่า **break-glass username**: นี่คือบัญชีในเครื่องเดียวที่ยังสามารถเข้าสู่ระบบด้วยรหัสผ่านได้ สำหรับการเข้าถึงฉุกเฉินหาก IdP ไม่สามารถเข้าถึงได้
 
-เมื่อการบังคับใช้ SSO เปิดใช้งาน ความพยายามเข้าสู่ระบบในเครื่องใด ๆ (ยกเว้นสำหรับผู้ใช้ break-glass) จะคืนค่าข้อผิดพลาด 403 พร้อมข้อความ "Local password login is disabled. Please use SSO."
+เมื่อการบังคับใช้ SSO เปิดใช้งาน มีเพียงผู้ใช้ break-glass เท่านั้นที่เข้าสู่ระบบด้วยรหัสผ่านในเครื่องได้ ความพยายามเข้าสู่ระบบในเครื่องอื่น ๆ จะถูกปฏิเสธด้วย 401 "Invalid credentials" เช่นเดียวกับรหัสผ่านที่ผิด แม้รหัสผ่านจะถูกต้อง และนับรวมในการจำกัดการเข้าสู่ระบบ
 
 ::: tip 
 กำหนดค่า break-glass username เสมอก่อนเปิดใช้งานการบังคับใช้ SSO หากไม่มี คุณอาจถูกล็อกออกจาก SnapOtter หาก IdP ของคุณล่ม

@@ -1,8 +1,9 @@
 ---
 description: "Thiết lập Đăng nhập một lần SAML 2.0 cho SnapOtter. Hướng dẫn từng bước cho Okta, Azure AD / Entra ID, Google Workspace và các nhà cung cấp danh tính SAML khác."
-i18n_source_hash: 33dfb8b02a22
+i18n_source_hash: 49babb70ce2d
 i18n_provenance: human
-i18n_output_hash: dad0601eb1e9
+i18n_output_hash: dd1869b81e88
+i18n_hash_version: 2
 ---
 
 # SAML SSO {#saml-sso}
@@ -176,7 +177,7 @@ Nếu bạn muốn yêu cầu tất cả người dùng đăng nhập qua SAML (
 2. Trong **Admin Settings > Security**, bật **SSO Enforcement**.
 3. Đặt một **break-glass username**: đây là tài khoản cục bộ duy nhất vẫn có thể đăng nhập bằng mật khẩu, cho truy cập khẩn cấp nếu không thể truy cập IdP.
 
-Khi bắt buộc SSO đang hoạt động, bất kỳ nỗ lực đăng nhập cục bộ nào (ngoài trừ người dùng break-glass) sẽ trả về lỗi 403 với thông báo "Local password login is disabled. Please use SSO."
+Khi bắt buộc SSO đang hoạt động, chỉ người dùng break-glass mới đăng nhập được bằng mật khẩu cục bộ. Mọi nỗ lực đăng nhập cục bộ khác đều bị từ chối bằng cùng mã 401 "Invalid credentials" mà mật khẩu sai nhận được, kể cả khi mật khẩu đúng, và được tính vào giới hạn đăng nhập.
 
 ::: tip 
 Luôn cấu hình một break-glass username trước khi bật bắt buộc SSO. Nếu không, bạn có thể bị khóa khỏi SnapOtter nếu IdP của bạn ngừng hoạt động.
