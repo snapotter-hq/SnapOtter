@@ -1242,11 +1242,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         updates.team = found.id;
       }
 
-      await db.update(schema.users).set(updates).where(eq(schema.users.id, id));
-
-      // Invalidate all sessions when role changes to force re-login with new permissions
-      if (updates.role && updates.role !== user.role) {
-        await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+      // One transaction: a role change whose session revoke failed would leave
+      // the new role in place while the old sessions keep the old permissions
+      // (#2126).
+      const roleChanged = Boolean(updates.role && updates.role !== user.role);
+      await db.transaction(async (tx) => {
+        await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
+        // Invalidate all sessions when role changes to force re-login with new permissions
+        if (roleChanged) {
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+        }
+      });
+      if (roleChanged) {
         request.log.info(
           { targetUserId: id, oldRole: user.role, newRole: updates.role },
           "Sessions invalidated due to role change",

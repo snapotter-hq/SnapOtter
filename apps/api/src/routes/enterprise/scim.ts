@@ -1015,21 +1015,25 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
       if (await rejectLastActiveAdminDeactivation(user, reply)) return;
 
-      // Soft-delete: preserve original role so reactivation can restore it
-      await db
-        .update(schema.users)
-        .set({
-          role: canonicalDisabledScimRole(user.role),
-          passwordHash: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.users.id, id));
+      // One transaction: a deprovision whose revoke failed would leave a
+      // disabled user with live sessions or API keys (#2126).
+      await db.transaction(async (tx) => {
+        // Soft-delete: preserve original role so reactivation can restore it
+        await tx
+          .update(schema.users)
+          .set({
+            role: canonicalDisabledScimRole(user.role),
+            passwordHash: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, id));
 
-      // Revoke all sessions
-      await db.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+        // Revoke all sessions
+        await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
 
-      // Revoke all API keys
-      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+        // Revoke all API keys
+        await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+      });
 
       await auditLog(
         request.log,
