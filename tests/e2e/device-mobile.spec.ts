@@ -7,7 +7,18 @@
  *
  * All tests are tagged @mobile so the device projects' grep filter picks them up.
  */
+import path from "node:path";
 import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+
+// A5 pages (419 x 595 pt): drawn at the old fixed 1.5x they are 629 x 893 px.
+const SIGN_PDF_FIXTURE = path.join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "document",
+  "valid",
+  "test-3page.pdf",
+);
 
 // ---------------------------------------------------------------------------
 // Core flow: load -> navigate -> upload -> process -> download
@@ -122,6 +133,46 @@ test.describe("@mobile A result taller than the preview area", () => {
     // receives the pointer event", without tapping.
     await peekBar.click({ trial: true, timeout: 5_000 });
     // Scoped to the page: the bottom navigation has a Settings button too.
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2190: the Sign PDF page was drawn at a fixed 1.5x, wider and taller than the
+// preview area on a phone. It covered the "Process" peek bar and the Settings
+// button, and the part left of the viewport couldn't be scrolled to, so a phone
+// user could neither place a signature nor reach the download.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Sign PDF on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("fits the page in the preview and leaves the settings controls tappable", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/sign-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page.locator("[class*='border-dashed']").first().click();
+    await (await chooser).setFiles(SIGN_PDF_FIXTURE);
+
+    const canvas = page.getByTestId("sign-pdf-canvas");
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    // Wait for pdf.js to size the page: the canvas is 300x150 until it renders.
+    await expect
+      .poll(async () => (await canvas.boundingBox())?.height ?? 0, { timeout: 15_000 })
+      .toBeGreaterThan(160);
+
+    // The page is as wide as the area, not the old fixed 1.5x (629px for this A5 page).
+    const box = await canvas.boundingBox();
+    expect(box?.width ?? Infinity).toBeLessThanOrEqual(390);
+
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await page
+      .getByRole("button", { name: "Process", exact: true })
+      .click({ trial: true, timeout: 5_000 });
     await page
       .locator("#main-content")
       .getByRole("button", { name: "Settings", exact: true })
