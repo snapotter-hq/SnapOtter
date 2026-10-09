@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
-import { csvParseFailure } from "../../lib/csv-parse.js";
+import { csvParseFailure, parseCsvWithHeader } from "../../lib/csv-parse.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -23,10 +23,7 @@ export function registerMergeCsvs(app: FastifyInstance) {
 
       // Parse the first file to establish column order and delimiter
       const firstText = ctx.inputs[0].buffer.toString("utf8");
-      const firstResult = Papa.parse<Record<string, unknown>>(firstText, {
-        header: true,
-        skipEmptyLines: true,
-      });
+      const firstResult = parseCsvWithHeader(firstText);
       const firstFailure = csvParseFailure(firstResult);
       if (firstFailure) {
         throw new InputValidationError(`CSV parse failed: ${firstFailure}`);
@@ -41,10 +38,7 @@ export function registerMergeCsvs(app: FastifyInstance) {
       for (let i = 1; i < ctx.inputs.length; i++) {
         const input = ctx.inputs[i];
         const text = input.buffer.toString("utf8");
-        const result = Papa.parse<Record<string, unknown>>(text, {
-          header: true,
-          skipEmptyLines: true,
-        });
+        const result = parseCsvWithHeader(text);
         const failure = csvParseFailure(result);
         if (failure) {
           throw new InputValidationError(`CSV parse failed in ${input.filename}: ${failure}`);

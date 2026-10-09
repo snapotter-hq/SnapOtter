@@ -83,6 +83,68 @@ describe("merge-csvs (pure JS, no skipIf)", () => {
     expect(dl.payload).toContain("b@x.io");
   }, 30_000);
 
+  it("keeps a column headed __proto__ instead of writing [object Object] (#2097)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("__proto__,x\r\n5,1"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("__proto__,x\r\n6,2"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.payload).toBe("__proto__,x\r\n5,1\r\n6,2");
+  }, 30_000);
+
+  it("merges files whose __proto__ column sits in a different position (#2097)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("x,__proto__,constructor\r\n1,5,a"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("constructor,__proto__,x\r\nb,6,2"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.payload).toBe("x,__proto__,constructor\r\n1,5,a\r\n2,6,b");
+  }, 30_000);
+
   it("answers 400, not a server error, for blank files (#2099)", async () => {
     const bom = Buffer.from("﻿");
     const { body, contentType } = createMultipartPayload([
