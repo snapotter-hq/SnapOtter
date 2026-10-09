@@ -228,12 +228,14 @@ export function EraseObjectSettings({
   const [progressStage, setProgressStage] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressCleanupRef = useRef<(() => void) | null>(null);
 
-  // Tear down any live progress subscription if the component unmounts mid-job.
+  // A bare unmount leaves a run to finish, as the batch always has: the panel also
+  // unmounts when the window crosses the layout breakpoint, and closing the stream
+  // then left a 202 run that could never end, with `processing` set for good
+  // (#2304). The run's own store watch ends it when its file leaves, and the stall
+  // timer bounds one nobody is listening to.
   useEffect(() => {
     return () => {
-      progressCleanupRef.current?.();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
     };
   }, []);
@@ -553,13 +555,11 @@ export function EraseObjectSettings({
       },
       onComplete: (r) => {
         endWatch();
-        progressCleanupRef.current = null;
         applyResult(r);
         finishUi();
       },
       onFailed: (failure) => {
         endWatch();
-        progressCleanupRef.current = null;
         abandonRequest();
         cancelIfHandlingFailed(failure, clientJobId);
         // The stream has already let go of the run, so a throw from the message
@@ -569,20 +569,18 @@ export function EraseObjectSettings({
       },
       onStall: () => {
         endWatch();
-        progressCleanupRef.current = null;
         abandonRequest();
         endRunWithError(t.toolSettings["erase-object"].stall);
       },
     });
     const stopProgress = subscription.stop;
-    progressCleanupRef.current = stopProgress;
 
     // Leaving for another tool resets the file store, and opening library
     // files replaces it. Either way this run's file is gone and its answer
     // would land on entries that belong to someone else, so the request is
     // dropped, as the batch does (#1894). This keys on the store rather than
-    // on unmount because the panel also unmounts whenever the mobile settings
-    // sheet closes, and that must not end the run (#1974).
+    // on unmount because the panel also unmounts when the layout swaps across the
+    // breakpoint, and that must not end the run (#1974, #2304).
     unwatchFiles = useFileStore.subscribe((state) => {
       if (abandoned || state.entries.some((e) => e.file === runFile)) return;
       // This runs inside whoever replaced the files (the tool page's reset,
@@ -596,9 +594,7 @@ export function EraseObjectSettings({
           if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
         },
         stopProgress,
-        () => {
-          progressCleanupRef.current = null;
-        },
+        () => {},
         finishUi,
       ]) {
         try {
@@ -661,7 +657,6 @@ export function EraseObjectSettings({
 
       endWatch();
       stopProgress();
-      progressCleanupRef.current = null;
 
       if (xhr.status >= 200 && xhr.status < 300) {
         // Same split as the batch path in processOneFile (#1734).
@@ -728,14 +723,12 @@ export function EraseObjectSettings({
       if (abandoned) return;
       endWatch();
       stopProgress();
-      progressCleanupRef.current = null;
       endRunWithError(t.errors.network);
     };
     xhr.ontimeout = () => {
       if (abandoned) return;
       endWatch();
       stopProgress();
-      progressCleanupRef.current = null;
       endRunWithError(t.toolSettings["erase-object"].timeoutOverloaded);
     };
     xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));

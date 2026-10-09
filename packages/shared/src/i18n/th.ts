@@ -5558,6 +5558,7 @@ export const th: TranslationKeys = {
     processingFailedNoDetail: "ประมวลผลล้มเหลว",
     jobTrackingFailed: "เกิดข้อผิดพลาดขณะติดตามงานนี้ ลองอีกครั้ง",
     requestTimedOut: "คำขอหมดเวลา",
+    runInterrupted: "การประมวลผลถูกขัดจังหวะ เรียกใช้อีกครั้ง",
     requestFailedWithStatus: "คำขอล้มเหลว: {status}",
   },
   sidebar: {

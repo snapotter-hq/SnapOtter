@@ -1939,6 +1939,28 @@ describe("erase-object single file: leaving the page mid-run (#1975)", () => {
     expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
   });
 
+  // #2304: the panel unmounting (a remount when the window crosses the breakpoint)
+  // used to close the stream of a 202 run, which then never heard its terminal
+  // frame, so `processing` stayed set for good. The batch has always been left to
+  // finish in the background; the single-file run now is too.
+  it("a bare unmount leaves a 202 run to finish in the background (#2304)", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    unmount();
+
+    expect(FakeEventSource.instances[0].readyState).not.toBe(2);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(0).status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
   it("does not touch the request of a run that already finished", async () => {
     const { unmount } = renderPanel();
     const xhr = await submit();

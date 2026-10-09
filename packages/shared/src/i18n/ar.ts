@@ -5595,6 +5595,7 @@ export const ar: TranslationKeys = {
     processingFailedNoDetail: "فشلت المعالجة",
     jobTrackingFailed: "حدث خطأ أثناء متابعة هذه المهمة. حاول مرة أخرى.",
     requestTimedOut: "انتهت مهلة الطلب",
+    runInterrupted: "تمت مقاطعة المعالجة. شغّلها مرة أخرى.",
     requestFailedWithStatus: "فشل الطلب: {status}",
   },
   sidebar: {

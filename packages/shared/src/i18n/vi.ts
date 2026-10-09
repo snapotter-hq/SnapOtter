@@ -5630,6 +5630,7 @@ export const vi: TranslationKeys = {
     processingFailedNoDetail: "Xử lý thất bại",
     jobTrackingFailed: "Đã xảy ra lỗi khi theo dõi tác vụ này. Vui lòng thử lại.",
     requestTimedOut: "Yêu cầu đã hết thời gian",
+    runInterrupted: "Quá trình xử lý bị gián đoạn. Hãy chạy lại.",
     requestFailedWithStatus: "Yêu cầu thất bại: {status}",
   },
   sidebar: {

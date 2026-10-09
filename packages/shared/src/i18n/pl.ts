@@ -5663,6 +5663,7 @@ export const pl: TranslationKeys = {
     processingFailedNoDetail: "Przetwarzanie nie powiodło się",
     jobTrackingFailed: "Coś poszło nie tak podczas śledzenia tego zadania. Spróbuj ponownie.",
     requestTimedOut: "Upłynął limit czasu żądania",
+    runInterrupted: "Przetwarzanie zostało przerwane. Uruchom je ponownie.",
     requestFailedWithStatus: "Żądanie nie powiodło się: {status}",
   },
   sidebar: {

@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -84,6 +85,7 @@ export function InfoSettings() {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : t.toolSettings.info.failedToRead);
       } finally {
+        if (abortRef.current === controller) abortRef.current = null;
         if (!controller.signal.aborted) {
           setProcessing(false);
         }
@@ -104,11 +106,12 @@ export function InfoSettings() {
     fetchInfo(selectedIndex);
   }, [selectedIndex, fetchInfo, files.length]);
 
-  useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, []);
+  // A fetch the unmount aborts is not "superseded by a newer one", so the finally
+  // above leaves `processing` set; end the run here (#2304).
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = () => {
     if (files.length === 0) return;

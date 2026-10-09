@@ -5667,6 +5667,7 @@ export const nl: TranslationKeys = {
     processingFailedNoDetail: "Verwerking mislukt",
     jobTrackingFailed: "Er ging iets mis bij het volgen van deze taak. Probeer het opnieuw.",
     requestTimedOut: "Time-out van verzoek",
+    runInterrupted: "De verwerking is onderbroken. Voer het opnieuw uit.",
     requestFailedWithStatus: "Verzoek mislukt: {status}",
   },
   sidebar: {

@@ -5662,6 +5662,7 @@ export const ptBR: TranslationKeys = {
     processingFailedNoDetail: "Falha no processamento",
     jobTrackingFailed: "Algo deu errado ao acompanhar esta tarefa. Tente novamente.",
     requestTimedOut: "A requisição expirou",
+    runInterrupted: "O processamento foi interrompido. Execute novamente.",
     requestFailedWithStatus: "Falha na requisição: {status}",
   },
   sidebar: {

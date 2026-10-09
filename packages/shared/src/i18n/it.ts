@@ -5665,6 +5665,7 @@ export const it: TranslationKeys = {
     jobTrackingFailed:
       "Si è verificato un problema durante il monitoraggio di questa operazione. Riprova.",
     requestTimedOut: "Richiesta scaduta",
+    runInterrupted: "L'elaborazione è stata interrotta. Eseguila di nuovo.",
     requestFailedWithStatus: "Richiesta non riuscita: {status}",
   },
   sidebar: {

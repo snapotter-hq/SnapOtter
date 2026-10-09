@@ -5656,6 +5656,7 @@ export const tr: TranslationKeys = {
     processingFailedNoDetail: "İşlem başarısız oldu",
     jobTrackingFailed: "Bu iş takip edilirken bir sorun oluştu. Tekrar deneyin.",
     requestTimedOut: "İstek zaman aşımına uğradı",
+    runInterrupted: "İşlem kesintiye uğradı. Yeniden çalıştırın.",
     requestFailedWithStatus: "İstek başarısız oldu: {status}",
   },
   sidebar: {

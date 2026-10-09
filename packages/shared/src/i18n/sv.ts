@@ -5643,6 +5643,7 @@ export const sv: TranslationKeys = {
     processingFailedNoDetail: "Bearbetningen misslyckades",
     jobTrackingFailed: "Något gick fel vid spårningen av jobbet. Försök igen.",
     requestTimedOut: "Tidsgränsen för begäran överskreds",
+    runInterrupted: "Bearbetningen avbröts. Kör den igen.",
     requestFailedWithStatus: "Begäran misslyckades: {status}",
   },
   sidebar: {

@@ -5659,6 +5659,7 @@ export const es: TranslationKeys = {
     processingFailedNoDetail: "Error en el procesamiento",
     jobTrackingFailed: "Algo salió mal al seguir esta tarea. Vuelve a intentarlo.",
     requestTimedOut: "La solicitud agotó el tiempo de espera",
+    runInterrupted: "Se interrumpió el procesamiento. Ejecútalo de nuevo.",
     requestFailedWithStatus: "Error en la solicitud: {status}",
   },
   sidebar: {

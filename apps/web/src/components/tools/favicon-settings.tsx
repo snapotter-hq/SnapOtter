@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
@@ -50,15 +51,22 @@ export function FaviconSettings() {
     return () => {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (processingTimerRef.current) clearInterval(processingTimerRef.current);
-      if (xhrRef.current) xhrRef.current.abort();
     };
   }, []);
+
+  // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
+  // be ended here, or `processing` stays set for good (#2304).
+  useSettleOnUnmount(
+    () => xhrRef.current !== null,
+    () => xhrRef.current?.abort(),
+  );
 
   const cleanup = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     if (processingTimerRef.current) clearInterval(processingTimerRef.current);
     elapsedRef.current = null;
     processingTimerRef.current = null;
+    xhrRef.current = null;
     setBusy(false);
     setProcessing(false);
   };
@@ -75,6 +83,12 @@ export function FaviconSettings() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: cleanup uses only stable refs and state setters
   const handleProcess = useCallback(() => {
     if (files.length === 0) return;
+
+    // The request is made, and the ref set, before the store flag goes up: a throw
+    // between the two would leave `processing` set with nothing for the unmount to
+    // end (#2304).
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
 
     flushSync(() => {
       setBusy(true);
@@ -111,8 +125,6 @@ export function FaviconSettings() {
     }
     formData.append("settings", JSON.stringify(settings));
 
-    const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
     xhr.responseType = "blob";
     xhr.timeout = 300_000;
 

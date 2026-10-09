@@ -5689,6 +5689,7 @@ export const de: TranslationKeys = {
     jobTrackingFailed:
       "Beim Verfolgen dieses Auftrags ist ein Fehler aufgetreten. Versuchen Sie es erneut.",
     requestTimedOut: "Zeitüberschreitung der Anfrage",
+    runInterrupted: "Die Verarbeitung wurde unterbrochen. Führen Sie sie erneut aus.",
     requestFailedWithStatus: "Anfrage fehlgeschlagen: {status}",
   },
   sidebar: {

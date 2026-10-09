@@ -5570,6 +5570,7 @@ export const en = {
     processingFailedNoDetail: "Processing failed",
     jobTrackingFailed: "Something went wrong while tracking this job. Try again.",
     requestTimedOut: "Request timed out",
+    runInterrupted: "Processing was interrupted. Run it again.",
     requestFailedWithStatus: "Request failed: {status}",
   },
   sidebar: {

@@ -5657,6 +5657,7 @@ export const ru: TranslationKeys = {
     processingFailedNoDetail: "Ошибка обработки",
     jobTrackingFailed: "Что-то пошло не так при отслеживании этой задачи. Попробуйте снова.",
     requestTimedOut: "Время ожидания истекло",
+    runInterrupted: "Обработка была прервана. Запустите её снова.",
     requestFailedWithStatus: "Ошибка запроса: {status}",
   },
   sidebar: {

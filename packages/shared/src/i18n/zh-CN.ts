@@ -5335,6 +5335,7 @@ export const zhCN: TranslationKeys = {
     processingFailedNoDetail: "处理失败",
     jobTrackingFailed: "跟踪此任务时出错。请重试。",
     requestTimedOut: "请求超时",
+    runInterrupted: "处理已中断。请重新运行。",
     requestFailedWithStatus: "请求失败：{status}",
   },
   sidebar: {

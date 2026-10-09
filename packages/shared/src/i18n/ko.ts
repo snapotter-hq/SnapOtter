@@ -5558,6 +5558,7 @@ export const ko: TranslationKeys = {
     processingFailedNoDetail: "처리에 실패했습니다",
     jobTrackingFailed: "이 작업을 추적하는 중에 문제가 발생했습니다. 다시 시도하세요.",
     requestTimedOut: "요청 시간이 초과되었습니다",
+    runInterrupted: "처리가 중단되었습니다. 다시 실행하세요.",
     requestFailedWithStatus: "요청에 실패했습니다: {status}",
   },
   sidebar: {

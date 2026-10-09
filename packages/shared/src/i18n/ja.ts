@@ -5595,6 +5595,7 @@ export const ja: TranslationKeys = {
     processingFailedNoDetail: "処理に失敗しました",
     jobTrackingFailed: "このジョブの追跡中に問題が発生しました。もう一度お試しください。",
     requestTimedOut: "リクエストがタイムアウトしました",
+    runInterrupted: "処理が中断されました。もう一度実行してください。",
     requestFailedWithStatus: "リクエストに失敗しました：{status}",
   },
   sidebar: {

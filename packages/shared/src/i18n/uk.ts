@@ -5656,6 +5656,7 @@ export const uk: TranslationKeys = {
     processingFailedNoDetail: "Обробка не вдалася",
     jobTrackingFailed: "Під час відстеження цього завдання сталася помилка. Спробуйте ще раз.",
     requestTimedOut: "Час очікування вичерпано",
+    runInterrupted: "Обробку було перервано. Запустіть її знову.",
     requestFailedWithStatus: "Помилка запиту: {status}",
   },
   sidebar: {

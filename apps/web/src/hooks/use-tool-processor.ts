@@ -73,8 +73,6 @@ const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-e
 
 const UPLOAD_WEIGHT = 15;
 const SSE_STALL_TIMEOUT_MS = 300_000;
-// What a run reads when its panel unmounted under it (#2125).
-const RUN_STOPPED = "Processing was interrupted. Run it again.";
 
 type DegradeTrigger = ToolRunDegradedProperties["trigger"];
 // After degrading a dead POST to the async path (#722), how long to wait for
@@ -710,7 +708,7 @@ export function useToolProcessor(toolId: string) {
         // failRun rethrows a teardown error by design, for callers in a timer.
         // Out of an effect cleanup it would reach the app's error boundary.
         try {
-          if (batchRun.abandon(RUN_STOPPED, "panel-unmounted")) return;
+          if (batchRun.abandon(t.errors.runInterrupted, "panel-unmounted")) return;
         } catch (cause) {
           reportRunEndFailure("Ending a tool run after its panel unmounted failed", cause, toolId);
           // failRun got as far as clearing the job: the run is over.
@@ -719,9 +717,9 @@ export function useToolProcessor(toolId: string) {
       }
       const teardownError = runEndWrites([
         clearActiveJob,
-        () => setError(RUN_STOPPED),
+        () => setError(t.errors.runInterrupted),
         () => setProcessing(false),
-        () => settleProcessingEntries(RUN_STOPPED),
+        () => settleProcessingEntries(t.errors.runInterrupted),
       ]);
       if (teardownError) {
         reportRunEndFailure(

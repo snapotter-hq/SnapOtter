@@ -5681,6 +5681,7 @@ export const fr: TranslationKeys = {
     processingFailedNoDetail: "Échec du traitement",
     jobTrackingFailed: "Un problème est survenu lors du suivi de cette tâche. Réessayez.",
     requestTimedOut: "Délai d'attente dépassé",
+    runInterrupted: "Le traitement a été interrompu. Relancez-le.",
     requestFailedWithStatus: "Échec de la requête : {status}",
   },
   sidebar: {
