@@ -5,6 +5,10 @@ import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
 import { STORAGE_FAULT_CODES } from "./object-storage.js";
 
+/** Re-reads of a row still in flight, and the pause between them: half a second in all. */
+const SETTLE_RETRIES = 10;
+const SETTLE_RETRY_MS = 50;
+
 export interface SettledFailureResponse {
   status: number;
   body: {
@@ -27,17 +31,28 @@ export interface SettledFailureResponse {
  *
  * A row that can't be read answers null as well, so the caller rethrows the
  * rejection it already holds instead of replacing it with a database error.
+ *
+ * A row still in flight is read again for a short while. A finalize that died
+ * by stall or crash is settled only by the worker's failed handler, which
+ * doesn't await its write, so its rejection can reach the route first (#2209).
+ * The wait is bounded so a rejection with no reason behind it still rethrows
+ * promptly.
  */
 export async function settledFailureResponse(
   jobId: string,
   log: FastifyBaseLogger,
 ): Promise<SettledFailureResponse | null> {
   let row: typeof schema.jobs.$inferSelect | undefined;
-  try {
-    [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-  } catch (err) {
-    log.warn({ err, jobId }, "Could not read the parent row of a failed batch");
-    return null;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    } catch (err) {
+      log.warn({ err, jobId }, "Could not read the parent row of a failed batch");
+      return null;
+    }
+    const inFlight = row?.status === "processing" || row?.status === "queued";
+    if (!inFlight || attempt >= SETTLE_RETRIES) break;
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_RETRY_MS));
   }
   if (row?.status !== "failed") return null;
   const error = row.error as { message?: string; code?: string; details?: unknown } | null;

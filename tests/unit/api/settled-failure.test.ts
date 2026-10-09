@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   /** What the parent-row select resolves with, or an Error it rejects with. */
   result: [] as unknown[] | Error,
+  /** Results served first, one per read, before `result` (#2209). */
+  queue: [] as unknown[][],
+  reads: 0,
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: () => ({}) }));
@@ -12,6 +15,9 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     select: () => ({
       from: () => ({
         where: async () => {
+          state.reads += 1;
+          const queued = state.queue.shift();
+          if (queued) return queued;
           if (state.result instanceof Error) throw state.result;
           return state.result;
         },
@@ -30,20 +36,51 @@ const failedRow = (error: unknown) => [{ status: "failed", error }];
 
 beforeEach(() => {
   state.result = [];
+  state.queue = [];
+  state.reads = 0;
   vi.mocked(log.warn).mockClear();
 });
 
 describe("settledFailureResponse (#2180)", () => {
-  it("answers null for a row that is not settled as failed", async () => {
-    for (const status of ["processing", "completed", "canceled"]) {
+  it("answers null at once for a row that finished another way", async () => {
+    for (const status of ["completed", "canceled"]) {
+      state.reads = 0;
       state.result = [{ status, error: { message: "Boom" } }];
       expect(await settledFailureResponse("parent", log)).toBeNull();
+      expect(state.reads).toBe(1);
     }
   });
 
   it("answers null when there is no row", async () => {
     state.result = [];
     expect(await settledFailureResponse("parent", log)).toBeNull();
+    expect(state.reads).toBe(1);
+  });
+
+  it("waits for a row the worker is still settling (#2209)", async () => {
+    // A finalize that died by stall or crash is settled only by the worker's
+    // failed handler, which doesn't await its write, so the route can read
+    // the row before it flips.
+    state.queue = [
+      [{ status: "processing", error: null }],
+      [{ status: "processing", error: null }],
+    ];
+    state.result = failedRow({ message: "Failed to package batch results" });
+
+    expect(await settledFailureResponse("parent", log)).toEqual({
+      status: 500,
+      body: { error: "Failed to package batch results", errors: [] },
+    });
+    expect(state.reads).toBe(3);
+  });
+
+  it("gives up promptly on a row that stays in flight (#2209)", async () => {
+    state.result = [{ status: "processing", error: null }];
+    const started = Date.now();
+
+    expect(await settledFailureResponse("parent", log)).toBeNull();
+    expect(state.reads).toBeGreaterThan(1);
+    expect(Date.now() - started).toBeLessThan(2_000);
   });
 
   it("answers null when the failed row carries no reason", async () => {
