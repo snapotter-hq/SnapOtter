@@ -1,5 +1,13 @@
 import { errors } from "@playwright/test";
-import { expect, expectNoPinnedSection, openSettings, test, uploadTestImage } from "./helpers";
+import {
+  type AppVersionMask,
+  expect,
+  expectNoPinnedSection,
+  maskAppVersion,
+  openSettings,
+  test,
+  uploadTestImage,
+} from "./helpers";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -143,13 +151,15 @@ async function takeThemedScreenshots(
   page: import("@playwright/test").Page,
   baseName: string,
   target?: import("@playwright/test").Locator,
+  extra: AppVersionMask = {},
 ) {
   // When a target locator is given (e.g. the settings dialog), screenshot just
   // that element so the live page behind a modal -- whose catalog/collapse state
   // varies between runs -- does not make the comparison flaky. fullPage only
-  // applies to a full-page screenshot.
+  // applies to a full-page screenshot. `extra` carries masks, such as
+  // maskAppVersion()'s.
   const subject = target ?? page;
-  const opts = target ? {} : { fullPage: false };
+  const opts = target ? { ...extra } : { fullPage: false, ...extra };
 
   // Light theme
   await setTheme(page, "light");
@@ -330,7 +340,8 @@ test.describe("Visual Desktop (1280x720)", () => {
     await openSettings(page);
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-general", page.getByRole("dialog"));
+    const dialog = page.getByRole("dialog");
+    await takeThemedScreenshots(page, "settings-general", dialog, await maskAppVersion(dialog));
   });
 
   // ---- Settings dialog - People tab ----
@@ -352,7 +363,8 @@ test.describe("Visual Desktop (1280x720)", () => {
     await page.getByRole("button", { name: "About" }).click();
     await page.waitForTimeout(500);
 
-    await takeThemedScreenshots(page, "settings-about", page.getByRole("dialog"));
+    const dialog = page.getByRole("dialog");
+    await takeThemedScreenshots(page, "settings-about", dialog, await maskAppVersion(dialog));
   });
 
   // ---- Help dialog ----

@@ -207,6 +207,28 @@ const MyToolSettings = lazy(() =>
 
 เพิ่มแอตทริบิวต์ `data-testid` ให้กับปุ่มการกระทำของคุณ (ดังที่แสดงด้านบน) เพื่อให้เทสต์ e2e สามารถกำหนดเป้าหมายได้อย่างน่าเชื่อถือ
 
+### 5. ภาพ baseline สำหรับเทสต์ภาพ {#_5-visual-baselines}
+
+เทสต์ภาพหน้าจอไม่ยอมให้มีพิกเซลเปลี่ยนแม้แต่พิกเซลเดียว และเครื่องมือใหม่จะเปลี่ยนสิ่งที่เทสต์เรนเดอร์ ได้แก่ จำนวนเครื่องมือในหน้าแรกและแคตตาล็อก การ์ดใหม่ในกริด และหน้าของเครื่องมือเองที่ `tests/e2e/gui-visual-tools.spec.ts` จะล้มเหลวด้วย "snapshot doesn't exist" จนกว่าหน้านั้นจะมี baseline ให้รีเฟรช baseline ใน PR เดียวกับเครื่องมือ เพื่อให้การเทียบภาพทุกคืนยังผ่านอยู่
+
+baseline ของ Linux มาจาก CI ให้ push branch ของคุณ แล้วสั่งรีเฟรชบน branch นั้น:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+เวิร์กโฟลว์จะเปิด PR แบบร่างไปยัง `main` พร้อมไฟล์ PNG ที่สร้างใหม่ ในคำอธิบายมีคำสั่ง `gh run download` ให้รันคำสั่งนั้นจากรูทของ checkout เพื่อนำ PNG เข้ามาใน branch ของคุณ commit แล้วปิด PR แบบร่าง หาก `changed` พลาดภาพที่คุณคาดว่าจะเปลี่ยน ให้ใช้ `update_snapshots=all` แทน การสั่งรันต้องมีสิทธิ์เขียนในรีโพซิทอรี ถ้า branch ของคุณอยู่บน fork ให้แจ้งใน PR ว่าต้องรีเฟรช baseline แล้วผู้ดูแลจะรันให้
+
+บน Mac ให้รีเฟรช baseline ของ darwin ด้วย:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+ถ้าคุณไม่ได้ใช้ Mac ให้แจ้งใน PR แล้วผู้ดูแลจะเพิ่มให้ ไม่ว่ากรณีใด ให้เปิดดู PNG ที่เพิ่มหรือเปลี่ยนทุกไฟล์ก่อน commit เพราะ baseline จะบันทึกสิ่งที่เรนเดอร์ออกมาไม่ว่าจะเสียหรือไม่
+
+การออกรีลีสไม่ต้องทำสิ่งเหล่านี้ เวอร์ชันของแอปถูกมาสก์ไว้ในทุกภาพหน้าจอที่แสดงเวอร์ชัน การเพิ่มเวอร์ชันจึงไม่เปลี่ยน baseline ใดเลย
+
 ## การ build Docker {#docker-builds}
 
 Build อิมเมจโปรดักชันเต็มรูปแบบในเครื่อง:

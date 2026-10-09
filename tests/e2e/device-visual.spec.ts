@@ -8,7 +8,7 @@
  * Tagged @mobile / @tablet so device projects' grep filter picks them up.
  * Matched by DEVICE_SPECS for project routing.
  */
-import { expect, expectNoPinnedSection, openSettings, test } from "./helpers";
+import { expect, expectNoPinnedSection, maskAppVersion, openSettings, test } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // Mobile (Pixel 7 -- mobile-chromium)
@@ -44,6 +44,7 @@ test.describe("@mobile @visual Device visual regression", () => {
 
     await expect(page).toHaveScreenshot("device-settings-mobile.png", {
       fullPage: false,
+      ...(await maskAppVersion(page.getByRole("dialog"))),
     });
   });
 });
@@ -82,6 +83,7 @@ test.describe("@tablet @visual Device visual regression", () => {
 
     await expect(page).toHaveScreenshot("device-settings-tablet.png", {
       fullPage: false,
+      ...(await maskAppVersion(page.getByRole("dialog"))),
     });
   });
 });

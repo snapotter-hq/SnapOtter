@@ -207,6 +207,28 @@ Tambahkan ke `packages/shared/src/i18n/en.ts`:
 
 Tambahkan atribut `data-testid` ke tombol aksi Anda (seperti ditunjukkan di atas) agar tes e2e dapat menargetkannya secara andal.
 
+### 5. Baseline visual {#_5-visual-baselines}
+
+Tes tangkapan layar tidak mengizinkan satu piksel pun berubah, dan alat baru mengubah apa yang dirender: jumlah alat di halaman beranda dan katalog, kartu baru di grid, dan halamannya sendiri yang membuat `tests/e2e/gui-visual-tools.spec.ts` gagal dengan "snapshot doesn't exist" sampai halaman itu punya baseline. Perbarui baseline di PR yang sama dengan alatnya, agar perbandingan visual malam hari tetap hijau.
+
+Baseline Linux berasal dari CI. Push branch Anda, lalu jalankan pembaruan pada branch itu:
+
+```bash
+gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
+```
+
+Workflow membuka PR draf ke `main` berisi PNG yang dibuat ulang. Deskripsinya memuat perintah `gh run download`; jalankan dari root checkout Anda untuk memasukkan PNG ke branch Anda, commit, lalu tutup PR draf tersebut. Gunakan `update_snapshots=all` jika `changed` melewatkan tangkapan yang Anda perkirakan berubah. Menjalankannya butuh akses tulis ke repositori, jadi jika branch Anda ada di fork, sebutkan di PR bahwa perlu pembaruan baseline dan maintainer akan menjalankannya.
+
+Di Mac, perbarui juga baseline darwin:
+
+```bash
+pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+```
+
+Jika Anda tidak memakai Mac, sebutkan di PR dan maintainer akan menambahkannya. Apa pun kasusnya, buka setiap PNG baru atau yang berubah sebelum Anda meng-commit-nya: baseline merekam apa pun yang dirender, rusak atau tidak.
+
+Rilis tidak memerlukan semua ini. Versi aplikasi disamarkan di setiap tangkapan layar yang menampilkannya, jadi menaikkannya tidak mengubah baseline mana pun.
+
 ## Build Docker {#docker-builds}
 
 Bangun image produksi lengkap secara lokal:
