@@ -90,7 +90,7 @@ function getMimeType(format: ExportFormat): string {
 // How long the size estimate waits after the last change before it captures and
 // encodes the whole document again. On every keystroke it cost a full render and
 // captured half-typed sizes (#2174). The 200 px thumbnail stays immediate.
-export const ESTIMATE_DEBOUNCE_MS = 300;
+const ESTIMATE_DEBOUNCE_MS = 300;
 
 type ExportFailureReason = NonNullable<EditorExportedProperties["reason"]>;
 
