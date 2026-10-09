@@ -30,16 +30,37 @@ beforeAll(() => {
 
 const ctx = {} as ToolProcessCtx;
 
+function trimSettings(extra: Record<string, unknown>) {
+  const parsed = schema.safeParse({ mode: "trim", ...extra });
+  expect(parsed.success).toBe(true);
+  return parsed.data;
+}
+
 async function solid(width: number, height: number) {
   return sharp({ create: { width, height, channels: 3, background: "#ff0000" } })
     .png()
     .toBuffer();
 }
 
-// Both trim branches read the input: the plain trim and the pad-to-square one.
-const BRANCHES: Record<string, unknown>[] = [{}, { padToSquare: true }];
+// A white strip with a red block across it. The block is 3 or more pixels on
+// each side so libvips' 3 x 3 median keeps it; a 1 pixel line would vanish.
+async function strip(width: number, height: number, block: sharp.Region) {
+  const red = await solid(block.width, block.height);
+  return sharp({ create: { width, height, channels: 3, background: "#ffffff" } })
+    .composite([{ input: red, left: block.left, top: block.top }])
+    .png()
+    .toBuffer();
+}
 
-describe("smart-crop trim on an image with a side under 3 pixels (#2202)", () => {
+// Both trim branches read the input: the plain trim and the pad-to-square one,
+// which pads what it trimmed out to a square on its long side.
+describe.each([
+  ["plain trim", {}],
+  ["pad to square", { padToSquare: true }],
+] as const)("smart-crop %s on an image with a side under 3 pixels (#2202)", (_branch, extra) => {
+  const expectedSize = (w: number, h: number) =>
+    "padToSquare" in extra ? [Math.max(w, h), Math.max(w, h)] : [w, h];
+
   it.each([
     [1, 1],
     [2, 2],
@@ -48,29 +69,29 @@ describe("smart-crop trim on an image with a side under 3 pixels (#2202)", () =>
     [2, 10],
     [10, 2],
   ])("refuses %i x %i with a ToolInputError that names the size", async (w, h) => {
-    const input = await solid(w, h);
-    for (const extra of BRANCHES) {
-      const settings = schema.safeParse({ mode: "trim", ...extra }).data;
-      const run = config.process(input, settings, "tiny.png", ctx);
-      await expect(run).rejects.toBeInstanceOf(ToolInputError);
-      await expect(run).rejects.toThrow(`${w} x ${h} pixels`);
-    }
+    const run = config.process(await solid(w, h), trimSettings(extra), "tiny.png", ctx);
+    await expect(run).rejects.toBeInstanceOf(ToolInputError);
+    await expect(run).rejects.toThrow(`(${w} x ${h} pixels)`);
   });
 
   it.each([
     [3, 3],
     [3, 10],
     [10, 3],
-  ])("still trims %i x %i", async (w, h) => {
-    const input = await solid(w, h);
-    for (const extra of BRANCHES) {
-      const settings = schema.safeParse({ mode: "trim", ...extra }).data;
-      const out = await config.process(input, settings, "small.png", ctx);
-      const meta = await sharp(out.buffer).metadata();
-      // A solid image trims to itself; the square branch pads it out to its long side.
-      const side = Math.max(w, h);
-      const expected = extra.padToSquare ? [side, side] : [w, h];
-      expect([meta.width, meta.height]).toEqual(expected);
-    }
+  ])("accepts %i x %i", async (w, h) => {
+    // A solid image has no border to cut, so the trim keeps all of it.
+    const out = await config.process(await solid(w, h), trimSettings(extra), "small.png", ctx);
+    const meta = await sharp(out.buffer).metadata();
+    expect([meta.width, meta.height]).toEqual(expectedSize(w, h));
+  });
+
+  it.each([
+    [3, 10, { left: 0, top: 3, width: 3, height: 4 }],
+    [10, 3, { left: 3, top: 0, width: 4, height: 3 }],
+  ] as const)("cuts the border off a %i x %i strip at the boundary", async (w, h, block) => {
+    const input = await strip(w, h, block);
+    const out = await config.process(input, trimSettings(extra), "strip.png", ctx);
+    const meta = await sharp(out.buffer).metadata();
+    expect([meta.width, meta.height]).toEqual(expectedSize(block.width, block.height));
   });
 });

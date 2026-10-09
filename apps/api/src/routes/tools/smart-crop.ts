@@ -187,15 +187,14 @@ async function processTrim(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
 ): Promise<Buffer> {
-  // Sharp's trim needs 3 pixels on each side: both sides under 3 trip its own
-  // check, and a 2 x 10 strip fails in libvips' 3 x 3 median window instead.
-  // Either way a bare Error reached the worker as a server fault (#2202).
-  const meta = await sharp(inputBuffer).metadata();
-  const srcW = meta.width ?? 0;
-  const srcH = meta.height ?? 0;
-  if (srcW < 3 || srcH < 3) {
+  // Sharp's trim needs each side to be at least 3 pixels. Both sides under 3 trip
+  // its own check, and a 2 x 10 strip fails in the 3 x 3 median window libvips
+  // runs first (skipped only with lineArt, which this tool never sets). Either way
+  // a bare Error reached the worker as a server fault (#2202).
+  const { width, height } = await sharp(inputBuffer).metadata();
+  if (width < 3 || height < 3) {
     throw new ToolInputError(
-      `The image is too small to trim (${srcW} x ${srcH} pixels). Both sides have to be at least 3 pixels.`,
+      `The image is too small to trim (${width} x ${height} pixels). Both sides have to be at least 3 pixels.`,
     );
   }
 
