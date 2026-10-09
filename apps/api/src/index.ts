@@ -68,6 +68,7 @@ import { registerPostHogProxy } from "./plugins/posthog-proxy.js";
 import { registerSaml } from "./plugins/saml.js";
 import { registerStatic } from "./plugins/static.js";
 import { toolAccessMiddleware } from "./plugins/tool-access.js";
+import { skipUnmatchedRequestBodies } from "./plugins/unmatched-body.js";
 import { registerUpload } from "./plugins/upload.js";
 import { adminOpsRoutes } from "./routes/admin-ops.js";
 import { analyticsRoutes } from "./routes/analytics.js";
@@ -388,6 +389,9 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, b
     done(parseErr, undefined);
   }
 });
+
+// A path with no route has nothing to parse; don't buffer its body before the 404 (#2123).
+skipUnmatchedRequestBodies(app);
 
 registerErrorHandler(app);
 
