@@ -519,24 +519,30 @@ describe("multipartFailure (#1341)", () => {
   // #2225: MAX_UPLOAD_SIZE_MB=0 (unlimited, the Docker image's default) leaves
   // the fallback nothing to name. @fastify/multipart still caps request.file()
   // at the body limit and throws without saying so; the answer read "the 0 KB
-  // upload limit".
-  it("names no number when neither the error nor MAX_UPLOAD_SIZE_MB sets a limit", () => {
-    const configured = env.MAX_UPLOAD_SIZE_MB;
-    env.MAX_UPLOAD_SIZE_MB = 0;
-    try {
-      const unnamed = Object.assign(new Error("request file too large"), { statusCode: 413 });
-      expect(multipartFailure(unnamed)).toEqual({
-        status: 413,
-        body: { error: "File exceeds the upload limit" },
-      });
+  // upload limit". The other limit checks read a negative value as unlimited
+  // as well.
+  it.each([0, -1])(
+    "names no number when neither the error nor MAX_UPLOAD_SIZE_MB=%i sets a limit",
+    (mb) => {
+      const configured = env.MAX_UPLOAD_SIZE_MB;
+      env.MAX_UPLOAD_SIZE_MB = mb;
+      try {
+        const unnamed = Object.assign(new Error("request file too large"), { statusCode: 413 });
+        expect(multipartFailure(unnamed)).toEqual({
+          status: 413,
+          body: { error: "File exceeds the upload limit" },
+        });
 
-      // A cap the error carries is still named on an unlimited instance.
-      const named = Object.assign(new Error("too large"), { statusCode: 413, limitBytes: 1024 });
-      expect(multipartFailure(named).body).toEqual({ error: "File exceeds the 1 KB upload limit" });
-    } finally {
-      env.MAX_UPLOAD_SIZE_MB = configured;
-    }
-  });
+        // A cap the error carries is still named on an unlimited instance.
+        const named = Object.assign(new Error("too large"), { statusCode: 413, limitBytes: 1024 });
+        expect(multipartFailure(named).body).toEqual({
+          error: "File exceeds the 1 KB upload limit",
+        });
+      } finally {
+        env.MAX_UPLOAD_SIZE_MB = configured;
+      }
+    },
+  );
 
   it("keeps any other parse failure a 400, with internal paths stripped", () => {
     const failure = multipartFailure(new Error("Unexpected end of form at /tmp/uploads/abc"));

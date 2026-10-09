@@ -13,7 +13,9 @@ import { multipartFailure } from "../lib/multipart-parts.js";
  * instance failed with "Internal server error" until the TTL sweep freed
  * space (#1161). SafeErrors without a status keep the mask: the AI bridge
  * builds them from the sidecar's stderr, and they are only ever meant for
- * Sentry and the worker's own sanitizer.
+ * Sentry and the worker's own sanitizer. An over-limit multipart file's 413
+ * answers through multipartFailure() instead, like the routes that catch it
+ * (#2225).
  */
 export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
@@ -35,11 +37,11 @@ export function registerErrorHandler(app: FastifyInstance): void {
       request.log.warn({ err: error, url: request.url, method: request.method }, "Request error");
     }
     // An over-limit file whose error escaped a route's multipart read (the
-    // library upload, save and preview routes let it) answers the way routes
-    // that catch it do: 413 naming the limit, not the bare "request file too
-    // large" (#2225). Keyed on the code as well as the status, because
-    // Fastify's own 413 for a body over bodyLimit isn't a file over the
-    // upload limit.
+    // routes tests/unit/api/multipart-failure-drift.test.ts pins on this
+    // handler) gets the same 413 multipartFailure() gives the routes that
+    // catch it, not the bare "request file too large" (#2225). Keyed on the
+    // code as well as the status, because Fastify's own 413 for a body over
+    // bodyLimit isn't a file over the upload limit.
     if (statusCode === 413 && (error as { code?: unknown }).code === "FST_REQ_FILE_TOO_LARGE") {
       const failure = multipartFailure(error);
       reply.status(failure.status).send(failure.body);

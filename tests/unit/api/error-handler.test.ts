@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { SafeError } from "@snapotter/shared";
 import Fastify, { errorCodes, type FastifyRequest, type FastifyServerOptions } from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,7 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 });
 
 import { env } from "../../../apps/api/src/config.js";
+import { readFilePart } from "../../../apps/api/src/lib/multipart-parts.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerUpload } from "../../../apps/api/src/plugins/upload.js";
 
@@ -174,7 +176,7 @@ describe("an over-limit multipart file reaching the handler", () => {
   // 413 never comes through here: the route sends it, code and all.)
   it.each([
     [
-      "a 413 with no code",
+      "a 413 from outside a multipart read",
       () => Object.assign(new Error("Too large"), { statusCode: 413 }),
       "Too large",
     ],
@@ -192,8 +194,8 @@ describe("an over-limit multipart file reaching the handler", () => {
     await app.close();
   });
 
-  // Reads through the real upload plugin, which index.ts registers ahead of
-  // this handler, so the error is the one a route actually gets.
+  // Reads through the real upload plugin, so the error is the one a route
+  // actually gets.
   describe("from a real read", () => {
     const boundary = "----HandlerBoundary2225";
 
@@ -227,17 +229,24 @@ describe("an over-limit multipart file reaching the handler", () => {
       }
     }
 
-    it("names a route's own cap for request.parts()", async () => {
-      // The library upload routes iterate request.parts() with no catch of
-      // their own, so the 413 reaches the handler (pinned by
-      // tests/unit/api/multipart-failure-drift.test.ts).
+    // The library upload and save routes read each part with readFilePart();
+    // /api/v1/upload and /api/v1/preview/generate drain it inline. None of
+    // them catches, so the 413 reaches the handler (pinned by
+    // tests/unit/api/multipart-failure-drift.test.ts).
+    it.each([
+      [
+        "an inline drain",
+        async (file: Readable) => {
+          for await (const _chunk of file) {
+            // drain
+          }
+        },
+      ],
+      ["readFilePart()", readFilePart],
+    ])("names a route's own cap for request.parts() read by %s", async (_label, readFile) => {
       const res = await upload(async (request) => {
         for await (const part of request.parts({ limits: { fileSize: 1024 } })) {
-          if (part.type === "file") {
-            for await (const _chunk of part.file) {
-              // drain
-            }
-          }
+          if (part.type === "file") await readFile(part.file);
         }
       }, 4096);
 
@@ -261,7 +270,8 @@ describe("an over-limit multipart file reaching the handler", () => {
     it("names no number for request.file() on an unlimited instance", async () => {
       // MAX_UPLOAD_SIZE_MB=0 (the Docker image's default) leaves the plugin's
       // cap at Fastify's bodyLimit (1 GiB in index.ts, 2 KiB here), and its
-      // error doesn't say so. The answer read "the 0 KB upload limit".
+      // error doesn't say so. Falling back to the env would name "the 0 KB
+      // upload limit".
       const configured = env.MAX_UPLOAD_SIZE_MB;
       env.MAX_UPLOAD_SIZE_MB = 0;
       try {
