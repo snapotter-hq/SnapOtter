@@ -216,11 +216,21 @@ test.describe("@mobile Organize PDF on a phone", () => {
     // Six Letter pages: the grid is taller than the preview area.
     const reset = page.getByTestId("organize-reset");
     await expect(reset).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: /page 6/i }).first()).toBeAttached();
+    const lastPage = page.getByRole("button", { name: /page 6/i }).first();
+    await expect(lastPage).toBeAttached();
 
     // The toolbar stays inside the viewport instead of scrolling away above it.
     const box = await reset.boundingBox();
     expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+
+    // The grid scrolls inside the preview: the last page can be brought into view
+    // and ends above the peek bar, not under it.
+    await lastPage.scrollIntoViewIfNeeded();
+    const lastBox = await lastPage.boundingBox();
+    const peekBox = await page.getByRole("button", { name: "Process", exact: true }).boundingBox();
+    expect((lastBox?.y ?? Infinity) + (lastBox?.height ?? 0)).toBeLessThanOrEqual(
+      (peekBox?.y ?? 0) + 1,
+    );
 
     // A trial click does the actionability checks, including "nothing else
     // receives the pointer event", without tapping.
