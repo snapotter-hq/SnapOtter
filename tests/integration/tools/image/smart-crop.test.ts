@@ -419,6 +419,33 @@ describe("Smart Crop", () => {
     expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
   });
 
+  // padColor went to Sharp as three hex slices with nothing in front of them,
+  // so "#fff" became NaN and failed in the worker instead of here (#2201).
+  it("answers 400 naming padColor for a colour that is not #rrggbb", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ mode: "trim", padToSquare: true, padColor: "#fff" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const result = JSON.parse(res.body);
+    expect(result.error).toMatch(/invalid settings/i);
+    expect(result.details).toMatch(/^padColor: Use a six-digit hex color/);
+  });
+
   it("rejects unauthenticated requests", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
