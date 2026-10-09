@@ -78,6 +78,7 @@ const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js")
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/worker.js");
+const { readStoredFile } = await import("../../../apps/api/src/lib/file-storage.js");
 const { logger } = await import("../../../apps/api/src/lib/logger.js");
 const { listObjects, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
@@ -341,6 +342,54 @@ describe("Worker timeout classification", () => {
     } finally {
       warnLog.mockRestore();
     }
+  }, 25_000);
+
+  it("keeps the library save of a handler that finished after the timeout (#2143)", async () => {
+    // The save watches the user-cancel signal, which the deadline never fires.
+    // Handed the job's own signal instead, it would read the expired deadline as
+    // a cancel, throw the finished result away, and retry the job.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    const userId = randomUUID();
+    await db
+      .insert(schema.users)
+      .values({ id: userId, username: `wt-timeout-${userId.slice(0, 8)}` });
+    const fileId = randomUUID();
+    await db.insert(schema.userFiles).values({
+      id: fileId,
+      userId,
+      originalName: "test.png",
+      storedName: `${randomUUID()}.png`,
+      mimeType: "image/png",
+      size: 17,
+      version: 1,
+      toolChain: [],
+    });
+
+    await enqueueToolJob({
+      jobId,
+      toolId: "timeout-ignores-signal",
+      userId,
+      pool: "image",
+      inputRefs: [inputRef],
+      filename: "test.png",
+      settings: {},
+      kind: "tool",
+      fileId,
+      saveMode: "overwrite",
+    });
+
+    const finalRow = await terminalJobRow(jobId);
+    expect(finalRow?.status).toBe("completed");
+    expect(finalRow?.attempts).toBe(1);
+    const versions = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.parentId, fileId));
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toMatchObject({ userId, version: 2 });
+    await expect(readStoredFile(versions[0]?.storedName ?? "")).resolves.toBeInstanceOf(Buffer);
   }, 25_000);
 
   it("keeps a streamed result that finished after the deadline (#2144)", async () => {
