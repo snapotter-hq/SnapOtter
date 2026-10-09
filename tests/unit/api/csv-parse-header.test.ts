@@ -20,11 +20,22 @@ describe("parseCsvWithHeader", () => {
     expect(JSON.stringify(data)).toBe('[{"__proto__":"5","x":"1"},{"__proto__":"6","x":"2"}]');
   });
 
-  it("builds rows without a prototype, so a missing key never reads an inherited member", () => {
-    const { data } = parseCsvWithHeader("a,b\r\n1,2");
+  it("builds rows without a prototype when a __proto__ column forces the rebuild", () => {
+    const { data } = parseCsvWithHeader("__proto__,b\r\n1,2");
 
     expect(Object.getPrototypeOf(data[0])).toBeNull();
     expect(data[0].constructor).toBeUndefined();
+  });
+
+  it("stays linear on a header of many __proto__ copies", () => {
+    const count = 5000;
+    const header = Array(count).fill("__proto__").join(",");
+    const started = Date.now();
+    const { meta } = parseCsvWithHeader(`${header}\r\n${Array(count).fill("1").join(",")}`);
+
+    expect(meta.fields).toHaveLength(count);
+    expect(new Set(meta.fields).size).toBe(count);
+    expect(Date.now() - started).toBeLessThan(3000);
   });
 
   it("renames a duplicated __proto__ header the way Papa renames any other duplicate", () => {

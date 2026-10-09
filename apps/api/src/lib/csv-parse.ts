@@ -8,9 +8,10 @@ const PROTO_HEADER = "\u0000proto\u0000";
 
 /**
  * Parse CSV text with a header row into rows keyed by header. Same options and
- * result as `Papa.parse(text, { header: true, skipEmptyLines: true })`, except the
- * rows have no prototype: every header, `__proto__` included, is an own property,
- * and a key a row lacks never reads an inherited member.
+ * result as `Papa.parse(text, { header: true, skipEmptyLines: true })`, except that
+ * a file with a `__proto__` header gets null-prototype rows, so that column is an
+ * own property. A file without one is returned untouched: rebuilding every row
+ * as a null-prototype object costs about 2.5x the memory on a large CSV.
  *
  * Papa renames a duplicated header to `name_1`, `name_2`, ... skipping names a real
  * column has. The `__proto__` copies get the same treatment here (`__proto__`, then
@@ -27,13 +28,20 @@ export function parseCsvWithHeader(text: string): ParseResult<Record<string, unk
   const sentinelFields = parsed.meta.fields ?? [];
   const taken = new Set(sentinelFields.filter((field) => !field.startsWith(PROTO_HEADER)));
   const names = new Map<string, string>();
+  // The counter lives outside the loop: every suffix below it is already taken, so
+  // restarting per column would make a header of many copies quadratic.
+  let suffix = 0;
   for (const field of sentinelFields) {
     if (!field.startsWith(PROTO_HEADER) || names.has(field)) continue;
-    let name = "__proto__";
-    for (let n = 1; taken.has(name); n++) name = `__proto___${n}`;
+    let name: string;
+    do {
+      name = suffix === 0 ? "__proto__" : `__proto___${suffix}`;
+      suffix++;
+    } while (taken.has(name));
     taken.add(name);
     names.set(field, name);
   }
+  if (names.size === 0) return parsed;
   const restore = (key: string) => names.get(key) ?? key;
 
   const data = parsed.data.map((row) => {
