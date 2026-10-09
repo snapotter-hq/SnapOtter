@@ -21,6 +21,10 @@ export function pickResultNotes(source: unknown): ResultNotes | null {
   if (skipped === "failed" || skipped === "unavailable" || skipped === "animated") {
     notes.deepEnhanceSkipped = skipped;
   }
+  const rows = raw.chartRows as { charted?: unknown; skipped?: unknown } | undefined;
+  if (rows && typeof rows.charted === "number" && typeof rows.skipped === "number") {
+    notes.chartRows = { charted: rows.charted, skipped: rows.skipped };
+  }
   return Object.keys(notes).length > 0 ? notes : null;
 }
 
@@ -52,5 +56,5 @@ export function parseFileNotesHeader(header: string | null): Record<string, unkn
 
 /** A result worth flagging: scaled down to fit, or short of its size target. */
 export function hasResultWarning(notes: ResultNotes | null | undefined): boolean {
-  return notes?.resizedTo != null || notes?.targetMet === false;
+  return notes?.resizedTo != null || notes?.targetMet === false || notes?.chartRows != null;
 }

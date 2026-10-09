@@ -3269,6 +3269,7 @@ export const ko: TranslationKeys = {
       kindBar: "막대",
       kindLine: "선",
       kindPie: "원형",
+      rowsSkipped: "차트에 표시된 행: {charted}/{total}. 값 열에 숫자가 없어 건너뛴 행: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "모델",

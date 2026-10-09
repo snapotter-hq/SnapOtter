@@ -3334,6 +3334,8 @@ export const es: TranslationKeys = {
       kindBar: "Barras",
       kindLine: "Línea",
       kindPie: "Circular",
+      rowsSkipped:
+        "Filas representadas: {charted} de {total}. Omitidas porque la columna de valores no tenía un número: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modelo",

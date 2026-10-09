@@ -81,3 +81,31 @@ describe("chart-maker numbers written the way a spreadsheet shows them (#1198)",
     expect(parseInput(Buffer.from(json)).map((p) => p.value)).toEqual([1200, 2400]);
   });
 });
+
+describe("chart-maker counts the rows it leaves out (#2060)", () => {
+  it("counts a value cell with text but no number, not a blank one", () => {
+    const skipped = { unreadable: 0 };
+    const points = parseInput(Buffer.from("k,v\na,10\nb,\nc,n/a\nd,20\ne,30\n"), skipped);
+
+    expect(points.map((p) => p.value)).toEqual([10, 20, 30]);
+    expect(skipped.unreadable).toBe(1);
+  });
+
+  it("counts them in a JSON array of objects too", () => {
+    const skipped = { unreadable: 0 };
+    const json = JSON.stringify([
+      { name: "a", total: "1" },
+      { name: "b", total: "lots" },
+      { name: "c", total: "3" },
+    ]);
+
+    expect(parseInput(Buffer.from(json), skipped)).toHaveLength(2);
+    expect(skipped.unreadable).toBe(1);
+  });
+
+  it("leaves the count at zero for a clean file", () => {
+    const skipped = { unreadable: 0 };
+    parseInput(Buffer.from("k,v\na,1\nb,2\n"), skipped);
+    expect(skipped.unreadable).toBe(0);
+  });
+});

@@ -3311,6 +3311,8 @@ export const ar: TranslationKeys = {
       kindBar: "أعمدة",
       kindLine: "خطي",
       kindPie: "دائري",
+      rowsSkipped:
+        "الصفوف المرسومة: {charted} من {total}. الصفوف المتخطاة لأن عمود القيم لا يحتوي على رقم: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "النموذج",

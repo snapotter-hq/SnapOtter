@@ -209,7 +209,16 @@ function toCell(value: unknown): string {
  * is genuinely ambiguous, and picking left would break the far more common
  * leading-id shape instead.
  */
-function tableToPoints({ header, rows }: Table): DataPoint[] {
+/**
+ * Rows a parse dropped because their value cell held text that isn't a number
+ * (#2060). Blank cells don't count: spreadsheet exports trail them, and a
+ * blank was never a value.
+ */
+export interface SkippedRows {
+  unreadable: number;
+}
+
+function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoint[] {
   if (rows.length === 0) return [];
 
   // Counted in a loop, not Math.max(...spread): the row cap is applied after
@@ -272,7 +281,10 @@ function tableToPoints({ header, rows }: Table): DataPoint[] {
     // A row with no number in the value column is not a data row. Blank cells
     // are the common case.
     const value = numericCell(row[valueCol], decimals[valueCol]);
-    if (value === null) continue;
+    if (value === null) {
+      if (skipped && toCell(row[valueCol]).trim() !== "") skipped.unreadable += 1;
+      continue;
+    }
     points.push({
       label: labelCol < 0 ? String(points.length + 1) : toCell(row[labelCol]).trim(),
       value,
@@ -308,7 +320,7 @@ function parseCsv(text: string): Table {
   return hasHeader ? { header: rows[0], rows: rows.slice(1) } : { rows };
 }
 
-function pointsFromJsonArray(items: unknown[]): DataPoint[] {
+function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint[] {
   if (items.length === 0) return [];
 
   const objects = items.filter(
@@ -338,18 +350,21 @@ function pointsFromJsonArray(items: unknown[]): DataPoint[] {
   // an optional field would otherwise read as blank and be dropped.
   const keys = [...new Set(objects.flatMap((item) => Object.keys(item)))];
   if (keys.length === 0) throw new ToolInputError(JSON_SHAPES);
-  return tableToPoints({
-    header: keys,
-    rows: objects.map((item) => keys.map((key) => toCell(item[key]))),
-  });
+  return tableToPoints(
+    {
+      header: keys,
+      rows: objects.map((item) => keys.map((key) => toCell(item[key]))),
+    },
+    skipped,
+  );
 }
 
 function isNumericEntry(entry: { label: string; value: number | null }): entry is DataPoint {
   return entry.value !== null;
 }
 
-function pointsFromJson(raw: unknown): DataPoint[] {
-  if (Array.isArray(raw)) return pointsFromJsonArray(raw);
+function pointsFromJson(raw: unknown, skipped?: SkippedRows): DataPoint[] {
+  if (Array.isArray(raw)) return pointsFromJsonArray(raw, skipped);
   if (typeof raw !== "object" || raw === null) throw new ToolInputError(JSON_SHAPES);
 
   const entries = Object.entries(raw as Record<string, unknown>);
@@ -360,12 +375,12 @@ function pointsFromJson(raw: unknown): DataPoint[] {
 
   // Exports wrap their rows: {"data": [...]}, {"results": [...]}, and friends.
   const wrapped = entries.filter(([, value]) => Array.isArray(value));
-  if (wrapped.length === 1) return pointsFromJsonArray(wrapped[0][1] as unknown[]);
+  if (wrapped.length === 1) return pointsFromJsonArray(wrapped[0][1] as unknown[], skipped);
 
   throw new ToolInputError(JSON_SHAPES);
 }
 
-export function parseInput(buf: Buffer): DataPoint[] {
+export function parseInput(buf: Buffer, skipped?: SkippedRows): DataPoint[] {
   // Strip a UTF-8 BOM. JS counts U+FEFF as whitespace so the sniff below still
   // matches, but JSON.parse rejects it, which killed every BOM'd export.
   // Papa strips it from CSV on its own.
@@ -383,10 +398,10 @@ export function parseInput(buf: Buffer): DataPoint[] {
         `This file starts like JSON but does not parse: ${err instanceof Error ? err.message : "invalid JSON"}`,
       );
     }
-    return pointsFromJson(raw);
+    return pointsFromJson(raw, skipped);
   }
 
-  return tableToPoints(parseCsv(text));
+  return tableToPoints(parseCsv(text), skipped);
 }
 
 function renderBarSvg(data: DataPoint[], w: number, h: number, title: string | undefined): string {
@@ -509,8 +524,9 @@ export function registerChartMaker(app: FastifyInstance) {
       const base = input.filename.replace(/\.[^.]+$/, "");
 
       let data: DataPoint[];
+      const skipped: SkippedRows = { unreadable: 0 };
       try {
-        data = parseInput(input.buffer);
+        data = parseInput(input.buffer, skipped);
       } catch (err) {
         // Every throw inside parseInput is already a ToolInputError. Blanket
         // rewrapping anything else as one told the user their file was at
@@ -557,6 +573,12 @@ export function registerChartMaker(app: FastifyInstance) {
         buffer: pngBuffer,
         filename: `${base}_chart.png`,
         contentType: "image/png",
+        // Say how many rows were left out, so a chart missing rows doesn't
+        // look complete (#2060).
+        resultPayload:
+          skipped.unreadable > 0
+            ? { chartRows: { charted: data.length, skipped: skipped.unreadable } }
+            : undefined,
       };
     },
   });

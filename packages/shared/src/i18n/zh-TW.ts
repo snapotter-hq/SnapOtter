@@ -3071,6 +3071,7 @@ export const zhTW: TranslationKeys = {
       kindBar: "長條圖",
       kindLine: "折線圖",
       kindPie: "圓餅圖",
+      rowsSkipped: "已繪製的列：{charted}/{total}。因數值欄中沒有數字而略過的列：{skipped}。",
     },
     "enhance-faces-standalone": {
       model: "模型",

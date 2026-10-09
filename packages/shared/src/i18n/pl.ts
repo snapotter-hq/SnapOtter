@@ -3343,6 +3343,8 @@ export const pl: TranslationKeys = {
       kindBar: "Słupkowy",
       kindLine: "Liniowy",
       kindPie: "Kołowy",
+      rowsSkipped:
+        "Wiersze na wykresie: {charted} z {total}. Pominięte, bo kolumna wartości nie zawierała liczby: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Model",

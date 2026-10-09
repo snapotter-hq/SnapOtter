@@ -10,6 +10,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// #2060: Chart Maker's rows left out ride the same notes and count as a warning.
+describe("pickResultNotes: chart rows", () => {
+  it("keeps the counts and nothing malformed", () => {
+    expect(pickResultNotes({ jobId: "x", chartRows: { charted: 4, skipped: 2 } })).toEqual({
+      chartRows: { charted: 4, skipped: 2 },
+    });
+    expect(pickResultNotes({ chartRows: { charted: 4 } })).toBeNull();
+  });
+
+  it("flags them as a warning", () => {
+    expect(hasResultWarning({ chartRows: { charted: 4, skipped: 2 } })).toBe(true);
+  });
+});
+
 // #1292: the notes a result carries beyond the file itself.
 describe("pickResultNotes", () => {
   it("keeps resizedTo, targetKb and targetMet and nothing else", () => {

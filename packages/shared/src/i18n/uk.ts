@@ -3345,6 +3345,8 @@ export const uk: TranslationKeys = {
       kindBar: "Стовпці",
       kindLine: "Лінія",
       kindPie: "Кругова",
+      rowsSkipped:
+        "Рядків на діаграмі: {charted} з {total}. Пропущено, бо в стовпці значень не було числа: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Модель",

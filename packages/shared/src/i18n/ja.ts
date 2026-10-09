@@ -3293,6 +3293,8 @@ export const ja: TranslationKeys = {
       kindBar: "棒グラフ",
       kindLine: "折れ線グラフ",
       kindPie: "円グラフ",
+      rowsSkipped:
+        "グラフにした行: {charted}/{total}。値の列に数値がなかったためスキップした行: {skipped}。",
     },
     "enhance-faces-standalone": {
       model: "モデル",

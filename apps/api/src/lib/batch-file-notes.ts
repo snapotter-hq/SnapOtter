@@ -12,6 +12,8 @@ export interface BatchFileNotes {
   targetKb?: number;
   targetMet?: boolean;
   deepEnhanceSkipped?: DeepEnhanceSkipReason;
+  /** Chart Maker left rows out because their value wasn't a number (#2060). */
+  chartRows?: { charted: number; skipped: number };
 }
 
 /** Why image-enhancement's requested Deep Enhance pass didn't run (#950). */
@@ -44,6 +46,10 @@ export function pickBatchFileNotes(
   const skipped = result.deepEnhanceSkipped;
   if (typeof skipped === "string" && DEEP_ENHANCE_SKIP_REASONS.has(skipped)) {
     notes.deepEnhanceSkipped = skipped as DeepEnhanceSkipReason;
+  }
+  const rows = result.chartRows as { charted?: unknown; skipped?: unknown } | undefined;
+  if (rows && typeof rows.charted === "number" && typeof rows.skipped === "number") {
+    notes.chartRows = { charted: rows.charted, skipped: rows.skipped };
   }
   if (Object.keys(notes).length === 0) return undefined;
   if (typeof result.targetKb === "number") notes.targetKb = result.targetKb;

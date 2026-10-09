@@ -4,6 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 type ChartKind = "bar" | "line" | "pie";
@@ -21,7 +22,7 @@ const INPUT_CLASS =
 export function ChartMakerSettings() {
   const { t } = useTranslation();
   const kindLabels = chartKindLabels(t);
-  const { files } = useFileStore();
+  const { files, currentEntry } = useFileStore();
   const { processFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("chart-maker");
 
@@ -122,6 +123,19 @@ export function ChartMakerSettings() {
       </div>
 
       {error && <p className="text-xs text-destructive-ink">{error}</p>}
+
+      {/* Rows the chart left out, so a short chart doesn't read as complete (#2060). */}
+      {currentEntry?.status === "completed" && currentEntry.resultNotes?.chartRows && (
+        <p className="text-xs text-muted-foreground" data-testid="chart-maker-rows-skipped">
+          {format(t.toolSettings["chart-maker"].rowsSkipped, {
+            charted: currentEntry.resultNotes.chartRows.charted,
+            total:
+              currentEntry.resultNotes.chartRows.charted +
+              currentEntry.resultNotes.chartRows.skipped,
+            skipped: currentEntry.resultNotes.chartRows.skipped,
+          })}
+        </p>
+      )}
 
       {processing ? (
         <ProgressCard

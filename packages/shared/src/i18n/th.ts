@@ -3290,6 +3290,7 @@ export const th: TranslationKeys = {
       kindBar: "แท่ง",
       kindLine: "เส้น",
       kindPie: "วงกลม",
+      rowsSkipped: "แถวที่แสดงในแผนภูมิ: {charted} จาก {total} แถวที่ข้ามเพราะคอลัมน์ค่าไม่มีตัวเลข: {skipped}",
     },
     "enhance-faces-standalone": {
       model: "โมเดล",

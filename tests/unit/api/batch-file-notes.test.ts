@@ -42,6 +42,18 @@ describe("pickBatchFileNotes", () => {
 });
 
 // #1303: one note every file shares goes out once, keeping X-File-Notes small.
+describe("pickBatchFileNotes: chart rows (#2060)", () => {
+  it("keeps Chart Maker's skipped-row count", () => {
+    expect(pickBatchFileNotes({ chartRows: { charted: 4, skipped: 2 } })).toEqual({
+      chartRows: { charted: 4, skipped: 2 },
+    });
+  });
+
+  it("drops a malformed one", () => {
+    expect(pickBatchFileNotes({ chartRows: { charted: "4", skipped: 2 } })).toBeUndefined();
+  });
+});
+
 describe("compactFileNotes", () => {
   const skip = { deepEnhanceSkipped: "unavailable" as const };
   const results = { "0": "a.png", "1": "b.png", "2": "c.png" };

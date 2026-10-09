@@ -38,6 +38,8 @@ export interface ResultNotes {
   targetMet?: boolean;
   /** Image Enhancement's requested Deep Enhance pass didn't run, and why (#1303). */
   deepEnhanceSkipped?: "failed" | "unavailable" | "animated";
+  /** Chart Maker left rows out because their value wasn't a number (#2060). */
+  chartRows?: { charted: number; skipped: number };
 }
 
 export interface FileEntry {

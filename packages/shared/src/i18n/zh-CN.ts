@@ -3072,6 +3072,7 @@ export const zhCN: TranslationKeys = {
       kindBar: "柱状图",
       kindLine: "折线图",
       kindPie: "饼图",
+      rowsSkipped: "已绘制的行：{charted}/{total}。因数值列中没有数字而跳过的行：{skipped}。",
     },
     "enhance-faces-standalone": {
       model: "模型",

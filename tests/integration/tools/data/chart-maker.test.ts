@@ -357,6 +357,20 @@ describe("Chart Maker column detection", () => {
     expect(png.equals(await renderChart("month,sales\nJan,100\nMar,300\n"))).toBe(true);
   });
 
+  it("reports the rows it left out, not counting blank ones (#2060)", async () => {
+    const res = await postChart("month,sales\nJan,100\nFeb,n/a\nMar,\nApr,300\nMay,400\n");
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).chartRows).toEqual({ charted: 3, skipped: 1 });
+  });
+
+  it("adds no row count when every row made the chart", async () => {
+    const res = await postChart("month,sales\nJan,100\nFeb,200\n");
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).chartRows).toBeUndefined();
+  });
+
   it("keeps rows whose value carries a thousands separator", async () => {
     const png = await renderChart(
       'month,sales\nJan,900\nFeb,"1,200"\nMar,"2,400"\nApr,850\nMay,700\nJun,650\n',

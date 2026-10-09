@@ -3344,6 +3344,8 @@ export const ru: TranslationKeys = {
       kindBar: "Столбцы",
       kindLine: "Линия",
       kindPie: "Круговая",
+      rowsSkipped:
+        "Строк на графике: {charted} из {total}. Пропущено, потому что в столбце значений не было числа: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Модель",

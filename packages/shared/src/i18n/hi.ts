@@ -3142,6 +3142,8 @@ export const hi: TranslationKeys = {
       kindBar: "बार",
       kindLine: "लाइन",
       kindPie: "पाई",
+      rowsSkipped:
+        "चार्ट में दिखाई गई पंक्तियाँ: {total} में से {charted}। मान कॉलम में संख्या न होने से छोड़ी गई पंक्तियाँ: {skipped}।",
     },
     "enhance-faces-standalone": {
       model: "मॉडल",

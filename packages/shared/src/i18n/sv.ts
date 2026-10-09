@@ -3334,6 +3334,8 @@ export const sv: TranslationKeys = {
       kindBar: "Stapel",
       kindLine: "Linje",
       kindPie: "Cirkel",
+      rowsSkipped:
+        "Rader i diagrammet: {charted} av {total}. Hoppades över eftersom värdekolumnen saknade ett tal: {skipped}.",
     },
     "enhance-faces-standalone": {
       model: "Modell",
