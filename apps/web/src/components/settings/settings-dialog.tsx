@@ -1656,6 +1656,7 @@ export function PeopleSection() {
             err,
             {
               SELF_DELETE: t.settings.people.cannotDeleteSelf,
+              LAST_ADMIN: t.settings.people.lastAdmin,
               ESCALATION_DENIED: t.errors.escalationDenied,
             },
             t.settings.people.deleteFailed,

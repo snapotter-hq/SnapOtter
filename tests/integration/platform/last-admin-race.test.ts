@@ -27,13 +27,15 @@ let schema: DbModule["schema"];
 let raceRowLocks: RaceModule["raceRowLocks"];
 /** Admins demoted to leave exactly two, restored after each test. */
 let parked: string[] = [];
+/** Users a test created, removed after it so later files see the admins they expect. */
+let created: string[] = [];
 
 beforeAll(async () => {
   // SCIM is enterprise-gated; licence it, then load the app, the db module and
   // the race helper from the same module graph.
   vi.resetModules();
   const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
-  mockEnterpriseFeatures(["scim"]);
+  mockEnterpriseFeatures(["scim", "gdpr_lifecycle"]);
   server = await import("../test-server.js");
   ({ db, schema } = await import("../../../apps/api/src/db/index.js"));
   ({ raceRowLocks } = await import("../../helpers/pg-race.js"));
@@ -58,6 +60,10 @@ afterEach(async () => {
     await db.update(schema.users).set({ role: "admin" }).where(inArray(schema.users.id, parked));
     parked = [];
   }
+  if (created.length > 0) {
+    await db.delete(schema.users).where(inArray(schema.users.id, created));
+    created = [];
+  }
 });
 
 interface Admin {
@@ -73,6 +79,7 @@ async function exactlyTwoAdmins(): Promise<{ x: Admin; y: Admin }> {
       `race_admin_${randomUUID().slice(0, 8)}`,
       "admin",
     );
+    created.push(userId);
     return { id: userId, token };
   };
   const x = await make();
@@ -145,6 +152,19 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
     const refused = results.find((r) => r.statusCode === 400);
     expect(JSON.parse(refused?.body ?? "{}").code).toBe("LAST_ADMIN");
     expect(await adminCount()).toBe(1);
+
+    // The admin whose deletion was refused is still there, sessions and all.
+    const survivorId = results[0].statusCode === 400 ? y.id : x.id;
+    const [survivor] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, survivorId));
+    expect(survivor?.id).toBe(survivorId);
+    const sessions = await db
+      .select({ id: schema.sessions.id })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, survivorId));
+    expect(sessions.length).toBeGreaterThan(0);
   });
 
   it("two SCIM deactivations of the last two admins: one wins, the other is refused", async () => {
@@ -163,6 +183,51 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
     );
 
     expect(results.map((r) => r.statusCode).sort()).toEqual([204, 409]);
+    expect(await adminCount()).toBe(1);
+  });
+
+  it("two SCIM PATCH deactivations of the last two admins: one wins, the other is refused", async () => {
+    const { x, y } = await exactlyTwoAdmins();
+
+    const results = await raceRowLocks("users", 2, () =>
+      Promise.all(
+        [x.id, y.id].map((id) =>
+          testApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Users/${id}`,
+            headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [{ op: "replace", path: "active", value: false }],
+            },
+          }),
+        ),
+      ),
+    );
+
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    expect(await adminCount()).toBe(1);
+  });
+
+  it("two admins purging each other under GDPR: one wins, the other is refused", async () => {
+    const { x, y } = await exactlyTwoAdmins();
+
+    const results = await raceRowLocks("users", 2, () =>
+      Promise.all([
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/enterprise/users/${y.id}/purge`,
+          headers: { authorization: `Bearer ${x.token}` },
+        }),
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/enterprise/users/${x.id}/purge`,
+          headers: { authorization: `Bearer ${y.token}` },
+        }),
+      ]),
+    );
+
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
     expect(await adminCount()).toBe(1);
   });
 });

@@ -5,6 +5,9 @@ import { type db, schema } from "../db/index.js";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/** Advisory lock key every admin removal shares (next to MIGRATION_LOCK_KEY and USER_LIMIT_LOCK_KEY). */
+const LAST_ADMIN_LOCK_KEY = 7_421_004;
+
 /** The write would leave the instance with no admin. */
 export class LastAdminError extends Error {
   constructor() {
@@ -22,9 +25,15 @@ export class LastAdminError extends Error {
  * them run one after the other: each used to count two admins, write, and
  * leave none (#2231). The target's role is read again under the lock, since a
  * request that waited may find it already changed.
+ *
+ * Two rules keep it correct. Call it as the transaction's first statement:
+ * taking the advisory lock after a lock on a users row can deadlock against a
+ * remover holding the advisory lock and waiting on that row. And it relies on
+ * READ COMMITTED (the default): each statement after the wait sees what the
+ * request it waited for committed.
  */
 export async function assertNotLastAdmin(tx: Tx, userId: string): Promise<void> {
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('snapotter:last-admin'))`);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${LAST_ADMIN_LOCK_KEY})`);
   const [target] = await tx
     .select({ role: schema.users.role })
     .from(schema.users)

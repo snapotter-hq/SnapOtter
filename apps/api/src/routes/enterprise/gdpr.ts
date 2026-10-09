@@ -8,6 +8,7 @@ import { getQueue } from "../../jobs/queues.js";
 import { SYSTEM_JOBS } from "../../jobs/system-jobs.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
 import { deleteLibraryFileStorage } from "../../lib/library-cleanup.js";
 import { deletePrefix } from "../../lib/object-storage.js";
 import { canManageTargetRole, requirePermission } from "../../permissions.js";
@@ -21,6 +22,11 @@ const purgeBodySchema = z.object({
  * Extracted so it can be reused by the team purge endpoint.
  */
 async function purgeUserData(userId: string): Promise<void> {
+  // Refuse up front when this is the last admin, before any data goes. The
+  // final delete below checks again under the shared lock, which is what holds
+  // against a concurrent removal (#2231).
+  await db.transaction((tx) => assertNotLastAdmin(tx, userId));
+
   // a. Delete user's library files from storage
   const userFileRows = await db
     .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
@@ -82,17 +88,22 @@ async function purgeUserData(userId: string): Promise<void> {
     .set({ actorUsername: "[redacted]", ipAddress: null, details: {} })
     .where(eq(schema.auditLog.actorId, userId));
 
-  // g. Delete sessions
-  await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
+  // g-j. The account itself, under the lock every admin removal shares (#2231).
+  await db.transaction(async (tx) => {
+    await assertNotLastAdmin(tx, userId);
 
-  // h. Delete apiKeys
-  await db.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
+    // g. Delete sessions
+    await tx.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
 
-  // i. Delete userPreferences
-  await db.delete(schema.userPreferences).where(eq(schema.userPreferences.userId, userId));
+    // h. Delete apiKeys
+    await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, userId));
 
-  // j. Delete user row (also cascades pipelines)
-  await db.delete(schema.users).where(eq(schema.users.id, userId));
+    // i. Delete userPreferences
+    await tx.delete(schema.userPreferences).where(eq(schema.userPreferences.userId, userId));
+
+    // j. Delete user row (also cascades pipelines)
+    await tx.delete(schema.users).where(eq(schema.users.id, userId));
+  });
 }
 
 export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
@@ -288,7 +299,16 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Execute purge
-      await purgeUserData(targetUserId);
+      try {
+        await purgeUserData(targetUserId);
+      } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply
+            .status(409)
+            .send({ error: "Cannot purge the last admin", code: "LAST_ADMIN" });
+        }
+        throw err;
+      }
 
       // Emit audit event (admin as actor, target = purged userId)
       await auditFromRequest(request)("GDPR_USER_PURGED", {
@@ -373,9 +393,31 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(409).send({ error: "A team member is under individual legal hold" });
       }
 
+      // A team holding every admin would leave none; refuse before any purge
+      // rather than part way through the members (#2231).
+      const memberIds = new Set(teamUsers.map((member) => member.id));
+      const admins = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.role, "admin"));
+      if (admins.length > 0 && admins.every((admin) => memberIds.has(admin.id))) {
+        return reply
+          .status(409)
+          .send({ error: "Cannot purge a team containing every admin", code: "LAST_ADMIN" });
+      }
+
       // Purge each team member
       for (const member of teamUsers) {
-        await purgeUserData(member.id);
+        try {
+          await purgeUserData(member.id);
+        } catch (err) {
+          if (err instanceof LastAdminError) {
+            return reply
+              .status(409)
+              .send({ error: "Cannot purge the last admin", code: "LAST_ADMIN" });
+          }
+          throw err;
+        }
       }
 
       // Delete the team itself

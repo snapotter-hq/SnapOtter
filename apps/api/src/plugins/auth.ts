@@ -1461,22 +1461,36 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // Loaded here rather than at the top: it reaches the preview route and the
       // logger, which the auth plugin otherwise has no need to pull in.
       const { deleteLibraryFileStorage } = await import("../lib/library-cleanup.js");
+      // Refuse the last admin before anything is removed. The row deletes below
+      // check again under the lock every admin removal shares, which is what
+      // holds against two admins deleting each other at once (#2231).
+      try {
+        await db.transaction((tx) => assertNotLastAdmin(tx, id));
+      } catch (err) {
+        if (err instanceof LastAdminError) {
+          return reply.status(400).send({
+            error: "Cannot delete the last admin",
+            code: "LAST_ADMIN",
+          });
+        }
+        throw err;
+      }
+
+      // The FK cascade below drops the user's user_files rows but not what they
+      // point at, so clear the stored files, thumbnails, and previews first (#1405).
+      // A storage delete that fails stops the user delete (#1455). This runs
+      // outside the lock so storage IO never holds up other admin removals.
+      const libraryFiles = await db
+        .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, id));
+      for (const file of libraryFiles) {
+        await deleteLibraryFileStorage(file);
+      }
+
       try {
         await db.transaction(async (tx) => {
-          // Last admin protection, under the lock every admin removal shares:
-          // two admins deleting each other each saw the other still there (#2231).
-          // It runs before the storage cleanup, so a refused delete keeps the files.
           await assertNotLastAdmin(tx, id);
-
-          // The FK cascade below drops the user's user_files rows but not what they
-          // point at, so clear the stored files, thumbnails, and previews first (#1405).
-          const libraryFiles = await tx
-            .select({ id: schema.userFiles.id, storedName: schema.userFiles.storedName })
-            .from(schema.userFiles)
-            .where(eq(schema.userFiles.userId, id));
-          for (const file of libraryFiles) {
-            await deleteLibraryFileStorage(file);
-          }
 
           // Delete associated sessions
           await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
