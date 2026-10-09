@@ -444,4 +444,57 @@ describe("applyEffects", () => {
     const result = await applyEffects(subject, original, {});
     expect(result.equals(subject)).toBe(true);
   });
+  // #2075: a bgType or flag that names an effect must produce it, not a silent no-op.
+  it("backgroundType blur blurs the original without blurEnabled", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createMultiColorImage(100, 100);
+    const result = await applyEffects(subject, original, { backgroundType: "blur" });
+    expect(result.equals(subject)).toBe(false);
+    const { data } = await sharp(result).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    // Right half of the subject is transparent, so the blurred original shows there.
+    const i = (50 * 100 + 90) * 4;
+    expect(data[i + 3]).toBe(255);
+  });
+
+  it("shadowEnabled without shadowOpacity uses the 35 default the UI shows", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const implicit = await applyEffects(subject, original, { shadowEnabled: true });
+    const explicit = await applyEffects(subject, original, {
+      shadowEnabled: true,
+      shadowOpacity: 35,
+    });
+    expect(implicit.equals(subject)).toBe(false);
+    expect(implicit.equals(explicit)).toBe(true);
+  });
+
+  it("expands a 3-digit hex color before compositing", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const short = await applyEffects(subject, original, {
+      backgroundType: "color",
+      backgroundColor: "#0f0",
+    });
+    const long = await applyEffects(subject, original, {
+      backgroundType: "color",
+      backgroundColor: "#00ff00",
+    });
+    expect(short.equals(long)).toBe(true);
+  });
+
+  it("expands 3-digit hex in gradient stops", async () => {
+    const subject = await createSubjectWithAlpha(100, 100);
+    const original = await createTestImage(100, 100, 3);
+    const short = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#f00",
+      gradientColor2: "#00f",
+    });
+    const long = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+    });
+    expect(short.equals(long)).toBe(true);
+  });
 });

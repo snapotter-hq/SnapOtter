@@ -373,6 +373,33 @@ describe("Remove Background", () => {
     expect(res.body).not.toMatch(/ENOENT|outputs\//);
   });
 
+  // Settings the compositor can't act on used to come back as a transparent or
+  // black image with a 200. They fail at the boundary now, before any stored
+  // cutout is read (#2075).
+  it.each([
+    ["a color that isn't hex", { backgroundType: "color", backgroundColor: "red" }],
+    ["a color background without a color", { backgroundType: "color" }],
+    ["a gradient missing a stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
+    ["an image background without the file", { backgroundType: "image" }],
+  ])("effects route answers 400 for %s (#2075)", async (_label, extra) => {
+    const res = await effectsFor({ jobId: randomUUID(), filename: "test.png", ...extra });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+  });
+
+  it("effects route reads past validation for 3-digit hex colors (#2075)", async () => {
+    const res = await effectsFor({
+      jobId: randomUUID(),
+      filename: "test.png",
+      backgroundType: "color",
+      backgroundColor: "#f00",
+    });
+
+    // Validation passed; the only thing missing is the stored cutout.
+    expect(res.statusCode).toBe(410);
+  });
+
   it("effects route answers 400 for a filename the store would refuse (#2119)", async () => {
     const res = await effectsFor({ jobId: randomUUID(), filename: "../../escape.png" });
 
@@ -472,6 +499,31 @@ describe("Remove Background", () => {
     if (res.statusCode === 400) {
       const result = JSON.parse(res.body);
       expect(result.error).toMatch(/invalid settings/i);
+    }
+  });
+
+  it("rejects a malformed background color (#2075)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ backgroundType: "color", backgroundColor: "red" }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect([400, 501]).toContain(res.statusCode);
+    if (res.statusCode === 400) {
+      expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
     }
   });
 

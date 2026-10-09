@@ -25,6 +25,7 @@ import {
   applyEffects,
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
+  HEX_COLOR_PATTERN,
 } from "../../lib/bg-effects.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
@@ -48,30 +49,70 @@ import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-const settingsSchema = z.object({
-  model: z.enum(BG_REMOVAL_MODELS).optional(),
-  backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
-  backgroundColor: z.string().optional(),
-  gradientColor1: z.string().optional(),
-  gradientColor2: z.string().optional(),
+const hexColor = z.string().regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
+
+const BACKGROUND_TYPES = ["transparent", "color", "gradient", "blur", "image"] as const;
+
+const backgroundFields = {
+  backgroundColor: hexColor.optional(),
+  gradientColor1: hexColor.optional(),
+  gradientColor2: hexColor.optional(),
   gradientAngle: z.number().optional(),
   blurEnabled: z.boolean().optional(),
   blurIntensity: z.number().min(0).max(100).optional(),
   shadowEnabled: z.boolean().optional(),
   shadowOpacity: z.number().min(0).max(100).optional(),
   outputFormat: z.enum(["png", "webp", "avif"]).optional(),
+};
+
+/** A color or gradient background has to say which colors, or it comes back transparent (#2075). */
+function requireBackgroundColors(
+  s: {
+    backgroundType?: string;
+    backgroundColor?: string;
+    gradientColor1?: string;
+    gradientColor2?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (s.backgroundType === "color" && !s.backgroundColor) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["backgroundColor"],
+      message: "A color background needs backgroundColor",
+    });
+  }
+  if (s.backgroundType === "gradient") {
+    for (const key of ["gradientColor1", "gradientColor2"] as const) {
+      if (!s[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: "A gradient background needs gradientColor1 and gradientColor2",
+        });
+      }
+    }
+  }
+}
+
+const settingsShape = z.object({
+  model: z.enum(BG_REMOVAL_MODELS).optional(),
+  backgroundType: z.enum(BACKGROUND_TYPES).optional(),
+  ...backgroundFields,
   edgeRefine: z.number().int().min(0).max(3).optional(),
   decontaminate: z.boolean().optional(),
 });
+
+const settingsSchema = settingsShape.superRefine(requireBackgroundColors);
 
 type RemoveBgSettings = z.infer<typeof settingsSchema>;
 
 // Pipelines and batches carry settings as JSON, so an uploaded background image
 // can't reach the worker. Reject the type up front instead of returning a
 // cutout with the background silently dropped (#1047).
-const pipelineSettingsSchema = settingsSchema.extend({
-  backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional(),
-});
+const pipelineSettingsSchema = settingsShape
+  .extend({ backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional() })
+  .superRefine(requireBackgroundColors);
 
 /**
  * Composite the cutout over the requested background and name the result.
@@ -358,20 +399,14 @@ export function registerRemoveBackground(app: FastifyInstance) {
         return reply.status(400).send({ error: "No settings provided" });
       }
 
-      const effectsSchema = z.object({
-        jobId: z.string().min(1),
-        filename: z.string().min(1),
-        backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
-        backgroundColor: z.string().optional(),
-        gradientColor1: z.string().optional(),
-        gradientColor2: z.string().optional(),
-        gradientAngle: z.number().optional(),
-        blurEnabled: z.boolean().optional(),
-        blurIntensity: z.number().min(0).max(100).optional(),
-        shadowEnabled: z.boolean().optional(),
-        shadowOpacity: z.number().min(0).max(100).optional(),
-        outputFormat: z.enum(["png", "webp", "avif"]).optional(),
-      });
+      const effectsSchema = z
+        .object({
+          jobId: z.string().min(1),
+          filename: z.string().min(1),
+          backgroundType: z.enum(BACKGROUND_TYPES).optional(),
+          ...backgroundFields,
+        })
+        .superRefine(requireBackgroundColors);
 
       let settings: z.infer<typeof effectsSchema>;
       try {
@@ -386,6 +421,14 @@ export function registerRemoveBackground(app: FastifyInstance) {
         settings = result.data;
       } catch {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      // Without the file this type falls through to a transparent result (#2075).
+      if (settings.backgroundType === "image" && !bgImageBuffer) {
+        return reply.status(400).send({
+          error: "Invalid settings",
+          details: "backgroundType: An image background needs a backgroundImage file",
+        });
       }
 
       const { jobId, filename } = settings;
