@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { SafeError } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as OTPAuth from "otpauth";
 import { z } from "zod";
@@ -75,6 +75,50 @@ export function verifyRecoveryCode(
   if (idx === -1) return { valid: false, remaining: hashList };
   hashes.splice(idx, 1);
   return { valid: true, remaining: hashes.join(",") };
+}
+
+/** What happened when a recovery code was offered at login. */
+type RecoveryOutcome = "consumed" | "invalid" | "spent_concurrently";
+
+/**
+ * Spends a recovery code. "consumed" only if this call removed it from the
+ * stored list: the write is conditional on the list that was read, so two logins
+ * at once can't both spend the same code or write back a list that revives one
+ * the other just spent (#2275).
+ *
+ * Losing the race re-reads the list and tries again. Each lost round means a
+ * different code was spent, so the list shrinks by at least one and as many
+ * rounds as there are hashes can't run out while the code is still spendable:
+ * contention never refuses a valid code. "spent_concurrently" is the case where
+ * the code was valid when read and gone when re-read, i.e. someone else used
+ * this exact code in the same moment. It reads as a wrong code to the caller,
+ * but is audited and logged apart, since two people holding one code is worth
+ * seeing. The conditional update assumes READ COMMITTED, Postgres's default.
+ */
+export async function consumeRecoveryCode(
+  userId: string,
+  code: string,
+  storedList: string,
+): Promise<RecoveryOutcome> {
+  let list = storedList;
+  const rounds = storedList.split(",").length;
+  for (let round = 0; round < rounds; round++) {
+    const result = verifyRecoveryCode(code, list);
+    if (!result.valid) return round === 0 ? "invalid" : "spent_concurrently";
+    const updated = await db
+      .update(schema.users)
+      .set({ recoveryCodesHash: result.remaining || null, updatedAt: new Date() })
+      .where(and(eq(schema.users.id, userId), eq(schema.users.recoveryCodesHash, list)))
+      .returning({ id: schema.users.id });
+    if (updated.length > 0) return "consumed";
+    const [fresh] = await db
+      .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+    if (!fresh?.recoveryCodesHash) return "spent_concurrently";
+    list = fresh.recoveryCodesHash;
+  }
+  return "spent_concurrently";
 }
 
 function generateRecoveryCodes(): string[] {
@@ -456,16 +500,15 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Try recovery code if TOTP failed
+      let recoveryRace = false;
       if (!verified && dbUser.recoveryCodesHash) {
-        const result = verifyRecoveryCode(code, dbUser.recoveryCodesHash);
-        if (result.valid) {
+        const outcome = await consumeRecoveryCode(userId, code, dbUser.recoveryCodesHash);
+        if (outcome === "consumed") {
           verified = true;
           recoveryUsed = true;
-          // Consume the recovery code
-          await db
-            .update(schema.users)
-            .set({ recoveryCodesHash: result.remaining || null, updatedAt: new Date() })
-            .where(eq(schema.users.id, userId));
+        } else if (outcome === "spent_concurrently") {
+          recoveryRace = true;
+          logger.warn({ userId }, "A recovery code was used by two logins at once; refusing one");
         }
       }
 
@@ -479,7 +522,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         if (attempts >= MFA_MAX_FAILED_ATTEMPTS) {
           await redis.del(`mfa:${mfaToken}`, attemptsKey);
         }
-        await audit("MFA_VERIFY_FAILED", { userId, username: dbUser.username });
+        await audit("MFA_VERIFY_FAILED", {
+          userId,
+          username: dbUser.username,
+          ...(recoveryRace && { reason: "recovery_code_spent_concurrently" }),
+        });
         return reply.status(401).send({
           error: "Invalid TOTP or recovery code",
           code: "INVALID_CODE",

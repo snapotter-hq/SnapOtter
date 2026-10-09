@@ -12,6 +12,7 @@ const { buildTestApp, loginAsAdmin, loginAsUser, createUserAndLogin } = await im
 );
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { verifyRecoveryCode } = await import("../../../apps/api/src/plugins/mfa.js");
 
 import type { TestApp } from "../test-server.js";
 
@@ -796,6 +797,75 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
       payload: { mfaToken, code: `${code.slice(0, 3)} ${code.slice(3)}` },
     });
     expect(res.statusCode).toBe(200);
+  });
+
+  describe("simultaneous recovery-code logins (#2275)", () => {
+    async function enrollAdmin(): Promise<string[]> {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const { uri, recoveryCodes } = JSON.parse(enrollRes.body);
+      await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: generateTotpCode(uri) },
+      });
+      return recoveryCodes as string[];
+    }
+
+    async function challenge(): Promise<string> {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: "admin", password: "Adminpass1" },
+      });
+      return JSON.parse(res.body).mfaToken as string;
+    }
+
+    function complete(mfaToken: string, code: string) {
+      return testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code },
+      });
+    }
+
+    it("lets one of two logins using the same code in, and refuses the other", async () => {
+      const codes = await enrollAdmin();
+      const [first, second] = [await challenge(), await challenge()];
+
+      const [a, b] = await Promise.all([complete(first, codes[0]), complete(second, codes[0])]);
+
+      expect([a.statusCode, b.statusCode].sort()).toEqual([200, 401]);
+      const [dbUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, "admin"));
+      expect((dbUser.recoveryCodesHash ?? "").split(",").filter(Boolean)).toHaveLength(
+        codes.length - 1,
+      );
+    });
+
+    it("lets two logins using different codes both in, and spends both codes", async () => {
+      const codes = await enrollAdmin();
+      const [first, second] = [await challenge(), await challenge()];
+
+      const [a, b] = await Promise.all([complete(first, codes[0]), complete(second, codes[1])]);
+
+      expect([a.statusCode, b.statusCode]).toEqual([200, 200]);
+      const [dbUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, "admin"));
+      const remaining = (dbUser.recoveryCodesHash ?? "").split(",").filter(Boolean);
+      expect(remaining).toHaveLength(codes.length - 2);
+      // Neither spent code comes back.
+      expect(verifyRecoveryCode(codes[0], dbUser.recoveryCodesHash ?? "").valid).toBe(false);
+      expect(verifyRecoveryCode(codes[1], dbUser.recoveryCodesHash ?? "").valid).toBe(false);
+    });
   });
 
   it("burns the last remaining recovery code to an empty stored list", async () => {
