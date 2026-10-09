@@ -469,12 +469,12 @@ describe("image-to-base64", () => {
     expect(json.results[0].height).toBeLessThanOrEqual(50);
   });
 
-  // ── Branch coverage: line 83 (ignored invalid settings JSON) ──────
+  // ── Unparseable settings JSON answers 400 (#2224) ─────────────────
 
-  it("ignores invalid settings JSON (uses defaults)", async () => {
+  it("answers 400 when the settings field is not valid JSON", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      { name: "settings", content: "not-json-at-all" },
+      { name: "settings", content: "{not json" },
     ]);
 
     const res = await app.inject({
@@ -484,11 +484,64 @@ describe("image-to-base64", () => {
       body,
     });
 
-    // The route silently ignores invalid JSON and uses defaults
+    // Same answer as meme-generator and the tool factory: a client that
+    // mistyped its settings must not get a default-encoded result back.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Settings must be valid JSON");
+    expect(json.results).toBeUndefined();
+  });
+
+  it("answers 400 for unparseable settings even when the field arrives before the file", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: "not-json-at-all" },
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe("Settings must be valid JSON");
+  });
+
+  it("treats an empty settings field as the defaults, like the tool factory", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.results).toHaveLength(1);
-    expect(json.results[0].mimeType).toContain("image/");
+    expect(json.results[0].mimeType).toBe("image/png");
+  });
+
+  it("still rejects a missing file before looking at unparseable settings", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "settings", content: "{not json" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain("No image files");
   });
 
   // ── Branch coverage: lines 149-150 (default case in outputFormat switch) ──
