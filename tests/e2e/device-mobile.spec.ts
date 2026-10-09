@@ -245,6 +245,68 @@ test.describe("@mobile Organize PDF on a phone", () => {
 });
 
 // ---------------------------------------------------------------------------
+// #2192: more phone views were taller than the preview area and covered the
+// "Process" peek bar or the Settings button. The bars now stack above the preview
+// content, and the views that overflowed are bounded.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Small phones keep the settings controls tappable", () => {
+  async function expectControlsTappable(page: import("@playwright/test").Page) {
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await page
+      .getByRole("button", { name: "Process", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  }
+
+  test.describe("QR code preview", () => {
+    test.use({ viewport: { width: 360, height: 560 } });
+
+    test("an empty QR preview does not cover the peek bar", async ({ loggedInPage: page }) => {
+      await page.goto("/image/qr-generate");
+      await expect(page.getByTestId("qr-preview")).toBeVisible({ timeout: 15_000 });
+
+      await expectControlsTappable(page);
+    });
+  });
+
+  test.describe("a failed run", () => {
+    test.use({ viewport: { width: 320, height: 480 } });
+
+    test("the failed-file card does not cover the controls", async ({ loggedInPage: page }) => {
+      await page.route("**/api/v1/tools/image/resize", (route) =>
+        route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error:
+              "Processing failed because the server could not decode this image. It may be corrupt, truncated, or in a format the converter does not support. Try a different file, a smaller size, or export it again from the program that made it.",
+          }),
+        }),
+      );
+      await page.goto("/image/resize");
+      await uploadTestImage(page);
+      await page.getByRole("button", { name: "Process", exact: true }).click();
+      await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+      await page
+        .getByRole("button", { name: /^resize$/i })
+        .last()
+        .click();
+      await expect(page.getByText(/could not decode this image/i).first()).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.getByRole("dialog").getByRole("button", { name: /close/i }).click();
+      await expect(page.locator("[role='dialog']")).toBeHidden();
+
+      await expectControlsTappable(page);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Responsive chrome: mobile-bottom-nav, hamburger, tool-grid, footer hidden
 // ---------------------------------------------------------------------------
 test.describe("@mobile Responsive chrome", () => {
