@@ -99,6 +99,48 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   };
 });
 
+// Runs once right after the library auto-save's own blob write (#2143),
+// standing in for a cancel that arrives while autoSaveToLibrary is still
+// uploading. The hook gets the stored name so the test can check the blob.
+// Setting `fail` makes that upload fail once the hook has run: the blob is
+// removed and the save rejects, as a storage fault would.
+const librarySaveHook = vi.hoisted(() => ({
+  after: null as ((storedName: string) => Promise<void>) | null,
+  fail: false,
+}));
+
+// Fails the removal of one stored library blob (#2143), standing in for a
+// storage outage when a canceled save takes its blob back.
+const libraryDeleteFault = vi.hoisted(() => ({ storedName: null as string | null }));
+
+vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
+  return {
+    ...actual,
+    saveFile: async (buffer: Buffer, originalName: string) => {
+      const storedName = await actual.saveFile(buffer, originalName);
+      const run = librarySaveHook.after;
+      if (run) {
+        librarySaveHook.after = null;
+        await run(storedName);
+      }
+      if (librarySaveHook.fail) {
+        librarySaveHook.fail = false;
+        await actual.deleteStoredFile(storedName);
+        throw new Error("injected library save outage");
+      }
+      return storedName;
+    },
+    deleteStoredFile: async (storedName: string) => {
+      if (storedName === libraryDeleteFault.storedName) {
+        throw new Error("injected blob delete outage");
+      }
+      return actual.deleteStoredFile(storedName);
+    },
+  };
+});
+
+import type { LibrarySaveMode } from "@snapotter/shared";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import {
@@ -121,6 +163,7 @@ import {
 import { closeQueues, getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { closeWorkers, startWorkers } from "../../../apps/api/src/jobs/worker.js";
+import { readStoredFile } from "../../../apps/api/src/lib/file-storage.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import { listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
@@ -271,6 +314,9 @@ interface EnqueueOpts {
   clientJobId?: string;
   userId?: string | null;
   jobId?: string;
+  /** A library file the run came from; the worker auto-saves the result against it. */
+  fileId?: string;
+  saveMode?: LibrarySaveMode;
 }
 
 /** Enqueue a single-tool run the way every tool route does. */
@@ -291,8 +337,26 @@ async function enqueueSingleRun(
     filename: "input.png",
     settings: { mode: opts.mode, tag: opts.tag },
     clientJobId: opts.clientJobId,
+    fileId: opts.fileId,
+    saveMode: opts.saveMode,
   });
   return { jobId, userId };
+}
+
+/** Insert a library file owned by `userId`, the original a run would overwrite. */
+async function createLibraryFile(userId: string): Promise<string> {
+  const id = randomUUID();
+  await db.insert(schema.userFiles).values({
+    id,
+    userId,
+    originalName: "input.png",
+    storedName: `${randomUUID()}.png`,
+    mimeType: "image/png",
+    size: 7,
+    version: 1,
+    toolChain: [],
+  });
+  return id;
 }
 
 beforeAll(async () => {
@@ -558,6 +622,252 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(row.status).toBe("canceled");
     expect(row.attempts).toBe(2);
     expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+  });
+
+  it("does not replace the library original when the cancel lands during the auto-save (#2143)", async () => {
+    // Past every guard in the worker: the cancel arrives while
+    // autoSaveToLibrary has written its blob and is about to insert the
+    // version row. Nothing may be saved, and the blob has to go with the
+    // job's own outputs.
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    // The hook runs inside the worker's save, where a throw would turn into a
+    // failed save instead of failing here; record it and assert it below.
+    const hook = { storedName: null as string | null, error: null as unknown };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(true);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-mid-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("canceled");
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      // The original alone: no superseding version and no independent copy.
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      if (!hook.storedName) throw new Error("the library save never wrote its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+    }
+  });
+
+  it("still settles canceled, and reports the orphan, when the canceled save cannot remove its blob (#2143)", async () => {
+    // A storage outage while the canceled save takes its blob back must not
+    // turn the cancel into a retried failure or let the version row in. The
+    // blob stays behind, and the log line is the only thing that names it.
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null, error: null as unknown };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      libraryDeleteFault.storedName = storedName;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(true);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-save-delete-fault",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+
+      const orphanLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) =>
+          msg === "canceled library auto-save could not remove its blob; it is an orphan" &&
+          (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(orphanLogs).toHaveLength(1);
+      expect(orphanLogs[0]?.[0]).toMatchObject({ storedName: hook.storedName, fileId });
+      expect(reported.filter((r) => r.jobId === jobId).map((r) => r.message)).toContain(
+        "injected blob delete outage",
+      );
+      // The fault was real: the blob is still there under the logged name.
+      if (!hook.storedName) throw new Error("the library save never wrote its blob");
+      await expect(readStoredFile(hook.storedName)).resolves.toBeInstanceOf(Buffer);
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      libraryDeleteFault.storedName = null;
+      errorLog.mockRestore();
+    }
+  });
+
+  it("settles canceled, and logs the fault, when the save fails as the cancel lands (#2143)", async () => {
+    // A storage fault that coincides with a cancel must not hide behind it (the
+    // warning carries it) or replace it (the job still settles canceled, with
+    // no retry and no "tool job failed").
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { ran: false, error: null as unknown };
+    librarySaveHook.after = async () => {
+      hook.ran = true;
+      librarySaveHook.fail = true;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(true);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    const warnLog = vi.spyOn(logger, "warn");
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-save-fault",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.ran).toBe(true);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+
+      const faultLogs = warnLog.mock.calls.filter(
+        ([ctx, msg]) =>
+          msg === "library auto-save failed; no library copy was made" &&
+          (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(faultLogs).toHaveLength(1);
+      expect(faultLogs[0]?.[0]).toMatchObject({
+        err: expect.objectContaining({ message: "injected library save outage" }),
+      });
+      const failureLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(failureLogs).toEqual([]);
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      librarySaveHook.fail = false;
+      warnLog.mockRestore();
+      errorLog.mockRestore();
+    }
+  });
+
+  it("completes with the version when the cancel lands right after the version row (#2143)", async () => {
+    // The earliest point where a cancel is too late: the row is in, and the
+    // save has not returned to the worker yet. The job completes and keeps the
+    // version and its blob, so no check after the save may undo it.
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { ran: false, error: null as unknown };
+    const afterVersionRow = async () => {
+      hook.ran = true;
+      try {
+        await requestCancel(clientJobId);
+        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    // Every insert runs for real; only the version row under this test's file
+    // also runs the cancel once it has landed.
+    const realInsert = db.insert.bind(db);
+    const insertSpy = vi.spyOn(db, "insert").mockImplementation(((
+      table: Parameters<typeof db.insert>[0],
+    ) => {
+      const builder = realInsert(table);
+      if (table !== schema.userFiles) return builder;
+      const realValues = builder.values.bind(builder);
+      builder.values = ((row: { parentId?: string | null }) => {
+        const query = realValues(row as never);
+        if (row.parentId !== fileId) return query;
+        return query.then(async (result: unknown) => {
+          await afterVersionRow();
+          return result;
+        });
+      }) as typeof builder.values;
+      return builder;
+    }) as typeof db.insert);
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-after-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(hook.ran).toBe(true);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("completed");
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      const versions = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.parentId, fileId));
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ userId: owner, version: 2 });
+      await expect(readStoredFile(versions[0]?.storedName ?? "")).resolves.toBeInstanceOf(Buffer);
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+    } finally {
+      insertSpy.mockRestore();
+    }
   });
 
   it("surfaces an active cancel to the sync window as the Canceled rejection", async () => {
