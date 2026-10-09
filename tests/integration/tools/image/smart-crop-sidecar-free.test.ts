@@ -175,6 +175,36 @@ describe("smart-crop sidecar-free processing", () => {
     expect(meta.height).toBe(80);
   });
 
+  it("fails a trim of a 2 x 2 image as rejected input, not a server fault", async () => {
+    // Sharp cannot trim a side under 3 pixels and used to throw a bare Error that
+    // the worker reported as a bug (#2202).
+    const tiny = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#ff0000" },
+    })
+      .png()
+      .toBuffer();
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "tiny.png", contentType: "image/png", content: tiny },
+      { name: "settings", content: JSON.stringify({ mode: "trim" }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // A long tool answers 202 and the worker's ToolInputError fails the job with
+    // its message; a sync answer carries the same message as a 400.
+    expect([202, 400]).toContain(res.statusCode);
+    const parsed = JSON.parse(res.body);
+    if (res.statusCode === 400) {
+      expect(parsed.error).toMatch(/too small to trim/);
+      return;
+    }
+    await expect(waitForJob("ai", parsed.jobId, 20_000)).rejects.toThrow(/too small to trim/);
+  });
+
   it("rejects malformed JSON and invalid setting ranges before enqueueing", async () => {
     const malformed = await postSmartCrop("{bad json");
     expect(malformed.statusCode).toBe(400);
