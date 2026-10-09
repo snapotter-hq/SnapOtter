@@ -707,6 +707,23 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const [bgFilename, setBgFilename] = useState<string | null>(null);
   const [bgOriginalUrl, setBgOriginalUrl] = useState<string | null>(null);
   const [_effectsDownloadUrl, setEffectsDownloadUrl] = useState<string | null>(null);
+
+  // A finished removal belongs to the files it ran on. Once that set changes
+  // (compared by File identity, so a status update on the same entries keeps
+  // it), its download and effects would act on a job for files no longer
+  // loaded (#2107).
+  const resultFilesRef = useRef(files);
+  useEffect(() => {
+    const previous = resultFilesRef.current;
+    resultFilesRef.current = files;
+    const sameFiles =
+      previous.length === files.length && previous.every((file, i) => file === files[i]);
+    if (sameFiles) return;
+    setBgJobId(null);
+    setBgFilename(null);
+    setBgOriginalUrl(null);
+    setEffectsDownloadUrl(null);
+  }, [files]);
   const [applyingEffects, setApplyingEffects] = useState(false);
   const [effectsError, setEffectsError] = useState<string | null>(null);
 
