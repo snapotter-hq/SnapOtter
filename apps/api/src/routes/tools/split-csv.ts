@@ -5,6 +5,8 @@ import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
+import { csvParseFailure } from "../../lib/csv-parse.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -28,8 +30,9 @@ export function registerSplitCsv(app: FastifyInstance) {
         header: false,
         skipEmptyLines: true,
       });
-      if (parsed.errors.length > 0) {
-        throw new Error(`CSV parse failed: ${parsed.errors[0].message}`);
+      const parseFailure = csvParseFailure(parsed.errors);
+      if (parseFailure) {
+        throw new InputValidationError(`CSV parse failed: ${parseFailure}`);
       }
       const allRows = parsed.data;
       if (allRows.length === 0) {

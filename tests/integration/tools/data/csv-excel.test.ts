@@ -66,6 +66,19 @@ describe("csv-excel (pure JS, no skipIf)", () => {
     expect(sstXml).toContain("name");
   }, 30_000);
 
+  it("converts a single-column CSV to XLSX instead of refusing it (#2099)", async () => {
+    const res = await runTool("emails.csv", Buffer.from("email\r\na@x.io\r\nb@x.io"));
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    const zip = new AdmZip(Buffer.from(dl.rawPayload));
+    const sst = zip.getEntry("xl/sharedStrings.xml")?.getData().toString("utf8") ?? "";
+    expect(sst).toContain("a@x.io");
+    expect(sst).toContain("b@x.io");
+  }, 30_000);
+
   it("converts TSV to XLSX with PK magic", async () => {
     const res = await runTool("tiny.tsv", TSV);
     expect(res.statusCode).toBe(200);

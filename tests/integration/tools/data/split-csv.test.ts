@@ -65,6 +65,50 @@ describe("split-csv (pure JS, no skipIf)", () => {
     }
   }, 30_000);
 
+  it("splits a single-column CSV instead of refusing it (#2099)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "emails.csv",
+        contentType: "text/csv",
+        content: Buffer.from("email\r\na@x.io\r\nb@x.io"),
+      },
+      { name: "settings", content: JSON.stringify({ rowsPerFile: 1, keepHeader: true }) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/split-csv",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    const zip = new AdmZip(Buffer.from(dl.rawPayload));
+    expect(zip.getEntries().length).toBe(2);
+  }, 30_000);
+
+  it("answers 400, not 422, for a CSV with a real parse error (#2099)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "broken.csv",
+        contentType: "text/csv",
+        content: Buffer.from('a,b\r\n"unterminated,1'),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/split-csv",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
   it("splits a TSV file correctly with rowsPerFile 1", async () => {
     const { body: tsvBody, contentType: tsvCt } = createMultipartPayload([
       {

@@ -117,6 +117,21 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(dl.payload).toContain("key1,value");
   }, 30_000);
 
+  it("converts a single-column CSV instead of refusing it (#2099)", async () => {
+    const res = await runTool("emails.csv", Buffer.from("email\r\na@x.io\r\nb@x.io"));
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(JSON.parse(dl.payload)).toEqual([{ email: "a@x.io" }, { email: "b@x.io" }]);
+  }, 30_000);
+
+  it("still refuses a CSV with a real parse error (#2099)", async () => {
+    const res = await runTool("broken.csv", Buffer.from('a,b\r\n"unterminated,1'));
+    expect(res.statusCode).toBe(400);
+  }, 30_000);
+
   it("keeps a __proto__ column in JSON-to-CSV (#2062)", async () => {
     const res = await runTool("proto.json", Buffer.from('[{"__proto__": {"a": 1}, "x": 1}]'));
     expect(res.statusCode).toBe(200);

@@ -51,6 +51,38 @@ describe("merge-csvs (pure JS, no skipIf)", () => {
     expect(text).toContain("beta");
   }, 30_000);
 
+  it("merges single-column CSVs instead of refusing them (#2099)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("email\r\na@x.io"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("email\r\nb@x.io"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.payload).toContain("a@x.io");
+    expect(dl.payload).toContain("b@x.io");
+  }, 30_000);
+
   it("rejects mismatched headers with 400", async () => {
     const bad = Buffer.from("x,y\n10,20\n");
     const { body, contentType } = createMultipartPayload([

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import { z } from "zod";
+import { csvParseFailure } from "../../lib/csv-parse.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -26,8 +27,9 @@ export function registerMergeCsvs(app: FastifyInstance) {
         header: true,
         skipEmptyLines: true,
       });
-      if (firstResult.errors.length > 0) {
-        throw new InputValidationError(`CSV parse failed: ${firstResult.errors[0].message}`);
+      const firstFailure = csvParseFailure(firstResult.errors);
+      if (firstFailure) {
+        throw new InputValidationError(`CSV parse failed: ${firstFailure}`);
       }
 
       const fields = firstResult.meta.fields ?? [];
@@ -43,10 +45,9 @@ export function registerMergeCsvs(app: FastifyInstance) {
           header: true,
           skipEmptyLines: true,
         });
-        if (result.errors.length > 0) {
-          throw new InputValidationError(
-            `CSV parse failed in ${input.filename}: ${result.errors[0].message}`,
-          );
+        const failure = csvParseFailure(result.errors);
+        if (failure) {
+          throw new InputValidationError(`CSV parse failed in ${input.filename}: ${failure}`);
         }
 
         const otherFields = new Set(result.meta.fields ?? []);
