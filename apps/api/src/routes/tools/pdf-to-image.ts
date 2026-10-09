@@ -780,9 +780,19 @@ export function registerPdfToImageRoute(
         zipSize: zipBuffer.length,
       });
     } catch (err) {
+      // Raised before the first page is written, so there is nothing to clear.
       if (err instanceof PdfInputError) {
         return reply.status(400).send({ error: err.message });
       }
+      // No response will link to the pages written so far, and no jobs row
+      // exists for retention or GDPR deletion to find them. On a full
+      // workspace they are also the space the next request needs (#2158).
+      await deletePrefix(`outputs/${jobId}`).catch((cleanupErr) =>
+        request.log.warn(
+          { err: cleanupErr, jobId, toolId: opts.toolId },
+          "cleanup of a failed PDF conversion failed",
+        ),
+      );
       if (hasServerErrorStatus(err)) throw err;
       request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");
       return reply.status(422).send({
