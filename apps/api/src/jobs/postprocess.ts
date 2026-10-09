@@ -180,6 +180,27 @@ export interface AutoSaveOpts {
   outName: string;
   contentType: string;
   toolId: string;
+  /** The job the output belongs to, for the logs and the error report. */
+  jobId: string;
+  /**
+   * The worker's userCancelSignal, never the job's own signal: a deadline that
+   * fired under a handler that returned anyway must not stop the save (#2144).
+   * A cancel that lands before the version row stops the save and takes the
+   * blob back; one that lands after it is too late, and the job completes with
+   * the version (#2143).
+   */
+  userCancel?: AbortSignal;
+}
+
+/**
+ * The save stopping itself for a user cancel. Told apart by type, so a storage
+ * or database fault is never mistaken for it, whatever its message says.
+ */
+class AutoSaveCanceledError extends Error {
+  constructor() {
+    super("Canceled");
+    this.name = "AutoSaveCanceledError";
+  }
 }
 
 /**
@@ -191,7 +212,11 @@ export interface AutoSaveOpts {
  *   - "overwrite": new version linked to the parent (version + 1, parentId),
  *     which supersedes the original in the list.
  *
- * Returns the new file ID on success, undefined when no fileId or on error.
+ * Returns `{ fileId }` on success, `{ error }` when over quota or on a save
+ * failure, or `{}` when there is no fileId or no such file of the requester's.
+ * Rejects when a user cancel landed before the version row (#2143): with
+ * "Canceled", or with the save's own error if it failed meanwhile. Either way
+ * the worker's catch settles the job canceled instead of completing it.
  */
 export async function autoSaveToLibrary(
   opts: AutoSaveOpts,
@@ -200,13 +225,15 @@ export async function autoSaveToLibrary(
 
   let storedName: string | undefined;
   try {
-    const { saveFile, deleteStoredFile } = await import("../lib/file-storage.js");
+    const { deleteStoredFile, saveFile } = await import("../lib/file-storage.js");
     const { quotaRefusal } = await import("../lib/quota.js");
 
     const [parent] = await db
       .select()
       .from(schema.userFiles)
       .where(eq(schema.userFiles.id, opts.fileId));
+    // Nothing is written yet, so a cancel that landed by now just stops here.
+    if (opts.userCancel?.aborted) throw new AutoSaveCanceledError();
     if (!parent) return {};
 
     const parentUserId = parent.userId;
@@ -217,8 +244,6 @@ export async function autoSaveToLibrary(
     const overwrite = opts.saveMode === "overwrite";
     const parentChain: string[] = parent.toolChain ?? [];
     const newToolChain = [...parentChain, opts.toolId];
-
-    // Write blob
     storedName = await saveFile(opts.buffer, opts.outName);
 
     // Output dimensions: sharp for images, ffprobe for video; null where N/A
@@ -248,6 +273,22 @@ export async function autoSaveToLibrary(
       } finally {
         await rm(probeDir, { recursive: true, force: true }).catch(() => {});
       }
+    }
+
+    // The last point a cancel can stop the save (#2143). Past it the version
+    // row goes in, and a cancel is too late.
+    if (opts.userCancel?.aborted) {
+      try {
+        await deleteStoredFile(storedName);
+      } catch (err) {
+        // Nothing references the blob, so this is the only record of it.
+        logger.error(
+          { err, jobId: opts.jobId, storedName, fileId: opts.fileId, toolId: opts.toolId },
+          "canceled library auto-save could not remove its blob; it is an orphan",
+        );
+        void reportError(err, { source: "worker", toolId: opts.toolId, jobId: opts.jobId });
+      }
+      throw new AutoSaveCanceledError();
     }
 
     const newId = randomUUID();
@@ -281,26 +322,56 @@ export async function autoSaveToLibrary(
       if (storedName) {
         await deleteStoredFile(storedName).catch((cleanupErr) => {
           logger.error(
-            { err: cleanupErr, storedName },
+            {
+              err: cleanupErr,
+              jobId: opts.jobId,
+              storedName,
+              fileId: opts.fileId,
+              toolId: opts.toolId,
+            },
             "Failed to delete orphaned file during quota rejection",
           );
         });
       }
+      if (opts.userCancel?.aborted) throw new AutoSaveCanceledError();
       return result;
     }
 
     return result;
   } catch (err) {
+    // The save stopped for a cancel and has dealt with its blob (removed, or
+    // logged as an orphan). The worker's catch settles the job canceled and
+    // removes its outputs (#2143).
+    if (err instanceof AutoSaveCanceledError) throw err;
     if (storedName) {
       const { deleteStoredFile } = await import("../lib/file-storage.js");
       await deleteStoredFile(storedName).catch((cleanupErr) => {
         logger.error(
-          { err: cleanupErr, storedName },
+          {
+            err: cleanupErr,
+            jobId: opts.jobId,
+            storedName,
+            fileId: opts.fileId,
+            toolId: opts.toolId,
+          },
           "Failed to delete orphaned file after auto-save error",
         );
       });
     }
-    await reportError(err as Error, { source: "worker", toolId: opts.toolId });
+    logger.warn(
+      { err, jobId: opts.jobId, storedName, fileId: opts.fileId, toolId: opts.toolId },
+      "library auto-save failed; no library copy was made",
+    );
+    await reportError(err as Error, {
+      source: "worker",
+      toolId: opts.toolId,
+      jobId: opts.jobId,
+    });
+    // A cancel that landed while the save was failing still settles the job
+    // canceled, now that the failure is on record.
+    if (opts.userCancel?.aborted) throw err;
+    // Non-fatal otherwise: the tool already succeeded, and the result stays
+    // downloadable without a library copy.
     return { error: "An unexpected system error prevented saving to your library." };
   }
 }

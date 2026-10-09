@@ -523,6 +523,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
           outName: outputFilename,
           contentType: BG_FORMAT_CONTENT_TYPES[fmt],
           toolId: "remove-background",
+          jobId,
         });
         const savedFileId = autoSaveResult.fileId;
 

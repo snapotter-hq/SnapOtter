@@ -52,6 +52,7 @@ test("autoSaveToLibrary respects quota after fix", async () => {
     contentType: "image/jpeg",
     toolId: "resize",
     saveMode: "new",
+    jobId: crypto.randomUUID(),
   });
 
   // Fixed behavior: it should return an error
@@ -99,6 +100,7 @@ test("autoSaveToLibrary successfully increments storageUsed", async () => {
     contentType: "image/jpeg",
     toolId: "resize",
     saveMode: "new",
+    jobId: crypto.randomUUID(),
   });
 
   expect(autoSaveResult.error).toBeUndefined();

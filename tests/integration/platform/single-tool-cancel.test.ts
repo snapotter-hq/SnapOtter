@@ -824,23 +824,29 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     };
     // Every insert runs for real; only the version row under this test's file
     // also runs the cancel once it has landed.
-    const realInsert = db.insert.bind(db);
-    const insertSpy = vi.spyOn(db, "insert").mockImplementation(((
-      table: Parameters<typeof db.insert>[0],
-    ) => {
-      const builder = realInsert(table);
-      if (table !== schema.userFiles) return builder;
-      const realValues = builder.values.bind(builder);
-      builder.values = ((row: { parentId?: string | null }) => {
-        const query = realValues(row as never);
-        if (row.parentId !== fileId) return query;
-        return query.then(async (result: unknown) => {
-          await afterVersionRow();
-          return result;
-        });
-      }) as typeof builder.values;
-      return builder;
-    }) as typeof db.insert);
+    const realTransaction = db.transaction.bind(db);
+    const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+      runInTransaction: Parameters<typeof db.transaction>[0],
+      config?: Parameters<typeof db.transaction>[1],
+    ) =>
+      realTransaction(async (tx) => {
+        const realInsert = tx.insert.bind(tx);
+        tx.insert = ((table: Parameters<typeof tx.insert>[0]) => {
+          const builder = realInsert(table);
+          if (table !== schema.userFiles) return builder;
+          const realValues = builder.values.bind(builder);
+          builder.values = ((row: { parentId?: string | null }) => {
+            const query = realValues(row as never);
+            if (row.parentId !== fileId) return query;
+            return query.then(async (result: unknown) => {
+              await afterVersionRow();
+              return result;
+            });
+          }) as typeof builder.values;
+          return builder;
+        }) as typeof tx.insert;
+        return runInTransaction(tx);
+      }, config)) as typeof db.transaction);
     try {
       await enqueueSingleRun({
         mode: "fast",
@@ -866,7 +872,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       await expect(readStoredFile(versions[0]?.storedName ?? "")).resolves.toBeInstanceOf(Buffer);
       expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
     } finally {
-      insertSpy.mockRestore();
+      txSpy.mockRestore();
     }
   });
 

@@ -23,16 +23,8 @@ const stubs = vi.hoisted(() => ({
   abortDuringInsert: null as AbortController | null,
 }));
 
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: async () => {
-          stubs.abortDuringLookup?.abort();
-          return stubs.parent ? [stubs.parent] : [];
-        },
-      }),
-    }),
+vi.mock("../../../apps/api/src/db/index.js", () => {
+  const tx = {
     insert: () => ({
       values: async (row: Record<string, unknown>) => {
         stubs.abortDuringInsert?.abort();
@@ -40,11 +32,40 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         stubs.inserted.push(row);
       },
     }),
-  },
-  schema: { jobs: {}, userFiles: { id: "id" } },
+    update: () => ({
+      set: () => ({
+        where: async () => {},
+      }),
+    }),
+  };
+  return {
+    db: {
+      select: () => ({
+        from: () => ({
+          where: async () => {
+            stubs.abortDuringLookup?.abort();
+            return stubs.parent ? [stubs.parent] : [];
+          },
+        }),
+      }),
+      transaction: async <T>(fn: (t: typeof tx) => Promise<T>) => fn(tx),
+    },
+    schema: {
+      jobs: {},
+      userFiles: { id: "id" },
+      users: { id: "id", storageUsed: "storageUsed" },
+    },
+  };
+});
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(() => "eq"),
+  sql: vi.fn(() => "sql"),
 }));
 
-vi.mock("drizzle-orm", () => ({ eq: vi.fn(() => "eq") }));
+vi.mock("../../../apps/api/src/lib/quota.js", () => ({
+  quotaRefusal: vi.fn(async () => null),
+}));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({ putObject: vi.fn() }));
 
@@ -118,12 +139,13 @@ beforeEach(() => {
 
 describe("autoSaveToLibrary under a user cancel (#2143)", () => {
   it("inserts the superseding version when no cancel landed", async () => {
-    const id = await autoSaveToLibrary(opts({ userCancel: new AbortController().signal }));
+    const res = await autoSaveToLibrary(opts({ userCancel: new AbortController().signal }));
 
-    expect(id).toBeDefined();
+    expect(res.fileId).toBeDefined();
+    expect(res.error).toBeUndefined();
     expect(stubs.inserted).toHaveLength(1);
     expect(stubs.inserted[0]).toMatchObject({
-      id,
+      id: res.fileId,
       parentId: "file-1",
       version: 4,
       storedName: "stored-out.pdf",
@@ -191,12 +213,13 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
     const ac = new AbortController();
     stubs.abortDuringInsert = ac;
 
-    const id = await autoSaveToLibrary(opts({ userCancel: ac.signal }));
+    const res = await autoSaveToLibrary(opts({ userCancel: ac.signal }));
 
     expect(ac.signal.aborted).toBe(true);
-    expect(id).toBeDefined();
+    expect(res.fileId).toBeDefined();
+    expect(res.error).toBeUndefined();
     expect(stubs.inserted).toHaveLength(1);
-    expect(stubs.inserted[0]).toMatchObject({ id, storedName: "stored-out.pdf" });
+    expect(stubs.inserted[0]).toMatchObject({ id: res.fileId, storedName: "stored-out.pdf" });
     expect(stubs.deleted).toEqual([]);
   });
 
@@ -231,8 +254,11 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
 
     await expect(
       autoSaveToLibrary(opts({ userCancel: new AbortController().signal })),
-    ).resolves.toBe(undefined);
+    ).resolves.toEqual({
+      error: "An unexpected system error prevented saving to your library.",
+    });
 
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
     expect(loggerMock.warn).toHaveBeenCalledWith(
       expect.objectContaining({
         err: stubs.insertError,
@@ -251,9 +277,11 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
 
     await expect(
       autoSaveToLibrary(opts({ userCancel: new AbortController().signal })),
-    ).resolves.toBe(undefined);
+    ).resolves.toEqual({
+      error: "An unexpected system error prevented saving to your library.",
+    });
 
-    expect(stubs.deleted).toEqual([]);
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
     expect(loggerMock.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: stubs.insertError, storedName: "stored-out.pdf" }),
       expect.stringContaining("auto-save failed"),
@@ -284,14 +312,14 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
 
   it("saves as before when no signal is given", async () => {
     // The inline remove-background route has no cancel to pass.
-    const id = await autoSaveToLibrary(opts());
+    const res = await autoSaveToLibrary(opts());
 
-    expect(id).toBeDefined();
+    expect(res.fileId).toBeDefined();
     expect(stubs.inserted).toHaveLength(1);
   });
 
   it("does nothing without a fileId", async () => {
-    await expect(autoSaveToLibrary({ ...opts(), fileId: undefined })).resolves.toBe(undefined);
+    await expect(autoSaveToLibrary({ ...opts(), fileId: undefined })).resolves.toEqual({});
 
     expect(stubs.saved).toEqual([]);
     expect(stubs.inserted).toEqual([]);
