@@ -1576,4 +1576,16 @@ describe("SSO enforcement without license", () => {
       await clearSetting("ssoEnforcement");
     }
   });
+
+  it("does not tell the login page enforcement is on when the feature is unlicensed (#2128)", async () => {
+    await setSetting("ssoEnforcement", "true");
+    try {
+      const res = await testApp.app.inject({ method: "GET", url: "/api/v1/config/auth" });
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).ssoEnforced).toBe(false);
+    } finally {
+      await clearSetting("ssoEnforcement");
+    }
+  });
 });

@@ -28,7 +28,7 @@ import {
 import { authAttempts } from "../lib/metrics.js";
 import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
-import { getSettingNumber, getSettingString } from "../lib/settings-helpers.js";
+import { getSettingNumber, getSettingStrict, getSettingString } from "../lib/settings-helpers.js";
 import { userLimitReached } from "../lib/user-limit.js";
 import {
   canAssignRole,
@@ -504,31 +504,19 @@ async function getLoginThrottleConfig(): Promise<LoginThrottleConfig> {
 }
 
 /**
- * Reads a setting and lets a database fault throw. getSettingString answers
- * its default on any error, which for the SSO gate would turn enforcement off
- * during a Postgres blip; the global error handler answers 500 and reports
- * instead, and no session is written (the MFA policy read is fail-closed for
- * the same reason, #815).
- */
-async function readSettingStrict(key: string): Promise<string | undefined> {
-  const [row] = await db
-    .select({ value: schema.settings.value })
-    .from(schema.settings)
-    .where(eq(schema.settings.key, key))
-    .limit(1);
-  return row?.value;
-}
-
-/**
  * True when SSO enforcement is on (and licensed) and `username` is not the
  * break-glass account, so a local password login must not produce a session.
+ * The settings are read strictly: getSettingString would answer "false" on a
+ * database fault and switch enforcement off, so a fault throws instead and the
+ * error handler answers 500 with no session written (the MFA policy read is
+ * fail-closed for the same reason, #815).
  */
 async function isLocalLoginRefusedBySso(username: string): Promise<boolean> {
   // The licence first: it needs no database read, so an unlicensed instance
   // never touches the settings table here.
   if (!(await isEnterpriseFeatureEnabled("sso_enforcement"))) return false;
-  if ((await readSettingStrict("ssoEnforcement")) !== "true") return false;
-  return username !== ((await readSettingStrict("ssoBreakGlassUsername")) ?? "");
+  if ((await getSettingStrict("ssoEnforcement")) !== "true") return false;
+  return username !== ((await getSettingStrict("ssoBreakGlassUsername")) ?? "");
 }
 
 // ── Auth routes ────────────────────────────────────────────────────

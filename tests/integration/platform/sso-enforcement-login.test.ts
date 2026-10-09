@@ -187,6 +187,36 @@ describe("SSO enforcement at login (licensed)", () => {
     }
   });
 
+  it("tells the login page enforcement is on only when it is set and licensed (#2128)", async () => {
+    const config = async () =>
+      JSON.parse((await testApp.app.inject({ method: "GET", url: "/api/v1/config/auth" })).body);
+
+    expect((await config()).ssoEnforced).toBe(false);
+
+    await enforceWithBreakGlass("admin");
+    expect((await config()).ssoEnforced).toBe(true);
+  });
+
+  it("keeps answering the login page when the settings read fails, reporting enforcement off", async () => {
+    await enforceWithBreakGlass("admin");
+
+    const originalSelect = db.select.bind(db);
+    const spy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && "value" in selection) throw new Error("simulated settings store failure");
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
+    });
+    try {
+      const res = await testApp.app.inject({ method: "GET", url: "/api/v1/config/auth" });
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).ssoEnforced).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("fails closed with a 500 and no session when the settings read fails", async () => {
     await enforceWithBreakGlass("admin");
     const before = await sessionCount(LOCAL_USER);

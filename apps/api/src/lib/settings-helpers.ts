@@ -63,3 +63,18 @@ export async function getSettingString(key: string, defaultValue = ""): Promise<
   }
   return defaultValue;
 }
+
+/**
+ * Read a setting and let a database fault throw, unlike getSettingString,
+ * which answers its default on any error. For gates where the default would
+ * quietly relax a restriction: the caller decides what a fault means.
+ * Returns undefined when the key is missing.
+ */
+export async function getSettingStrict(key: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ value: schema.settings.value })
+    .from(schema.settings)
+    .where(eq(schema.settings.key, key))
+    .limit(1);
+  return row?.value;
+}

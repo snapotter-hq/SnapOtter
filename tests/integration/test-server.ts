@@ -58,6 +58,7 @@ import { analyticsRoutes } from "../../apps/api/src/routes/analytics.js";
 import { apiKeyRoutes } from "../../apps/api/src/routes/api-keys.js";
 import { auditLogRoutes } from "../../apps/api/src/routes/audit-log.js";
 import { registerBatchRoutes } from "../../apps/api/src/routes/batch.js";
+import { configRoutes } from "../../apps/api/src/routes/config.js";
 import { docsRoutes } from "../../apps/api/src/routes/docs.js";
 import { registerEnterpriseRoutes } from "../../apps/api/src/routes/enterprise/index.js";
 import { feedbackRoutes } from "../../apps/api/src/routes/feedback.js";
@@ -303,20 +304,8 @@ export async function buildTestApp(): Promise<TestApp> {
     };
   });
 
-  // Public config endpoint
-  app.get("/api/v1/config/auth", async () => {
-    const config: Record<string, unknown> = { authEnabled: env.AUTH_ENABLED };
-    if (env.OIDC_ENABLED) {
-      config.oidcEnabled = true;
-      config.oidcProviderName = env.OIDC_PROVIDER_NAME || null;
-      config.oidcLoginUrl = "/api/auth/oidc/login";
-    }
-    config.samlEnabled = false;
-    config.samlProviderName = "";
-    config.samlLoginUrl = "";
-    config.ssoEnforced = false;
-    return config;
-  });
+  // Public config endpoints (the real routes, so /config/auth is tested as shipped)
+  await configRoutes(app);
 
   // Readiness probe (no auth)
   app.get("/api/v1/readyz", async (_request, reply) => {
