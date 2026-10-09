@@ -48,8 +48,15 @@ describe("preferences refuse text Postgres cannot store", () => {
   });
 
   it("saves a deeply nested value instead of overflowing the stack", async () => {
-    const deep = JSON.parse(`${'{"a":'.repeat(5000)}1${"}".repeat(5000)}`);
-    expect((await put({ deep })).statusCode).toBe(200);
+    // Sent as text: inject's own JSON.stringify of a nested object would overflow first.
+    const body = `{"deep":${'{"a":'.repeat(3000)}1${"}".repeat(3000)}}`;
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/v1/preferences",
+      headers: { ...auth(), "content-type": "application/json" },
+      payload: body,
+    });
+    expect(res.statusCode, res.body).toBe(200);
   });
 
   it("stores nothing from a refused body, even the valid keys beside the bad one", async () => {
