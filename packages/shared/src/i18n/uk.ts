@@ -5643,6 +5643,7 @@ export const uk: TranslationKeys = {
     passwordNeedsSpecial: "Пароль має містити спеціальний символ.",
     passwordNoControlCharacters: "Пароль не має містити керувальні символи.",
     passwordTooLong: "Пароль задовгий (максимум: {maxLength}).",
+    passwordNoInvalidCharacters: "Пароль не має містити недопустимі символи.",
     tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
     escalationDenied: "Для цього потрібно більше прав, ніж має ваша роль.",
     featureNotLicensed: "Для цього потрібна корпоративна ліцензія.",

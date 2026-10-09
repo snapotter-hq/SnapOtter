@@ -5582,6 +5582,7 @@ export const ja: TranslationKeys = {
     passwordNeedsSpecial: "パスワードには特殊文字を含める必要があります。",
     passwordNoControlCharacters: "パスワードに制御文字を含めることはできません。",
     passwordTooLong: "パスワードは{maxLength}文字以内にしてください。",
+    passwordNoInvalidCharacters: "パスワードに無効な文字を含めることはできません。",
     tooManyRequests: "試行回数が多すぎます。1分待ってからもう一度お試しください。",
     escalationDenied: "この操作には、あなたのロールを超える権限が必要です。",
     featureNotLicensed: "エンタープライズライセンスが必要です。",

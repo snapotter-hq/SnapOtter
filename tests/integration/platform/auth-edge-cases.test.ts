@@ -7,6 +7,8 @@ import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { authAttempts } from "../../../apps/api/src/lib/metrics.js";
+import { normalizePassword } from "../../../apps/api/src/lib/password-form.js";
+import { hashPassword } from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -1381,6 +1383,65 @@ describe("Admin user-management guards", () => {
       rule: "controlCharacter",
       rules: ["controlCharacter"],
     });
+  });
+
+  // A lone UTF-16 surrogate can't be encoded: Node's UTF-8 turns each one into
+  // U+FFFD before scrypt sees it, so "\uD800" x8 and "\uFFFD" x8 hashed alike and
+  // every string of lone surrogates of that length logged in (#2170). Only an API
+  // client can send one; a browser form can't produce it.
+  it.each([
+    ["a lone high surrogate", "Abcdefg1\uD800"],
+    ["a lone low surrogate", "Abcdefg1\uDC00"],
+    ["a high surrogate followed by a letter", "Abcdefg1\uD800x"],
+  ])("change-password refuses %s and names the rule (#2170)", async (_label, newPassword) => {
+    const res = await sendChangePassword(await loggedInUser(), newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    });
+  });
+
+  it("register refuses a lone surrogate in the password (#2170)", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { username: `sur_${Date.now()}`, password: "Abcdefg1\uD800" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+    });
+  });
+
+  // Setting one is refused, but signing in is not touched: an account whose password
+  // was set with a lone surrogate before the fix must still reach its owner. At login
+  // the surrogate compares as U+FFFD (Node's UTF-8 replaces it), which is why setting
+  // one is refused at all. A later hardening of login with the same check would lock
+  // these accounts out, so this pins the asymmetry.
+  it("an account already holding a lone-surrogate password can still sign in (#2170)", async () => {
+    const { username, id } = await createUser();
+    const stored = "Abcdefg1\uD800";
+    await db
+      .update(schema.users)
+      .set({ passwordHash: await hashPassword(normalizePassword(stored)) })
+      .where(eq(schema.users.id, id));
+
+    expect(await loginAs(username, stored)).toEqual(expect.any(String));
+    // The weakness the refusal exists for: the same hash opens with U+FFFD.
+    expect(await loginAs(username, "Abcdefg1\uFFFD")).toEqual(expect.any(String));
+  });
+
+  it("still accepts a surrogate pair, which is a real character (#2170)", async () => {
+    const res = await sendChangePassword(await loggedInUser(), "Abcdefg1\u{1F600}");
+
+    expect(res.statusCode, res.body).toBe(200);
   });
 
   it("lets a user sign in with the non-Latin password they just set", async () => {

@@ -5644,6 +5644,7 @@ export const ru: TranslationKeys = {
     passwordNeedsSpecial: "Пароль должен содержать специальный символ.",
     passwordNoControlCharacters: "Пароль не должен содержать управляющие символы.",
     passwordTooLong: "Пароль слишком длинный (максимум: {maxLength}).",
+    passwordNoInvalidCharacters: "Пароль не должен содержать недопустимые символы.",
     tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
     escalationDenied: "Для этого нужно больше прав, чем есть у вашей роли.",
     featureNotLicensed: "Для этого нужна корпоративная лицензия.",

@@ -39,6 +39,8 @@ function ruleMessage(
       return format(t.errors.passwordTooLong, {
         maxLength: typeof maxLength === "number" ? maxLength : PASSWORD_MAX_LENGTH,
       });
+    case "invalidCharacter":
+      return t.errors.passwordNoInvalidCharacters;
     default: {
       // A rule added to PASSWORD_RULES without a message fails to compile here.
       const unhandled: never = rule;
