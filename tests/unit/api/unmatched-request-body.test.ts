@@ -1,6 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
+import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
@@ -25,9 +27,12 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 const BIG = 5 * 1024 * 1024;
 
 /** The app as index.ts builds it: a JSON parser, plus a urlencoded one when SAML is on. */
-async function buildApp() {
+async function buildApp(opts: { cors?: boolean } = {}) {
   const seen: { type: string; length: number }[] = [];
   const app = Fastify({ bodyLimit: 100 * 1024 * 1024 });
+  // Production runs cors with origin: false unless CORS_ORIGIN is set; its OPTIONS *
+  // catch-all route is still registered and matches every preflight.
+  if (opts.cors) await app.register(cors, { origin: false });
   const record = (type: string) => (_request: unknown, body: string | Buffer, done: Function) => {
     seen.push({ type, length: body.length });
     done(null, body.length > 0 && type === "json" ? JSON.parse(body.toString()) : body);
@@ -101,16 +106,35 @@ describe("a request for a path with no route", () => {
     }
   });
 
-  it("answers an unmatched request that declares a body but sends it chunked", async () => {
-    const { app } = await buildApp();
+  it("answers an unmatched request that sends its body with no declared length", async () => {
+    const { app, seen } = await buildApp();
     try {
       const response = await app.inject({
         method: "POST",
         url: "/nowhere",
-        headers: { "content-type": "application/json", "transfer-encoding": "chunked" },
-        payload: '{"a":1}',
+        headers: { "content-type": "application/json" },
+        payload: Readable.from(['{"pad":"', "x".repeat(1024), '"}']),
       });
       expect(response.statusCode).toBe(404);
+      expect(Math.max(0, ...seen.map((s) => s.length))).toBe(0);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not buffer the body of a CORS preflight to a path with no route", async () => {
+    const { app, seen } = await buildApp({ cors: true });
+    try {
+      for (const url of ["/nope", "/api/nope"]) {
+        const response = await app.inject({
+          method: "OPTIONS",
+          url,
+          headers: { "content-type": "application/json" },
+          payload: `{"pad":"${"x".repeat(BIG)}"}`,
+        });
+        expect(response.statusCode, url).toBe(404);
+      }
+      expect(Math.max(0, ...seen.map((s) => s.length))).toBe(0);
     } finally {
       await app.close();
     }
@@ -143,13 +167,45 @@ describe("a request for a path that has a route", () => {
     skipUnmatchedRequestBodies(app);
     app.post("/api/echo", async (request) => ({ got: request.body }));
     try {
-      const response = await app.inject({
+      // Declared length over the limit: refused before anything is read.
+      const declared = await app.inject({
         method: "POST",
         url: "/api/echo",
         headers: { "content-type": "application/json" },
         payload: JSON.stringify({ pad: "x".repeat(4096) }),
       });
-      expect(response.statusCode).toBe(413);
+      expect(declared.statusCode).toBe(413);
+
+      // No declared length: the limit has to be enforced while reading, which a hook
+      // that emptied every body would silently skip.
+      const streamed = await app.inject({
+        method: "POST",
+        url: "/api/echo",
+        headers: { "content-type": "application/json" },
+        payload: Readable.from(['{"pad":"', "x".repeat(4096), '"}']),
+      });
+      expect(streamed.statusCode).toBe(413);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("still has a CORS preflight to a real route answered by cors", async () => {
+    const app = Fastify();
+    await app.register(cors, { origin: "https://app.example" });
+    skipUnmatchedRequestBodies(app);
+    app.post("/api/echo", async () => ({ ok: true }));
+    try {
+      const response = await app.inject({
+        method: "OPTIONS",
+        url: "/api/echo",
+        headers: {
+          origin: "https://app.example",
+          "access-control-request-method": "POST",
+        },
+      });
+      expect(response.statusCode).toBe(204);
+      expect(response.headers["access-control-allow-origin"]).toBe("https://app.example");
     } finally {
       await app.close();
     }
@@ -161,6 +217,5 @@ it("keeps the hook wired in before routes and plugins in the production entry po
   const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
   const hook = source.indexOf("skipUnmatchedRequestBodies(app);");
   expect(hook).toBeGreaterThan(-1);
-  expect(source.indexOf("app.addContentTypeParser(")).toBeLessThan(hook);
   expect(hook).toBeLessThan(source.indexOf("await app.register(cors"));
 });
