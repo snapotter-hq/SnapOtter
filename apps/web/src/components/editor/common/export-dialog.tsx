@@ -92,7 +92,7 @@ function getMimeType(format: ExportFormat): string {
 // captured half-typed sizes (#2174). The 200 px thumbnail stays immediate.
 export const ESTIMATE_DEBOUNCE_MS = 300;
 
-type ExportFailureReason = NonNullable<EditorExportedProperties["failure_reason"]>;
+type ExportFailureReason = NonNullable<EditorExportedProperties["reason"]>;
 
 // The canvas the file is made from: exactly `width` x `height` (at least 1 px a
 // side), on white unless the format keeps transparency. The two axes scale on their
@@ -306,12 +306,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   // the outcome is known (#2174): it used to fire on the click, so a canvas the
   // browser couldn't encode or a server error still counted as an export.
   const handleExport = useCallback(() => {
-    const report = (outcome: "success" | "failed", failureReason?: ExportFailureReason) => {
-      const properties: EditorExportedProperties = {
+    const report = (status: "completed" | "failed", reason?: ExportFailureReason) => {
+      const properties = {
         output_format: settings.format,
-        outcome,
-        ...(failureReason ? { failure_reason: failureReason } : {}),
-      };
+        status,
+        ...(reason ? { reason } : {}),
+      } satisfies EditorExportedProperties;
       void import("@/lib/analytics").then(({ track }) =>
         track(ANALYTICS_EVENTS.EDITOR_EXPORTED, properties),
       );
@@ -329,71 +329,83 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       a.click();
       document.body.removeChild(a);
       markClean();
-      report("success");
+      report("completed");
     };
     const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
 
-    const failure = guardCapture(() => {
-      const canvas = renderExportCanvas(stage, canvasSize, settings);
+    let failure: CaptureFailure | null;
+    try {
+      failure = guardCapture(() => {
+        const canvas = renderExportCanvas(stage, canvasSize, settings);
 
-      // Formats the Canvas API cannot encode go to the server as PNG.
-      if (formatOption?.needsServerConvert) {
-        canvas.toBlob(async (blob) => {
-          if (!blob || blob.size === 0) {
-            reportEmptyExport();
-            report("failed", "no-context");
-            return;
-          }
-          const formData = new FormData();
-          formData.append("file", blob, "export.png");
-          formData.append(
-            "settings",
-            JSON.stringify({ format: settings.format, quality: settings.quality }),
-          );
-          try {
-            const res = await fetch(appUrl(apiToolPath("convert")), {
-              method: "POST",
-              body: formData,
-            });
-            if (!res.ok) throw new Error("Server convert failed");
-            const json = resolveServerUrls(await res.json());
-            if (!json.downloadUrl)
-              throw new Error("Server convert answered without a download URL");
-            download(json.downloadUrl);
-          } catch (err) {
-            console.error("Server-side export failed:", err);
-            report("failed", "server-convert");
-          }
-        }, "image/png");
-        return;
-      }
+        // Formats the Canvas API cannot encode go to the server as PNG.
+        if (formatOption?.needsServerConvert) {
+          canvas.toBlob(async (blob) => {
+            if (!blob || blob.size === 0) {
+              reportEmptyExport();
+              report("failed", "no-context");
+              return;
+            }
+            const formData = new FormData();
+            formData.append("file", blob, "export.png");
+            formData.append(
+              "settings",
+              JSON.stringify({ format: settings.format, quality: settings.quality }),
+            );
+            try {
+              const res = await fetch(appUrl(apiToolPath("convert")), {
+                method: "POST",
+                body: formData,
+              });
+              if (!res.ok) throw new Error("Server convert failed");
+              const json = resolveServerUrls(await res.json());
+              // A conversion that outlives the server's sync wait answers 202 with no
+              // file yet, and the dialog doesn't follow the job (#2171).
+              if (!json.downloadUrl) {
+                console.error("Server-side export answered before the file was ready");
+                report("failed", "server-pending");
+                return;
+              }
+              download(json.downloadUrl);
+            } catch (err) {
+              console.error("Server-side export failed:", err);
+              report("failed", "server-convert");
+            }
+          }, "image/png");
+          return;
+        }
 
-      const dataUrl = canvas.toDataURL(
-        getMimeType(settings.format),
-        settings.format === "png" ? undefined : settings.quality / 100,
-      );
-      if (dataUrl === "data:,") {
-        reportEmptyExport();
-        report("failed", "no-context");
-        return;
-      }
-      fetch(dataUrl)
-        .then((res) => res.blob())
-        .then((blob) => {
-          if (blob.size === 0) {
-            reportEmptyExport();
-            report("failed", "no-context");
-            return;
-          }
-          const url = URL.createObjectURL(blob);
-          download(url);
-          URL.revokeObjectURL(url);
-        })
-        .catch((err) => {
-          console.error("Export failed:", err);
-          report("failed", "download");
-        });
-    });
+        const dataUrl = canvas.toDataURL(
+          getMimeType(settings.format),
+          settings.format === "png" ? undefined : settings.quality / 100,
+        );
+        if (dataUrl === "data:,") {
+          reportEmptyExport();
+          report("failed", "no-context");
+          return;
+        }
+        fetch(dataUrl)
+          .then((res) => res.blob())
+          .then((blob) => {
+            if (blob.size === 0) {
+              reportEmptyExport();
+              report("failed", "no-context");
+              return;
+            }
+            const url = URL.createObjectURL(blob);
+            download(url);
+            URL.revokeObjectURL(url);
+          })
+          .catch((err) => {
+            console.error("Export failed:", err);
+            report("failed", "download");
+          });
+      });
+    } catch (err) {
+      // Not a capture failure: a bug. It still propagates, but the attempt is counted.
+      report("failed", "bug");
+      throw err;
+    }
     if (failure) report("failed", failure);
   }, [settings, canvasSize, markClean, reportEmptyExport, guardCapture]);
 

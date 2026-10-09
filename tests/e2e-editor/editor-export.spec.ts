@@ -20,7 +20,12 @@ test.describe("Editor Export", () => {
     await expect(page.getByText("Export Image")).toBeVisible();
 
     await page.getByRole("button", { name: "Unlock aspect ratio" }).click();
-    const [width, height] = await page.locator('input[type="number"]').all();
+    // Scoped to the dialog's Dimensions block: the status bar's zoom box and the
+    // tool options bar are number inputs too, and come first on the page.
+    const boxes = page.getByText("Dimensions").locator("..").locator('input[type="number"]');
+    await expect(boxes).toHaveCount(2);
+    const width = boxes.nth(0);
+    const height = boxes.nth(1);
     await width.fill("300");
     await height.fill("100");
     await expect(width).toHaveValue("300");

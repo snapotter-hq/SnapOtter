@@ -243,7 +243,7 @@ describe("editor_exported carries the outcome (#2174)", () => {
     clickExport();
     await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(exported()).toHaveLength(1));
-    expect(exported()[0][1]).toEqual({ output_format: "png", outcome: "success" });
+    expect(exported()[0][1]).toEqual({ output_format: "png", status: "completed" });
   });
 
   it("counts a canvas the browser could not encode as a failed export", async () => {
@@ -254,8 +254,8 @@ describe("editor_exported carries the outcome (#2174)", () => {
     await waitFor(() => expect(exported()).toHaveLength(1));
     expect(exported()[0][1]).toEqual({
       output_format: "png",
-      outcome: "failed",
-      failure_reason: "no-context",
+      status: "failed",
+      reason: "no-context",
     });
     expect(markClean).not.toHaveBeenCalled();
   });
@@ -266,7 +266,30 @@ describe("editor_exported carries the outcome (#2174)", () => {
     clickExport();
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(TAINTED, expect.anything()));
     await waitFor(() => expect(exported()).toHaveLength(1));
-    expect(exported()[0][1]).toMatchObject({ outcome: "failed", failure_reason: "tainted" });
+    expect(exported()[0][1]).toMatchObject({ status: "failed", reason: "tainted" });
+  });
+
+  it("counts an error that is not a capture failure as a failed export and still throws it", async () => {
+    render(<ExportDialog onClose={() => {}} />);
+    fake.state.throwOnEncode = new TypeError("a real bug");
+    // React hands an event-handler error to window's error event; keep it from
+    // failing the run and record that it surfaced.
+    const surfaced: unknown[] = [];
+    const swallow = (event: ErrorEvent) => {
+      surfaced.push(event.error);
+      event.preventDefault();
+    };
+    window.addEventListener("error", swallow);
+    try {
+      clickExport();
+    } finally {
+      window.removeEventListener("error", swallow);
+    }
+    expect(surfaced).toEqual([expect.any(TypeError)]);
+    await waitFor(() => expect(exported()).toHaveLength(1));
+    expect(exported()[0][1]).toEqual({ output_format: "png", status: "failed", reason: "bug" });
+    expect(toastError).not.toHaveBeenCalled();
+    expect(markClean).not.toHaveBeenCalled();
   });
 
   it("counts a server conversion the API refused as a failed export", async () => {
@@ -281,19 +304,45 @@ describe("editor_exported carries the outcome (#2174)", () => {
     await waitFor(() => expect(exported()).toHaveLength(1));
     expect(exported()[0][1]).toEqual({
       output_format: "avif",
-      outcome: "failed",
-      failure_reason: "server-convert",
+      status: "failed",
+      reason: "server-convert",
     });
     expect(markClean).not.toHaveBeenCalled();
   });
 
-  it("counts a finished server conversion as a success", async () => {
+  // The convert route answers 202 with no file once a job outlives its sync wait,
+  // and the dialog doesn't follow the job yet (#2171). That gets its own reason so
+  // a slow server isn't counted as a refusal.
+  it("counts a conversion the server answered before it finished as a failed export", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        blob: async () => new Blob(["x"]),
+        json: async () => ({ jobId: "job-1", async: true }),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "AVIF" }));
+    clickExport();
+    await waitFor(() => expect(exported()).toHaveLength(1));
+    expect(exported()[0][1]).toEqual({
+      output_format: "avif",
+      status: "failed",
+      reason: "server-pending",
+    });
+    expect(markClean).not.toHaveBeenCalled();
+  });
+
+  it("counts a finished server conversion as completed", async () => {
     render(<ExportDialog onClose={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "AVIF" }));
     clickExport();
     await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(exported()).toHaveLength(1));
-    expect(exported()[0][1]).toEqual({ output_format: "avif", outcome: "success" });
+    expect(exported()[0][1]).toEqual({ output_format: "avif", status: "completed" });
   });
 
   it("does not count the click while the server is still converting", async () => {
