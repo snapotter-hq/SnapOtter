@@ -386,10 +386,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     const ac = registerCancelable(jobId);
     const signal = ac.signal;
     // Fires on a user cancel only, never on the deadline (#2144). The streamed
-    // uploads after the handler take this signal (the buffered writes re-check
-    // wasUserCanceled instead): a handler that ignored the signal and returned
-    // after the deadline has a finished result worth keeping, while a user
-    // cancel still has to stop the upload.
+    // uploads and the library auto-save after the handler take this signal (the
+    // other buffered writes re-check wasUserCanceled instead): a handler that
+    // ignored the signal and returned after the deadline has a finished result
+    // worth keeping, while a user cancel still has to stop the upload.
     const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
@@ -633,8 +633,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       let savedFileId: string | undefined;
       if (resultBuffer) {
         // Re-check just before the library overwrite, the one write a cancel is
-        // most costly to lose to. A cancel landing during the save itself is not
-        // covered (#2092).
+        // most costly to lose to (#2092). The save checks again up to its
+        // version row (#2143).
         if (wasUserCanceled(jobId)) throw new Error("Canceled");
         savedFileId = await autoSaveToLibrary({
           fileId: data.fileId,
@@ -644,6 +644,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           outName,
           contentType: resultContentType,
           toolId: data.toolId,
+          jobId,
+          userCancel,
         });
       } else if (data.fileId) {
         logger.info(
