@@ -944,13 +944,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // Two requests that both proved the old password otherwise both
         // write, and the first caller is told a change succeeded that the
         // second one overwrote (#2127). The lock also orders the revokes below
-        // after any concurrent change has committed.
+        // after any concurrent change has committed. NO KEY UPDATE, not
+        // UPDATE: it still excludes every other writer of this row, but
+        // doesn't hold up inserts that only reference it (sessions, keys,
+        // audit rows).
         const [locked] = await tx
           .select({ passwordHash: schema.users.passwordHash })
           .from(schema.users)
           .where(eq(schema.users.id, authUser.id))
-          .for("update");
-        if (locked?.passwordHash !== user.passwordHash) return "changed" as const;
+          .for("no key update");
+        if (!locked) return "gone" as const;
+        if (locked.passwordHash !== user.passwordHash) return "changed" as const;
 
         await tx
           .update(schema.users)
@@ -971,9 +975,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return "changed-here" as const;
       });
 
+      if (outcome === "gone") {
+        return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+      }
       if (outcome === "changed") {
+        // Another change won: the user's own in another tab, an admin reset,
+        // or a SCIM deprovision. Nothing was written here.
+        request.log.info({ userId: authUser.id }, "Password change lost to a concurrent change");
         return reply.status(409).send({
-          error: "Your password was changed by another request. Sign in with the new password.",
+          error: "Your password was changed elsewhere. Sign in again.",
           code: "PASSWORD_CHANGED",
         });
       }
