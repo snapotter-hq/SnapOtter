@@ -10,6 +10,16 @@
 import path from "node:path";
 import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
 
+// Six Letter pages: enough thumbnails to be taller than a phone's preview area.
+const ORGANIZE_PDF_FIXTURE = path.join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "document",
+  "valid",
+  "multipage-6.pdf",
+);
+
 // A5 pages (419 x 595 pt): drawn at the old fixed 1.5x they are 629 x 893 px.
 const SIGN_PDF_FIXTURE = path.join(
   process.cwd(),
@@ -170,6 +180,47 @@ test.describe("@mobile Sign PDF on a phone", () => {
     // The page is as wide as the area, not the old fixed 1.5x (629px for this A5 page).
     const box = await canvas.boundingBox();
     expect(box?.width ?? Infinity).toBeLessThanOrEqual(390);
+
+    // A trial click does the actionability checks, including "nothing else
+    // receives the pointer event", without tapping.
+    await page
+      .getByRole("button", { name: "Process", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+    await page
+      .locator("#main-content")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click({ trial: true, timeout: 5_000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2191: the Organize PDF grid grew to fit its pages instead of scrolling inside
+// the preview area. With four or more pages it covered the "Process" peek bar and
+// the Settings button, so the sheet could not be opened to run the tool at all,
+// and the "Reset order" toolbar scrolled out of reach above the viewport.
+// ---------------------------------------------------------------------------
+test.describe("@mobile Organize PDF on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("scrolls its page grid inside the preview and leaves the settings controls tappable", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/organize-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    // Six Letter pages: the grid is taller than the preview area.
+    const reset = page.getByTestId("organize-reset");
+    await expect(reset).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: /page 6/i }).first()).toBeAttached();
+
+    // The toolbar stays inside the viewport instead of scrolling away above it.
+    const box = await reset.boundingBox();
+    expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
 
     // A trial click does the actionability checks, including "nothing else
     // receives the pointer event", without tapping.
