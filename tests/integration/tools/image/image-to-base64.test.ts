@@ -524,8 +524,32 @@ describe("image-to-base64", () => {
 
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
+    expect(json.errors).toHaveLength(0);
     expect(json.results).toHaveLength(1);
+    // All four defaults: original format, no resize either way.
     expect(json.results[0].mimeType).toBe("image/png");
+    expect(json.results[0].width).toBe(200);
+    expect(json.results[0].height).toBe(150);
+  });
+
+  it("answers 400 Invalid settings when the settings JSON is not an object", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "[]" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    // Parses as JSON, so it reaches Zod and gets the other 400 message.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.results).toBeUndefined();
   });
 
   it("still rejects a missing file before looking at unparseable settings", async () => {
