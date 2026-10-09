@@ -1227,9 +1227,13 @@ describe("Workspace storage cap during batch processing", () => {
         body,
       });
 
-      expect(res.statusCode).toBe(422);
-      const payload = JSON.parse(res.body) as { error: string; errors: unknown[] };
+      // The cap is the instance's fault, so it answers 503 with its code like
+      // every other place a storage fault surfaces (#1161, #1421). The worker
+      // used to leave the status off the child rows, which made it a 422 (#2210).
+      expect(res.statusCode).toBe(503);
+      const payload = JSON.parse(res.body) as { error: string; code?: string; errors: unknown[] };
       expect(payload.error).toBe("Injected cap on child output");
+      expect(payload.code).toBe("workspace-cap");
       expect(payload.errors).toHaveLength(2);
 
       const frame = await waitForTerminalFrame(clientJobId);
