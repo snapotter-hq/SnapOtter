@@ -487,6 +487,40 @@ export function EraseObjectSettings({
       setProgressPhase("idle");
       setProgressStage(null);
     };
+    // Ends the run with an error message. The message and the teardown are both
+    // store writes, so each is guarded on its own: one that throws must not leave
+    // the run stuck at processing. The first throw is rethrown so it reaches
+    // Sentry's global handler; a second one is reported, since nothing else would
+    // carry it (#2134). Once per run: the progress stream calls onFailed again as a
+    // tracking failure when the first call throws, and that retry must neither
+    // replace the server's message nor report the same ending a second time.
+    let runEndedWithError = false;
+    const endRunWithError = (message: string) => {
+      if (runEndedWithError) return;
+      runEndedWithError = true;
+      let first: { cause: unknown } | null = null;
+      let second: { cause: unknown } | null = null;
+      for (const step of [() => setError(message), finishUi]) {
+        try {
+          step();
+        } catch (err) {
+          if (first) {
+            console.error("Ending the run with an error failed", err);
+            second ??= { cause: err };
+          } else {
+            first = { cause: err };
+          }
+        }
+      }
+      if (second) {
+        reportRunEndFailure(
+          "Ending an Erase Object run with an error failed",
+          second.cause,
+          "erase-object",
+        );
+      }
+      if (first) throw first.cause;
+    };
 
     // Same as the batch path (#1893): a stream that gave up on the run aborts
     // its request, and anything the request answers after that is dropped.
@@ -528,21 +562,16 @@ export function EraseObjectSettings({
         progressCleanupRef.current = null;
         abandonRequest();
         cancelIfHandlingFailed(failure, clientJobId);
-        // setError is a store write, and the stream has already let go of the
-        // run: a throw from it must not skip finishUi and leave the run at
-        // processing for good (#1830). It still surfaces, after the teardown.
-        try {
-          setError(jobFailureMessage(failure, t.errors));
-        } finally {
-          finishUi();
-        }
+        // The stream has already let go of the run, so a throw from the message
+        // write must not skip finishUi and leave the run at processing for good
+        // (#1830). It still surfaces, after the teardown.
+        endRunWithError(jobFailureMessage(failure, t.errors));
       },
       onStall: () => {
         endWatch();
         progressCleanupRef.current = null;
         abandonRequest();
-        setError(t.toolSettings["erase-object"].stall);
-        finishUi();
+        endRunWithError(t.toolSettings["erase-object"].stall);
       },
     });
     const stopProgress = subscription.stop;
@@ -642,7 +671,8 @@ export function EraseObjectSettings({
         } catch (err) {
           // Reported first: a throw from the store write below must not lose it.
           reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
-          setError(t.errors.invalidResponse);
+          endRunWithError(t.errors.invalidResponse);
+          return;
         }
         if (result) {
           try {
@@ -689,11 +719,7 @@ export function EraseObjectSettings({
         } catch {
           message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
         }
-        try {
-          setError(message);
-        } finally {
-          finishUi();
-        }
+        endRunWithError(message);
         return;
       }
       finishUi();
@@ -703,16 +729,14 @@ export function EraseObjectSettings({
       endWatch();
       stopProgress();
       progressCleanupRef.current = null;
-      setError(t.errors.network);
-      finishUi();
+      endRunWithError(t.errors.network);
     };
     xhr.ontimeout = () => {
       if (abandoned) return;
       endWatch();
       stopProgress();
       progressCleanupRef.current = null;
-      setError(t.toolSettings["erase-object"].timeoutOverloaded);
-      finishUi();
+      endRunWithError(t.toolSettings["erase-object"].timeoutOverloaded);
     };
     xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
     formatHeaders().forEach((value, key) => {

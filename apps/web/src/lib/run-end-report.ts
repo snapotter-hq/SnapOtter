@@ -27,7 +27,8 @@ export type RunEndFailure =
   | "Stopping an OCR scan whose files left failed"
   | "Ending a Collage run after a result handling error failed"
   | "Ending a Sign PDF run after a result handling error failed"
-  | "Ending an Erase Object run after a result handling error failed";
+  | "Ending an Erase Object run after a result handling error failed"
+  | "Ending an Erase Object run with an error failed";
 
 /**
  * Reports a store write that threw while a run was ending (#1812). Those

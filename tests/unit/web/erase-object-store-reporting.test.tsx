@@ -315,15 +315,24 @@ describe("erase-object single file: its own failures apart from a bad response",
   it("reports a malformed body even when showing the error throws", async () => {
     renderPanel();
     const xhr = await submit();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const unsubscribe = useFileStore.subscribe(() => {
       throw new Error("store broke");
     });
 
     try {
       expect(() => xhr.respond(200, {})).toThrow("store broke");
-      expectReported("Tool result has no download URL", 200);
+      const calls = vi.mocked(captureHandledError).mock.calls;
+      // The malformed answer is reported first, before any store write. Every
+      // write throws here, so the teardown's failure is reported too (#2134).
+      expect(calls).toHaveLength(2);
+      expect(calls[0][0].message).toBe("Tool result has no download URL");
+      expect((calls[0][0] as { statusCode?: number }).statusCode).toBe(200);
+      expect(calls[0][1]).toEqual({ error_class: "operational", tool_id: "erase-object" });
+      expect(calls[1][0].message).toBe("Ending an Erase Object run with an error failed");
     } finally {
       unsubscribe();
+      consoleError.mockRestore();
     }
   });
 
@@ -386,6 +395,145 @@ describe("erase-object batch: its own failures apart from a bad response", () =>
     expect(entry(0).error).toBe(en.errors.invalidResponse);
     expect(entry(0).processedUrl).toBeNull();
     expectReported("Tool result has no download URL", 200);
+  });
+});
+
+// Ending the run with an error message is two store writes, the message and the
+// UI teardown. Each is guarded on its own, so one that throws cannot leave the run
+// stuck at processing, and the first throw still reaches Sentry's global handler
+// (#2134).
+describe("erase-object single file: a store write that throws while the run ends with an error", () => {
+  const endings = [
+    ["a failed answer", (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" })],
+    ["a malformed answer", (xhr: FakeXhr) => xhr.respond(200, {})],
+    ["a network error", (xhr: FakeXhr) => act(() => xhr.onerror?.())],
+    ["a timeout", (xhr: FakeXhr) => act(() => xhr.ontimeout?.())],
+  ] as const;
+
+  it.each(endings)(
+    "still ends the run after %s when showing the error throws",
+    async (_label, end) => {
+      renderPanel();
+      const xhr = await submit();
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+      let threw = false;
+      const unsubscribe = useFileStore.subscribe((state, previous) => {
+        if (threw || state.error === previous.error) return;
+        threw = true;
+        // Only what runs after this write counts as ending the run.
+        clearIntervalSpy.mockClear();
+        throw new Error("store broke");
+      });
+
+      try {
+        expect(() => end(xhr)).toThrow("store broke");
+        // The UI teardown still ran: the elapsed counter stops.
+        expect(clearIntervalSpy).toHaveBeenCalled();
+        expect(useFileStore.getState().processing).toBe(false);
+      } finally {
+        clearIntervalSpy.mockRestore();
+        unsubscribe();
+      }
+    },
+  );
+
+  it("rethrows the first failure and reports the second when both writes throw", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "message write broke" : "teardown write broke");
+    });
+
+    try {
+      expect(() => act(() => xhr.onerror?.())).toThrow("message write broke");
+
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run with an error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown write broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("still ends the run after a stall when showing the message throws", async () => {
+    const stalls = captureStallTimers();
+    renderPanel();
+    await submit();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      clearIntervalSpy.mockClear();
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("store broke");
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      stalls.restore();
+    }
+  });
+
+  it("rethrows the message write's failure, not the teardown's, after a failed frame", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    await submit();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      // The message write lands first; every later write breaks too.
+      throw new Error(state.error !== previous.error ? "message write broke" : "teardown broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+        }),
+      ).toThrow("message write broke");
+      // Once: the stream must not call onFailed again and report a second time.
+      expect(
+        vi
+          .mocked(captureHandledError)
+          .mock.calls.filter(
+            ([e]) => e.message === "Ending an Erase Object run with an error failed",
+          ),
+      ).toHaveLength(1);
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports nothing extra when only the first write throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => act(() => xhr.onerror?.())).toThrow("store broke");
+      // The throw itself reaches Sentry's global handler; a report would double it.
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
   });
 });
 
@@ -518,6 +666,7 @@ describe("erase-object single file: a completed frame with nothing to download (
   );
 
   it("keeps the invalid-response error, reported once, when showing it throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     renderPanel();
     const xhr = await submit();
     xhr.respond(202, { jobId: "job-1", async: true });
@@ -535,7 +684,14 @@ describe("erase-object single file: a completed frame with nothing to download (
       // zustand sets the state before its listeners run. The server's fault
       // stays the error: it is not relabelled as our own tracking failure.
       expect(useFileStore.getState().error).toBe(en.errors.invalidResponse);
-      expectReported("Tool result has no download URL", undefined);
+      // The server's fault is reported once, before any store write. Every write
+      // throws here, so the teardown's failure is reported too (#2134).
+      const messages = vi.mocked(captureHandledError).mock.calls.map(([e]) => e.message);
+      expect(messages.filter((m) => m === "Tool result has no download URL")).toHaveLength(1);
+      expect(
+        messages.filter((m) => m === "Ending an Erase Object run with an error failed"),
+      ).toHaveLength(1);
+      expect(messages).toHaveLength(2);
       // The stream already let go of the run, so the teardown must still run
       // or it sits at processing for good.
       expect(useFileStore.getState().processing).toBe(false);
@@ -543,6 +699,7 @@ describe("erase-object single file: a completed frame with nothing to download (
     } finally {
       clearIntervalSpy.mockRestore();
       unsubscribe();
+      consoleError.mockRestore();
     }
   });
 
