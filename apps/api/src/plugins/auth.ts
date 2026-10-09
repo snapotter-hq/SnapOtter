@@ -135,7 +135,11 @@ async function upgradeLegacyPasswordHash(
 let dummyHashPromise: Promise<string> | null = null;
 function getDummyHash(): Promise<string> {
   if (!dummyHashPromise) {
-    dummyHashPromise = hashPassword(randomBytes(SALT_LENGTH).toString("hex"));
+    dummyHashPromise = hashPassword(randomBytes(SALT_LENGTH).toString("hex")).catch((err) => {
+      // Don't cache a failure: every later unknown-user login would fail with it.
+      dummyHashPromise = null;
+      throw err;
+    });
   }
   return dummyHashPromise;
 }
@@ -534,6 +538,17 @@ async function isLocalLoginRefusedBySso(username: string): Promise<boolean> {
 // ── Auth routes ────────────────────────────────────────────────────
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  // Build the dummy hash now. Built on the first unknown-user login instead, that one
+  // request runs a scrypt computation more than a real user's wrong password does,
+  // which is the timing gap the hash exists to close (#2254). A failure is not fatal:
+  // the first login that needs the hash tries again.
+  try {
+    await getDummyHash();
+  } catch (err) {
+    app.log.warn({ err }, "auth: could not pre-build the login timing hash");
+    void reportError(err, { source: "boot", subsystem: "login-dummy-hash" });
+  }
+
   // POST /api/auth/login
   app.post(
     "/api/auth/login",
