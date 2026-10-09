@@ -4,10 +4,10 @@
  * that check and fails inside libvips' 3 x 3 median window with "rank: window
  * too large". Either way the worker saw a bare Error and reported a tiny upload
  * that passed intake as a server fault (#2202). processTrim now refuses with a
- * ToolInputError, which the worker answers as a 400.
+ * ToolInputError, which the worker records on the job row as a 400.
  */
 
-import { ToolInputError } from "@snapotter/shared";
+import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -57,7 +57,7 @@ async function strip(width: number, height: number, block: sharp.Region) {
 describe.each([
   ["plain trim", {}],
   ["pad to square", { padToSquare: true }],
-] as const)("smart-crop %s on an image with a side under 3 pixels (#2202)", (_branch, extra) => {
+] as const)("smart-crop %s: the 3 pixel minimum for trim (#2202)", (_branch, extra) => {
   const expectedSize = (w: number, h: number) =>
     "padToSquare" in extra ? [Math.max(w, h), Math.max(w, h)] : [w, h];
 
@@ -70,7 +70,8 @@ describe.each([
     [10, 2],
   ])("refuses %i x %i with a ToolInputError that names the size", async (w, h) => {
     const run = config.process(await solid(w, h), trimSettings(extra), "tiny.png", ctx);
-    await expect(run).rejects.toBeInstanceOf(ToolInputError);
+    // The worker reads the marker, not the class, to answer a 400.
+    await expect(run).rejects.toSatisfy(isToolInputError);
     await expect(run).rejects.toThrow(`(${w} x ${h} pixels)`);
   });
 
