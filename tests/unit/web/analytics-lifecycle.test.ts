@@ -195,6 +195,64 @@ describe("analytics lifecycle (#2197)", () => {
     expect(mockSentryInit).toHaveBeenCalledTimes(1);
   });
 
+  // #2217: telemetry being allowed used to depend on PostHog starting, so a
+  // PostHog that failed left Sentry initialised but dropping everything.
+  describe("when PostHog fails to start", () => {
+    beforeEach(() => {
+      mockPosthogInit.mockImplementationOnce(() => {
+        throw new Error("posthog-js chunk failed");
+      });
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    it("still reports crashes to Sentry", async () => {
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+
+      expect(mod.isTelemetryEnabled()).toBe(true);
+      expect(mod.isAnalyticsActive()).toBe(false);
+      expect(mockSentryInit).toHaveBeenCalledTimes(1);
+      const options = (mockSentryInit.mock.calls[0] as unknown[])[0] as {
+        beforeSend: (e: unknown) => unknown;
+      };
+      expect(
+        options.beforeSend({ exception: { values: [{ type: "TypeError", value: "x" }] } }),
+      ).not.toBeNull();
+    });
+
+    it("replays crashes from before the start", async () => {
+      early.startEarlyErrorCapture();
+      const err = new Error("first paint");
+      window.dispatchEvent(new ErrorEvent("error", { error: err }));
+
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+
+      expect(mockCaptureException).toHaveBeenCalledWith(err);
+    });
+
+    it("retries PostHog on the next answer that says on, without restarting Sentry", async () => {
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+
+      expect(mockPosthogInit).toHaveBeenCalledTimes(2);
+      expect(mod.isAnalyticsActive()).toBe(true);
+      expect(mockSentryInit).toHaveBeenCalledTimes(1);
+    });
+
+    it("still stops everything on an opt-out", async () => {
+      await mod.applyInstanceAnalytics(ON);
+      await settle();
+      await mod.applyInstanceAnalytics(OFF);
+      await settle();
+
+      expect(mod.isTelemetryEnabled()).toBe(false);
+      expect(client?.close).toHaveBeenCalled();
+    });
+  });
+
   it("optIn() after optOut() brings Sentry back too", async () => {
     await mod.initAnalytics(ON);
     mod.optOut();
