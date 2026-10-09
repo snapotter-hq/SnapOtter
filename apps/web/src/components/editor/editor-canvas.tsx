@@ -733,7 +733,7 @@ function useActiveToolHandlers(stageRef: React.RefObject<Konva.Stage | null>) {
   const moveTool = useMoveTool();
   const selectionTool = useSelectionTool();
   const transformTool = useTransformTool();
-  const eyedropperTool = useEyedropperTool({ stageRef, sampleSize: 1 });
+  const eyedropperTool = useEyedropperTool({ stageRef });
 
   useEffect(() => {
     const typeMap: Record<string, "rect" | "ellipse" | "lasso"> = {

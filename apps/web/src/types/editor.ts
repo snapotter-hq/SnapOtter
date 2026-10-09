@@ -4,6 +4,9 @@ export type EraserMode = "brush" | "block";
 
 export type SelectionMode = "new" | "add" | "subtract";
 
+/** Side of the square the eyedropper averages: a point, 3x3 or 5x5. */
+export type EyedropperSampleSize = 1 | 3 | 5;
+
 export type StrokeDashStyle = "solid" | "dashed" | "dotted";
 
 export type ToolType =
@@ -355,6 +358,9 @@ export interface EditorState {
   brushFlow: number;
   eraserMode: EraserMode;
 
+  // Eyedropper
+  eyedropperSampleSize: EyedropperSampleSize;
+
   // Colors
   foregroundColor: string;
   backgroundColor: string;
@@ -513,6 +519,9 @@ export interface EditorState {
   // Crop
   setCropState: (state: CropState | null) => void;
   applyCrop: () => Promise<void>;
+
+  // Eyedropper
+  setEyedropperSampleSize: (size: EyedropperSampleSize) => void;
 
   // Brush
   setBrushSize: (size: number) => void;

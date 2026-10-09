@@ -4,7 +4,6 @@ import type Konva from "konva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
-import type { SampleSize } from "../options/eyedropper-options";
 import {
   captureDocumentContext,
   type DocumentContext,
@@ -14,21 +13,16 @@ import { samplePixelColor } from "./eyedropper-sample";
 
 interface UseEyedropperToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>;
-  sampleSize: SampleSize;
 }
 
-export function useEyedropperTool({
-  stageRef,
-  sampleSize: _sampleSizeProp,
-}: UseEyedropperToolOptions) {
+export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
   const setForegroundColor = useEditorStore((s) => s.setForegroundColor);
   const setBackgroundColor = useEditorStore((s) => s.setBackgroundColor);
   const zoom = useEditorStore((s) => s.zoom);
   const panOffset = useEditorStore((s) => s.panOffset);
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const historyVersion = useEditorStore((s) => s._historyVersion);
-  // Use the sampleSize prop directly (caller wires it from options state)
-  const sampleSize: SampleSize = _sampleSizeProp;
+  const sampleSize = useEditorStore((s) => s.eyedropperSampleSize);
   const [sampledColor, setSampledColor] = useState<string | null>(null);
   const contextCache = useRef<CanvasRenderingContext2D | null>(null);
   // Set when a capture couldn't be read. Sampling runs on every mousemove, so

@@ -100,9 +100,7 @@ afterEach(() => {
 describe("eyedropper (#2139)", () => {
   function setup(ctx: unknown) {
     const { stage, toCanvas } = fakeStage(ctx);
-    const hook = renderHook(() =>
-      useEyedropperTool({ stageRef: { current: stage }, sampleSize: 1 }),
-    );
+    const hook = renderHook(() => useEyedropperTool({ stageRef: { current: stage } }));
     return { stage, toCanvas, hook };
   }
 

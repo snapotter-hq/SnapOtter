@@ -391,6 +391,9 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       activeTool: "move" as ToolType,
       previousTool: null,
 
+      // --- Eyedropper ---
+      eyedropperSampleSize: 1,
+
       // --- Brush ---
       brushSize: 10,
       brushOpacity: 1,
@@ -980,6 +983,9 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           _historyVersion: get()._historyVersion + 1,
         });
       },
+
+      // Eyedropper
+      setEyedropperSampleSize: (size) => set({ eyedropperSampleSize: size }),
 
       // Colors
       setForegroundColor: (color) => {

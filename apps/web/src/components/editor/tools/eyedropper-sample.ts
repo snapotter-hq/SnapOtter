@@ -28,19 +28,26 @@ export function samplePixelColor(
   const data = imageData.data;
   const pixelCount = imageData.width * imageData.height;
 
+  // Weight each pixel by its alpha: a transparent pixel reads 0,0,0,0 and would
+  // otherwise drag the colour toward black beside a cutout's edge. A square with
+  // nothing visible in it has no colour to average and reads black, as a single
+  // transparent pixel always did.
   let rSum = 0;
   let gSum = 0;
   let bSum = 0;
+  let alphaSum = 0;
 
   for (let i = 0; i < pixelCount; i++) {
-    rSum += data[i * 4];
-    gSum += data[i * 4 + 1];
-    bSum += data[i * 4 + 2];
+    const alpha = data[i * 4 + 3];
+    rSum += data[i * 4] * alpha;
+    gSum += data[i * 4 + 1] * alpha;
+    bSum += data[i * 4 + 2] * alpha;
+    alphaSum += alpha;
   }
 
-  const r = Math.round(rSum / pixelCount);
-  const g = Math.round(gSum / pixelCount);
-  const b = Math.round(bSum / pixelCount);
+  const r = alphaSum === 0 ? 0 : Math.round(rSum / alphaSum);
+  const g = alphaSum === 0 ? 0 : Math.round(gSum / alphaSum);
+  const b = alphaSum === 0 ? 0 : Math.round(bSum / alphaSum);
 
   return rgbToHex(r, g, b);
 }

@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
+import type { EyedropperSampleSize } from "@/types/editor";
 import { ColorSwatch } from "../common/color-swatch";
 
-export type SampleSize = 1 | 3 | 5;
+export type SampleSize = EyedropperSampleSize;
 
 const SAMPLE_SIZES: SampleSize[] = [1, 3, 5];
 

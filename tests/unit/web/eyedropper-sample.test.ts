@@ -105,3 +105,69 @@ describe("samplePixelColor", () => {
     expect(samplePixelColor(ctx, 0, 2, 3)).toBe("#808080");
   });
 });
+
+// An RGBA canvas whose pixel at (x, y) is given by `pixel`. getImageData over
+// something transparent reads 0,0,0,0, which must not drag the colour toward black.
+function pixelCanvas(
+  width: number,
+  height: number,
+  pixel: (x: number, y: number) => [number, number, number, number],
+) {
+  return {
+    canvas: { width, height },
+    getImageData(x: number, y: number, w: number, h: number) {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let row = 0; row < h; row++) {
+        for (let col = 0; col < w; col++) {
+          data.set(pixel(x + col, y + row), (row * w + col) * 4);
+        }
+      }
+      return { data, width: w, height: h };
+    },
+  } as unknown as CanvasRenderingContext2D;
+}
+
+describe("samplePixelColor with transparency", () => {
+  it("averages only the opaque pixels beside a transparent area", () => {
+    // One opaque white pixel at (5, 5) on an otherwise transparent canvas.
+    const ctx = pixelCanvas(10, 10, (x, y) =>
+      x === 5 && y === 5 ? [255, 255, 255, 255] : [0, 0, 0, 0],
+    );
+
+    expect(samplePixelColor(ctx, 5, 5, 3)).toBe("#ffffff");
+    expect(samplePixelColor(ctx, 5, 5, 5)).toBe("#ffffff");
+    // The neighbours see it too, and the transparent ones around it still add nothing.
+    expect(samplePixelColor(ctx, 6, 5, 3)).toBe("#ffffff");
+  });
+
+  it("keeps the colour of a cutout's edge", () => {
+    // Left half opaque orange, right half transparent.
+    const ctx = pixelCanvas(10, 10, (x) => (x < 5 ? [255, 100, 50, 255] : [0, 0, 0, 0]));
+
+    expect(samplePixelColor(ctx, 4, 5, 5)).toBe("#ff6432");
+  });
+
+  it("weights a semi-transparent pixel by its alpha", () => {
+    // Opaque black beside 50% white: (0 * 255 + 255 * 128) / (255 + 128) = 85.
+    const ctx = pixelCanvas(4, 1, (x) => (x === 0 ? [0, 0, 0, 255] : [255, 255, 255, 128]));
+
+    expect(samplePixelColor(ctx, 0, 0, 3)).toBe("#555555");
+  });
+
+  it("is unchanged for a single pixel, opaque or not", () => {
+    const ctx = pixelCanvas(4, 4, (x) =>
+      x === 0 ? [255, 100, 50, 255] : x === 1 ? [255, 100, 50, 128] : [0, 0, 0, 0],
+    );
+
+    expect(samplePixelColor(ctx, 0, 0, 1)).toBe("#ff6432");
+    expect(samplePixelColor(ctx, 1, 0, 1)).toBe("#ff6432");
+    // A fully transparent pixel has no colour; it reads black, as it always did.
+    expect(samplePixelColor(ctx, 3, 0, 1)).toBe("#000000");
+  });
+
+  it("reads black when nothing in the square is visible", () => {
+    const ctx = pixelCanvas(6, 6, () => [0, 0, 0, 0]);
+
+    expect(samplePixelColor(ctx, 3, 3, 5)).toBe("#000000");
+  });
+});
