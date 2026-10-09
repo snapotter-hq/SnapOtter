@@ -64,6 +64,10 @@ export function ocrOneFile(
     const clientJobId = generateId();
     let settled = false;
     let asyncMode = false;
+    // The upload finished (the server has the whole body); set before any answer.
+    let uploadDone = false;
+    // A stop landed in the window after the upload and before the 202.
+    let cancelOnAnswer = false;
     let stallTimer: ReturnType<typeof setTimeout> | null = null;
     let es: EventSource | null = null;
 
@@ -165,11 +169,20 @@ export function ocrOneFile(
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) callbacks.onUploadProgress((e.loaded / e.total) * 100);
     };
+    xhr.upload.onload = () => {
+      uploadDone = true;
+    };
     xhr.onload = () => {
       // The BullMQ worker owns long OCR jobs. Keep the progress subscription
       // alive and resolve from buildLegacyResultPayload(resultPayload).text.
       if (xhr.status === 202) {
         asyncMode = true;
+        // The scan was stopped while the server was still working on the upload:
+        // now that a job is known to exist, cancel it (#2136).
+        if (cancelOnAnswer) {
+          void cancelAbandonedJob(clientJobId, "ocr");
+          return;
+        }
         armStallTimer();
         return;
       }
@@ -207,8 +220,13 @@ export function ocrOneFile(
       // still unsettled has a job still running (#2093).
       // Posted first, so a teardown step that throws can't leave the job running.
       if (asyncMode && !settled) void cancelAbandonedJob(clientJobId, "ocr");
+      // The whole body is with the server but it hasn't answered: it may be
+      // validating and decoding, and will still enqueue. Aborting would leave
+      // that job running with nothing to cancel it by, so the request stays open
+      // and the cancel goes out when the 202 arrives (#2136).
+      else if (uploadDone && !settled) cancelOnAnswer = true;
       rejectOnce(new Error("OCR scan stopped"));
-      xhr.abort();
+      if (!cancelOnAnswer) xhr.abort();
     });
     xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
     for (const [key, value] of formatHeaders()) {

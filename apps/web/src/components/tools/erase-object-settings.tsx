@@ -288,6 +288,12 @@ export function EraseObjectSettings({
       // Set once the server has answered 202: from then on a job exists for
       // this file, and dropping the file has to cancel it (#2093).
       let accepted = false;
+      // The whole body is with the server; set before any answer. A stop in the
+      // window after that and before the 202 can't abort: the server may still be
+      // validating and decoding, and will enqueue a job nothing could cancel. The
+      // request stays open and the cancel goes out when the 202 arrives (#2136).
+      let uploadDone = false;
+      let cancelOnAnswer = false;
       const abandon = (err: Error) => {
         abandoned = true;
         xhr.abort();
@@ -314,6 +320,12 @@ export function EraseObjectSettings({
         // First, so a teardown step that throws can't leave the job running.
         if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
         stopProgress();
+        if (uploadDone && !accepted) {
+          cancelOnAnswer = true;
+          abandoned = true;
+          reject(new Error("Erase Object batch stopped"));
+          return;
+        }
         abandon(new Error("Erase Object batch stopped"));
       });
 
@@ -331,8 +343,14 @@ export function EraseObjectSettings({
       // stream only this keeps it from cutting off an image that is still
       // uploading (#1959). xhr.timeout still bounds the request as a whole.
       xhr.upload.onprogress = () => subscription.touch();
+      xhr.upload.onload = () => {
+        uploadDone = true;
+      };
       xhr.onload = () => {
-        if (xhr.status === 202) accepted = true;
+        if (xhr.status === 202) {
+          accepted = true;
+          if (cancelOnAnswer) void cancelAbandonedJob(clientJobId, "erase-object");
+        }
         if (abandoned || xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -470,9 +488,21 @@ export function EraseObjectSettings({
     // See the batch path: once the server has answered 202 a job exists, and
     // a library run's job would still save over or beside the original (#2093).
     let accepted = false;
+    // See the batch path: a file dropped after the upload finished and before the
+    // 202 keeps its request open, and the cancel goes out when the 202 arrives (#2136).
+    let uploadDone = false;
+    let cancelOnAnswer = false;
     const abandonRequest = () => {
       abandoned = true;
       xhr.abort();
+    };
+    const dropRequest = () => {
+      if (uploadDone && !accepted) {
+        abandoned = true;
+        cancelOnAnswer = true;
+        return;
+      }
+      abandonRequest();
     };
 
     const subscription = subscribeEraseObjectJobProgress(clientJobId, {
@@ -525,7 +555,7 @@ export function EraseObjectSettings({
       // processing. The first error is reported once.
       let stopError: { cause: unknown } | null = null;
       for (const step of [
-        abandonRequest,
+        dropRequest,
         () => {
           if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
         },
@@ -575,12 +605,16 @@ export function EraseObjectSettings({
       }
     };
     xhr.upload.onload = () => {
+      uploadDone = true;
       setProgressPhase("processing");
       setProgressPercent(15);
     };
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
-      if (xhr.status === 202) accepted = true;
+      if (xhr.status === 202) {
+        accepted = true;
+        if (cancelOnAnswer) void cancelAbandonedJob(clientJobId, "erase-object");
+      }
       if (abandoned || xhr.status === 202) return;
 
       endWatch();
