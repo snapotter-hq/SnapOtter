@@ -47,16 +47,32 @@ interface AuthConfig {
   ssoEnforced?: boolean;
 }
 
-// /api/v1/config/auth returns static instance config (auth mode, OIDC/SAML
-// setup) that cannot change without a server restart. useAuth() runs in many
-// components, so without sharing this the tool page fetches it once per consumer
-// (6+ times on initial load). Share a single fetch; reset on failure so a
-// transient error can be retried.
+// /api/v1/config/auth returns instance config (auth mode, OIDC/SAML setup, and
+// whether SSO is enforced) that changes only when an admin edits settings or
+// the server restarts. useAuth() runs in many components, so without sharing
+// this the tool page fetches it once per consumer (6+ times on initial load).
+// Share a single fetch; reset on failure so a transient error can be retried.
+//
+// A non-2xx answer is a failure too. Its JSON body (a rate limit's, an error
+// handler's) has no `authEnabled`, which would read as "auth is off" and put
+// the app in anonymous-admin mode for the life of the page (#2297).
+/** First retry after a failed auth check, doubling up to the cap. */
+const AUTH_RETRY_BASE_MS = 1_000;
+const AUTH_RETRY_MAX_MS = 30_000;
+
 let authConfigPromise: Promise<AuthConfig> | null = null;
 function fetchAuthConfig(): Promise<AuthConfig> {
   if (!authConfigPromise) {
     authConfigPromise = fetch(appUrl("/api/v1/config/auth"))
-      .then((res) => res.json() as Promise<AuthConfig>)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Auth config request failed with ${res.status}`);
+        return res.json().then((config: AuthConfig) => {
+          if (typeof config?.authEnabled !== "boolean") {
+            throw new Error("Auth config response has no authEnabled flag");
+          }
+          return config;
+        });
+      })
       .catch((err) => {
         authConfigPromise = null;
         throw err;
@@ -86,8 +102,15 @@ export function useAuth() {
 
   useEffect(() => {
     let cancelled = false;
+    // Retry state for a failed auth check. The connection store's reconnect
+    // re-check only fires when /health itself failed, so a failure that leaves
+    // /health healthy (a rate limit shared with it, a proxy that answers one
+    // path differently) would otherwise leave this hook loading for good.
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
 
     async function checkAuth() {
+      clearTimeout(retryTimer); // a reconnect re-check replaces a pending retry
       try {
         const config = await fetchAuthConfig();
 
@@ -110,10 +133,11 @@ export function useAuth() {
               hasLocalPassword: false,
               totpEnabled: false,
             });
+          failures = 0;
           return;
         }
 
-        // Always call /api/auth/session -- OIDC users have a session cookie
+        // Always call /api/auth/session: OIDC users have a session cookie
         // (not a localStorage token), so we cannot skip based on token absence.
         const sessionRes = await fetch(appUrl("/api/auth/session"), {
           headers: formatHeaders(),
@@ -161,9 +185,17 @@ export function useAuth() {
               totpEnabled: false,
             });
         }
-      } catch {
-        // API unreachable — stay in loading state.
-        // ConnectionBanner explains the outage. AuthGuard shows spinner.
+        failures = 0;
+      } catch (err) {
+        // The auth config or the session check failed: stay in the loading
+        // state rather than guess (never anonymous admin), and ask again with
+        // a capped backoff. When the server itself is down the ConnectionBanner
+        // explains it and the reconnect re-check also runs; a failure that
+        // leaves /health healthy has only this retry (#2297).
+        if (cancelled) return;
+        const delay = Math.min(AUTH_RETRY_MAX_MS, AUTH_RETRY_BASE_MS * 2 ** failures++);
+        console.warn(`Auth check failed, retrying in ${delay / 1000}s`, err);
+        retryTimer = setTimeout(checkAuth, delay);
       }
     }
 
@@ -177,6 +209,7 @@ export function useAuth() {
 
     return () => {
       cancelled = true;
+      clearTimeout(retryTimer);
       unsubscribe();
     };
   }, []);
