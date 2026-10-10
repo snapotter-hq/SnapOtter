@@ -199,6 +199,8 @@ export type SettingsRuntimeValidation =
       statusCode: 400 | 403;
       code: "DEPENDENCY_VALIDATION_FAILED" | "FEATURE_NOT_LICENSED";
       error: string;
+      /** The setting that was refused, so a client can point at its row (#2339). */
+      setting: string;
       validationErrors?: string[];
     };
 
@@ -218,6 +220,7 @@ export async function validateSettingsRuntimeConstraints(
         statusCode: 403,
         error: "MFA requires an enterprise license",
         code: "FEATURE_NOT_LICENSED",
+        setting: "mfaPolicy",
       };
     }
   }
@@ -234,6 +237,7 @@ export async function validateSettingsRuntimeConstraints(
       statusCode: 400,
       error: "Dependency validation failed",
       code: "DEPENDENCY_VALIDATION_FAILED",
+      setting: "ssoEnforcement",
       validationErrors,
     };
   }
@@ -246,6 +250,7 @@ export async function validateSettingsRuntimeConstraints(
       statusCode: 403,
       error: "SSO enforcement requires an enterprise license",
       code: "FEATURE_NOT_LICENSED",
+      setting: "ssoEnforcement",
     };
   }
 

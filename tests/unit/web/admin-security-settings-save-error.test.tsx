@@ -78,6 +78,29 @@ describe("AdminSecuritySettings save errors", () => {
     );
   });
 
+  it("puts a refused setting back where it was, so the tab stops showing a value the server never took (#2339)", async () => {
+    apiPut.mockRejectedValue(
+      new ApiError("SSO enforcement requires an enterprise license", 403, "FEATURE_NOT_LICENSED", {
+        setting: "ssoEnforcement",
+      }),
+    );
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    const toggle = await screen.findByRole("switch", {
+      name: en.settings.security.ssoEnforcement,
+    });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "false"));
+    expect(await screen.findByText(en.errors.featureNotLicensed)).toHaveClass("text-destructive");
+  });
+
   it("falls back to a generic message when the save rejects with a non-Error value", async () => {
     apiPut.mockRejectedValue("network exploded");
 
