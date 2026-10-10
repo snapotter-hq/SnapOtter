@@ -49,33 +49,56 @@ const settingsSchema = z.object({
 type Settings = z.infer<typeof settingsSchema>;
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
-  let format: string = settings.format;
-  let quality = settings.quality;
+const EXT_MAP: Record<string, string> = {
+  jpeg: "jpg",
+  jpg: "jpg",
+  png: "png",
+  webp: "webp",
+  tiff: "tiff",
+  gif: "gif",
+  avif: "avif",
+  heic: "heic",
+  heif: "heif",
+  jxl: "jxl",
+};
+
+const CONTENT_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  tiff: "image/tiff",
+  gif: "image/gif",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jxl: "image/jxl",
+};
+
+/**
+ * Encode the outpainted image in the requested format (the input's own when the
+ * setting says "auto") and name the result. Shared by the AI job handler and the
+ * registry process fn so a pipeline step and the tool page agree on format,
+ * quality and extension (#2076).
+ */
+async function encodeExtended(
+  resultBuffer: Buffer,
+  requested: string,
+  requestedQuality: number,
+  input: Buffer,
+  filename: string,
+): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+  let format = requested;
+  let quality = requestedQuality;
 
   if (format === "auto") {
-    const detected = await resolveOutputFormat(input, data.filename);
+    const detected = await resolveOutputFormat(input, filename);
     format = detected.format === "jpeg" ? "jpg" : detected.format;
     // detected.quality is undefined for PNG, whose encode path below never
     // reads it anyway; keep the local a plain number.
     quality = detected.quality ?? quality;
   }
 
-  const resultBuffer = await outpaint(
-    input,
-    {
-      extendTop: settings.extendTop,
-      extendRight: settings.extendRight,
-      extendBottom: settings.extendBottom,
-      extendLeft: settings.extendLeft,
-      tier: settings.tier,
-    },
-    ctx.scratchDir,
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  // Convert to requested output format
   const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
   let outputBuffer: Buffer;
   let finalFormat = format;
@@ -83,10 +106,8 @@ registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
   if (needsNodeConversion) {
     if (format === "heic" || format === "heif") {
       outputBuffer = await encodeHeic(resultBuffer, quality);
-      finalFormat = format;
     } else if (format === "jxl") {
       outputBuffer = await encodeJxl(resultBuffer, quality);
-      finalFormat = "jxl";
     } else {
       outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
       finalFormat = "avif";
@@ -108,39 +129,32 @@ registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
     finalFormat = "png";
   }
 
-  const EXT_MAP: Record<string, string> = {
-    jpeg: "jpg",
-    jpg: "jpg",
-    png: "png",
-    webp: "webp",
-    tiff: "tiff",
-    gif: "gif",
-    avif: "avif",
-    heic: "heic",
-    heif: "heif",
-    jxl: "jxl",
-  };
   const ext = EXT_MAP[finalFormat] || "png";
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_extended.${ext}`;
-
-  const CONTENT_TYPES: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    tiff: "image/tiff",
-    gif: "image/gif",
-    avif: "image/avif",
-    heic: "image/heic",
-    heif: "image/heif",
-    jxl: "image/jxl",
-  };
-
   return {
     buffer: outputBuffer,
-    filename: outputFilename,
+    filename: `${filename.replace(/\.[^.]+$/, "")}_extended.${ext}`,
     contentType: CONTENT_TYPES[finalFormat] || "image/png",
   };
+}
+
+// ── AI job handler ────────────────────────────────────────────────
+registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
+  const settings = settingsSchema.parse(data.settings);
+
+  const resultBuffer = await outpaint(
+    input,
+    {
+      extendTop: settings.extendTop,
+      extendRight: settings.extendRight,
+      extendBottom: settings.extendBottom,
+      extendLeft: settings.extendLeft,
+      tier: settings.tier,
+    },
+    ctx.scratchDir,
+    (percent, stage) => ctx.report(percent, stage),
+  );
+
+  return encodeExtended(resultBuffer, settings.format, settings.quality, input, data.filename);
 });
 
 export function registerAiCanvasExpand(app: FastifyInstance) {
@@ -325,8 +339,13 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
           scratchDir,
         );
 
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_extended.png`;
-        return { buffer: resultBuffer, filename: outputFilename, contentType: "image/png" };
+        return await encodeExtended(
+          resultBuffer,
+          s.format ?? "auto",
+          s.quality ?? 95,
+          orientedBuffer,
+          filename,
+        );
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
