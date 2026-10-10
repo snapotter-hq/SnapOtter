@@ -60,8 +60,12 @@ const I18nContext = createContext<I18nContextValue>({
 const LOCALE_STORAGE_KEY = "snapotter-locale";
 
 function detectLocale(): string {
-  const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
-  if (stored) return stored;
+  try {
+    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (stored) return stored;
+  } catch {
+    // Storage blocked or unavailable
+  }
 
   const codes = SUPPORTED_LOCALES.map((l) => l.code);
   for (const browserLang of navigator.languages) {
@@ -99,7 +103,12 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const dir = getDir(locale);
 
   useEffect(() => {
-    const hasExplicitChoice = localStorage.getItem(LOCALE_STORAGE_KEY);
+    let hasExplicitChoice: string | null = null;
+    try {
+      hasExplicitChoice = localStorage.getItem(LOCALE_STORAGE_KEY);
+    } catch {
+      // Storage blocked or unavailable
+    }
     if (hasExplicitChoice) return;
 
     if (detectLocale() !== "en") return;
@@ -134,7 +143,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [locale, dir]);
 
   const setLocale = useCallback((code: string) => {
-    localStorage.setItem(LOCALE_STORAGE_KEY, code);
+    try {
+      localStorage.setItem(LOCALE_STORAGE_KEY, code);
+    } catch {
+      // Storage blocked or unavailable
+    }
     setLocaleState(code);
   }, []);
 

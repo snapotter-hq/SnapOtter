@@ -77,7 +77,11 @@ export function failedAnswerMessage(
 // ── Auth Headers ───────────────────────────────────────────────
 
 function getBrowserStorage(): Storage | null {
-  return typeof window !== "undefined" ? window.localStorage : null;
+  try {
+    return typeof window !== "undefined" ? window.localStorage : null;
+  } catch {
+    return null;
+  }
 }
 
 function getToken(): string {
@@ -236,11 +240,19 @@ export async function apiDelete<T>(path: string): Promise<T> {
 }
 
 export function setToken(token: string) {
-  getBrowserStorage()?.setItem("snapotter-token", token);
+  try {
+    getBrowserStorage()?.setItem("snapotter-token", token);
+  } catch {
+    // Storage blocked or unavailable
+  }
 }
 
 export function clearToken() {
-  getBrowserStorage()?.removeItem("snapotter-token");
+  try {
+    getBrowserStorage()?.removeItem("snapotter-token");
+  } catch {
+    // Storage blocked or unavailable
+  }
 }
 
 // ── File Upload / Download ──────────────────────────────────────

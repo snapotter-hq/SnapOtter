@@ -141,7 +141,11 @@ export function useAuth() {
               totpEnabled: session.user?.totpEnabled === true,
             });
         } else {
-          clearToken();
+          try {
+            clearToken();
+          } catch {
+            // Storage blocked or unavailable
+          }
           if (!cancelled)
             setState({
               loading: false,
