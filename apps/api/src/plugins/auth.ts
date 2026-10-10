@@ -164,7 +164,7 @@ interface PasswordRuleFailure {
   maxLength?: number;
 }
 
-async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
+export async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
   // Before normalizing: the cap bounds the work every later step does, and the
   // request schemas leave the length to this check so a refusal can say why (#2037).
   if (typed.length > PASSWORD_MAX_LENGTH) {
@@ -250,7 +250,7 @@ function weakPasswordBody({ message, rule, rules, minLength, maxLength }: Passwo
   };
 }
 
-function validateUsername(username: string): string | null {
+export function validateUsername(username: string): string | null {
   if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
     return "Username must be between 3 and 50 characters";
   }
