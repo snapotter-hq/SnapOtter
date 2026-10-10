@@ -253,6 +253,26 @@ describe("isConfigExportableSetting", () => {
 // ── validateSettingsRuntimeConstraints: MFA + SSO gates ───────────────────
 
 describe("validateSettingsRuntimeConstraints: MFA licensing", () => {
+  it("names the setting it refused, so a caller can point at the row (#2339)", async () => {
+    state.mfaLicensed = false;
+    const mfa = await validateSettingsRuntimeConstraints([{ key: "mfaPolicy", value: "required" }]);
+    expect(mfa).toMatchObject({ success: false, setting: "mfaPolicy" });
+
+    state.oidcEnabled = false;
+    state.samlEnabled = false;
+    const sso = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(sso).toMatchObject({ success: false, setting: "ssoEnforcement" });
+
+    state.oidcEnabled = true;
+    state.ssoLicensed = false;
+    const unlicensed = await validateSettingsRuntimeConstraints([
+      { key: "ssoEnforcement", value: "true" },
+    ]);
+    expect(unlicensed).toMatchObject({ success: false, setting: "ssoEnforcement" });
+  });
+
   it("blocks mfaPolicy=required with 403 FEATURE_NOT_LICENSED when MFA is unlicensed", async () => {
     state.mfaLicensed = false;
     const result = await validateSettingsRuntimeConstraints([

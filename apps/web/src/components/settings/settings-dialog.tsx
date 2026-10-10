@@ -1163,11 +1163,18 @@ export function AdminSecuritySettings() {
       originalSettingsRef.current = { ...settings };
       setSaveMsg({ type: "success", text: t.settings.security.securitySettingsSaved });
     } catch (err) {
-      // A refused value comes back with the setting's key: name its row.
-      const refused =
+      // A refused value comes back with the setting's key: name its row and put
+      // the row back where it was, so the tab doesn't keep showing a value the
+      // server never accepted (and doesn't send it again on the next save).
+      const refusedKey =
         err instanceof ApiError && typeof err.body.setting === "string"
-          ? securitySettingLabel(t, err.body.setting)
+          ? err.body.setting
           : undefined;
+      if (refusedKey) {
+        const saved = originalSettingsRef.current[refusedKey] ?? "";
+        setSettings((prev) => ({ ...prev, [refusedKey]: saved }));
+      }
+      const refused = refusedKey ? securitySettingLabel(t, refusedKey) : undefined;
       setSaveMsg({
         type: "error",
         text: apiErrorMessage(

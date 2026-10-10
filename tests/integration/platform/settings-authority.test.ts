@@ -279,6 +279,9 @@ describe("generic settings authority", () => {
 
     expect.soft(res.statusCode, res.body).toBe(400);
     expect.soft(JSON.parse(res.body).code).toBe("DEPENDENCY_VALIDATION_FAILED");
+    // The refusal names the row, so the Security tab can point at it and put the
+    // switch back where it was (#2339).
+    expect.soft(JSON.parse(res.body).setting).toBe("ssoEnforcement");
     expect.soft(await readSetting("defaultTheme")).toBe("system");
     expect(await readSetting("ssoEnforcement")).toBe("false");
   });

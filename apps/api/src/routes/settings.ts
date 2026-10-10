@@ -175,6 +175,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(runtimeValidation.statusCode).send({
         error: runtimeValidation.error,
         code: runtimeValidation.code,
+        setting: runtimeValidation.setting,
         ...(runtimeValidation.validationErrors
           ? { validationErrors: runtimeValidation.validationErrors }
           : {}),
