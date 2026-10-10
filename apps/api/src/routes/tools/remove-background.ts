@@ -146,10 +146,11 @@ async function compositeCutout(
 }
 
 // ── AI job handler (runs inside the BullMQ worker) ────────────────
-// The worker dispatches to this handler before the registry process fn, so it
-// has to cover every job kind. Standalone jobs ("ai-tool") are Phase 1 of the
-// two-phase flow and return the transparent mask; pipeline steps and batch
-// children have no Phase 2, so they get the finished composite (#1047).
+// Standalone jobs ("ai-tool") are Phase 1 of the two-phase flow and return the
+// transparent mask. The composite below is the belt to the registry process
+// fn's braces: since #2076 that fn owns pipeline steps and batch children, and
+// the only kind reaching here is "ai-tool", but both paths call the same
+// compositeCutout so neither can drift from the other.
 registerAiJobHandler("remove-background", async (input, data, ctx) => {
   const settings = settingsSchema.parse(data.settings);
   const standalone = data.kind === "ai-tool";

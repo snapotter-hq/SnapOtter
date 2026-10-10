@@ -68,13 +68,14 @@ function toWrapperOptions(s: z.infer<typeof jobSettingsSchema>, frames: number, 
   };
 }
 
-// ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("remove-gif-background", async (input, data, ctx) => {
-  const settings = jobSettingsSchema.parse(data.settings);
-
-  // ctx.signal is not plumbed to Python; drop a sentinel the loop polls between
-  // frames so a cancel stops the run instead of wasting the whole animation.
-  const cancelFile = join(ctx.scratchDir, "cancel.flag");
+/**
+ * ctx.signal is not plumbed to Python, so drop a sentinel file the frame loop
+ * polls between frames: a cancel stops the run instead of wasting the whole
+ * animation. Shared by the AI job handler and the registry process fn so both
+ * behave the same (#2076).
+ */
+function writeCancelSentinel(scratchDir: string, signal?: AbortSignal): string {
+  const cancelFile = join(scratchDir, "cancel.flag");
   const writeCancel = () => {
     try {
       writeFileSync(cancelFile, "1");
@@ -82,8 +83,16 @@ registerAiJobHandler("remove-gif-background", async (input, data, ctx) => {
       // best effort
     }
   };
-  if (ctx.signal.aborted) writeCancel();
-  else ctx.signal.addEventListener("abort", writeCancel, { once: true });
+  if (signal?.aborted) writeCancel();
+  else signal?.addEventListener("abort", writeCancel, { once: true });
+  return cancelFile;
+}
+
+// ── AI job handler (runs inside the BullMQ worker) ────────────────
+registerAiJobHandler("remove-gif-background", async (input, data, ctx) => {
+  const settings = jobSettingsSchema.parse(data.settings);
+
+  const cancelFile = writeCancelSentinel(ctx.scratchDir, ctx.signal);
 
   let bgImagePath: string | undefined;
   if (settings.bgImageKey) {
@@ -289,16 +298,18 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
+        const cancelFile = writeCancelSentinel(scratchDir, ctx?.signal);
+
+        // A still frame is an animation with one frame, which the sidecar
+        // handles; the tool page has always accepted one (#2076).
         const animation = await detectAnimation(inputBuffer, filename);
-        if (!animation.animated) {
-          throw new Error("Input is not an animated image");
-        }
         // Batch/pipeline has no per-request background image; "image" degrades
         // to transparent in the pipeline (the Python side handles a null bg).
         const result = await removeBackgroundAnimated(
           inputBuffer,
           scratchDir,
-          toWrapperOptions(s, animation.frames, filename),
+          { ...toWrapperOptions(s, animation.frames, filename), cancelFile },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
         );
         const base = filename.replace(/\.[^.]+$/, "");
         return {

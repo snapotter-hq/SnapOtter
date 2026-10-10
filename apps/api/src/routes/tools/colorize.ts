@@ -226,8 +226,22 @@ export function registerColorize(app: FastifyInstance) {
           intensity: (settings as { intensity?: number }).intensity ?? 1.0,
           model: (settings as { model?: string }).model ?? "auto",
         });
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_colorized.png`;
-        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+
+        // Match the input's own format, the way the tool page does; a pipeline
+        // step that fed a JPEG used to get a PNG here (#2076).
+        const outputFormat = await resolveOutputFormat(orientedBuffer, filename);
+        let outputBuffer = result.buffer;
+        if (outputFormat.format !== "png") {
+          outputBuffer = await sharp(result.buffer)
+            .toFormat(outputFormat.format, outputFormat.encoderOptions)
+            .toBuffer();
+        }
+        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+        return {
+          buffer: outputBuffer,
+          filename: `${filename.replace(/\.[^.]+$/, "")}_colorized.${ext}`,
+          contentType: outputFormat.contentType,
+        };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }

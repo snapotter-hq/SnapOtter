@@ -39,10 +39,10 @@ vi.mock("@snapotter/ai", async (importOriginal) => ({
 
 const fakeApp = { post: vi.fn(), get: vi.fn() } as unknown as FastifyInstance;
 
-// Every tool that registers an AI job handler. The worker used to prefer that
-// handler over the registry process fn for every job kind, so a pipeline step
-// or batch child ran the handler while the tool page ran the process fn (#2076).
-// ocr-pdf is the exception: it registers the path-backed handler instead.
+// The tools that register both an AI job handler and a registry process fn.
+// The worker used to prefer the handler over the process fn for every job kind,
+// so a pipeline step or batch child ran the handler while the process fns were
+// dead code (#2076). ocr-pdf is separate: it registers the path-backed handler.
 const AI_TOOLS = [
   "ai-canvas-expand",
   "blur-faces",
