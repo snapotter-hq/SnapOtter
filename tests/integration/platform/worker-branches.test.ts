@@ -63,6 +63,7 @@ const { requestCancel, startCancelListener, stopCancelListener } = await import(
   "../../../apps/api/src/jobs/cancel.js"
 );
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { registerAiJobHandler } = await import("../../../apps/api/src/jobs/ai-handlers.js");
 const { enqueueToolJob } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
@@ -1254,5 +1255,65 @@ describe("batch children and finalize", () => {
       return (await job.getState()) === "failed" ? job : undefined;
     }, 25_000);
     expect(failedJob.failedReason).toContain("Unknown system job: wt-not-a-system-job");
+  }, 30_000);
+});
+
+// ── AI handler vs registry process fn dispatch (#2076) ──────────
+
+// The shape all thirteen AI tools register: an AI job handler plus a registry
+// process fn. A pipeline step or batch child has no second phase, so it must
+// run the process fn that owns the whole job; only the standalone ai-tool kind
+// takes the handler. Before #2076 the handler won every kind, which is how the
+// pipeline behaviour of those tools drifted from their tool page.
+registerAiJobHandler("wt-ai-both", async () => ({
+  buffer: Buffer.from("from-the-ai-handler"),
+  filename: "handler.png",
+  contentType: "image/png",
+}));
+
+registerToolProcessFn({
+  toolId: "wt-ai-both",
+  settingsSchema: passthroughSchema,
+  process: unusedLegacyProcess,
+  processV2: async () => ({
+    buffer: Buffer.from("from-the-process-fn"),
+    filename: "process.png",
+    contentType: "image/png",
+  }),
+});
+
+describe("AI handler vs registry process fn (#2076)", () => {
+  it.each(["pipeline-step", "batch-child"] as const)(
+    "runs the process fn for a %s job",
+    async (kind) => {
+      const jobId = randomUUID();
+      const inputRef = await seedInput(jobId, "photo.png", Buffer.from("fake-png-input"));
+
+      await enqueueToolJob(toolJob({ jobId, toolId: "wt-ai-both", inputRefs: [inputRef], kind }));
+
+      const row = await terminalRow(jobId, 25_000);
+      expect(row.status).toBe("completed");
+      expect(row.outputRefs).toEqual([`outputs/${jobId}/process.png`]);
+      expect((await getObjectBuffer(`outputs/${jobId}/process.png`)).toString("utf8")).toBe(
+        "from-the-process-fn",
+      );
+    },
+    30_000,
+  );
+
+  it("runs the AI handler for the standalone ai-tool kind", async () => {
+    const jobId = randomUUID();
+    const inputRef = await seedInput(jobId, "photo.png", Buffer.from("fake-png-input"));
+
+    await enqueueToolJob(
+      toolJob({ jobId, toolId: "wt-ai-both", inputRefs: [inputRef], kind: "ai-tool", pool: "ai" }),
+    );
+
+    const row = await terminalRow(jobId, 25_000);
+    expect(row.status).toBe("completed");
+    expect(row.outputRefs).toEqual([`outputs/${jobId}/handler.png`]);
+    expect((await getObjectBuffer(`outputs/${jobId}/handler.png`)).toString("utf8")).toBe(
+      "from-the-ai-handler",
+    );
   }, 30_000);
 });
