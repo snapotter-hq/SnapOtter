@@ -21,6 +21,10 @@ vi.stubGlobal("localStorage", {
   clear: () => storage.clear(),
 });
 
+// The page reads the signed-in name from the session (#2317); the real hook
+// would fetch the auth config, which would shift this file's fetch call indices.
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ username: "admin" }) }));
+
 import { I18nProvider } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { ChangePasswordPage } from "@/pages/change-password-page";
