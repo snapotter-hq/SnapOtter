@@ -12,6 +12,7 @@ import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
+import { setSessionCookie } from "../lib/session-cookie.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
@@ -556,6 +557,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         .from(schema.teams)
         .where(eq(schema.teams.id, dbUser.team));
 
+      setSessionCookie(request, reply, token);
+
       return reply.send({
         token,
         user: {
@@ -660,6 +663,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         .select()
         .from(schema.teams)
         .where(eq(schema.teams.id, dbUser.team));
+
+      setSessionCookie(request, reply, token);
 
       return reply.send({
         token,

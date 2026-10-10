@@ -6,10 +6,49 @@ import { useSearchParams } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useTimeouts } from "@/hooks/use-timeouts";
-import { setToken } from "@/lib/api";
+import { clearToken, setToken } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { copyToClipboard } from "@/lib/utils";
+
+/**
+ * The last step of every successful login: remember the token and username,
+ * then go into the app. Every route that returns a session token also sets the
+ * session cookie, so a storage failure (a full quota) must not read as a failed
+ * login and send the user back to retype a good password; the app runs on the
+ * cookie without the stored copies (#2053). Each write has its own try so one
+ * failing doesn't skip the other, and a failed write removes the old value, so
+ * a token or username left by an earlier session can't outlive this login.
+ */
+function completeLogin(
+  data: { token?: string; user?: { username?: string; mustChangePassword?: boolean } },
+  typedUsername: string,
+): void {
+  try {
+    setToken(data.token ?? "");
+  } catch (err) {
+    console.warn(
+      "Could not save the session token to browser storage; using the session cookie",
+      err,
+    );
+    try {
+      clearToken();
+    } catch {
+      /* storage is unusable; nothing stale to clear */
+    }
+  }
+  try {
+    localStorage.setItem("snapotter-username", data.user?.username || typedUsername);
+  } catch (err) {
+    console.warn("Could not save the username to browser storage", err);
+    try {
+      localStorage.removeItem("snapotter-username");
+    } catch {
+      /* storage is unusable; nothing stale to clear */
+    }
+  }
+  window.location.href = appUrl(data.user?.mustChangePassword ? "/change-password" : "/");
+}
 
 function parseManualSecret(uri: string): string {
   try {
@@ -304,6 +343,7 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/login"), {
         method: "POST",
@@ -364,17 +404,15 @@ export function LoginPage() {
         later(() => mfaInputRef.current?.focus(), 100);
         return;
       }
-      setToken(data.token);
-      localStorage.setItem("snapotter-username", data.user?.username || username);
-      if (data.user?.mustChangePassword) {
-        window.location.href = appUrl("/change-password");
-      } else {
-        window.location.href = appUrl("/");
-      }
-    } catch {
+      // The page is leaving: keep the buttons disabled so a second click
+      // can't spend the single-use challenge again (#2053).
+      navigating = true;
+      completeLogin(data, username);
+    } catch (err) {
+      console.warn("Login request failed", err);
       setError(t.auth.connectionError);
     } finally {
-      setLoading(false);
+      if (!navigating) setLoading(false);
     }
   };
 
@@ -399,6 +437,7 @@ export function LoginPage() {
   const handleMfaComplete = async () => {
     setMfaLoading(true);
     setError("");
+    let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/mfa/complete"), {
         method: "POST",
@@ -426,23 +465,22 @@ export function LoginPage() {
         return;
       }
       const data = await res.json();
-      setToken(data.token);
-      localStorage.setItem("snapotter-username", data.user?.username || username);
-      if (data.user?.mustChangePassword) {
-        window.location.href = appUrl("/change-password");
-      } else {
-        window.location.href = appUrl("/");
-      }
-    } catch {
+      // The page is leaving: keep the buttons disabled so a second click
+      // can't spend the single-use challenge again (#2053).
+      navigating = true;
+      completeLogin(data, username);
+    } catch (err) {
+      console.warn("Login request failed", err);
       setError(t.auth.connectionError);
     } finally {
-      setMfaLoading(false);
+      if (!navigating) setMfaLoading(false);
     }
   };
 
   const handleEnrollComplete = async () => {
     setEnrollmentLoading(true);
     setError("");
+    let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/mfa/enroll-complete"), {
         method: "POST",
@@ -469,17 +507,15 @@ export function LoginPage() {
         return;
       }
       const data = await res.json();
-      setToken(data.token);
-      localStorage.setItem("snapotter-username", data.user?.username || username);
-      if (data.user?.mustChangePassword) {
-        window.location.href = appUrl("/change-password");
-      } else {
-        window.location.href = appUrl("/");
-      }
-    } catch {
+      // The page is leaving: keep the buttons disabled so a second click
+      // can't spend the single-use challenge again (#2053).
+      navigating = true;
+      completeLogin(data, username);
+    } catch (err) {
+      console.warn("Login request failed", err);
       setError(t.auth.connectionError);
     } finally {
-      setEnrollmentLoading(false);
+      if (!navigating) setEnrollmentLoading(false);
     }
   };
 

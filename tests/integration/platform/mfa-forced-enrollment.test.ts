@@ -129,6 +129,16 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
     });
     expect(sessionRes.statusCode).toBe(200);
 
+    // The session cookie is set too, like a password login: the form can lose
+    // its localStorage copy of the token and the browser is still signed in (#2053).
+    expect(String(completeRes.headers["set-cookie"])).toContain(`snapotter-session=${body.token}`);
+    const cookieOnly = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      cookies: { "snapotter-session": body.token },
+    });
+    expect(cookieOnly.statusCode).toBe(200);
+
     // Logging in again is now the ordinary enrolled-user challenge, not another
     // forced enrollment.
     const nextLogin = await login(username, password);

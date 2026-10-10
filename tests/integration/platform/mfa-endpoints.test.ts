@@ -868,6 +868,47 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
     });
   });
 
+  it("sets the session cookie when the TOTP step completes, so the token isn't the only credential (#2053)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode(uri) },
+    });
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: "admin", password: "Adminpass1" },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(uri) },
+    });
+    expect(res.statusCode).toBe(200);
+    const { token } = JSON.parse(res.body);
+
+    const cookie = String(res.headers["set-cookie"]);
+    expect(cookie).toContain(`snapotter-session=${token}`);
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Strict/i);
+
+    const cookieOnly = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      cookies: { "snapotter-session": token },
+    });
+    expect(cookieOnly.statusCode).toBe(200);
+  });
+
   it("burns the last remaining recovery code to an empty stored list", async () => {
     // Enroll a fresh user, then overwrite its stored recovery hash with a
     // single known code so the consume path collapses to the empty-string

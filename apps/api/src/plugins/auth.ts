@@ -29,7 +29,7 @@ import {
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
 import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
-import { isSecureRequest } from "../lib/secure-cookie.js";
+import { setSessionCookie } from "../lib/session-cookie.js";
 import { getSettingNumber, getSettingStrict, getSettingString } from "../lib/settings-helpers.js";
 import { userLimitReached } from "../lib/user-limit.js";
 import {
@@ -802,18 +802,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const [teamRow] = await db.select().from(schema.teams).where(eq(schema.teams.id, user.team));
 
-      const cookieReply = reply as FastifyReply & {
-        setCookie?: (name: string, value: string, opts: Record<string, unknown>) => FastifyReply;
-      };
-      if (typeof cookieReply.setCookie === "function") {
-        cookieReply.setCookie("snapotter-session", token, {
-          path: `${env.BASE_PATH}/`,
-          httpOnly: true,
-          sameSite: "strict",
-          secure: isSecureRequest(request),
-          maxAge: SESSION_DURATION_MS / 1000,
-        });
-      }
+      setSessionCookie(request, reply, token);
 
       return reply.send({
         token,
