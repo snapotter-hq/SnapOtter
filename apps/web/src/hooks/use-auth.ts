@@ -164,7 +164,12 @@ export function useAuth() {
               hasLocalPassword: session.user?.hasLocalPassword ?? false,
               totpEnabled: session.user?.totpEnabled === true,
             });
-        } else {
+        } else if (sessionRes.status === 401 || sessionRes.status === 403) {
+          // Only these two mean "not signed in": 401 for no or expired session,
+          // 403 for a disabled account. Anything else (a rate limit shared with
+          // /health, a 5xx from a database fault) says nothing about the
+          // session, so it must not clear the token and sign the user out
+          // (#2355); it falls through to the retry below instead.
           clearToken();
           if (!cancelled)
             setState({
@@ -184,6 +189,8 @@ export function useAuth() {
               hasLocalPassword: false,
               totpEnabled: false,
             });
+        } else {
+          throw new Error(`Session check failed with ${sessionRes.status}`);
         }
         failures = 0;
       } catch (err) {

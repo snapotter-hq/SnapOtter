@@ -115,8 +115,11 @@ describe("useAuth anonymous happy path", () => {
         json: async () => ({ authEnabled: true }),
       })
       .mockResolvedValueOnce({
+        // A real "not signed in": 401 is what the server sends for an absent or
+        // expired session, and it is the only kind of failure that signs out.
         ok: false,
-        json: async () => ({}),
+        status: 401,
+        json: async () => ({ error: "Not authenticated" }),
       });
 
     const { renderHook, act } = await import("@testing-library/react");
@@ -379,5 +382,56 @@ describe("useAuth when /api/v1/config/auth fails (#2297)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("useAuth when the session check fails (#2355)", () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.resetModules();
+  });
+
+  async function renderWithSession(status: number, body: unknown = {}) {
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ authEnabled: true }) })
+      .mockResolvedValueOnce({ ok: false, status, json: async () => body });
+
+    const { renderHook, act } = await import("@testing-library/react");
+    const { clearToken } = await import("@/lib/api");
+    const { useAuth } = await import("@/hooks/use-auth");
+    vi.mocked(clearToken).mockClear();
+
+    const { result } = renderHook(() => useAuth());
+    await act(async () => {});
+    return { result, clearToken: vi.mocked(clearToken) };
+  }
+
+  it.each([[429], [500], [503]])(
+    "keeps the session and retries on a %i instead of signing the user out",
+    async (status) => {
+      vi.useFakeTimers();
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const { result, clearToken } = await renderWithSession(status);
+
+        expect(clearToken).not.toHaveBeenCalled();
+        expect(result.current.loading).toBe(true);
+        expect(result.current.isAuthenticated).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each([
+    [401, "not signed in"],
+    [403, "the account is disabled"],
+  ])("signs the user out on a %i, which is what %s means", async (status) => {
+    const { result, clearToken } = await renderWithSession(status);
+
+    expect(clearToken).toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.authEnabled).toBe(true);
+    expect(result.current.isAuthenticated).toBe(false);
   });
 });
