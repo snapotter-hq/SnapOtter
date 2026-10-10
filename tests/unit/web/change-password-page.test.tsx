@@ -16,6 +16,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // stored locale choice from it (same stub as change-password-errors.test.tsx).
 const storage = vi.hoisted(() => new Map<string, string>());
 const storageFails = vi.hoisted(() => ({ set: false }));
+// The page shows and offers the signed-in name. The session is the source of
+// truth; storage is only a fallback for a browser whose config has not loaded (#2317).
+const auth = vi.hoisted(() => ({ username: null as string | null }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ username: auth.username }) }));
+
 vi.stubGlobal("localStorage", {
   getItem: (k: string) => storage.get(k) ?? null,
   setItem: (k: string, v: string) => {
@@ -36,6 +41,7 @@ const submitSpy = vi.fn();
 
 beforeEach(() => {
   storage.clear();
+  auth.username = null;
   storageFails.set = false;
   storage.set("snapotter-locale", "en");
   vi.stubGlobal("fetch", fetchMock);
@@ -273,5 +279,52 @@ describe("Generate sizes the password to the policy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: en.changePassword.generateButton }));
     expect(field(en.changePassword.newPasswordLabel).value).toHaveLength(20);
+  });
+});
+
+describe("the username shown and offered (#2317)", () => {
+  it("comes from the session, not from a name an earlier account left in storage", async () => {
+    storage.set("snapotter-username", "someone-else");
+    auth.username = "real-user";
+    let offered = "";
+    submitSpy.mockImplementation(function (this: HTMLFormElement) {
+      offered = this.querySelector<HTMLInputElement>("input[name=username]")?.value ?? "";
+    });
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    expect(screen.getByLabelText(en.changePassword.usernameLabel)).toHaveValue("real-user");
+    await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
+    expect(offered).toBe("real-user");
+  });
+
+  it("falls back to the stored name while the session is still loading", async () => {
+    storage.set("snapotter-username", "alice");
+    auth.username = null;
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    expect(screen.getByLabelText(en.changePassword.usernameLabel)).toHaveValue("alice");
+  });
+
+  it("falls back to admin when neither the session nor storage has a name", async () => {
+    auth.username = null;
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    expect(screen.getByLabelText(en.changePassword.usernameLabel)).toHaveValue("admin");
+  });
+
+  it("does not throw when storage is blocked and the session has no name yet", async () => {
+    auth.username = null;
+    storageFails.set = true;
+    answer(200, {});
+
+    await fillAndSubmit();
+
+    expect(screen.getByLabelText(en.changePassword.usernameLabel)).toHaveValue("admin");
   });
 });

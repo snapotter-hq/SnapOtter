@@ -1,6 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useAuth } from "@/hooks/use-auth";
 import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
@@ -45,6 +46,16 @@ function triggerBrowserPasswordSave(username: string, password: string) {
   // The form.submit() causes a full page navigation to "/", so no cleanup needed.
 }
 
+/** The name an earlier login left in storage, if storage can be read at all. */
+function storedUsername(): string | null {
+  try {
+    return localStorage.getItem("snapotter-username");
+  } catch {
+    // Storage blocked (a private window with site data blocked).
+    return null;
+  }
+}
+
 /**
  * What happens once the server has changed the password. None of it may be
  * reported as a failed change: the password is already different, so telling
@@ -52,15 +63,7 @@ function triggerBrowserPasswordSave(username: string, password: string) {
  * password (#1569). Blocked storage is ignored; a form the browser won't
  * submit falls back to a plain navigation to the app.
  */
-function finishPasswordChange(newPassword: string) {
-  // Read the name before the write: a full quota throws on setItem, and the
-  // browser must still be offered the password under the right username.
-  let username = "admin";
-  try {
-    username = localStorage.getItem("snapotter-username") || username;
-  } catch {
-    // Storage blocked: keep the default.
-  }
+function finishPasswordChange(username: string, newPassword: string) {
   try {
     localStorage.setItem("snapotter-welcome", "1");
   } catch {
@@ -77,6 +80,10 @@ function finishPasswordChange(newPassword: string) {
 
 export function ChangePasswordPage() {
   const { t } = useTranslation();
+  // The session knows who is signed in; storage is only what an earlier login
+  // left behind, which can be another account's name or nothing at all (#2317).
+  const { username: sessionUsername } = useAuth();
+  const username = sessionUsername || storedUsername() || "admin";
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -142,7 +149,7 @@ export function ChangePasswordPage() {
       if (!changed) setLoading(false);
     }
 
-    finishPasswordChange(newPassword); // navigates away
+    finishPasswordChange(username, newPassword); // navigates away
   };
 
   return (
@@ -166,7 +173,7 @@ export function ChangePasswordPage() {
                 type="text"
                 name="username"
                 autoComplete="username"
-                value={localStorage.getItem("snapotter-username") || "admin"}
+                value={username}
                 readOnly
                 className="w-full px-4 py-3 rounded-lg border border-border bg-muted text-muted-foreground cursor-not-allowed"
               />
