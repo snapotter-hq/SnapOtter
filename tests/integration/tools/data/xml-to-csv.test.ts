@@ -71,4 +71,43 @@ describe("xml-to-csv (pure JS, no skipIf)", () => {
     expect(text).toContain("single");
     expect(text).toContain("value");
   }, 30_000);
+
+  // #2098: flattenRow built each row on a {} literal, so an attribute named
+  // __proto__ hit the prototype setter (column dropped) and a row missing a
+  // column named toString read the inherited function into its cell. The same
+  // bug was fixed in csv-json (#2062) with null-prototype rows.
+  it("keeps a column whose attribute is named __proto__", async () => {
+    const xml = Buffer.from(
+      '<?xml version="1.0"?><rows><row __proto__="5" a="1"/><row __proto__="6" a="2"/></rows>',
+    );
+    const res = await runTool("proto.xml", xml);
+    expect(res.statusCode).toBe(200);
+
+    const envelope = JSON.parse(res.body);
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+
+    const text = (dl.payload as string).replace(/\r\n/g, "\n");
+    const lines = text.trim().split("\n");
+    expect(lines[0]).toBe("__proto__,a");
+    expect(lines[1]).toBe("5,1");
+    expect(lines[2]).toBe("6,2");
+  }, 30_000);
+
+  it("leaves a missing toString cell empty instead of the inherited function", async () => {
+    const xml = Buffer.from('<?xml version="1.0"?><rows><row toString="5"/><row a="1"/></rows>');
+    const res = await runTool("tostring.xml", xml);
+    expect(res.statusCode).toBe(200);
+
+    const envelope = JSON.parse(res.body);
+    const dl = await testApp.app.inject({ method: "GET", url: envelope.downloadUrl });
+    expect(dl.statusCode).toBe(200);
+
+    const text = (dl.payload as string).replace(/\r\n/g, "\n");
+    const lines = text.trim().split("\n");
+    expect(lines[0]).toBe("toString,a");
+    expect(lines[1]).toBe("5,");
+    expect(lines[2]).toBe(",1");
+    expect(text).not.toContain("native code");
+  }, 30_000);
 });
