@@ -1118,11 +1118,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       const body = parsed.data;
 
-      const pwError = await validatePasswordStrength(body.newPassword);
-      if (pwError) {
-        return reply.status(400).send(weakPasswordBody(pwError));
-      }
-
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, authUser.id));
 
       if (!user) {
@@ -1134,6 +1129,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           error: "Password changes are managed by your identity provider.",
           code: "OIDC_NO_PASSWORD",
         });
+      }
+
+      const pwError = await validatePasswordStrength(body.newPassword);
+      if (pwError) {
+        return reply.status(400).send(weakPasswordBody(pwError));
       }
 
       const valid =
@@ -1567,11 +1567,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       const body = parsed.data;
 
-      const pwError = await validatePasswordStrength(body.newPassword);
-      if (pwError) {
-        return reply.status(400).send(weakPasswordBody(pwError));
-      }
-
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!user) {
@@ -1590,6 +1585,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           error: "Cannot reset password for OIDC user.",
           code: "OIDC_NO_PASSWORD",
         });
+      }
+
+      const pwError = await validatePasswordStrength(body.newPassword);
+      if (pwError) {
+        return reply.status(400).send(weakPasswordBody(pwError));
       }
 
       const newHash = await hashPassword(normalizePassword(body.newPassword));

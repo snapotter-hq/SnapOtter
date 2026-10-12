@@ -932,7 +932,7 @@ export function SystemSection() {
 
 export function SecuritySection() {
   const { t } = useTranslation();
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasLocalPassword, loading: authLoading } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -990,106 +990,108 @@ export function SecuritySection() {
         <p className="text-sm text-muted-foreground mt-1">{t.settings.security.description}</p>
       </div>
 
-      <form onSubmit={handleChangePassword} className="space-y-4">
-        <h4 className="text-sm font-medium text-foreground">
-          {t.settings.security.changePasswordHeading}
-        </h4>
+      {(authLoading || hasLocalPassword !== false) && (
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <h4 className="text-sm font-medium text-foreground">
+            {t.settings.security.changePasswordHeading}
+          </h4>
 
-        <div className="space-y-3 max-w-sm">
-          <div className="relative">
-            <label htmlFor="current-password" className="sr-only">
-              {t.settings.security.currentPasswordPlaceholder}
-            </label>
-            <input
-              id="current-password"
-              type={showCurrent ? "text" : "password"}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder={t.settings.security.currentPasswordPlaceholder}
-              className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
-              required
-              aria-invalid={message?.type === "error" || undefined}
-              aria-describedby={message ? "password-change-error" : undefined}
-            />
+          <div className="space-y-3 max-w-sm">
+            <div className="relative">
+              <label htmlFor="current-password" className="sr-only">
+                {t.settings.security.currentPasswordPlaceholder}
+              </label>
+              <input
+                id="current-password"
+                type={showCurrent ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder={t.settings.security.currentPasswordPlaceholder}
+                className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
+                required
+                aria-invalid={message?.type === "error" || undefined}
+                aria-describedby={message ? "password-change-error" : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <label htmlFor="new-password" className="sr-only">
+                {t.settings.security.newPasswordPlaceholder}
+              </label>
+              <input
+                id="new-password"
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={t.settings.security.newPasswordPlaceholder}
+                className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
+                required
+                aria-invalid={message?.type === "error" || undefined}
+                aria-describedby={message ? "password-change-error" : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew(!showNew)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <label htmlFor="confirm-password" className="sr-only">
+                {t.settings.security.confirmPasswordPlaceholder}
+              </label>
+              <input
+                id="confirm-password"
+                type={showConfirm ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t.settings.security.confirmPasswordPlaceholder}
+                className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
+                required
+                aria-invalid={message?.type === "error" || undefined}
+                aria-describedby={message ? "password-change-error" : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            {message && (
+              <AlertMessages
+                id="password-change-error"
+                messages={message.messages}
+                className={cn(
+                  "text-sm",
+                  message.type === "error" ? "text-destructive" : "text-success-ink",
+                )}
+              />
+            )}
+
             <button
-              type="button"
-              onClick={() => setShowCurrent(!showCurrent)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              type="submit"
+              disabled={submitting}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {t.settings.security.changePasswordButton}
             </button>
           </div>
-
-          <div className="relative">
-            <label htmlFor="new-password" className="sr-only">
-              {t.settings.security.newPasswordPlaceholder}
-            </label>
-            <input
-              id="new-password"
-              type={showNew ? "text" : "password"}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder={t.settings.security.newPasswordPlaceholder}
-              className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
-              required
-              aria-invalid={message?.type === "error" || undefined}
-              aria-describedby={message ? "password-change-error" : undefined}
-            />
-            <button
-              type="button"
-              onClick={() => setShowNew(!showNew)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-            >
-              {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-
-          <div className="relative">
-            <label htmlFor="confirm-password" className="sr-only">
-              {t.settings.security.confirmPasswordPlaceholder}
-            </label>
-            <input
-              id="confirm-password"
-              type={showConfirm ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder={t.settings.security.confirmPasswordPlaceholder}
-              className="w-full px-3 py-2 pe-10 rounded-lg border border-border bg-background text-sm text-foreground"
-              required
-              aria-invalid={message?.type === "error" || undefined}
-              aria-describedby={message ? "password-change-error" : undefined}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirm(!showConfirm)}
-              className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-              tabIndex={-1}
-            >
-              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-
-          {message && (
-            <AlertMessages
-              id="password-change-error"
-              messages={message.messages}
-              className={cn(
-                "text-sm",
-                message.type === "error" ? "text-destructive" : "text-success-ink",
-              )}
-            />
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-            {t.settings.security.changePasswordButton}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div className="border-t border-border pt-4">
         <p className="text-sm text-muted-foreground">{t.settings.security.loginAttemptLimitNote}</p>

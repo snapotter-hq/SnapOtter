@@ -133,10 +133,12 @@ beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "de");
   useAuth.mockReturnValue({
+    loading: false,
     permissions: [],
     hasPermission: () => false,
     authEnabled: true,
     role: "admin",
+    hasLocalPassword: true,
     totpEnabled: false,
   });
   apiGet.mockImplementation(async (path: string) => {
@@ -241,6 +243,41 @@ describe("Security: change password", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(de.errors.passwordNeedsDigit);
     expect(within(alert).queryByRole("list")).toBeNull();
+  });
+
+  it("hides the change-password form for accounts without a local password (#2311)", async () => {
+    useAuth.mockReturnValue({
+      loading: false,
+      permissions: [],
+      hasPermission: () => false,
+      authEnabled: true,
+      role: "user",
+      hasLocalPassword: false,
+      totpEnabled: false,
+    });
+    renderDe(<SecuritySection />);
+
+    expect(await screen.findByText(s.security.heading)).toBeInTheDocument();
+    expect(screen.getByText(s.security.loginAttemptLimitNote)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(s.security.currentPasswordPlaceholder)).toBeNull();
+    expect(screen.queryByRole("button", { name: s.security.changePasswordButton })).toBeNull();
+  });
+
+  it("keeps the change-password form visible while the session check is still loading (#2311)", async () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      permissions: [],
+      hasPermission: () => false,
+      authEnabled: true,
+      role: "user",
+      hasLocalPassword: false,
+      totpEnabled: false,
+    });
+    renderDe(<SecuritySection />);
+
+    expect(
+      await screen.findByPlaceholderText(s.security.currentPasswordPlaceholder),
+    ).toBeInTheDocument();
   });
 });
 

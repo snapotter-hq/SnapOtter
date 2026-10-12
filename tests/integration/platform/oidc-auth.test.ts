@@ -211,9 +211,31 @@ describe("Password guards for OIDC users", () => {
     });
 
     expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body);
-    expect(body.code).toBe("OIDC_NO_PASSWORD");
+    expect(res.json().code).toBe("OIDC_NO_PASSWORD");
   });
+
+  it.each([
+    ["too short", "1"],
+    ["too long", "A1a".repeat(500)],
+  ])(
+    "OIDC user trying to change password with a %s new password still gets OIDC_NO_PASSWORD (#2311)",
+    async (_label, newPassword) => {
+      const { sessionToken } = await createOidcUser();
+
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/change-password",
+        headers: { authorization: `Bearer ${sessionToken}` },
+        payload: {
+          currentPassword: "anything",
+          newPassword,
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().code).toBe("OIDC_NO_PASSWORD");
+    },
+  );
 
   it("admin cannot reset password for OIDC user", async () => {
     const { userId } = await createOidcUser();
@@ -226,9 +248,28 @@ describe("Password guards for OIDC users", () => {
     });
 
     expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body);
-    expect(body.code).toBe("OIDC_NO_PASSWORD");
+    expect(res.json().code).toBe("OIDC_NO_PASSWORD");
   });
+
+  it.each([
+    ["too short", "1"],
+    ["too long", "A1a".repeat(500)],
+  ])(
+    "admin trying to reset password for OIDC user with a %s new password still gets OIDC_NO_PASSWORD (#2311)",
+    async (_label, newPassword) => {
+      const { userId } = await createOidcUser();
+
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: `/api/auth/users/${userId}/reset-password`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { newPassword },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().code).toBe("OIDC_NO_PASSWORD");
+    },
+  );
 });
 
 // =====================================================================
@@ -248,7 +289,9 @@ describe("Users list includes OIDC fields", () => {
     const body = JSON.parse(res.body);
 
     // Find the OIDC user we just created
-    const oidcEntry = body.users.find((u: any) => u.username === oidcUsername);
+    const oidcEntry = body.users.find(
+      (u: { username: string; authProvider: string }) => u.username === oidcUsername,
+    );
     expect(oidcEntry).toBeDefined();
     expect(oidcEntry.authProvider).toBe("oidc");
     expect(oidcEntry.hasLocalPassword).toBe(false);
@@ -256,7 +299,9 @@ describe("Users list includes OIDC fields", () => {
     expect(oidcEntry.email).toMatch(/@example\.com$/);
 
     // The admin user should be local
-    const adminEntry = body.users.find((u: any) => u.username === "admin");
+    const adminEntry = body.users.find(
+      (u: { username: string; authProvider: string }) => u.username === "admin",
+    );
     expect(adminEntry).toBeDefined();
     expect(adminEntry.authProvider).toBe("local");
     expect(adminEntry.hasLocalPassword).toBe(true);
@@ -404,24 +449,24 @@ describe("Config endpoint with OIDC enabled", () => {
 
   beforeAll(async () => {
     // Mutate the cached env to enable OIDC for route registration
-    (env as any).OIDC_ENABLED = true;
-    (env as any).EXTERNAL_URL = "http://localhost:9999";
-    (env as any).OIDC_ISSUER_URL = "http://localhost:0";
-    (env as any).OIDC_CLIENT_ID = "test-client-id";
-    (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
-    (env as any).OIDC_PROVIDER_NAME = "TestProvider";
+    env.OIDC_ENABLED = true;
+    env.EXTERNAL_URL = "http://localhost:9999";
+    env.OIDC_ISSUER_URL = "http://localhost:0";
+    env.OIDC_CLIENT_ID = "test-client-id";
+    env.OIDC_CLIENT_SECRET = "test-client-secret";
+    env.OIDC_PROVIDER_NAME = "TestProvider";
 
     oidcApp = await buildTestApp();
   }, 30_000);
 
   afterAll(async () => {
     // Restore original env values
-    (env as any).OIDC_ENABLED = origOidcEnabled;
-    (env as any).EXTERNAL_URL = origExternalUrl;
-    (env as any).OIDC_ISSUER_URL = origIssuerUrl;
-    (env as any).OIDC_CLIENT_ID = origClientId;
-    (env as any).OIDC_CLIENT_SECRET = origClientSecret;
-    (env as any).OIDC_PROVIDER_NAME = origProviderName;
+    env.OIDC_ENABLED = origOidcEnabled;
+    env.EXTERNAL_URL = origExternalUrl;
+    env.OIDC_ISSUER_URL = origIssuerUrl;
+    env.OIDC_CLIENT_ID = origClientId;
+    env.OIDC_CLIENT_SECRET = origClientSecret;
+    env.OIDC_PROVIDER_NAME = origProviderName;
 
     await oidcApp.cleanup();
   }, 10_000);
@@ -508,11 +553,11 @@ describe("OIDC login discovery failure", () => {
       });
     });
 
-    (env as any).OIDC_ENABLED = true;
-    (env as any).EXTERNAL_URL = "http://localhost:9999";
-    (env as any).OIDC_ISSUER_URL = `http://localhost:${deadPort}`;
-    (env as any).OIDC_CLIENT_ID = "test-client-id";
-    (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
+    env.OIDC_ENABLED = true;
+    env.EXTERNAL_URL = "http://localhost:9999";
+    env.OIDC_ISSUER_URL = `http://localhost:${deadPort}`;
+    env.OIDC_CLIENT_ID = "test-client-id";
+    env.OIDC_CLIENT_SECRET = "test-client-secret";
 
     // Force a cold discovery cache so this test does not depend on running
     // before any describe that warms the module-level 24h cache.
@@ -525,11 +570,11 @@ describe("OIDC login discovery failure", () => {
   }, 30_000);
 
   afterAll(async () => {
-    (env as any).OIDC_ENABLED = origOidcEnabled;
-    (env as any).EXTERNAL_URL = origExternalUrl;
-    (env as any).OIDC_ISSUER_URL = origIssuerUrl;
-    (env as any).OIDC_CLIENT_ID = origClientId;
-    (env as any).OIDC_CLIENT_SECRET = origClientSecret;
+    env.OIDC_ENABLED = origOidcEnabled;
+    env.EXTERNAL_URL = origExternalUrl;
+    env.OIDC_ISSUER_URL = origIssuerUrl;
+    env.OIDC_CLIENT_ID = origClientId;
+    env.OIDC_CLIENT_SECRET = origClientSecret;
 
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => deadServer.close(() => resolve()));
@@ -599,11 +644,11 @@ describe("OIDC login redirect", () => {
     });
 
     // Mutate the cached env to enable OIDC
-    (env as any).OIDC_ENABLED = true;
-    (env as any).EXTERNAL_URL = "http://localhost:9999";
-    (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
-    (env as any).OIDC_CLIENT_ID = "test-client-id";
-    (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
+    env.OIDC_ENABLED = true;
+    env.EXTERNAL_URL = "http://localhost:9999";
+    env.OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+    env.OIDC_CLIENT_ID = "test-client-id";
+    env.OIDC_CLIENT_SECRET = "test-client-secret";
 
     // Clear the cached OIDC config so discovery hits our mock
     const _oidcModule = await import("../../../apps/api/src/plugins/oidc.js");
@@ -613,11 +658,11 @@ describe("OIDC login redirect", () => {
 
   afterAll(async () => {
     // Restore original env values
-    (env as any).OIDC_ENABLED = origOidcEnabled;
-    (env as any).EXTERNAL_URL = origExternalUrl;
-    (env as any).OIDC_ISSUER_URL = origIssuerUrl;
-    (env as any).OIDC_CLIENT_ID = origClientId;
-    (env as any).OIDC_CLIENT_SECRET = origClientSecret;
+    env.OIDC_ENABLED = origOidcEnabled;
+    env.EXTERNAL_URL = origExternalUrl;
+    env.OIDC_ISSUER_URL = origIssuerUrl;
+    env.OIDC_CLIENT_ID = origClientId;
+    env.OIDC_CLIENT_SECRET = origClientSecret;
 
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
@@ -755,21 +800,21 @@ describe("OIDC callback edge cases", () => {
       });
     });
 
-    (env as any).OIDC_ENABLED = true;
-    (env as any).EXTERNAL_URL = "http://localhost:9999";
-    (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
-    (env as any).OIDC_CLIENT_ID = "test-client-id";
-    (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
+    env.OIDC_ENABLED = true;
+    env.EXTERNAL_URL = "http://localhost:9999";
+    env.OIDC_ISSUER_URL = `http://localhost:${mockPort}`;
+    env.OIDC_CLIENT_ID = "test-client-id";
+    env.OIDC_CLIENT_SECRET = "test-client-secret";
 
     oidcApp = await buildTestApp();
   }, 30_000);
 
   afterAll(async () => {
-    (env as any).OIDC_ENABLED = origOidcEnabled;
-    (env as any).EXTERNAL_URL = origExternalUrl;
-    (env as any).OIDC_ISSUER_URL = origIssuerUrl;
-    (env as any).OIDC_CLIENT_ID = origClientId;
-    (env as any).OIDC_CLIENT_SECRET = origClientSecret;
+    env.OIDC_ENABLED = origOidcEnabled;
+    env.EXTERNAL_URL = origExternalUrl;
+    env.OIDC_ISSUER_URL = origIssuerUrl;
+    env.OIDC_CLIENT_ID = origClientId;
+    env.OIDC_CLIENT_SECRET = origClientSecret;
 
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
