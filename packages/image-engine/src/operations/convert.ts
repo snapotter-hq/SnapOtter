@@ -30,6 +30,9 @@ export async function convert(image: Sharp, options: ConvertOptions): Promise<Sh
     }
     formatOptions.quality = quality;
   }
+  if (sharpFormat === "gif") {
+    formatOptions.reuse = false;
+  }
 
   return image.toFormat(sharpFormat, formatOptions);
 }

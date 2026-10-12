@@ -110,7 +110,11 @@ export async function processImage(
     if (!sharpFormat) {
       throw new Error(`Unsupported output format: ${outputFormat}`);
     }
-    image = image.toFormat(sharpFormat as SharpFormat);
+    const formatOptions: Record<string, unknown> = {};
+    if (sharpFormat === "gif") {
+      formatOptions.reuse = false;
+    }
+    image = image.toFormat(sharpFormat as SharpFormat, formatOptions);
   }
 
   const buffer = await image.toBuffer();

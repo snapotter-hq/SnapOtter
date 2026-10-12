@@ -17,6 +17,7 @@ const FORMAT_MAP: Record<string, SharpFormat> = {
 function formatOpts(format: SharpFormat, quality: number): Record<string, unknown> {
   const opts: Record<string, unknown> = { quality };
   if (format === "avif") opts.effort = 4;
+  if (format === "gif") opts.reuse = false;
   return opts;
 }
 
