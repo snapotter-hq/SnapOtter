@@ -72,6 +72,15 @@ describe("ensureDefaultAdmin", () => {
     expect(store.values).not.toHaveBeenCalled();
   });
 
+  it("refuses to create the admin when DEFAULT_PASSWORD has too many code units (over 4096)", async () => {
+    env.DEFAULT_PASSWORD = "a".repeat(4097);
+
+    await expect(ensureDefaultAdmin()).rejects.toThrow(
+      "DEFAULT_PASSWORD must be at most 4096 characters; sign-in refuses a longer password",
+    );
+    expect(store.values).not.toHaveBeenCalled();
+  });
+
   it("counts characters in code points like the login schema, so 513 emoji are within the limit", async () => {
     env.DEFAULT_PASSWORD = "\u{1F600}".repeat(PASSWORD_MAX_LENGTH / 2 + 1);
 

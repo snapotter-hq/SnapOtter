@@ -119,6 +119,17 @@ describe("Security: loginSchema max lengths", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("rejects password with too many code units (over 4096)", () => {
+    const result = loginSchema.safeParse({
+      username: "testuser",
+      password: "a".repeat(4097),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes("Password too long"))).toBe(true);
+    }
+  });
 });
 
 describe("Security: changePasswordSchema max lengths", () => {
