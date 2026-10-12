@@ -762,6 +762,7 @@ export function ToolPage() {
       shouldShowConversionCard({
         hasProcessed,
         isProcessedPreviewable,
+        processedUrl,
         processedPreviewUrl,
         originalBlobUrl,
         displayMode,
