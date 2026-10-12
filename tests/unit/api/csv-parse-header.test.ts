@@ -20,6 +20,27 @@ describe("parseCsvWithHeader", () => {
     expect(JSON.stringify(data)).toBe('[{"__proto__":"5","x":"1"},{"__proto__":"6","x":"2"}]');
   });
 
+  it("keeps a column headed __parsed_extra as a scalar, instead of Papa wrapping it in an array (#2269)", () => {
+    const { data, meta } = parseCsvWithHeader("__parsed_extra,x\r\n1,2");
+
+    expect(meta.fields).toEqual(["__parsed_extra", "x"]);
+    expect(JSON.stringify(data)).toBe('[{"__parsed_extra":"1","x":"2"}]');
+  });
+
+  it("handles duplicate __parsed_extra headers the way Papa renames any other duplicate", () => {
+    const { data, meta } = parseCsvWithHeader("__parsed_extra,__parsed_extra,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["__parsed_extra", "__parsed_extra_1", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"__parsed_extra":"1","__parsed_extra_1":"2","x":"3"}');
+  });
+
+  it("restores the sentinel properly without affecting columns that just happen to start with the NUL byte (#2322)", () => {
+    const { data, meta } = parseCsvWithHeader("\u0000foo,x\r\n1,2");
+
+    expect(meta.fields).toEqual(["\u0000foo", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"\\u0000foo":"1","x":"2"}');
+  });
+
   it("builds rows without a prototype when a __proto__ column forces the rebuild", () => {
     const { data } = parseCsvWithHeader("__proto__,b\r\n1,2");
 
