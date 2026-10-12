@@ -149,9 +149,9 @@ export async function createGradientBackground(
   color2 = normalizeHexColor(color2);
   const rad = (angle * Math.PI) / 180;
   const x1 = 50 - Math.sin(rad) * 50;
-  const y1 = 50 - Math.cos(rad) * 50;
+  const y1 = 50 + Math.cos(rad) * 50;
   const x2 = 50 + Math.sin(rad) * 50;
-  const y2 = 50 + Math.cos(rad) * 50;
+  const y2 = 50 - Math.cos(rad) * 50;
 
   const svg = Buffer.from(
     `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">

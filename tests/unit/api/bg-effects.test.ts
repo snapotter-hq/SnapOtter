@@ -202,6 +202,76 @@ describe("createGradientBackground", () => {
     const grad2 = await createGradientBackground(100, 100, "#00ff00", "#ffff00");
     expect(grad1.equals(grad2)).toBe(false);
   });
+
+  describe("gradient corner orientation (#2279)", () => {
+    it("angle 0 has color1 at bottom and color2 at top", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 0);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color2 (#0000ff)
+      expect(data[0]).toBeLessThan(50);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeGreaterThan(200);
+      // Bottom-left (0, 2) is color1 (#ff0000)
+      const i = (2 * 3 + 0) * 4;
+      expect(data[i]).toBeGreaterThan(200);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeLessThan(50);
+    });
+
+    it("angle 90 has color1 at left and color2 at right", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 90);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color1 (#ff0000)
+      expect(data[0]).toBeGreaterThan(200);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeLessThan(50);
+      // Top-right (2, 0) is color2 (#0000ff)
+      const i = (0 * 3 + 2) * 4;
+      expect(data[i]).toBeLessThan(50);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeGreaterThan(200);
+    });
+
+    it("angle 180 has color1 at top and color2 at bottom", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 180);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color1 (#ff0000)
+      expect(data[0]).toBeGreaterThan(200);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeLessThan(50);
+      // Bottom-left (0, 2) is color2 (#0000ff)
+      const i = (2 * 3 + 0) * 4;
+      expect(data[i]).toBeLessThan(50);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeGreaterThan(200);
+    });
+
+    it("angle 270 has color1 at right and color2 at left", async () => {
+      const result = await createGradientBackground(3, 3, "#ff0000", "#0000ff", 270);
+      const { data } = await sharp(result)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Top-left (0, 0) is color2 (#0000ff)
+      expect(data[0]).toBeLessThan(50);
+      expect(data[1]).toBeLessThan(50);
+      expect(data[2]).toBeGreaterThan(200);
+      // Top-right (2, 0) is color1 (#ff0000)
+      const i = (0 * 3 + 2) * 4;
+      expect(data[i]).toBeGreaterThan(200);
+      expect(data[i + 1]).toBeLessThan(50);
+      expect(data[i + 2]).toBeLessThan(50);
+    });
+  });
 });
 
 describe("compositeOnColor", () => {
@@ -356,6 +426,34 @@ describe("applyEffects", () => {
     const meta = await sharp(result).metadata();
     expect(meta.format).toBe("png");
     expect(result.equals(subject)).toBe(false);
+  });
+
+  it("defaults gradientAngle to 180 (color1 at top, color2 at bottom) when not provided (#2279)", async () => {
+    const subject = await createSubjectWithAlpha(4, 3);
+    const original = await createTestImage(4, 3, 3);
+    const withDefault = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+    });
+    const with180 = await applyEffects(subject, original, {
+      backgroundType: "gradient",
+      gradientColor1: "#ff0000",
+      gradientColor2: "#0000ff",
+      gradientAngle: 180,
+    });
+    expect(withDefault.equals(with180)).toBe(true);
+    const { data } = await sharp(withDefault)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    // Right half (x = 3) is transparent in the subject, showing top=color1 and bottom=color2
+    const topRight = (0 * 4 + 3) * 4;
+    expect(data[topRight]).toBeGreaterThan(200);
+    expect(data[topRight + 2]).toBeLessThan(50);
+    const bottomRight = (2 * 4 + 3) * 4;
+    expect(data[bottomRight]).toBeLessThan(50);
+    expect(data[bottomRight + 2]).toBeGreaterThan(200);
   });
 
   it("image backgroundType composites on provided image", async () => {
