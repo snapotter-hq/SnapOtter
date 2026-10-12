@@ -86,12 +86,6 @@ registerAiPathJobHandler("ocr-pdf", async (input, data, ctx) => {
   const base = data.filename.replace(/\.[^.]+$/, "");
   const outName = `${base}_ocr.txt`;
 
-  if (result.requestedQuality !== quality || result.actualQuality !== quality) {
-    throw new Error(
-      `OCR runtime tier mismatch: requested ${quality}, reported ${result.requestedQuality}/${result.actualQuality}`,
-    );
-  }
-
   return {
     buffer: Buffer.from(result.text, "utf-8"),
     filename: outName,

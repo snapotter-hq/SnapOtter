@@ -91,12 +91,6 @@ async function processOcrJob(
     },
     (percent, stage) => ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
   );
-  if (result.requestedQuality !== quality || result.actualQuality !== quality) {
-    throw new Error(
-      `OCR runtime tier mismatch: requested ${quality}, reported ${result.requestedQuality}/${result.actualQuality}`,
-    );
-  }
-
   const base = prepared.filename.replace(/\.[^.]+$/, "");
   return {
     buffer: Buffer.from(result.text, "utf-8"),

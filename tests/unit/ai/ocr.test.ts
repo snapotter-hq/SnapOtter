@@ -457,6 +457,32 @@ describe("extractText error and progress behavior", () => {
     }
   });
 
+  it("throws a SafeError when the accurate runtime reports a tier mismatch", async () => {
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce(
+      runtimeResponse({
+        success: true,
+        text: "hello",
+        engine: "paddle",
+        requestedQuality: "best",
+        actualQuality: "fast",
+        device: "cpu",
+        provider: "none",
+        degraded: false,
+        warnings: [],
+      }),
+    );
+
+    const promise = extractText(INPUT, "/tmp/ocr", { quality: "best" });
+    const err = await promise.catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
+    expect(err.code).toBe("OCR_RUNTIME_MISMATCH");
+    expect(err.statusCode).toBe(500);
+    expect(err.cause).toBeInstanceOf(Error);
+    expect(err.cause.message).toBe("requested best, reported best/fast");
+  });
+
   it("propagates malformed accurate-runtime output", async () => {
     vi.mocked(runOcrRuntime).mockResolvedValueOnce(runtimeResponse("not an object"));
 

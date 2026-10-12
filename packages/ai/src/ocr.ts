@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import { SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { type ProgressCallback, toSidecarError } from "./bridge.js";
 import { runOcrRuntime } from "./ocr-runtime-dispatcher.js";
@@ -96,9 +97,14 @@ function parseAccurateResult(resultValue: unknown, quality: OcrQuality): OcrResu
   }
 
   if (result.requestedQuality !== quality || result.actualQuality !== quality) {
-    throw new Error(
-      `OCR runtime tier mismatch: requested ${quality}, reported ${String(result.requestedQuality)}/${String(result.actualQuality)}`,
-    );
+    throw new SafeError("OCR runtime tier mismatch", {
+      kind: "bug",
+      code: "OCR_RUNTIME_MISMATCH",
+      statusCode: 500,
+      cause: new Error(
+        `requested ${quality}, reported ${String(result.requestedQuality)}/${String(result.actualQuality)}`,
+      ),
+    });
   }
   if (Buffer.byteLength(result.text as string, "utf8") > MAX_OCR_OUTPUT_BYTES) {
     throw new Error(
