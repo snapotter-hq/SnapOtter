@@ -395,7 +395,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     const abandonRequest = () => {
       settled = true;
       abandoned = true;
-      xhr.abort();
+      try {
+        xhr.abort();
+      } catch (_e) {}
     };
 
     const subscription = subscribeSignPdfJobProgress(clientJobId, {

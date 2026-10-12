@@ -379,7 +379,9 @@ export function useToolProcessor(toolId: string) {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       es.close();
       if (eventSourceRef.current === es) eventSourceRef.current = null;
-      xhrRef.current?.abort();
+      try {
+        xhrRef.current?.abort();
+      } catch (_e) {}
       batchRunRef.current = null;
       setProgress(IDLE_PROGRESS);
       // The store write that threw may throw again, so each write gets its
@@ -514,7 +516,9 @@ export function useToolProcessor(toolId: string) {
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {}
               const run = batchRunRef.current;
               if (run) {
                 run.onTerminal(frame);
@@ -556,7 +560,9 @@ export function useToolProcessor(toolId: string) {
               eventSourceRef.current = null;
               // Settle the still-open POST so its late onerror/ontimeout
               // cannot replace this specific error with a generic one.
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {}
               setProgress(IDLE_PROGRESS);
               // Each write gets its own guard and the entries settle last, so
               // a write that throws can't leave the run at processing. The run
@@ -591,7 +597,9 @@ export function useToolProcessor(toolId: string) {
               // The SSE settles the run; a still-open sync POST (half-dead
               // proxy, no RST) must not fire a late onerror/ontimeout over
               // this result. abort() only emits onabort, which stays silent.
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {}
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
               if (result.savedFileId) {
@@ -747,7 +755,11 @@ export function useToolProcessor(toolId: string) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) xhrRef.current.abort();
+      if (xhrRef.current) {
+        try {
+          xhrRef.current.abort();
+        } catch (_e) {}
+      }
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
       // This runs on unmount, but also whenever reconnectSSE changes, which it
@@ -1527,7 +1539,9 @@ export function useToolProcessor(toolId: string) {
             canceledByUser = true;
             // The upload may still be in flight; aborting it is what actually
             // stops ingress when no job row exists server-side yet.
-            xhrRef.current?.abort();
+            try {
+              xhrRef.current?.abort();
+            } catch (_e) {}
             failRun("Canceled", "canceled");
             return true;
           },

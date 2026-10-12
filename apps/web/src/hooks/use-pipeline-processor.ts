@@ -248,7 +248,9 @@ export function usePipelineProcessor() {
       // run spinning with its cancel button already gone (#1814).
       let teardownError: { cause: unknown } | null = null;
       try {
-        xhrRef.current?.abort();
+        try {
+          xhrRef.current?.abort();
+        } catch (_e) {}
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -295,7 +297,9 @@ export function usePipelineProcessor() {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       es.close();
       if (eventSourceRef.current === es) eventSourceRef.current = null;
-      xhrRef.current?.abort();
+      try {
+        xhrRef.current?.abort();
+      } catch (_e) {}
       batchRunRef.current = null;
       setProgress(IDLE_PROGRESS);
       // The store write that threw may throw again, so each write gets its
@@ -426,7 +430,9 @@ export function usePipelineProcessor() {
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {}
               const run = batchRunRef.current;
               if (run) {
                 run.onTerminal(frame);
@@ -463,7 +469,9 @@ export function usePipelineProcessor() {
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
               eventSourceRef.current = null;
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {}
               batchRunRef.current = null;
               setProgress(IDLE_PROGRESS);
               // Each write gets its own guard and the entries settle last, so
@@ -498,7 +506,9 @@ export function usePipelineProcessor() {
               eventSourceRef.current = null;
               // The SSE settles the run; a still-open sync POST must not
               // fire a late onerror/ontimeout over this result.
-              xhrRef.current?.abort();
+              try {
+                xhrRef.current?.abort();
+              } catch (_e) {}
               const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
 
               useFileStore.getState().updateEntry(idx, {
@@ -589,7 +599,11 @@ export function usePipelineProcessor() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) xhrRef.current.abort();
+      if (xhrRef.current) {
+        try {
+          xhrRef.current.abort();
+        } catch (_e) {}
+      }
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
     };
