@@ -69,7 +69,27 @@ export function parseCsvWithHeader(text: string): ParseResult<Record<string, unk
 
   const data = parsed.data.map((row) => {
     const out: Record<string, unknown> = Object.create(null);
-    for (const [key, value] of Object.entries(row)) out[restore(key)] = value;
+
+    // First, restore all headers that were in parsed.meta.fields (if any).
+    // This ensures user columns always get their intended names before any internal extras.
+    for (const field of parsed.meta.fields || []) {
+      if (field in row) {
+        out[restore(field)] = row[field];
+      }
+    }
+
+    // Now, handle any extra keys PapaParse added (like its internal "__parsed_extra" array).
+    for (const [key, value] of Object.entries(row)) {
+      if (parsed.meta.fields?.includes(key)) continue;
+
+      let finalKey = restore(key);
+      if (finalKey in out) {
+        let suffix = 1;
+        while (`${finalKey}_${suffix}` in out) suffix++;
+        finalKey = `${finalKey}_${suffix}`;
+      }
+      out[finalKey] = value;
+    }
     return out;
   });
 

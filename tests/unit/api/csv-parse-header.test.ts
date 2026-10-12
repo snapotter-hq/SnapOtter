@@ -41,6 +41,14 @@ describe("parseCsvWithHeader", () => {
     expect(JSON.stringify(data[0])).toBe('{"\\u0000foo":"1","x":"2"}');
   });
 
+  it("prevents PapaParse's extra fields array from overwriting a real __parsed_extra column", () => {
+    const { data } = parseCsvWithHeader("__parsed_extra,x\r\n1,2,extra_val");
+
+    expect(JSON.stringify(data[0])).toBe(
+      '{"__parsed_extra":"1","x":"2","__parsed_extra_1":["extra_val"]}',
+    );
+  });
+
   it("builds rows without a prototype when a __proto__ column forces the rebuild", () => {
     const { data } = parseCsvWithHeader("__proto__,b\r\n1,2");
 
