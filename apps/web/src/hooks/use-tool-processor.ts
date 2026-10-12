@@ -1564,7 +1564,14 @@ export function useToolProcessor(toolId: string) {
             return;
           }
           if (!zipBlob) {
-            failRun("Processing was interrupted. Retry when reconnected.", "download-failed");
+            // The upload and the server run both finished; without an explicit
+            // category, classifyFeedbackError reads "interrupted" as an upload
+            // failure (#1922).
+            failRun(
+              "Processing was interrupted. Retry when reconnected.",
+              "download-failed",
+              "processing_error",
+            );
             return;
           }
           // A durable ZIP that won't settle still reports "download-failed",
@@ -1608,8 +1615,13 @@ export function useToolProcessor(toolId: string) {
             if (frame.status === "completed") {
               // A batch route without a durable result (custom sub-routes like
               // pdf-to-image): its ZIP only ever existed on the response this
-              // run lost, so the outcome matches a plain interruption.
-              failRun("Processing was interrupted. Retry when reconnected.", "no-durable-result");
+              // run lost, so the outcome matches a plain interruption. Tagged
+              // so "interrupted" is not misread as an upload error (#1922).
+              failRun(
+                "Processing was interrupted. Retry when reconnected.",
+                "no-durable-result",
+                "processing_error",
+              );
               return;
             }
             // Replay-synthesized failures carry their message in a blank-name
@@ -1769,13 +1781,17 @@ export function useToolProcessor(toolId: string) {
           // events (#722 run-identity guard).
           if (activeJobIdRef.current !== clientJobId) return;
           if (degradeToAsync("socket")) return;
-          failRun("Processing was interrupted. Retry when reconnected.", "socket");
+          failRun("Processing was interrupted. Retry when reconnected.", "socket", "upload_error");
         };
 
         xhr.ontimeout = () => {
           if (activeJobIdRef.current !== clientJobId) return;
           if (degradeToAsync("timeout")) return;
-          failRun("Request timed out - the server may be overloaded. Try again.", "timeout");
+          failRun(
+            "Request timed out - the server may be overloaded. Try again.",
+            "timeout",
+            "timeout",
+          );
         };
 
         xhr.open("POST", `${appUrl(apiToolPath(toolId))}/batch`);
