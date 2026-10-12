@@ -428,6 +428,11 @@ export async function ensureDefaultAdmin(): Promise<void> {
       `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_CODE_UNITS} characters; sign-in refuses a longer password`,
     );
   }
+  if (Array.from(normalizePassword(env.DEFAULT_PASSWORD)).length > PASSWORD_MAX_LENGTH) {
+    throw new Error(
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters; sign-in refuses a longer password`,
+    );
+  }
 
   const id = randomUUID();
   const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));

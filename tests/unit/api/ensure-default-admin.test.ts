@@ -72,10 +72,12 @@ describe("ensureDefaultAdmin", () => {
     expect(store.values).not.toHaveBeenCalled();
   });
 
-  it("counts characters in UTF-16 units like the login schema, so 513 emoji are over the limit", async () => {
+  it("counts characters in code points like the login schema, so 513 emoji are within the limit", async () => {
     env.DEFAULT_PASSWORD = "\u{1F600}".repeat(PASSWORD_MAX_LENGTH / 2 + 1);
 
-    await expect(ensureDefaultAdmin()).rejects.toThrow("DEFAULT_PASSWORD must be at most");
+    await ensureDefaultAdmin();
+
+    expect(store.values).toHaveBeenCalledTimes(1);
   });
 
   it("creates the admin for a DEFAULT_PASSWORD of exactly the longest length login accepts", async () => {

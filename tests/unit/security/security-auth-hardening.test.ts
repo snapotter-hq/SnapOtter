@@ -104,7 +104,11 @@ describe("Security: loginSchema max lengths", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.message === "Password too long")).toBe(true);
+      expect(
+        result.error.issues.some((i) =>
+          i.message.includes("Password must be at most 1024 characters"),
+        ),
+      ).toBe(true);
     }
   });
 
