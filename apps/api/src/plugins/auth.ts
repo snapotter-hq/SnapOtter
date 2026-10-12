@@ -560,6 +560,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const parsed = loginSchema.safeParse(request.body);
       if (!parsed.success) {
+        const passwordIssue = parsed.error.issues.find(
+          (i) => i.path[0] === "password" && i.code === "too_big",
+        );
+        if (passwordIssue) {
+          const audit = auditFromRequest(request);
+          const rawBody = request.body as Record<string, unknown> | null;
+          const rawUsername = typeof rawBody?.username === "string" ? rawBody.username : "";
+
+          await audit("LOGIN_FAILED", {
+            username: sanitizeAuditInput(rawUsername),
+            reason: "password_too_long",
+          });
+
+          return reply.status(400).send({
+            error: passwordIssue.message,
+            code: "VALIDATION_ERROR",
+            rule: "maxLength",
+            maxLength: PASSWORD_MAX_LENGTH,
+          });
+        }
         return reply.status(400).send({ error: "Username and password are required" });
       }
       const body = parsed.data;

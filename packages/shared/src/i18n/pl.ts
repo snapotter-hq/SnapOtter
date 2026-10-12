@@ -5651,6 +5651,8 @@ export const pl: TranslationKeys = {
     passwordNeedsSpecial: "Hasło musi zawierać znak specjalny.",
     passwordNoControlCharacters: "Hasło nie może zawierać znaków sterujących.",
     passwordTooLong: "Hasło jest za długie (maksimum: {maxLength}).",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
     escalationDenied: "To wymaga szerszego dostępu, niż ma twoja rola.",
     featureNotLicensed: "Wymaga to licencji enterprise.",

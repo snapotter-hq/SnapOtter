@@ -5648,6 +5648,8 @@ export const es: TranslationKeys = {
     passwordNeedsSpecial: "La contraseña debe contener un carácter especial.",
     passwordNoControlCharacters: "La contraseña no puede contener caracteres de control.",
     passwordTooLong: "La contraseña no puede tener más de {maxLength} caracteres.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
     escalationDenied: "Eso requiere más acceso del que tiene tu rol.",
     featureNotLicensed: "Esto requiere una licencia empresarial.",

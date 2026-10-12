@@ -70,6 +70,19 @@ async function expectLoginError(text: string) {
 }
 
 describe("LoginPage throttled logins", () => {
+  it("tells the user an admin must reset when the password is over the length limit (#2309)", async () => {
+    stubLoginResponse(400, {
+      code: "VALIDATION_ERROR",
+      rule: "maxLength",
+      maxLength: 1024,
+    });
+
+    renderLoginPage();
+    submitLogin();
+
+    await expectLoginError("Password is too long (max 1024 characters). An admin must reset it.");
+  });
+
   it("reports the wait instead of bad credentials when the username throttle fires", async () => {
     // What a correct password gets during a throttle episode, body and header
     // both, copied from tests/integration/platform/login-throttle.test.ts.

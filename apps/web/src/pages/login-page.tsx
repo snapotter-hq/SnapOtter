@@ -360,6 +360,8 @@ export function LoginPage() {
           // The 403 only goes to a caller who proved the password (#818), so
           // saying so tells the account owner the truth without leaking it.
           setError(t.auth.accountDisabled);
+        } else if (failure?.code === "VALIDATION_ERROR" && failure?.rule === "maxLength") {
+          setError(format(t.errors.passwordTooLongAdminReset, { maxLength: failure.maxLength }));
         } else if (res.status === 429) {
           // Every 429 this route can produce (the per-username throttle from
           // #820, the per-IP limiter, a proxy in front of us) is a "come back

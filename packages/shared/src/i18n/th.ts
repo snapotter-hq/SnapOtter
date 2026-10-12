@@ -5546,6 +5546,8 @@ export const th: TranslationKeys = {
     passwordNeedsSpecial: "รหัสผ่านต้องมีอักขระพิเศษ",
     passwordNoControlCharacters: "รหัสผ่านต้องไม่มีอักขระควบคุม",
     passwordTooLong: "รหัสผ่านต้องมีไม่เกิน {maxLength} ตัวอักษร",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "ลองหลายครั้งเกินไป รอหนึ่งนาทีแล้วลองอีกครั้ง",
     escalationDenied: "การดำเนินการนี้ต้องใช้สิทธิ์มากกว่าที่บทบาทของคุณมี",
     featureNotLicensed: "ต้องใช้ใบอนุญาตระดับองค์กร",

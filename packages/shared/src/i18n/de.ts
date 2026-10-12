@@ -5677,6 +5677,8 @@ export const de: TranslationKeys = {
     passwordNeedsSpecial: "Das Passwort muss ein Sonderzeichen enthalten.",
     passwordNoControlCharacters: "Das Passwort darf keine Steuerzeichen enthalten.",
     passwordTooLong: "Das Passwort darf höchstens {maxLength} Zeichen lang sein.",
+    passwordTooLongAdminReset:
+      "Password is too long (max {maxLength} characters). An admin must reset it.",
     tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
     escalationDenied: "Dafür reichen die Rechte Ihrer Rolle nicht aus.",
     featureNotLicensed: "Dafür ist eine Enterprise-Lizenz erforderlich.",

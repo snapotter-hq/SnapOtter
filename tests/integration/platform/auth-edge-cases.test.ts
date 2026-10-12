@@ -82,6 +82,37 @@ async function loginAs(username: string, password: string): Promise<string> {
 // LOGIN FAILURES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Login failures", () => {
+  it("rejects password over 1024 characters with VALIDATION_ERROR and logs audit row (#2309)", async () => {
+    const start = Date.now();
+    const username = uid();
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: "A".repeat(1025) },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body).toMatchObject({
+      code: "VALIDATION_ERROR",
+      rule: "maxLength",
+      maxLength: 1024,
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "LOGIN_FAILED"))
+      .orderBy(asc(schema.auditLog.createdAt));
+
+    const auditRow = rows.find((r) => (r.details as any)?.username === username);
+
+    expect(auditRow).toBeDefined();
+    expect(auditRow.action).toBe("LOGIN_FAILED");
+    const details = auditRow.details as any;
+    expect(details?.reason).toBe("password_too_long");
+  });
+
   it("empty body returns 400", async () => {
     const res = await testApp.app.inject({
       method: "POST",
