@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { hashPassword, verifyPassword } from "../../../apps/api/src/plugins/auth.js";
+import {
+  computeKeyPrefix,
+  hashPassword,
+  verifyPassword,
+} from "../../../apps/api/src/plugins/auth.js";
 import { raceInserts, raceUpdates } from "../../helpers/pg-race.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
@@ -1910,6 +1914,99 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const row = await userRow(id);
       expect(row?.username).toBe(userName);
       expect(row?.role).toBe("user");
+    });
+  });
+
+  // A deprovision through DELETE removed the user's API keys; a deactivation
+  // through PATCH or PUT only revoked sessions, so a key survived the disable
+  // and started working again the moment the user was reactivated (#2233).
+  describe("a deactivation revokes API keys (#2233)", () => {
+    const RAW_KEY = `si_scimdeact_${"d".repeat(32)}`;
+
+    async function seedApiKey(userId: string): Promise<void> {
+      await db.insert(schema.apiKeys).values({
+        id: randomUUID(),
+        userId,
+        keyHash: await hashPassword(RAW_KEY),
+        keyPrefix: computeKeyPrefix(RAW_KEY),
+        name: "scim-deactivation-test",
+      });
+    }
+
+    async function keyWorks(): Promise<number> {
+      const res = await crudApp.app.inject({
+        method: "GET",
+        url: "/api/v1/preferences",
+        headers: { authorization: `Bearer ${RAW_KEY}` },
+      });
+      return res.statusCode;
+    }
+
+    async function apiKeyCount(userId: string): Promise<number> {
+      return (await db.select().from(schema.apiKeys).where(eq(schema.apiKeys.userId, userId)))
+        .length;
+    }
+
+    it("PATCH deactivation revokes the key, so reactivation starts clean", async () => {
+      const { id } = await createScimUser({
+        userName: uniqueName("scim-key-revoke"),
+        active: true,
+      });
+      await seedApiKey(id);
+
+      expect(await keyWorks(), "the key works before any deactivation").toBe(200);
+
+      const patch = (active: boolean) => ({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "replace", path: "active", value: active }],
+      });
+      const off = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: patch(false),
+      });
+      expect(off.statusCode, off.body).toBe(200);
+      expect(await apiKeyCount(id)).toBe(0);
+      expect(await keyWorks(), "a revoked key is not accepted while disabled").toBe(401);
+
+      const on = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: patch(true),
+      });
+      expect(on.statusCode, on.body).toBe(200);
+      expect((await userRow(id))?.role).toBe("user");
+      expect(await keyWorks(), "reactivation does not bring the key back").toBe(401);
+    });
+
+    it("PUT deactivation revokes the key, so reactivation starts clean", async () => {
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-key-revoke-put"),
+        active: true,
+      });
+      await seedApiKey(id);
+      expect(await keyWorks()).toBe(200);
+
+      const off = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: { userName, active: false },
+      });
+      expect(off.statusCode, off.body).toBe(200);
+      expect(await apiKeyCount(id)).toBe(0);
+      expect(await keyWorks()).toBe(401);
+
+      const on = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: { userName, active: true },
+      });
+      expect(on.statusCode, on.body).toBe(200);
+      expect(await keyWorks(), "reactivation does not bring the key back").toBe(401);
     });
   });
 
