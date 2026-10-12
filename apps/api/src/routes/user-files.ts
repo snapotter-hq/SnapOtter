@@ -44,7 +44,7 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
@@ -363,23 +363,42 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           // reported 500 for anything unexpected. Either way the batch so far
           // is discarded first.
           let safeBuffer: Buffer = buffer;
-          if (isSvgBuffer(buffer)) {
+          const ext = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+          let isDecompressedSvg = false;
+          if (ext === ".svgz" || isSvgBuffer(buffer)) {
             try {
-              safeBuffer = sanitizeSvg(buffer);
+              if (ext === ".svgz") {
+                safeBuffer = decompressSvgz(buffer);
+              }
+              if (isSvgBuffer(safeBuffer)) {
+                safeBuffer = sanitizeSvg(safeBuffer);
+                if (ext === ".svgz") {
+                  isDecompressedSvg = true;
+                }
+              }
             } catch (err) {
-              if ((err as { statusCode?: number }).statusCode === 400) {
+              if ((err as Error).message.includes("SVGZ file does not contain")) {
+                // Not a valid SVG inside, let it fall through to be stored as octet-stream
+                safeBuffer = buffer;
+              } else if (
+                (err as { statusCode?: number }).statusCode === 400 ||
+                (err as { code?: string }).code === "Z_DATA_ERROR" ||
+                (err as { code?: string }).code === "Z_BUF_ERROR"
+              ) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardStaged();
                 return reply.status(400).send({ error: (err as Error).message });
+              } else {
+                request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+                void reportError(err, {
+                  source: "http",
+                  route: "/api/v1/files/upload",
+                  method: "POST",
+                  statusCode: 500,
+                });
+                await discardStaged();
+                return reply.status(500).send({ error: "Internal server error" });
               }
-              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
-              void reportError(err, {
-                source: "http",
-                route: "/api/v1/files/upload",
-                method: "POST",
-                statusCode: 500,
-              });
-              await discardStaged();
-              return reply.status(500).send({ error: "Internal server error" });
             }
           }
 
@@ -399,9 +418,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           const validation = await validateImageBuffer(safeBuffer, part.filename).catch(() => null);
           const isValidImage = validation?.valid === true;
 
-          const safeName = sanitizeFilename(part.filename ?? "upload");
+          let safeName = sanitizeFilename(part.filename ?? "upload");
+          if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+            safeName = safeName.replace(/\.svgz$/i, ".svg");
+          }
           const mimeType =
-            (isValidImage && validatedImageMime(validation, part.filename)) ||
+            (isValidImage && validatedImageMime(validation, safeName)) ||
             unverifiedMime(part.mimetype || "application/octet-stream");
           const dimensions = measuredDimensions(isValidImage ? validation : null);
 
@@ -902,7 +924,42 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
-    const safeResultBuffer = isSvgBuffer(fileBuffer) ? sanitizeSvg(fileBuffer) : fileBuffer;
+    let safeResultBuffer = fileBuffer;
+    const resultExt = filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+    let isDecompressedSvg = false;
+    if (resultExt === ".svgz" || isSvgBuffer(fileBuffer)) {
+      try {
+        if (resultExt === ".svgz") {
+          safeResultBuffer = decompressSvgz(fileBuffer);
+        }
+        if (isSvgBuffer(safeResultBuffer)) {
+          safeResultBuffer = sanitizeSvg(safeResultBuffer);
+          if (resultExt === ".svgz") {
+            isDecompressedSvg = true;
+          }
+        }
+      } catch (err) {
+        if ((err as Error).message.includes("SVGZ file does not contain")) {
+          safeResultBuffer = fileBuffer;
+        } else if (
+          (err as { statusCode?: number }).statusCode === 400 ||
+          (err as { code?: string }).code === "Z_DATA_ERROR" ||
+          (err as { code?: string }).code === "Z_BUF_ERROR"
+        ) {
+          request.log.warn({ err, filename }, "SVGZ decompression failed");
+          return reply.status(400).send({ error: (err as Error).message });
+        } else {
+          request.log.error({ err, filename }, "SVG sanitize failed");
+          void reportError(err, {
+            source: "http",
+            route: "/api/v1/files/save-result",
+            method: "POST",
+            statusCode: 500,
+          });
+          return reply.status(500).send({ error: "Internal server error" });
+        }
+      }
+    }
 
     // Try image validation on the bytes that will be stored; non-image outputs
     // from trusted tools are accepted
@@ -933,12 +990,14 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const newChain = toolId ? [...existingChain, toolId] : existingChain;
 
     // Determine the original filename (preserve parent's name, update extension)
-    const ext = extname(filename) || extname(parent.originalName);
+    let ext = extname(filename) || extname(parent.originalName);
+    if (isDecompressedSvg && ext.toLowerCase() === ".svgz") ext = ".svg";
     const baseName = parent.originalName.replace(/\.[^.]+$/, "");
     const resultName = `${baseName}${ext}`;
 
     const mimeType =
-      (isValidImage && validatedImageMime(validation, filename)) || unverifiedMime(extToMime(ext));
+      (isValidImage && validatedImageMime(validation, resultName)) ||
+      unverifiedMime(extToMime(ext));
     const dimensions = measuredDimensions(isValidImage ? validation : null);
 
     // Re-check quota with actual file size before persisting

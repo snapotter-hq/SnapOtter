@@ -31,6 +31,12 @@ const PAYLOADS = [
     mustNotMatch: [/<!DOCTYPE/i, /<!ENTITY/i],
   },
   {
+    label: "a DOCTYPE with an external entity inside a gzip compressed SVGZ",
+    filename: "xxe.svgz",
+    content: readFixture(fixtures.security.svgXxeFileZipped),
+    mustNotMatch: [/<!DOCTYPE/i, /<!ENTITY/i],
+  },
+  {
     label: "an XHTML-namespaced script element, which Sharp accepts",
     filename: "namespace.svg",
     content: readFixture(fixtures.security.svgXssNamespace),

@@ -21,7 +21,7 @@ import {
   isValidObjectKey,
   putObject,
 } from "../lib/object-storage.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { requireFileAccess, requirePermission } from "../permissions.js";
 
@@ -141,26 +141,47 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         // return the sanitizer's reason for a size/element-cap rejection, and
         // report + 500 for anything unexpected rather than storing the file.
         let safeBuffer: Buffer = buffer;
-        if (isSvgBuffer(buffer)) {
+        const uploadExt = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+        let isDecompressedSvg = false;
+        if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
           try {
-            safeBuffer = sanitizeSvg(buffer);
-          } catch (err) {
-            if ((err as { statusCode?: number }).statusCode === 400) {
-              return reply.status(400).send({ error: (err as Error).message });
+            if (uploadExt === ".svgz") {
+              safeBuffer = decompressSvgz(buffer);
             }
-            request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
-            void reportError(err, {
-              source: "http",
-              route: "/api/v1/upload",
-              method: "POST",
-              statusCode: 500,
-            });
-            return reply.status(500).send({ error: "Internal server error" });
+            if (isSvgBuffer(safeBuffer)) {
+              safeBuffer = sanitizeSvg(safeBuffer);
+              if (uploadExt === ".svgz") {
+                isDecompressedSvg = true;
+              }
+            }
+          } catch (err) {
+            if ((err as Error).message.includes("SVGZ file does not contain")) {
+              safeBuffer = buffer;
+            } else if (
+              (err as { statusCode?: number }).statusCode === 400 ||
+              (err as { code?: string }).code === "Z_DATA_ERROR" ||
+              (err as { code?: string }).code === "Z_BUF_ERROR"
+            ) {
+              request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
+              return reply.status(400).send({ error: (err as Error).message });
+            } else {
+              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+              void reportError(err, {
+                source: "http",
+                route: "/api/v1/upload",
+                method: "POST",
+                statusCode: 500,
+              });
+              return reply.status(500).send({ error: "Internal server error" });
+            }
           }
         }
 
         // Sanitize filename (canonical; do NOT re-sanitize downstream)
-        const safeName = sanitizeFilename(part.filename ?? "upload");
+        let safeName = sanitizeFilename(part.filename ?? "upload");
+        if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+          safeName = safeName.replace(/\.svgz$/i, ".svg");
+        }
 
         // Write to object storage uploads prefix
         await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
