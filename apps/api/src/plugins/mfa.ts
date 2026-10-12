@@ -470,16 +470,51 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       // Look up the pending MFA challenge in Redis
       const redis = sharedRedis();
-      const userId = await redis.get(`mfa:${mfaToken}`);
-      if (!userId) {
+      const payload = await redis.get(`mfa:${mfaToken}`);
+      if (!payload) {
         return reply.status(401).send({
           error: "MFA challenge expired or invalid",
           code: "MFA_EXPIRED",
         });
       }
 
+      const [userId, hashFingerprint] = payload.split(":");
+
       // Load user
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+
+      if (hashFingerprint) {
+        if (!dbUser?.passwordHash) {
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_removed",
+          });
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+
+        const { createHash } = await import("node:crypto");
+        const currentFingerprint = createHash("sha256")
+          .update(dbUser.passwordHash)
+          .digest("hex")
+          .substring(0, 16);
+        if (currentFingerprint !== hashFingerprint) {
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_changed",
+          });
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+      }
       if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
         return reply.status(401).send({
           error: "User not found or MFA not configured",
