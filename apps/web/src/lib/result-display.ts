@@ -36,13 +36,16 @@ export function playerDownloadClaim(
 export function shouldShowConversionCard(state: {
   hasProcessed: boolean;
   isProcessedPreviewable: boolean;
+  processedUrl: string | null | undefined;
   processedPreviewUrl: string | null | undefined;
   originalBlobUrl: string | null | undefined;
   displayMode: string;
   hasImageWrapperStyle: boolean;
 }): boolean {
   if (!state.hasProcessed) return false;
-  const resultIsRenderable = state.processedPreviewUrl != null || state.isProcessedPreviewable;
+  const resultIsRenderable =
+    state.processedPreviewUrl != null ||
+    (state.isProcessedPreviewable && state.processedUrl != null);
   if (resultIsRenderable) return false;
   const wysiwygCanRender =
     state.displayMode === "live-preview" &&

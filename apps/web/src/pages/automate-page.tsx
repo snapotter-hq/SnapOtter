@@ -125,7 +125,7 @@ export function AutomatePage() {
   const [importError, setImportError] = useState<string | null>(null);
 
   const hasFile = files.length > 0;
-  const hasProcessed = !!processedUrl;
+  const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const hasMultiple = entries.length > 1;
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex < entries.length - 1;
@@ -450,6 +450,28 @@ export function AutomatePage() {
     if (!sourceUrl) return null;
 
     if (mode === "result") {
+      // If we skipped extraction to save memory on a huge batch, there's no url to preview.
+      // Show the success card instead of failing or staying blank.
+      if (!processedUrl && currentEntry?.status === "completed") {
+        const fname = currentEntry.processedFilename ?? selectedFileName ?? files[0]?.name ?? "";
+        const ext = fname.split(".").pop()?.toUpperCase() ?? "";
+        return (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-6 max-w-xs">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-3">
+                <CheckCircle2 className="h-7 w-7 text-success-ink" />
+              </div>
+              <p className="font-medium text-foreground mb-1">{fname}</p>
+              {processedSize != null && (
+                <p className="text-xs text-muted-foreground">
+                  {ext} &middot; {formatFileSize(processedSize)}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      }
+
       if (!processedUrl) return null;
       if (kind === "image") {
         return (
