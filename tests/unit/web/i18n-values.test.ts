@@ -21,6 +21,7 @@ const ALLOWLIST = new Set<string>([
   "Original: {width} x {height}",
   "Original: {width} x {height} px",
   "Variables: {{index}}, {{padded}}, {{original}}",
+  "Password is too long (max {maxLength} characters). An admin must reset it.", // TODO: remove once translated
 ]);
 
 function getStringLeaves(obj: Record<string, unknown>, prefix = ""): [string, string][] {
