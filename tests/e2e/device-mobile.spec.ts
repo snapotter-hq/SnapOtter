@@ -148,6 +148,42 @@ test.describe("@mobile A result taller than the preview area", () => {
       .getByRole("button", { name: "Settings", exact: true })
       .click({ trial: true, timeout: 5_000 });
   });
+
+  test("sizes both before and after images exactly to the slider container", async ({
+    loggedInPage: page,
+  }) => {
+    // 2261: before/after slider size mismatch
+    await page.goto("/image/compress");
+    await uploadTestImage(page);
+
+    // Wait for processing to finish and slider to appear
+    const peekBar = page.getByRole("button", { name: "Process", exact: true });
+    await peekBar.click();
+    await page
+      .getByRole("button", { name: /^compress$/i })
+      .last()
+      .click();
+    await expect(page.getByRole("slider")).toBeVisible({ timeout: 15_000 });
+
+    // Compare bounding boxes
+    const slider = page.getByRole("slider");
+    const beforeImg = slider.locator("img[alt='Original']");
+    const afterImg = slider.locator("img[alt='Processed']");
+
+    const sliderBox = await slider.boundingBox();
+    const beforeBox = await beforeImg.boundingBox();
+    const afterBox = await afterImg.boundingBox();
+
+    expect(sliderBox).not.toBeNull();
+    expect(beforeBox).not.toBeNull();
+    expect(afterBox).not.toBeNull();
+
+    // The images should match the container's box exactly (since they use absolute positioning + inset-0 + w-full h-full)
+    expect(beforeBox!.width).toBeCloseTo(sliderBox!.width, 1);
+    expect(beforeBox!.height).toBeCloseTo(sliderBox!.height, 1);
+    expect(afterBox!.width).toBeCloseTo(sliderBox!.width, 1);
+    expect(afterBox!.height).toBeCloseTo(sliderBox!.height, 1);
+  });
 });
 
 // ---------------------------------------------------------------------------
