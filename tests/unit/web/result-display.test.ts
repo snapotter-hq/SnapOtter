@@ -13,6 +13,7 @@ const base = {
   hasProcessed: true,
   isProcessedPreviewable: false,
   processedPreviewUrl: null as string | null,
+  processedUrl: "blob:processed" as string | null,
   originalBlobUrl: "blob:original" as string | null,
   displayMode: "side-by-side",
   hasImageWrapperStyle: false,
