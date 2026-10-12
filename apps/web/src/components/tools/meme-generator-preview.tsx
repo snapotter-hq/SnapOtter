@@ -365,8 +365,8 @@ function EditorPreview() {
     : ((customLayout && PRESET_LAYOUTS[customLayout]?.boxes) ?? PRESET_LAYOUTS["top-bottom"].boxes);
 
   return (
-    <div className="h-full flex items-center justify-center p-4 overflow-auto">
-      <div className="max-w-2xl w-full">
+    <div className="h-full flex p-4 overflow-auto">
+      <div className="max-w-2xl w-full m-auto">
         <div
           ref={containerRef}
           data-testid="meme-editor-preview"
