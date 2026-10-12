@@ -154,7 +154,22 @@ test.describe("@mobile A result taller than the preview area", () => {
   }) => {
     // 2261: before/after slider size mismatch
     await page.goto("/image/compress");
-    await uploadTestImage(page);
+
+    // Create and upload a portrait image (width: 400, height: 800)
+    const portraitPath = path.join(getE2eRunRoot(), "portrait.png");
+    const script = [
+      "const sharp = require('sharp');",
+      `sharp({create:{width:400,height:800,channels:4,background:{r:255,g:0,b:0,alpha:1}}}).png().toFile(${JSON.stringify(portraitPath)})`,
+    ].join(" ");
+    execFileSync("node", ["-e", script]);
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(portraitPath);
 
     // Wait for processing to finish and slider to appear
     const peekBar = page.getByRole("button", { name: "Process", exact: true });
