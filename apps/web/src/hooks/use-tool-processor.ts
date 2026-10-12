@@ -1234,6 +1234,7 @@ export function useToolProcessor(toolId: string) {
         // Batch runs never auto-save to the library (no fileId is sent), so a
         // previous single run's saved indicator must not survive into this one.
         useFileStore.getState().setLastSavedLibraryFileId(null);
+        useFileStore.getState().clearBatchZip();
         // Mirror the single-file reset: clear every entry's stale processed state
         // before this run uploads, so a failed or absent result can't render a
         // previous run's output under the new run's filename and size (#746).

@@ -1674,6 +1674,33 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
     unmount();
   });
 
+  it("clears the previous batch's ZIP when a rerun fails (#1806)", async () => {
+    const { result, unmount } = startBatchRun();
+    act(() => respondZip(0));
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    expect(useFileStore.getState().batchZipBlob).not.toBeNull();
+    expect(useFileStore.getState().batchZipFilename).toBe("batch-pipeline.zip");
+    useFileStore.getState().markBatchClaimed();
+    expect(useFileStore.getState().batchZipClaimed).toBe(true);
+
+    act(() => {
+      void result.current.processAll(useFileStore.getState().files, STEPS);
+    });
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(useFileStore.getState().batchZipFilename).toBeNull();
+    expect(useFileStore.getState().batchZipClaimed).toBe(false);
+
+    act(() => respondError(1, 422, JSON.stringify({ error: "Step 1 (resize): bad width" })));
+
+    await settled(() => expectBatchFailed("error"));
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(useFileStore.getState().batchZipFilename).toBeNull();
+    expect(useFileStore.getState().batchZipClaimed).toBe(false);
+    unmount();
+  });
+
   it("fails an entry a single run completed when the batch after it fails", async () => {
     // The issue's repro: one image through a single run, a second image
     // added, then a batch the server rejects.

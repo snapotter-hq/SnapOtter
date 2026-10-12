@@ -261,8 +261,9 @@ export function useWorkInFlight(): WorkReason | null {
     // Nothing gates the zip on the entries having results. A batch settles by
     // storing the zip first and filling in per-entry results after, so a run
     // that fails that second half leaves a real, downloadable zip behind with
-    // no entry carrying a processedUrl. setFiles already clears a zip that
-    // outlived its file set, so there is no stale zip left to screen out.
+    // no entry carrying a processedUrl. Changing the file set or starting a
+    // new batch run already clears an earlier zip (#1806), so there is no
+    // stale zip left to screen out.
     if (batchZipBlob && !batchZipClaimed) {
       return {
         kind: "unsaved",

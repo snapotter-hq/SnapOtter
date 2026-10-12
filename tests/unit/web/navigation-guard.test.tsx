@@ -838,6 +838,38 @@ describe("NavigationGuard download then leave", () => {
     expect(router.state.location.pathname).toBe("/files");
   });
 
+  it("does not block when a failed rerun cleared the previous batch zip (#1806)", async () => {
+    leaveABatchZip();
+    useFileStore.getState().clearBatchZip();
+    const { router } = renderGuard();
+    const seen = recordBlockerStates(router);
+
+    await navigateTo(router, "/files");
+    seen.stop();
+
+    expect(router.state.location.pathname).toBe("/files");
+    expect(seen.states).not.toContain("blocked");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("falls back to completed entry results after addFiles invalidates the batch zip (#1806)", async () => {
+    leaveTwoResults();
+    useFileStore.getState().setBatchZip(new Blob(["zip"]), "processed-files.zip");
+    useFileStore.getState().addFiles([makeFile("c.png")]);
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(started).toEqual([
+      { url: "blob:result-a", filename: "a-small.png" },
+      { url: "blob:result-b", filename: "b-small.png" },
+    ]);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
   it("takes every unclaimed result and leaves a claimed one alone", async () => {
     leaveTwoResults();
     useFileStore.getState().markClaimed(0);

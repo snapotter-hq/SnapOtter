@@ -202,6 +202,7 @@ interface FileState {
   /** `claimed` is excluded: a patch touching `processedUrl` always resets it. */
   updateEntry: (index: number, patch: Omit<Partial<FileEntry>, "claimed">) => void;
   setBatchZip: (blob: Blob, filename: string) => void;
+  clearBatchZip: () => void;
   /** Index is required: selectedIndex can change while a job runs. */
   markClaimed: (index: number) => void;
   markBatchClaimed: () => void;
@@ -295,7 +296,19 @@ export const useFileStore = create<FileState>((set, get) => ({
     const newEntries = files.map(createEntry);
     const entries = [...get().entries, ...newEntries];
     const idx = get().selectedIndex;
-    set({ entries, files: deriveFiles(entries), ...deriveSelected(entries, idx) });
+    set({
+      entries,
+      // Adding files means the previous batch zip no longer matches the file set (#1806).
+      ...(newEntries.length > 0
+        ? {
+            batchZipBlob: null,
+            batchZipFilename: null,
+            batchZipClaimed: false,
+          }
+        : {}),
+      files: deriveFiles(entries),
+      ...deriveSelected(entries, idx),
+    });
     // Async: decode HEIC/HEIF files for browser preview
     for (let j = 0; j < newEntries.length; j++) {
       const i = oldLen + j;
@@ -345,6 +358,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({
       entries: newEntries,
       selectedIndex: newIndex,
+      // Removing a file means the previous batch zip no longer matches the file set (#1806).
+      batchZipBlob: null,
+      batchZipFilename: null,
+      batchZipClaimed: false,
       files: deriveFiles(newEntries),
       ...deriveSelected(newEntries, newIndex),
     });
@@ -425,6 +442,8 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   setBatchZip: (blob, filename) =>
     set({ batchZipBlob: blob, batchZipFilename: filename, batchZipClaimed: false }),
+
+  clearBatchZip: () => set({ batchZipBlob: null, batchZipFilename: null, batchZipClaimed: false }),
 
   markClaimed: (index) => {
     const { entries, selectedIndex } = get();

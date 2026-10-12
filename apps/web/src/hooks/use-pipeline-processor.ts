@@ -967,6 +967,7 @@ export function usePipelineProcessor() {
       let claimed = false;
       try {
         setError(null);
+        useFileStore.getState().clearBatchZip();
         // Mirror processSingle's reset for every entry this batch sends: an
         // earlier run's result must not survive into this one, or a batch that
         // fails leaves it on screen as if this run produced it (#1699). Each

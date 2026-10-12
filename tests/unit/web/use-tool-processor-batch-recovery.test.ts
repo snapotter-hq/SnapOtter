@@ -1003,6 +1003,51 @@ describe("useToolProcessor batch stale-state reset (#746)", () => {
 
     unmount();
   });
+
+  it("clears the previous batch's ZIP when a rerun fails (#1806)", async () => {
+    const { result, unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    expect(useFileStore.getState().batchZipBlob).not.toBeNull();
+    expect(useFileStore.getState().batchZipFilename).toBe("batch-resize.zip");
+    useFileStore.getState().markBatchClaimed();
+    expect(useFileStore.getState().batchZipClaimed).toBe(true);
+
+    act(() => {
+      void result.current.processAllFiles(useFileStore.getState().files, { width: 50 });
+    });
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(useFileStore.getState().batchZipFilename).toBeNull();
+    expect(useFileStore.getState().batchZipClaimed).toBe(false);
+
+    act(() => {
+      xhrs[1].upload.onload?.();
+      xhrs[1].status = 422;
+      xhrs[1].response = new Blob([JSON.stringify({ error: "All files failed processing" })], {
+        type: "application/json",
+      });
+      xhrs[1].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().processing).toBe(false);
+    });
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(useFileStore.getState().batchZipFilename).toBeNull();
+    expect(useFileStore.getState().batchZipClaimed).toBe(false);
+
+    unmount();
+  });
 });
 
 /**

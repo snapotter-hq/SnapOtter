@@ -114,6 +114,55 @@ describe("file store claim tracking", () => {
     expect(state.batchZipClaimed).toBe(false);
   });
 
+  it("clears the batch zip and its claim on clearBatchZip (#1806)", () => {
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore.getState().setBatchZip(new Blob(["z"]), "out.zip");
+    useFileStore.getState().markBatchClaimed();
+
+    useFileStore.getState().clearBatchZip();
+
+    const state = useFileStore.getState();
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.batchZipFilename).toBeNull();
+    expect(state.batchZipClaimed).toBe(false);
+  });
+
+  it("drops the previous batch zip when files are added, and keeps it on an empty addFiles (#1806)", () => {
+    const zip = new Blob(["z"]);
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore.getState().setBatchZip(zip, "out.zip");
+    useFileStore.getState().markBatchClaimed();
+
+    useFileStore.getState().addFiles([]);
+    expect(useFileStore.getState().batchZipBlob).toBe(zip);
+    expect(useFileStore.getState().batchZipFilename).toBe("out.zip");
+    expect(useFileStore.getState().batchZipClaimed).toBe(true);
+
+    useFileStore.getState().addFiles([makeFile("c.png")]);
+    const state = useFileStore.getState();
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.batchZipFilename).toBeNull();
+    expect(state.batchZipClaimed).toBe(false);
+  });
+
+  it("drops the previous batch zip when a file is removed, and keeps it when the index is missing (#1806)", () => {
+    const zip = new Blob(["z"]);
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore.getState().setBatchZip(zip, "out.zip");
+    useFileStore.getState().markBatchClaimed();
+
+    useFileStore.getState().removeFile(9);
+    expect(useFileStore.getState().batchZipBlob).toBe(zip);
+    expect(useFileStore.getState().batchZipFilename).toBe("out.zip");
+    expect(useFileStore.getState().batchZipClaimed).toBe(true);
+
+    useFileStore.getState().removeFile(1);
+    const state = useFileStore.getState();
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.batchZipFilename).toBeNull();
+    expect(state.batchZipClaimed).toBe(false);
+  });
+
   it("clears entries and the batch zip claim on reset", () => {
     useFileStore.getState().setFiles([makeFile("a.png")]);
     useFileStore.getState().setBatchZip(new Blob(["z"]), "out.zip");

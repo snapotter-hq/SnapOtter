@@ -496,6 +496,42 @@ describe("a batch zip", () => {
     expect(workAt(TOOL_ROUTE)).toBeNull();
   });
 
+  it("is cleared when a file is added, falling back to the completed entries (#1806)", () => {
+    seedResult();
+    useFileStore.getState().setBatchZip(new Blob(["z"]), "batch.zip");
+    useFileStore.getState().addFiles([makeFile("extra.png")]);
+
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(workAt(TOOL_ROUTE)).toEqual({
+      kind: "unsaved",
+      downloads: [{ kind: "result", index: 0, url: "blob:result", filename: "a-compressed.png" }],
+    });
+  });
+
+  it("is cleared when a file is removed, falling back to the remaining completed entry (#1806)", () => {
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore
+      .getState()
+      .updateEntry(0, { processedUrl: "blob:result-a", processedFilename: "a-out.png" });
+    useFileStore.getState().setBatchZip(new Blob(["z"]), "batch.zip");
+    useFileStore.getState().removeFile(1);
+
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(workAt(TOOL_ROUTE)).toEqual({
+      kind: "unsaved",
+      downloads: [{ kind: "result", index: 0, url: "blob:result-a", filename: "a-out.png" }],
+    });
+  });
+
+  it("is cleared by clearBatchZip, leaving nothing when the entries were reset (#1806)", () => {
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore.getState().setBatchZip(new Blob(["z"]), "batch.zip");
+    useFileStore.getState().clearBatchZip();
+
+    expect(useFileStore.getState().batchZipBlob).toBeNull();
+    expect(workAt(TOOL_ROUTE)).toBeNull();
+  });
+
   // settleFromZip stores the zip first and fills in per-entry results after, so
   // a run that fails that second half (a fileResults mismatch, or unzipSync
   // throwing) leaves a real downloadable zip with no entry results behind it.
