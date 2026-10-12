@@ -5575,7 +5575,7 @@ export const ko: TranslationKeys = {
     passwordNoControlCharacters: "비밀번호에 제어 문자를 포함할 수 없습니다.",
     passwordTooLong: "비밀번호는 {maxLength}자 이하여야 합니다.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "비밀번호가 너무 깁니다(최대 {maxLength}자). 관리자가 재설정해야 합니다.",
     passwordNoInvalidCharacters: "비밀번호에 유효하지 않은 문자를 포함할 수 없습니다.",
     tooManyRequests: "시도 횟수가 너무 많습니다. 1분 후에 다시 시도하세요.",
     escalationDenied: "이 작업에는 현재 역할보다 높은 권한이 필요합니다.",

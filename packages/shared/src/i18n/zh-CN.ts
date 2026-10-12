@@ -5348,8 +5348,7 @@ export const zhCN: TranslationKeys = {
     passwordNeedsSpecial: "密码必须包含一个特殊字符。",
     passwordNoControlCharacters: "密码不能包含控制字符。",
     passwordTooLong: "密码长度最多为 {maxLength} 个字符。",
-    passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+    passwordTooLongAdminReset: "密码太长（最多 {maxLength} 个字符）。必须由管理员重置。",
     passwordNoInvalidCharacters: "密码不能包含无效字符。",
     tooManyRequests: "尝试次数过多。请等待一分钟后重试。",
     escalationDenied: "此操作需要超出您角色的权限。",

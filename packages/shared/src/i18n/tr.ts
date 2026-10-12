@@ -5673,7 +5673,7 @@ export const tr: TranslationKeys = {
     passwordNoControlCharacters: "Parola kontrol karakterleri içermemelidir.",
     passwordTooLong: "Parola en fazla {maxLength} karakter olmalıdır.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "Parola çok uzun (en fazla {maxLength} karakter). Bir yönetici tarafından sıfırlanması gerekiyor.",
     passwordNoInvalidCharacters: "Parola geçersiz karakterler içermemelidir.",
     tooManyRequests: "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
     escalationDenied: "Bu işlem, rolünüzün sahip olduğundan daha fazla erişim gerektirir.",

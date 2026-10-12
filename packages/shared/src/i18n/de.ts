@@ -5710,7 +5710,7 @@ export const de: TranslationKeys = {
     passwordNoControlCharacters: "Das Passwort darf keine Steuerzeichen enthalten.",
     passwordTooLong: "Das Passwort darf höchstens {maxLength} Zeichen lang sein.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "Das Passwort ist zu lang (max. {maxLength} Zeichen). Ein Administrator muss es zurücksetzen.",
     passwordNoInvalidCharacters: "Das Passwort darf keine ungültigen Zeichen enthalten.",
     tooManyRequests: "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
     escalationDenied: "Dafür reichen die Rechte Ihrer Rolle nicht aus.",

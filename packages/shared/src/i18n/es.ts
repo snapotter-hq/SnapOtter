@@ -5677,7 +5677,7 @@ export const es: TranslationKeys = {
     passwordNoControlCharacters: "La contraseña no puede contener caracteres de control.",
     passwordTooLong: "La contraseña no puede tener más de {maxLength} caracteres.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "La contraseña es demasiado larga (máx. {maxLength} caracteres). Un administrador debe restablecerla.",
     passwordNoInvalidCharacters: "La contraseña no puede contener caracteres no válidos.",
     tooManyRequests: "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
     escalationDenied: "Eso requiere más acceso del que tiene tu rol.",

@@ -5442,7 +5442,7 @@ export const hi: TranslationKeys = {
     passwordNoControlCharacters: "पासवर्ड में नियंत्रण वर्ण नहीं होने चाहिए।",
     passwordTooLong: "पासवर्ड अधिकतम {maxLength} वर्णों का होना चाहिए।",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "पासवर्ड बहुत लंबा है (अधिकतम {maxLength} वर्ण)। किसी एडमिन को इसे रीसेट करना होगा।",
     passwordNoInvalidCharacters: "पासवर्ड में अमान्य वर्ण नहीं होने चाहिए।",
     tooManyRequests: "बहुत अधिक प्रयास। एक मिनट रुककर फिर से प्रयास करें।",
     escalationDenied: "इसके लिए आपकी भूमिका से अधिक पहुंच चाहिए।",

@@ -5663,7 +5663,7 @@ export const id: TranslationKeys = {
     passwordNoControlCharacters: "Kata sandi tidak boleh mengandung karakter kontrol.",
     passwordTooLong: "Kata sandi maksimal {maxLength} karakter.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "Kata sandi terlalu panjang (maks {maxLength} karakter). Seorang admin harus menyetel ulangnya.",
     passwordNoInvalidCharacters: "Kata sandi tidak boleh mengandung karakter yang tidak valid.",
     tooManyRequests: "Terlalu banyak percobaan. Tunggu satu menit lalu coba lagi.",
     escalationDenied: "Tindakan itu memerlukan akses lebih dari yang dimiliki peran Anda.",

@@ -5701,7 +5701,7 @@ export const fr: TranslationKeys = {
     passwordNoControlCharacters: "Le mot de passe ne doit pas contenir de caractères de contrôle.",
     passwordTooLong: "Le mot de passe ne doit pas dépasser {maxLength} caractères.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "Le mot de passe est trop long (max {maxLength} caractères). Un administrateur doit le réinitialiser.",
     passwordNoInvalidCharacters: "Le mot de passe ne doit pas contenir de caractères non valides.",
     tooManyRequests: "Trop de tentatives. Patientez une minute puis réessayez.",
     escalationDenied: "Cette action demande plus de droits que n'en a votre rôle.",

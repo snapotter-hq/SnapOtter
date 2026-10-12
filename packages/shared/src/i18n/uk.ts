@@ -5675,7 +5675,7 @@ export const uk: TranslationKeys = {
     passwordNoControlCharacters: "Пароль не має містити керувальні символи.",
     passwordTooLong: "Пароль задовгий (максимум: {maxLength}).",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "Пароль занадто довгий (максимум {maxLength} символів). Адміністратор повинен його скинути.",
     passwordNoInvalidCharacters: "Пароль не має містити недопустимі символи.",
     tooManyRequests: "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
     escalationDenied: "Для цього потрібно більше прав, ніж має ваша роль.",

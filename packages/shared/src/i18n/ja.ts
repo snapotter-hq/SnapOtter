@@ -5615,7 +5615,7 @@ export const ja: TranslationKeys = {
     passwordNoControlCharacters: "パスワードに制御文字を含めることはできません。",
     passwordTooLong: "パスワードは{maxLength}文字以内にしてください。",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "パスワードが長すぎます（最大 {maxLength} 文字）。管理者がリセットする必要があります。",
     passwordNoInvalidCharacters: "パスワードに無効な文字を含めることはできません。",
     tooManyRequests: "試行回数が多すぎます。1分待ってからもう一度お試しください。",
     escalationDenied: "この操作には、あなたのロールを超える権限が必要です。",

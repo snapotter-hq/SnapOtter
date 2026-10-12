@@ -5681,7 +5681,7 @@ export const ptBR: TranslationKeys = {
     passwordNoControlCharacters: "A senha não pode conter caracteres de controle.",
     passwordTooLong: "A senha deve ter no máximo {maxLength} caracteres.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "A senha é muito longa (máx. {maxLength} caracteres). Um administrador deve redefini-la.",
     passwordNoInvalidCharacters: "A senha não pode conter caracteres inválidos.",
     tooManyRequests: "Muitas tentativas. Aguarde um minuto e tente novamente.",
     escalationDenied: "Isso exige mais acesso do que sua função tem.",
