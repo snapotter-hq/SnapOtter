@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
+  PASSWORD_MAX_CODE_UNITS,
   PASSWORD_MAX_LENGTH,
   type PasswordRule,
   SafeError,
@@ -165,9 +166,9 @@ interface PasswordRuleFailure {
 }
 
 export async function validatePasswordStrength(typed: string): Promise<PasswordRuleFailure | null> {
-  // Before normalizing: the cap bounds the work every later step does, and the
-  // request schemas leave the length to this check so a refusal can say why (#2037).
-  if (typed.length > PASSWORD_MAX_LENGTH) {
+  // Before normalizing: a hard body-size guard to protect the NFKC normalization
+  // step from pathological inputs. Normal usage never hits this.
+  if (typed.length > PASSWORD_MAX_CODE_UNITS) {
     return {
       message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
       rule: "maxLength",
@@ -175,8 +176,19 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
       maxLength: PASSWORD_MAX_LENGTH,
     };
   }
+
   // The rules judge the text that will be hashed, not the spelling it was typed in (#2056).
   const password = normalizePassword(typed);
+
+  // Both the minimum and the maximum are measured in Unicode code points (#2310).
+  if (Array.from(password).length > PASSWORD_MAX_LENGTH) {
+    return {
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: PASSWORD_MAX_LENGTH,
+    };
+  }
   // A control character can be saved but never typed back: login refuses NUL
   // outright and browsers strip LF and CR from password inputs (#2055).
   if (/\p{Cc}/u.test(password)) {
@@ -264,7 +276,21 @@ export function validateUsername(username: string): string | null {
 
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required").max(255, "Username too long"),
-  password: z.string().min(1, "Password is required").max(PASSWORD_MAX_LENGTH, "Password too long"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .max(PASSWORD_MAX_CODE_UNITS, "Password too long")
+    .superRefine((val, ctx) => {
+      if (Array.from(normalizePassword(val)).length > PASSWORD_MAX_LENGTH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_big,
+          maximum: PASSWORD_MAX_LENGTH,
+          type: "string",
+          inclusive: true,
+          message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+        });
+      }
+    }),
 });
 
 export const changePasswordSchema = z.object({
@@ -397,9 +423,9 @@ export async function ensureDefaultAdmin(): Promise<void> {
   if (env.DEFAULT_PASSWORD.length === 0) {
     throw new Error("DEFAULT_PASSWORD must not be empty; sign-in refuses an empty password");
   }
-  if (env.DEFAULT_PASSWORD.length > PASSWORD_MAX_LENGTH) {
+  if (env.DEFAULT_PASSWORD.length > PASSWORD_MAX_CODE_UNITS) {
     throw new Error(
-      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters; sign-in refuses a longer password`,
+      `DEFAULT_PASSWORD must be at most ${PASSWORD_MAX_CODE_UNITS} characters; sign-in refuses a longer password`,
     );
   }
 
@@ -1026,7 +1052,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const valid =
-        body.currentPassword.length <= PASSWORD_MAX_LENGTH &&
+        body.currentPassword.length <= PASSWORD_MAX_CODE_UNITS &&
         (await verifyUserPassword(body.currentPassword, user.passwordHash)).valid;
       if (!valid) {
         return reply

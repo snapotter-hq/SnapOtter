@@ -1207,7 +1207,7 @@ describe("Admin user-management guards", () => {
   // the English sentence: the Settings dialog still shows it as-is.
   async function loggedInUser() {
     const { username, password } = await createUser();
-    return { password, token: await loginAs(username, password) };
+    return { username, password, token: await loginAs(username, password) };
   }
 
   function sendChangePassword(user: { password: string; token: string }, newPassword: string) {
@@ -1355,6 +1355,63 @@ describe("Admin user-management guards", () => {
       rules: ["maxLength"],
       maxLength: 1024,
     });
+  });
+
+  it("change-password allows 1024 code points that exceed 1024 code units, handling NFC/NFD variations (#2310)", async () => {
+    // 500 '𐐀's + 'Aa1' + 521 'a's = 1024 code points, 1524 code units.
+    const newPassword = `Aa1${"𐐀".repeat(500)}${"a".repeat(521)}`;
+    const user = await loggedInUser();
+
+    const res = await sendChangePassword(user, newPassword);
+    expect(res.statusCode).toBe(200);
+
+    // Should also allow login with the new password
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: user.username, password: newPassword },
+    });
+    expect(loginRes.statusCode).toBe(200);
+  });
+
+  it("change-password prevents 1025 code points that exceed 1024 code points but are under 4096 code units (#2310)", async () => {
+    const newPassword = `Aa1${"𐐀".repeat(501)}${"a".repeat(521)}`;
+    const user = await loggedInUser();
+    const res = await sendChangePassword(user, newPassword);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must be at most 1024 characters",
+      rule: "maxLength",
+      rules: ["maxLength"],
+      maxLength: 1024,
+    });
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: user.username, password: newPassword },
+    });
+
+    expect(loginRes.statusCode).toBe(400);
+    expect(loginRes.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      error: "Password must be at most 1024 characters",
+      rule: "maxLength",
+      maxLength: 1024,
+    });
+
+    // Check audit log
+    const logs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "LOGIN_FAILED"));
+    const matchingLog = logs.find((l) => {
+      const details = l.details as any;
+      return details.username === user.username && details.reason === "password_too_long";
+    });
+    expect(matchingLog).toBeDefined();
   });
 
   it("change-password answers an over-long current password as incorrect, not a schema failure (#2037)", async () => {

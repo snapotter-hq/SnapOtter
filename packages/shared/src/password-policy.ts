@@ -15,12 +15,18 @@ export const PASSWORD_RULES = [
 ] as const;
 
 /**
- * The longest password the server accepts, in UTF-16 code units like the
- * request schemas. Anything the policy lets a user set has to pass the login
- * schema's cap too, so both use this one constant. The cap bounds the
- * normalizing and rule checks a password goes through before it is hashed.
+ * The longest password the server accepts, measured in Unicode code points
+ * after NFKC normalization.
  */
 export const PASSWORD_MAX_LENGTH = 1024;
+
+/**
+ * The body-size guard on the login and password-set schemas. This is a limit
+ * on UTF-16 code units (the string's .length) to protect the normalization
+ * step, set high enough that 1024 code points can never exceed it even with
+ * extreme modifiers.
+ */
+export const PASSWORD_MAX_CODE_UNITS = 4096;
 
 export type PasswordRule = (typeof PASSWORD_RULES)[number];
 
