@@ -99,7 +99,11 @@ export function CropCanvas({
   const pixelHeight = imgDimensions ? Math.round((crop.height / 100) * imgDimensions.height) : 0;
 
   return (
-    <div ref={containerRef} className="flex flex-col w-full h-full max-w-4xl mx-auto outline-none">
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      className="flex flex-col w-full h-full max-w-4xl mx-auto outline-none"
+    >
       {/* Crop area */}
       <div className="flex-1 flex items-center justify-center overflow-hidden bg-muted/20 p-4 min-h-0">
         <ReactCrop
