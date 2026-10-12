@@ -167,7 +167,7 @@ export function finishStroke(
   objectId: string,
   canvas: HTMLCanvasElement,
   messages: CaptureFailureMessages,
-): boolean {
+): void {
   const dataUrl = strokeToDataUrl(canvas);
   const { updateObject, removeObjects } = useEditorStore.getState();
   if (!dataUrl) {
@@ -177,10 +177,9 @@ export function finishStroke(
     updateObject(objectId, { image: undefined } as unknown as Record<string, unknown>);
     removeObjects([objectId]);
     reportCaptureFailure("no-context", messages);
-    return false;
+    return;
   }
   updateObject(objectId, { src: dataUrl, image: undefined } as unknown as Record<string, unknown>);
-  return true;
 }
 
 /**

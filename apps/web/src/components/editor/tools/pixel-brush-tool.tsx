@@ -20,7 +20,6 @@ interface StrokeState {
   objectId: string;
   canvas: HTMLCanvasElement;
   strokeCtx: CanvasRenderingContext2D;
-  workingCtx: CanvasRenderingContext2D;
   sourceSnapshot: ImageData;
   lastX: number;
   lastY: number;
@@ -78,7 +77,7 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
         return;
       }
 
-      applyPixelBrush(workingCtx, strokeCtx, sourceSnapshot, x, y, canvasSize);
+      applyPixelBrush(strokeCtx, sourceSnapshot, x, y, canvasSize);
 
       const id = generateId();
       const dataUrl = strokeToDataUrl(canvas);
@@ -107,7 +106,6 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
         objectId: id,
         canvas,
         strokeCtx,
-        workingCtx,
         sourceSnapshot,
         lastX: x,
         lastY: y,
@@ -131,22 +129,10 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
       const x = Math.floor((pointer.x - panOffset.x) / zoom);
       const y = Math.floor((pointer.y - panOffset.y) / zoom);
 
-      const { strokeCtx, workingCtx, sourceSnapshot, canvas, objectId } = strokeRef.current;
+      const { strokeCtx, sourceSnapshot, canvas, objectId } = strokeRef.current;
 
-      applyPixelBrush(workingCtx, strokeCtx, sourceSnapshot, x, y, canvasSize);
+      applyPixelBrush(strokeCtx, sourceSnapshot, x, y, canvasSize);
 
-      // Update source snapshot for smudge continuity. A document too big to read
-      // again ends the stroke where it is rather than throwing out of the handler.
-      const read = readDocumentPixels(workingCtx, canvasSize.width, canvasSize.height);
-      if (!read.ok) {
-        strokeRef.current = null;
-        // finishStroke has already told the user when the stroke couldn't be saved.
-        if (finishStroke(objectId, canvas, captureMessages)) {
-          reportCaptureFailure(read.reason, captureMessages);
-        }
-        return;
-      }
-      strokeRef.current.sourceSnapshot = read.imageData;
       strokeRef.current.lastX = x;
       strokeRef.current.lastY = y;
 
@@ -169,7 +155,6 @@ export function usePixelBrushTool(stageRef: React.RefObject<Konva.Stage | null>)
 }
 
 function applyPixelBrush(
-  workingCtx: CanvasRenderingContext2D,
   strokeCtx: CanvasRenderingContext2D,
   source: ImageData,
   centerX: number,
@@ -189,7 +174,12 @@ function applyPixelBrush(
 
   if (w <= 0 || h <= 0) return;
 
-  const imageData = workingCtx.getImageData(left, top, w, h);
+  const imageData = strokeCtx.createImageData(w, h);
+  for (let py = 0; py < h; py++) {
+    const srcIdx = ((top + py) * canvasSize.width + left) * 4;
+    const dstIdx = py * w * 4;
+    imageData.data.set(source.data.subarray(srcIdx, srcIdx + w * 4), dstIdx);
+  }
 
   if (activeTool === "blur-brush") {
     applyBoxBlur(
@@ -229,7 +219,13 @@ function applyPixelBrush(
     );
   }
 
-  workingCtx.putImageData(imageData, left, top);
+  // Update the source snapshot using fast bulk copies for smudge continuity
+  for (let py = 0; py < h; py++) {
+    const srcIdx = ((top + py) * canvasSize.width + left) * 4;
+    const dstIdx = py * w * 4;
+    source.data.set(imageData.data.subarray(dstIdx, dstIdx + w * 4), srcIdx);
+  }
+
   copyBrushCircle(imageData, strokeCtx, left, top, centerX, centerY, halfSize);
 }
 
@@ -346,7 +342,7 @@ function applySharpen(
           if (kx === 0 && ky === 0) continue;
           const nx = sx + kx;
           const ny = sy + ky;
-          if (nx >= 0 && nx < sourceWidth && ny >= 0) {
+          if (nx >= 0 && nx < sourceWidth && ny >= 0 && ny < source.height) {
             const ni = (ny * sourceWidth + nx) * 4;
             if (ni >= 0 && ni < source.data.length) {
               avgR += source.data[ni];
@@ -409,7 +405,7 @@ function applySmudge(
       // Blend with the pixel at previous position
       const prevX = sx - Math.sign(dxC || 1);
       const prevY = sy - Math.sign(dyC || 1);
-      if (prevX >= 0 && prevX < sourceWidth && prevY >= 0) {
+      if (prevX >= 0 && prevX < sourceWidth && prevY >= 0 && prevY < source.height) {
         const pi = (prevY * sourceWidth + prevX) * 4;
         if (pi >= 0 && pi + 2 < source.data.length) {
           const idx = (py * imageData.width + px) * 4;

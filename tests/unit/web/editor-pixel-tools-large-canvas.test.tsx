@@ -36,6 +36,9 @@ function fakeContext() {
       }
       return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
     }),
+    createImageData: vi.fn((w: number, h: number) => {
+      return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
+    }),
     putImageData: vi.fn(),
     fillRect: vi.fn(() => {
       state.fills++;
@@ -156,35 +159,7 @@ describe("clone stamp: an aborted first click", () => {
   });
 });
 
-describe("pixel brush: running out of memory partway through a stroke", () => {
-  it("ends the stroke cleanly and keeps what was drawn", () => {
-    useEditorStore.setState({ activeTool: "blur-brush" });
-    const { result } = renderHook(() => usePixelBrushTool(stageRef));
-    result.current.handleMouseDown(event);
-    // A good move first, so the object points at the live canvas.
-    result.current.handleMouseMove(event);
-    const attrsOf = () => objects()[0].attrs as unknown as { src: string; image?: unknown };
-    expect(attrsOf().image).toBeDefined();
-
-    state.bigReadsFail = true;
-    state.dataUrl = "data:image/png;base64,FINAL";
-    expect(() => result.current.handleMouseMove(event)).not.toThrow();
-
-    expectOneMemoryToast();
-    // The stroke is saved as it stood: encoded, and no longer the live canvas.
-    expect(attrsOf().src).toBe("data:image/png;base64,FINAL");
-    expect(attrsOf().image).toBeUndefined();
-
-    // And it is over: a later move changes nothing about the object.
-    state.bigReadsFail = false;
-    state.dataUrl = "data:image/png;base64,LATER";
-    result.current.handleMouseMove(event);
-    result.current.handleMouseUp();
-    expect(attrsOf().src).toBe("data:image/png;base64,FINAL");
-    expect(attrsOf().image).toBeUndefined();
-    expect(toastError).toHaveBeenCalledTimes(1);
-  });
-
+describe("a stroke that can't be encoded when the mouse is released", () => {
   it("cuts the live canvas loose before removing an object it can't encode", () => {
     useEditorStore.setState({ activeTool: "blur-brush" });
     const { result } = renderHook(() => usePixelBrushTool(stageRef));
@@ -211,21 +186,6 @@ describe("pixel brush: running out of memory partway through a stroke", () => {
     expect(calls).toEqual(['update:["image"]', "remove"]);
   });
 
-  it("drops the object when the finished stroke can't be encoded", () => {
-    useEditorStore.setState({ activeTool: "blur-brush" });
-    const { result } = renderHook(() => usePixelBrushTool(stageRef));
-    result.current.handleMouseDown(event);
-
-    state.bigReadsFail = true;
-    state.dataUrl = "data:,";
-    result.current.handleMouseMove(event);
-
-    expectOneMemoryToast();
-    expect(objects()).toHaveLength(0);
-  });
-});
-
-describe("a stroke that can't be encoded when the mouse is released", () => {
   it.each([
     ["blur-brush", usePixelBrushTool],
     ["dodge", useDodgeBurnTool],
