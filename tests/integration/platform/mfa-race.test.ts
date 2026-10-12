@@ -1,0 +1,381 @@
+import { eq } from "drizzle-orm";
+import * as OTPAuth from "otpauth";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+vi.resetModules();
+const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
+mockEnterpriseFeatures(["mfa"]);
+
+const { buildTestApp, createUserAndLogin } = await import("../test-server.js");
+const { db, schema } = await import("../../../apps/api/src/db/index.js");
+const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { verifyRecoveryCode } = await import("../../../apps/api/src/plugins/mfa.js");
+
+import type { TestApp } from "../test-server.js";
+
+function generateTotpCode(uri: string): string {
+  const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
+  return totp.generate();
+}
+
+describe("MFA Race Condition #2328", () => {
+  let testApp: TestApp;
+
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+  }, 30_000);
+
+  afterEach(async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
+  });
+
+  afterAll(async () => {
+    if (testApp) {
+      await testApp.cleanup();
+    }
+  }, 10_000);
+
+  async function createEnrolledUser(): Promise<{
+    userId: string;
+    username: string;
+    password: string;
+    uri: string;
+    recoveryCodes: string[];
+  }> {
+    const username = `mfarace_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const password = "Userpass1";
+    const { userId, token: userToken } = await createUserAndLogin(
+      testApp.app,
+      username,
+      "user",
+      password,
+    );
+
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${userToken}` },
+    });
+    expect(enrollRes.statusCode).toBe(200);
+    const { uri, recoveryCodes } = JSON.parse(enrollRes.body);
+
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${userToken}` },
+      payload: { code: generateTotpCode(uri) },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+
+    return { userId, username, password, uri, recoveryCodes };
+  }
+
+  it("allows only one session when two /mfa/complete requests race with the same TOTP code", async () => {
+    const { userId, username, password, uri } = await createEnrolledUser();
+
+    const sessionsBefore = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const { mfaToken, requiresMfa } = JSON.parse(loginRes.body);
+    expect(requiresMfa).toBe(true);
+
+    const code = generateTotpCode(uri);
+
+    const [res1, res2] = await Promise.all([
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code },
+      }),
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code },
+      }),
+    ]);
+
+    expect([res1.statusCode, res2.statusCode].sort()).toEqual([200, 401]);
+    const loser = res1.statusCode === 401 ? res1 : res2;
+    expect(JSON.parse(loser.body).code).toBe("MFA_EXPIRED");
+
+    const sessionsAfter = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(sessionsAfter).toHaveLength(sessionsBefore.length + 1);
+  });
+
+  it("spends only one recovery code and creates one session when two /mfa/complete requests race on one mfaToken with different recovery codes", async () => {
+    const { userId, username, password, recoveryCodes } = await createEnrolledUser();
+
+    const sessionsBefore = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const [res1, res2] = await Promise.all([
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: recoveryCodes[0] },
+      }),
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: recoveryCodes[1] },
+      }),
+    ]);
+
+    expect([res1.statusCode, res2.statusCode].sort()).toEqual([200, 401]);
+    const loser = res1.statusCode === 401 ? res1 : res2;
+    expect(JSON.parse(loser.body).code).toBe("MFA_EXPIRED");
+
+    const sessionsAfter = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(sessionsAfter).toHaveLength(sessionsBefore.length + 1);
+
+    const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+    const remaining = (dbUser.recoveryCodesHash ?? "").split(",").filter(Boolean);
+    expect(remaining).toHaveLength(recoveryCodes.length - 1);
+
+    const code0StillValid = verifyRecoveryCode(
+      recoveryCodes[0],
+      dbUser.recoveryCodesHash ?? "",
+    ).valid;
+    const code1StillValid = verifyRecoveryCode(
+      recoveryCodes[1],
+      dbUser.recoveryCodesHash ?? "",
+    ).valid;
+    expect(Number(code0StillValid) + Number(code1StillValid)).toBe(1);
+  });
+
+  it("checks at most 5 wrong guesses when concurrent /mfa/complete requests race on one mfaToken", async () => {
+    const { username, password, uri } = await createEnrolledUser();
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    // Spend 4 of the 5 allowed wrong attempts first.
+    for (let i = 0; i < 4; i++) {
+      const bad = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(bad.statusCode).toBe(401);
+      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
+    }
+
+    // Now race 5 wrong guesses against the single remaining attempt.
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, (_, idx) =>
+        testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken, code: String(idx).padStart(6, "0") },
+        }),
+      ),
+    );
+
+    for (const res of responses) {
+      expect(res.statusCode).toBe(401);
+    }
+
+    const codes = responses.map((res: { body: string }) => JSON.parse(res.body).code as string);
+    const invalidCodeCount = codes.filter((c: string) => c === "INVALID_CODE").length;
+    const expiredCount = codes.filter((c: string) => c === "MFA_EXPIRED").length;
+
+    // Only 1 of the 5 racing guesses may be checked (bringing the total to 5);
+    // the other 4 must be rejected without being checked.
+    expect(invalidCodeCount).toBe(1);
+    expect(expiredCount).toBe(4);
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+    // The challenge must now be burned even for the valid TOTP code.
+    const afterRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(uri) },
+    });
+    expect(afterRes.statusCode).toBe(401);
+    expect(JSON.parse(afterRes.body).code).toBe("MFA_EXPIRED");
+  });
+
+  it("restores the challenge with its remaining TTL after wrong guesses and cleans up attemptsKey on success", async () => {
+    const { username, password, uri } = await createEnrolledUser();
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    // Shrink the challenge TTL to 60s so we can verify failed attempts preserve
+    // the remaining TTL rather than resetting it back to 300s.
+    await sharedRedis().pexpire(`mfa:${mfaToken}`, 60_000);
+
+    for (let i = 0; i < 3; i++) {
+      const bad = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(bad.statusCode).toBe(401);
+      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
+    }
+
+    const pttlAfterFails = await sharedRedis().pttl(`mfa:${mfaToken}`);
+    expect(pttlAfterFails).toBeGreaterThan(0);
+    expect(pttlAfterFails).toBeLessThanOrEqual(60_000);
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("3");
+
+    const okRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(uri) },
+    });
+    expect(okRes.statusCode).toBe(200);
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+  });
+
+  it("restores the challenge without counting an attempt if a DB read throws mid-request", async () => {
+    const { username, password, uri } = await createEnrolledUser();
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw new Error("simulated transient DB error");
+    });
+
+    try {
+      const errRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: generateTotpCode(uri) },
+      });
+      expect(errRes.statusCode).toBe(500);
+    } finally {
+      selectSpy.mockRestore();
+    }
+
+    // The challenge must still be present in Redis so the user can retry.
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode(uri) },
+    });
+    expect(retryRes.statusCode).toBe(200);
+  });
+
+  it("allows only one session and caps concurrent wrong guesses on /mfa/enroll-complete", async () => {
+    const username = `mfaenrollrace_${Date.now()}`;
+    const password = "Userpass1";
+    const { userId } = await createUserAndLogin(testApp.app, username, "user", password);
+
+    const sessionsBefore = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+
+    // 1. Concurrent wrong guesses on the final attempt of enroll-complete check only 1 code.
+    const loginRes1 = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { enrollmentToken: token1 } = JSON.parse(loginRes1.body);
+
+    for (let i = 0; i < 4; i++) {
+      const bad = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken: token1, code: "000000" },
+      });
+      expect(bad.statusCode).toBe(401);
+      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
+    }
+
+    const badResponses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/enroll-complete",
+          payload: { enrollmentToken: token1, code: "000000" },
+        }),
+      ),
+    );
+    const badCodes = badResponses.map(
+      (res: { body: string }) => JSON.parse(res.body).code as string,
+    );
+    expect(badCodes.filter((c: string) => c === "INVALID_CODE").length).toBe(1);
+    expect(badCodes.filter((c: string) => c === "MFA_EXPIRED").length).toBe(4);
+
+    // 2. Concurrent valid TOTP codes on enroll-complete mint only one session.
+    const loginRes2 = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { enrollmentToken: token2, uri } = JSON.parse(loginRes2.body);
+    const validCode = generateTotpCode(uri);
+
+    const [ok1, ok2] = await Promise.all([
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken: token2, code: validCode },
+      }),
+      testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken: token2, code: validCode },
+      }),
+    ]);
+
+    expect([ok1.statusCode, ok2.statusCode].sort()).toEqual([200, 401]);
+    const loser = ok1.statusCode === 401 ? ok1 : ok2;
+    expect(JSON.parse(loser.body).code).toBe("MFA_EXPIRED");
+
+    const sessionsAfter = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(sessionsAfter).toHaveLength(sessionsBefore.length + 1);
+  });
+});
