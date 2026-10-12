@@ -142,3 +142,54 @@ test.describe("Editor pixel tools: refused capture (issue #1040)", () => {
     });
   }
 });
+
+test.describe("Editor layer-sized captures: refused encode (issue #2165)", () => {
+  test.beforeEach(async ({ editorPage: page }) => {
+    await loadTestImage(page);
+    await waitForSourceImage(page);
+  });
+
+  async function makeDocumentSizedCanvasFailToEncode(page: Page): Promise<void> {
+    await page.evaluate(() => {
+      const original = HTMLCanvasElement.prototype.toDataURL;
+      HTMLCanvasElement.prototype.toDataURL = function (this: HTMLCanvasElement, ...args) {
+        if (this.width === 200 && this.height === 150) return "data:,";
+        return (original as (...a: unknown[]) => string).apply(this, args);
+      };
+    });
+  }
+
+  test("gradient says so when the layer canvas can't be encoded", async ({ editorPage: page }) => {
+    await selectTool(page, "gradient");
+    await makeDocumentSizedCanvasFailToEncode(page);
+
+    const from = await documentPoint(page, 10, 10);
+    const to = await documentPoint(page, 100, 75);
+
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y);
+    await page.mouse.up();
+
+    await expect(page.locator("[data-sonner-toast]")).toContainText(/too big/i, {
+      timeout: 10_000,
+    });
+    expect(await countImageObjects(page)).toBe(0);
+  });
+
+  test("fill dialog says so when the layer canvas can't be encoded", async ({
+    editorPage: page,
+  }) => {
+    await makeDocumentSizedCanvasFailToEncode(page);
+
+    await page.keyboard.press("Shift+Backspace");
+    const dialog = page.locator("div[role='dialog'][aria-label='Fill']");
+    await expect(dialog).toBeVisible();
+    await dialog.locator("button").filter({ hasText: "OK" }).click();
+
+    await expect(page.locator("[data-sonner-toast]")).toContainText(/too big/i, {
+      timeout: 10_000,
+    });
+    expect(await countImageObjects(page)).toBe(0);
+  });
+});

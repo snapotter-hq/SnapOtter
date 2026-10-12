@@ -2,9 +2,11 @@
 
 import type Konva from "konva";
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "@/contexts/i18n-context";
 import { generateId } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
+import { reportCaptureFailure, strokeToDataUrl } from "../stage-capture";
 
 interface DragState {
   startX: number;
@@ -25,6 +27,7 @@ export interface GradientPreview {
 export function useGradientTool() {
   const dragRef = useRef<DragState | null>(null);
   const [preview, setPreview] = useState<GradientPreview | null>(null);
+  const captureMessages = useTranslation().t.editor.ui.captureFailure;
 
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const { activeTool, zoom, panOffset } = useEditorStore.getState();
@@ -119,7 +122,12 @@ export function useGradientTool() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-    const dataUrl = canvas.toDataURL();
+    const dataUrl = strokeToDataUrl(canvas);
+    if (!dataUrl) {
+      reportCaptureFailure("no-context", captureMessages);
+      dragRef.current = null;
+      return;
+    }
 
     const obj: CanvasObject = {
       id: generateId(),
