@@ -674,6 +674,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               originalSize: result.originalSize,
               processedSize: result.processedSize,
               savedFileId: result.savedFileId,
+              autoSaveError: result.autoSaveError,
               ...result.resultPayload,
             });
           }

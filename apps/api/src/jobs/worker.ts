@@ -283,6 +283,7 @@ export interface LegacyResultPayload {
   originalSize: number;
   processedSize: number;
   savedFileId?: string;
+  autoSaveError?: string;
   [key: string]: unknown;
 }
 
@@ -303,6 +304,9 @@ export function buildLegacyResultPayload(
   }
   if (jobResult.savedFileId) {
     payload.savedFileId = jobResult.savedFileId;
+  }
+  if (jobResult.autoSaveError) {
+    payload.autoSaveError = jobResult.autoSaveError;
   }
   if (jobResult.resultPayload) {
     Object.assign(payload, jobResult.resultPayload);
@@ -654,12 +658,13 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // version. Without a fileId this is a no-op, so tool-first uploads are
       // not auto-saved.
       let savedFileId: string | undefined;
+      let autoSaveError: string | undefined;
       if (resultBuffer) {
         // Re-check just before the library overwrite, the one write a cancel is
         // most costly to lose to. A cancel landing during the save itself is not
         // covered (#2092).
         if (wasUserCanceled(jobId)) throw new Error("Canceled");
-        savedFileId = await autoSaveToLibrary({
+        const autoSaveResult = await autoSaveToLibrary({
           fileId: data.fileId,
           saveMode: data.saveMode,
           userId: data.userId,
@@ -668,6 +673,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           contentType: resultContentType,
           toolId: data.toolId,
         });
+        savedFileId = autoSaveResult.fileId;
+        autoSaveError = autoSaveResult.error;
       } else if (data.fileId) {
         logger.info(
           { jobId, toolId: data.toolId, bytes: resultSize },
@@ -686,6 +693,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         processedSize: resultSize,
         previewRef,
         savedFileId,
+        autoSaveError,
         resultPayload,
       };
       const legacyResult = buildLegacyResultPayload(jobResult, jobId);

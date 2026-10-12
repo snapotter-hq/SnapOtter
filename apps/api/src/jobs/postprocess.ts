@@ -12,9 +12,10 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
 import type { LibrarySaveMode } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
+import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
@@ -192,24 +193,33 @@ export interface AutoSaveOpts {
  *
  * Returns the new file ID on success, undefined when no fileId or on error.
  */
-export async function autoSaveToLibrary(opts: AutoSaveOpts): Promise<string | undefined> {
-  if (!opts.fileId) return undefined;
+export async function autoSaveToLibrary(
+  opts: AutoSaveOpts,
+): Promise<{ fileId?: string; error?: string }> {
+  if (!opts.fileId) return {};
 
+  let storedName: string | undefined;
   try {
-    const { saveFile } = await import("../lib/file-storage.js");
+    const { saveFile, deleteStoredFile } = await import("../lib/file-storage.js");
+    const { quotaRefusal } = await import("../lib/quota.js");
+
     const [parent] = await db
       .select()
       .from(schema.userFiles)
       .where(eq(schema.userFiles.id, opts.fileId));
-    if (!parent) return undefined;
+    if (!parent) return {};
+
+    const parentUserId = parent.userId;
     // Only version a file the requester owns; never create a version on
     // another user's file via a known fileId.
-    if (parent.userId !== opts.userId) return undefined;
+    if (!parentUserId || parentUserId !== opts.userId) return {};
 
     const overwrite = opts.saveMode === "overwrite";
     const parentChain: string[] = parent.toolChain ?? [];
     const newToolChain = [...parentChain, opts.toolId];
-    const storedName = await saveFile(opts.buffer, opts.outName);
+
+    // Write blob
+    storedName = await saveFile(opts.buffer, opts.outName);
 
     // Output dimensions: sharp for images, ffprobe for video; null where N/A
     // (audio/document have no pixel dimensions). Non-critical, best-effort.
@@ -241,22 +251,56 @@ export async function autoSaveToLibrary(opts: AutoSaveOpts): Promise<string | un
     }
 
     const newId = randomUUID();
-    await db.insert(schema.userFiles).values({
-      id: newId,
-      userId: parent.userId,
-      originalName: opts.outName,
-      storedName,
-      mimeType: opts.contentType,
-      size: opts.buffer.length,
-      width,
-      height,
-      version: overwrite ? parent.version + 1 : 1,
-      parentId: overwrite ? opts.fileId : null,
-      toolChain: newToolChain,
+    const result = await db.transaction(async (tx) => {
+      const overQuota = await quotaRefusal(tx, parentUserId, opts.buffer.length, true);
+      if (overQuota) return { error: overQuota };
+
+      await tx.insert(schema.userFiles).values({
+        id: newId,
+        userId: parentUserId,
+        originalName: opts.outName,
+        storedName: storedName as string,
+        mimeType: opts.contentType,
+        size: opts.buffer.length,
+        width,
+        height,
+        version: overwrite ? parent.version + 1 : 1,
+        parentId: overwrite ? opts.fileId : null,
+        toolChain: newToolChain,
+      });
+
+      await tx
+        .update(schema.users)
+        .set({ storageUsed: sql`${schema.users.storageUsed} + ${opts.buffer.length}` })
+        .where(eq(schema.users.id, parentUserId));
+
+      return { fileId: newId };
     });
-    return newId;
-  } catch {
-    // Non-fatal: tool processing already succeeded
-    return undefined;
+
+    if (result.error) {
+      if (storedName) {
+        await deleteStoredFile(storedName).catch((cleanupErr) => {
+          logger.error(
+            { err: cleanupErr, storedName },
+            "Failed to delete orphaned file during quota rejection",
+          );
+        });
+      }
+      return result;
+    }
+
+    return result;
+  } catch (err) {
+    if (storedName) {
+      const { deleteStoredFile } = await import("../lib/file-storage.js");
+      await deleteStoredFile(storedName).catch((cleanupErr) => {
+        logger.error(
+          { err: cleanupErr, storedName },
+          "Failed to delete orphaned file after auto-save error",
+        );
+      });
+    }
+    await reportError(err as Error, { source: "worker", toolId: opts.toolId });
+    return { error: "An unexpected system error prevented saving to your library." };
   }
 }

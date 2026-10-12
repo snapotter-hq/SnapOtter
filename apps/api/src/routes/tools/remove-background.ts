@@ -515,7 +515,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         // Auto-save the composited result (not the Phase 1 transparent
         // intermediate) to the library when the run referenced a library file.
-        const savedFileId = await autoSaveToLibrary({
+        const autoSaveResult = await autoSaveToLibrary({
           fileId: fileId ?? undefined,
           saveMode,
           userId: getAuthUser(request)?.id ?? null,
@@ -524,12 +524,14 @@ export function registerRemoveBackground(app: FastifyInstance) {
           contentType: BG_FORMAT_CONTENT_TYPES[fmt],
           toolId: "remove-background",
         });
+        const savedFileId = autoSaveResult.fileId;
 
         return reply.send({
           jobId,
           downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
           processedSize: resultBuffer.length,
           savedFileId,
+          autoSaveError: autoSaveResult.error,
         });
       } catch (err) {
         if (isDecoderUnavailable(err)) throw err;

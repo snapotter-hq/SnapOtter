@@ -98,5 +98,6 @@ export interface ToolJobResult {
   processedSize: number;
   previewRef?: string;
   savedFileId?: string;
+  autoSaveError?: string;
   resultPayload?: Record<string, unknown>;
 }
