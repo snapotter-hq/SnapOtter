@@ -4,6 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
+import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
@@ -299,8 +300,8 @@ export function EraseObjectSettings({
       let cancelOnAnswer = false;
       const abandon = (err: Error) => {
         abandoned = true;
-        xhr.abort();
         reject(err);
+        xhr.abort();
       };
 
       const subscription = subscribeEraseObjectJobProgress(clientJobId, {
@@ -560,17 +561,29 @@ export function EraseObjectSettings({
       },
       onFailed: (failure) => {
         endWatch();
-        abandonRequest();
+        let abortError: unknown = null;
+        try {
+          abandonRequest();
+        } catch (err) {
+          abortError = err;
+        }
         cancelIfHandlingFailed(failure, clientJobId);
         // The stream has already let go of the run, so a throw from the message
         // write must not skip finishUi and leave the run at processing for good
         // (#1830). It still surfaces, after the teardown.
         endRunWithError(jobFailureMessage(failure, t.errors));
+        if (abortError) throw abortError;
       },
       onStall: () => {
         endWatch();
-        abandonRequest();
+        let abortError: unknown = null;
+        try {
+          abandonRequest();
+        } catch (err) {
+          abortError = err;
+        }
         endRunWithError(t.toolSettings["erase-object"].stall);
+        if (abortError) throw abortError;
       },
     });
     const stopProgress = subscription.stop;

@@ -1552,6 +1552,28 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     });
   }
 
+  it("an abort that throws still settles the stopped file's promise (#2137)", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    act(() => {
+      first.respond(202, { jobId: "queued", async: true });
+    });
+
+    const originalAbort = first.abort;
+    first.abort = () => {
+      originalAbort.call(first);
+      throw new Error("fake abort error");
+    };
+
+    act(() => {
+      useFileStore.getState().setFiles([image("library.png")]);
+    });
+
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
   it("leaving for another tool stops the file in flight and sends no more", async () => {
     const { unmount } = renderPanel(3);
     const first = await submit(1);
