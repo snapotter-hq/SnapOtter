@@ -187,7 +187,13 @@ export async function startHarness({
   // SDK records only our outgoing side of the call, as it would in production.
   const webhookRequests: string[] = [];
   const hooks = net.createServer((socket) => {
-    socket.on("error", () => {}); // a reset client must not crash the fork
+    socket.on("error", (err: NodeJS.ErrnoException) => {
+      // Specifically ignore expected client resets/pipes to prevent fork crashes
+      if (err.code === "ECONNRESET" || err.code === "EPIPE") return;
+
+      // Do not silently swallow other unexpected socket errors
+      console.error("Unexpected socket error in test harness webhook server:", err);
+    });
     socket.once("data", (data) => {
       webhookRequests.push(data.toString());
       socket.end("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");

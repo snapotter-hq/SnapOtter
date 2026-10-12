@@ -59,11 +59,18 @@ describe("a failing request on a diagnostic instance, tracing on (#1880)", () =>
   });
 
   it("keeps a webhook token in an outgoing url's path out of spans and breadcrumbs (#1899)", async () => {
-    const { event, transactions } = await harness.send(
+    const { event, transactions, rawWebhookRequests } = await harness.send(
       REQUESTS.webhook.path,
       REQUESTS.webhook.init,
     );
     expectNoSecrets(event, REQUESTS.webhook.secrets);
+
+    // Check that outbound webhook calls don't carry tracing headers (#1925)
+    expect(rawWebhookRequests.length).toBeGreaterThan(0);
+    for (const req of rawWebhookRequests) {
+      expect(req).not.toMatch(/^sentry-trace:/im);
+      expect(req).not.toMatch(/^baggage:.*sentry-trace_id/im);
+    }
     for (const t of transactions) expectNoSecrets(t, REQUESTS.webhook.secrets);
     // The outgoing calls are still in the trace, named by method and host.
     const spans = transactions.flatMap(
@@ -77,8 +84,17 @@ describe("a failing request on a diagnostic instance, tracing on (#1880)", () =>
 
 describe("a failing request after analytics is switched off, tracing on, diagnostic instance (#1898)", () => {
   it("sends nothing at all: no transaction, no error event, no other envelope", async () => {
-    const { itemTypes } = await harness.sendOptedOut(REQUESTS.login.path, REQUESTS.login.init);
+    const { itemTypes, rawWebhookRequests } = await harness.sendOptedOut(
+      REQUESTS.webhook.path,
+      REQUESTS.webhook.init,
+    );
     expect(itemTypes).toEqual([]);
+
+    expect(rawWebhookRequests.length).toBeGreaterThan(0);
+    for (const webhookReq of rawWebhookRequests) {
+      expect(webhookReq).not.toMatch(/^sentry-trace:/im);
+      expect(webhookReq).not.toMatch(/^baggage:.*sentry-trace_id/im);
+    }
   });
 
   it("sends again once analytics is back on", async () => {
