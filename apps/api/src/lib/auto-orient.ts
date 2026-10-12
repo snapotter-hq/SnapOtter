@@ -22,6 +22,20 @@ import { resolveOutputFormat } from "./output-format.js";
  * sideways result (#1417). Without it they go to the process logger, which
  * carries only trace ids, and only when OpenTelemetry is active.
  */
+function isLosslessWebP(buffer: Buffer): boolean {
+  if (buffer.length < 16 || buffer.toString("ascii", 0, 4) !== "RIFF") return false;
+
+  let offset = 12;
+  while (offset + 8 <= buffer.length) {
+    const chunkType = buffer.toString("ascii", offset, offset + 4);
+    if (chunkType === "VP8L") return true;
+    if (chunkType === "VP8 ") return false;
+    const chunkLength = buffer.readUInt32LE(offset + 4);
+    offset += 8 + chunkLength + (chunkLength % 2);
+  }
+  return false;
+}
+
 export async function autoOrient(
   buffer: Buffer,
   log: Pick<FastifyBaseLogger, "warn"> = logger,
@@ -49,7 +63,20 @@ export async function autoOrient(
     // which for a JPEG means a second lossy generation at the encoder's
     // default (~80) before any tool the user asked for has run.
     const output = await resolveOutputFormat(buffer, "");
-    return await sharp(buffer).rotate().toFormat(output.format, output.encoderOptions).toBuffer();
+    const encoderOptions: Record<string, unknown> = { ...output.encoderOptions };
+    let pipeline = sharp(buffer).rotate();
+
+    if (output.format === "webp" && isLosslessWebP(buffer)) {
+      encoderOptions.lossless = true;
+    } else if (output.format === "tiff") {
+      encoderOptions.compression = meta.compression || "lzw";
+    }
+
+    if (meta.depth === "ushort" && meta.space) {
+      pipeline = pipeline.toColorspace(meta.space);
+    }
+
+    return await pipeline.toFormat(output.format, encoderOptions).toBuffer();
   } catch (err) {
     // The tool's own decode of the same buffer is expected to reject it. A warn
     // here with no failed-job line after it points at an encode-side bug.
