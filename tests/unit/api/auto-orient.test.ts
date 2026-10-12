@@ -149,6 +149,64 @@ describe("autoOrient", () => {
     expect(result.equals(atQuality95)).toBe(true);
   });
 
+  it("preserves lossless encoding for WebP", async () => {
+    const buf = await sharp({
+      create: {
+        width: 32,
+        height: 24,
+        channels: 4,
+        background: { r: 255, g: 0, b: 0, alpha: 0.5 },
+      },
+    })
+      .withMetadata({ orientation: 6 })
+      .webp({ lossless: true })
+      .toBuffer();
+
+    const result = await autoOrient(buf);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.format).toBe("webp");
+    expect(result.toString("ascii", 12, 16)).toBe("VP8L");
+  });
+
+  it("preserves alpha channel for TIFF by passing compression", async () => {
+    const buf = await sharp({
+      create: {
+        width: 32,
+        height: 24,
+        channels: 4,
+        background: { r: 0, g: 255, b: 0, alpha: 0.5 },
+      },
+    })
+      .withMetadata({ orientation: 6 })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+
+    const result = await autoOrient(buf);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.format).toBe("tiff");
+    expect(meta.channels).toBe(4);
+    expect(meta.hasAlpha).toBe(true);
+  });
+
+  it("preserves 16-bit depth for PNG", async () => {
+    const rawData = Buffer.alloc(32 * 24 * 3 * 2, 0);
+    const buf = await sharp(rawData, {
+      raw: { width: 32, height: 24, channels: 3 },
+    })
+      .toColorspace("rgb16")
+      .withMetadata({ orientation: 6 })
+      .png()
+      .toBuffer();
+
+    const result = await autoOrient(buf);
+    const meta = await sharp(result).metadata();
+
+    expect(meta.format).toBe("png");
+    expect(meta.depth).toBe("ushort");
+  });
+
   it("returns original buffer for corrupted/invalid input", async () => {
     const invalid = Buffer.from("this is not an image at all");
     const result = await autoOrient(invalid);
