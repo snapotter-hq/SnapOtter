@@ -153,13 +153,17 @@ test.describe("@mobile A result taller than the preview area", () => {
     loggedInPage: page,
   }) => {
     // 2261: before/after slider size mismatch
-    await page.goto("/image/upscale");
+    await page.goto("/image/compress");
     await uploadTestImage(page);
 
     // Wait for processing to finish and slider to appear
     const peekBar = page.getByRole("button", { name: "Process", exact: true });
     await peekBar.click();
-    await page.getByTestId("upscale-submit").click();
+
+    // Fill target size for compress tool
+    await page.getByRole("spinbutton", { name: /Target Size/i }).fill("500");
+
+    await page.getByTestId("compress-submit").click();
     await expect(page.getByRole("slider", { name: /before\/after/i })).toBeVisible({
       timeout: 15_000,
     });
