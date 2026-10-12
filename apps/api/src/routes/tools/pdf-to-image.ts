@@ -552,6 +552,7 @@ export function registerPdfToImageRoute(
       // so interleaving documents mostly multiplies peak memory.
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const childJobId = `${jobId}-f${i}`;
         try {
           publishProgress(i, file.filename);
           if (file.buffer.length === 0) {
@@ -560,7 +561,6 @@ export function registerPdfToImageRoute(
           if (!isPdfBuffer(file.buffer)) {
             throw new PdfInputError("Invalid or corrupt PDF file");
           }
-          const childJobId = `${jobId}-f${i}`;
           const prefix = `outputs/${childJobId}`;
           const { filenames } = await renderPdfPages(file.buffer, settings, childJobId);
           const zipName = `${file.filename.replace(/\.pdf$/i, "")}-pages.zip`;
@@ -605,6 +605,17 @@ export function registerPdfToImageRoute(
             );
             throw err;
           }
+
+          // A file that fails mid-render leaves its already-written pages
+          // stranded on the volume. Clear its prefix now so it doesn't wait
+          // for the storage sweep.
+          await deletePrefix(`outputs/${childJobId}`).catch((cleanupErr) =>
+            request.log.warn(
+              { err: cleanupErr, jobId, childJobId, toolId: opts.toolId },
+              "cleanup of a failed PDF batch file failed",
+            ),
+          );
+
           if (err instanceof PdfInputError) {
             errors.push({ filename: file.filename, error: err.message });
           } else {
@@ -707,7 +718,16 @@ export function registerPdfToImageRoute(
       // page on the volume until the storage sweep, and they carry no jobs row
       // for retention or GDPR deletion to find.
       await Promise.all(
-        results.map((entry) => (entry ? deletePrefix(entry.prefix).catch(() => {}) : null)),
+        results.map((entry) =>
+          entry
+            ? deletePrefix(entry.prefix).catch((cleanupErr) =>
+                request.log.warn(
+                  { err: cleanupErr, jobId, prefix: entry.prefix },
+                  "failed to clean up temporary batch PDF prefix",
+                ),
+              )
+            : null,
+        ),
       );
     },
   );

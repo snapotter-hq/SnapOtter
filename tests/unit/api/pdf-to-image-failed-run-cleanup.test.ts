@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
 const getObjectBuffer = vi.fn();
+const getObjectStream = vi.fn();
 const deletePrefix = vi.fn();
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
@@ -26,6 +27,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     ...actual,
     putObject: (...args: unknown[]) => putObject(...args),
     getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
+    getObjectStream: (...args: unknown[]) => getObjectStream(...args),
     deletePrefix: (...args: unknown[]) => deletePrefix(...args),
   };
 });
@@ -89,6 +91,9 @@ describe("pdf-to-image single file clears what a failed run wrote (#2158)", () =
   beforeEach(() => {
     putObject.mockReset().mockResolvedValue(undefined);
     getObjectBuffer.mockReset().mockResolvedValue(Buffer.from("page"));
+    getObjectStream
+      .mockReset()
+      .mockResolvedValue(import("node:stream").then((m) => m.Readable.from([Buffer.from("page")])));
     deletePrefix.mockReset().mockResolvedValue(undefined);
   });
 
@@ -158,6 +163,64 @@ describe("pdf-to-image single file clears what a failed run wrote (#2158)", () =
     expect(res.statusCode).toBe(400);
     expect(putObject).not.toHaveBeenCalled();
     expect(deletePrefix).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("pdf-to-image batch clears what a failed file wrote (#2265)", () => {
+  beforeEach(() => {
+    putObject.mockReset().mockResolvedValue(undefined);
+    getObjectBuffer.mockReset().mockResolvedValue(Buffer.from("page"));
+    deletePrefix.mockReset().mockResolvedValue(undefined);
+  });
+
+  async function convertBatch(app: Awaited<ReturnType<typeof buildApp>>) {
+    const boundary = "----batch";
+    const body = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="a.pdf"\r\nContent-Type: application/pdf\r\n\r\n`,
+      ),
+      PDF,
+      Buffer.from(
+        `\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="b.pdf"\r\nContent-Type: application/pdf\r\n\r\n`,
+      ),
+      PDF,
+      Buffer.from(
+        `\r\n--${boundary}\r\nContent-Disposition: form-data; name="settings"\r\n\r\n${JSON.stringify({ dpi: 36 })}\r\n--${boundary}--\r\n`,
+      ),
+    ]);
+    return app.inject({
+      method: "POST",
+      url: apiToolPath("pdf-to-image") + "/batch",
+      payload: body,
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+    });
+  }
+
+  it("clears a document's prefix when it fails mid-render, leaving the batch to continue", async () => {
+    let writes = 0;
+    putObject.mockImplementation(async (key: string) => {
+      // PDF fixture is 3 pages. Fail on the second file's first page (which is the 5th write,
+      // since file 1 has 3 pages + 1 zip = 4 writes. Actually, putObject is called for pages first.
+      // For file 1: page 1, 2, 3, then zip.
+      // So writes = 4 is the zip for file 1. writes = 5 is page 1 of file 2.
+      if (++writes === 5) throw new Error("disk hiccup");
+    });
+    const app = await buildApp();
+    const res = await convertBatch(app);
+
+    // One file succeeded, one failed. The batch as a whole returns 200 with the ZIP containing the success.
+    expect(res.statusCode).toBe(200);
+
+    const prefixes = writtenPrefixes();
+    expect(prefixes.length).toBeGreaterThan(0);
+    // The second file failed mid-render. Its prefix should be deleted.
+    // The prefix for the second file is outputs/<jobId>-f1
+    const deletedPrefixes = deletePrefix.mock.calls.map(([key]) => key);
+    expect(deletedPrefixes.length).toBe(2);
+    expect(deletedPrefixes.some((p) => p.match(/outputs\/[a-f0-9-]{36}-f1$/))).toBe(true);
+    expect(deletedPrefixes.some((p) => p.match(/outputs\/[a-f0-9-]{36}-f0$/))).toBe(true);
+
     await app.close();
   });
 });
