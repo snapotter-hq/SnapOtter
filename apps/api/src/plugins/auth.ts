@@ -105,13 +105,14 @@ async function upgradeLegacyPasswordHash(
   userId: string,
   verifiedHash: string,
   password: string,
-): Promise<void> {
+): Promise<string | undefined> {
   try {
     const upgraded = await hashPassword(normalizePassword(password));
     await db
       .update(schema.users)
       .set({ passwordHash: upgraded })
       .where(and(eq(schema.users.id, userId), eq(schema.users.passwordHash, verifiedHash)));
+    return upgraded;
   } catch (err) {
     request.log.warn({ err, userId }, "Could not upgrade a password hash to its normalized form");
     // request.log has no Sentry bridge, and a fault that persists leaves the other
@@ -721,7 +722,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       // Before the MFA branch, which never sees the password again.
       if (legacy) {
-        await upgradeLegacyPasswordHash(request, user.id, user.passwordHash, body.password);
+        const upgraded = await upgradeLegacyPasswordHash(
+          request,
+          user.id,
+          user.passwordHash,
+          body.password,
+        );
+        if (upgraded) {
+          user.passwordHash = upgraded;
+        }
       }
 
       // Two failures used to share one silent catch here and they want

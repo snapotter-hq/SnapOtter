@@ -296,6 +296,7 @@ export function resolveExternalLoginMfaOutcome(
 export async function beginForcedEnrollment(user: {
   id: string;
   username: string;
+  passwordHash: string | null;
 }): Promise<{ enrollmentToken: string; uri: string; recoveryCodes: string[] } | null> {
   const mfaLicensed = await isEnterpriseFeatureEnabled("mfa");
   if (!mfaLicensed) return null;
@@ -315,7 +316,16 @@ export async function beginForcedEnrollment(user: {
     .where(eq(schema.users.id, user.id));
 
   const enrollmentToken = randomUUID();
-  await sharedRedis().setex(`mfa:enroll:${enrollmentToken}`, MFA_CHALLENGE_TTL_SECONDS, user.id);
+  let payload = user.id;
+  if (user.passwordHash) {
+    const { createHash } = await import("node:crypto");
+    const hashFingerprint = createHash("sha256")
+      .update(user.passwordHash)
+      .digest("hex")
+      .substring(0, 16);
+    payload = `${user.id}:${hashFingerprint}`;
+  }
+  await sharedRedis().setex(`mfa:enroll:${enrollmentToken}`, MFA_CHALLENGE_TTL_SECONDS, payload);
   return { enrollmentToken, uri: totp.toString(), recoveryCodes };
 }
 
@@ -576,11 +586,38 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: dbUser.id,
-        expiresAt,
+      const inserted = await db.transaction(async (tx) => {
+        const [lockedUser] = await tx
+          .select({ passwordHash: schema.users.passwordHash })
+          .from(schema.users)
+          .where(eq(schema.users.id, dbUser.id))
+          .for("share");
+
+        if (hashFingerprint) {
+          const { createHash } = await import("node:crypto");
+          const freshFingerprint = lockedUser?.passwordHash
+            ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
+            : null;
+          if (freshFingerprint !== hashFingerprint) return false;
+        } else if (lockedUser?.passwordHash !== dbUser.passwordHash) {
+          return false;
+        }
+
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: dbUser.id,
+          expiresAt,
+        });
+
+        return true;
       });
+
+      if (!inserted) {
+        return reply.status(401).send({
+          error: "MFA challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
 
       await audit(recoveryUsed ? "MFA_RECOVERY_USED" : "MFA_VERIFIED", {
         userId: dbUser.id,
@@ -630,15 +667,50 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const { enrollmentToken, code } = parsed.data;
 
       const redis = sharedRedis();
-      const userId = await redis.get(`mfa:enroll:${enrollmentToken}`);
-      if (!userId) {
+      const payload = await redis.get(`mfa:enroll:${enrollmentToken}`);
+      if (!payload) {
         return reply.status(401).send({
           error: "Enrollment challenge expired or invalid",
           code: "MFA_EXPIRED",
         });
       }
 
+      const [userId, hashFingerprint] = payload.split(":");
+
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+
+      if (hashFingerprint) {
+        if (!dbUser?.passwordHash) {
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_removed",
+          });
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+
+        const { createHash } = await import("node:crypto");
+        const currentFingerprint = createHash("sha256")
+          .update(dbUser.passwordHash)
+          .digest("hex")
+          .substring(0, 16);
+        if (currentFingerprint !== hashFingerprint) {
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_changed",
+          });
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+      }
       if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
         return reply.status(401).send({
           error: "User not found or MFA not configured",
@@ -685,11 +757,39 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       // Create a session, same as the complete route's login completion.
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: dbUser.id,
-        expiresAt,
+
+      const inserted = await db.transaction(async (tx) => {
+        const [lockedUser] = await tx
+          .select({ passwordHash: schema.users.passwordHash })
+          .from(schema.users)
+          .where(eq(schema.users.id, dbUser.id))
+          .for("share");
+
+        if (hashFingerprint) {
+          const { createHash } = await import("node:crypto");
+          const freshFingerprint = lockedUser?.passwordHash
+            ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
+            : null;
+          if (freshFingerprint !== hashFingerprint) return false;
+        } else if (lockedUser?.passwordHash !== dbUser.passwordHash) {
+          return false;
+        }
+
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: dbUser.id,
+          expiresAt,
+        });
+
+        return true;
       });
+
+      if (!inserted) {
+        return reply.status(401).send({
+          error: "Enrollment challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
 
       await audit("MFA_ENROLLED", { userId: dbUser.id, username: dbUser.username });
       await audit("LOGIN_SUCCESS", { userId: dbUser.id, username: dbUser.username });
