@@ -7,8 +7,10 @@
  *
  * All tests are tagged @mobile so the device projects' grep filter picks them up.
  */
+
+import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { expect, test, uploadTestImage, waitForProcessing } from "./helpers";
+import { expect, getE2eRunRoot, test, uploadTestImage, waitForProcessing } from "./helpers";
 
 // Six Letter pages: enough thumbnails to be taller than a phone's preview area.
 const ORGANIZE_PDF_FIXTURE = path.join(
