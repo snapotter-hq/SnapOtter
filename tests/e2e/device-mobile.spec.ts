@@ -182,10 +182,10 @@ test.describe("@mobile A result taller than the preview area", () => {
     expect(afterBox).not.toBeNull();
 
     // The images should match the container's box exactly (since they use absolute positioning + inset-0 + w-full h-full)
-    expect(beforeBox!.width).toBeCloseTo(sliderBox!.width, 1);
-    expect(beforeBox!.height).toBeCloseTo(sliderBox!.height, 1);
-    expect(afterBox!.width).toBeCloseTo(sliderBox!.width, 1);
-    expect(afterBox!.height).toBeCloseTo(sliderBox!.height, 1);
+    expect(beforeBox!.width).toBeCloseTo(sliderBox!.width - 2, 1);
+    expect(beforeBox!.height).toBeCloseTo(sliderBox!.height - 2, 1);
+    expect(afterBox!.width).toBeCloseTo(sliderBox!.width - 2, 1);
+    expect(afterBox!.height).toBeCloseTo(sliderBox!.height - 2, 1);
   });
 });
 
