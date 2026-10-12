@@ -19,7 +19,12 @@ const PROTO_HEADER = "\u0000proto\u0000";
  * raw header names, not against what the sentinel restores to.
  */
 export function parseCsvWithHeader(text: string): ParseResult<Record<string, unknown>> {
-  const parsed = Papa.parse<Record<string, unknown>>(text, {
+  // Papa renames duplicate headers on the very first row before applying skipEmptyLines.
+  // A leading completely blank line becomes the "header" it deduplicates, bypassing the
+  // real header row. We strip leading blank lines so Papa sees the real header first.
+  const cleanedText = text.replace(/^[\r\n]+/, "");
+
+  const parsed = Papa.parse<Record<string, unknown>>(cleanedText, {
     header: true,
     skipEmptyLines: true,
     transformHeader: (header) => (header === "__proto__" ? PROTO_HEADER : header),
@@ -89,6 +94,13 @@ export function csvParseFailure(parsed: Pick<ParseResult<unknown>, "data" | "err
   const rows = parsed.data as unknown[];
   const fields = parsed.meta.fields;
   if (rows.length === 0 && !fields?.length) return "The file has no rows";
+
+  if (fields) {
+    const uniqueFields = new Set(fields);
+    if (uniqueFields.size !== fields.length) {
+      return "The file has duplicate column headers";
+    }
+  }
 
   const singleColumn = fields
     ? fields.length === 1

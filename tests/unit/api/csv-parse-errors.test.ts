@@ -74,4 +74,10 @@ describe("csvParseFailure", () => {
   it("returns null when there are no errors", () => {
     expect(csvParseFailure({ data: [["a", "b"]], errors: [], meta: meta() })).toBeNull();
   });
+
+  it("refuses a file with duplicate column headers", () => {
+    expect(csvParseFailure({ data: [], errors: [], meta: meta(["a", "a"]) })).toBe(
+      "The file has duplicate column headers",
+    );
+  });
 });

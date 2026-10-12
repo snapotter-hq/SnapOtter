@@ -45,6 +45,13 @@ describe("parseCsvWithHeader", () => {
     expect(JSON.stringify(data[0])).toBe('{"__proto__":"1","__proto___1":"2","x":"3"}');
   });
 
+  it("strips leading blank lines to preserve Papa's deduplication logic (#2268)", () => {
+    const { data, meta } = parseCsvWithHeader("\n\n\ra,a,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["a", "a_1", "x"]);
+    expect(JSON.stringify(data[0])).toBe('{"a":"1","a_1":"2","x":"3"}');
+  });
+
   // Papa checks its rename candidates against the raw header names, so the second
   // copy could restore onto a name a real column already has and silently replace it.
   it.each([
