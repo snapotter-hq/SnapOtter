@@ -332,7 +332,7 @@ function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint
 
   // An explicit {label, value} shape wins: the file named its fields, so don't
   // second-guess it by sniffing the other keys.
-  if (objects.every((item) => "value" in item)) {
+  if (objects.every((item) => Object.hasOwn(item, "value"))) {
     return objects.map((item) => {
       const value = numericCell(item.value);
       if (value === null) {
@@ -343,7 +343,7 @@ function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint
           `Chart Maker needs every "value" to be a number, and ${shown.slice(0, 60)} is not.`,
         );
       }
-      return { label: toCell(item.label).trim(), value };
+      return { label: toCell(Object.hasOwn(item, "label") ? item.label : undefined).trim(), value };
     });
   }
 
@@ -354,7 +354,9 @@ function pointsFromJsonArray(items: unknown[], skipped?: SkippedRows): DataPoint
   return tableToPoints(
     {
       header: keys,
-      rows: objects.map((item) => keys.map((key) => toCell(item[key]))),
+      rows: objects.map((item) =>
+        keys.map((key) => toCell(Object.hasOwn(item, key) ? item[key] : undefined)),
+      ),
     },
     skipped,
   );
