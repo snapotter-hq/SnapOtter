@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { SafeError } from "@snapotter/shared";
+import { SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import { type ProgressCallback, toSidecarError } from "./bridge.js";
 import { runOcrRuntime } from "./ocr-runtime-dispatcher.js";
@@ -62,13 +62,17 @@ function resolveQuality(options: OcrOptions): OcrQuality {
 
 function assertFastLanguageSupported(quality: OcrQuality, language: string | undefined): void {
   if (quality === "fast" && language === "ko") {
-    throw new Error(FAST_KOREAN_UNSUPPORTED_REASON);
+    throw new ToolInputError(FAST_KOREAN_UNSUPPORTED_REASON);
   }
 }
 
 function parseAccurateResult(resultValue: unknown, quality: OcrQuality): OcrResult {
   if (typeof resultValue !== "object" || resultValue === null || Array.isArray(resultValue)) {
-    throw new Error("OCR runtime returned invalid metadata");
+    throw new SafeError("OCR runtime returned invalid metadata", {
+      kind: "bug",
+      code: "OCR_RUNTIME_INVALID_METADATA",
+      statusCode: 500,
+    });
   }
   const result = resultValue as Record<string, unknown>;
   if (result.success !== true) {
@@ -93,7 +97,11 @@ function parseAccurateResult(resultValue: unknown, quality: OcrQuality): OcrResu
     (result.modelVersion === undefined || typeof result.modelVersion === "string");
 
   if (!metadataValid) {
-    throw new Error("OCR runtime returned invalid metadata");
+    throw new SafeError("OCR runtime returned invalid metadata", {
+      kind: "bug",
+      code: "OCR_RUNTIME_INVALID_METADATA",
+      statusCode: 500,
+    });
   }
 
   if (result.requestedQuality !== quality || result.actualQuality !== quality) {
@@ -107,8 +115,13 @@ function parseAccurateResult(resultValue: unknown, quality: OcrQuality): OcrResu
     });
   }
   if (Buffer.byteLength(result.text as string, "utf8") > MAX_OCR_OUTPUT_BYTES) {
-    throw new Error(
+    throw new SafeError(
       `OCR runtime output exceeds the ${MAX_OCR_OUTPUT_BYTES.toLocaleString("en-US")} byte safety limit`,
+      {
+        kind: "operational",
+        code: "OCR_OUTPUT_TOO_LARGE",
+        statusCode: 500,
+      },
     );
   }
 
@@ -170,15 +183,15 @@ export async function extractText(
   const height = meta.height ?? 0;
   const pixels = width * height;
   if (!Number.isSafeInteger(pixels) || pixels <= 0) {
-    throw new Error("OCR input has invalid image dimensions");
+    throw new ToolInputError("OCR input has invalid image dimensions");
   }
   if (width > MAX_OCR_INPUT_DIMENSION || height > MAX_OCR_INPUT_DIMENSION) {
-    throw new Error(
+    throw new ToolInputError(
       `OCR input exceeds the ${MAX_OCR_INPUT_DIMENSION.toLocaleString("en-US")} pixel dimension safety limit`,
     );
   }
   if (pixels > MAX_OCR_INPUT_PIXELS) {
-    throw new Error(
+    throw new ToolInputError(
       `OCR input exceeds the ${MAX_OCR_INPUT_PIXELS.toLocaleString("en-US")} pixel safety limit`,
     );
   }
@@ -422,8 +435,13 @@ export async function extractPdfText(
     const ocr = parseAccurateResult(result, quality);
     const resultRecord = result as Record<string, unknown>;
     if (resultRecord.pages !== prepared.pages.length) {
-      throw new Error(
+      throw new SafeError(
         `PDF OCR runtime page count mismatch: expected ${prepared.pages.length}, received ${String(resultRecord.pages)}`,
+        {
+          kind: "bug",
+          code: "PDF_OCR_PAGE_MISMATCH",
+          statusCode: 500,
+        },
       );
     }
     onProgress?.(100, "Accurate PDF OCR complete");

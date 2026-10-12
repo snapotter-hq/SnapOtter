@@ -485,10 +485,22 @@ describe("extractText error and progress behavior", () => {
 
   it("propagates malformed accurate-runtime output", async () => {
     vi.mocked(runOcrRuntime).mockResolvedValueOnce(runtimeResponse("not an object"));
+    const promise1 = extractText(INPUT, "/tmp/ocr", { quality: "balanced" });
+    await expect(promise1).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "bug",
+      code: "OCR_RUNTIME_INVALID_METADATA",
+      statusCode: 500,
+    });
 
-    await expect(extractText(INPUT, "/tmp/ocr", { quality: "balanced" })).rejects.toThrow(
-      "invalid metadata",
-    );
+    vi.mocked(runOcrRuntime).mockResolvedValueOnce(runtimeResponse({ success: true }));
+    const promise2 = extractText(INPUT, "/tmp/ocr", { quality: "balanced" });
+    await expect(promise2).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "bug",
+      code: "OCR_RUNTIME_INVALID_METADATA",
+      statusCode: 500,
+    });
   });
 
   it("preserves multiline Unicode text", async () => {
