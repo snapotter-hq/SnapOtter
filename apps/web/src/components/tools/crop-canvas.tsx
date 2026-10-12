@@ -113,7 +113,7 @@ export function CropCanvas({
           // it. Without this a tall portrait renders at full natural height
           // and overflows the viewport. max-h-full doesn't help because the
           // ancestor chain isn't reliably height-bounded.
-          className="max-h-[calc(100dvh-12rem)]"
+          className="max-md:max-h-full md:max-h-[calc(100dvh-12rem)]"
           ruleOfThirds={showGrid}
         >
           <img
@@ -121,7 +121,7 @@ export function CropCanvas({
             src={imageSrc}
             alt={t.toolSettings["crop-canvas"].cropPreview}
             onLoad={handleImageLoad}
-            className="max-w-full max-h-[calc(100dvh-12rem)] select-none"
+            className="max-w-full max-md:max-h-full md:max-h-[calc(100dvh-12rem)] select-none"
             draggable={false}
           />
         </ReactCrop>
