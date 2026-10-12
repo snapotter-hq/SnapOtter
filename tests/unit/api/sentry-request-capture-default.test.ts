@@ -25,8 +25,20 @@ describe("a failing request on a default instance, tracing on (#1880)", () => {
   for (const [name, req] of Object.entries(REQUESTS)) {
     it(`sends no request data or secrets for the ${name} request`, async () => {
       const init = typeof req.init === "function" ? req.init() : req.init;
-      const { event, transactions, rawRequests } = await harness.send(req.path, init);
+      const { event, transactions, rawRequests, rawWebhookRequests } = await harness.send(
+        req.path,
+        init,
+      );
       expectNothingCollected(rawRequests);
+
+      if (name === "webhook") {
+        expect(rawWebhookRequests.length).toBeGreaterThan(0);
+        for (const webhookReq of rawWebhookRequests) {
+          expect(webhookReq).not.toMatch(/^sentry-trace:/im);
+          expect(webhookReq).not.toMatch(/^baggage:.*sentry-trace_id/im);
+        }
+      }
+
       expectNoSecrets(event, req.secrets);
       expect(event.request).toBeUndefined();
       for (const t of transactions) {
@@ -39,8 +51,17 @@ describe("a failing request on a default instance, tracing on (#1880)", () => {
 
 describe("a failing request after analytics is switched off, tracing on, default instance (#1898)", () => {
   it("sends nothing at all: no transaction, no error event, no other envelope", async () => {
-    const sent = await harness.sendOptedOut(REQUESTS.login.path, REQUESTS.login.init);
-    expect(sent).toEqual([]);
+    const { itemTypes, rawWebhookRequests } = await harness.sendOptedOut(
+      REQUESTS.webhook.path,
+      REQUESTS.webhook.init,
+    );
+    expect(itemTypes).toEqual([]);
+
+    expect(rawWebhookRequests.length).toBeGreaterThan(0);
+    for (const webhookReq of rawWebhookRequests) {
+      expect(webhookReq).not.toMatch(/^sentry-trace:/im);
+      expect(webhookReq).not.toMatch(/^baggage:.*sentry-trace_id/im);
+    }
   });
 
   it("sends again once analytics is back on", async () => {

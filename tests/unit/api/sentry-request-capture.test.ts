@@ -80,8 +80,19 @@ describe("a failing request on a diagnostic instance, tracing off (#1880)", () =
   });
 
   it("ships no webhook token from the path of an outgoing call (#1899)", async () => {
-    const { event } = await harness.send(REQUESTS.webhook.path, REQUESTS.webhook.init);
+    const { event, rawWebhookRequests } = await harness.send(
+      REQUESTS.webhook.path,
+      REQUESTS.webhook.init,
+    );
     expectNoSecrets(event, REQUESTS.webhook.secrets);
+
+    // Check that outbound webhook calls don't carry tracing headers (#1925)
+    expect(rawWebhookRequests.length).toBeGreaterThan(0);
+    for (const req of rawWebhookRequests) {
+      expect(req).not.toMatch(/^sentry-trace:/im);
+      expect(req).not.toMatch(/^baggage:.*sentry-trace_id/im);
+    }
+
     // Both webhook calls (node:http and fetch) still show up, by host and status.
     const http = (event.breadcrumbs as Array<{ category?: string; data?: Payload }>).filter(
       (b) => b.category === "http",

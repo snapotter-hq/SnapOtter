@@ -80,6 +80,7 @@ if (dsn && !telemetryEnvKilled()) {
       // envelope while analytics is off; the hooks stay as a second line for
       // events and transactions (#1919).
       transport: buildGatedTransport(sentryActive, Sentry.makeNodeTransport),
+      tracePropagationTargets: [],
     });
 
     console.log(
