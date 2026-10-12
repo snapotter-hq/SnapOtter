@@ -28,9 +28,15 @@ const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 // to this set avoids eating version strings ("2.2.0") and code filenames
 // ("rounded-crop.ts"), which carry no user data and aid triage. Unicode-aware
 // (\p{L} + the u flag) so a non-ASCII user filename (CJK, Arabic) is masked too.
+// Matches up to 80 chars of name, which can include spaces.
 const USER_FILE_EXT =
   "jpe?g|png|gif|webp|avif|heif?|tiff?|bmp|svg|raw|psd|mp4|mov|avi|mkv|webm|flv|wmv|m4v|mp3|wav|flac|aac|ogg|m4a|opus|pdf|docx?|xlsx?|pptx?|odt|ods|odp|txt|csv|epub|zip";
-const FILE_RE = new RegExp(`[\\p{L}\\p{N}_-]{1,80}\\.(?:${USER_FILE_EXT})`, "giu");
+const ERROR_PREFIXES =
+  "cannot|could|not|fail(?:ed|s)?|error|warning|info|debug|fatal|critical|trace|open|read|write|stat|unlink|copy|move|upload(?:ing|ed)?|download(?:ing|ed)?|process(?:ing|ed)?|load(?:ing|ed)?|pars(?:e|ing|ed)|invalid|bad|missing|found|file|directory|path|image|video|audio|document|pdf|from|to|in|on|at|for|of|with|a|an|the|is|was|are|were";
+const FILE_RE = new RegExp(
+  `(?<=^|\\s)(?!(?:${ERROR_PREFIXES})\\b)(?:[\\p{L}\\p{N}_-]| (?=[\\p{L}\\p{N}_-])){1,80}\\.(?:${USER_FILE_EXT})\\b`,
+  "giu",
+);
 const QUOTED_RE = /(['"])(.{24,}?)\1/g;
 const HEX_RE = /\b[0-9a-fA-F]{16,}\b/g;
 const MAX_LEN = 300;

@@ -8,6 +8,9 @@ describe("redactMessage (default)", () => {
   it("masks a user filename token by known extension", () => {
     expect(redactMessage("cannot read family_photo.JPG")).toBe("cannot read <file>");
   });
+  it("masks a user filename with spaces", () => {
+    expect(redactMessage("write failed for My Holiday Photo.jpg")).toBe("write failed for <file>");
+  });
   it("keeps a source filename (code extension, not a user file)", () => {
     expect(redactMessage("failed in rounded-crop.ts")).toBe("failed in rounded-crop.ts");
   });
