@@ -1350,32 +1350,54 @@ export function useToolProcessor(toolId: string) {
           { fileResults, fileNotes, reason, status }: ZipSettle,
         ) => {
           settling = true;
-          const extracted = await unpackBatchZip(zipBlob, { status, toolId });
-          // The unpack awaits: a cancel or a newer run may have ended this
-          // one meanwhile, and its writes would land on that run's state.
-          if (activeJobIdRef.current !== clientJobId) return;
-          if (storeWasReset()) return;
-          if (!extracted) {
-            failRun("Batch processing failed", reason);
-            return;
+          const entriesCount = useFileStore.getState().entries.length;
+          // #1240: Unpacking a massive ZIP into memory fails the client with RangeError.
+          // Above a threshold, skip extraction and just keep the ZIP as the batch result.
+          const skipExtraction = entriesCount >= 100 || zipBlob.size > 50 * 1024 * 1024;
+          let extracted: Record<string, Uint8Array> | null = null;
+
+          if (!skipExtraction) {
+            extracted = await unpackBatchZip(zipBlob, { status, toolId });
+            // The unpack awaits: a cancel or a newer run may have ended this
+            // one meanwhile, and its writes would land on that run's state.
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
+            if (!extracted) {
+              failRun("Batch processing failed", reason);
+              return;
+            }
+          } else {
+            // Still need to respect cancel across the async tick
+            await new Promise((r) => setTimeout(r, 0));
+            if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
           }
-          // Only a ZIP that opened is kept as the batch's download.
+
+          // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
           setBatchZip(zipBlob, `batch-${toolId}.zip`);
 
           const entries = useFileStore.getState().entries;
           for (let i = 0; i < entries.length; i++) {
             const processedName = fileResults[String(i)];
-            if (processedName && extracted[processedName]) {
-              const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
-              const blobType = MIME_BY_EXT[ext];
-              const blob = new Blob(
-                [extracted[processedName] as BlobPart],
-                blobType ? { type: blobType } : undefined,
-              );
+            if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
+              let processedUrl = null;
+              let processedSize = null;
+
+              if (extracted && extracted[processedName]) {
+                const ext = processedName.split(".").pop()?.toLowerCase() ?? "";
+                const blobType = MIME_BY_EXT[ext];
+                const blob = new Blob(
+                  [extracted[processedName] as BlobPart],
+                  blobType ? { type: blobType } : undefined,
+                );
+                processedUrl = URL.createObjectURL(blob);
+                processedSize = blob.size;
+              }
+
               updateEntry(i, {
-                processedUrl: URL.createObjectURL(blob),
+                processedUrl,
                 processedFilename: processedName,
-                processedSize: blob.size,
+                processedSize,
                 // Batch results come from the ZIP, not a server preview; clear any
                 // stale processedPreviewUrl so an earlier single run's preview
                 // can't win over this result (displayUrl prefers it) (#746).

@@ -666,7 +666,7 @@ export function ToolPage() {
     (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
 
   const hasFile = files.length > 0;
-  const hasProcessed = !!processedUrl;
+  const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const isProcessing = currentEntry?.status === "processing";
   const displayMode = registryEntry.displayMode;
   const isNoDropzone = displayMode === "no-dropzone";
@@ -739,6 +739,38 @@ export function ToolPage() {
 
   // Render the image viewer based on display mode
   function renderImageArea() {
+    const conversionCompleteCard = (
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
+            <CheckCircle2 className="h-8 w-8 text-success-ink" />
+          </div>
+          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
+          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
+          {processedSize != null && (
+            <p className="text-xs text-muted-foreground">
+              {processedFileType} &middot; {formatFileSize(processedSize)}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+
+    // A processed result with no renderable preview must not fall back to the
+    // original. Handled early so document/media-player views also catch it.
+    if (
+      shouldShowConversionCard({
+        hasProcessed,
+        isProcessedPreviewable,
+        processedPreviewUrl,
+        originalBlobUrl,
+        displayMode,
+        hasImageWrapperStyle: imageWrapperStyle != null,
+      })
+    ) {
+      return conversionCompleteCard;
+    }
+
     if (isNoDropzone) {
       if (registryEntry?.ResultsPanel) {
         const Panel = registryEntry.ResultsPanel;
@@ -810,7 +842,9 @@ export function ToolPage() {
 
       if (!isNativeVideo && currentExt) {
         const previewFile = hasProcessed ? undefined : currentEntry?.file;
-        const previewSrc = hasProcessed ? (processedUrl ?? originalBlobUrl) : undefined;
+        const previewSrc = hasProcessed
+          ? (processedUrl ?? originalBlobUrl ?? undefined)
+          : undefined;
         const previewSize = hasProcessed
           ? (currentEntry?.processedSize ?? null)
           : (currentEntry?.file?.size ?? 0);
@@ -999,41 +1033,6 @@ export function ToolPage() {
           </Suspense>
         );
       }
-    }
-
-    const conversionCompleteCard = (
-      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
-        <div className="m-auto text-center p-8 max-w-xs">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
-            <CheckCircle2 className="h-8 w-8 text-success-ink" />
-          </div>
-          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
-          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
-          {processedSize != null && (
-            <p className="text-xs text-muted-foreground">
-              {processedFileType} &middot; {formatFileSize(processedSize)}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-
-    // A processed result with no renderable preview must not fall back to the
-    // original: the branches below render displayUrl as the result, so they
-    // would otherwise show the untouched original under the processed filename
-    // and size (#746). The live-preview + imageWrapperStyle branch is excluded
-    // (WYSIWYG CSS simulation, or #713 input-overlay handling).
-    if (
-      shouldShowConversionCard({
-        hasProcessed,
-        isProcessedPreviewable,
-        processedPreviewUrl,
-        originalBlobUrl,
-        displayMode,
-        hasImageWrapperStyle: imageWrapperStyle != null,
-      })
-    ) {
-      return conversionCompleteCard;
     }
 
     if (
@@ -1304,7 +1303,7 @@ export function ToolPage() {
           </button>
         )}
 
-        {hasProcessed && processedSize != null && (
+        {hasProcessed && (processedSize != null || batchTotal > 1) && (
           <div className="animate-fade-in">
             <ReviewPanel
               filename={processedFileName}

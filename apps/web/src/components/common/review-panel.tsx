@@ -67,10 +67,10 @@ async function uploadFailure(res: Response): Promise<SaveFailure> {
 
 interface ReviewPanelProps {
   filename: string;
-  fileSize: number;
+  fileSize: number | null;
   fileType: string;
   originalSize: number;
-  downloadUrl: string;
+  downloadUrl: string | null;
   onUndo: () => void;
   onStartOver: () => void;
   currentToolId: string;
@@ -101,6 +101,7 @@ export function ReviewPanel({
   const isMultiOutput = MULTI_OUTPUT_TOOLS.has(currentToolId);
 
   const sizeDelta = useMemo(() => {
+    if (fileSize == null) return 0;
     if (!originalSize || originalSize === 0) return 0;
     return Math.round((1 - fileSize / originalSize) * 100);
   }, [originalSize, fileSize]);
@@ -109,12 +110,12 @@ export function ReviewPanel({
     import("@/lib/analytics").then(({ track }) => {
       track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: currentToolId });
     });
-    triggerDownload(downloadUrl, filename);
+    if (downloadUrl) triggerDownload(downloadUrl, filename);
     useFileStore.getState().claimSelected();
   };
 
   // Per result, keyed by its URL, in a store that outlives this panel (#1502).
-  const saveState = useSaveToFilesStore((s) => s.byUrl[downloadUrl]);
+  const saveState = useSaveToFilesStore((s) => (downloadUrl ? s.byUrl[downloadUrl] : undefined));
   const saveStatus = saveState?.status ?? "idle";
   const saveFailure = saveState?.status === "error" ? saveState.failure : "generic";
 
@@ -124,6 +125,7 @@ export function ReviewPanel({
     // must land on the result that was actually saved.
     const claimIndex = useFileStore.getState().selectedIndex;
     const url = downloadUrl;
+    if (!url) return;
     const saves = useSaveToFilesStore.getState();
     saves.saving(url);
     let failure: SaveFailure = "generic";
@@ -211,7 +213,7 @@ export function ReviewPanel({
       )}
 
       {/* Size delta -- hidden for data-output tools */}
-      {!isDataOutput && originalSize > 0 && (
+      {!isDataOutput && originalSize > 0 && fileSize != null && (
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t.toolPage.original}</span>
@@ -219,7 +221,7 @@ export function ReviewPanel({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t.toolPage.processed}</span>
-            <span className="tabular-nums text-foreground">{formatFileSize(fileSize)}</span>
+            <span className="tabular-nums text-foreground">{formatFileSize(fileSize ?? 0)}</span>
           </div>
           {/* Only claim "Saved" when the output is actually smaller; growth or
               no-change is already visible from the Original/Processed sizes above. */}
@@ -239,18 +241,20 @@ export function ReviewPanel({
             <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
             <span className="text-muted-foreground">{t.toolPage.dataResultsHint}</span>
           </div>
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="w-full text-center text-xs text-primary-ink hover:text-primary-ink-strong underline underline-offset-2"
-          >
-            {t.toolPage.downloadAsFile}
-          </button>
+          {downloadUrl != null && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="w-full text-center text-xs text-primary-ink hover:text-primary-ink-strong underline underline-offset-2"
+            >
+              {t.toolPage.downloadAsFile}
+            </button>
+          )}
         </>
       )}
 
       {/* Download button -- primary for non-data tools */}
-      {!isDataOutput && (
+      {!isDataOutput && downloadUrl != null && (
         <button
           type="button"
           data-download-button
@@ -259,15 +263,15 @@ export function ReviewPanel({
         >
           <Download className="h-4 w-4" />
           {isMultiOutput
-            ? format(t.reviewPanel.downloadAllZipSize, { size: formatFileSize(fileSize) })
+            ? format(t.reviewPanel.downloadAllZipSize, { size: formatFileSize(fileSize ?? 0) })
             : hasBatchStats && successCount != null && successCount > 1
               ? format(t.reviewPanel.downloadFilesZipSize, {
                   count: successCount,
-                  size: formatFileSize(fileSize),
+                  size: formatFileSize(fileSize ?? 0),
                 })
               : format(t.reviewPanel.downloadTypeSize, {
                   type: fileType,
-                  size: formatFileSize(fileSize),
+                  size: formatFileSize(fileSize ?? 0),
                 })}
         </button>
       )}
@@ -285,7 +289,7 @@ export function ReviewPanel({
       )}
 
       {/* Save to Files -- subtle text link */}
-      {!isDataOutput && !savedLibraryFileId && (
+      {!isDataOutput && !savedLibraryFileId && downloadUrl != null && (
         <div className="flex justify-center">
           <button
             type="button"
