@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { ensureAnonymousUser, hashPassword } from "../../../apps/api/src/plugins/auth.js";
+import {
+  ensureAnonymousUser,
+  ensureDefaultAdmin,
+  hashPassword,
+} from "../../../apps/api/src/plugins/auth.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -184,5 +188,52 @@ describe("admin pipeline operations", () => {
     expect(
       body.pipelines.some((p: { name: string }) => p.name === "integration-test-pipeline"),
     ).toBe(true);
+  });
+});
+
+describe("ensureDefaultAdmin after ensureAnonymousUser (#2334)", () => {
+  it("creates the default admin and allows sign-in when only the anonymous user exists", async () => {
+    await db.delete(schema.users).where(ne(schema.users.id, "anonymous"));
+    await ensureAnonymousUser();
+
+    const beforeUsers = await db.select().from(schema.users);
+    expect(beforeUsers.map((u) => u.id)).toEqual(["anonymous"]);
+
+    await ensureDefaultAdmin();
+
+    const [adminRow] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "admin"));
+    expect(adminRow).toBeDefined();
+
+    const [anonRow] = await db.select().from(schema.users).where(eq(schema.users.id, "anonymous"));
+    expect(anonRow).toBeDefined();
+
+    const anonPipelines = await db
+      .select()
+      .from(schema.pipelines)
+      .where(eq(schema.pipelines.userId, "anonymous"));
+    expect(anonPipelines.length).toBeGreaterThan(0);
+
+    const anonFiles = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.userId, "anonymous"));
+    expect(anonFiles.length).toBeGreaterThan(0);
+
+    await ensureDefaultAdmin();
+    const afterSecondCall = await db.select().from(schema.users);
+    expect(afterSecondCall).toHaveLength(2);
+
+    const token = await loginAsAdmin(app);
+    expect(typeof token).toBe("string");
+    expect(token.length).toBeGreaterThan(0);
+
+    await db
+      .update(schema.users)
+      .set({ mustChangePassword: false })
+      .where(eq(schema.users.username, "admin"));
+    adminToken = token;
   });
 });

@@ -131,6 +131,28 @@ describe("ensureDefaultAdmin", () => {
     await expect(ensureDefaultAdmin()).resolves.toBeUndefined();
     expect(store.values).not.toHaveBeenCalled();
   });
+
+  it("creates the admin when only the synthetic anonymous user exists (#2334)", async () => {
+    store.users = [{ id: "anonymous" }];
+
+    await ensureDefaultAdmin();
+
+    expect(store.values).toHaveBeenCalledTimes(1);
+    expect(store.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: env.DEFAULT_USERNAME,
+        role: "admin",
+      }),
+    );
+  });
+
+  it("leaves an established install alone when a real user exists alongside the anonymous user (#2334)", async () => {
+    store.users = [{ id: "anonymous" }, { id: "existing-admin" }];
+    env.DEFAULT_PASSWORD = `stale-value\n${"a".repeat(PASSWORD_MAX_LENGTH)}`;
+
+    await expect(ensureDefaultAdmin()).resolves.toBeUndefined();
+    expect(store.values).not.toHaveBeenCalled();
+  });
 });
 
 describe("API startup (#2333)", () => {
