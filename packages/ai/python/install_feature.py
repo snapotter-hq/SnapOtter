@@ -407,6 +407,9 @@ def ensure_hf_hub(venv_path: str) -> None:
         # The finder caches the venv's site-packages listing; drop it so the
         # just-installed package is visible to the import in download_with_hf_hub.
         importlib.invalidate_caches()
+    except subprocess.CalledProcessError as e:
+        err_msg = (e.stderr or "").strip()
+        emit_progress(1, f"Accelerated client unavailable (pip failed: {err_msg}); using resumable download.")
     except Exception as e:
         emit_progress(1, f"Accelerated client unavailable ({e}); using resumable download.")
 
@@ -1291,13 +1294,17 @@ def apply_fixups(staging_dir: str, venv_path: str) -> None:
     for wheel in wheels:
         pkg_name = wheel.split("-")[0]
         try:
-            subprocess.run(
+            proc = subprocess.run(
                 [python_path, "-m", "pip", "install", "--no-index",
                  f"--find-links={fixups_dir}", pkg_name],
                 capture_output=True, text=True, timeout=60,
             )
-        except Exception:
-            pass  # Non-fatal
+            if proc.returncode != 0:
+                sys.stderr.write(f"[install] WARNING: fixup {pkg_name} failed to install: {proc.stderr}\n")
+                sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write(f"[install] WARNING: fixup {pkg_name} failed to execute: {e}\n")
+            sys.stderr.flush()
 
 
 # -- installed.json management --
@@ -1310,7 +1317,9 @@ def read_installed(ai_dir: str) -> dict:
     try:
         with open(path, "r") as f:
             return json.load(f)
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as e:
+        sys.stderr.write(f"[install] WARNING: Could not read installed.json ({e}); starting fresh and overwriting.\n")
+        sys.stderr.flush()
         return {"bundles": {}}
 
 
@@ -1596,6 +1605,47 @@ def _install() -> None:
                     venv_writing_marker, bundle_id,
                 )
                 fail("Installation verification timed out. Please retry the install.")
+
+            # Auto-remediation for native linux/LXC users without CUDA libraries
+            if proc.returncode != 0 and "onnxruntime" in smoke_imports:
+                stderr_output = (proc.stderr or "")
+                # onnxruntime-gpu on CPU-only Debian/Ubuntu fails to load its C extensions
+                # resulting in missing attributes or missing libcudart/libcudnn errors.
+                if "AttributeError" in stderr_output and "SessionOptions" in stderr_output or "libcudart" in stderr_output or "libcudnn" in stderr_output:
+                    emit_progress(99, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
+                    fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "onnxruntime==1.20.1"]
+                    subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
+
+                    # Re-run smoke test after fallback
+                    proc = subprocess.run(
+                        [venv_python, "-c", import_stmt],
+                        capture_output=True, text=True, timeout=300,
+                    )
+
+            # Auto-remediation for broken cv2 (OpenCV conflict)
+            if proc.returncode != 0:
+                stderr_output = (proc.stderr or "")
+                # The bundle might contain conflicting cv2 binaries due to mediapipe vs rembg requirements
+                if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
+                    emit_progress(99, "OpenCV conflict detected; applying headless fallback...")
+                    fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
+                    subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
+
+                    # Clean up other opencv dist-info to prevent pip from getting confused
+                    clean_cmd = [venv_python, "-c",
+                        "import os, shutil, site; "
+                        "sp = site.getsitepackages()[0]; "
+                        "bad = [n for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and n.endswith('.dist-info')]; "
+                        "[shutil.rmtree(os.path.join(sp, n), ignore_errors=True) for n in bad]"
+                    ]
+                    subprocess.run(clean_cmd, capture_output=True, text=True, timeout=60)
+
+                    # Re-run smoke test after fallback
+                    proc = subprocess.run(
+                        [venv_python, "-c", import_stmt],
+                        capture_output=True, text=True, timeout=300,
+                    )
+
             if proc.returncode != 0:
                 shutil.rmtree(staging_dir, ignore_errors=True)
                 abandon_merge(
