@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { de } from "@snapotter/shared/i18n/de.js";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -47,7 +47,9 @@ describe("data-structure label sweep (#922)", () => {
     renderDe(<EyedropperOptions sampleSize={3} onSampleSizeChange={() => {}} />);
 
     const dropdown = await screen.findByTestId("sample-size-dropdown");
-    expect(dropdown).toHaveTextContent(de.editor.options.eyedropper.sampleAverage3);
+    await waitFor(() => {
+      expect(dropdown).toHaveTextContent(de.editor.options.eyedropper.sampleAverage3);
+    });
     fireEvent.click(dropdown);
     expect(screen.getByText(de.editor.options.eyedropper.samplePoint)).toBeInTheDocument();
     expect(screen.getByText(de.editor.options.eyedropper.sampleAverage5)).toBeInTheDocument();
@@ -58,7 +60,10 @@ describe("data-structure label sweep (#922)", () => {
   it("localizes toolbar tool names without the old map-variable shadowing", async () => {
     renderDe(<EditorToolbar />);
 
-    expect(await screen.findByTestId("tool-move")).toHaveAccessibleName(de.editor.toolbar.move);
+    const moveButton = await screen.findByTestId("tool-move");
+    await waitFor(() => {
+      expect(moveButton).toHaveAccessibleName(de.editor.toolbar.move);
+    });
     expect(screen.getByTestId("tool-crop")).toHaveAccessibleName(de.editor.toolbar.crop);
     expect(screen.queryByRole("button", { name: "Move" })).not.toBeInTheDocument();
   });
