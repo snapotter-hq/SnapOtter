@@ -140,4 +140,114 @@ describe("MFA window revoked by password change", () => {
         .where(eq(schema.settings.key, "mfaPolicy"));
     }
   });
+
+  it("rejects an MFA completion gracefully if the user is deleted mid-challenge (#2420)", async () => {
+    // 1. Create a user and enroll them in MFA
+    const username = `mfadel_${Date.now()}`;
+    const { token: userToken, userId } = await createUserAndLogin(
+      testApp.app,
+      username,
+      "user",
+      "Password1!",
+    );
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${userToken}` },
+    });
+    const enrollData = JSON.parse(enrollRes.body);
+    const totpCode = generateTotpCode(enrollData.uri);
+    const enrollConfirmRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${userToken}` },
+      payload: { code: totpCode },
+    });
+    expect(enrollConfirmRes.statusCode).toBe(200);
+
+    // 2. Start a login to get an MFA challenge
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: "Password1!" },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const loginData = JSON.parse(loginRes.body);
+    expect(loginData.requiresMfa).toBe(true);
+    const mfaToken = loginData.mfaToken;
+
+    // 3. Admin deletes the user
+    const delRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${userId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(delRes.statusCode).toBe(200);
+
+    // 4. Try to complete the MFA challenge
+    const completeCode = generateTotpCode(enrollData.uri);
+    const completeRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: completeCode },
+    });
+
+    // Should be rejected gracefully with 401, not 500 TypeError
+    expect(completeRes.statusCode).toBe(401);
+    const completeBody = JSON.parse(completeRes.body);
+    expect(completeBody.code).toBe("MFA_EXPIRED");
+  });
+
+  it("rejects a forced MFA enrollment completion gracefully if the user is deleted mid-challenge (#2420)", async () => {
+    // 1. Create a user
+    const username = `mfaforcedel_${Date.now()}`;
+    const { userId } = await createUserAndLogin(testApp.app, username, "user", "Password1!");
+
+    // 2. Set MFA policy to required
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+
+    try {
+      // 3. Login again. Because MFA is required, this should trigger forced enrollment
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password: "Password1!" },
+      });
+
+      const loginData = JSON.parse(loginRes.body);
+      if (!loginData.requiresMfaEnrollment) {
+        throw new Error("Expected requiresMfaEnrollment to be true, got body: " + loginRes.body);
+      }
+      const enrollmentToken = loginData.enrollmentToken;
+
+      // 4. Admin deletes the user
+      const delRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${userId}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(delRes.statusCode).toBe(200);
+
+      // 5. Try to complete the forced enrollment
+      const totpCode = generateTotpCode(loginData.uri);
+      const completeRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code: totpCode },
+      });
+
+      // Should be rejected gracefully with 401, not 500 TypeError
+      expect(completeRes.statusCode).toBe(401);
+      const completeBody = JSON.parse(completeRes.body);
+      expect(completeBody.code).toBe("MFA_EXPIRED");
+    } finally {
+      await db
+        .update(schema.settings)
+        .set({ value: "optional" })
+        .where(eq(schema.settings.key, "mfaPolicy"));
+    }
+  });
 });

@@ -495,6 +495,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       // Load user
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
 
+      if (!dbUser) {
+        return reply.status(401).send({
+          error: "MFA challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
+
       if (hashFingerprint) {
         if (!dbUser?.passwordHash) {
           const audit = auditFromRequest(request);
@@ -687,6 +694,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const [userId, hashFingerprint] = payload.split(":");
 
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+
+      if (!dbUser) {
+        return reply.status(401).send({
+          error: "Enrollment challenge expired or invalid",
+          code: "MFA_EXPIRED",
+        });
+      }
 
       if (hashFingerprint) {
         if (!dbUser?.passwordHash) {
