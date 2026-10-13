@@ -1210,7 +1210,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         passwordHash: schema.users.passwordHash,
         createdAt: schema.users.createdAt,
       })
-      .from(schema.users);
+      .from(schema.users)
+      .where(ne(schema.users.id, "anonymous"));
 
     // Build a team ID -> name lookup
     const allTeams = await db.select().from(schema.teams);
@@ -1867,7 +1868,7 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
               .select()
               .from(schema.users)
               .where(eq(schema.users.id, key.userId));
-            if (apiUser && !isDisabledRole(apiUser.role)) {
+            if (apiUser && apiUser.id !== "anonymous" && !isDisabledRole(apiUser.role)) {
               authAttempts.inc({ method: "apikey", result: "success" });
               const keyPermissions = key.permissions ?? undefined;
               (request as FastifyRequest & { user?: AuthUser }).user = {

@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { eq, ne } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
+  computeKeyPrefix,
   ensureAnonymousUser,
   ensureDefaultAdmin,
   hashPassword,
@@ -235,5 +237,75 @@ describe("ensureDefaultAdmin after ensureAnonymousUser (#2334)", () => {
       .set({ mustChangePassword: false })
       .where(eq(schema.users.username, "admin"));
     adminToken = token;
+  });
+});
+
+describe("leftover anonymous row when AUTH_ENABLED=true (#2461)", () => {
+  it("omits the synthetic anonymous row from GET /api/auth/users", async () => {
+    await ensureAnonymousUser();
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/auth/users",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as { users: Array<{ id: string; username: string }> };
+    expect(body.users.some((u) => u.id === "anonymous")).toBe(false);
+    expect(body.users.some((u) => u.username === "admin")).toBe(true);
+  });
+
+  it("does not count the synthetic anonymous row toward MAX_USERS on register", async () => {
+    await ensureAnonymousUser();
+    const realUsers = await db.select().from(schema.users).where(ne(schema.users.id, "anonymous"));
+    const origMaxUsers = env.MAX_USERS;
+    (env as Record<string, unknown>).MAX_USERS = realUsers.length + 1;
+
+    try {
+      const allowedRes = await app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: "anon-cap-allowed", password: "Testpass1!", role: "user" },
+      });
+      expect(allowedRes.statusCode).toBe(201);
+
+      const blockedRes = await app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: "anon-cap-blocked", password: "Testpass1!", role: "user" },
+      });
+      expect(blockedRes.statusCode).toBe(403);
+      expect(JSON.parse(blockedRes.body).code).toBe("USER_LIMIT_REACHED");
+    } finally {
+      (env as Record<string, unknown>).MAX_USERS = origMaxUsers;
+      await db.delete(schema.users).where(eq(schema.users.username, "anon-cap-allowed"));
+      await db.delete(schema.users).where(eq(schema.users.username, "anon-cap-blocked"));
+    }
+  });
+
+  it("refuses API keys owned by the synthetic anonymous user when AUTH_ENABLED=true", async () => {
+    await ensureAnonymousUser();
+    const rawKey = `si_anon_leftover_${randomUUID()}`;
+    const keyId = randomUUID();
+    await db.insert(schema.apiKeys).values({
+      id: keyId,
+      userId: "anonymous",
+      keyHash: await hashPassword(rawKey),
+      keyPrefix: computeKeyPrefix(rawKey),
+      name: "leftover-anonymous-key",
+    });
+
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${rawKey}` },
+      });
+      expect(res.statusCode).toBe(401);
+    } finally {
+      await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, keyId));
+    }
   });
 });
