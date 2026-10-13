@@ -3705,5 +3705,74 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         detail: "Group not found",
       });
     });
+
+    it("DELETE on the Default team returns SCIM 400 and leaves the team alone", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-del-default") });
+
+      const res = await crudApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/scim/v2/Groups/${DEFAULT_TEAM_ID}`,
+        headers: authHeaders(),
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Cannot delete the Default team",
+      });
+
+      const [teamRowDb] = await db
+        .select()
+        .from(schema.teams)
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      expect(teamRowDb).toBeDefined();
+      const memberRow = await userRow(member.id);
+      expect(memberRow?.team).toBe(DEFAULT_TEAM_ID);
+    });
+
+    it("PATCH remove member on the Default team returns SCIM 400", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-patch-del-default") });
+
+      const res = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Groups/${DEFAULT_TEAM_ID}`,
+        headers: authHeaders(),
+        payload: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations: [{ op: "remove", path: "members", value: [{ value: member.id }] }],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Cannot remove members from the Default team",
+      });
+
+      const memberRow = await userRow(member.id);
+      expect(memberRow?.team).toBe(DEFAULT_TEAM_ID);
+    });
+
+    it("PUT remove member on the Default team returns SCIM 400", async () => {
+      await createScimUser({ userName: uniqueName("scim-put-del-default") });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Groups/${DEFAULT_TEAM_ID}`,
+        headers: authHeaders(),
+        payload: {
+          displayName: "Default",
+          members: [],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toMatchObject({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Cannot remove members from the Default team",
+      });
+    });
   });
 });

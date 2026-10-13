@@ -1260,6 +1260,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const body = parsed.data;
       const displayName = body.displayName?.trim();
 
+      const isDefaultTeam = id === schema.DEFAULT_TEAM_ID || existing.name === "Default";
+      if (isDefaultTeam && body.members !== undefined) {
+        request.log.warn({ teamId: id }, "Attempted to modify Default team members via PUT");
+        return reply
+          .status(400)
+          .send(scimError(400, "Cannot remove members from the Default team"));
+      }
+
       if (body.displayName !== undefined && !displayName) {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
@@ -1377,6 +1385,19 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send(scimError(400, "displayName cannot be empty"));
       }
 
+      const isDefaultTeam = id === schema.DEFAULT_TEAM_ID || existing.name === "Default";
+      const hasMemberRemoval = operations.some(
+        (op) =>
+          op.path === "members" &&
+          (op.op.toLowerCase() === "remove" || op.op.toLowerCase() === "replace"),
+      );
+      if (isDefaultTeam && hasMemberRemoval) {
+        request.log.warn({ teamId: id }, "Attempted to remove members from Default team via PATCH");
+        return reply
+          .status(400)
+          .send(scimError(400, "Cannot remove members from the Default team"));
+      }
+
       const sync = emptyMemberSync();
 
       // All or nothing. Each operation used to write straight to the database,
@@ -1478,6 +1499,11 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
       if (!team) {
         return reply.status(404).send(scimError(404, "Group not found"));
+      }
+
+      if (id === schema.DEFAULT_TEAM_ID || team.name === "Default") {
+        request.log.warn({ teamId: id }, "Attempted to delete the Default team");
+        return reply.status(400).send(scimError(400, "Cannot delete the Default team"));
       }
 
       // Move members to default team
