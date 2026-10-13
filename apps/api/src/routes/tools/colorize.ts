@@ -222,10 +222,15 @@ export function registerColorize(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await colorize(orientedBuffer, scratchDir, {
-          intensity: (settings as { intensity?: number }).intensity ?? 1.0,
-          model: (settings as { model?: string }).model ?? "auto",
-        });
+        const result = await colorize(
+          orientedBuffer,
+          scratchDir,
+          {
+            intensity: (settings as { intensity?: number }).intensity ?? 1.0,
+            model: (settings as { model?: string }).model ?? "auto",
+          },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
 
         // Match the input's own format, the way the tool page does; a pipeline
         // step that fed a JPEG used to get a PNG here (#2076).
@@ -241,6 +246,11 @@ export function registerColorize(app: FastifyInstance) {
           buffer: outputBuffer,
           filename: `${filename.replace(/\.[^.]+$/, "")}_colorized.${ext}`,
           contentType: outputFormat.contentType,
+          resultPayload: {
+            width: result.width,
+            height: result.height,
+            method: result.method,
+          },
         };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

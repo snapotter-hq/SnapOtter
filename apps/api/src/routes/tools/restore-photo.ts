@@ -255,15 +255,20 @@ export function registerRestorePhoto(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await restorePhoto(orientedBuffer, scratchDir, {
-          scratchRemoval: s.scratchRemoval,
-          faceEnhancement: s.faceEnhancement,
-          fidelity: s.fidelity,
-          denoise: s.denoise,
-          denoiseStrength: s.denoiseStrength,
-          colorize: s.colorize,
-          colorizeStrength: s.colorizeStrength,
-        });
+        const result = await restorePhoto(
+          orientedBuffer,
+          scratchDir,
+          {
+            scratchRemoval: s.scratchRemoval,
+            faceEnhancement: s.faceEnhancement,
+            fidelity: s.fidelity,
+            denoise: s.denoise,
+            denoiseStrength: s.denoiseStrength,
+            colorize: s.colorize,
+            colorizeStrength: s.colorizeStrength,
+          },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         let outputBuffer = result.buffer;
         if (outputFormat.format !== "png") {
@@ -277,6 +282,15 @@ export function registerRestorePhoto(app: FastifyInstance) {
           buffer: outputBuffer,
           filename: outputFilename,
           contentType: outputFormat.contentType,
+          resultPayload: {
+            width: result.width,
+            height: result.height,
+            steps: result.steps,
+            scratchCoverage: result.scratchCoverage,
+            facesEnhanced: result.facesEnhanced,
+            isGrayscale: result.isGrayscale,
+            colorized: result.colorized,
+          },
         };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

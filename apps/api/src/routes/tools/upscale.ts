@@ -283,7 +283,12 @@ export function registerUpscale(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await upscale(orientedBuffer, scratchDir, { scale, signal: ctx?.signal });
+        const result = await upscale(
+          orientedBuffer,
+          scratchDir,
+          { scale, signal: ctx?.signal },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         let outputBuffer = result.buffer;
         if (outputFormat.format !== "png") {
@@ -297,6 +302,11 @@ export function registerUpscale(app: FastifyInstance) {
           buffer: outputBuffer,
           filename: outputFilename,
           contentType: outputFormat.contentType,
+          resultPayload: {
+            width: result.width,
+            height: result.height,
+            method: result.method,
+          },
         };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

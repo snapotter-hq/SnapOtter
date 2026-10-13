@@ -226,14 +226,28 @@ export function registerEnhanceFaces(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await enhanceFaces(orientedBuffer, scratchDir, {
-          model: s.model ?? "auto",
-          strength: s.strength ?? 0.8,
-          onlyCenterFace: s.onlyCenterFace ?? false,
-          sensitivity: s.sensitivity ?? 0.5,
-        });
+        const result = await enhanceFaces(
+          orientedBuffer,
+          scratchDir,
+          {
+            model: s.model ?? "auto",
+            strength: s.strength ?? 0.8,
+            onlyCenterFace: s.onlyCenterFace ?? false,
+            sensitivity: s.sensitivity ?? 0.5,
+          },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
-        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+        return {
+          buffer: result.buffer,
+          filename: outputFilename,
+          contentType: "image/png",
+          resultPayload: {
+            facesDetected: result.facesDetected,
+            faces: result.faces,
+            model: result.model,
+          },
+        };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }

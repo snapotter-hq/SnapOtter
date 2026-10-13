@@ -233,14 +233,19 @@ export function registerNoiseRemoval(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await noiseRemoval(orientedBuffer, scratchDir, {
-          tier: s.tier,
-          strength: s.strength,
-          detailPreservation: s.detailPreservation,
-          colorNoise: s.colorNoise,
-          format: s.format,
-          quality: s.quality,
-        });
+        const result = await noiseRemoval(
+          orientedBuffer,
+          scratchDir,
+          {
+            tier: s.tier,
+            strength: s.strength,
+            detailPreservation: s.detailPreservation,
+            colorNoise: s.colorNoise,
+            format: s.format,
+            quality: s.quality,
+          },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
         const ext = result.format === "jpeg" ? "jpg" : result.format;
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_denoised.${ext}`;
         const CONTENT_TYPES: Record<string, string> = {

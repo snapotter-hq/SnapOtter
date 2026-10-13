@@ -236,14 +236,27 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await removeRedEye(orientedBuffer, scratchDir, {
-          sensitivity: s.sensitivity ?? 50,
-          strength: s.strength ?? 70,
-          format: s.format,
-          quality: s.quality ?? 90,
-        });
+        const result = await removeRedEye(
+          orientedBuffer,
+          scratchDir,
+          {
+            sensitivity: s.sensitivity ?? 50,
+            strength: s.strength ?? 70,
+            format: s.format,
+            quality: s.quality ?? 90,
+          },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
-        return { buffer: result.buffer, filename: outputFilename, contentType: "image/png" };
+        return {
+          buffer: result.buffer,
+          filename: outputFilename,
+          contentType: "image/png",
+          resultPayload: {
+            facesDetected: result.facesDetected,
+            eyesCorrected: result.eyesCorrected,
+          },
+        };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }

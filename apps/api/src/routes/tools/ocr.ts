@@ -114,6 +114,7 @@ registerToolProcessFn({
       buffer: result.buffer,
       filename: result.filename,
       contentType: result.contentType,
+      resultPayload: result.resultPayload,
     };
   },
 });

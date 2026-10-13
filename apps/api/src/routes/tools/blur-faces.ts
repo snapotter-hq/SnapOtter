@@ -237,10 +237,15 @@ export function registerBlurFaces(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await blurFaces(orientedBuffer, scratchDir, {
-          blurRadius: s.blurRadius ?? 30,
-          sensitivity: s.sensitivity ?? 0.5,
-        });
+        const result = await blurFaces(
+          orientedBuffer,
+          scratchDir,
+          {
+            blurRadius: s.blurRadius ?? 30,
+            sensitivity: s.sensitivity ?? 0.5,
+          },
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
         const outputFormat = await resolveOutputFormat(inputBuffer, filename);
         let outputBuffer = result.buffer;
         if (outputFormat.format !== "png") {
@@ -254,6 +259,13 @@ export function registerBlurFaces(app: FastifyInstance) {
           buffer: outputBuffer,
           filename: outputFilename,
           contentType: outputFormat.contentType,
+          resultPayload: {
+            facesDetected: result.facesDetected,
+            faces: result.faces,
+            ...(result.facesDetected === 0 && {
+              warning: "No faces detected in this image. Try increasing detection sensitivity.",
+            }),
+          },
         };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

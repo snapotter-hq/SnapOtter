@@ -364,6 +364,7 @@ describe("worker abort signal pass-through", () => {
       expect.any(Buffer),
       SCRATCH_DIR,
       expect.objectContaining({ scale: 2, signal: ctx.signal }),
+      expect.any(Function),
     );
   });
 });

@@ -363,12 +363,24 @@ export function registerTransparencyFixer(app: FastifyInstance) {
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const resultBuffer = await processTransparencyFix(orientedBuffer, s, scratchDir);
+        const resultBuffer = await processTransparencyFix(
+          orientedBuffer,
+          s,
+          scratchDir,
+          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+        );
 
         const outputExt = s.outputFormat === "webp" ? "webp" : "png";
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
         const contentType = outputExt === "webp" ? "image/webp" : "image/png";
-        return { buffer: resultBuffer, filename: outputFilename, contentType };
+        return {
+          buffer: resultBuffer,
+          filename: outputFilename,
+          contentType,
+          resultPayload: {
+            filename,
+          },
+        };
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
       }
