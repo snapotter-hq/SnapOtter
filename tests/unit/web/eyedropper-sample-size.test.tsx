@@ -85,6 +85,50 @@ describe("eyedropper sample size", () => {
     act(() => hook.result.current.handleEyedropperClick(pointerEvent(10, 5)));
     expect(getImageData).toHaveBeenLastCalledWith(10, 5, 1, 1);
   });
+
+  it("samples the correct pixel when zoomed in, reading the pixel's floor instead of rounding to nearest", () => {
+    const hook = setup();
+
+    act(() => useEditorStore.setState({ zoom: 4 }));
+
+    // Zoom 4, click x = 4 * 5 + 3 = 23 (canvas x = 5.75).
+    // The previous Math.round would sample 6. We expect 5.
+    // y = 4 * 1 + 3 = 7 (canvas y = 1.75). Math.round would yield 2, we expect 1.
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(23, 7)));
+    expect(getImageData).toHaveBeenLastCalledWith(5, 1, 1, 1);
+
+    // The right half of the very last pixel on the row.
+    // Width is 20, so canvas x ranges 0..19.
+    // x = 19 * 4 + 3 = 79 (canvas x = 19.75).
+    // The previous Math.round would yield 20 and fail the bounds check (so getImageData wouldn't be called).
+    getImageData.mockClear();
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(79, 7)));
+    expect(getImageData).toHaveBeenLastCalledWith(19, 1, 1, 1);
+  });
+
+  it("handles panning offsets correctly", () => {
+    const hook = setup();
+
+    act(() => useEditorStore.setState({ zoom: 2, panOffset: { x: -10, y: -20 } }));
+
+    // x = 2 * 3 + (-10) + 1 = -3. (pointer - panOffset) / zoom = (-3 - (-10)) / 2 = 7 / 2 = 3.5. Floor is 3.
+    // y = 2 * 4 + (-20) + 1 = -11. (pointer - panOffset) / zoom = (-11 - (-20)) / 2 = 9 / 2 = 4.5. Floor is 4.
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(-3, -11)));
+    expect(getImageData).toHaveBeenLastCalledWith(3, 4, 1, 1);
+  });
+
+  it("fails the bounds check for clicks just outside the top-left edge", () => {
+    const hook = setup();
+
+    act(() => useEditorStore.setState({ zoom: 4 }));
+
+    getImageData.mockClear();
+    // pointer x=-2, y=-2. canvas x = -2/4 = -0.5.
+    // Math.round(-0.5) is 0, which would incorrectly pass the < 0 bounds check.
+    // Math.floor(-0.5) is -1, which correctly fails.
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(-2, -2)));
+    expect(getImageData).not.toHaveBeenCalled();
+  });
 });
 
 describe("eyedropper options bar", () => {

@@ -1,0 +1,23 @@
+The Magic Wand tool and the canvas cursor tracker use `Math.round()` to translate screen coordinates to canvas pixels, missing the fix applied to the eyedropper in #2345. 
+
+When zoomed in, this means clicking the right or bottom half of a pixel selects the next adjacent pixel. Clicking the right or bottom edge of the final row or column silently fails bounds checks. The cursor coordinates displayed in the UI also flip to the next pixel halfway across the current pixel's visual footprint.
+
+### Where it lives
+1. `apps/web/src/components/editor/tools/selection-tool.tsx`
+   Line ~270 (`floodFillMask` function):
+   ```typescript
+   const sx = Math.round(startX);
+   const sy = Math.round(startY);
+   ```
+   These should be `Math.floor`.
+
+2. `apps/web/src/components/editor/editor-canvas.tsx`
+   Line ~80 (`handleMouseMove` function):
+   ```typescript
+   const x = Math.round((pointer.x - panOffset.x) / zoom);
+   const y = Math.round((pointer.y - panOffset.y) / zoom);
+   setCursorPosition({ x, y });
+   ```
+   These should be `Math.floor`.
+
+The fix is replacing `Math.round` with `Math.floor` in both files.

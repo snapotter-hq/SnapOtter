@@ -94,19 +94,29 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
       if (!ctx) return null;
 
       // Transform pointer coordinates from screen space to canvas space
-      const x = Math.round((pointer.x - panOffset.x) / zoom);
-      const y = Math.round((pointer.y - panOffset.y) / zoom);
+      const x = Math.floor((pointer.x - panOffset.x) / zoom);
+      const y = Math.floor((pointer.y - panOffset.y) / zoom);
 
       // Bounds check against the actual canvas dimensions (unzoomed)
       if (x < 0 || y < 0 || x >= canvasSize.width || y >= canvasSize.height) {
         return null;
       }
 
-      const color = samplePixelColor(ctx, x, y, sampleSize);
+      let color: string;
+      try {
+        color = samplePixelColor(ctx, x, y, sampleSize);
+      } catch (err) {
+        if (report) {
+          console.error("Failed to sample pixel color:", err);
+          reportCaptureFailure("no-context", captureMessages);
+        }
+        return null;
+      }
+
       setSampledColor(color);
       return color;
     },
-    [getStageContext, sampleSize, zoom, panOffset, canvasSize],
+    [getStageContext, sampleSize, zoom, panOffset, canvasSize, captureMessages],
   );
 
   /**
