@@ -220,10 +220,16 @@ try {
 await ensureBuiltinRoles();
 await ensureDefaultTeam();
 
-if (env.AUTH_ENABLED) {
-  await ensureDefaultAdmin();
-} else {
-  await ensureAnonymousUser();
+try {
+  if (env.AUTH_ENABLED) {
+    await ensureDefaultAdmin();
+  } else {
+    await ensureAnonymousUser();
+  }
+} catch (err) {
+  console.error(`FATAL: ${(err as Error).message}`);
+  console.error(err);
+  process.exit(1);
 }
 
 async function ensureInstanceId(): Promise<string> {

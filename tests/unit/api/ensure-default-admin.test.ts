@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -129,5 +130,22 @@ describe("ensureDefaultAdmin", () => {
 
     await expect(ensureDefaultAdmin()).resolves.toBeUndefined();
     expect(store.values).not.toHaveBeenCalled();
+  });
+});
+
+describe("API startup (#2333)", () => {
+  it("catches a rejected default-user check, prints a FATAL line, and exits 1", () => {
+    // index.ts boots the full service on import, so pin the startup try/catch
+    // around ensureDefaultAdmin / ensureAnonymousUser in the entry point's source.
+    const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+    const start = source.indexOf("await ensureDefaultTeam();");
+    const end = source.indexOf("async function ensureInstanceId()", start);
+    const block = source.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(block).toMatch(
+      /try\s*\{\s*if\s*\(env\.AUTH_ENABLED\)\s*\{\s*await ensureDefaultAdmin\(\);\s*\}\s*else\s*\{\s*await ensureAnonymousUser\(\);\s*\}\s*\}\s*catch\s*\(err\)\s*\{\s*console\.error\(`FATAL: \$\{\(err as Error\)\.message\}`\);\s*console\.error\(err\);\s*process\.exit\(1\);\s*\}/,
+    );
   });
 });
