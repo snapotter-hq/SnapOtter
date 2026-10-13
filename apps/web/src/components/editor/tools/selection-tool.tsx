@@ -57,8 +57,8 @@ function floodFillMask(
     () => Array(width).fill(false) as boolean[],
   );
 
-  const sx = Math.round(startX);
-  const sy = Math.round(startY);
+  const sx = Math.floor(startX);
+  const sy = Math.floor(startY);
   if (sx < 0 || sx >= width || sy < 0 || sy >= height) return mask;
 
   const idx = (sy * width + sx) * 4;

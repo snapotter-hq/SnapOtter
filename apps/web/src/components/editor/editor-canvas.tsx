@@ -973,8 +973,8 @@ export function EditorCanvas({
       if (!stage) return;
       const pointer = stage.getPointerPosition();
       if (!pointer) return;
-      const x = Math.round((pointer.x - panOffset.x) / zoom);
-      const y = Math.round((pointer.y - panOffset.y) / zoom);
+      const x = Math.floor((pointer.x - panOffset.x) / zoom);
+      const y = Math.floor((pointer.y - panOffset.y) / zoom);
       setCursorPosition({ x, y });
 
       // Forward to active tool
