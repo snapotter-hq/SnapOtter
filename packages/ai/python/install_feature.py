@@ -1611,10 +1611,12 @@ def _install() -> None:
                 stderr_output = (proc.stderr or "")
                 # onnxruntime-gpu on CPU-only Debian/Ubuntu fails to load its C extensions
                 # resulting in missing attributes or missing libcudart/libcudnn errors.
-                if "AttributeError" in stderr_output and "SessionOptions" in stderr_output or "libcudart" in stderr_output or "libcudnn" in stderr_output:
+                if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
                     emit_progress(99, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
                     fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "onnxruntime==1.20.1"]
-                    subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
+                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
+                    if fix_proc.returncode != 0:
+                        emit_progress(99, "Fallback onnxruntime installation failed")
 
                     # Re-run smoke test after fallback
                     proc = subprocess.run(
@@ -1629,14 +1631,16 @@ def _install() -> None:
                 if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
                     emit_progress(99, "OpenCV conflict detected; applying headless fallback...")
                     fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
-                    subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
+                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
+                    if fix_proc.returncode != 0:
+                        emit_progress(99, "Fallback opencv installation failed")
 
                     # Clean up other opencv dist-info to prevent pip from getting confused
                     clean_cmd = [venv_python, "-c",
                         "import os, shutil, site; "
-                        "sp = site.getsitepackages()[0]; "
-                        "bad = [n for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and n.endswith('.dist-info')]; "
-                        "[shutil.rmtree(os.path.join(sp, n), ignore_errors=True) for n in bad]"
+                        "bad = [(sp, n) for sp in site.getsitepackages() if os.path.exists(sp) "
+                        "for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and not n.startswith('opencv_contrib_python_headless-') and n.endswith('.dist-info')]; "
+                        "for sp, n in bad: shutil.rmtree(os.path.join(sp, n), ignore_errors=True)"
                     ]
                     subprocess.run(clean_cmd, capture_output=True, text=True, timeout=60)
 

@@ -323,7 +323,8 @@ if subprocess.run(shlex.split(cmd)).returncode != 0:
     sys.exit(1)
 
 for name in cv_variants:
-    shutil.rmtree(os.path.join(site_packages, name), ignore_errors=True)
+    if not name.startswith("opencv_contrib_python_headless-"):
+        shutil.rmtree(os.path.join(site_packages, name), ignore_errors=True)
 print(f"  Forced opencv-contrib-python-headless=={version} and removed conflicting dist-infos")
 PYOPENCV
 
