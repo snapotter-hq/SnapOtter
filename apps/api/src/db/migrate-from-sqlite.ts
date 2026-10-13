@@ -232,10 +232,12 @@ export function detachTwinIdentities(
   for (const row of rows) {
     if (!losers.has(row)) continue;
     const keeper = losers.get(row) ?? null;
+    const rawProvider = row.auth_provider == null ? "local" : String(row.auth_provider);
     detached.push({
       id: String(row.id),
       username: String(row.username),
-      authProvider: row.auth_provider == null ? "local" : String(row.auth_provider),
+      // A 1.x 'local' row with an external_id is a leftover OIDC email auto-link (#1613).
+      authProvider: rawProvider === "local" ? "oidc" : rawProvider,
       externalId: String(row.external_id),
       keptBy: keeper ? { id: String(keeper.id), username: String(keeper.username) } : null,
     });
@@ -302,12 +304,22 @@ async function mapUserTeamNamesToIds(tx: { execute: typeof db.execute }): Promis
  * distinct.
  */
 
+interface CollisionRow {
+  id: string;
+  username: string;
+  external_id: string;
+  kept_by_username: string;
+  kept_by_id: string;
+}
+
 async function repairOidcEmailLinks(
   tx: { execute: typeof db.execute },
   detached: DetachedIdentity[],
+  taken: ReadonlySet<string>,
 ): Promise<void> {
   // First, find 'local' rows with external_id that collide with an existing 'oidc' row.
-  // This happens if the user signed in later and a new OIDC row was created.
+  // This happens if the user signed in later and a new OIDC row was created, or under
+  // --force when the target database already holds that OIDC identity.
   const collisions = await tx.execute(
     sql`SELECT u1.id, u1.username, u1.external_id, u2.username as kept_by_username, u2.id as kept_by_id
         FROM users u1
@@ -316,13 +328,15 @@ async function repairOidcEmailLinks(
   );
 
   for (const row of collisions.rows) {
-    const r = row as any;
+    const r = row as unknown as CollisionRow;
+    const key = identityKey({ auth_provider: "oidc", external_id: r.external_id });
+    const targetHolds = key !== null && taken.has(key);
     detached.push({
       id: r.id,
       username: r.username,
       externalId: r.external_id,
       authProvider: "oidc", // It's an OIDC identity that couldn't be claimed
-      keptBy: { id: r.kept_by_id, username: r.kept_by_username },
+      keptBy: targetHolds ? null : { id: r.kept_by_id, username: r.kept_by_username },
     });
   }
 
@@ -386,6 +400,7 @@ export async function migrateFromSqlite(
         );
       }
 
+      const taken = await heldIdentities(tx);
       for (const table of MIGRATED_TABLES) {
         let rows: SqliteRow[];
         try {
@@ -408,7 +423,7 @@ export async function migrateFromSqlite(
         let convertedUsers: SqliteRow[] | null = null;
         if (table === "users") {
           convertedUsers = rows.map((row) => convertRow(table, row));
-          detached.push(...detachTwinIdentities(convertedUsers, await heldIdentities(tx)));
+          detached.push(...detachTwinIdentities(convertedUsers, taken));
         }
 
         // Sum what each INSERT reports rather than counting the table. Under
@@ -450,7 +465,7 @@ export async function migrateFromSqlite(
 
       await mapUserTeamNamesToIds(tx);
       await moveScimExternalIds(tx);
-      await repairOidcEmailLinks(tx, detached);
+      await repairOidcEmailLinks(tx, detached, taken);
     });
   } finally {
     sqlite.close();

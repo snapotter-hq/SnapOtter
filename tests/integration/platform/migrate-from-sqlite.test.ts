@@ -1,17 +1,21 @@
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { sql } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "../../../apps/api/src/db/index.js";
+import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import {
   MIGRATED_TABLES,
   type MigrationResult,
   migrateFromSqlite,
 } from "../../../apps/api/src/db/migrate-from-sqlite.js";
 import { buildLegacySqlite, seedRealistic1xData } from "../../helpers/legacy-sqlite-fixture.js";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 /**
  * Empty the tables the importer writes into, so each suite starts from the
@@ -1187,8 +1191,8 @@ describe("migrate-from-sqlite (a dropped row under force)", () => {
         "local",
         "sub456",
         "collision@example.com",
-        now,
-        now,
+        now + 60,
+        now + 60,
       );
       insert.run(
         "u-oidc",
@@ -1200,12 +1204,27 @@ describe("migrate-from-sqlite (a dropped row under force)", () => {
         now,
         now,
       );
+
+      // Twin local OIDC auto-links sharing the same subject (#2448): oldest keeps the link,
+      // younger is detached instead of failing the UPDATE with 23505.
+      insert.run("u-twin-old", "twin-old", "hash", "local", "sub789", "twin@example.com", now, now);
+      insert.run(
+        "u-twin-new",
+        "twin-new",
+        "hash",
+        "local",
+        "sub789",
+        "twin@example.com",
+        now + 60,
+        now + 60,
+      );
       s.close();
       await truncateMigratedTables();
     });
 
-    it("updates auth_provider to oidc for leftover auto-links, avoiding collisions", async () => {
-      await migrateFromSqlite(oidcSqlitePath, { force: false });
+    it("updates auth_provider to oidc for leftover auto-links, settling collisions and twins", async () => {
+      const run = await importCapturingWarnings(oidcSqlitePath, { force: false });
+      expect(run.error).toBeNull();
 
       const linked = (
         await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-linked'`)
@@ -1215,7 +1234,105 @@ describe("migrate-from-sqlite (a dropped row under force)", () => {
       const collided = (
         await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-local'`)
       ).rows[0];
-      expect(collided).toEqual({ auth_provider: "local", external_id: null }); // cleared
+      expect(collided.external_id).toBeNull();
+
+      const twinOld = (
+        await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-twin-old'`)
+      ).rows[0];
+      expect(twinOld).toEqual({ auth_provider: "oidc", external_id: "sub789" });
+
+      const twinNew = (
+        await db.execute(sql`SELECT auth_provider, external_id FROM users WHERE id = 'u-twin-new'`)
+      ).rows[0];
+      expect(twinNew.external_id).toBeNull();
+      expect(run.warnings.find((w) => w.includes("u-twin-new"))).toContain(
+        'shares the oidc identity "sub789" with user "twin-old" (id u-twin-old)',
+      );
+      expect(run.result?.detached.find((d) => d.id === "u-twin-new")).toEqual({
+        id: "u-twin-new",
+        username: "twin-new",
+        authProvider: "oidc",
+        externalId: "sub789",
+        keptBy: { id: "u-twin-old", username: "twin-old" },
+      });
+    });
+
+    it("reports keptBy: null under --force when the target already holds the OIDC subject", async () => {
+      await truncateMigratedTables();
+      const seedDb = join(oidcDir, "seed-target.db");
+      const forceDb = join(oidcDir, "force-local-oidc.db");
+      const now = 1750000000;
+      buildTwinSource(seedDb, [
+        {
+          id: "u-target-oidc",
+          username: "target-oidc",
+          provider: "oidc",
+          externalId: "sub-held",
+          createdAt: now,
+        },
+      ]);
+      buildTwinSource(forceDb, [
+        {
+          id: "u-incoming-local",
+          username: "incoming-local",
+          provider: "local",
+          externalId: "sub-held",
+          createdAt: now - 100,
+        },
+      ]);
+
+      await migrateFromSqlite(seedDb, { force: false });
+      const run = await importCapturingWarnings(forceDb, { force: true });
+      expect(run.error).toBeNull();
+      expect(run.result?.detached).toEqual([
+        {
+          id: "u-incoming-local",
+          username: "incoming-local",
+          authProvider: "oidc",
+          externalId: "sub-held",
+          keptBy: null,
+        },
+      ]);
+      expect(run.warnings[0]).toContain("which an account already in this database holds");
+    });
+
+    it("registers 0011_users_oidc_auto_link in drizzle _journal.json and runs it on existing rows", async () => {
+      const journal = JSON.parse(
+        readFileSync(join(REPO_ROOT, "apps/api/drizzle/meta/_journal.json"), "utf8"),
+      ) as { entries: Array<{ tag: string }> };
+      expect(journal.entries.some((e) => e.tag === "0011_users_oidc_auto_link")).toBe(true);
+      expect(existsSync(join(REPO_ROOT, "apps/api/drizzle/meta/0011_snapshot.json"))).toBe(true);
+      expect(existsSync(join(REPO_ROOT, "add-test.py"))).toBe(false);
+      expect(existsSync(join(REPO_ROOT, "fix-import.py"))).toBe(false);
+
+      // Verify the SQL migration repairs pre-existing local rows with external_id
+      // when replayed against a populated users table.
+      await truncateMigratedTables();
+      await db.execute(sql`
+        INSERT INTO users (id, username, password_hash, role, team, must_change_password, auth_provider, external_id, created_at, updated_at)
+        VALUES
+          ('m-linked', 'm-linked', 'hash', 'user', 'default-team-00000000', false, 'local', 'm-sub-1', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z'),
+          ('m-oidc', 'm-oidc', NULL, 'user', 'default-team-00000000', false, 'oidc', 'm-sub-2', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z'),
+          ('m-collided', 'm-collided', 'hash', 'user', 'default-team-00000000', false, 'local', 'm-sub-2', '2025-01-01T00:01:00Z', '2025-01-01T00:01:00Z')
+      `);
+      // Drop the last __drizzle_migrations entry as privileged user and re-run runMigrations()
+      await withPrivileged(async (client) => {
+        await client.query(
+          "DELETE FROM drizzle.__drizzle_migrations WHERE id = (SELECT max(id) FROM drizzle.__drizzle_migrations)",
+        );
+      });
+      await runMigrations();
+
+      const rows = (
+        await db.execute(
+          sql`SELECT id, auth_provider, external_id FROM users WHERE id LIKE 'm-%' ORDER BY id`,
+        )
+      ).rows;
+      expect(rows).toEqual([
+        { id: "m-collided", auth_provider: "local", external_id: null },
+        { id: "m-linked", auth_provider: "oidc", external_id: "m-sub-1" },
+        { id: "m-oidc", auth_provider: "oidc", external_id: "m-sub-2" },
+      ]);
     });
   });
 });
