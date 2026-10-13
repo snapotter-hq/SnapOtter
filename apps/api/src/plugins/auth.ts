@@ -278,6 +278,9 @@ export function validateUsername(username: string): string | null {
   if (!USERNAME_PATTERN.test(username)) {
     return "Username can only contain letters, numbers, dots, hyphens, and underscores";
   }
+  if (username.toLowerCase() === "anonymous") {
+    return "Username 'anonymous' is reserved";
+  }
   return null;
 }
 

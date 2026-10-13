@@ -100,6 +100,17 @@ describe("ensureDefaultAdmin", () => {
     expect(store.values).not.toHaveBeenCalled();
   });
 
+  it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+    "refuses to create the admin when DEFAULT_USERNAME is the reserved '%s' identity (#2460)",
+    async (username) => {
+      env.DEFAULT_USERNAME = username;
+      await expect(ensureDefaultAdmin()).rejects.toThrow(
+        "DEFAULT_USERNAME is invalid: Username 'anonymous' is reserved",
+      );
+      expect(store.values).not.toHaveBeenCalled();
+    },
+  );
+
   it("counts characters in code points like the login schema, so 513 emoji are within the limit", async () => {
     env.DEFAULT_PASSWORD = "\u{1F600}".repeat(PASSWORD_MAX_LENGTH / 2 + 1);
 

@@ -77,4 +77,13 @@ describe("validateUsername", () => {
       );
     });
   });
+
+  describe("reserved usernames (#2460)", () => {
+    it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+      "rejects '%s' so it cannot collide with the synthetic anonymous identity",
+      (username) => {
+        expect(validateUsername(username)).toBe("Username 'anonymous' is reserved");
+      },
+    );
+  });
 });
