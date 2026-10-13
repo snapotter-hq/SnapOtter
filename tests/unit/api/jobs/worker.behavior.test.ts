@@ -163,6 +163,7 @@ describe("worker result payload behavior", () => {
     await expect(loadToolInputBuffer("ocr", "uploads/job-1/input.bin")).rejects.toMatchObject({
       name: "InputValidationError",
       statusCode: 413,
+      message: "OCR input exceeds the 512 MB safety limit",
     });
     expect(objectStorageMocks.getObjectBuffer).not.toHaveBeenCalled();
   });
@@ -181,7 +182,11 @@ describe("worker result payload behavior", () => {
         "/tmp/job-1",
         new AbortController().signal,
       ),
-    ).rejects.toMatchObject({ name: "InputValidationError", statusCode: 413 });
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 413,
+      message: "OCR input exceeds the 512 MB safety limit",
+    });
     expect(objectStorageMocks.getObjectBuffer).not.toHaveBeenCalled();
   });
 

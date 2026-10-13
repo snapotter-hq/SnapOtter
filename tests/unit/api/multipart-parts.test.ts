@@ -17,6 +17,7 @@ import type { FastifyRequest } from "fastify";
 import { describe, expect, it } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import {
+  formatLimit,
   multipartFailure,
   multipartParts,
   readFilePart,
@@ -575,5 +576,12 @@ describe("multipartFailure (#1341)", () => {
 
     const other = Object.assign(new Error("storage exploded"), { statusCode: 500 });
     expect(() => multipartFailure(other)).toThrow(other);
+  });
+
+  it("formats byte limits in KB below 1 MiB and MB at or above 1 MiB (#2437)", () => {
+    expect(formatLimit(64)).toBe("1 KB");
+    expect(formatLimit(1024)).toBe("1 KB");
+    expect(formatLimit(512 * 1024 * 1024)).toBe("512 MB");
+    expect(formatLimit(1.5 * 1024 * 1024)).toBe("1.5 MB");
   });
 });

@@ -66,6 +66,7 @@ import { friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { createUniqueNamer } from "../lib/filename.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
+import { formatLimit } from "../lib/multipart-parts.js";
 import {
   copyObjectToFile,
   deletePrefix,
@@ -145,7 +146,7 @@ export async function loadToolInputBuffer(toolId: string, ref: string): Promise<
     const size = await getObjectSize(ref);
     if (size > OCR_MAX_ENCODED_INPUT_BYTES) {
       throw new InputValidationError(
-        `OCR input exceeds the ${OCR_MAX_ENCODED_INPUT_BYTES} byte safety limit`,
+        `OCR input exceeds the ${formatLimit(OCR_MAX_ENCODED_INPUT_BYTES)} safety limit`,
         413,
       );
     }
@@ -251,7 +252,7 @@ async function readToolInputs(
         error.statusCode === 413
       ) {
         throw new InputValidationError(
-          `OCR input exceeds the ${OCR_MAX_ENCODED_INPUT_BYTES} byte safety limit`,
+          `OCR input exceeds the ${formatLimit(OCR_MAX_ENCODED_INPUT_BYTES)} safety limit`,
           413,
         );
       }

@@ -66,7 +66,7 @@ function requestError(err: unknown): Error {
 
 const MIB = 1024 * 1024;
 
-function formatLimit(bytes: number): string {
+export function formatLimit(bytes: number): string {
   if (bytes < MIB) return `${Math.ceil(bytes / 1024)} KB`;
   const mb = bytes / MIB;
   return `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB`;

@@ -42,7 +42,7 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { multipartFailure } from "../lib/multipart-parts.js";
+import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
 import {
   deleteObject,
   getObjectStream,
@@ -192,7 +192,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     totalEncodedBytes > ocrUploadLimits.aggregateBytes
                   ) {
                     throw new InputValidationError(
-                      `OCR batch input exceeds the ${ocrUploadLimits.aggregateBytes} byte aggregate safety limit`,
+                      `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
                       413,
                     );
                   }
@@ -208,7 +208,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       totalEncodedBytes += chunk.length;
                       if (totalEncodedBytes > ocrUploadLimits.aggregateBytes) {
                         throw new InputValidationError(
-                          `OCR batch input exceeds the ${ocrUploadLimits.aggregateBytes} byte aggregate safety limit`,
+                          `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
                           413,
                         );
                       }

@@ -43,7 +43,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
-import { multipartFailure } from "../lib/multipart-parts.js";
+import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
 import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
 import { prepareOcrIngressImage } from "../lib/ocr-image-input.js";
@@ -386,7 +386,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const violation = findOcrEncodedInputViolation([file.size], env.MAX_UPLOAD_SIZE_MB);
             if (violation) {
               return reply.status(413).send({
-                error: `OCR pipeline input exceeds the ${violation.limitBytes} byte ${violation.scope} safety limit`,
+                error: `OCR pipeline input exceeds the ${formatLimit(violation.limitBytes)} ${violation.scope} safety limit`,
               });
             }
           }
@@ -1201,7 +1201,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             );
             if (violation) {
               return reply.status(413).send({
-                error: `OCR pipeline input exceeds the ${violation.limitBytes} byte ${violation.scope} safety limit`,
+                error: `OCR pipeline input exceeds the ${formatLimit(violation.limitBytes)} ${violation.scope} safety limit`,
               });
             }
           }
