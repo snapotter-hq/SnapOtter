@@ -173,7 +173,10 @@ describe("POST /api/auth/mfa/verify", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("returns 401 with invalid code", async () => {
+  it("returns 401 with invalid code and creates an audit log", async () => {
+    // Clear any previous logs for a clean test
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
     await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/enroll",
@@ -189,6 +192,13 @@ describe("POST /api/auth/mfa/verify", () => {
     expect(res.statusCode).toBe(401);
     const body = JSON.parse(res.body);
     expect(body.code).toBe("INVALID_CODE");
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0].details).toMatchObject({ username: "admin" });
   });
 
   it("successfully activates MFA with correct TOTP code", async () => {
@@ -289,7 +299,10 @@ describe("POST /api/auth/mfa/disable", () => {
     expect(JSON.parse(res.body).code).toBe("MFA_NOT_ENABLED");
   });
 
-  it("returns 401 INVALID_CODE when the TOTP code is wrong", async () => {
+  it("returns 401 INVALID_CODE when the TOTP code is wrong and creates an audit log", async () => {
+    // Clear any previous logs for a clean test
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
     const enrollRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/enroll",
@@ -311,6 +324,13 @@ describe("POST /api/auth/mfa/disable", () => {
     });
     expect(res.statusCode).toBe(401);
     expect(JSON.parse(res.body).code).toBe("INVALID_CODE");
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(1);
+    expect(auditLogs[0].details).toMatchObject({ username: "admin" });
   });
 
   it("clears all MFA data on success with a valid TOTP code", async () => {

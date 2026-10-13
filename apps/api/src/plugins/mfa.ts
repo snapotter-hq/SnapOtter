@@ -431,8 +431,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const secretBase32 = await decryptSecret(dbUser.totpSecret);
       if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
+      const audit = auditFromRequest(request);
+
       // Validate the code
       if (!verifyTotpCode(secretBase32, code)) {
+        await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
           code: "INVALID_CODE",
@@ -445,7 +448,6 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         .set({ totpEnabled: true, updatedAt: new Date() })
         .where(eq(schema.users.id, user.id));
 
-      const audit = auditFromRequest(request);
       await audit("MFA_ENROLLED", { userId: user.id, username: user.username });
 
       return reply.send({ ok: true });
@@ -598,9 +600,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           const freshFingerprint = lockedUser?.passwordHash
             ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
             : null;
-          if (freshFingerprint !== hashFingerprint) return false;
+          if (freshFingerprint !== hashFingerprint) {
+            return lockedUser?.passwordHash ? "password_changed" : "password_removed";
+          }
         } else if (lockedUser?.passwordHash !== dbUser.passwordHash) {
-          return false;
+          return lockedUser?.passwordHash ? "password_changed" : "password_removed";
         }
 
         await tx.insert(schema.sessions).values({
@@ -609,10 +613,15 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           expiresAt,
         });
 
-        return true;
+        return "success";
       });
 
-      if (!inserted) {
+      if (inserted !== "success") {
+        await audit("MFA_VERIFY_FAILED", {
+          userId: dbUser.id,
+          username: dbUser.username,
+          reason: inserted,
+        });
         return reply.status(401).send({
           error: "MFA challenge expired or invalid",
           code: "MFA_EXPIRED",
@@ -847,7 +856,10 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const secretBase32 = await decryptSecret(dbUser.totpSecret);
       if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
+      const audit = auditFromRequest(request);
+
       if (!verifyTotpCode(secretBase32, code)) {
+        await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
           code: "INVALID_CODE",
@@ -856,7 +868,6 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       await clearUserMfa(user.id);
 
-      const audit = auditFromRequest(request);
       await audit("MFA_DISABLED", { userId: user.id, username: user.username });
 
       return reply.send({ ok: true });
