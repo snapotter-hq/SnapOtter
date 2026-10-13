@@ -1,52 +1,18 @@
 import { extname, join } from "node:path";
-import {
-  type EncoderTarget,
-  probeMedia,
-  resolveEncoder,
-  runFfmpeg,
-  videoCodecArgs,
-} from "@snapotter/media-engine";
+import { probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  mp4TimescaleArgs,
   runFfmpegWithProgress,
   stageMediaInputs,
   videoContentType,
+  videoEncodeArgsForContainer,
 } from "../../lib/media-tool.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   smoothing: z.number().int().min(5).max(60).default(15),
 });
-
-/**
- * Choose a codec that is valid for the given container extension.
- * webm requires VP9 (or VP8/AV1); ogv requires Theora; everything
- * else gets H.264 (mp4/mov/mkv/avi/ts).
- */
-function codecForContainer(ext: string): {
-  target: EncoderTarget;
-  encodeArgs: string[];
-} {
-  const lower = ext.toLowerCase();
-  if (lower === ".webm") {
-    return {
-      target: "vp9",
-      encodeArgs: ["-c:v", resolveEncoder("vp9"), "-crf", "30", "-b:v", "0", "-row-mt", "1"],
-    };
-  }
-  if (lower === ".ogv" || lower === ".ogg") {
-    return {
-      target: "theora",
-      encodeArgs: ["-c:v", resolveEncoder("theora"), "-q:v", "7"],
-    };
-  }
-  return {
-    target: "h264",
-    encodeArgs: [...videoCodecArgs("h264", 20), "-pix_fmt", "yuv420p"],
-  };
-}
 
 /**
  * mp4/mov muxers write the moov atom at the end of the file by default. A
@@ -84,7 +50,7 @@ export function registerStabilizeVideo(app: FastifyInstance) {
       // Resolve encoders before pass 1: an ffmpeg without one of them should
       // fail the job now, not after a motion analysis that can run for 30
       // minutes (#1270). webm/ogv need Opus/Vorbis audio; other containers copy.
-      const { encodeArgs } = codecForContainer(origExt);
+      const encodeArgs = videoEncodeArgsForContainer(origExt);
       const audioArgs =
         origExt.toLowerCase() === ".webm"
           ? ["-c:a", resolveEncoder("opus")]
@@ -116,7 +82,6 @@ export function registerStabilizeVideo(app: FastifyInstance) {
           ...encodeArgs,
           ...audioArgs,
           ...faststartArgs(origExt),
-          ...mp4TimescaleArgs(origExt),
           outPath,
         ],
         info.durationS,

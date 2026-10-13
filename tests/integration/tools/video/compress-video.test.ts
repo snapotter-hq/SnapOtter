@@ -151,6 +151,9 @@ describe.skipIf(!ffmpegAvailable())("compress-video (requires ffmpeg)", () => {
         ],
         { timeout: 60_000 },
       );
+      if (gen.error) {
+        throw new Error(`Failed to spawn ffmpeg for VFR fixture: ${gen.error.message}`);
+      }
       if (gen.status !== 0) {
         throw new Error(`Failed to generate VFR fixture: ${gen.stderr?.toString()}`);
       }

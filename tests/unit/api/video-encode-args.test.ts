@@ -96,7 +96,7 @@ describe("mp4TimescaleArgs", () => {
   });
 
   it("adds nothing for containers without the mov muxer", () => {
-    for (const ext of [".mkv", ".webm", ".avi", ".ts", ".ogv", ".mpg"]) {
+    for (const ext of [".mkv", ".webm", ".avi", ".ts", ".ogv", ".mpg", ".3gp", ".3g2"]) {
       expect(mp4TimescaleArgs(ext)).toEqual([]);
     }
   });
@@ -130,6 +130,16 @@ describe("no API code resolves a rate-controlled video encoder by hand", () => {
   it("finds no bare resolveEncoder call for h264, hevc or av1", () => {
     const offenders = files.filter((file) =>
       /resolveEncoder\("(h264|hevc|av1)"\)/.test(readFileSync(file, "utf8")),
+    );
+    expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
+  });
+
+  it("delegates preserved-container video encoding to videoEncodeArgsForContainer", () => {
+    const offenders = files.filter(
+      (file) =>
+        !file.endsWith("media-tool.ts") &&
+        (/function codecForContainer\b/.test(readFileSync(file, "utf8")) ||
+          /resolveEncoder\("theora"\)/.test(readFileSync(file, "utf8"))),
     );
     expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
   });
