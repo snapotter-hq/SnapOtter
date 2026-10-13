@@ -7,12 +7,12 @@ test.use({
 test("meme generator top text is reachable on a phone", async ({ page }) => {
   await page.goto("/image/meme-generator");
 
-  // Upload a tiny custom image
+  // Upload a tiny custom image (1x1 PNG)
   await page.setInputFiles('input[type="file"]', {
-    name: "test.jpg",
-    mimeType: "image/jpeg",
+    name: "test.png",
+    mimeType: "image/png",
     buffer: Buffer.from(
-      "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAGBAQABPxA=",
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
       "base64",
     ),
   });
