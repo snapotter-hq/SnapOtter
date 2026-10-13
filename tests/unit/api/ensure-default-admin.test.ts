@@ -33,11 +33,13 @@ import { env } from "../../../apps/api/src/config.js";
 import { ensureDefaultAdmin } from "../../../apps/api/src/plugins/auth.js";
 
 const originalPassword = env.DEFAULT_PASSWORD;
+const originalUsername = env.DEFAULT_USERNAME;
 
 beforeEach(() => {
   store.users = [];
   store.values.mockClear();
   env.DEFAULT_PASSWORD = originalPassword;
+  env.DEFAULT_USERNAME = originalUsername;
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
@@ -77,6 +79,22 @@ describe("ensureDefaultAdmin", () => {
 
     await expect(ensureDefaultAdmin()).rejects.toThrow(
       "DEFAULT_PASSWORD must be at most 4096 characters; sign-in refuses a longer password",
+    );
+    expect(store.values).not.toHaveBeenCalled();
+  });
+
+  it("refuses to create the admin when DEFAULT_USERNAME fails login validation (#2330)", async () => {
+    env.DEFAULT_USERNAME = "a".repeat(256);
+    await expect(ensureDefaultAdmin()).rejects.toThrow(
+      "Username must be between 3 and 50 characters",
+    );
+    expect(store.values).not.toHaveBeenCalled();
+  });
+
+  it("refuses to create the admin when DEFAULT_USERNAME has invalid characters (#2330)", async () => {
+    env.DEFAULT_USERNAME = "admin\n";
+    await expect(ensureDefaultAdmin()).rejects.toThrow(
+      "Username can only contain letters, numbers, dots, hyphens, and underscores",
     );
     expect(store.values).not.toHaveBeenCalled();
   });

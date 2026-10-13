@@ -447,6 +447,12 @@ export async function ensureDefaultAdmin(): Promise<void> {
   const passwordHash = await hashPassword(normalizePassword(env.DEFAULT_PASSWORD));
 
   const mustChange = !env.SKIP_MUST_CHANGE_PASSWORD;
+
+  const usernameError = validateUsername(env.DEFAULT_USERNAME);
+  if (usernameError) {
+    throw new Error(`DEFAULT_USERNAME is invalid: ${usernameError}`);
+  }
+
   const result = await db
     .insert(schema.users)
     .values({
