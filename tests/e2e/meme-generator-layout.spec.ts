@@ -29,10 +29,15 @@ test("meme generator top text is reachable on a phone", async ({ page }) => {
   const img = preview.locator("img");
   await img.waitFor({ state: "visible" });
   await img.evaluate((image: HTMLImageElement) => {
-    if (image.complete) return;
-    return new Promise((resolve) => {
+    if (image.complete) {
+      if (image.naturalWidth === 0) {
+        throw new Error(`Image failed to load synchronously: ${image.src}`);
+      }
+      return;
+    }
+    return new Promise((resolve, reject) => {
       image.onload = resolve;
-      image.onerror = resolve; // Continue even on error to avoid hanging
+      image.onerror = () => reject(new Error(`Failed to load preview image: ${image.src}`));
     });
   });
 
