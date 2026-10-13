@@ -4761,6 +4761,7 @@ export const tr: TranslationKeys = {
         exportButton: "Dışa Aktar",
         copied: "Kopyalandı",
         copyFailed: "Kopyalanamadı",
+        exportFailed: "Dışa aktarma başarısız oldu. Tekrar deneyin veya başka bir format seçin.",
         tooLarge:
           "Bu dışa aktarma, tarayıcının oluşturamayacağı kadar büyük. Daha küçük boyutlar deneyin.",
         saveProject: "Projeyi Kaydet",

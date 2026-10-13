@@ -162,22 +162,6 @@ describe("export of a tainted canvas (#2140)", () => {
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(TAINTED, expect.anything()));
     expect(markClean).not.toHaveBeenCalled();
   });
-
-  it("does not swallow an error that is not a capture failure", () => {
-    render(<ExportDialog onClose={() => {}} />);
-    capture.throwOnEncode = new TypeError("a real bug");
-    // React rethrows an event-handler error asynchronously; the test only needs
-    // the guard not to turn it into a toast.
-    const swallow = (event: ErrorEvent) => event.preventDefault();
-    window.addEventListener("error", swallow);
-    try {
-      clickExport();
-    } finally {
-      window.removeEventListener("error", swallow);
-    }
-    expect(toastError).not.toHaveBeenCalled();
-    expect(markClean).not.toHaveBeenCalled();
-  });
 });
 
 describe("copy of a canvas that can't be encoded (#2140)", () => {
@@ -203,6 +187,17 @@ describe("copy of a canvas that can't be encoded (#2140)", () => {
     clickCopy();
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(TAINTED, expect.anything()));
     expect(copyImageToClipboard).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast and reports a bug on an unexpected capture error in Copy", async () => {
+    capture.throwOnEncode = new TypeError("a real bug");
+    render(<ExportDialog onClose={() => {}} />);
+    clickCopy();
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(copyImageToClipboard).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: en.editor.ui.exportDialog.copyFailed })).toBeTruthy();
   });
 });
 
@@ -253,6 +248,36 @@ describe("a 2D context the browser won't give (#2140)", () => {
     fireEvent.click(screen.getByText(en.editor.ui.exportDialog.transparentBackground));
     clickExport();
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(TOO_LARGE, expect.anything()));
+    expect(markClean).not.toHaveBeenCalled();
+  });
+});
+
+describe("export failures that reach the catch block (#2351)", () => {
+  it("shows an error toast and reports a bug when fetch(dataUrl) fails", async () => {
+    // Make fetch reject to simulate a failed download
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("Network error");
+      }),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    clickExport();
+    // Wait for the toast to be called with exportFailed
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(markClean).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast and reports a bug on an unexpected capture error", async () => {
+    capture.throwOnEncode = new TypeError("a real bug");
+    render(<ExportDialog onClose={() => {}} />);
+    clickExport();
+    // Wait for the toast to be called with exportFailed
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
     expect(markClean).not.toHaveBeenCalled();
   });
 });

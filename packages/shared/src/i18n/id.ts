@@ -4755,6 +4755,7 @@ export const id: TranslationKeys = {
         exportButton: "Ekspor",
         copied: "Disalin",
         copyFailed: "Gagal menyalin",
+        exportFailed: "Gagal mengekspor. Coba lagi, atau pilih format lain.",
         tooLarge: "Ekspor ini terlalu besar untuk dirender browser. Coba dimensi yang lebih kecil.",
         saveProject: "Simpan Proyek",
         loadProject: "Muat Proyek",

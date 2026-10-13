@@ -4684,6 +4684,7 @@ export const ko: TranslationKeys = {
         exportButton: "내보내기",
         copied: "복사됨",
         copyFailed: "복사 실패",
+        exportFailed: "내보내기 실패. 다시 시도하거나 다른 형식을 선택하세요.",
         tooLarge: "이 내보내기는 너무 커서 브라우저에서 처리할 수 없습니다. 크기를 줄여 보세요.",
         saveProject: "프로젝트 저장",
         loadProject: "프로젝트 불러오기",

@@ -4723,6 +4723,7 @@ export const ar: TranslationKeys = {
         exportButton: "تصدير",
         copied: "تم النسخ",
         copyFailed: "فشل النسخ",
+        exportFailed: "فشل التصدير. حاول مرة أخرى، أو اختر تنسيقاً آخر.",
         tooLarge: "هذا التصدير أكبر من أن يعرضه المتصفح. جرّب أبعادًا أصغر.",
         saveProject: "حفظ المشروع",
         loadProject: "تحميل المشروع",

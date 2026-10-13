@@ -4754,6 +4754,7 @@ export const sv: TranslationKeys = {
         exportButton: "Exportera",
         copied: "Kopierat",
         copyFailed: "Kopiering misslyckades",
+        exportFailed: "Exporten misslyckades. Försök igen eller välj ett annat format.",
         tooLarge:
           "Den här exporten är för stor för att webbläsaren ska kunna skapa den. Prova mindre mått.",
         saveProject: "Spara projekt",

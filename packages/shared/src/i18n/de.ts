@@ -4781,6 +4781,8 @@ export const de: TranslationKeys = {
         exportButton: "Exportieren",
         copied: "Kopiert",
         copyFailed: "Kopieren fehlgeschlagen",
+        exportFailed:
+          "Export fehlgeschlagen. Versuchen Sie es erneut oder wählen Sie ein anderes Format.",
         tooLarge:
           "Dieser Export ist zu groß, als dass der Browser ihn darstellen könnte. Kleinere Abmessungen könnten helfen.",
         saveProject: "Projekt speichern",

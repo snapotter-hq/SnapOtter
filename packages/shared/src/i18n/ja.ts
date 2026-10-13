@@ -4710,6 +4710,8 @@ export const ja: TranslationKeys = {
         exportButton: "書き出し",
         copied: "コピーしました",
         copyFailed: "コピーに失敗しました",
+        exportFailed:
+          "エクスポートに失敗しました。もう一度お試しいただくか、別の形式を選択してください。",
         tooLarge:
           "この書き出しは大きすぎて、ブラウザで処理できません。サイズを小さくしてみてください。",
         saveProject: "プロジェクトを保存",

@@ -103,6 +103,19 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Issue #6: Use Konva stage ref for proper export instead of DOM query
+  const handleUnexpectedError = useCallback(
+    (err: unknown) => {
+      toast.error(t.editor.ui.exportDialog.exportFailed);
+      void import("@/lib/analytics").then(({ captureHandledError }) =>
+        captureHandledError(new SafeError("Editor export failed", { kind: "bug", cause: err }), {
+          error_class: "bug",
+          tool_id: "editor-export",
+        }),
+      );
+    },
+    [t],
+  );
+
   const generatePreview = useCallback(() => {
     const stage = editorStageRefHolder.current;
     if (!stage) return;
@@ -231,7 +244,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         return true;
       } catch (err) {
         const reason = classifyCaptureError(err);
-        if (!reason) throw err;
+        if (!reason) {
+          handleUnexpectedError(err);
+          return false;
+        }
         reportCaptureFailure(reason, captureMessages);
         return false;
       }
@@ -386,6 +402,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           })
           .catch((err) => {
             console.error("Export failed:", err);
+            handleUnexpectedError(err);
           });
       } else {
         fetch(dataUrl)
@@ -407,6 +424,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           })
           .catch((err) => {
             console.error("Export failed:", err);
+            handleUnexpectedError(err);
           });
       }
     });
