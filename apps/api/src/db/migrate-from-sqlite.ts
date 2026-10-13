@@ -9,6 +9,7 @@ const SQLITE_IMPORT_LOCK_KEY = 7_421_002;
 type SqliteRow = Record<string, unknown>;
 export interface MigrationResult {
   tables: Record<string, number>;
+  detached: DetachedIdentity[];
 }
 
 /** Thrown when the target became non-empty (e.g. another replica imported first). */
@@ -372,8 +373,8 @@ export async function migrateFromSqlite(
   await runMigrations();
 
   const sqlite = new Database(sqlitePath, { readonly: true, fileMustExist: true });
-  const result: MigrationResult = { tables: {} };
   const detached: DetachedIdentity[] = [];
+  const result: MigrationResult = { tables: {}, detached };
   try {
     await db.transaction(async (tx) => {
       // Serialize concurrent replicas: only one import proceeds; losers re-check below.

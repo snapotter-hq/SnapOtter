@@ -117,6 +117,7 @@ describe("migrate-from-sqlite", () => {
     const result = await migrateFromSqlite(sqlitePath, { force: false });
     expect(result.tables.users).toBe(1);
     expect(result.tables.pipelines).toBe(1);
+    expect(result.detached).toEqual([]);
     const [user] = (await db.execute(sql`SELECT * FROM users WHERE id = 'u1'`)).rows;
     expect(user.username).toBe("alice");
     expect(user.must_change_password).toBe(false); // 0 became boolean false
@@ -791,6 +792,22 @@ describe("migrate-from-sqlite (twin SSO identities)", () => {
     expect(line).toContain("u-twin-b");
     // One line per detached row, and nothing for the rows left alone.
     expect(imported.warnings).toHaveLength(2);
+    expect(imported.result?.detached).toEqual([
+      {
+        id: "u-twin-a",
+        username: "sso-user-2",
+        authProvider: "oidc",
+        externalId: "ext-twin",
+        keptBy: { id: "u-twin-b", username: "sso-user" },
+      },
+      {
+        id: "u-twin-c",
+        username: "sso-user-3",
+        authProvider: "oidc",
+        externalId: "ext-twin",
+        keptBy: { id: "u-twin-b", username: "sso-user" },
+      },
+    ]);
   });
 });
 
@@ -867,6 +884,15 @@ describe("migrate-from-sqlite (an identity the target already holds)", () => {
     expect(rows.find((u) => u.id === "u-saml")?.external_id).toBe("ext-held");
     expect(run.warnings.find((w) => w.includes("u-incoming"))).toContain("ext-held");
     expect(run.warnings).toHaveLength(1);
+    expect(run.result?.detached).toEqual([
+      {
+        id: "u-incoming",
+        username: "late-sso",
+        authProvider: "oidc",
+        externalId: "ext-held",
+        keptBy: null,
+      },
+    ]);
   });
 
   it("reports nothing when the import rolls back", async () => {
