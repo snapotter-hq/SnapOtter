@@ -27,7 +27,7 @@ resolve_file_env() {
     echo "ERROR: $file_var points to '$file_path' but the file does not exist or is not readable." >&2
     exit 1
   fi
-  export "$var"="$(cat "$file_path")"
+  export "$var"="$(tr -d '\r' < "$file_path")"
   unset "$file_var"
 }
 ${SUPPORTED_VARS.map((v) => `resolve_file_env ${v}`).join("\n")}
@@ -76,8 +76,14 @@ describe("Docker _FILE secret convention", () => {
     expect(result.DEFAULT_PASSWORD_FILE).toBe("");
   });
 
-  it("strips trailing newline from secret file", () => {
-    const secretPath = writeSecret("password-newline.txt", "my-secret\n");
+  it("strips trailing newline and carriage return from secret file", () => {
+    const secretPath = writeSecret("password-newline.txt", "my-secret\r\n");
+    const result = runResolve({ DEFAULT_PASSWORD_FILE: secretPath });
+    expect(result.DEFAULT_PASSWORD).toBe("my-secret");
+  });
+
+  it("strips trailing carriage return even without a newline", () => {
+    const secretPath = writeSecret("cr-only.txt", "my-secret\r");
     const result = runResolve({ DEFAULT_PASSWORD_FILE: secretPath });
     expect(result.DEFAULT_PASSWORD).toBe("my-secret");
   });
