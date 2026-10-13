@@ -318,7 +318,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               } else if (
                 (err as { statusCode?: number }).statusCode === 400 ||
                 (err as { code?: string }).code === "Z_DATA_ERROR" ||
-                (err as { code?: string }).code === "Z_BUF_ERROR"
+                (err as { code?: string }).code === "Z_BUF_ERROR" ||
+                err instanceof RangeError
               ) {
                 request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardStaged();

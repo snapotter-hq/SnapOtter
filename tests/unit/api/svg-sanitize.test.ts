@@ -357,3 +357,41 @@ describe("isSvgBuffer: prolog before the root element", () => {
     expect(isSvgBuffer(input)).toBe(false);
   });
 });
+
+describe("isSvgBuffer", () => {
+  it("identifies standard SVG", () => {
+    expect(isSvgBuffer(Buffer.from("<svg></svg>"))).toBe(true);
+  });
+
+  it("identifies SVG with DOCTYPE", () => {
+    expect(isSvgBuffer(Buffer.from("<!DOCTYPE svg><svg></svg>"))).toBe(true);
+  });
+
+  it("identifies padded SVG", () => {
+    const padded = " ".repeat(5000) + "<svg></svg>";
+    expect(isSvgBuffer(Buffer.from(padded))).toBe(true);
+  });
+
+  it("identifies heavily padded SVG with mixed whitespace", () => {
+    const padded = " \n\t\r".repeat(2000) + "<svg></svg>";
+    expect(isSvgBuffer(Buffer.from(padded))).toBe(true);
+  });
+
+  it("rejects non-SVG", () => {
+    expect(isSvgBuffer(Buffer.from("<html><body></body></html>"))).toBe(false);
+  });
+});
+
+describe("decompressSvgz", () => {
+  it("decompresses valid SVGZ", () => {
+    const compressed = gzipSync(Buffer.from("<svg></svg>"));
+    const result = decompressSvgz(compressed);
+    expect(result.toString("utf-8")).toBe("<svg></svg>");
+  });
+
+  it("throws RangeError on decompression bomb", () => {
+    // 60MB of spaces compresses to very small gzip
+    const bomb = gzipSync(Buffer.alloc(60 * 1024 * 1024, 0x20));
+    expect(() => decompressSvgz(bomb)).toThrow(RangeError);
+  });
+});

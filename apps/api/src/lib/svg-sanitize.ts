@@ -205,7 +205,21 @@ export const SVG_SNIFF_BYTES = 4096;
  * DOCTYPE and misfire on an HTML document that merely embeds an inline `<svg>`.
  */
 export function isSvgBuffer(buffer: Buffer): boolean {
-  let head = buffer.subarray(0, SVG_SNIFF_BYTES).toString("utf-8").trim();
+  let start = 0;
+  while (
+    start < buffer.length &&
+    (buffer[start] === 0x20 ||
+      buffer[start] === 0x09 ||
+      buffer[start] === 0x0a ||
+      buffer[start] === 0x0d ||
+      buffer[start] === 0x0c)
+  ) {
+    start++;
+  }
+  let head = buffer
+    .subarray(start, start + SVG_SNIFF_BYTES)
+    .toString("utf-8")
+    .trim();
   let prev: string;
   do {
     prev = head;
