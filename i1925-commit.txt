@@ -1,3 +1,0 @@
-fix(sentry): stop trace propagation to outbound requests
-
-Closes #1925
