@@ -368,16 +368,21 @@ describe("Manifest v2 archive fields", () => {
         expect(typeof entry.extractedSize, `${id}/${arch} extractedSize should be number`).toBe(
           "number",
         );
-        // extractedSize (uncompressed size) is a best-effort, informational field feeding
-        // only a conservative disk-space pre-check (install_feature.py). The build script
-        // does not always measure it, so 0 ("not yet measured") is valid. The sha256 and
-        // compressedSize fields above are integrity-critical and remain strictly validated.
+        // Every legacy v2 archive must record its measured extractedSize (> 0)
+        // so install_feature.py never falls back to the 3x compressedSize
+        // estimate that demanded 18.4 GB for background-removal (#1248).
         expect(
           entry.extractedSize as number,
-          `${id}/${arch} extractedSize should be >= 0`,
-        ).toBeGreaterThanOrEqual(0);
+          `${id}/${arch} extractedSize should be > 0`,
+        ).toBeGreaterThan(0);
       }
     }
+  });
+
+  it("build-bundle.sh keeps OpenCV on the base opencv-python-headless package without leaking contrib dirs into the delta", () => {
+    expect(bundleBuilder).toContain("opencv-python-headless==4.10.0.84");
+    expect(bundleBuilder).not.toContain("opencv-contrib-python-headless==");
+    expect(bundleBuilder).toContain("opencv_contrib_python.libs");
   });
 
   it("archive file paths include version prefix", () => {

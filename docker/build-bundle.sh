@@ -285,47 +285,48 @@ print(f"  Kept onnxruntime-gpu=={version}; removed CPU dist-info: {', '.join(cpu
 PYONNX
 
 # ── Step 4.7: OpenCV flavor hygiene ──────────────────────────────────────
-# mediapipe pulls opencv-contrib-python, while rembg/basePackages use
-# opencv-python-headless. Having multiple opencv variants installed causes
-# .so conflicts in the shared cv2 namespace (e.g. missing libpng).
+# mediapipe pulls opencv-contrib-python, while basePackages (/opt/venv) uses
+# opencv-python-headless==4.10.0.84. Step 4 re-pinned opencv-python-headless
+# over cv2/, but left opencv_contrib_python-*.dist-info and
+# opencv_contrib_python.libs behind; Step 6 (comm -13 against base-packages.txt)
+# then shipped those orphan dirs without cv2/ (#1248). Clean cv2/ and all
+# non-base opencv dirs, then reinstall the base opencv-python-headless==4.10.0.84
+# so the bundle delta carries no partial OpenCV files.
 echo "=== Reconciling OpenCV flavor ==="
 python3 << 'PYOPENCV'
 import os, shlex, shutil, site, subprocess, sys
 
-site_packages = site.getsitepackages()[0]
-names = os.listdir(site_packages)
+for site_packages in site.getsitepackages():
+    if not os.path.isdir(site_packages):
+        continue
+    names = os.listdir(site_packages)
+    cv_variants = [n for n in names if (n.startswith("opencv_python-") or
+                                        n.startswith("opencv_python_headless-") or
+                                        n.startswith("opencv_contrib_python-") or
+                                        n.startswith("opencv_contrib_python_headless-"))
+                                        and n.endswith(".dist-info")]
+    extra_libs = [n for n in ("opencv_contrib_python.libs", "opencv_python.libs", "opencv_contrib_python_headless.libs")
+                  if os.path.exists(os.path.join(site_packages, n))]
 
-cv_variants = [n for n in names if (n.startswith("opencv_python-") or
-                                    n.startswith("opencv_python_headless-") or
-                                    n.startswith("opencv_contrib_python-") or
-                                    n.startswith("opencv_contrib_python_headless-"))
-                                    and n.endswith(".dist-info")]
+    if len(cv_variants) <= 1 and not extra_libs:
+        print(f"  Single OpenCV flavor in {site_packages}; nothing to reconcile")
+        continue
 
-if len(cv_variants) <= 1:
-    print("  Single OpenCV flavor (or none); nothing to reconcile")
-    sys.exit(0)
-
-print(f"  Multiple OpenCV variants detected: {', '.join(cv_variants)}")
-# To resolve the conflict, we force-reinstall opencv-contrib-python-headless
-# which contains everything needed by both rembg and mediapipe without GUI deps.
-version = "4.10.0.84"
-cmd = (f"{sys.executable} -m pip install --no-cache-dir --force-reinstall "
-       f"--no-deps opencv-contrib-python-headless=={version}")
-print(f"  > {cmd}", flush=True)
-
-# Delete existing cv2 directory to ensure a clean slate, removing conflicting .so files
-cv2_dir = os.path.join(site_packages, "cv2")
-if os.path.exists(cv2_dir):
-    shutil.rmtree(cv2_dir, ignore_errors=True)
-
-if subprocess.run(shlex.split(cmd)).returncode != 0:
-    print("ERROR: opencv-contrib-python-headless reinstall failed", file=sys.stderr)
-    sys.exit(1)
-
-for name in cv_variants:
-    if not name.startswith("opencv_contrib_python_headless-"):
+    print(f"  Multiple OpenCV variants/libs in {site_packages}: {', '.join(cv_variants + extra_libs)}")
+    cv2_dir = os.path.join(site_packages, "cv2")
+    if os.path.exists(cv2_dir):
+        shutil.rmtree(cv2_dir, ignore_errors=True)
+    for name in cv_variants + extra_libs:
         shutil.rmtree(os.path.join(site_packages, name), ignore_errors=True)
-print(f"  Forced opencv-contrib-python-headless=={version} and removed conflicting dist-infos")
+
+    version = "4.10.0.84"
+    cmd = (f"{sys.executable} -m pip install --no-cache-dir --force-reinstall "
+           f"--no-deps opencv-python-headless=={version}")
+    print(f"  > {cmd}", flush=True)
+    if subprocess.run(shlex.split(cmd)).returncode != 0:
+        print("ERROR: opencv-python-headless reinstall failed", file=sys.stderr)
+        sys.exit(1)
+    print(f"  Restored base opencv-python-headless=={version} and removed non-base OpenCV dirs")
 PYOPENCV
 
 # ── Step 5: Download models ──────────────────────────────────────────────

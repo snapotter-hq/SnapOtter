@@ -101,14 +101,15 @@ def _existing_ancestor(path: str) -> str:
     return p or "/"
 
 
-def check_disk_space(path: str, needed_bytes: int) -> None:
+def check_disk_space(path: str, needed_bytes: int, detail: str = "") -> None:
     """Fail if insufficient disk space on the filesystem holding path."""
     usage = shutil.disk_usage(_existing_ancestor(path))
     if usage.free < needed_bytes:
         free_gb = usage.free / (1024 ** 3)
         need_gb = needed_bytes / (1024 ** 3)
+        suffix = f" ({detail})" if detail else ""
         fail(
-            f"Insufficient disk space: need {need_gb:.1f} GB, "
+            f"Insufficient disk space: need {need_gb:.1f} GB{suffix}, "
             f"have {free_gb:.1f} GB free. "
             f"Free up space and retry."
         )
@@ -122,6 +123,52 @@ def estimate_extracted(compressed: int, extracted: int) -> int:
     ~3x). This is only the early sanity bail; the accurate guard is the
     real-on-disk re-check just before the destructive venv write."""
     return extracted if extracted > 0 else compressed * 3
+
+
+def needed_download_disk_bytes(
+    ai_dir: str,
+    bundle_id: str,
+    arch: str,
+    compressed_size: int,
+    extracted_size: int,
+) -> int:
+    """Calculate additional free bytes required on ai_dir before downloading.
+
+    During download + extraction, both the compressed archive in staging/ and
+    the extracted tree in staging-<bundleId>/ coexist on disk before the archive
+    is removed. Any stale staging-<bundleId>/ directory from a crashed run is
+    deleted first so its space is reclaimed, and any bytes already on disk in
+    the resumable .tar.gz / .partial file are credited against the download
+    portion so a retry does not double-count them (#1248).
+    """
+    stale_staging_dir = os.path.join(ai_dir, f"staging-{bundle_id}")
+    if os.path.exists(stale_staging_dir):
+        shutil.rmtree(stale_staging_dir, ignore_errors=True)
+
+    extracted = estimate_extracted(compressed_size, extracted_size)
+    needed = compressed_size + extracted + 500 * 1024 * 1024  # 500 MB buffer
+    if needed <= 0:
+        return 0
+
+    staging_base = os.path.join(ai_dir, "staging")
+    tar_path = os.path.join(staging_base, f"{bundle_id}-{arch}.tar.gz")
+    # A leftover complete .tar.gz before download_and_verify starts is an orphan
+    # from a run that died during extraction; remove it so download_with_resume
+    # does not hold both .tar.gz and .tar.gz.partial on disk at once.
+    if os.path.isfile(tar_path):
+        _unlink_quietly(tar_path)
+
+    already_staged = 0
+    partial_path = tar_path + ".partial"
+    try:
+        if os.path.isfile(partial_path):
+            already_staged = os.path.getsize(partial_path)
+    except OSError:
+        pass
+    if compressed_size > 0:
+        already_staged = min(already_staged, compressed_size)
+
+    return max(0, needed - already_staged)
 
 
 def dir_size(path: str) -> int:
@@ -964,6 +1011,74 @@ def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
         sys.stderr.flush()
 
 
+def reconcile_opencv(staging_sp: str, site_packages_dir: str) -> None:
+    """Drop orphan OpenCV metadata and .libs directories from bundle staging.
+
+    In build-bundle.sh, /opt/venv already holds cv2/ from basePackages
+    (opencv-python-headless==4.10.0.84), so Step 6's top-level diff excludes
+    cv2/. Bundles whose dependencies pulled opencv-contrib-python (via
+    mediapipe) before Step 4.7 existed therefore shipped
+    opencv_contrib_python-*.dist-info and opencv_contrib_python.libs/ WITHOUT
+    cv2/. Merging those orphan directories into a venv whose cv2.abi3.so links
+    against a different build's libpng16-*.so replaces the .libs directory while
+    leaving the old cv2.abi3.so behind, breaking every cv2 import (#1248).
+    """
+    if not os.path.isdir(staging_sp):
+        return
+    # Base OpenCV lives in /opt/venv; a bundle delta without cv2/ must never
+    # place OpenCV dist-info or .libs directories on its own.
+    if os.path.isdir(os.path.join(staging_sp, "cv2")):
+        return
+    removed = []
+    for name in os.listdir(staging_sp):
+        is_cv_dist = (
+            name.startswith(
+                (
+                    "opencv_python-",
+                    "opencv_python_headless-",
+                    "opencv_contrib_python-",
+                    "opencv_contrib_python_headless-",
+                )
+            )
+            and name.endswith(".dist-info")
+        )
+        is_cv_libs = name in (
+            "opencv_python.libs",
+            "opencv_python_headless.libs",
+            "opencv_contrib_python.libs",
+            "opencv_contrib_python_headless.libs",
+        )
+        if is_cv_dist or is_cv_libs:
+            shutil.rmtree(os.path.join(staging_sp, name), ignore_errors=True)
+            removed.append(name)
+    if removed:
+        sys.stderr.write(
+            f"[install] dropped orphan OpenCV entries from bundle delta (no cv2/ in bundle): {', '.join(sorted(removed))}\n"
+        )
+        sys.stderr.flush()
+
+
+def can_reseed_venv() -> bool:
+    """True only when the official image's baked /opt/venv and reseed script exist."""
+    return os.path.exists("/usr/local/bin/reseed-ai-venv.sh") and os.path.exists("/opt/venv")
+
+
+def _venv_python_major_minor(venv_python: str) -> str:
+    """Return 'major.minor' of venv_python, or '' if it cannot be queried."""
+    try:
+        proc = subprocess.run(
+            [venv_python, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
 # -- Distribution reconciliation (one version per distribution) --
 
 DIST_INFO_SUFFIX = ".dist-info"
@@ -1440,10 +1555,16 @@ def _install() -> None:
         # estimate_extracted covers the extractedSize:0 case so the budget can't
         # collapse to just the compressed size; the accurate guard is the
         # real-on-disk re-check just before the destructive venv write below.
-        needed = compressed_size + estimate_extracted(compressed_size, extracted_size)
-        needed += 500 * 1024 * 1024  # 500 MB buffer
+        needed = needed_download_disk_bytes(
+            ai_dir, bundle_id, arch, compressed_size, extracted_size
+        )
         if needed > 0:
-            check_disk_space(ai_dir, needed)
+            detail = ""
+            if compressed_size > 0 or extracted_size > 0:
+                dl_gb = compressed_size / (1024 ** 3)
+                ext_gb = estimate_extracted(compressed_size, extracted_size) / (1024 ** 3)
+                detail = f"{dl_gb:.1f} GB download + {ext_gb:.1f} GB extracted during install"
+            check_disk_space(ai_dir, needed, detail)
 
         # Download
         os.makedirs(staging_base, exist_ok=True)
@@ -1480,6 +1601,11 @@ def _install() -> None:
                 "Free up space and retry."
             )
         fail(f"Failed to extract archive: {e}")
+
+    # Free the downloaded archive as soon as extraction finishes so it does not
+    # sit on disk during the post-extract disk check and venv/models moves.
+    if not local_path and os.path.exists(tar_path):
+        _unlink_quietly(tar_path)
 
     # -- Read bundle.json from tar --
     bundle_json_path = os.path.join(staging_dir, "bundle.json")
@@ -1543,6 +1669,7 @@ def _install() -> None:
             # from staging, the general pass never sees it and so never uninstalls
             # the GPU build the venv is keeping (#490).
             reconcile_onnxruntime(staging_sp, site_packages_dir)
+            reconcile_opencv(staging_sp, site_packages_dir)
             reconciliation_plan = plan_reconciliation(staging_sp, site_packages_dir)
             supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
             move_tree(
@@ -1613,9 +1740,13 @@ def _install() -> None:
                 # resulting in missing attributes or missing libcudart/libcudnn errors.
                 if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
                     emit_progress(99, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
-                    fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "onnxruntime==1.20.1"]
+                    fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "onnxruntime==1.20.1"]
                     fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
-                    if fix_proc.returncode != 0:
+                    if fix_proc.returncode == 0 and site_packages_dir and os.path.isdir(site_packages_dir):
+                        for name in os.listdir(site_packages_dir):
+                            if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
+                                shutil.rmtree(os.path.join(site_packages_dir, name), ignore_errors=True)
+                    elif fix_proc.returncode != 0:
                         emit_progress(99, "Fallback onnxruntime installation failed")
 
                     # Re-run smoke test after fallback
@@ -1657,13 +1788,32 @@ def _install() -> None:
                     venv_writing_marker, bundle_id,
                 )
                 tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
+                bundle_py = str(bundle_meta.get("pythonVersion", "")).strip()
+                bundle_py_mm = ".".join(bundle_py.split(".")[:2]) if "." in bundle_py else ""
+                venv_py_mm = _venv_python_major_minor(venv_python)
+                mismatch_note = ""
+                if bundle_py_mm and venv_py_mm and bundle_py_mm != venv_py_mm:
+                    mismatch_note = (
+                        f"Bundle requires Python {bundle_py_mm}, but the AI venv at "
+                        f"{venv_path} is running Python {venv_py_mm}.\n\n"
+                    )
+                if can_reseed_venv():
+                    recovery_hint = (
+                        "This usually means an interrupted or corrupted install. Retry the "
+                        "install; if it keeps failing, use Settings > AI Features > Reset AI "
+                        "Environment, then reinstall."
+                    )
+                else:
+                    recovery_hint = (
+                        "This usually means an interrupted install or a host Python/base-package "
+                        f"mismatch in {venv_path}. Retry the install, or rebuild {venv_path} "
+                        "with the Python version and basePackages from docker/feature-manifest.json."
+                    )
                 fail(
                     "Installation verification failed: the bundle installed but its "
                     "libraries could not be loaded, so the tool would not work.\n"
                     f"{tail}\n\n"
-                    "This usually means an interrupted or corrupted install. Retry the "
-                    "install; if it keeps failing, use Settings > AI Features > Reset AI "
-                    "Environment, then reinstall."
+                    f"{mismatch_note}{recovery_hint}"
                 )
 
     # -- Write installed.json --

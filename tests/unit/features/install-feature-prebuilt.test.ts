@@ -341,3 +341,154 @@ describe("onnxruntime flavor reconciliation (#490)", () => {
     expect(existsSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"))).toBe(true);
   });
 });
+
+describe("OpenCV orphan delta reconciliation and disk precheck (#1248, #1030)", () => {
+  it("drops orphan opencv_contrib_python metadata and .libs when a bundle delta has no cv2/ directory", () => {
+    // Reproduce Bug 4 from #1248: build-bundle.sh excluded cv2/ (already in
+    // basePackages) but leaked opencv_contrib_python.libs/ and its dist-info
+    // (claiming cv2/ in RECORD) into the bundle delta. Merging that into a
+    // venv whose cv2.abi3.so links against 4.10.0.84's libpng16-ef62451c.so
+    // replaced .libs with 4.11.0.86's libpng16-1bde1c40.so while leaving
+    // 4.10.0.84's cv2.abi3.so behind.
+    const venvCv2 = join(sitePackagesDir, "cv2");
+    const venvLibs = join(sitePackagesDir, "opencv_contrib_python.libs");
+    const venvDist = join(sitePackagesDir, "opencv_contrib_python-4.10.0.84.dist-info");
+    mkdirSync(venvCv2, { recursive: true });
+    mkdirSync(venvLibs, { recursive: true });
+    mkdirSync(venvDist, { recursive: true });
+    writeFileSync(join(venvCv2, "cv2.abi3.so"), "links-libpng16-ef62451c");
+    writeFileSync(join(venvLibs, "libpng16-ef62451c.so.16.44.0"), "png-4.10");
+    writeFileSync(
+      join(venvDist, "RECORD"),
+      "cv2/cv2.abi3.so,,\nopencv_contrib_python.libs/libpng16-ef62451c.so.16.44.0,,\n",
+    );
+
+    const buildDir = join(tempDir, "build-orphan-cv");
+    const stagedLibs = join(buildDir, "site-packages", "opencv_contrib_python.libs");
+    const stagedDist = join(buildDir, "site-packages", "opencv_contrib_python-4.11.0.86.dist-info");
+    mkdirSync(stagedLibs, { recursive: true });
+    mkdirSync(stagedDist, { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "rembg"), { recursive: true });
+    writeFileSync(join(buildDir, "site-packages", "rembg", "__init__.py"), "# rembg");
+    writeFileSync(join(stagedLibs, "libpng16-1bde1c40.so.16.44.0"), "png-4.11");
+    writeFileSync(
+      join(stagedDist, "RECORD"),
+      "cv2/cv2.abi3.so,,\nopencv_contrib_python.libs/libpng16-1bde1c40.so.16.44.0,,\n",
+    );
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "background-removal",
+        version: "2.0.0",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: [],
+      }),
+    );
+
+    const tarPath = join(tempDir, "bg-orphan-cv.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+    writeManifest("background-removal", tarPath, sha256, { models: [] });
+
+    const result = installBundle("background-removal", tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+
+    // The venv's matching cv2.abi3.so and libpng16-ef62451c.so stay intact, and
+    // the incomplete 4.11.0.86 dist-info / .libs did not overwrite them.
+    expect(readFileSync(join(venvCv2, "cv2.abi3.so"), "utf-8")).toBe("links-libpng16-ef62451c");
+    expect(existsSync(join(venvLibs, "libpng16-ef62451c.so.16.44.0"))).toBe(true);
+    expect(existsSync(join(venvLibs, "libpng16-1bde1c40.so.16.44.0"))).toBe(false);
+    expect(existsSync(venvDist)).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "opencv_contrib_python-4.11.0.86.dist-info"))).toBe(
+      false,
+    );
+    expect(existsSync(join(sitePackagesDir, "rembg", "__init__.py"))).toBe(true);
+  });
+
+  it("credits already-staged partial download bytes and removes the archive before the post-extract disk check", () => {
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, os, tempfile
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with tempfile.TemporaryDirectory() as d:
+    staging_base = os.path.join(d, "staging")
+    os.makedirs(staging_base, exist_ok=True)
+    partial = os.path.join(staging_base, "background-removal-amd64-gpu.tar.gz.partial")
+    with open(partial, "wb") as f:
+        f.truncate(3 * 1024 ** 3)
+    stale_extract = os.path.join(d, "staging-background-removal")
+    os.makedirs(stale_extract, exist_ok=True)
+    with open(os.path.join(stale_extract, "old.bin"), "wb") as f:
+        f.truncate(2 * 1024 ** 3)
+
+    needed = mod.needed_download_disk_bytes(
+        d,
+        "background-removal",
+        "amd64-gpu",
+        4 * 1024 ** 3,
+        6 * 1024 ** 3,
+    )
+    # 4 GiB compressed + 6 GiB extracted + 0.5 GiB buffer = 10.5 GiB total,
+    # minus 3 GiB already on disk in .partial = 7.5 GiB additional space needed,
+    # and the stale staging-background-removal dir is cleaned up before measuring.
+    assert not os.path.exists(stale_extract), "stale extraction dir must be removed before precheck"
+    expected = (4 + 6) * (1024 ** 3) + 500 * (1024 ** 2) - 3 * (1024 ** 3)
+    assert needed == expected, f"expected {expected}, got {needed}"
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
+
+  it("surfaces Python major.minor mismatch and omits the Reset AI Environment hint on native installs", () => {
+    linkVenvPython();
+    const hostPyMm = execFileSync("python3", [
+      "-c",
+      "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+    ])
+      .toString()
+      .trim();
+    const mismatchedMm = hostPyMm === "3.12" ? "3.11" : "3.12";
+
+    const buildDir = join(tempDir, "build-py-mismatch");
+    mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
+    writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# test");
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "background-removal",
+        version: "2.0.0",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: `${mismatchedMm}.3`,
+        models: [],
+      }),
+    );
+    const tarPath = join(tempDir, "bg-mismatch.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+    writeManifest("background-removal", tarPath, sha256, {
+      models: [],
+      smokeImports: ["snapotter_missing_c_ext_zzz"],
+    });
+
+    const result = installBundle("background-removal", tarPath);
+    expect(result.status).not.toBe(0);
+    const stderr = result.stderr?.toString() ?? "";
+    expect(stderr).toContain(`Python ${mismatchedMm}`);
+    expect(stderr).toContain(`Python ${hostPyMm}`);
+    // Native installs have no /usr/local/bin/reseed-ai-venv.sh, so telling the
+    // user to click Reset AI Environment is misleading (#1248 Bug 3, #796).
+    expect(stderr).not.toContain("Reset AI Environment");
+  });
+});
