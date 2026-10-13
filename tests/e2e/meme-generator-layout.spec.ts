@@ -22,23 +22,27 @@ test("meme generator top text is reachable on a phone", async ({ page }) => {
   await expect(preview).toBeVisible();
 
   // Wait for image to load to get accurate dimensions
-  await page.waitForSelector('[data-testid="meme-editor-preview"] img');
-
-  const scrollerBox = await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="meme-editor-preview"]')?.parentElement
-      ?.parentElement;
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    return { top: rect.top, height: rect.height };
+  // Using evaluate to wait for the image's complete property is robust
+  const img = preview.locator("img");
+  await img.waitFor({ state: "visible" });
+  await img.evaluate((image: HTMLImageElement) => {
+    if (image.complete) return;
+    return new Promise((resolve) => {
+      image.onload = resolve;
+      image.onerror = resolve; // Continue even on error to avoid hanging
+    });
   });
 
+  // Get the scroller using its new test id
+  const scroller = page.getByTestId("meme-editor-scroller");
+  await expect(scroller).toBeVisible();
+
+  const scrollerBox = await scroller.boundingBox();
   expect(scrollerBox).not.toBeNull();
 
   // Try to scroll to the top
-  await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="meme-editor-preview"]')?.parentElement
-      ?.parentElement;
-    if (el) el.scrollTop = 0;
+  await scroller.evaluate((el) => {
+    el.scrollTop = 0;
   });
 
   // Re-measure after scroll
@@ -46,5 +50,5 @@ test("meme generator top text is reachable on a phone", async ({ page }) => {
 
   // If the top of the preview box is ABOVE the top of the scroller, and we are scrolled to 0,
   // it means the top content is unreachable!
-  expect(newPreviewBox!.y).toBeGreaterThanOrEqual(scrollerBox!.top);
+  expect(newPreviewBox!.y).toBeGreaterThanOrEqual(scrollerBox!.y);
 });

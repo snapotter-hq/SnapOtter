@@ -365,7 +365,7 @@ function EditorPreview() {
     : ((customLayout && PRESET_LAYOUTS[customLayout]?.boxes) ?? PRESET_LAYOUTS["top-bottom"].boxes);
 
   return (
-    <div className="h-full flex p-4 overflow-auto">
+    <div data-testid="meme-editor-scroller" className="h-full flex p-4 overflow-auto">
       <div className="max-w-2xl w-full m-auto">
         <div
           ref={containerRef}

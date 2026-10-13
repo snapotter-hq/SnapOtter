@@ -1,0 +1,7 @@
+test(e2e): fix flaky DOM traversal in meme generator test
+
+Refactors the `meme-generator-layout.spec.ts` test to use proper
+Playwright Locators (`data-testid="meme-editor-scroller"`) instead of
+brittle `.parentElement?.parentElement` traversal. Also improves image
+load synchronization by explicitly waiting for the `complete` property
+of the image element using `evaluate`.
