@@ -248,7 +248,7 @@ describe("runFfmpeg: resolution and stderr capture", () => {
 });
 
 describe("runFfmpeg: non-zero exit", () => {
-  it("rejects with 'ffmpeg exited <code>: <tail>' including the last 2000 chars", async () => {
+  it("rejects with 'ffmpeg exited <code>: <tail>' including the full stderr tail (up to ring max)", async () => {
     const child = makeChild();
     mockSpawnReturns(child);
     const runFfmpeg = await loadRunFfmpeg();
@@ -300,7 +300,7 @@ describe("runFfmpeg: non-zero exit", () => {
     expect(isToolInputError(caught)).toBe(false);
   });
 
-  it("truncates the reject message tail to the last 2000 chars", async () => {
+  it("does not truncate the reject message tail", async () => {
     const child = makeChild();
     mockSpawnReturns(child);
     const runFfmpeg = await loadRunFfmpeg();
@@ -315,7 +315,7 @@ describe("runFfmpeg: non-zero exit", () => {
     }
     const msg = (caught as Error).message;
     const prefix = "ffmpeg exited 1: ";
-    expect(msg.slice(prefix.length).length).toBe(2000);
+    expect(msg.slice(prefix.length).length).toBe(5000);
   });
 });
 

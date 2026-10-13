@@ -103,7 +103,7 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       cleanup();
       if (code === 0) resolvePromise(stderrTail);
       else {
-        const err = new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail.slice(-2000)}`);
+        const err = new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail}`);
         reject(markIfInputError(err, stderrTail));
       }
     });
