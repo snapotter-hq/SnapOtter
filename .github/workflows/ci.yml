@@ -255,6 +255,27 @@ jobs:
           done
       - run: pnpm vitest run tests/integration/ --reporter=verbose --shard=${{ matrix.shard }}/8
 
+  test-integration-result:
+    # Single gate job for branch protection so changing the shard count (or
+    # skipping the matrix on a docs/landing-only PR, where GitHub reports the
+    # unexpanded name "Integration (${{ matrix.shard }}/8)") never leaves
+    # required shard contexts stuck as expected.
+    name: Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: test-integration
+    if: always()
+    steps:
+      - name: Check all integration shards
+        env:
+          RESULT: ${{ needs.test-integration.result }}
+        run: |
+          echo "test-integration: $RESULT"
+          case "$RESULT" in
+            success | skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
+
   test-e2e-smoke:
     name: E2E Smoke (Chromium)
     runs-on: ubuntu-latest
