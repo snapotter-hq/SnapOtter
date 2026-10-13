@@ -17,6 +17,9 @@ test("meme generator top text is reachable on a phone", async ({ page }) => {
     ),
   });
 
+  // Click a layout first to proceed to the editor
+  await page.getByTestId("layout-top-bottom").click();
+
   // Wait for the preview container
   const preview = page.getByTestId("meme-editor-preview");
   await expect(preview).toBeVisible();
