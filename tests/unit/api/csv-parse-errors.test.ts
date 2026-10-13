@@ -80,4 +80,14 @@ describe("csvParseFailure", () => {
       "The file has duplicate column headers",
     );
   });
+
+  it("refuses a file when PapaParse renames duplicate column headers", () => {
+    expect(
+      csvParseFailure({
+        data: [],
+        errors: [],
+        meta: { fields: ["a", "a_1"], renamedHeaders: { a_1: "a" } } as never,
+      }),
+    ).toBe("The file has duplicate column headers");
+  });
 });

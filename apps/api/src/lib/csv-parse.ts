@@ -137,7 +137,10 @@ export function csvParseFailure(parsed: Pick<ParseResult<unknown>, "data" | "err
 
   if (fields) {
     const uniqueFields = new Set(fields);
-    if (uniqueFields.size !== fields.length) {
+    if (
+      uniqueFields.size !== fields.length ||
+      (parsed.meta as { renamedHeaders?: unknown }).renamedHeaders
+    ) {
       return "The file has duplicate column headers";
     }
   }
