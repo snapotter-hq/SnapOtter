@@ -1,6 +1,10 @@
 // apps/web/src/components/editor/common/new-document-dialog.tsx
+
+import { SafeError } from "@snapotter/shared";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -56,8 +60,13 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
     const canvas = document.createElement("canvas");
     canvas.width = validWidth;
     canvas.height = validHeight;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
+
+    try {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("canvas.getContext returned null");
+      }
+
       if (background === "White") {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, validWidth, validHeight);
@@ -65,10 +74,24 @@ export function NewDocumentDialog({ open, onClose }: NewDocumentDialogProps) {
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, validWidth, validHeight);
       }
+
+      const url = canvas.toDataURL("image/png");
+      if (url === "data:,") {
+        throw new Error("canvas.toDataURL returned empty data URI");
+      }
+
+      loadImage(url, validWidth, validHeight);
+      onClose();
+    } catch (err) {
+      void captureHandledError(
+        new SafeError("Editor failed to create new document canvas", {
+          kind: "operational",
+          cause: err,
+        }),
+        { error_class: "operational" },
+      );
+      toast.error(t.editor.ui.captureFailure.noCanvasMemory);
     }
-    const url = canvas.toDataURL("image/png");
-    loadImage(url, validWidth, validHeight);
-    onClose();
   };
 
   return (
