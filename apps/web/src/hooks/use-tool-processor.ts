@@ -1178,7 +1178,7 @@ export function useToolProcessor(toolId: string) {
   );
 
   const processAllFiles = useCallback(
-    async (files: File[], settings: Record<string, unknown>) => {
+    async (files: File[], settings: Record<string, unknown> | Record<string, unknown>[]) => {
       if (files.length === 0) {
         setError("No files selected");
         return;
@@ -1193,7 +1193,7 @@ export function useToolProcessor(toolId: string) {
       });
 
       if (files.length === 1) {
-        processFiles(files, settings);
+        processFiles(files, Array.isArray(settings) ? settings[0] : settings);
         return;
       }
 

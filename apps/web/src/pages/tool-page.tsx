@@ -373,6 +373,50 @@ export function ToolPage() {
     width: number;
     height: number;
   } | null>(null);
+  const [perFileCropState, setPerFileCropState] = useState<
+    Record<string, { crop: Crop; aspect: number | undefined }>
+  >({});
+
+  const handleCropChange = useCallback(
+    (crop: Crop) => {
+      setCropCrop(crop);
+      if (currentEntry) {
+        setPerFileCropState((prev) => ({
+          ...prev,
+          [currentEntry.id]: { crop, aspect: cropAspect },
+        }));
+      }
+    },
+    [currentEntry, cropAspect],
+  );
+
+  const handleAspectChange = useCallback(
+    (aspect: number | undefined) => {
+      setCropAspect(aspect);
+      if (currentEntry) {
+        setPerFileCropState((prev) => ({
+          ...prev,
+          [currentEntry.id]: { crop: cropCrop, aspect },
+        }));
+      }
+    },
+    [currentEntry, cropCrop],
+  );
+
+  const prevEntryIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentEntry?.id !== prevEntryIdRef.current) {
+      prevEntryIdRef.current = currentEntry?.id || null;
+      if (currentEntry && perFileCropState[currentEntry.id]) {
+        const state = perFileCropState[currentEntry.id];
+        setCropCrop(state.crop);
+        setCropAspect(state.aspect);
+      } else {
+        setCropCrop({ unit: "%", x: 0, y: 0, width: 100, height: 100 });
+        setCropAspect(undefined);
+      }
+    }
+  }, [currentEntry?.id, perFileCropState]);
 
   const cropState = useMemo(
     () => ({
@@ -707,8 +751,9 @@ export function ToolPage() {
       displayMode === "interactive-crop"
         ? {
             cropState,
-            onCropChange: setCropCrop,
-            onAspectChange: setCropAspect,
+            perFileCropState,
+            onCropChange: handleCropChange,
+            onAspectChange: handleAspectChange,
             onGridToggle: setCropShowGrid,
           }
         : undefined,
@@ -939,7 +984,7 @@ export function ToolPage() {
           aspect={cropAspect}
           showGrid={cropShowGrid}
           imgDimensions={cropImgDimensions}
-          onCropChange={setCropCrop}
+          onCropChange={handleCropChange}
           onImageLoad={setCropImgDimensions}
         />
       );

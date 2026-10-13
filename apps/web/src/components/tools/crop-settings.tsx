@@ -28,6 +28,7 @@ export interface CropSettingsProps {
     showGrid: boolean;
     imgDimensions: { width: number; height: number } | null;
   };
+  perFileCropState?: Record<string, { crop: Crop; aspect: number | undefined }>;
   onCropChange: (crop: Crop) => void;
   onAspectChange: (aspect: number | undefined) => void;
   onGridToggle: (show: boolean) => void;
@@ -35,12 +36,13 @@ export interface CropSettingsProps {
 
 export function CropSettings({
   cropState,
+  perFileCropState,
   onCropChange,
   onAspectChange,
   onGridToggle,
 }: CropSettingsProps) {
   const { t } = useTranslation();
-  const { files } = useFileStore();
+  const { files, entries } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("crop");
 
@@ -179,13 +181,20 @@ export function CropSettings({
   const handleProcess = () => {
     if (files.length > 1) {
       // Send percentage-based crop so the server adapts to each image's dimensions
-      const settings = {
-        left: crop.x,
-        top: crop.y,
-        width: Math.max(0.1, crop.width),
-        height: Math.max(0.1, crop.height),
-        unit: "percent" as const,
-      };
+      const settings = files.map((_, i) => {
+        const entryId = entries[i]?.id;
+        if (!entryId) {
+          console.error(`Missing entry ID for file at index ${i} during batch crop`);
+        }
+        const fileCrop = (entryId ? perFileCropState?.[entryId]?.crop : null) || crop;
+        return {
+          left: fileCrop.x,
+          top: fileCrop.y,
+          width: Math.max(0.1, fileCrop.width),
+          height: Math.max(0.1, fileCrop.height),
+          unit: "percent" as const,
+        };
+      });
       processAllFiles(files, settings);
     } else {
       const settings = {
@@ -201,7 +210,7 @@ export function CropSettings({
   const hasFile = files.length > 0;
   const hasSize = pixels.width > 0 && pixels.height > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (hasFile && hasSize && !processing) handleProcess();
   };

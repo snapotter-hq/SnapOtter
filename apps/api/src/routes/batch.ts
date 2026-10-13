@@ -255,10 +255,34 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           }
 
           // Parse and validate settings
-          let settings: unknown;
-          let requestedSettings: unknown;
+          let parsed: unknown;
           try {
-            const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+            parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          } catch {
+            return reply.status(400).send({ error: "Settings must be valid JSON" });
+          }
+
+          let settingsList: unknown[] = [];
+          let requestedSettingsList: unknown[] = [];
+
+          if (Array.isArray(parsed)) {
+            if (parsed.length !== files.length) {
+              return reply
+                .status(400)
+                .send({ error: "Array of settings must match number of files" });
+            }
+            for (const p of parsed) {
+              const result = toolConfig.settingsSchema.safeParse(p);
+              if (!result.success) {
+                return reply.status(400).send({
+                  error: "Invalid settings in array",
+                  details: formatZodErrors(result.error.issues),
+                });
+              }
+              requestedSettingsList.push(p);
+              settingsList.push(result.data);
+            }
+          } else {
             const result = toolConfig.settingsSchema.safeParse(parsed);
             if (!result.success) {
               return reply.status(400).send({
@@ -266,30 +290,33 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 details: formatZodErrors(result.error.issues),
               });
             }
-            requestedSettings = parsed;
-            settings = result.data;
-          } catch {
-            return reply.status(400).send({ error: "Settings must be valid JSON" });
+            requestedSettingsList = files.map(() => parsed);
+            settingsList = files.map(() => result.data);
           }
 
-          const ocrResolution = resolveOcrIngressSettings(toolId, settings, { requestedSettings });
-          if (!ocrResolution.ok) {
-            const bundle = FEATURE_BUNDLES.ocr;
-            return reply.status(501).send({
-              error:
-                ocrResolution.code === "FEATURE_INCOMPATIBLE"
-                  ? "Feature incompatible"
-                  : "Feature not installed",
-              code: ocrResolution.code,
-              feature: "ocr",
-              featureName: bundle?.name ?? toolId,
-              estimatedSize: bundle?.estimatedSize ?? "unknown",
-              requestedQuality: ocrResolution.requestedQuality,
-              compatibilityReason: ocrResolution.reason,
-              ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
+          const resolvedSettingsList: unknown[] = [];
+          for (let i = 0; i < settingsList.length; i++) {
+            const ocrResolution = resolveOcrIngressSettings(toolId, settingsList[i], {
+              requestedSettings: requestedSettingsList[i],
             });
+            if (!ocrResolution.ok) {
+              const bundle = FEATURE_BUNDLES.ocr;
+              return reply.status(501).send({
+                error:
+                  ocrResolution.code === "FEATURE_INCOMPATIBLE"
+                    ? "Feature incompatible"
+                    : "Feature not installed",
+                code: ocrResolution.code,
+                feature: "ocr",
+                featureName: bundle?.name ?? toolId,
+                estimatedSize: bundle?.estimatedSize ?? "unknown",
+                requestedQuality: ocrResolution.requestedQuality,
+                compatibilityReason: ocrResolution.reason,
+                ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
+              });
+            }
+            resolvedSettingsList.push(ocrResolution.settings);
           }
-          settings = ocrResolution.settings;
 
           // Settings errors take precedence over feature availability. This keeps
           // unavailable installations from masking invalid client input.
@@ -520,7 +547,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               type: "batch-child",
               status: "queued",
               inputRefs: [key],
-              settings: toStorableJson(settings as Record<string, unknown>),
+              settings: toStorableJson(resolvedSettingsList[i] as Record<string, unknown>),
             });
             stagedBatch?.childIds.push(childId);
 
@@ -539,7 +566,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 fileIndex: i,
                 inputRefs: [key],
                 filename: processFilename,
-                settings,
+                settings: resolvedSettingsList[i] as Record<string, unknown>,
                 analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
               } satisfies ToolJobData,
               // Children swallow failures via return markers, so a retry
