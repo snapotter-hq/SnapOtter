@@ -1,6 +1,6 @@
 // apps/api/src/lib/last-admin.ts
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { type db, schema } from "../db/index.js";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -34,6 +34,7 @@ export class LastAdminError extends Error {
  */
 export async function assertNotLastAdmin(tx: Tx, userId: string): Promise<void> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(${LAST_ADMIN_LOCK_KEY})`);
+  if (userId === "anonymous") return;
   const [target] = await tx
     .select({ role: schema.users.role })
     .from(schema.users)
@@ -42,6 +43,6 @@ export async function assertNotLastAdmin(tx: Tx, userId: string): Promise<void> 
   const [admins] = await tx
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.users)
-    .where(eq(schema.users.role, "admin"));
+    .where(and(eq(schema.users.role, "admin"), ne(schema.users.id, "anonymous")));
   if ((admins?.count ?? 0) <= 1) throw new LastAdminError();
 }

@@ -232,4 +232,40 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
     expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
     expect(await adminCount()).toBe(1);
   });
+
+  it("refuses to remove the sole real admin when the passwordless anonymous row exists (#2459)", async () => {
+    const { ensureAnonymousUser } = await import("../../../apps/api/src/plugins/auth.js");
+    const { x, y } = await exactlyTwoAdmins();
+    await ensureAnonymousUser();
+    created.push("anonymous");
+
+    const results = await raceRowLocks("users", 2, () =>
+      Promise.all([
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/enterprise/users/${y.id}/purge`,
+          headers: { authorization: `Bearer ${x.token}` },
+          payload: { confirm: true },
+        }),
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/enterprise/users/${x.id}/purge`,
+          headers: { authorization: `Bearer ${y.token}` },
+          payload: { confirm: true },
+        }),
+      ]),
+    );
+
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    const refused = results.find((r) => r.statusCode === 409);
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("LAST_ADMIN");
+
+    const survivorId = results[0].statusCode === 409 ? y.id : x.id;
+    const scimRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/scim/v2/Users/${survivorId}`,
+      headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+    });
+    expect(scimRes.statusCode).toBe(409);
+  });
 });

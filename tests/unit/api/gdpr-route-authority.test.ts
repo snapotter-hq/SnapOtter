@@ -36,10 +36,11 @@ function nextChain() {
 }
 
 /** Flatten the nested `and(eq(...), eq(...))` shape into its leaf comparisons. */
-function eqLeaves(predicate: unknown): Array<{ col: unknown; val: unknown }> {
+function eqLeaves(predicate: unknown): Array<{ op: string; col: unknown; val: unknown }> {
   const node = predicate as { op?: string; conds?: unknown[]; col?: unknown; val?: unknown };
   if (node?.op === "and") return (node.conds ?? []).flatMap(eqLeaves);
-  if (node?.op === "eq") return [{ col: node.col, val: node.val }];
+  if (node?.op === "eq" || node?.op === "ne")
+    return [{ op: node.op, col: node.col, val: node.val }];
   return [];
 }
 
@@ -67,6 +68,7 @@ async function buildApp(): Promise<FastifyInstance> {
   // query actually constrained.
   vi.doMock("drizzle-orm", () => ({
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    ne: (col: unknown, val: unknown) => ({ op: "ne", col, val }),
     and: (...conds: unknown[]) => ({ op: "and", conds }),
     inArray: (col: unknown, vals: unknown) => ({ op: "inArray", col, vals }),
   }));
@@ -74,7 +76,8 @@ async function buildApp(): Promise<FastifyInstance> {
   vi.doMock("../../../apps/api/src/db/index.js", () => ({
     db: { select: selectMock, insert: insertMock, delete: vi.fn(), update: vi.fn() },
     schema: {
-      users: { id: "users.id", role: "users.role" },
+      users: { id: "users.id", role: "users.role", team: "users.team" },
+      teams: { id: "teams.id", legalHold: "teams.legal_hold" },
       jobs: { id: "jobs.id", userId: "jobs.user_id", toolId: "jobs.tool_id" },
     },
   }));
@@ -197,9 +200,35 @@ describe("GDPR export route authority", () => {
     const leaves = eqLeaves(whereArgs.at(-1));
     expect(leaves).toEqual(
       expect.arrayContaining([
-        { col: "jobs.id", val: "job-1" },
-        { col: "jobs.user_id", val: "victim-1" },
-        { col: "jobs.tool_id", val: "gdpr-export" },
+        { op: "eq", col: "jobs.id", val: "job-1" },
+        { op: "eq", col: "jobs.user_id", val: "victim-1" },
+        { op: "eq", col: "jobs.tool_id", val: "gdpr-export" },
+      ]),
+    );
+  });
+
+  it("excludes the synthetic anonymous row when checking whether a team purge removes every admin (#2459)", async () => {
+    app = await buildApp();
+    selectResults = [
+      [{ id: "team-1", legalHold: false }],
+      [{ id: "admin-1", role: "admin", legalHold: false }],
+      [{ id: "admin-1" }],
+    ];
+    canManageTargetRoleMock.mockResolvedValue(true);
+
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/enterprise/teams/team-1/purge",
+      payload: { confirm: true },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ code: "LAST_ADMIN" });
+    const adminQueryLeaves = eqLeaves(whereArgs.at(-1));
+    expect(adminQueryLeaves).toEqual(
+      expect.arrayContaining([
+        { op: "eq", col: "users.role", val: "admin" },
+        { op: "ne", col: "users.id", val: "anonymous" },
       ]),
     );
   });

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
@@ -399,7 +399,7 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
       const admins = await db
         .select({ id: schema.users.id })
         .from(schema.users)
-        .where(eq(schema.users.role, "admin"));
+        .where(and(eq(schema.users.role, "admin"), ne(schema.users.id, "anonymous")));
       if (admins.length > 0 && admins.every((admin) => memberIds.has(admin.id))) {
         return reply
           .status(409)
