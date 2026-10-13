@@ -75,4 +75,50 @@ describe("shouldShowConversionCard (#746)", () => {
       }),
     ).toBe(true);
   });
+
+  it("is false for single-file results in media-player, document, custom-results, interactive-split, interactive-sign, and no-dropzone (#2449)", () => {
+    for (const displayMode of [
+      "media-player",
+      "document",
+      "custom-results",
+      "interactive-split",
+      "interactive-sign",
+      "no-dropzone",
+    ]) {
+      expect(
+        shouldShowConversionCard({
+          ...base,
+          displayMode,
+          isProcessedPreviewable: false,
+          processedUrl: "/api/v1/download/job-1/result.bin",
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("is true for skipped batch extractions (processedUrl null) in media-player, document, and custom-results (#2449)", () => {
+    for (const displayMode of ["media-player", "document", "custom-results"]) {
+      expect(
+        shouldShowConversionCard({
+          ...base,
+          displayMode,
+          isProcessedPreviewable: false,
+          processedUrl: null,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it("is false for interactive-sign and no-dropzone even when processedUrl is null (#2449)", () => {
+    for (const displayMode of ["interactive-sign", "no-dropzone"]) {
+      expect(
+        shouldShowConversionCard({
+          ...base,
+          displayMode,
+          isProcessedPreviewable: false,
+          processedUrl: null,
+        }),
+      ).toBe(false);
+    }
+  });
 });

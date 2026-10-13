@@ -802,6 +802,41 @@ export function ToolPage() {
       );
     }
 
+    const conversionCompleteCard = (
+      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
+        <div className="m-auto text-center p-8 max-w-xs">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
+            <CheckCircle2 className="h-8 w-8 text-success-ink" />
+          </div>
+          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
+          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
+          {processedSize != null && (
+            <p className="text-xs text-muted-foreground">
+              {processedFileType} &middot; {formatFileSize(processedSize)}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+
+    // A processed result with no renderable preview must not fall back to the
+    // original: the branches below (including media-player and document when a
+    // large batch skipped ZIP extraction) would otherwise show the untouched
+    // original under the processed filename and size (#746, #1240, #2449).
+    if (
+      shouldShowConversionCard({
+        hasProcessed,
+        isProcessedPreviewable,
+        processedUrl,
+        processedPreviewUrl,
+        originalBlobUrl,
+        displayMode,
+        hasImageWrapperStyle: imageWrapperStyle != null,
+      })
+    ) {
+      return conversionCompleteCard;
+    }
+
     // Media player: waveform for audio, native <video> for video
     if (displayMode === "media-player" && hasFile) {
       if (tool?.modality === "audio") {
@@ -1046,42 +1081,6 @@ export function ToolPage() {
           </Suspense>
         );
       }
-    }
-
-    const conversionCompleteCard = (
-      <div className="flex min-h-0 max-h-full flex-1 overflow-auto">
-        <div className="m-auto text-center p-8 max-w-xs">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mb-4">
-            <CheckCircle2 className="h-8 w-8 text-success-ink" />
-          </div>
-          <p className="font-medium text-foreground mb-1">{t.toolPage.conversionComplete}</p>
-          <p className="text-sm text-muted-foreground mb-1">{processedFileName}</p>
-          {processedSize != null && (
-            <p className="text-xs text-muted-foreground">
-              {processedFileType} &middot; {formatFileSize(processedSize)}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-
-    // A processed result with no renderable preview must not fall back to the
-    // original: the branches below render displayUrl as the result, so they
-    // would otherwise show the untouched original under the processed filename
-    // and size (#746). The live-preview + imageWrapperStyle branch is excluded
-    // (WYSIWYG CSS simulation, or #713 input-overlay handling).
-    if (
-      shouldShowConversionCard({
-        hasProcessed,
-        isProcessedPreviewable,
-        processedUrl,
-        processedPreviewUrl,
-        originalBlobUrl,
-        displayMode,
-        hasImageWrapperStyle: imageWrapperStyle != null,
-      })
-    ) {
-      return conversionCompleteCard;
     }
 
     if (

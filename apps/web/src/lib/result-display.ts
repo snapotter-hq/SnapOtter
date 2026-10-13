@@ -19,6 +19,29 @@ export function playerDownloadClaim(
 }
 
 /**
+ * Display modes that never swap the main area for the conversion-complete card:
+ * generator tools have no input file, and interactive-sign keeps its signature
+ * canvas mounted even after signing (#1969).
+ */
+const NEVER_CONVERSION_CARD_MODES = new Set(["no-dropzone", "interactive-sign"]);
+
+/**
+ * Display modes that render their own viewer or panel (pdf.js, <video>/<audio>,
+ * or a dedicated ResultsPanel) rather than an <img> tag fed by `displayUrl`.
+ * For these modes `isProcessedPreviewable` (which checks image extensions only)
+ * is false on single-file `/api/...` download URLs even though the mode's own
+ * viewer can render `processedUrl` directly. They only show the conversion card
+ * when a completed result has no `processedUrl` at all, such as a large batch
+ * whose ZIP extraction was skipped (#1240, #2449).
+ */
+const SELF_RENDERING_RESULT_MODES = new Set([
+  "media-player",
+  "document",
+  "custom-results",
+  "interactive-split",
+]);
+
+/**
  * Whether the result area should render the "conversion complete" success card
  * instead of an image, because the processed result has no renderable source.
  *
@@ -43,6 +66,10 @@ export function shouldShowConversionCard(state: {
   hasImageWrapperStyle: boolean;
 }): boolean {
   if (!state.hasProcessed) return false;
+  if (NEVER_CONVERSION_CARD_MODES.has(state.displayMode)) return false;
+  if (SELF_RENDERING_RESULT_MODES.has(state.displayMode)) {
+    return state.processedUrl == null;
+  }
   const resultIsRenderable =
     state.processedPreviewUrl != null ||
     (state.isProcessedPreviewable && state.processedUrl != null);
