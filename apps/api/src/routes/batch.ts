@@ -42,6 +42,7 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { multipartFailure } from "../lib/multipart-parts.js";
 import {
   deleteObject,
   getObjectStream,
@@ -230,7 +231,14 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               }
             }
           } catch (err) {
+            if (err instanceof InputValidationError) {
+              return reply.status(err.statusCode).send({ error: err.message });
+            }
             const statusCode = ocrUploadErrorStatus(err);
+            if (statusCode === 413) {
+              const failure = multipartFailure(err);
+              return reply.status(failure.status).send(failure.body);
+            }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
               details: err instanceof Error ? err.message : String(err),

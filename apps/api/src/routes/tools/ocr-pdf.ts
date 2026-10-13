@@ -15,6 +15,7 @@ import {
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { copyObjectToFile, deleteObject } from "../../lib/object-storage.js";
 import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
 import {
@@ -157,6 +158,10 @@ export function registerOcrPdf(app: FastifyInstance) {
       } catch (err) {
         if (inputKey) await deleteObject(inputKey).catch(() => {});
         const statusCode = ocrUploadErrorStatus(err);
+        if (statusCode === 413) {
+          const failure = multipartFailure(err);
+          return reply.status(failure.status).send(failure.body);
+        }
         return reply.status(statusCode).send({
           error: ocrUploadErrorMessage(statusCode),
           details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -253,7 +258,11 @@ export function registerOcrPdf(app: FastifyInstance) {
           });
         }
         const statusCode = ocrUploadErrorStatus(err);
-        if (statusCode === 413 || statusCode === 503) {
+        if (statusCode === 413) {
+          const failure = multipartFailure(err);
+          return reply.status(failure.status).send(failure.body);
+        }
+        if (statusCode === 503) {
           return reply.status(statusCode).send({
             error: ocrUploadErrorMessage(statusCode),
             details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

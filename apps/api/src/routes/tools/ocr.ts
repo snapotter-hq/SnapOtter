@@ -18,6 +18,7 @@ import {
   parseSaveModeField,
 } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { multipartFailure } from "../../lib/multipart-parts.js";
 import { deleteObject } from "../../lib/object-storage.js";
 import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
 import {
@@ -162,6 +163,10 @@ export function registerOcr(app: FastifyInstance) {
     } catch (err) {
       if (inputKey) await deleteObject(inputKey).catch(() => {});
       const statusCode = ocrUploadErrorStatus(err);
+      if (statusCode === 413) {
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
+      }
       return reply.status(statusCode).send({
         error: ocrUploadErrorMessage(statusCode),
         details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

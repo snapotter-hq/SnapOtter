@@ -203,7 +203,9 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
       const batch = await postMultipart("/api/v1/pipeline/batch", [oversized, pipelinePart]);
 
       expect(execute.statusCode).toBe(413);
+      expect(JSON.parse(execute.body)).toEqual({ error: "File exceeds the 1 KB upload limit" });
       expect(batch.statusCode).toBe(413);
+      expect(JSON.parse(batch.body)).toEqual({ error: "File exceeds the 1 KB upload limit" });
       expect(mocks.flowAdd).not.toHaveBeenCalled();
       expect(prepareSpy).not.toHaveBeenCalled();
     } finally {

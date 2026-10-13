@@ -51,6 +51,11 @@ describe("tool routes answer 413 for an over-limit upload", () => {
     ["custom route", "/api/v1/tools/image/info"],
     // Used a different error string, so a string-matching guard missed it.
     ["custom route", "/api/v1/tools/image/gif-tools/info"],
+    ["batch route", "/api/v1/tools/image/compress/batch"],
+    ["pipeline route", "/api/v1/pipeline/execute"],
+    ["pipeline batch route", "/api/v1/pipeline/batch"],
+    ["ocr route", "/api/v1/tools/image/ocr"],
+    ["ocr-pdf route", "/api/v1/tools/pdf/ocr-pdf"],
   ])("%s %s", async (_kind, url) => {
     const res = await post(url, [OVER_LIMIT]);
 

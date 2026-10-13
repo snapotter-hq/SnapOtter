@@ -43,6 +43,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { multipartFailure } from "../lib/multipart-parts.js";
 import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
 import { prepareOcrIngressImage } from "../lib/ocr-image-input.js";
@@ -355,6 +356,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             }
           } catch (err) {
             const statusCode = ocrUploadErrorStatus(err);
+            if (statusCode === 413) {
+              const failure = multipartFailure(err);
+              return reply.status(failure.status).send(failure.body);
+            }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
               details: err instanceof Error ? err.message : String(err),
@@ -635,7 +640,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 return reply.status(err.statusCode).send(body);
               }
               const statusCode = ocrUploadErrorStatus(err);
-              if (statusCode === 413 || statusCode === 503) {
+              if (statusCode === 413) {
+                const failure = multipartFailure(err);
+                return reply.status(failure.status).send(failure.body);
+              }
+              if (statusCode === 503) {
                 return reply.status(statusCode).send({
                   error: ocrUploadErrorMessage(statusCode),
                   details: err instanceof Error ? err.message : String(err),
@@ -1044,6 +1053,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             }
           } catch (err) {
             const statusCode = ocrUploadErrorStatus(err);
+            if (statusCode === 413) {
+              const failure = multipartFailure(err);
+              return reply.status(failure.status).send(failure.body);
+            }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
               details: err instanceof Error ? err.message : String(err),

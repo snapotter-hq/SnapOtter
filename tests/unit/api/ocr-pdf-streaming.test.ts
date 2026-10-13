@@ -210,4 +210,52 @@ describe("OCR PDF path-backed processing", () => {
     expect(request.raw.removeListener).toHaveBeenCalledWith("aborted", expect.any(Function));
     expect(existsSync(validationPath.replace(/\/input\.pdf$/, ""))).toBe(false);
   });
+
+  it("answers 413 naming the limit when validation copy exceeds the OCR cap", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    mocks.copyObjectToFile.mockRejectedValueOnce(
+      Object.assign(new Error("Object exceeds the maximum allowed size (536870912 bytes)"), {
+        statusCode: 413,
+        limitBytes: 512 * 1024 * 1024,
+      }),
+    );
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(reply.statusCode).toBe(413);
+    expect(reply.payload).toEqual({ error: "File exceeds the 512 MB upload limit" });
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+  });
 });

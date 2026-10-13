@@ -1012,8 +1012,7 @@ describe("OCR batch aggregate size limit", () => {
 
       expect(res.statusCode).toBe(413);
       const result = JSON.parse(res.body);
-      expect(result.error).toBe("Upload exceeds the allowed size");
-      expect(result.details).toMatch(/aggregate safety limit/);
+      expect(result.error).toBe("OCR batch input exceeds the 64 byte aggregate safety limit");
     } finally {
       ocrLimitsMock.override = null;
     }
