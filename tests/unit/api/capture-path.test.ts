@@ -271,6 +271,17 @@ describe("capture path", () => {
     expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
   });
 
+  it("reports an ENETUNREACH fetch failure as a connectivity warning, not a bug (#1992)", async () => {
+    const err = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ENETUNREACH 10.0.0.1:443"), { code: "ENETUNREACH" }),
+    });
+    await reportError(err, { source: "worker", pool: "image" });
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_class", "operational");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "ENETUNREACH");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+  });
+
   it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {
     const pg = Object.assign(new Error("Failed query: select 1"), {
       cause: Object.assign(new Error("57P01"), { code: "57P01" }),

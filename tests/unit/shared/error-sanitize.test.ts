@@ -265,6 +265,23 @@ describe("connectivityClass", () => {
     const err = new TypeError("fetch failed", { cause: Object.assign(new Error(msg), { code }) });
     expect(connectivityClass(err)).toBe("net-unavailable");
   });
+  it.each(["ENETUNREACH", "EHOSTUNREACH"])(
+    "classifies a fetch that hit %s as net-unavailable (#1992)",
+    (code) => {
+      const err = new TypeError("fetch failed", {
+        cause: Object.assign(new Error(`connect ${code} 10.0.0.1:443`), { code }),
+      });
+      expect(connectivityClass(err)).toBe("net-unavailable");
+    },
+  );
+  it("classifies ENETUNREACH under a pg wrapper as pg-unavailable (#1992)", () => {
+    const conn = Object.assign(new Error("connect ENETUNREACH 10.0.0.1:5432"), {
+      code: "ENETUNREACH",
+    });
+    expect(connectivityClass(Object.assign(new Error("Failed query: z"), { cause: conn }))).toBe(
+      "pg-unavailable",
+    );
+  });
   it("leaves undici's other codes (header/body timeouts, aborts) unclassified", () => {
     for (const code of ["UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT", "UND_ERR_ABORTED"]) {
       const err = new TypeError("fetch failed", {

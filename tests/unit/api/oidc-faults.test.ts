@@ -108,6 +108,7 @@ describe("oidcTokenExchangeFaultCode", () => {
       "OIDC_TOKEN_TIMEOUT",
     ],
     ["a refused connection", fetchFailed("ECONNREFUSED"), "OIDC_TOKEN_UNREACHABLE"],
+    ["an unreachable network", fetchFailed("ENETUNREACH"), "OIDC_TOKEN_UNREACHABLE"],
     ["an unknown host", fetchFailed("ENOTFOUND"), "OIDC_TOKEN_UNREACHABLE"],
     ["an IdP that closes the socket", fetchFailed("UND_ERR_SOCKET"), "OIDC_TOKEN_UNREACHABLE"],
     [

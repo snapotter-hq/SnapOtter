@@ -31,6 +31,7 @@ const NET_CODES = new Set([
   "ECONNRESET",
   "ETIMEDOUT",
   "EHOSTUNREACH",
+  "ENETUNREACH",
   "EPIPE",
   "EAI_AGAIN",
   "ENOTFOUND",

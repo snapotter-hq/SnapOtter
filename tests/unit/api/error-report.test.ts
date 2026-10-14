@@ -60,6 +60,14 @@ describe("classifyError", () => {
       ),
     ).toBe("operational");
   });
+  it("operational: a worker fetch with no route to the network (ENETUNREACH, #1992)", () => {
+    const err = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ENETUNREACH 10.0.0.1:443"), {
+        code: "ENETUNREACH",
+      }),
+    });
+    expect(classifyError(err, "worker")).toBe("operational");
+  });
   it("operational: environmental database errors (auth, permission, resources), not query bugs", () => {
     // The deployment's DB is misconfigured or starved -- the operator's
     // environment, not our code. These flooded the bug view as pg auth /

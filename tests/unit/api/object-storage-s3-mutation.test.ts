@@ -191,6 +191,10 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
         "the endpoint unreachable",
         Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
       ],
+      [
+        "the network unreachable (#1992)",
+        Object.assign(new Error("connect ENETUNREACH 10.0.0.9:9000"), { code: "ENETUNREACH" }),
+      ],
     ])("answers 503 for %s", async (_case, cause) => {
       const err = await streamFailure(cause);
       expect(err).toMatchObject({
