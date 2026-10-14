@@ -31,6 +31,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const batchProgressMock = vi.hoisted(() => ({
   failCountersForParentId: null as string | null,
   failRecordOutcomeForParentId: null as string | null,
+  recordOutcomeCalls: [] as Array<{ parentId: string; filename: string; error?: string }>,
 }));
 
 vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) => {
@@ -50,6 +51,7 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) =
       filename: string,
       error?: string,
     ) => {
+      batchProgressMock.recordOutcomeCalls.push({ parentId, filename, error });
       if (batchProgressMock.failRecordOutcomeForParentId === parentId) {
         throw new Error("injected record outcome outage");
       }
@@ -1189,6 +1191,129 @@ describe("pipeline finalize", () => {
       batchProgressMock.failRecordOutcomeForParentId = null;
     }
   }, 30_000);
+
+  it("survives a batch counter fault after settling a failed pipeline-batch file (#2620)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "failed",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      error: { message: "kaboom" },
+    });
+
+    batchProgressMock.failRecordOutcomeForParentId = batchParent;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "chain.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("failed");
+      expect(row.error?.message).toBe("Step 1: kaboom");
+
+      const settledJob = await waitFor(async () => {
+        const job = await getQueue("image").getJob(jobId);
+        if (!job) return undefined;
+        const state = await job.getState();
+        return state === "completed" || state === "failed"
+          ? { state, returnvalue: job.returnvalue }
+          : undefined;
+      });
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.resultPayload).toMatchObject({
+        error: "Step 1: kaboom",
+        stepsCompleted: 0,
+        steps: [],
+      });
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+      expect(events[0].status).toBe("failed");
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ),
+      ).toBe(true);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
+
+  it("survives a batch counter fault after settling a completed pipeline-batch file (#2620)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await putObject("outputs/seed-2620/final.png", Buffer.from("final-2620"));
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "completed",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      outputRefs: ["outputs/seed-2620/final.png"],
+      bytesIn: 10,
+      bytesOut: 10,
+    });
+
+    batchProgressMock.failRecordOutcomeForParentId = batchParent;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "chain.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.outputRefs).toEqual([`outputs/${jobId}/final.png`]);
+
+      const settledJob = await waitFor(async () => {
+        const job = await getQueue("image").getJob(jobId);
+        if (!job) return undefined;
+        const state = await job.getState();
+        return state === "completed" || state === "failed"
+          ? { state, returnvalue: job.returnvalue }
+          : undefined;
+      });
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.outputRefs).toEqual([`outputs/${jobId}/final.png`]);
+      expect(settledJob.returnvalue?.resultPayload).toMatchObject({
+        stepsCompleted: 1,
+        steps: [{ step: 1, toolId: "resize", size: 10 }],
+      });
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+      expect(events[0].status).toBe("completed");
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ),
+      ).toBe(true);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
 });
 
 describe("batch children and finalize", () => {
@@ -1290,6 +1415,124 @@ describe("batch children and finalize", () => {
     const entries = new AdmZip(zipBytes).getEntries();
     expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
     expect(entries[0].getData().toString("utf8")).toBe("aaa");
+  }, 30_000);
+
+  it("survives a batch counter fault in batch-child without corrupting a succeeded child or hard-failing a failed child (#2620)", async () => {
+    const parentId = `bparent-fault-${randomUUID()}`;
+    const okId = `${parentId}-f0`;
+    const boomId = `${parentId}-f1`;
+    const okRef = await seedInput(okId, "a.png", Buffer.from("aaa"));
+    const boomRef = await seedInput(boomId, "b.png", Buffer.from("bbb"));
+
+    batchProgressMock.failRecordOutcomeForParentId = parentId;
+    batchProgressMock.recordOutcomeCalls.length = 0;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId: okId,
+          toolId: "wt-echo",
+          kind: "batch-child",
+          parentId,
+          totalFiles: 2,
+          inputRefs: [okRef],
+          filename: "a.png",
+        }),
+      );
+      // Flow children run with attempts: 1 in production (batch.ts:587) so the
+      // first failure is final and processToolJob commits the failed DB row.
+      await db.insert(schema.jobs).values({
+        id: boomId,
+        type: "batch-child",
+        toolId: "wt-boom",
+        pool: "image",
+        status: "queued",
+        inputRefs: [boomRef],
+      });
+      await getQueue("image").add(
+        "wt-boom",
+        toolJob({
+          jobId: boomId,
+          toolId: "wt-boom",
+          kind: "batch-child",
+          parentId,
+          totalFiles: 2,
+          inputRefs: [boomRef],
+          filename: "b.png",
+        }),
+        { jobId: boomId, attempts: 1 },
+      );
+
+      const okRow = await terminalRow(okId);
+      expect(okRow.status).toBe("completed");
+      expect(okRow.outputRefs).toEqual([`outputs/${okId}/a_wt-echo.png`]);
+
+      const okSettled = await waitFor(async () => {
+        const job = await getQueue("image").getJob(okId);
+        if (!job) return undefined;
+        const state = await job.getState();
+        return state === "completed" || state === "failed"
+          ? { state, returnvalue: job.returnvalue }
+          : undefined;
+      });
+      expect(okSettled.state).toBe("completed");
+      expect(okSettled.returnvalue?.outputRefs).toEqual([`outputs/${okId}/a_wt-echo.png`]);
+      expect(okSettled.returnvalue?.resultPayload).toBeUndefined();
+
+      const boomRow = await terminalRow(boomId);
+      expect(boomRow.status).toBe("failed");
+      expect(boomRow.error?.message).toBe("boom");
+
+      const boomSettled = await waitFor(async () => {
+        const job = await getQueue("image").getJob(boomId);
+        if (!job) return undefined;
+        const state = await job.getState();
+        return state === "completed" || state === "failed"
+          ? { state, returnvalue: job.returnvalue }
+          : undefined;
+      });
+      expect(boomSettled.state).toBe("completed");
+      expect(boomSettled.returnvalue?.resultPayload).toEqual({ failed: true, error: "boom" });
+
+      const callsForParent = batchProgressMock.recordOutcomeCalls.filter(
+        (c) => c.parentId === parentId,
+      );
+      expect(callsForParent.filter((c) => c.filename === "a.png")).toEqual([
+        { parentId, filename: "a.png", error: undefined },
+      ]);
+      expect(callsForParent.filter((c) => c.filename === "b.png")).toEqual([
+        { parentId, filename: "b.png", error: "boom" },
+      ]);
+
+      expect(
+        reported.errors.filter(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ).length,
+      ).toBe(2);
+
+      // Once Redis recovers, batch-finalize builds the ZIP manifest from the
+      // durable child DB rows rather than the missed Redis counters (#2620).
+      batchProgressMock.failRecordOutcomeForParentId = null;
+      await enqueueToolJob(
+        toolJob({
+          jobId: parentId,
+          toolId: "wt-echo",
+          kind: "batch-finalize",
+          pool: "system",
+          totalFiles: 2,
+          settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+          filename: "",
+        }),
+      );
+      const parentRow = await terminalRow(parentId);
+      expect(parentRow.status).toBe("completed");
+      const zipKey = (parentRow.outputRefs ?? [])[0];
+      const entries = new AdmZip(await getObjectBuffer(zipKey)).getEntries();
+      expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
+      expect(entries[0].getData().toString("utf8")).toBe("aaa");
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
   }, 30_000);
 
   it("the failed-handler safety net publishes a terminal failed frame when the finalize crashes", async () => {
