@@ -6,8 +6,11 @@
  * and margin.
  */
 
+import { spawnSync } from "node:child_process";
+import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
+import { hasFitz, pythonBin } from "../../../helpers/python-gate.js";
 import {
   buildTestApp,
   createMultipartPayload,
@@ -17,6 +20,21 @@ import {
 
 const PNG = readFixture(fixtures.image.base.png200);
 const JPG = readFixture(fixtures.image.base.jpg100);
+
+function readPdfProducer(pdf: Buffer): { producer: string; creator: string } {
+  if (!pythonBin) throw new Error("pythonBin is required when hasFitz is true");
+  const script = [
+    "import json, sys, fitz",
+    "doc = fitz.open(stream=sys.stdin.buffer.read(), filetype='pdf')",
+    "meta = doc.metadata or {}",
+    "print(json.dumps({'producer': meta.get('producer', ''), 'creator': meta.get('creator', '')}))",
+  ].join("; ");
+  const res = spawnSync(pythonBin, ["-c", script], { input: pdf });
+  if (res.status !== 0) {
+    throw new Error(`fitz metadata read failed: ${res.stderr?.toString("utf8")}`);
+  }
+  return JSON.parse(res.stdout.toString("utf8")) as { producer: string; creator: string };
+}
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -79,6 +97,13 @@ describe("image-to-pdf", () => {
     const pdfBuffer = Buffer.from(dlRes.rawPayload);
     // PDF files start with %PDF-
     expect(pdfBuffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+    expect(pdfBuffer.length).toBe(json.processedSize);
+    if (hasFitz) {
+      expect(readPdfProducer(pdfBuffer)).toEqual({
+        producer: "SnapOtter",
+        creator: "SnapOtter",
+      });
+    }
   });
 
   it("converts multiple images to multi-page PDF", async () => {
@@ -408,6 +433,21 @@ describe("image-to-pdf", () => {
     expect(json.compression.jpegQuality).toBeGreaterThanOrEqual(10);
     expect(json.compression.jpegQuality).toBeLessThanOrEqual(95);
     expect(json.processedSize).toBeLessThanOrEqual(5_000_000);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const pdfBuffer = Buffer.from(dlRes.rawPayload);
+    expect(pdfBuffer.length).toBe(json.processedSize);
+    if (hasFitz) {
+      expect(readPdfProducer(pdfBuffer)).toEqual({
+        producer: "SnapOtter",
+        creator: "SnapOtter",
+      });
+    }
   });
 
   it("returns targetMet=false when target is impossibly small", async () => {
@@ -1096,6 +1136,26 @@ describe("image-to-pdf", () => {
     expect(json.collated).toBe(false);
     expect(json.downloadUrl).toContain("images.zip");
     expect(json.processedSize).toBeGreaterThan(0);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(dlRes.rawPayload));
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName).sort()).toEqual(["page1.pdf", "page2.pdf"]);
+    const sumBytes = entries.reduce((sum, e) => sum + e.getData().length, 0);
+    expect(json.processedSize).toBe(sumBytes);
+    if (hasFitz) {
+      for (const entry of entries) {
+        expect(readPdfProducer(entry.getData())).toEqual({
+          producer: "SnapOtter",
+          creator: "SnapOtter",
+        });
+      }
+    }
   });
 
   // ── collate=false with single image returns single PDF in ZIP ────
@@ -1235,5 +1295,40 @@ describe("image-to-pdf", () => {
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.pages).toBe(1);
+  });
+
+  // ── Conversion preset route (png-to-pdf) ─────────────────────────
+
+  it("png-to-pdf preset scrubs Producer and Creator metadata (#2501)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/png-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(1);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const pdfBuffer = Buffer.from(dlRes.rawPayload);
+    expect(pdfBuffer.length).toBe(json.processedSize);
+    if (hasFitz) {
+      expect(readPdfProducer(pdfBuffer)).toEqual({
+        producer: "SnapOtter",
+        creator: "SnapOtter",
+      });
+    }
   });
 });

@@ -17,6 +17,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { scrubPdfProducer } from "../../lib/pdf-producer.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const targetSizeSchema = z.object({
@@ -310,7 +311,7 @@ export function registerImageToPdfRoute(
         }
 
         doc.end();
-        return pdfDone;
+        return scrubPdfProducer(await pdfDone);
       }
 
       const jobId = randomUUID();
