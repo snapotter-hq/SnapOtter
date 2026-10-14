@@ -12,7 +12,7 @@ import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
+import { decryptSetting, encrypt } from "../lib/encryption.js";
 import {
   getSettingPolicy,
   prepareSetting,
@@ -45,15 +45,7 @@ function hasSettingAuthority(
 }
 
 async function decryptIfNeeded(value: string): Promise<string> {
-  if (!isEncrypted(value)) return value;
-  if (!env.DATA_ENCRYPTION_KEY) return value;
-  return (
-    (await decrypt(
-      value,
-      env.DATA_ENCRYPTION_KEY,
-      env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined,
-    )) ?? value
-  );
+  return (await decryptSetting(value)) ?? value;
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {

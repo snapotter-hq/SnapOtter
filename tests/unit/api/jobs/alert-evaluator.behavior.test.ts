@@ -3,11 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const statfsMock = vi.hoisted(() => vi.fn());
 const getSettingStringMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
-const decryptMock = vi.hoisted(() => vi.fn());
-const isEncryptedMock = vi.hoisted(() => vi.fn());
+const decryptSettingMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
 
 function queryChain<T>(result: T) {
   const chain = {
@@ -17,18 +23,18 @@ function queryChain<T>(result: T) {
   return chain;
 }
 
-async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) {
-  const { dataEncryptionKey = "test-key" } = options;
+async function loadAlertEvaluator() {
   vi.resetModules();
   statfsMock.mockReset();
   getSettingStringMock.mockReset();
   deliverWebhookMock.mockReset();
-  decryptMock.mockReset();
-  isEncryptedMock.mockReset();
+  decryptSettingMock.mockReset();
   getActiveLicenseMock.mockReset();
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  reportErrorMock.mockClear();
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
 
   vi.doMock("node:fs/promises", () => ({
     statfs: statfsMock,
@@ -44,7 +50,6 @@ async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) 
   vi.doMock("../../../../apps/api/src/config.js", () => ({
     env: {
       WORKSPACE_PATH: "/workspace",
-      DATA_ENCRYPTION_KEY: dataEncryptionKey,
     },
   }));
 
@@ -65,8 +70,15 @@ async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) 
   }));
 
   vi.doMock("../../../../apps/api/src/lib/encryption.js", () => ({
-    decrypt: decryptMock,
-    isEncrypted: isEncryptedMock,
+    decryptSetting: decryptSettingMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({
+    logger: loggerMock,
   }));
 
   vi.doMock("../../../../apps/api/src/lib/webhook-delivery.js", () => ({
@@ -147,12 +159,12 @@ describe("alert evaluator behavior", () => {
     statfsMock.mockResolvedValue({ bfree: 100, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 21 }]));
     getActiveLicenseMock.mockReturnValue({ expiresAt: "2026-07-05T12:00:00.000Z" });
-    isEncryptedMock.mockReturnValue(true);
-    decryptMock.mockResolvedValue("Bearer decrypted");
+    decryptSettingMock.mockResolvedValue("Bearer decrypted");
     deliverWebhookMock.mockResolvedValue({ success: true });
 
     await evaluateAlerts();
 
+    expect(decryptSettingMock).toHaveBeenCalledWith("enc:token");
     expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
     expect(deliverWebhookMock).toHaveBeenCalledWith(
       "https://example.test/alerts",
@@ -325,12 +337,12 @@ describe("alert evaluator behavior", () => {
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
-    isEncryptedMock.mockReturnValue(false);
+    decryptSettingMock.mockResolvedValue("Bearer plaintext");
     deliverWebhookMock.mockResolvedValue({ success: true });
 
     await evaluateAlerts();
 
-    expect(decryptMock).not.toHaveBeenCalled();
+    expect(decryptSettingMock).toHaveBeenCalledWith("Bearer plaintext");
     expect(deliverWebhookMock).toHaveBeenCalledWith(
       "https://example.test/alerts",
       "Bearer plaintext",
@@ -339,8 +351,54 @@ describe("alert evaluator behavior", () => {
     );
   });
 
-  it("falls back to an empty auth header when decryption returns null", async () => {
+  it("logs, reports an operational error, and skips delivery when decryptSetting returns null", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const { evaluateAlerts } = await loadAlertEvaluator();
+
+    getSettingStringMock
+      .mockResolvedValueOnce(
+        JSON.stringify([
+          {
+            name: "Ops Alerts",
+            url: "https://example.test/alerts",
+            authHeader: "$ENC$blob",
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce("");
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue(null);
+    decryptSettingMock.mockResolvedValue(null);
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await evaluateAlerts();
+
+    expect(decryptSettingMock).toHaveBeenCalledWith("$ENC$blob");
+    expect(deliverWebhookMock).not.toHaveBeenCalled();
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { name: "Ops Alerts" },
+      expect.stringContaining("DATA_ENCRYPTION_KEY"),
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock.mock.calls[0][0]).toMatchObject({
+      code: "ALERT_DECRYPTION_FAILED",
+      kind: "operational",
+    });
+    expect(reportErrorMock.mock.calls[0][1]).toMatchObject({
+      source: "worker",
+      pool: "system",
+      subsystem: "alert-evaluator",
+    });
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not log completion when deliverWebhook returns success: false for every destination", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
     getSettingStringMock
@@ -348,7 +406,7 @@ describe("alert evaluator behavior", () => {
         JSON.stringify([
           {
             url: "https://example.test/alerts",
-            authHeader: "$ENC$blob",
+            authHeader: "",
             enabled: true,
             type: "alerts",
           },
@@ -358,65 +416,33 @@ describe("alert evaluator behavior", () => {
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
-    isEncryptedMock.mockReturnValue(true);
-    // decrypt resolves to null -> `decrypted ?? ""` yields ""
-    decryptMock.mockResolvedValue(null);
-    deliverWebhookMock.mockResolvedValue({ success: true });
+    deliverWebhookMock.mockResolvedValue({ success: false, statusCode: 500, error: "HTTP 500" });
 
     await evaluateAlerts();
 
-    expect(decryptMock).toHaveBeenCalledTimes(1);
-    expect(deliverWebhookMock).toHaveBeenCalledWith(
-      "https://example.test/alerts",
-      "",
-      [{ condition: "backup_never_run" }],
-      { maxRetries: 1 },
-    );
+    expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps the raw auth header when decryption throws", async () => {
+  it("skips a destination whose authHeader fails to decrypt while still delivering to other destinations", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
     getSettingStringMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
-            url: "https://example.test/alerts",
-            authHeader: "$ENC$blob",
+            name: "Broken Hook",
+            url: "https://example.test/broken",
+            authHeader: "$ENC$broken",
             enabled: true,
             type: "alerts",
           },
-        ]),
-      )
-      .mockResolvedValueOnce("");
-    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
-    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
-    getActiveLicenseMock.mockReturnValue(null);
-    isEncryptedMock.mockReturnValue(true);
-    decryptMock.mockRejectedValue(new Error("bad ciphertext"));
-    deliverWebhookMock.mockResolvedValue({ success: true });
-
-    await evaluateAlerts();
-
-    expect(deliverWebhookMock).toHaveBeenCalledWith(
-      "https://example.test/alerts",
-      "$ENC$blob",
-      [{ condition: "backup_never_run" }],
-      { maxRetries: 1 },
-    );
-  });
-
-  it("does not decrypt an encrypted header when DATA_ENCRYPTION_KEY is unset", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
-    const { evaluateAlerts } = await loadAlertEvaluator({ dataEncryptionKey: "" });
-
-    getSettingStringMock
-      .mockResolvedValueOnce(
-        JSON.stringify([
           {
-            url: "https://example.test/alerts",
-            authHeader: "$ENC$blob",
+            name: "Healthy Hook",
+            url: "https://example.test/healthy",
+            authHeader: "Bearer plain",
             enabled: true,
             type: "alerts",
           },
@@ -426,19 +452,23 @@ describe("alert evaluator behavior", () => {
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
-    isEncryptedMock.mockReturnValue(true);
+    decryptSettingMock.mockImplementation(async (val: string) =>
+      val.startsWith("$ENC$") ? null : val,
+    );
     deliverWebhookMock.mockResolvedValue({ success: true });
 
     await evaluateAlerts();
 
-    // isEncrypted is true but the key guard is false, so decrypt is never reached.
-    expect(decryptMock).not.toHaveBeenCalled();
+    expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
     expect(deliverWebhookMock).toHaveBeenCalledWith(
-      "https://example.test/alerts",
-      "$ENC$blob",
+      "https://example.test/healthy",
+      "Bearer plain",
       [{ condition: "backup_never_run" }],
       { maxRetries: 1 },
     );
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
   });
 
   it("delivers to every enabled alerts destination", async () => {

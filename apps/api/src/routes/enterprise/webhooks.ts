@@ -7,14 +7,16 @@
  *
  * Gated behind the `webhooks:manage` permission + `admin_alerts` enterprise feature.
  */
+import { SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { encrypt } from "../../lib/encryption.js";
+import { decryptSetting, encrypt } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { reportError } from "../../lib/error-report.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
 import { deliverWebhook } from "../../lib/webhook-delivery.js";
 import { requirePermission } from "../../permissions.js";
@@ -255,15 +257,32 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       // Decrypt auth header if needed
       let authHeader = dest.authHeader;
       if (authHeader) {
-        try {
-          const { isEncrypted, decrypt } = await import("../../lib/encryption.js");
-          if (isEncrypted(authHeader) && env.DATA_ENCRYPTION_KEY) {
-            const decrypted = await decrypt(authHeader, env.DATA_ENCRYPTION_KEY);
-            authHeader = decrypted ?? "";
-          }
-        } catch {
-          // Use raw value if decryption fails
+        const decrypted = await decryptSetting(authHeader);
+        if (decrypted === null) {
+          request.log.error(
+            { index, name: dest.name, type: dest.type },
+            "webhooks: stored webhook authHeader could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+          );
+          void reportError(
+            new SafeError("Failed to decrypt webhook auth header", {
+              kind: "operational",
+              code: "WEBHOOK_DECRYPTION_FAILED",
+              statusCode: 500,
+            }),
+            {
+              source: "http",
+              route: request.routeOptions?.url,
+              method: request.method,
+              statusCode: 500,
+              subsystem: "webhooks",
+            },
+          );
+          return reply.status(500).send({
+            error: "Failed to decrypt webhook auth header",
+            code: "DECRYPTION_FAILED",
+          });
         }
+        authHeader = decrypted;
       }
 
       const testEvent = [

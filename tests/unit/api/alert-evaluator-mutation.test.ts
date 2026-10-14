@@ -14,11 +14,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const statfsMock = vi.hoisted(() => vi.fn());
 const getSettingStringMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
-const decryptMock = vi.hoisted(() => vi.fn());
-const isEncryptedMock = vi.hoisted(() => vi.fn());
+const decryptSettingMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
 
 function queryChain<T>(result: T) {
   const chain = {
@@ -30,18 +36,18 @@ function queryChain<T>(result: T) {
 
 const NOW = new Date("2026-06-29T12:00:00.000Z").getTime();
 
-async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) {
-  const { dataEncryptionKey = "test-key" } = options;
+async function loadAlertEvaluator() {
   vi.resetModules();
   statfsMock.mockReset();
   getSettingStringMock.mockReset();
   deliverWebhookMock.mockReset();
-  decryptMock.mockReset();
-  isEncryptedMock.mockReset();
+  decryptSettingMock.mockReset();
   getActiveLicenseMock.mockReset();
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  reportErrorMock.mockClear();
+  for (const fn of Object.values(loggerMock)) fn.mockClear();
 
   vi.doMock("node:fs/promises", () => ({ statfs: statfsMock }));
 
@@ -55,7 +61,6 @@ async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) 
   vi.doMock("../../../apps/api/src/config.js", () => ({
     env: {
       WORKSPACE_PATH: "/workspace",
-      DATA_ENCRYPTION_KEY: dataEncryptionKey,
     },
   }));
 
@@ -71,8 +76,15 @@ async function loadAlertEvaluator(options: { dataEncryptionKey?: string } = {}) 
   }));
 
   vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
-    decrypt: decryptMock,
-    isEncrypted: isEncryptedMock,
+    decryptSetting: decryptSettingMock,
+  }));
+
+  vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
+  }));
+
+  vi.doMock("../../../apps/api/src/lib/logger.js", () => ({
+    logger: loggerMock,
   }));
 
   vi.doMock("../../../apps/api/src/lib/webhook-delivery.js", () => ({
@@ -266,8 +278,13 @@ describe("alert-evaluator.ts mutation coverage", () => {
         getSettingString: getSettingStringMock,
       }));
       vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
-        decrypt: decryptMock,
-        isEncrypted: isEncryptedMock,
+        decryptSetting: decryptSettingMock,
+      }));
+      vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
+        reportError: reportErrorMock,
+      }));
+      vi.doMock("../../../apps/api/src/lib/logger.js", () => ({
+        logger: loggerMock,
       }));
       vi.doMock("../../../apps/api/src/lib/webhook-delivery.js", () => ({
         deliverWebhook: deliverWebhookMock,
@@ -529,12 +546,12 @@ describe("alert-evaluator.ts mutation coverage", () => {
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
-      isEncryptedMock.mockReturnValue(true);
-      decryptMock.mockResolvedValue("Bearer clear");
+      decryptSettingMock.mockResolvedValue("Bearer clear");
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await evaluateAlerts();
 
+      expect(decryptSettingMock).toHaveBeenCalledWith("$ENC$blob");
       expect(deliverWebhookMock.mock.calls[0][1]).toBe("Bearer clear");
     });
 
@@ -556,22 +573,24 @@ describe("alert-evaluator.ts mutation coverage", () => {
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
-      isEncryptedMock.mockReturnValue(false);
+      decryptSettingMock.mockResolvedValue("Bearer plain");
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await evaluateAlerts();
 
-      expect(decryptMock).not.toHaveBeenCalled();
+      expect(decryptSettingMock).toHaveBeenCalledWith("Bearer plain");
       expect(deliverWebhookMock.mock.calls[0][1]).toBe("Bearer plain");
     });
 
-    it("falls back to an empty auth header when decrypt resolves null", async () => {
+    it("logs, reports an operational error, and skips delivery when decryptSetting resolves null", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
       getSettingStringMock
         .mockResolvedValueOnce(
           JSON.stringify([
             {
+              name: "Ops Alerts",
               url: "https://example.test/alerts",
               authHeader: "$ENC$blob",
               enabled: true,
@@ -583,13 +602,43 @@ describe("alert-evaluator.ts mutation coverage", () => {
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
-      isEncryptedMock.mockReturnValue(true);
-      decryptMock.mockResolvedValue(null);
+      decryptSettingMock.mockResolvedValue(null);
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await evaluateAlerts();
 
-      expect(deliverWebhookMock.mock.calls[0][1]).toBe("");
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { name: "Ops Alerts" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+      expect(reportErrorMock.mock.calls[0][0]).toMatchObject({
+        code: "ALERT_DECRYPTION_FAILED",
+        kind: "operational",
+      });
+      expect(reportErrorMock.mock.calls[0][1]).toMatchObject({
+        source: "worker",
+        pool: "system",
+        subsystem: "alert-evaluator",
+      });
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not log completion when deliverWebhook returns success: false", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      deliverWebhookMock.mockResolvedValue({ success: false, statusCode: 500, error: "HTTP 500" });
+
+      await evaluateAlerts();
+
+      expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+      expect(logSpy).not.toHaveBeenCalled();
     });
   });
 

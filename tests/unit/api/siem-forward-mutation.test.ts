@@ -23,12 +23,12 @@ const loggerMock = vi.hoisted(() => ({
 const readSiemConfigMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const upsertSettingMock = vi.hoisted(() => vi.fn());
-const decryptMock = vi.hoisted(() => vi.fn());
-const isEncryptedMock = vi.hoisted(() => vi.fn());
+const decryptSettingMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
 const gteMock = vi.hoisted(() => vi.fn(() => "gte-condition"));
 const ascMock = vi.hoisted(() => vi.fn(() => "asc-order"));
+const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 /**
  * Build a chained query stub. Settings reads terminate at .where(); the
@@ -53,28 +53,23 @@ function queryChain<T>(result: T, terminalWhere = false) {
   return chain;
 }
 
-async function loadSiemForward(options: { dataEncryptionKey?: string } = {}) {
-  const { dataEncryptionKey = "test-key" } = options;
+async function loadSiemForward() {
   vi.resetModules();
   readSiemConfigMock.mockReset();
   deliverWebhookMock.mockReset();
   upsertSettingMock.mockReset();
-  decryptMock.mockReset();
-  isEncryptedMock.mockReset();
+  decryptSettingMock.mockReset();
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
   gteMock.mockClear();
   ascMock.mockClear();
+  reportErrorMock.mockClear();
 
   vi.doMock("drizzle-orm", () => ({
     asc: ascMock,
     eq: vi.fn(() => "eq"),
     gte: gteMock,
-  }));
-
-  vi.doMock("../../../apps/api/src/config.js", () => ({
-    env: { DATA_ENCRYPTION_KEY: dataEncryptionKey },
   }));
 
   vi.doMock("../../../apps/api/src/db/index.js", () => ({
@@ -95,8 +90,11 @@ async function loadSiemForward(options: { dataEncryptionKey?: string } = {}) {
   }));
 
   vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
-    decrypt: decryptMock,
-    isEncrypted: isEncryptedMock,
+    decryptSetting: decryptSettingMock,
+  }));
+
+  vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
   }));
 
   vi.doMock("../../../apps/api/src/lib/settings-helpers.js", () => ({
@@ -425,16 +423,16 @@ describe("siem-forward.ts mutation coverage", () => {
         .mockReturnValueOnce(queryChain([{ value: "0" }], true))
         .mockReturnValueOnce(queryChain([], true))
         .mockReturnValueOnce(queryChain([auditRow()]));
-      isEncryptedMock.mockReturnValue(true);
-      decryptMock.mockResolvedValue("Bearer clear");
+      decryptSettingMock.mockResolvedValue("Bearer clear");
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await runSiemForward();
 
+      expect(decryptSettingMock).toHaveBeenCalledWith("$ENC$blob");
       expect(deliverWebhookMock.mock.calls[0][1]).toBe("Bearer clear");
     });
 
-    it("sends the raw header when isEncrypted is false", async () => {
+    it("sends the raw header when it is plaintext", async () => {
       const { runSiemForward } = await loadSiemForward();
       readSiemConfigMock.mockResolvedValue({
         enabled: true,
@@ -445,36 +443,16 @@ describe("siem-forward.ts mutation coverage", () => {
         .mockReturnValueOnce(queryChain([{ value: "0" }], true))
         .mockReturnValueOnce(queryChain([], true))
         .mockReturnValueOnce(queryChain([auditRow()]));
-      isEncryptedMock.mockReturnValue(false);
+      decryptSettingMock.mockResolvedValue("Bearer raw");
       deliverWebhookMock.mockResolvedValue({ success: true });
 
       await runSiemForward();
 
-      expect(decryptMock).not.toHaveBeenCalled();
+      expect(decryptSettingMock).toHaveBeenCalledWith("Bearer raw");
       expect(deliverWebhookMock.mock.calls[0][1]).toBe("Bearer raw");
     });
 
-    it("does not decrypt when DATA_ENCRYPTION_KEY is unset", async () => {
-      const { runSiemForward } = await loadSiemForward({ dataEncryptionKey: "" });
-      readSiemConfigMock.mockResolvedValue({
-        enabled: true,
-        webhookUrl: "https://siem.test",
-        authHeader: "$ENC$blob",
-      });
-      selectMock
-        .mockReturnValueOnce(queryChain([{ value: "0" }], true))
-        .mockReturnValueOnce(queryChain([], true))
-        .mockReturnValueOnce(queryChain([auditRow()]));
-      isEncryptedMock.mockReturnValue(true);
-      deliverWebhookMock.mockResolvedValue({ success: true });
-
-      await runSiemForward();
-
-      expect(decryptMock).not.toHaveBeenCalled();
-      expect(deliverWebhookMock.mock.calls[0][1]).toBe("$ENC$blob");
-    });
-
-    it("falls back to an empty header when decrypt resolves null", async () => {
+    it("logs, reports an operational error, and skips delivery when decryptSetting resolves null", async () => {
       const { runSiemForward } = await loadSiemForward();
       readSiemConfigMock.mockResolvedValue({
         enabled: true,
@@ -485,13 +463,25 @@ describe("siem-forward.ts mutation coverage", () => {
         .mockReturnValueOnce(queryChain([{ value: "0" }], true))
         .mockReturnValueOnce(queryChain([], true))
         .mockReturnValueOnce(queryChain([auditRow()]));
-      isEncryptedMock.mockReturnValue(true);
-      decryptMock.mockResolvedValue(null);
+      decryptSettingMock.mockResolvedValue(null);
       deliverWebhookMock.mockResolvedValue({ success: true });
 
-      await runSiemForward();
+      await expect(runSiemForward()).resolves.toBeUndefined();
 
-      expect(deliverWebhookMock.mock.calls[0][1]).toBe("");
+      expect(decryptSettingMock).toHaveBeenCalledWith("$ENC$blob");
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+      expect(upsertSettingMock).not.toHaveBeenCalled();
+      expect(loggerMock.error).toHaveBeenCalledWith(expect.stringContaining("DATA_ENCRYPTION_KEY"));
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+      expect(reportErrorMock.mock.calls[0][0]).toMatchObject({
+        code: "SIEM_DECRYPTION_FAILED",
+        kind: "operational",
+      });
+      expect(reportErrorMock.mock.calls[0][1]).toMatchObject({
+        source: "worker",
+        pool: "system",
+        subsystem: "siem-forward",
+      });
     });
 
     it("does not attempt decryption when the header is empty", async () => {
@@ -509,8 +499,7 @@ describe("siem-forward.ts mutation coverage", () => {
 
       await runSiemForward();
 
-      expect(isEncryptedMock).not.toHaveBeenCalled();
-      expect(decryptMock).not.toHaveBeenCalled();
+      expect(decryptSettingMock).not.toHaveBeenCalled();
     });
   });
 

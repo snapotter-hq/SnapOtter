@@ -14,11 +14,12 @@
  *   - siem_last_forwarded_at: cursor (last successfully forwarded createdAt timestamp)
  *   - siem_consecutive_failures: circuit breaker counter
  */
+import { SafeError } from "@snapotter/shared";
 import { asc, eq, gte } from "drizzle-orm";
-import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { decrypt, isEncrypted } from "../lib/encryption.js";
+import { decryptSetting } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
 import { upsertSetting } from "../lib/settings-helpers.js";
 import { deliverWebhook } from "../lib/webhook-delivery.js";
@@ -87,9 +88,26 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
 
   // 5. Decrypt auth header if encrypted
   let authHeader = config.authHeader;
-  if (authHeader && isEncrypted(authHeader) && env.DATA_ENCRYPTION_KEY) {
-    const decrypted = await decrypt(authHeader, env.DATA_ENCRYPTION_KEY);
-    authHeader = decrypted ?? "";
+  if (authHeader) {
+    const decrypted = await decryptSetting(authHeader);
+    if (decrypted === null) {
+      logger.error(
+        "siem-forward: stored SIEM authHeader could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+      );
+      void reportError(
+        new SafeError("Failed to decrypt SIEM auth header", {
+          kind: "operational",
+          code: "SIEM_DECRYPTION_FAILED",
+        }),
+        {
+          source: "worker",
+          pool: "system",
+          subsystem: "siem-forward",
+        },
+      );
+      return;
+    }
+    authHeader = decrypted;
   }
 
   // 6. Map rows to SIEM event payload

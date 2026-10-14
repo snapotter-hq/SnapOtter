@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, hkdf as hkdfCb, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
+import { env } from "../config.js";
 
 const hkdf = promisify(hkdfCb);
 
@@ -53,6 +54,18 @@ export async function decrypt(
   if (result !== null) return result;
   if (previousKeyHex) return tryDecrypt(previousKeyHex);
   return null;
+}
+
+/**
+ * Decrypt a stored setting or secret using DATA_ENCRYPTION_KEY (with fallback
+ * to DATA_ENCRYPTION_KEY_PREVIOUS during key rotation). Plaintext values pass
+ * through unchanged. An encrypted value returns null when no key is configured
+ * or when neither key can authenticate the ciphertext.
+ */
+export async function decryptSetting(value: string): Promise<string | null> {
+  if (!isEncrypted(value)) return value;
+  if (!env.DATA_ENCRYPTION_KEY) return null;
+  return decrypt(value, env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined);
 }
 
 export function isEncrypted(value: string): boolean {

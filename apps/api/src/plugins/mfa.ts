@@ -8,7 +8,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
+import { decryptSetting, encrypt } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -239,16 +239,6 @@ async function encryptSecret(secretBase32: string): Promise<string> {
     return encrypt(secretBase32, env.DATA_ENCRYPTION_KEY);
   }
   return secretBase32;
-}
-
-async function decryptSecret(stored: string): Promise<string | null> {
-  if (env.DATA_ENCRYPTION_KEY) {
-    return decrypt(stored, env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_PREVIOUS || undefined);
-  }
-  // An encrypted row with no key configured (the key was removed after
-  // enrollment) is as unreadable as a wrong key. Returning the ciphertext as
-  // if it were the base32 secret makes otpauth throw a TypeError instead.
-  return isEncrypted(stored) ? null : stored;
 }
 
 /**
@@ -520,7 +510,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Decrypt the stored secret
-      const secretBase32 = await decryptSecret(dbUser.totpSecret);
+      const secretBase32 = await decryptSetting(dbUser.totpSecret);
       if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
       const audit = auditFromRequest(request);
@@ -648,7 +638,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         }
 
         // Decrypt the stored secret
-        secretBase32 = await decryptSecret(dbUser.totpSecret);
+        secretBase32 = await decryptSetting(dbUser.totpSecret);
         if (!secretBase32) {
           await redis.del(attemptsKey);
           return replyDecryptionFailed(request, reply, userId);
@@ -874,7 +864,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
 
-        secretBase32 = await decryptSecret(dbUser.totpSecret);
+        secretBase32 = await decryptSetting(dbUser.totpSecret);
         if (!secretBase32) {
           await redis.del(attemptsKey);
           return replyDecryptionFailed(request, reply, userId);
@@ -1012,7 +1002,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Decrypt and verify the code
-      const secretBase32 = await decryptSecret(dbUser.totpSecret);
+      const secretBase32 = await decryptSetting(dbUser.totpSecret);
       if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
       const audit = auditFromRequest(request);

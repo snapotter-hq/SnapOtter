@@ -17,10 +17,10 @@ function loggerCalls(level: "info" | "warn" | "error") {
 const readSiemConfigMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const upsertSettingMock = vi.hoisted(() => vi.fn());
-const decryptMock = vi.hoisted(() => vi.fn());
-const isEncryptedMock = vi.hoisted(() => vi.fn());
+const decryptSettingMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 function queryChain<T>(result: T, terminalWhere = false) {
   const chain = {
@@ -37,20 +37,16 @@ async function loadSiemForward() {
   readSiemConfigMock.mockReset();
   deliverWebhookMock.mockReset();
   upsertSettingMock.mockReset();
-  decryptMock.mockReset();
-  isEncryptedMock.mockReset();
+  decryptSettingMock.mockReset();
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  reportErrorMock.mockClear();
 
   vi.doMock("drizzle-orm", () => ({
     asc: vi.fn(() => "asc"),
     eq: vi.fn(() => "eq"),
     gte: vi.fn(() => "gte"),
-  }));
-
-  vi.doMock("../../../../apps/api/src/config.js", () => ({
-    env: { DATA_ENCRYPTION_KEY: "test-key" },
   }));
 
   vi.doMock("../../../../apps/api/src/db/index.js", () => ({
@@ -76,8 +72,11 @@ async function loadSiemForward() {
   }));
 
   vi.doMock("../../../../apps/api/src/lib/encryption.js", () => ({
-    decrypt: decryptMock,
-    isEncrypted: isEncryptedMock,
+    decryptSetting: decryptSettingMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
   }));
 
   vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
@@ -159,12 +158,12 @@ describe("SIEM forwarding behavior", () => {
           },
         ]),
       );
-    isEncryptedMock.mockReturnValue(true);
-    decryptMock.mockResolvedValue("Bearer clear");
+    decryptSettingMock.mockResolvedValue("Bearer clear");
     deliverWebhookMock.mockResolvedValue({ success: true });
 
     await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
 
+    expect(decryptSettingMock).toHaveBeenCalledWith("enc:auth");
     expect(deliverWebhookMock).toHaveBeenCalledWith("https://siem.test/events", "Bearer clear", [
       {
         timestamp: "2026-06-29T12:00:00.000Z",

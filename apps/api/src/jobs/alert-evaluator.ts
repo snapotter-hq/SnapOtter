@@ -11,10 +11,14 @@
  *   - License expiring (< 30 days remaining)
  */
 import { statfs } from "node:fs/promises";
+import { SafeError } from "@snapotter/shared";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { decryptSetting } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { reportError } from "../lib/error-report.js";
+import { logger } from "../lib/logger.js";
 import { getSettingString } from "../lib/settings-helpers.js";
 
 /**
@@ -33,7 +37,13 @@ export async function evaluateAlerts(): Promise<void> {
 
   // 1. Read webhook destinations from settings
   const destJson = await getSettingString("webhook_destinations", "[]");
-  let destinations: { url: string; authHeader: string; enabled: boolean; type: string }[];
+  let destinations: {
+    name?: string;
+    url: string;
+    authHeader: string;
+    enabled: boolean;
+    type: string;
+  }[];
   try {
     destinations = JSON.parse(destJson);
   } catch {
@@ -114,25 +124,42 @@ export async function evaluateAlerts(): Promise<void> {
   if (alerts.length === 0) return;
 
   // 5. Deliver to each enabled "alerts" webhook
+  let delivered = 0;
   for (const dest of alertDests) {
     let authHeader = dest.authHeader;
 
     // Decrypt auth header if encrypted
     if (authHeader) {
-      try {
-        const { isEncrypted, decrypt } = await import("../lib/encryption.js");
-        if (isEncrypted(authHeader) && env.DATA_ENCRYPTION_KEY) {
-          const decrypted = await decrypt(authHeader, env.DATA_ENCRYPTION_KEY);
-          authHeader = decrypted ?? "";
-        }
-      } catch {
-        // Use raw value if decryption fails
+      const decrypted = await decryptSetting(authHeader);
+      if (decrypted === null) {
+        logger.error(
+          { name: dest.name },
+          "alert-evaluator: stored webhook authHeader could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+        );
+        void reportError(
+          new SafeError("Failed to decrypt alert webhook auth header", {
+            kind: "operational",
+            code: "ALERT_DECRYPTION_FAILED",
+          }),
+          {
+            source: "worker",
+            pool: "system",
+            subsystem: "alert-evaluator",
+          },
+        );
+        continue;
       }
+      authHeader = decrypted;
     }
 
     const { deliverWebhook } = await import("../lib/webhook-delivery.js");
-    await deliverWebhook(dest.url, authHeader, alerts, { maxRetries: 1 });
+    const result = await deliverWebhook(dest.url, authHeader, alerts, { maxRetries: 1 });
+    if (result?.success !== false) {
+      delivered++;
+    }
   }
 
-  console.log(`Alert evaluation complete: ${alerts.length} alert(s) delivered`);
+  if (delivered > 0) {
+    console.log(`Alert evaluation complete: ${alerts.length} alert(s) delivered`);
+  }
 }
