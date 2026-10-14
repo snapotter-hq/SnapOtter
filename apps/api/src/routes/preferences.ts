@@ -56,14 +56,19 @@ export async function preferencesRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      for (const [key, value] of Object.entries(parsed.data)) {
-        await db
-          .insert(schema.userPreferences)
-          .values({ userId: user.id, key, value: { value } })
-          .onConflictDoUpdate({
-            target: [schema.userPreferences.userId, schema.userPreferences.key],
-            set: { value: { value } },
-          });
+      const entries = Object.entries(parsed.data).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      if (entries.length > 0) {
+        await db.transaction(async (tx) => {
+          for (const [key, value] of entries) {
+            await tx
+              .insert(schema.userPreferences)
+              .values({ userId: user.id, key, value: { value } })
+              .onConflictDoUpdate({
+                target: [schema.userPreferences.userId, schema.userPreferences.key],
+                set: { value: { value } },
+              });
+          }
+        });
       }
       return reply.send({ ok: true });
     },
