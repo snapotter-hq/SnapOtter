@@ -216,6 +216,8 @@ interface PanelRow {
   panel: string;
   transport: "xhr" | "fetch";
   fallback: string;
+  /** The fallback when the body is not JSON, if it differs from `fallback`. */
+  nonJsonFallback?: string;
   /** Renders the panel and starts the request. */
   start: () => void | Promise<void>;
   /** The failure text the panel ended on, or null while it has none. */
@@ -254,6 +256,9 @@ const PANELS: PanelRow[] = [
     panel: "barcode-read",
     transport: "xhr",
     fallback: failedWithStatus,
+    nonJsonFallback: format(de.toolSettings["barcode-read"].scanningFailedWithStatus, {
+      status: STATUS,
+    }),
     start: () => {
       useFileStore.getState().setFiles([image("code.png")]);
       render(<BarcodeReadSettings />);
@@ -382,6 +387,9 @@ const PANELS: PanelRow[] = [
     panel: "image-to-pdf",
     transport: "xhr",
     fallback: failedWithStatus,
+    nonJsonFallback: format(de.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+      status: STATUS,
+    }),
     start: () => {
       useFileStore.getState().setFiles([image("page.png")]);
       render(<ImageToPdfSettings />);
@@ -427,11 +435,10 @@ afterEach(() => {
 });
 
 describe.each(PANELS)("$panel: a failed answer", (row) => {
-  // An XHR panel's unparseable body takes its own catch branch, unchanged here.
-  const shapes: Array<[string, unknown, string]> =
-    row.transport === "fetch"
-      ? [...answers(row.fallback), ["a body that is not JSON", NOT_JSON, row.fallback]]
-      : answers(row.fallback);
+  const shapes: Array<[string, unknown, string]> = [
+    ...answers(row.fallback),
+    ["a body that is not JSON", NOT_JSON, row.nonJsonFallback ?? row.fallback],
+  ];
 
   it.each(shapes)("shows %s as readable text", async (_label, body, message) => {
     const expected = row.framed ? row.framed(message) : message;
@@ -453,15 +460,11 @@ describe.each(PANELS)("$panel: a failed answer", (row) => {
   });
 });
 
-// Barcode Read's catch branch for a body that is not JSON still builds its
-// own status line (as does OCR's, below), tracked in #1996.
-const PROXY_413_PENDING = new Set(["barcode-read"]);
-
 describe.each(PANELS)("$panel: a 413", (row) => {
   const shapes: Array<[string, unknown]> = [
     ["the API's JSON body", { error: "File too large", details: "Max 100 MB" }],
+    ["a proxy's HTML page", NOT_JSON],
   ];
-  if (!PROXY_413_PENDING.has(row.panel)) shapes.push(["a proxy's HTML page", NOT_JSON]);
 
   it.each(shapes)("shows %s as the translated file-too-large message", async (_label, body) => {
     const message = de.errors.fileTooLarge;
@@ -484,21 +487,21 @@ describe.each(PANELS)("$panel: a 413", (row) => {
 });
 
 describe("ocr: a failed answer", () => {
-  it.each(answers(`Failed: ${STATUS}`))(
-    "rejects %s with readable text",
-    async (_label, body, expected) => {
-      const run = ocrOneFile(
-        image("scan.png"),
-        { quality: "fast", language: "en", enhance: false },
-        { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
-        { t: en },
-      );
-      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
-      FakeXhr.instances[0].respond(STATUS, body);
+  it.each([
+    ...answers(`Failed: ${STATUS}`),
+    ["a body that is not JSON", NOT_JSON, `Processing failed: ${STATUS}`],
+  ])("rejects %s with readable text", async (_label, body, expected) => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: en },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(STATUS, body);
 
-      await expect(run).rejects.toThrow(expected);
-    },
-  );
+    await expect(run).rejects.toThrow(expected);
+  });
 
   it("rejects FEATURE_NOT_INSTALLED with the install message in the locale it was given", async () => {
     const run = ocrOneFile(
@@ -521,18 +524,24 @@ describe("ocr: a failed answer", () => {
     );
   });
 
-  it("rejects the API's 413 with the file-too-large message in the locale it was given", async () => {
-    const run = ocrOneFile(
-      image("scan.png"),
-      { quality: "fast", language: "en", enhance: false },
-      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
-      { t: de },
-    );
-    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
-    FakeXhr.instances[0].respond(413, { error: "File too large" });
+  it.each([
+    ["the API's 413", { error: "File too large" }],
+    ["a proxy's 413 HTML page", NOT_JSON],
+  ])(
+    "rejects %s with the file-too-large message in the locale it was given",
+    async (_label, body) => {
+      const run = ocrOneFile(
+        image("scan.png"),
+        { quality: "fast", language: "en", enhance: false },
+        { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+        { t: de },
+      );
+      await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+      FakeXhr.instances[0].respond(413, body);
 
-    await expect(run).rejects.toThrow(de.errors.fileTooLarge);
-  });
+      await expect(run).rejects.toThrow(de.errors.fileTooLarge);
+    },
+  );
 
   it("is handed the panel's locale", () => {
     const source = readFileSync(

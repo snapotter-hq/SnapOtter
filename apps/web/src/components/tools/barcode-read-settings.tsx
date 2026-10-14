@@ -180,9 +180,14 @@ function scanOneFile(
         } catch {
           reject(
             new Error(
-              format(t.toolSettings["barcode-read"].scanningFailedWithStatus, {
-                status: xhr.status,
-              }),
+              failedAnswerMessage(
+                t,
+                null,
+                xhr.status,
+                format(t.toolSettings["barcode-read"].scanningFailedWithStatus, {
+                  status: xhr.status,
+                }),
+              ),
             ),
           );
         }

@@ -211,7 +211,16 @@ export function ocrOneFile(
             ),
           );
         } catch {
-          rejectOnce(new Error(messages.processingFailed ?? `Processing failed: ${xhr.status}`));
+          rejectOnce(
+            new Error(
+              failedAnswerMessage(
+                messages.t ?? en,
+                null,
+                xhr.status,
+                messages.processingFailed ?? `Processing failed: ${xhr.status}`,
+              ),
+            ),
+          );
         }
       }
     };
