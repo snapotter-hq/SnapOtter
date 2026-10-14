@@ -149,7 +149,6 @@ def _run_ai_denoise(model, img_array, strength, detail, color_noise, device):
     detail preservation, and optional color noise post-processing.
     """
     import torch
-    import torch.nn.functional as F
     import numpy as np
     import cv2
 
@@ -166,13 +165,13 @@ def _run_ai_denoise(model, img_array, strength, detail, color_noise, device):
     with torch.inference_mode():
         # Decide whether to use tiling (for images > 2048px on either side)
         if h > 2048 or w > 2048:
-            result_tensor = _tile_process(model, tensor, tile_size=512, overlap=32, device=device)
+            result_tensor = _tile_process(model, tensor, tile_size=512, overlap=64, device=device)
         else:
             # Pad to multiple of 8 for model compatibility
             pad_h = (8 - h % 8) % 8
             pad_w = (8 - w % 8) % 8
             if pad_h > 0 or pad_w > 0:
-                tensor = F.pad(tensor, (0, pad_w, 0, pad_h), mode="reflect")
+                tensor = _reflect_pad_bottom_right(tensor, pad_h, pad_w)
 
             result_tensor = model(tensor)
 
@@ -220,71 +219,158 @@ def _run_ai_denoise(model, img_array, strength, detail, color_noise, device):
     return result
 
 
-def _tile_process(model, tensor, tile_size=512, overlap=32, device="cpu"):
-    """Process large images in overlapping tiles to avoid OOM.
+def _tile_grid(h, w, tile_size=512, overlap=64):
+    """Return fixed-grid tile bounds (y_start, y_end, x_start, x_end) for an h x w image.
 
-    Tiles are blended at overlapping edges using linear ramps
-    for seamless results.
+    Adjacent tiles step by tile_size - overlap and never shift backward at the
+    far boundary, so every interior overlap is exactly `overlap` pixels wide.
     """
-    import torch
+    if h <= 0 or w <= 0:
+        raise ValueError(f"Image dimensions must be positive: got ({h}, {w})")
+    if tile_size <= 0 or overlap < 0 or overlap * 2 > tile_size:
+        raise ValueError(
+            f"Require tile_size > 0 and 0 <= overlap <= tile_size // 2: got tile_size={tile_size}, overlap={overlap}"
+        )
+
+    step = tile_size - overlap
+    tiles_y = max(1, (h - overlap + step - 1) // step)
+    tiles_x = max(1, (w - overlap + step - 1) // step)
+
+    tiles = []
+    for ty in range(tiles_y):
+        y_start = ty * step
+        y_end = min(y_start + tile_size, h)
+        for tx in range(tiles_x):
+            x_start = tx * step
+            x_end = min(x_start + tile_size, w)
+            tiles.append((y_start, y_end, x_start, x_end))
+    return tiles
+
+
+def _tile_edge_ramps(y_start, y_end, x_start, x_end, h, w, overlap):
+    """Build 1D vertical and horizontal blend ramps for a single tile.
+
+    Only edges shared with an adjacent tile are ramped; edges that coincide with
+    the outer image boundary stay at 1.0 so border and corner pixels are never
+    attenuated.
+    """
+    th = y_end - y_start
+    tw = x_end - x_start
+    ramp_y = [1.0] * th
+    ramp_x = [1.0] * tw
+
+    if overlap > 0:
+        if y_start > 0:
+            for i in range(overlap):
+                ramp_y[i] *= (i + 1) / (overlap + 1)
+        if y_end < h:
+            for i in range(overlap):
+                ramp_y[th - 1 - i] *= (i + 1) / (overlap + 1)
+        if x_start > 0:
+            for i in range(overlap):
+                ramp_x[i] *= (i + 1) / (overlap + 1)
+        if x_end < w:
+            for i in range(overlap):
+                ramp_x[tw - 1 - i] *= (i + 1) / (overlap + 1)
+
+    return ramp_y, ramp_x
+
+
+def _build_tile_weight_map(h, w, tile_size=512, overlap=64):
+    """Accumulate the 2D tile blending weight map for an h x w image."""
+    tiles = _tile_grid(h, w, tile_size=tile_size, overlap=overlap)
+    weight = [[0.0] * w for _ in range(h)]
+
+    for y_start, y_end, x_start, x_end in tiles:
+        ramp_y, ramp_x = _tile_edge_ramps(y_start, y_end, x_start, x_end, h, w, overlap)
+        for r, ry in enumerate(ramp_y):
+            row = weight[y_start + r]
+            for c, rx in enumerate(ramp_x):
+                row[x_start + c] += ry * rx
+
+    return weight
+
+
+def _reflect_pad_bottom_right(tensor, pad_h, pad_w):
+    """Pad height (bottom) and width (right) using iterative reflect padding.
+
+    PyTorch's reflect mode requires each padding step to be strictly smaller
+    than the current tensor dimension; narrow final tiles (where pad_h >= th or
+    pad_w >= tw) are padded in bounded steps, falling back to replicate when a
+    dimension is 1.
+    """
     import torch.nn.functional as F
 
-    _, c, h, w = tensor.shape
-    step = tile_size - overlap
+    if pad_h < 0 or pad_w < 0:
+        raise ValueError(f"Padding must be non-negative: got pad_h={pad_h}, pad_w={pad_w}")
+
+    while pad_h > 0 or pad_w > 0:
+        cur_h, cur_w = tensor.shape[2], tensor.shape[3]
+        if (pad_h > 0 and cur_h <= 1) or (pad_w > 0 and cur_w <= 1):
+            step_h = pad_h if cur_h <= 1 else 0
+            step_w = pad_w if cur_w <= 1 else 0
+            tensor = F.pad(tensor, (0, step_w, 0, step_h), mode="replicate")
+            pad_h -= step_h
+            pad_w -= step_w
+            continue
+        step_h = min(pad_h, cur_h - 1) if pad_h > 0 else 0
+        step_w = min(pad_w, cur_w - 1) if pad_w > 0 else 0
+        tensor = F.pad(tensor, (0, step_w, 0, step_h), mode="reflect")
+        pad_h -= step_h
+        pad_w -= step_w
+    return tensor
+
+
+def _tile_process(model, tensor, tile_size=512, overlap=64, device="cpu"):
+    """Process large images in overlapping tiles to avoid OOM.
+
+    Tiles are placed on a fixed grid (reflect-padded on the final row/column)
+    and blended only across shared interior edges so the accumulated weight map
+    forms a partition of unity.
+    """
+    import torch
+
+    _, _, h, w = tensor.shape
+    tiles = _tile_grid(h, w, tile_size=tile_size, overlap=overlap)
+    total_tiles = len(tiles)
 
     # Allocate output and weight map for blending
     output = torch.zeros_like(tensor)
-    weight = torch.zeros((1, 1, h, w), device=device)
+    weight = torch.zeros((1, 1, h, w), device=device, dtype=tensor.dtype)
 
-    # Create blending weight ramp for overlap regions
-    ramp = torch.ones((1, 1, tile_size, tile_size), device=device)
-    if overlap > 0:
-        for i in range(overlap):
-            factor = (i + 1) / (overlap + 1)
-            ramp[:, :, i, :] *= factor       # top edge
-            ramp[:, :, -1 - i, :] *= factor  # bottom edge
-            ramp[:, :, :, i] *= factor        # left edge
-            ramp[:, :, :, -1 - i] *= factor   # right edge
+    for tile_count, (y_start, y_end, x_start, x_end) in enumerate(tiles, 1):
+        tile = tensor[:, :, y_start:y_end, x_start:x_end]
 
-    tiles_y = max(1, (h - overlap + step - 1) // step)
-    tiles_x = max(1, (w - overlap + step - 1) // step)
-    total_tiles = tiles_y * tiles_x
-    tile_count = 0
+        # Pad final-row / final-column tile to tile_size x tile_size
+        th, tw = tile.shape[2], tile.shape[3]
+        pad_h = tile_size - th
+        pad_w = tile_size - tw
+        if pad_h > 0 or pad_w > 0:
+            tile = _reflect_pad_bottom_right(tile, pad_h, pad_w)
 
-    for y in range(0, h, step):
-        for x in range(0, w, step):
-            y_end = min(y + tile_size, h)
-            x_end = min(x + tile_size, w)
-            y_start = max(0, y_end - tile_size)
-            x_start = max(0, x_end - tile_size)
+        result_tile = model(tile)
 
-            tile = tensor[:, :, y_start:y_end, x_start:x_end]
+        # Remove padding
+        if pad_h > 0 or pad_w > 0:
+            result_tile = result_tile[:, :, :th, :tw]
 
-            # Pad tile if smaller than tile_size
-            th, tw = tile.shape[2], tile.shape[3]
-            pad_h = tile_size - th
-            pad_w = tile_size - tw
-            if pad_h > 0 or pad_w > 0:
-                tile = F.pad(tile, (0, pad_w, 0, pad_h), mode="reflect")
+        ramp_y, ramp_x = _tile_edge_ramps(y_start, y_end, x_start, x_end, h, w, overlap)
+        ry = torch.tensor(ramp_y, dtype=tensor.dtype, device=device).view(1, 1, th, 1)
+        rx = torch.tensor(ramp_x, dtype=tensor.dtype, device=device).view(1, 1, 1, tw)
+        tile_ramp = ry * rx
 
-            result_tile = model(tile)
+        output[:, :, y_start:y_end, x_start:x_end] += result_tile * tile_ramp
+        weight[:, :, y_start:y_end, x_start:x_end] += tile_ramp
 
-            # Remove padding
-            if pad_h > 0 or pad_w > 0:
-                result_tile = result_tile[:, :, :th, :tw]
+        pct = 50 + int(20 * tile_count / total_tiles)
+        emit_progress(pct, f"Processing tile {tile_count}/{total_tiles}")
 
-            # Trim ramp to actual tile size
-            tile_ramp = ramp[:, :, :th, :tw]
-
-            output[:, :, y_start:y_end, x_start:x_end] += result_tile * tile_ramp
-            weight[:, :, y_start:y_end, x_start:x_end] += tile_ramp
-
-            tile_count += 1
-            pct = 50 + int(20 * tile_count / total_tiles)
-            emit_progress(pct, f"Processing tile {tile_count}/{total_tiles}")
-
-    # Normalize by weight
-    weight = torch.clamp(weight, min=1e-6)
+    w_min = float(weight.min())
+    w_max = float(weight.max())
+    if not (w_min > 0.5 and w_max < 2.5):
+        raise RuntimeError(
+            f"Malformed tile blend weight map: min={w_min:.6f}, max={w_max:.6f}"
+        )
     output = output / weight
 
     return output
