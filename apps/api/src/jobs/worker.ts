@@ -1362,9 +1362,19 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       ...failFault,
     });
 
-    // Batch progress (pipeline-batch only)
+    // Batch progress (pipeline-batch only): guarded like the cancel branch
+    // (#836, #2620) so a Redis counter blip after the terminal write does not
+    // fail the finalize job or drop its analytics and result payload.
     if (data.parentId && data.totalFiles !== undefined) {
-      await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+      try {
+        await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+      } catch (err) {
+        logger.error(
+          { err, jobId: data.jobId, parentId: data.parentId },
+          "failed pipeline batch outcome write failed",
+        );
+        void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+      }
     }
 
     // Analytics: emit pipeline_executed on failure
@@ -1452,9 +1462,19 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     },
   );
 
-  // Batch progress (pipeline-batch only)
+  // Batch progress (pipeline-batch only): guarded (#2620) so a Redis counter
+  // blip after the atomic completion write does not fail the finalize job or
+  // drop its completed analytics and result payload.
   if (data.parentId && data.totalFiles !== undefined) {
-    await recordChildOutcome(data.parentId, data.totalFiles, outFilename);
+    try {
+      await recordChildOutcome(data.parentId, data.totalFiles, outFilename);
+    } catch (err) {
+      logger.error(
+        { err, jobId: data.jobId, parentId: data.parentId },
+        "completed pipeline batch outcome write failed",
+      );
+      void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+    }
   }
 
   // Analytics: emit pipeline_executed on success
@@ -1533,13 +1553,25 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
       );
     }
   }
+  let result: ToolJobResult;
   try {
-    const result = await processToolJob(job);
-    await recordChildOutcome(parentId, totalFiles, job.data.filename);
-    return result;
+    result = await processToolJob(job);
   } catch (err) {
     const error = friendlyError(err instanceof Error ? err.message : String(err));
-    await recordChildOutcome(parentId, totalFiles, job.data.filename, error);
+    try {
+      await recordChildOutcome(parentId, totalFiles, job.data.filename, error);
+    } catch (outcomeErr) {
+      logger.error(
+        { err: outcomeErr, jobId: job.data.jobId, parentId, toolId: job.data.toolId },
+        "batch child failure outcome write failed",
+      );
+      void reportError(outcomeErr, {
+        source: "worker",
+        pool: job.data.pool,
+        toolId: job.data.toolId,
+        jobId: job.data.jobId,
+      });
+    }
     // Return a completed job with a failure marker so the parent runs.
     return {
       outputRefs: [],
@@ -1550,6 +1582,24 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
       resultPayload: { failed: true, error },
     };
   }
+  // Recorded outside processToolJob's try/catch (#2620) so a counter fault
+  // after the child row settled as completed cannot enter the failure catch
+  // block, record the succeeded file as failed, or return failed: true.
+  try {
+    await recordChildOutcome(parentId, totalFiles, job.data.filename);
+  } catch (err) {
+    logger.error(
+      { err, jobId: job.data.jobId, parentId, toolId: job.data.toolId },
+      "batch child outcome write failed",
+    );
+    void reportError(err, {
+      source: "worker",
+      pool: job.data.pool,
+      toolId: job.data.toolId,
+      jobId: job.data.jobId,
+    });
+  }
+  return result;
 }
 
 // ── Batch finalize handler ────────────────────────────────────
