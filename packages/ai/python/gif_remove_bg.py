@@ -18,6 +18,7 @@ _OOM_MARKERS = (
     "cudaerrormemoryallocation",
     "cublas_status_alloc_failed",
     "bad_alloc",
+    "memoryerror",
 )
 
 
@@ -26,6 +27,8 @@ def emit_progress(percent, stage):
 
 
 def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
     m = str(err).lower()
     return any(s in m for s in _OOM_MARKERS)
 
@@ -347,10 +350,11 @@ def main():
                 {"success": True, "model": model, "device": device, "frames": n, "format": fmt}
             )
     except ImportError as e:
-        print(f"[gif-remove-bg] Import failed: {e}", file=sys.stderr, flush=True)
-        result = json.dumps({"success": False, "error": f"import failed: {e}"})
+        detail = str(e).strip() or type(e).__name__
+        print(f"[gif-remove-bg] Import failed: {detail}", file=sys.stderr, flush=True)
+        result = json.dumps({"success": False, "error": f"import failed: {detail}"})
     except Exception as e:  # noqa: BLE001
-        result = json.dumps({"success": False, "error": str(e)})
+        result = json.dumps({"success": False, "error": str(e).strip() or type(e).__name__})
 
     os.dup2(stdout_fd, 1)
     os.close(stdout_fd)

@@ -216,6 +216,26 @@ describe("transcribeAudio", () => {
       );
     });
 
+    it("throws fallback message when Python returns an empty error string (e.g. bare MemoryError())", async () => {
+      vi.mocked(parseStdoutJson).mockReturnValue({
+        error: "",
+      });
+
+      await expect(transcribeAudio(FAKE_AUDIO, { language: "auto" })).rejects.toThrow(
+        "Transcription failed",
+      );
+    });
+
+    it("throws when Python returns success: false without a non-empty error string", async () => {
+      vi.mocked(parseStdoutJson).mockReturnValue({
+        success: false,
+      });
+
+      await expect(transcribeAudio(FAKE_AUDIO, { language: "auto" })).rejects.toThrow(
+        "Transcription failed",
+      );
+    });
+
     it("propagates bridge timeout", async () => {
       vi.mocked(runPythonWithProgress).mockRejectedValue(new Error("Python script timed out"));
 

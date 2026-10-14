@@ -44,4 +44,49 @@ assert files, "no frames captured"
 assert "dispatcher.py" not in files, files
 assert all(f == "zzz_wire_check.py" for f in files), files
 assert any(fr["func"] == "_inner" for fr in info["frames"]), info["frames"]
+
+# Bare MemoryError() has str(e) == "": confirm both the dispatcher uncaught path
+# and all 14 AI entrypoint scripts fall back to the exception class name rather
+# than emitting an empty "error": "".
+with open(RAISER, "w") as f:
+    f.write("raise MemoryError()\n")
+try:
+    empty_stdout, empty_code = dispatcher._run_script_main("zzz_wire_check", [])
+finally:
+    os.remove(RAISER)
+
+empty_payload = json.loads(empty_stdout)
+assert empty_code == 1, empty_code
+assert empty_payload["success"] is False, empty_payload
+assert empty_payload["error"] == "MemoryError", empty_payload
+assert empty_payload["errorInfo"]["type"] == "MemoryError", empty_payload
+assert empty_payload["errorInfo"]["message"] == "MemoryError", empty_payload
+
+AI_ENTRYPOINT_SCRIPTS = (
+    "colorize.py",
+    "detect_faces.py",
+    "enhance_faces.py",
+    "face_landmarks.py",
+    "gif_remove_bg.py",
+    "inpaint.py",
+    "inpaint_hq.py",
+    "noise_removal.py",
+    "outpaint.py",
+    "red_eye_removal.py",
+    "remove_bg.py",
+    "restore.py",
+    "transcribe.py",
+    "upscale.py",
+)
+for script_file in AI_ENTRYPOINT_SCRIPTS:
+    with open(os.path.join(SIDE, script_file)) as sf:
+        src = sf.read()
+    assert '{"error": str(e)}' not in src, f"{script_file} still emits bare str(e) without success: False"
+    assert '"error": str(e)}' not in src, f"{script_file} still formats caught exception with bare str(e)"
+    assert "type(e).__name__" in src, f"{script_file} does not fall back to type(e).__name__"
+
+import gif_remove_bg  # noqa: E402
+assert gif_remove_bg._is_oom(MemoryError()) is True, "gif_remove_bg._is_oom must recognize bare MemoryError()"
+assert gif_remove_bg._is_oom(RuntimeError("MemoryError")) is True
+
 print("WIRE OK")

@@ -16,7 +16,10 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
 });
 
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
-import { removeBackground } from "../../../packages/ai/src/background-removal.js";
+import {
+  isMemoryAllocError,
+  removeBackground,
+} from "../../../packages/ai/src/background-removal.js";
 
 let png: Buffer;
 beforeAll(async () => {
@@ -65,6 +68,26 @@ describe("removeBackground error surfacing", () => {
     }
 
     // OOM detection still works: the fallback attempt fired (two sidecar calls).
+    expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+    expect(isSafeMessageError(caught)).toBe(true);
+    expect((caught as SafeError).message).toBe("still failing");
+  });
+
+  it("recognizes Python MemoryError as an allocation failure and retries with the lighter model", async () => {
+    expect(isMemoryAllocError(new Error("MemoryError"))).toBe(true);
+
+    parseStdoutJson
+      .mockReturnValueOnce({ success: false, error: "MemoryError" })
+      .mockReturnValueOnce({ success: false, error: "still failing" });
+    runPythonWithProgress.mockResolvedValue({ stdout: "{}" });
+
+    let caught: unknown;
+    try {
+      await removeBackground(png, tmpdir(), { model: "isnet-general-use" });
+    } catch (e) {
+      caught = e;
+    }
+
     expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
     expect(isSafeMessageError(caught)).toBe(true);
     expect((caught as SafeError).message).toBe("still failing");

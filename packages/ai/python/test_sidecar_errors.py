@@ -25,7 +25,17 @@ def test_envelope_shape_and_frames():
     assert top["func"] == "test_envelope_shape_and_frames"
 
 
+def test_envelope_falls_back_to_exception_type_when_message_is_empty():
+    try:
+        raise MemoryError()
+    except MemoryError as exc:
+        env = build_error_envelope(exc)
+    assert env["type"] == "MemoryError"
+    assert env["message"] == "MemoryError"
+
+
 if __name__ == "__main__":
     test_redact_masks_paths_and_files()
     test_envelope_shape_and_frames()
+    test_envelope_falls_back_to_exception_type_when_message_is_empty()
     print("ok")

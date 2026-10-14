@@ -248,10 +248,13 @@ def main():
                     alpha_matting_foreground_threshold=240,
                     alpha_matting_background_threshold=10,
                 )
+            except MemoryError:
+                raise
             except Exception as e:
                 if use_alpha_matting:
                     return remove(input_data, session=session, alpha_matting=False)
-                raise RuntimeError(f"Background removal failed: {e}") from e
+                detail = str(e).strip() or type(e).__name__
+                raise RuntimeError(f"Background removal failed: {detail}") from e
 
         output_data = run_with_heartbeat(_remove, emit_progress, 30, 80, "Analyzing image")
 
@@ -278,15 +281,16 @@ def main():
         result = json.dumps({"success": True, "model": model, "device": device})
 
     except ImportError as e:
-        print(f"[remove-bg] Import failed: {e}", file=sys.stderr, flush=True)
+        detail = str(e).strip() or type(e).__name__
+        print(f"[remove-bg] Import failed: {detail}", file=sys.stderr, flush=True)
         result = json.dumps(
             {
                 "success": False,
-                "error": f"rembg import failed: {e}",
+                "error": f"rembg import failed: {detail}",
             }
         )
     except Exception as e:
-        result = json.dumps({"success": False, "error": str(e)})
+        result = json.dumps({"success": False, "error": str(e).strip() or type(e).__name__})
 
     # Restore original stdout and write only our JSON result
     os.dup2(stdout_fd, 1)

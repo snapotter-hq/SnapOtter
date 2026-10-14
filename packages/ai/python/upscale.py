@@ -85,9 +85,10 @@ def realesrgan_failure_message(error: BaseException) -> str:
     shape that really means "not installed"; anything else is an install that is
     there and broken, which needs a reinstall rather than an install.
     """
+    detail = str(error).strip() or type(error).__name__
     if is_oom_error(error):
         return (
-            f"Real-ESRGAN ran out of memory: {error}. "
+            f"Real-ESRGAN ran out of memory: {detail}. "
             "Try a smaller image, lower scale factor, or use model=lanczos for basic upscaling."
         )
     missing = isinstance(error, (ModuleNotFoundError, FileNotFoundError))
@@ -100,7 +101,7 @@ def realesrgan_failure_message(error: BaseException) -> str:
             "Features, or use Reset AI Environment if that does not help"
         )
     )
-    return f"Real-ESRGAN is not available: {error}. {remedy}, or use model=lanczos for basic upscaling."
+    return f"Real-ESRGAN is not available: {detail}. {remedy}, or use model=lanczos for basic upscaling."
 
 
 def apply_denoise(img, strength):
@@ -379,7 +380,7 @@ def main():
         )
         sys.exit(1)
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

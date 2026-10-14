@@ -46,7 +46,7 @@ export async function transcribeAudio(
   });
 
   const result = parseStdoutJson(stdout);
-  if (result.error) {
+  if ("error" in result || result.success === false) {
     throw toSidecarError(result.error, "Transcription failed");
   }
 

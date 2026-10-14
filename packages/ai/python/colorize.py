@@ -13,9 +13,9 @@ try:
     import cv2
     from PIL import Image
 except ImportError as _e:
-    _msg = str(_e)
+    _msg = str(_e).strip() or type(_e).__name__
     _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
-    print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
+    print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
     sys.exit(1)
 
 
@@ -190,12 +190,13 @@ def main():
                 result_bgr, method = colorize_ddcolor(img_bgr, intensity)
             except Exception as e:
                 import traceback
-                print(f"[colorize] DDColor failed: {e}", file=sys.stderr, flush=True)
+                detail = str(e).strip() or type(e).__name__
+                print(f"[colorize] DDColor failed: {detail}", file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
                 print(json.dumps({
                     "success": False,
                     "error": (
-                        f"DDColor is not available: {e}. "
+                        f"DDColor is not available: {detail}. "
                         "Install the colorize feature or use model=opencv for basic colorization."
                     ),
                 }))
@@ -233,7 +234,7 @@ def main():
         }))
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

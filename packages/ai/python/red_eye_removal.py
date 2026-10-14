@@ -293,7 +293,7 @@ def main():
             )
 
         except ImportError as e:
-            msg = str(e)
+            msg = str(e).strip() or type(e).__name__
             hint = "Fix with: apt-get install -y libgl1" if "libGL" in msg else "Install with: pip install mediapipe numpy opencv-python"
             print(
                 json.dumps(
@@ -316,7 +316,7 @@ def main():
         )
         sys.exit(1)
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

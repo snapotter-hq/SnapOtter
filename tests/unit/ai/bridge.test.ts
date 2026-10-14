@@ -2565,6 +2565,37 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     expect(err.kind).toBe("operational");
     expect(err.message).toContain("out of memory");
   });
+
+  it("classifies an in-band Python MemoryError as operational and falls back to errorInfo.type when error is empty", async () => {
+    const mock = await setupReadyDispatcher();
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({
+          id,
+          exitCode: 1,
+          stdout: JSON.stringify({
+            success: false,
+            error: "",
+            errorInfo: { type: "MemoryError", message: "", frames: [] },
+          }),
+        })}\n`,
+      ),
+    );
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      pythonType?: string;
+    };
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.message).toBe("MemoryError");
+    expect(err.kind).toBe("operational");
+    expect(err.pythonType).toBe("MemoryError");
+  });
 });
 
 // ── Dispatcher partial stderr buffering ──────────────────────────────
@@ -3412,6 +3443,41 @@ describe("bridge - extractPythonError coverage via per-request path", () => {
     mockPerReq.emitEvent("close", 1, null);
 
     await expect(promise).rejects.toThrow("Model failed to load");
+  });
+
+  it("falls back to stderr traceback line when per-request stdout JSON error is empty", async () => {
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    mockDisp.emitEvent("error", enoent);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"success": false, "error": "   "}\n'));
+    mockPerReq.stderr.emit(
+      "data",
+      Buffer.from('Traceback (most recent call last):\n  File "test.py", line 1\nMemoryError\n'),
+    );
+    mockPerReq.emitEvent("close", 1, null);
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+    };
+    expect(err.message).toBe("MemoryError");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
   });
 
   it("extracts last meaningful line from traceback when error is only in stderr", async () => {

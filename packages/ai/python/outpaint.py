@@ -162,7 +162,7 @@ def main():
             import cv2
             import onnxruntime
         except ImportError as e:
-            msg = str(e)
+            msg = str(e).strip() or type(e).__name__
             hint = "Fix with: apt-get install -y libgl1" if "libGL" in msg else "Requires opencv-python-headless and onnxruntime."
             print(json.dumps({
                 "success": False,
@@ -282,7 +282,7 @@ def main():
         }))
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

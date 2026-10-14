@@ -76,8 +76,9 @@ def _our_frames(exc):
 
 def build_error_envelope(exc):
     """A JSON-serializable {type, message, frames} describing a caught exception."""
+    exc_type = type(exc).__name__
     return {
-        "type": type(exc).__name__,
-        "message": redact(str(exc)),
+        "type": exc_type,
+        "message": redact(str(exc).strip() or exc_type) or exc_type,
         "frames": _our_frames(exc),
     }

@@ -24,4 +24,13 @@ describe("sidecar dispatcher wire (real python)", () => {
     const out = execFileSync("python3", [script], { encoding: "utf8" });
     expect(out).toContain("WIRE OK");
   });
+
+  it.runIf(pythonAvailable())(
+    "preserves exception type in sidecar_errors envelope when message is empty",
+    () => {
+      const script = resolve(here, "../../../packages/ai/python/test_sidecar_errors.py");
+      const out = execFileSync("python3", [script], { encoding: "utf8" });
+      expect(out).toContain("ok");
+    },
+  );
 });

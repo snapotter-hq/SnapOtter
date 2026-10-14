@@ -102,7 +102,7 @@ function getPythonPath(): string {
  * Extract a user-friendly error from a Python process error.
  */
 const OOM_EXIT_TEXT =
-  /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc/i;
+  /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i;
 
 /**
  * Build the error to reject a non-zero Python exit with. The extracted reason is
@@ -155,7 +155,7 @@ function pythonExitError(
  */
 export function toSidecarError(reason: unknown, fallback: string): Error {
   if (isSafeMessageError(reason)) return reason;
-  const message = reason instanceof Error ? reason.message : String(reason ?? "");
+  const message = (reason instanceof Error ? reason.message : String(reason ?? "")).trim();
   return new SafeError(message || fallback, {
     kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
   });
@@ -172,7 +172,12 @@ function extractPythonError(error: unknown): string {
       if (output) {
         try {
           const parsed = JSON.parse(output.trim());
-          if (parsed.error) return parsed.error;
+          if (typeof parsed?.error === "string" && parsed.error.trim()) {
+            return parsed.error;
+          }
+          if (typeof parsed?.errorInfo?.type === "string" && parsed.errorInfo.type.trim()) {
+            return parsed.errorInfo.type.trim();
+          }
         } catch {
           const trimmed = output.trim();
           if (trimmed && !trimmed.startsWith("Traceback")) {

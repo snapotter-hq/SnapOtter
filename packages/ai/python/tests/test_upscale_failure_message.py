@@ -91,4 +91,8 @@ def test_oom_errors_report_memory_remedy_rather_than_reinstall():
     assert "Reset AI Environment" not in message
     assert "model=lanczos" in message
 
+    bare_oom = upscale.realesrgan_failure_message(MemoryError())
+    assert "MemoryError" in bare_oom
+    assert "out of memory" in bare_oom.lower()
+
 

@@ -36,14 +36,15 @@ describe("toSidecarError", () => {
       "Failed to allocate memory for requested buffer",
       "CUBLAS_STATUS_ALLOC_FAILED",
       "std::bad_alloc",
+      "MemoryError",
     ]) {
       const err = toSidecarError(reason, "Upscaling failed") as SafeError;
       expect(err.kind).toBe("operational");
     }
   });
 
-  it("falls back to the constant tool message when the reason is empty", () => {
-    for (const reason of [undefined, null, ""]) {
+  it("falls back to the constant tool message when the reason is empty or whitespace-only", () => {
+    for (const reason of [undefined, null, "", "   ", "\n\t"]) {
       const err = toSidecarError(reason, "Upscaling failed");
       expect(isSafeMessageError(err)).toBe(true);
       expect(err.message).toBe("Upscaling failed");
@@ -104,5 +105,21 @@ describe("wrapper propagation (sidecar reason survives the Sentry scrubber)", ()
     }
     expect(isSafeMessageError(caught)).toBe(true);
     expect((caught as SafeError).message).toBe("audio stream unreadable");
+  });
+
+  it("transcribeAudio classifies a sidecar MemoryError as an operational SafeError", async () => {
+    runPythonWithProgress.mockResolvedValue({
+      stdout: JSON.stringify({ success: false, error: "MemoryError" }),
+    });
+
+    let caught: unknown;
+    try {
+      await transcribeAudio("/nonexistent/input.wav", { language: "auto" });
+    } catch (e) {
+      caught = e;
+    }
+    expect(isSafeMessageError(caught)).toBe(true);
+    expect((caught as SafeError).message).toBe("MemoryError");
+    expect((caught as SafeError).kind).toBe("operational");
   });
 });

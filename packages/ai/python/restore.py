@@ -22,9 +22,9 @@ except ImportError as _e:
     Image = None
     _IMPORT_ERROR = _e
     if __name__ == "__main__":
-        _msg = str(_e)
+        _msg = str(_e).strip() or type(_e).__name__
         _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
-        print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
+        print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
         sys.exit(1)
 
 
@@ -744,9 +744,9 @@ def colorize_bw(img_bgr, intensity=0.85):
 
 def main():
     if _IMPORT_ERROR is not None:
-        _msg = str(_IMPORT_ERROR)
+        _msg = str(_IMPORT_ERROR).strip() or type(_IMPORT_ERROR).__name__
         _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
-        print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
+        print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
         sys.exit(1)
 
     input_path = sys.argv[1]
@@ -807,7 +807,8 @@ def main():
                 else:
                     emit_progress(65, "No faces detected")
             except Exception as e:
-                emit_progress(65, f"Face enhancement skipped: {str(e)[:40]}")
+                detail = str(e).strip() or type(e).__name__
+                emit_progress(65, f"Face enhancement skipped: {detail[:40]}")
         else:
             emit_progress(65, "Face enhancement disabled")
 
@@ -848,7 +849,8 @@ def main():
                     else:
                         emit_progress(92, "Colorization model not available")
                 except Exception as e:
-                    emit_progress(92, f"Colorization skipped: {str(e)[:40]}")
+                    detail = str(e).strip() or type(e).__name__
+                    emit_progress(92, f"Colorization skipped: {detail[:40]}")
         else:
             emit_progress(92, "Colorization skipped")
 
@@ -869,7 +871,7 @@ def main():
         }))
 
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}))
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)
 
 

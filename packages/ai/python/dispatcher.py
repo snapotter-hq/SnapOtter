@@ -418,7 +418,7 @@ def main():
         except Exception as e:
             response = {
                 "id": request_id,
-                "stdout": json.dumps({"success": False, "error": str(e)}),
+                "stdout": json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}),
                 "exitCode": 1,
             }
 
