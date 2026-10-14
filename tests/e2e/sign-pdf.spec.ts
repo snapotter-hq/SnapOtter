@@ -42,7 +42,7 @@ async function uploadPdf(page: Page): Promise<void> {
 // This whole path is pure client-side until the user clicks Apply & Download.
 async function placeUploadedSignature(page: Page): Promise<void> {
   await page.getByRole("button", { name: "+ New" }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByRole("dialog", { name: "Create signature" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Upload", exact: true }).click();
   // The hidden file input only mounts once the Upload tab is active. Scope it to
@@ -74,6 +74,53 @@ test.describe("Sign PDF tool", () => {
     // image asynchronously and only then bumps the count, so toBeEnabled
     // auto-retries until the count propagates to the settings panel.
     await expect(apply).toBeEnabled();
+  });
+
+  // #2248: rotating a phone across the 768px breakpoint swapped the mobile and
+  // desktop branches of ToolPage with mismatched keys on the image-area div,
+  // unmounting SignCanvas and destroying every placed signature.
+  test("keeps the placed signature when rotating across 768px", async ({ loggedInPage: page }) => {
+    let submittedBody = "";
+    await page.route("**/api/v1/tools/pdf/sign-pdf", async (route) => {
+      submittedBody = route.request().postData() ?? "";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          jobId: "job-rotate-2248",
+          downloadUrl: "/api/v1/download/job-rotate-2248/test-3page_signed.pdf",
+          originalSize: 1024,
+          processedSize: 1280,
+        }),
+      });
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/pdf/sign-pdf");
+    await uploadPdf(page);
+
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    const apply = page.getByRole("button", { name: /Apply & Download/ });
+    await expect(apply).toBeDisabled();
+
+    await placeUploadedSignature(page);
+    await expect(apply).toBeEnabled();
+
+    // Rotate to landscape (>= 768px): desktop sidebar mounts, SignCanvas survives.
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
+    await expect(apply).toBeEnabled();
+
+    // Rotate back to portrait (< 768px): mobile sheet still sees the placement and exports it.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("sign-pdf-canvas")).toBeVisible();
+    await expect(apply).toBeEnabled();
+
+    await apply.click();
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
+    expect(submittedBody).toContain('"page":0');
   });
 
   // #1969: a failed sign marks its entry failed, which turns on the page's

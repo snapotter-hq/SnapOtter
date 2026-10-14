@@ -67,6 +67,7 @@ import { useFeaturesStore } from "@/stores/features-store";
 import { type FileEntry, useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 import { useMultiToolStore } from "@/stores/multi-tool-store";
+import { useOrganizeStore } from "@/stores/organize-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useQrStore } from "@/stores/qr-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -468,6 +469,7 @@ export function ToolPage() {
     useQrStore.getState().reset();
     useSplitStore.getState().reset();
     useHtmlToImageStore.getState().reset();
+    useOrganizeStore.getState().clear();
 
     setPreviewTransform(null);
     setPreviewFilter("");
@@ -481,9 +483,12 @@ export function ToolPage() {
     setEraserBrushSize(30);
     setEraserSliderInitPos(null);
     setMobileSettingsOpen(false);
-    // The editor session belongs to the tool route, not to the settings panel.
-    // (The mobile sheet keeps the panel mounted while closed, #1974.)
-    return () => useMultiToolStore.getState().clear();
+    // The editor session belongs to the tool route, not to the settings panel,
+    // which unmounts when the viewport crosses the mobile breakpoint (#1974, #2248).
+    return () => {
+      useMultiToolStore.getState().clear();
+      useOrganizeStore.getState().clear();
+    };
   }, [toolId]);
 
   const toolAccept = registryEntry?.accept ?? (tool?.acceptedInputs?.join(",") || undefined);
@@ -721,6 +726,13 @@ export function ToolPage() {
   // would throw away the signatures the user just placed, and fading the area
   // back in would flash the page for a view that did not change.
   const resultOwnsImageArea = hasProcessed && displayMode !== "interactive-sign";
+  // Shared between the mobile and desktop image-area divs so they reconcile in
+  // place when useMobile flips at 768px and interactive canvases survive (#2248).
+  const imageAreaKey = resultOwnsImageArea
+    ? `processed-${selectedIndex}`
+    : displayMode === "interactive-eraser"
+      ? "pending-eraser"
+      : `pending-${selectedIndex}`;
 
   // Derive processed file info: use stored filename for batch results (blob URLs),
   // fall back to parsing the download URL for single-file results
@@ -1452,6 +1464,7 @@ export function ToolPage() {
               {liveMessage}
             </div>
             <div
+              key={imageAreaKey}
               className={`flex-1 relative flex items-center justify-center p-4 min-h-0 min-w-0${isProcessing ? " animate-pulse" : ""}`}
             >
               {renderNavArrows()}
@@ -1582,13 +1595,7 @@ export function ToolPage() {
             {liveMessage}
           </div>
           <div
-            key={
-              resultOwnsImageArea
-                ? `processed-${selectedIndex}`
-                : displayMode === "interactive-eraser"
-                  ? "pending-eraser"
-                  : `pending-${selectedIndex}`
-            }
+            key={imageAreaKey}
             className={`flex-1 relative flex items-center justify-center p-6 min-h-0 min-w-0 ${resultOwnsImageArea ? "animate-fade-in" : ""}${isProcessing ? " animate-pulse" : ""}`}
           >
             {renderNavArrows()}
