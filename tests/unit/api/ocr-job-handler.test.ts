@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  cancelSingleJobGuarded: vi.fn(),
   deleteObject: vi.fn(),
   enqueueToolJob: vi.fn(),
   extractText: vi.fn(),
   extractPdfText: vi.fn(),
   getAuthUser: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
+  insertToolJobAlias: vi.fn(),
   prepare: vi.fn(),
   receiveUpload: vi.fn(),
+  requestCancel: vi.fn(),
   waitForJob: vi.fn(),
 }));
 
@@ -28,7 +31,16 @@ vi.mock("../../../apps/api/src/modality/input-handler.js", () => ({
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   enqueueToolJob: mocks.enqueueToolJob,
+  insertToolJobAlias: mocks.insertToolJobAlias,
   waitForJob: mocks.waitForJob,
+}));
+
+vi.mock("../../../apps/api/src/jobs/cancel.js", () => ({
+  requestCancel: mocks.requestCancel,
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  cancelSingleJobGuarded: mocks.cancelSingleJobGuarded,
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
@@ -78,8 +90,11 @@ beforeEach(() => {
     providers: ["CPUExecutionProvider"],
   });
   mocks.getAuthUser.mockReturnValue({ id: "user-1" });
+  mocks.cancelSingleJobGuarded.mockResolvedValue(undefined);
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.enqueueToolJob.mockResolvedValue(undefined);
+  mocks.insertToolJobAlias.mockResolvedValue(undefined);
+  mocks.requestCancel.mockResolvedValue(true);
   mocks.waitForJob.mockResolvedValue(null);
   mocks.receiveUpload.mockResolvedValue({
     key: "uploads/ocr-job/scan.png",
@@ -231,6 +246,251 @@ describe("OCR route enqueue safety", () => {
     expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
     expect(reply.statusCode).toBe(503);
     expect(reply.payload).toMatchObject({ error: "Failed to queue OCR" });
+  });
+
+  it("discards the upload, settles the alias, and skips enqueueing when the client disconnected before enqueue (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const clientJobId = "11111111-1111-4111-8111-111111111111";
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: true } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: { destroyed: true, writableEnded: false, once: vi.fn(), removeListener: vi.fn() },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.insertToolJobAlias).toHaveBeenCalledTimes(1);
+    const stampedJobId = mocks.insertToolJobAlias.mock.calls[0][0].jobId as string;
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: clientJobId,
+      expectedArtifactJobId: stampedJobId,
+    });
+    expect(reply.payload).toBeUndefined();
+  });
+
+  it("cancels the enqueued job when the client disconnects during enqueue (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    let closeListener: (() => void) | undefined;
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === "close") closeListener = cb;
+        }),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+    mocks.enqueueToolJob.mockImplementationOnce(async () => {
+      reply.raw.destroyed = true;
+      closeListener?.();
+    });
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: false } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0][0].jobId as string;
+    expect(mocks.requestCancel).toHaveBeenCalledWith(enqueuedJobId);
+  });
+
+  it("cancels the enqueued job when the response socket closes after enqueue before writableEnded (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    let closeListener: (() => void) | undefined;
+    let finishListener: (() => void) | undefined;
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === "close") closeListener = cb;
+          if (event === "finish") finishListener = cb;
+        }),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: false } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+    expect(mocks.requestCancel).not.toHaveBeenCalled();
+    expect(finishListener).toBeTypeOf("function");
+
+    // Socket closes before the 202 response finished flushing.
+    closeListener?.();
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0][0].jobId as string;
+    expect(mocks.requestCancel).toHaveBeenCalledTimes(1);
+    expect(mocks.requestCancel).toHaveBeenCalledWith(enqueuedJobId);
+  });
+
+  it("does not cancel the enqueued job when the socket closes after the 202 response finished (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    let closeListener: (() => void) | undefined;
+    let finishListener: (() => void) | undefined;
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === "close") closeListener = cb;
+          if (event === "finish") finishListener = cb;
+        }),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: false } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+    reply.raw.writableEnded = true;
+    finishListener?.();
+    expect(reply.raw.removeListener).toHaveBeenCalledWith("close", closeListener);
+    closeListener?.();
+    expect(mocks.requestCancel).not.toHaveBeenCalled();
+  });
+
+  it("still settles the alias and logs warn when deleteObject or requestCancel rejects on disconnect (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    mocks.deleteObject.mockRejectedValueOnce(new Error("storage fault"));
+    const clientJobId = "11111111-1111-4111-8111-111111111111";
+    const warn = vi.fn();
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn },
+      raw: { socket: { destroyed: true } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: { destroyed: true, writableEnded: false, once: vi.fn(), removeListener: vi.fn() },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "uploads/ocr-job/scan.png" }),
+      "Failed to delete abandoned upload",
+    );
   });
 });
 

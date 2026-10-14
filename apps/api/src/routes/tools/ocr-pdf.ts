@@ -15,6 +15,7 @@ import {
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { copyObjectToFile, deleteObject } from "../../lib/object-storage.js";
 import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
@@ -128,10 +129,7 @@ export function registerOcrPdf(app: FastifyInstance) {
     let fileId: string | null = null;
     let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
-    const ingressAbort = new AbortController();
-    const abortIngress = () => ingressAbort.abort();
-    request.raw.once("aborted", abortIngress);
-    if (request.raw.aborted) ingressAbort.abort();
+    const disconnect = trackClientDisconnect(request, reply);
 
     try {
       try {
@@ -141,7 +139,7 @@ export function registerOcrPdf(app: FastifyInstance) {
             if (inputKey) throw new Error("Only one PDF file may be uploaded");
             const upload = await receiveUpload(part, jobId, {
               maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
-              signal: ingressAbort.signal,
+              signal: disconnect.signal,
             });
             inputKey = upload.key;
             filename = upload.filename;
@@ -239,15 +237,24 @@ export function registerOcrPdf(app: FastifyInstance) {
           const validationPath = join(validationScratch, "input.pdf");
           await copyObjectToFile(uploadedInputKey, validationPath, {
             maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
-            signal: ingressAbort.signal,
+            signal: disconnect.signal,
           });
           await validatePdfPath(validationPath, {
             rejectPasswordProtected: true,
-            signal: ingressAbort.signal,
+            signal: disconnect.signal,
             log: request.log,
           });
         });
       } catch (err) {
+        if (disconnect.clientGone()) {
+          await disconnect.settleAbandoned({
+            jobId,
+            clientJobId,
+            uploadKeys: [uploadedInputKey],
+            log: request.log,
+          });
+          return;
+        }
         await deleteObject(uploadedInputKey).catch(() => {});
         if (err instanceof InputValidationError) {
           reportEngineUnavailable(err, toolId, request.log);
@@ -271,9 +278,18 @@ export function registerOcrPdf(app: FastifyInstance) {
         throw err;
       }
 
+      if (disconnect.clientGone()) {
+        await disconnect.settleAbandoned({
+          jobId,
+          clientJobId,
+          uploadKeys: [uploadedInputKey],
+          log: request.log,
+        });
+        return;
+      }
+
       const { engine: _legacyEngine, ...normalizedSettings } = settings;
       try {
-        ingressAbort.signal.throwIfAborted();
         await enqueueToolJob({
           jobId,
           toolId,
@@ -288,6 +304,15 @@ export function registerOcrPdf(app: FastifyInstance) {
           kind: "ai-tool",
         });
       } catch (err) {
+        if (disconnect.clientGone()) {
+          await disconnect.settleAbandoned({
+            jobId,
+            clientJobId,
+            uploadKeys: [uploadedInputKey],
+            log: request.log,
+          });
+          return;
+        }
         await deleteObject(uploadedInputKey).catch(() => {});
         request.log.error({ err, toolId, jobId }, "Failed to enqueue PDF OCR");
         return reply.status(503).send({
@@ -296,9 +321,13 @@ export function registerOcrPdf(app: FastifyInstance) {
         });
       }
 
+      if (await disconnect.armCancelAfterEnqueue(jobId, request.log)) {
+        return;
+      }
+
       return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     } finally {
-      request.raw.removeListener("aborted", abortIngress);
+      disconnect.release();
     }
   });
 }

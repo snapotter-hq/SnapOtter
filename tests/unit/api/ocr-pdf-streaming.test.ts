@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  cancelSingleJobGuarded: vi.fn(),
   copyObjectToFile: vi.fn(),
   deleteObject: vi.fn(),
   enqueueToolJob: vi.fn(),
@@ -12,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   getObjectBuffer: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
+  insertToolJobAlias: vi.fn(),
   receiveUpload: vi.fn(),
+  requestCancel: vi.fn(),
   validatePdfPath: vi.fn(),
 }));
 
@@ -27,6 +30,15 @@ vi.mock("@snapotter/ai", async (importOriginal) => {
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   enqueueToolJob: mocks.enqueueToolJob,
+  insertToolJobAlias: mocks.insertToolJobAlias,
+}));
+
+vi.mock("../../../apps/api/src/jobs/cancel.js", () => ({
+  requestCancel: mocks.requestCancel,
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  cancelSingleJobGuarded: mocks.cancelSingleJobGuarded,
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
@@ -75,8 +87,11 @@ function job(): ToolJobData {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.copyObjectToFile.mockResolvedValue(42);
+  mocks.cancelSingleJobGuarded.mockResolvedValue(undefined);
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.enqueueToolJob.mockResolvedValue(undefined);
+  mocks.insertToolJobAlias.mockResolvedValue(undefined);
+  mocks.requestCancel.mockResolvedValue(true);
   mocks.getAuthUser.mockReturnValue({ id: "user-1" });
   mocks.getOcrRuntimeCapability.mockReturnValue({
     available: false,
@@ -257,5 +272,192 @@ describe("OCR PDF path-backed processing", () => {
     expect(reply.statusCode).toBe(413);
     expect(reply.payload).toEqual({ error: "File exceeds the 512 MB upload limit" });
     expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+  });
+
+  it("discards the upload, settles the alias, and skips enqueueing when the client closes after the body was read (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    let closeListener: (() => void) | undefined;
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === "close") closeListener = cb;
+        }),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    mocks.validatePdfPath.mockImplementationOnce(async (_path, opts) => {
+      reply.raw.destroyed = true;
+      closeListener?.();
+      opts?.signal?.throwIfAborted();
+    });
+
+    const clientJobId = "22222222-2222-4222-8222-222222222222";
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        socket: { destroyed: false },
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.insertToolJobAlias).toHaveBeenCalledTimes(1);
+    const stampedJobId = mocks.insertToolJobAlias.mock.calls[0][0].jobId as string;
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: clientJobId,
+      expectedArtifactJobId: stampedJobId,
+    });
+    expect(reply.payload).toBeUndefined();
+  });
+
+  it("cancels the enqueued PDF OCR job when the client closes during enqueue (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    let closeListener: (() => void) | undefined;
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === "close") closeListener = cb;
+        }),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+    mocks.enqueueToolJob.mockImplementationOnce(async () => {
+      reply.raw.destroyed = true;
+      closeListener?.();
+    });
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        socket: { destroyed: false },
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0][0].jobId as string;
+    expect(mocks.requestCancel).toHaveBeenCalledWith(enqueuedJobId);
+  });
+
+  it("discards the upload, settles the alias, and skips enqueueing when the client disconnects right after validation (#2238)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    let closeListener: (() => void) | undefined;
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        once: vi.fn((event: string, cb: () => void) => {
+          if (event === "close") closeListener = cb;
+        }),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    // Validation succeeds, then the client disconnects just as validatePdfPath resolves.
+    mocks.validatePdfPath.mockImplementationOnce(async () => {
+      reply.raw.destroyed = true;
+      closeListener?.();
+    });
+
+    const clientJobId = "22222222-2222-4222-8222-222222222222";
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        socket: { destroyed: false },
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.insertToolJobAlias).toHaveBeenCalledTimes(1);
+    const stampedJobId = mocks.insertToolJobAlias.mock.calls[0][0].jobId as string;
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: clientJobId,
+      expectedArtifactJobId: stampedJobId,
+    });
   });
 });

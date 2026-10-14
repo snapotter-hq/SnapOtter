@@ -18,6 +18,7 @@ import {
   parseSaveModeField,
 } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { deleteObject } from "../../lib/object-storage.js";
 import { ocrRuntimeUnavailable, resolveOcrIngressSettings } from "../../lib/ocr-capability.js";
@@ -139,130 +140,158 @@ export function registerOcr(app: FastifyInstance) {
     let fileId: string | null = null;
     let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
+    const disconnect = trackClientDisconnect(request, reply);
 
     try {
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type === "file") {
-          if (inputKey) throw new Error("Only one image file may be uploaded");
-          const upload = await receiveUpload(part, jobId, {
-            maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
-          });
-          inputKey = upload.key;
-          filename = upload.filename;
-        } else if (part.fieldname === "settings") {
-          settingsRaw = part.value as string;
-        } else if (part.fieldname === "clientJobId") {
-          clientJobIdRaw = part.value as string;
-        } else if (part.fieldname === "fileId") {
-          fileId = part.value as string;
-        } else if (part.fieldname === "saveMode") {
-          saveModeRaw = part.value as string;
+      try {
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type === "file") {
+            if (inputKey) throw new Error("Only one image file may be uploaded");
+            const upload = await receiveUpload(part, jobId, {
+              maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
+            });
+            inputKey = upload.key;
+            filename = upload.filename;
+          } else if (part.fieldname === "settings") {
+            settingsRaw = part.value as string;
+          } else if (part.fieldname === "clientJobId") {
+            clientJobIdRaw = part.value as string;
+          } else if (part.fieldname === "fileId") {
+            fileId = part.value as string;
+          } else if (part.fieldname === "saveMode") {
+            saveModeRaw = part.value as string;
+          }
         }
-      }
-    } catch (err) {
-      if (inputKey) await deleteObject(inputKey).catch(() => {});
-      const statusCode = ocrUploadErrorStatus(err);
-      if (statusCode === 413) {
-        const failure = multipartFailure(err);
-        return reply.status(failure.status).send(failure.body);
-      }
-      return reply.status(statusCode).send({
-        error: ocrUploadErrorMessage(statusCode),
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
-
-    const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
-    if (clientJobIdField === null) {
-      if (inputKey) await deleteObject(inputKey).catch(() => {});
-      return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
-    }
-    clientJobId = clientJobIdField ?? null;
-
-    // Stamp the client-facing alias before any pre-enqueue work (#892): a
-    // cancel landing between parse and enqueueToolJob needs a durable pointer
-    // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-    if (clientJobId && clientJobId !== jobId) {
-      await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-    }
-
-    const saveMode = parseSaveModeField(saveModeRaw);
-    if (saveMode === null) {
-      if (inputKey) await deleteObject(inputKey).catch(() => {});
-      return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-    }
-
-    if (!inputKey) {
-      return reply.status(400).send({ error: "No image file provided" });
-    }
-
-    let settings: OcrSettings;
-    let requestedSettings: unknown;
-    try {
-      const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-      requestedSettings = parsed;
-      const result = settingsSchema.safeParse(parsed);
-      if (!result.success) {
-        await deleteObject(inputKey).catch(() => {});
-        return reply.status(400).send({
-          error: "Invalid settings",
-          details: formatZodErrors(result.error.issues),
+      } catch (err) {
+        if (inputKey) await deleteObject(inputKey).catch(() => {});
+        const statusCode = ocrUploadErrorStatus(err);
+        if (statusCode === 413) {
+          const failure = multipartFailure(err);
+          return reply.status(failure.status).send(failure.body);
+        }
+        return reply.status(statusCode).send({
+          error: ocrUploadErrorMessage(statusCode),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
-      settings = result.data;
-    } catch {
-      await deleteObject(inputKey).catch(() => {});
-      return reply.status(400).send({ error: "Settings must be valid JSON" });
-    }
 
-    const ocrResolution = resolveOcrIngressSettings(toolId, settings, { requestedSettings });
-    if (!ocrResolution.ok) {
-      await deleteObject(inputKey).catch(() => {});
-      const bundleId = TOOL_OPTIONAL_BUNDLE_MAP[toolId];
-      const bundle = getOptionalBundleForTool(toolId);
-      return reply.status(501).send({
-        error:
-          ocrResolution.code === "FEATURE_INCOMPATIBLE"
-            ? "Feature incompatible"
-            : "Feature not installed",
-        code: ocrResolution.code,
-        feature: bundleId,
-        featureName: bundle?.name ?? toolId,
-        estimatedSize: bundle?.estimatedSize ?? "unknown",
-        requestedQuality: ocrResolution.requestedQuality,
-        compatibilityReason: ocrResolution.reason,
-        ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
-      });
-    }
-    settings = ocrResolution.settings as OcrSettings;
-    const quality = settings.quality as "fast" | "balanced" | "best";
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        if (inputKey) await deleteObject(inputKey).catch(() => {});
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
+      }
+      clientJobId = clientJobIdField ?? null;
 
-    const { engine: _legacyEngine, ...normalizedSettings } = settings;
-    try {
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings: { ...normalizedSettings, quality },
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-        analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-      });
-    } catch (err) {
-      await deleteObject(inputKey).catch(() => {});
-      request.log.error({ err, toolId, jobId }, "Failed to enqueue OCR");
-      return reply.status(503).send({
-        error: "Failed to queue OCR",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
+      // Stamp the client-facing alias before any pre-enqueue work (#892): a
+      // cancel landing between parse and enqueueToolJob needs a durable pointer
+      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+      if (clientJobId && clientJobId !== jobId) {
+        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+      }
 
-    return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        if (inputKey) await deleteObject(inputKey).catch(() => {});
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+      }
+
+      if (!inputKey) {
+        return reply.status(400).send({ error: "No image file provided" });
+      }
+
+      let settings: OcrSettings;
+      let requestedSettings: unknown;
+      try {
+        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+        requestedSettings = parsed;
+        const result = settingsSchema.safeParse(parsed);
+        if (!result.success) {
+          await deleteObject(inputKey).catch(() => {});
+          return reply.status(400).send({
+            error: "Invalid settings",
+            details: formatZodErrors(result.error.issues),
+          });
+        }
+        settings = result.data;
+      } catch {
+        await deleteObject(inputKey).catch(() => {});
+        return reply.status(400).send({ error: "Settings must be valid JSON" });
+      }
+
+      const ocrResolution = resolveOcrIngressSettings(toolId, settings, { requestedSettings });
+      if (!ocrResolution.ok) {
+        await deleteObject(inputKey).catch(() => {});
+        const bundleId = TOOL_OPTIONAL_BUNDLE_MAP[toolId];
+        const bundle = getOptionalBundleForTool(toolId);
+        return reply.status(501).send({
+          error:
+            ocrResolution.code === "FEATURE_INCOMPATIBLE"
+              ? "Feature incompatible"
+              : "Feature not installed",
+          code: ocrResolution.code,
+          feature: bundleId,
+          featureName: bundle?.name ?? toolId,
+          estimatedSize: bundle?.estimatedSize ?? "unknown",
+          requestedQuality: ocrResolution.requestedQuality,
+          compatibilityReason: ocrResolution.reason,
+          ...(ocrResolution.guidance && { guidance: ocrResolution.guidance }),
+        });
+      }
+      settings = ocrResolution.settings as OcrSettings;
+      const quality = settings.quality as "fast" | "balanced" | "best";
+
+      if (disconnect.clientGone()) {
+        await disconnect.settleAbandoned({
+          jobId,
+          clientJobId,
+          uploadKeys: [inputKey],
+          log: request.log,
+        });
+        return;
+      }
+
+      const { engine: _legacyEngine, ...normalizedSettings } = settings;
+      try {
+        await enqueueToolJob({
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings: { ...normalizedSettings, quality },
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+        });
+      } catch (err) {
+        if (disconnect.clientGone()) {
+          await disconnect.settleAbandoned({
+            jobId,
+            clientJobId,
+            uploadKeys: [inputKey],
+            log: request.log,
+          });
+          return;
+        }
+        await deleteObject(inputKey).catch(() => {});
+        request.log.error({ err, toolId, jobId }, "Failed to enqueue OCR");
+        return reply.status(503).send({
+          error: "Failed to queue OCR",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
+      }
+
+      if (await disconnect.armCancelAfterEnqueue(jobId, request.log)) {
+        return;
+      }
+
+      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+    } finally {
+      disconnect.release();
+    }
   });
 }
