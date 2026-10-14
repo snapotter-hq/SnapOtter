@@ -538,6 +538,75 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
     }
   });
 
+  it("keeps a failed frame's server error on the panel when ending the run throws", async () => {
+    renderPanel();
+    await apply();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (previous.processing && !state.processing) {
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "failed",
+              error: "PDF is password-protected",
+            }),
+          });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+
+      expect(screen.getByText("PDF is password-protected")).toBeInTheDocument();
+      expect(screen.queryByText(en.errors.jobTrackingFailed)).not.toBeInTheDocument();
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe("PDF is password-protected");
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("reports the entry failure once when every store write throws on a failed frame", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    await apply();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      throw new Error(
+        previous.processing && !state.processing ? "teardown broke" : "entry write broke",
+      );
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "failed",
+              error: "PDF is password-protected",
+            }),
+          });
+        }),
+      ).toThrow("teardown broke");
+      await act(async () => {});
+
+      expect(screen.getByText("PDF is password-protected")).toBeInTheDocument();
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(([e]) => e.message === "Failing a Sign PDF run's entry failed");
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "entry write broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "sign-pdf" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
   it("leaves alone a file that took the run's slot after the files were cleared", async () => {
     renderPanel();
 

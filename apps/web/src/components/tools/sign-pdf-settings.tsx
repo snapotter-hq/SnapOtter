@@ -327,9 +327,14 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      * reports instead of throwing. The entry is found by id, so a reorder or a
      * fresh file in the slot can't redirect the failure, and only the
      * "pending" the run reset it to is failed: an entry already holding this
-     * run's result keeps it.
+     * run's result keeps it. Once per run: the progress stream calls onFailed
+     * again as a tracking failure when the first call throws, and that retry
+     * must not replace the server's message (#2498).
      */
+    let runFailed = false;
     const failRun = (message: string, category?: FeedbackErrorCategory) => {
+      if (runFailed) return;
+      runFailed = true;
       let teardown: { cause: unknown } | null = null;
       for (const write of [() => setError(message), endRun]) {
         try {
