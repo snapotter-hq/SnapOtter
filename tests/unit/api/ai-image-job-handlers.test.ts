@@ -430,4 +430,83 @@ describe("AI image pipeline process registrations", () => {
       ),
     ).resolves.toMatchObject({ filename: "photo_fixed.png", contentType: "image/png" });
   });
+
+  it("upscale pipeline registration preserves model, faceEnhance, denoise, format, and quality (#2362)", async () => {
+    registerUpscale(fakeApp);
+    const upscaleConfig = getToolConfig("upscale");
+    expect(upscaleConfig).toBeDefined();
+
+    const rawSettings = {
+      scale: 2,
+      model: "realesrgan-x4plus",
+      faceEnhance: true,
+      denoise: 15,
+      format: "webp",
+      quality: 85,
+    };
+
+    const parsed = upscaleConfig?.settingsSchema.parse(rawSettings);
+    expect(parsed).toEqual(rawSettings);
+
+    vi.mocked(upscale).mockResolvedValueOnce({
+      buffer: PNG,
+      width: 400,
+      height: 300,
+      method: "realesrgan",
+      format: "webp",
+    });
+
+    const out = await upscaleConfig?.process(PNG, parsed, "photo.png", ctx);
+    expect(upscale).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      SCRATCH_DIR,
+      {
+        scale: 2,
+        model: "realesrgan-x4plus",
+        faceEnhance: true,
+        denoise: 15,
+        format: "webp",
+        quality: 85,
+        signal: ctx.signal,
+      },
+      expect.any(Function),
+    );
+    expect(out).toMatchObject({
+      filename: "photo_2x.webp",
+      contentType: "image/webp",
+      resultPayload: {
+        width: 400,
+        height: 300,
+        method: "realesrgan",
+      },
+    });
+  });
+
+  it("upscale pipeline processor converts Node-handled output formats like avif (#2362)", async () => {
+    registerUpscale(fakeApp);
+    const upscaleConfig = getToolConfig("upscale");
+    expect(upscaleConfig).toBeDefined();
+
+    const parsed = upscaleConfig?.settingsSchema.parse({
+      scale: 2,
+      format: "avif",
+      quality: 80,
+    });
+
+    const out = await upscaleConfig?.process(PNG, parsed, "photo.png", ctx);
+    expect(upscale).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      SCRATCH_DIR,
+      expect.objectContaining({
+        scale: 2,
+        format: "png",
+        quality: 80,
+      }),
+      expect.any(Function),
+    );
+    expect(out).toMatchObject({
+      filename: "photo_2x.avif",
+      contentType: "image/avif",
+    });
+  });
 });

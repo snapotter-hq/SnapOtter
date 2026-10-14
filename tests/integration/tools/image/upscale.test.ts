@@ -8,6 +8,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -360,4 +361,43 @@ describe("Upscale", () => {
     expect(res.statusCode).toBe(202);
     expect(elapsed).toBeLessThan(30_000);
   }, 60_000);
+
+  // ── Pipeline and batch schema parity (regression for #2362) ────────
+
+  it("retains model, faceEnhance, denoise, format, and quality in the registered batch/pipeline schema", async () => {
+    const config = getToolConfig("upscale");
+    expect(config).toBeDefined();
+
+    const fullSettings = {
+      scale: 2,
+      model: "realesrgan-x4plus",
+      faceEnhance: true,
+      denoise: 15,
+      format: "webp",
+      quality: 85,
+    };
+
+    expect(config?.settingsSchema.parse(fullSettings)).toEqual(fullSettings);
+
+    // Invalid non-scale fields must be rejected by the batch route rather than stripped
+    const badBatch = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ scale: 2, faceEnhance: "not-a-boolean" }),
+      },
+    ]);
+
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/upscale/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": badBatch.contentType,
+      },
+      body: badBatch.body,
+    });
+
+    expect(badRes.statusCode).toBe(400);
+  });
 });

@@ -26,13 +26,14 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
-import { registerToolProcessFn } from "../tool-factory.js";
+import { registerToolProcessFn, type ToolProcessCtx } from "../tool-factory.js";
 
 const settingsSchema = z.object({
   scale: z.union([z.number(), z.string()]).transform(Number).default(2),
@@ -43,9 +44,40 @@ const settingsSchema = z.object({
   quality: z.union([z.number(), z.string()]).transform(Number).default(95),
 });
 
-// ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("upscale", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+const EXT_MAP: Record<string, string> = {
+  jpeg: "jpg",
+  jpg: "jpg",
+  png: "png",
+  webp: "webp",
+  tiff: "tiff",
+  gif: "gif",
+  avif: "avif",
+  heic: "heic",
+  heif: "heif",
+  jxl: "jxl",
+};
+
+const CONTENT_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  tiff: "image/tiff",
+  gif: "image/gif",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jxl: "image/jxl",
+};
+
+async function runUpscale(
+  input: Buffer,
+  rawSettings: unknown,
+  filename: string,
+  scratchDir: string,
+  ctx?: ToolProcessCtx,
+) {
+  const settings = settingsSchema.parse(rawSettings);
   const scale = settings.scale;
   const model = settings.model;
   const faceEnhance = settings.faceEnhance;
@@ -54,7 +86,7 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
   const outputQuality = settings.quality;
 
   if (format === "auto") {
-    const detected = await resolveOutputFormat(input, data.filename);
+    const detected = await resolveOutputFormat(input, filename);
     format = detected.format === "jpeg" ? "jpg" : detected.format;
   }
 
@@ -63,7 +95,7 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
 
   const result = await upscale(
     input,
-    ctx.scratchDir,
+    scratchDir,
     {
       scale,
       model,
@@ -71,9 +103,9 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
       denoise,
       format: pythonFormat,
       quality: outputQuality,
-      signal: ctx.signal,
+      signal: ctx?.signal,
     },
-    (percent, stage) => ctx.report(percent, stage),
+    ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
   );
 
   let outputBuffer = result.buffer;
@@ -91,33 +123,8 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
     }
   }
 
-  const EXT_MAP: Record<string, string> = {
-    jpeg: "jpg",
-    jpg: "jpg",
-    png: "png",
-    webp: "webp",
-    tiff: "tiff",
-    gif: "gif",
-    avif: "avif",
-    heic: "heic",
-    heif: "heif",
-    jxl: "jxl",
-  };
   const ext = EXT_MAP[finalFormat] || "png";
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
-
-  const CONTENT_TYPES: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    tiff: "image/tiff",
-    gif: "image/gif",
-    avif: "image/avif",
-    heic: "image/heic",
-    heif: "image/heif",
-    jxl: "image/jxl",
-  };
+  const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
 
   return {
     buffer: outputBuffer,
@@ -129,6 +136,11 @@ registerAiJobHandler("upscale", async (input, data, ctx) => {
       method: result.method,
     },
   };
+}
+
+// ── AI job handler (runs inside the BullMQ worker) ────────────────
+registerAiJobHandler("upscale", async (input, data, ctx) => {
+  return runUpscale(input, data.settings, data.filename, ctx.scratchDir, ctx);
 });
 
 /**
@@ -270,46 +282,23 @@ export function registerUpscale(app: FastifyInstance) {
   });
 
   // Register in the pipeline/batch registry so this tool can be used
-  // as a step in automation pipelines (without progress callbacks).
+  // as a step in automation pipelines and batch runs.
   registerToolProcessFn({
     toolId: "upscale",
-    settingsSchema: z.object({
-      scale: z.union([z.number(), z.string()]).transform(Number).default(2),
-    }),
+    settingsSchema,
     process: async (inputBuffer, settings, filename, ctx) => {
-      const scale = Number((settings as { scale?: number }).scale) || 2;
       const orientedBuffer = await autoOrient(inputBuffer);
       const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
       const needsCleanup = !ctx?.scratchDir;
       if (needsCleanup) await mkdir(scratchDir, { recursive: true });
       try {
-        const result = await upscale(
-          orientedBuffer,
-          scratchDir,
-          { scale, signal: ctx?.signal },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
-        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-        let outputBuffer = result.buffer;
-        if (outputFormat.format !== "png") {
-          outputBuffer = await sharp(result.buffer)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
-        }
-        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_${scale}x.${ext}`;
-        return {
-          buffer: outputBuffer,
-          filename: outputFilename,
-          contentType: outputFormat.contentType,
-          resultPayload: {
-            width: result.width,
-            height: result.height,
-            method: result.method,
-          },
-        };
+        return await runUpscale(orientedBuffer, settings, filename, scratchDir, ctx);
       } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        if (needsCleanup) {
+          await rm(scratchDir, { recursive: true, force: true }).catch((err) => {
+            logger.error({ err, scratchDir }, "Failed to clean up upscale scratch directory");
+          });
+        }
       }
     },
   });
