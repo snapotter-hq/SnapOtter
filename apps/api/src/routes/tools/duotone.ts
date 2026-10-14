@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -26,7 +26,17 @@ export function registerDuotone(app: FastifyInstance) {
     toolId: "duotone",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+      const resolvedFormat = await resolveOutputFormat(inputBuffer, filename);
+      const ALPHA_FORMATS = new Set(["png", "webp", "avif", "gif"]);
+      const inputHasAlpha = (await sharp(inputBuffer).metadata()).hasAlpha === true;
+      // A transparent input whose detected format cannot carry alpha (JPEG, or
+      // TIFF which Sharp's default encoder flattens to 3 channels) switches to
+      // lossless PNG so the rejoined alpha band is not discarded at the end (#1188).
+      const outputFormat =
+        inputHasAlpha && !ALPHA_FORMATS.has(resolvedFormat.format)
+          ? outputFormatFor("png")
+          : resolvedFormat;
+
       // The blend path rebuilds from a raw buffer, and Sharp ignores page hints
       // on raw input, so animation is handled a frame at a time (#1083).
       const core = async (source: Buffer): Promise<Buffer> => {
@@ -38,6 +48,14 @@ export function registerDuotone(app: FastifyInstance) {
         // .linear(multipliers, offsets) with per-channel arrays
         const multipliers = [(b.r - a.r) / 255, (b.g - a.g) / 255, (b.b - a.b) / 255];
         const offsets = [a.r, a.g, a.b];
+
+        // Hold the alpha band aside as a named PNG intermediate so the colour
+        // ramp and optional intensity blend can run over 3-channel sRGB without
+        // transforming or losing transparency (#1188, #1180).
+        const meta = await sharp(source).metadata();
+        const alpha = meta.hasAlpha
+          ? await sharp(source).extractChannel(3).png().toBuffer()
+          : undefined;
 
         // Grayscale to single channel, then expand back to 3-channel sRGB
         // so that .linear() can apply per-channel multipliers/offsets.
@@ -85,6 +103,10 @@ export function registerDuotone(app: FastifyInstance) {
           })
             .png()
             .toBuffer();
+        }
+
+        if (alpha) {
+          buf = await sharp(buf).joinChannel(alpha).png().toBuffer();
         }
 
         return await sharp(buf)

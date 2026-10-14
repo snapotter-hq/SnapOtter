@@ -482,6 +482,77 @@ describe("transparency survives the container it arrived in (#1187)", () => {
     const i = (5 * info.width + 5) * info.channels;
     expect([data[i], data[i + 1], data[i + 2]]).toEqual([255, 255, 255]);
   });
+
+  it.each([100, 50, 0])(
+    "duotone keeps transparency across PNG, GIF and WebP at intensity %i (#1188)",
+    async (intensity) => {
+      const gif = await transparentCorner();
+      const png = await sharp(gif).png().toBuffer();
+      const webp = await sharp(gif).webp({ lossless: true }).toBuffer();
+
+      const config = getToolConfig("duotone");
+      if (!config) throw new Error("duotone must be registered");
+      const settings = config.settingsSchema.parse({ intensity });
+
+      const [fromPng, fromGif, fromWebp] = await Promise.all([
+        config.process(png, settings, "corner.png"),
+        config.process(gif, settings, "corner.gif"),
+        config.process(webp, settings, "corner.webp"),
+      ]);
+
+      for (const [label, out] of [
+        ["png", fromPng],
+        ["gif", fromGif],
+        ["webp", fromWebp],
+      ] as const) {
+        const meta = await sharp(out.buffer).metadata();
+        expect(meta.hasAlpha, `${label}: output keeps its alpha channel`).toBe(true);
+        expect(await alphaAt(out.buffer, 5, 5), `${label}: the transparent corner`).toBe(0);
+        expect(await alphaAt(out.buffer, 40, 40), `${label}: the opaque body`).toBe(255);
+      }
+
+      if (intensity === 0) {
+        const { data, info } = await sharp(fromPng.buffer)
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const body = (40 * info.width + 40) * info.channels;
+        expect([data[body], data[body + 1], data[body + 2], data[body + 3]]).toEqual([
+          200, 40, 40, 255,
+        ]);
+      }
+    },
+  );
+
+  it("duotone switches a transparent TIFF to PNG rather than flattening its alpha (#1188)", async () => {
+    const tiff = await sharp(await transparentCorner())
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+    expect((await sharp(tiff).metadata()).hasAlpha, "fixture carries alpha").toBe(true);
+
+    const config = getToolConfig("duotone");
+    if (!config) throw new Error("duotone must be registered");
+    const out = await config.process(tiff, config.settingsSchema.parse({}), "logo.tiff");
+
+    expect(out.contentType).toBe("image/png");
+    expect(out.filename).toBe("logo_duotone.png");
+    expect((await sharp(out.buffer).metadata()).hasAlpha).toBe(true);
+    expect(await alphaAt(out.buffer, 5, 5)).toBe(0);
+    expect(await alphaAt(out.buffer, 40, 40)).toBe(255);
+
+    const opaqueTiff = await sharp({
+      create: { width: 20, height: 20, channels: 3, background: RED },
+    })
+      .tiff()
+      .toBuffer();
+    const opaqueOut = await config.process(
+      opaqueTiff,
+      config.settingsSchema.parse({}),
+      "photo.tiff",
+    );
+    expect(opaqueOut.contentType).toBe("image/tiff");
+    expect(opaqueOut.filename).toBe("photo_duotone.tiff");
+  });
 });
 
 describe("the container guard covers the image catalogue (#1190)", () => {
