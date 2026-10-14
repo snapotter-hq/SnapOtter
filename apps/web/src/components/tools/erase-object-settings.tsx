@@ -5,7 +5,6 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
-import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
@@ -312,6 +311,7 @@ export function EraseObjectSettings({
           resolve();
         },
         onFailed: (failure) => {
+          if (abandoned) return;
           cancelIfHandlingFailed(failure, clientJobId);
           abandon(new Error(jobFailureMessage(failure, t.errors)));
         },
@@ -499,12 +499,12 @@ export function EraseObjectSettings({
     // tracking failure when the first call throws, and that retry must neither
     // replace the server's message nor report the same ending a second time.
     let runEndedWithError = false;
-    const endRunWithError = (message: string) => {
+    const endRunWithError = (message: string, before?: () => void) => {
       if (runEndedWithError) return;
       runEndedWithError = true;
       let first: { cause: unknown } | null = null;
       let second: { cause: unknown } | null = null;
-      for (const step of [() => setError(message), finishUi]) {
+      for (const step of [...(before ? [before] : []), () => setError(message), finishUi]) {
         try {
           step();
         } catch (err) {
@@ -562,29 +562,16 @@ export function EraseObjectSettings({
       },
       onFailed: (failure) => {
         endWatch();
-        let abortError: unknown = null;
-        try {
-          abandonRequest();
-        } catch (err) {
-          abortError = err;
-        }
+        if (runEndedWithError) return;
         cancelIfHandlingFailed(failure, clientJobId);
-        // The stream has already let go of the run, so a throw from the message
-        // write must not skip finishUi and leave the run at processing for good
-        // (#1830). It still surfaces, after the teardown.
-        endRunWithError(jobFailureMessage(failure, t.errors));
-        if (abortError) throw abortError;
+        // The stream has already let go of the run, so a throw from the abort or
+        // the message write must not skip finishUi and leave the run at
+        // processing for good (#1830, #1961). It still surfaces, after the teardown.
+        endRunWithError(jobFailureMessage(failure, t.errors), abandonRequest);
       },
       onStall: () => {
         endWatch();
-        let abortError: unknown = null;
-        try {
-          abandonRequest();
-        } catch (err) {
-          abortError = err;
-        }
-        endRunWithError(t.toolSettings["erase-object"].stall);
-        if (abortError) throw abortError;
+        endRunWithError(t.toolSettings["erase-object"].stall, abandonRequest);
       },
     });
     const stopProgress = subscription.stop;

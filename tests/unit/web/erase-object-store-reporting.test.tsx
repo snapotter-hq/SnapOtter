@@ -488,6 +488,36 @@ describe("erase-object single file: a store write that throws while the run ends
     }
   });
 
+  it("rethrows the message write's failure, and reports the teardown's once, after a stall (#1961)", async () => {
+    const stalls = captureStallTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    await submit();
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      throw new Error(state.error !== previous.error ? "message write broke" : "teardown broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("message write broke");
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run with an error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      consoleError.mockRestore();
+      stalls.restore();
+    }
+  });
+
   it("rethrows the message write's failure, not the teardown's, after a failed frame", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     renderPanel();
@@ -1228,6 +1258,29 @@ describe("erase-object batch: a file the progress stream gave up on (#1893)", ()
     }
   });
 
+  it("keeps the file failed and continues the batch after a stall even when aborting throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      vi.spyOn(first, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.toolSettings["erase-object"].stallBatch);
+      expect(entry(0).errorCategory).toBe("timeout");
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
   it("does not abort a request that answered first", async () => {
     renderPanel(2);
     const first = await submit(1);
@@ -1273,6 +1326,57 @@ describe("erase-object single file: a run the progress stream gave up on (#1893)
       expect(entry().processedUrl).toBeNull();
       expect(xhr.aborted).toBe(true);
     } finally {
+      stalls.restore();
+    }
+  });
+
+  it("still ends the run after a stall when aborting the request throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      vi.spyOn(xhr, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("rethrows the abort failure and reports the store failure when both aborting and showing the stall message throw", async () => {
+    const stalls = captureStallTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    vi.spyOn(xhr, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run with an error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "store broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
       stalls.restore();
     }
   });
@@ -1468,6 +1572,49 @@ describe("erase-object cancels a job the client gave up on (#1960)", () => {
     });
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not cancel a failed frame's job when showing its error or aborting throws", async () => {
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    vi.spyOn(xhr, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      }),
+    ).toThrow("abort broke");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useFileStore.getState().error).toBe("Object erasing failed");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("batch: does not cancel a failed frame's job when aborting throws", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+    const first = await submit(1);
+    first.respond(202, { jobId: "job-1", async: true });
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+      }),
+    ).toThrow("abort broke");
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Object erasing failed");
+    expect(entry(1).status).toBe("completed");
   });
 
   it("does not cancel on a stall, whose copy says the result may have saved", async () => {
