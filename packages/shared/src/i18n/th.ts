@@ -4861,6 +4861,7 @@ export const th: TranslationKeys = {
       changeSuccess: "เปลี่ยนรหัสผ่านสำเร็จ",
       changeFailed: "เปลี่ยนรหัสผ่านล้มเหลว",
       currentPasswordIncorrect: "รหัสผ่านปัจจุบันไม่ถูกต้อง",
+      passwordChangedElsewhere: "รหัสผ่านของคุณถูกเปลี่ยนจากที่อื่น ลงชื่อเข้าใช้อีกครั้ง",
       changePasswordButton: "เปลี่ยนรหัสผ่าน",
       loginAttemptLimitNote: "สามารถกำหนดจำนวนครั้งจำกัดการเข้าสู่ระบบได้ในตั้งค่าระบบ",
       twoFactorHeading: "การยืนยันตัวตนสองปัจจัย",

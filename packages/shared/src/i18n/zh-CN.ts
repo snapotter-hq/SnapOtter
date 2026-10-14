@@ -4639,6 +4639,7 @@ export const zhCN: TranslationKeys = {
       changeSuccess: "密码修改成功",
       changeFailed: "密码修改失败",
       currentPasswordIncorrect: "当前密码不正确",
+      passwordChangedElsewhere: "您的密码已在其他地方更改。请重新登录。",
       changePasswordButton: "修改密码",
       loginAttemptLimitNote: "登录尝试限制可在系统设置中配置。",
       twoFactorHeading: "双重身份验证",

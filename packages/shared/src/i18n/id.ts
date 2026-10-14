@@ -4919,6 +4919,7 @@ export const id: TranslationKeys = {
       changeSuccess: "Kata sandi berhasil diubah",
       changeFailed: "Gagal mengubah kata sandi",
       currentPasswordIncorrect: "Kata sandi saat ini salah",
+      passwordChangedElsewhere: "Kata sandi Anda telah diubah di tempat lain. Masuk lagi.",
       changePasswordButton: "Ubah Kata Sandi",
       loginAttemptLimitNote: "Batas percobaan login dapat dikonfigurasi di Pengaturan Sistem.",
       twoFactorHeading: "Autentikasi Dua Faktor",

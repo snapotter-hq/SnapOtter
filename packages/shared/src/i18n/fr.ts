@@ -4945,6 +4945,7 @@ export const fr: TranslationKeys = {
       changeSuccess: "Mot de passe modifié avec succès",
       changeFailed: "Échec de la modification du mot de passe",
       currentPasswordIncorrect: "Le mot de passe actuel est incorrect",
+      passwordChangedElsewhere: "Votre mot de passe a été modifié ailleurs. Reconnectez-vous.",
       changePasswordButton: "Changer le mot de passe",
       loginAttemptLimitNote:
         "Les limites de tentatives de connexion peuvent être configurées dans les Paramètres système.",

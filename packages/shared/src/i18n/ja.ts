@@ -4876,6 +4876,8 @@ export const ja: TranslationKeys = {
       changeSuccess: "パスワードを変更しました",
       changeFailed: "パスワードの変更に失敗しました",
       currentPasswordIncorrect: "現在のパスワードが正しくありません",
+      passwordChangedElsewhere:
+        "パスワードが別の場所で変更されました。もう一度サインインしてください。",
       changePasswordButton: "パスワード変更",
       loginAttemptLimitNote: "ログイン試行制限はシステム設定で構成できます。",
       twoFactorHeading: "2 要素認証",

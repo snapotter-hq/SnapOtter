@@ -180,6 +180,13 @@ describe("Security: change password", () => {
     await expectShown(s.security.currentPasswordIncorrect);
   });
 
+  it("409 PASSWORD_CHANGED says the password was changed elsewhere (#2236)", async () => {
+    apiPost.mockRejectedValueOnce(apiError(409, "PASSWORD_CHANGED"));
+    await submit();
+    await expectShown(s.security.passwordChangedElsewhere);
+    expect(screen.queryByText(s.security.changeFailed)).toBeNull();
+  });
+
   it("lets the server's policy answer for a short password, with its own minimum", async () => {
     // No client-side "at least 8" guess: the policy may say 12.
     apiPost.mockRejectedValueOnce(

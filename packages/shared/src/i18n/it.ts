@@ -4933,6 +4933,7 @@ export const it: TranslationKeys = {
       changeSuccess: "Password modificata con successo",
       changeFailed: "Modifica della password non riuscita",
       currentPasswordIncorrect: "La password attuale non è corretta",
+      passwordChangedElsewhere: "La password è stata modificata altrove. Accedi di nuovo.",
       changePasswordButton: "Cambia password",
       loginAttemptLimitNote:
         "I limiti dei tentativi di accesso possono essere configurati nelle Impostazioni di sistema.",

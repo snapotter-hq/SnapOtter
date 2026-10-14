@@ -4933,6 +4933,7 @@ export const ptBR: TranslationKeys = {
       changeSuccess: "Senha alterada com sucesso",
       changeFailed: "Falha ao alterar a senha",
       currentPasswordIncorrect: "A senha atual está incorreta",
+      passwordChangedElsewhere: "Sua senha foi alterada em outro lugar. Entre novamente.",
       changePasswordButton: "Alterar senha",
       loginAttemptLimitNote:
         "Os limites de tentativas de login podem ser configurados nas Configurações do sistema.",

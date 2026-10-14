@@ -4855,6 +4855,7 @@ export const en = {
       changeSuccess: "Password changed successfully",
       changeFailed: "Failed to change password",
       currentPasswordIncorrect: "Current password is incorrect",
+      passwordChangedElsewhere: "Your password was changed elsewhere. Sign in again.",
       changePasswordButton: "Change Password",
       loginAttemptLimitNote: "Login attempt limits can be configured in System Settings.",
       twoFactorHeading: "Two-Factor Authentication",

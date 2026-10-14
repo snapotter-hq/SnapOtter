@@ -4927,6 +4927,7 @@ export const tr: TranslationKeys = {
       changeSuccess: "Parola başarıyla değiştirildi",
       changeFailed: "Parola değiştirilemedi",
       currentPasswordIncorrect: "Mevcut parola yanlış",
+      passwordChangedElsewhere: "Parolanız başka bir yerde değiştirildi. Yeniden oturum açın.",
       changePasswordButton: "Parolayı Değiştir",
       loginAttemptLimitNote: "Giriş deneme limitleri Sistem Ayarlarından yapılandırılabilir.",
       twoFactorHeading: "İki Faktörlü Kimlik Doğrulama",

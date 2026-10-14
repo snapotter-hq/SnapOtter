@@ -99,6 +99,26 @@ describe("change-password errors are translated (#1446)", () => {
     expect(storage.has("snapotter-token")).toBe(false);
   });
 
+  it("sends the user back to sign in when the password was changed elsewhere (#2236)", async () => {
+    storage.set("snapotter-token", "stale");
+    answer(409, {
+      error: "Your password was changed elsewhere. Sign in again.",
+      code: "PASSWORD_CHANGED",
+    });
+
+    await submit();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(de.settings.security.passwordChangedElsewhere);
+    expect(screen.getByRole("link", { name: de.auth.loginButton })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(screen.queryByText(de.changePassword.failedError)).toBeNull();
+    expect(screen.queryByText("Your password was changed elsewhere. Sign in again.")).toBeNull();
+    expect(storage.has("snapotter-token")).toBe(false);
+  });
+
   it("says an SSO account's password is managed by the identity provider", async () => {
     answer(400, {
       error: "Password changes are managed by your identity provider.",

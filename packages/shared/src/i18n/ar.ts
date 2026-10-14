@@ -4888,6 +4888,7 @@ export const ar: TranslationKeys = {
       changeSuccess: "تم تغيير كلمة المرور بنجاح",
       changeFailed: "فشل تغيير كلمة المرور",
       currentPasswordIncorrect: "كلمة المرور الحالية غير صحيحة",
+      passwordChangedElsewhere: "تم تغيير كلمة المرور في مكان آخر. سجّل الدخول مرة أخرى.",
       changePasswordButton: "تغيير كلمة المرور",
       loginAttemptLimitNote: "يمكن ضبط حدود محاولات تسجيل الدخول في إعدادات النظام.",
       twoFactorHeading: "المصادقة الثنائية",

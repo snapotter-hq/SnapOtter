@@ -4922,6 +4922,7 @@ export const es: TranslationKeys = {
       changeSuccess: "Contraseña cambiada correctamente",
       changeFailed: "Error al cambiar la contraseña",
       currentPasswordIncorrect: "La contraseña actual es incorrecta",
+      passwordChangedElsewhere: "Tu contraseña se cambió en otro lugar. Vuelve a iniciar sesión.",
       changePasswordButton: "Cambiar contraseña",
       loginAttemptLimitNote:
         "Los límites de intentos de inicio de sesión se pueden configurar en Configuración del sistema.",

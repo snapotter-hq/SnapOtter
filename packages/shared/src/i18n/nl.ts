@@ -4939,6 +4939,7 @@ export const nl: TranslationKeys = {
       changeSuccess: "Wachtwoord succesvol gewijzigd",
       changeFailed: "Wachtwoord wijzigen mislukt",
       currentPasswordIncorrect: "Huidig wachtwoord is onjuist",
+      passwordChangedElsewhere: "Je wachtwoord is ergens anders gewijzigd. Log opnieuw in.",
       changePasswordButton: "Wachtwoord wijzigen",
       loginAttemptLimitNote: "Inlogpogingslimieten kun je instellen bij Systeeminstellingen.",
       twoFactorHeading: "Tweefactorauthenticatie",

@@ -4848,6 +4848,7 @@ export const ko: TranslationKeys = {
       changeSuccess: "비밀번호가 변경되었습니다",
       changeFailed: "비밀번호 변경에 실패했습니다",
       currentPasswordIncorrect: "현재 비밀번호가 올바르지 않습니다",
+      passwordChangedElsewhere: "다른 곳에서 비밀번호가 변경되었습니다. 다시 로그인하세요.",
       changePasswordButton: "비밀번호 변경",
       loginAttemptLimitNote: "로그인 시도 제한은 시스템 설정에서 구성할 수 있습니다.",
       twoFactorHeading: "2단계 인증",

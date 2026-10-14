@@ -56,6 +56,15 @@ function storedUsername(): string | null {
   }
 }
 
+/** Drop the stored token without letting a blocked-storage throw hide the refusal. */
+function forgetToken(): void {
+  try {
+    clearToken();
+  } catch {
+    // Storage blocked: the session cookie still governs auth state.
+  }
+}
+
 /**
  * What happens once the server has changed the password. None of it may be
  * reported as a failed change: the password is already different, so telling
@@ -106,6 +115,7 @@ export function ChangePasswordPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrors([]);
+    setSessionEnded(false);
 
     if (newPassword !== confirmPassword) {
       setErrors([t.changePassword.passwordsMismatch]);
@@ -127,9 +137,16 @@ export function ChangePasswordPage() {
         // gone (expired, idle, or ended by an admin's password reset).
         // Retrying here can't work, so point back to sign-in.
         if (res.status === 401 && data.code !== "INVALID_PASSWORD") {
-          clearToken();
+          forgetToken();
           setSessionEnded(true);
+          setErrors([t.changePassword.sessionEnded]);
           return;
+        }
+        // Another change won (another tab, an admin reset, or SCIM): the old
+        // password will never verify again, so drop the token and link to sign-in (#2236).
+        if (data.code === "PASSWORD_CHANGED") {
+          forgetToken();
+          setSessionEnded(true);
         }
         if (typeof data.minLength === "number") setMinLength(data.minLength);
         const messages = passwordErrorMessages(t, res.status, data);
@@ -245,17 +262,17 @@ export function ChangePasswordPage() {
                 required
               />
             </div>
-            {sessionEnded && (
-              <p role="alert" className="text-sm text-destructive">
-                {t.changePassword.sessionEnded}{" "}
-                <a href={appUrl("/login")} className="underline">
-                  {t.auth.loginButton}
-                </a>
-              </p>
-            )}
             {errors.length === 1 && (
               <p role="alert" className="text-sm text-destructive">
                 {errors[0]}
+                {sessionEnded && (
+                  <>
+                    {" "}
+                    <a href={appUrl("/login")} className="underline">
+                      {t.auth.loginButton}
+                    </a>
+                  </>
+                )}
               </p>
             )}
             {errors.length > 1 && (

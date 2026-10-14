@@ -4638,6 +4638,7 @@ export const zhTW: TranslationKeys = {
       changeSuccess: "密碼變更成功",
       changeFailed: "密碼變更失敗",
       currentPasswordIncorrect: "目前密碼不正確",
+      passwordChangedElsewhere: "您的密碼已在其他地方變更。請重新登入。",
       changePasswordButton: "變更密碼",
       loginAttemptLimitNote: "登入嘗試限制可在系統設定中配置。",
       twoFactorHeading: "兩步驟驗證",

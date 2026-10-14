@@ -4913,6 +4913,7 @@ export const vi: TranslationKeys = {
       changeSuccess: "Đã đổi mật khẩu thành công",
       changeFailed: "Đổi mật khẩu thất bại",
       currentPasswordIncorrect: "Mật khẩu hiện tại không đúng",
+      passwordChangedElsewhere: "Mật khẩu của bạn đã được đổi ở nơi khác. Hãy đăng nhập lại.",
       changePasswordButton: "Đổi mật khẩu",
       loginAttemptLimitNote: "Giới hạn đăng nhập có thể được cấu hình trong Cài đặt hệ thống.",
       twoFactorHeading: "Xác thực hai yếu tố",

@@ -57,6 +57,9 @@ describe("passwordErrorMessage (#1446)", () => {
     expect(passwordErrorMessage(en, 401, { code: "INVALID_PASSWORD" })).toBe(
       en.settings.security.currentPasswordIncorrect,
     );
+    expect(passwordErrorMessage(en, 409, { code: "PASSWORD_CHANGED" })).toBe(
+      en.settings.security.passwordChangedElsewhere,
+    );
     expect(passwordErrorMessage(en, 400, { code: "OIDC_NO_PASSWORD" })).toBe(
       en.auth.passwordManagedByProvider,
     );

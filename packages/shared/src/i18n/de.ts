@@ -4949,6 +4949,8 @@ export const de: TranslationKeys = {
       changeSuccess: "Passwort erfolgreich geändert",
       changeFailed: "Passwort konnte nicht geändert werden",
       currentPasswordIncorrect: "Aktuelles Passwort ist falsch",
+      passwordChangedElsewhere:
+        "Ihr Passwort wurde an anderer Stelle geändert. Melden Sie sich erneut an.",
       changePasswordButton: "Passwort ändern",
       loginAttemptLimitNote:
         "Anmeldeversuchslimits können in den Systemeinstellungen konfiguriert werden.",

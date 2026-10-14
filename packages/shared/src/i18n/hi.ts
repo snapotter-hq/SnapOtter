@@ -4719,6 +4719,7 @@ export const hi: TranslationKeys = {
       changeSuccess: "पासवर्ड सफलतापूर्वक बदला गया",
       changeFailed: "पासवर्ड बदलने में विफल",
       currentPasswordIncorrect: "मौजूदा पासवर्ड गलत है",
+      passwordChangedElsewhere: "आपका पासवर्ड कहीं और बदल दिया गया है। फिर से साइन इन करें।",
       changePasswordButton: "पासवर्ड बदलें",
       loginAttemptLimitNote: "लॉगिन प्रयास सीमाएं सिस्टम सेटिंग्स में कॉन्फ़िगर की जा सकती हैं।",
       twoFactorHeading: "द्वि-कारक प्रमाणीकरण",

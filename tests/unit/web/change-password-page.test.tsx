@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The jsdom env here has no working localStorage; the provider reads the
 // stored locale choice from it (same stub as change-password-errors.test.tsx).
 const storage = vi.hoisted(() => new Map<string, string>());
-const storageFails = vi.hoisted(() => ({ set: false }));
+const storageFails = vi.hoisted(() => ({ set: false, remove: false }));
 // The page shows and offers the signed-in name. The session is the source of
 // truth; storage is only a fallback for a browser whose config has not loaded (#2317).
 const auth = vi.hoisted(() => ({ username: null as string | null }));
@@ -27,7 +27,10 @@ vi.stubGlobal("localStorage", {
     if (storageFails.set) throw new Error("QuotaExceededError");
     storage.set(k, v);
   },
-  removeItem: (k: string) => void storage.delete(k),
+  removeItem: (k: string) => {
+    if (storageFails.remove) throw new Error("SecurityError");
+    storage.delete(k);
+  },
   clear: () => storage.clear(),
 });
 
@@ -43,6 +46,7 @@ beforeEach(() => {
   storage.clear();
   auth.username = null;
   storageFails.set = false;
+  storageFails.remove = false;
   storage.set("snapotter-locale", "en");
   vi.stubGlobal("fetch", fetchMock);
   // jsdom doesn't implement form submission; the page's post-success navigation is one.
@@ -227,6 +231,36 @@ describe("a refused change stays on the page", () => {
     expect(await screen.findByText(en.changePassword.failedError)).toBeVisible();
     expect(submitSpy).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: en.changePassword.changeButton })).toBeEnabled();
+  });
+
+  it("clears the sign-in link when a later attempt fails for another reason", async () => {
+    answer(409, { code: "PASSWORD_CHANGED" });
+
+    await fillAndSubmit();
+
+    expect(await screen.findByRole("link", { name: en.auth.loginButton })).toBeVisible();
+
+    answer(400, { code: "VALIDATION_ERROR", rule: "digit", rules: ["digit"] });
+    fireEvent.click(screen.getByRole("button", { name: en.changePassword.changeButton }));
+
+    expect(await screen.findByText(en.errors.passwordNeedsDigit)).toBeVisible();
+    expect(screen.queryByRole("link", { name: en.auth.loginButton })).toBeNull();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
+  it("still shows the sign-in link when storage refuses removeItem on PASSWORD_CHANGED", async () => {
+    storageFails.remove = true;
+    answer(409, { code: "PASSWORD_CHANGED" });
+
+    await fillAndSubmit();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(en.settings.security.passwordChangedElsewhere);
+    expect(screen.getByRole("link", { name: en.auth.loginButton })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(screen.queryByText(en.changePassword.failedError)).toBeNull();
   });
 });
 

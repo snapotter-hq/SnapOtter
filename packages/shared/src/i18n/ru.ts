@@ -4928,6 +4928,7 @@ export const ru: TranslationKeys = {
       changeSuccess: "Пароль успешно изменён",
       changeFailed: "Не удалось изменить пароль",
       currentPasswordIncorrect: "Текущий пароль неверен",
+      passwordChangedElsewhere: "Ваш пароль был изменён в другом месте. Войдите снова.",
       changePasswordButton: "Изменить пароль",
       loginAttemptLimitNote: "Лимиты попыток входа можно настроить в Системных настройках.",
       twoFactorHeading: "Двухфакторная аутентификация",

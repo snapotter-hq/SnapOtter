@@ -4930,6 +4930,7 @@ export const uk: TranslationKeys = {
       changeSuccess: "Пароль успішно змінено",
       changeFailed: "Не вдалося змінити пароль",
       currentPasswordIncorrect: "Поточний пароль невірний",
+      passwordChangedElsewhere: "Ваш пароль було змінено в іншому місці. Увійдіть знову.",
       changePasswordButton: "Змінити пароль",
       loginAttemptLimitNote: "Ліміти спроб входу можна налаштувати в Системних налаштуваннях.",
       twoFactorHeading: "Двофакторна автентифікація",

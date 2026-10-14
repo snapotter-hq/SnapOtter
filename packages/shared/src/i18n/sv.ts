@@ -4919,6 +4919,7 @@ export const sv: TranslationKeys = {
       changeSuccess: "Lösenordet ändrat",
       changeFailed: "Kunde inte ändra lösenordet",
       currentPasswordIncorrect: "Nuvarande lösenord är felaktigt",
+      passwordChangedElsewhere: "Ditt lösenord har ändrats någon annanstans. Logga in igen.",
       changePasswordButton: "Byt lösenord",
       loginAttemptLimitNote: "Inloggningsförsöksgränser kan konfigureras i Systeminställningar.",
       twoFactorHeading: "Tvåfaktorsautentisering",

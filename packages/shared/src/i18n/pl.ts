@@ -4931,6 +4931,8 @@ export const pl: TranslationKeys = {
       changeSuccess: "Hasło zostało zmienione",
       changeFailed: "Nie udało się zmienić hasła",
       currentPasswordIncorrect: "Bieżące hasło jest nieprawidłowe",
+      passwordChangedElsewhere:
+        "Twoje hasło zostało zmienione w innym miejscu. Zaloguj się ponownie.",
       changePasswordButton: "Zmień hasło",
       loginAttemptLimitNote:
         "Limity prób logowania można skonfigurować w Ustawieniach systemowych.",
