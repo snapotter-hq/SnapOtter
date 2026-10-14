@@ -184,6 +184,23 @@ describe("analytics lib (baked model)", () => {
       });
     });
 
+    // The export dialog reports how each attempt ended; without these keys on the
+    // allowlist every export would arrive with output_format alone (#2174).
+    it("forwards the editor_exported status and reason (#2174)", async () => {
+      await mod.initAnalytics(enabledConfig);
+      mod.track("editor_exported", {
+        output_format: "avif",
+        status: "failed",
+        reason: "server-convert",
+        width: 4000,
+      });
+      expect(mockCapture).toHaveBeenCalledWith("editor_exported", {
+        output_format: "avif",
+        status: "failed",
+        reason: "server-convert",
+      });
+    });
+
     it("drops all properties for an unknown event", async () => {
       await mod.initAnalytics(enabledConfig);
       mod.track("not_allow_listed", { tool_id: "resize" });

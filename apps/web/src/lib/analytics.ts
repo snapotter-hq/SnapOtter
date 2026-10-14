@@ -38,7 +38,7 @@ const ALLOWED: Record<string, ReadonlySet<string>> = {
   batch_processed: new Set(["tool_id", "file_count", "status", "reason", "total_bytes"]),
   editor_opened: new Set<string>([]),
   editor_tool_used: new Set(["editor_tool"]),
-  editor_exported: new Set(["output_format"]),
+  editor_exported: new Set(["output_format", "status", "reason"]),
   pipeline_opened: new Set<string>([]),
   pipeline_step_added: new Set(["tool_id"]),
   pipeline_saved: new Set(["step_count"]),

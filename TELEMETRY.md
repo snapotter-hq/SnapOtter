@@ -64,7 +64,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `ai_bundle_prompted` | An AI install prompt is shown | `bundle_id` |
 | `editor_opened` | The image editor opens | none |
 | `editor_tool_used` | An editor tool is selected | `editor_tool` |
-| `editor_exported` | An editor export runs | `output_format` |
+| `editor_exported` | An editor export attempt ends: the file reached the browser's download, or the export failed | `output_format`, `status` (`completed` or `failed`), `reason` (absent on completed exports; on failed ones `no-context` when the browser couldn't back or encode the canvas, `tainted` for a cross-origin image, `no-stage`, `server-convert` when the server refused the conversion or couldn't be reached, `server-pending` when it answered before the conversion finished, `download`, or `bug`) |
 | `pipeline_opened` | The Automate page opens | none |
 | `pipeline_step_added` | A step is added to a pipeline | `tool_id` |
 | `pipeline_saved` | A pipeline is saved | `step_count` |
