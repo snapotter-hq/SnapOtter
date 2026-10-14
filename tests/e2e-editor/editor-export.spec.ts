@@ -79,4 +79,30 @@ test.describe("Editor Export", () => {
     await expect(page.getByText("Save Project")).toBeVisible();
     await expect(page.getByText("Load Project")).toBeVisible();
   });
+
+  test("Save Project writes a data: URL when the source image was opened from a file (#2132)", async ({
+    editorPage: page,
+  }) => {
+    await page.click('[data-testid="menu-file"]');
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.click('[data-testid="menu-item-open"]');
+    const chooser = await chooserPromise;
+    await chooser.setFiles("tests/fixtures/image/valid/test-200x150.png");
+    await expect(page.getByTestId("status-dimensions")).toHaveText("200 x 150 px");
+
+    await page.keyboard.press("Control+Shift+s");
+    await expect(page.getByText("Export Image")).toBeVisible();
+
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save Project" }).click();
+    const file = await (await download).path();
+    expect(file).toBeTruthy();
+
+    const saved = JSON.parse(readFileSync(file as string, "utf8")) as {
+      sourceImageUrl: string;
+      sourceImageSize: { width: number; height: number };
+    };
+    expect(saved.sourceImageUrl).toMatch(/^data:image\/png;base64,/);
+    expect(saved.sourceImageSize).toEqual({ width: 200, height: 150 });
+  });
 });

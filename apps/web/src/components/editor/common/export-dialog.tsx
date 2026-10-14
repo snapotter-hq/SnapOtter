@@ -463,34 +463,32 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   }, [settings, canvasSize, later, guardCapture, reportEmptyExport]);
 
   // Project save (.snapotter file)
-  const handleSaveProject = useCallback(() => {
-    const state = useEditorStore.getState();
-    const projectData = {
-      version: 1,
-      canvasSize: state.canvasSize,
-      layers: state.layers,
-      objects: state.objects.map(withoutLiveStroke),
-      adjustments: state.adjustments,
-      filters: state.filters,
-      guides: state.guides,
-      sourceImageUrl: state.sourceImageUrl,
-      sourceImageSize: state.sourceImageSize,
-      foregroundColor: state.foregroundColor,
-      backgroundColor: state.backgroundColor,
-    };
+  const handleSaveProject = useCallback(async () => {
+    try {
+      const state = useEditorStore.getState();
+      const projectData = {
+        version: 1,
+        ...(await serializeEditorState(state)),
+      };
 
-    const json = JSON.stringify(projectData, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "project.snapotter";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    markClean();
-  }, [markClean]);
+      const json = JSON.stringify(projectData, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "project.snapotter";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (useEditorStore.getState()._historyVersion === state._historyVersion) {
+        markClean();
+      }
+    } catch (err) {
+      console.error("Save project failed:", err);
+      handleUnexpectedError(err);
+    }
+  }, [markClean, handleUnexpectedError]);
 
   // Project load (.snapotter file)
   const handleLoadProject = useCallback(() => {
@@ -823,10 +821,6 @@ interface AutosaveData {
   state: AutosaveState;
 }
 
-/**
- * Convert a blob: URL to a data: URL. Returns the original string
- * if it is not a blob URL or if the fetch fails.
- */
 // The canvas a brush paints into mid-stroke lives in attrs.image. It serialises as
 // `{}`, which a restored object would then try to draw.
 function withoutLiveStroke(obj: CanvasObject): CanvasObject {
@@ -835,58 +829,79 @@ function withoutLiveStroke(obj: CanvasObject): CanvasObject {
   return { ...obj, attrs };
 }
 
+/**
+ * Convert a blob: URL to a data: URL. Returns the original string if it is not
+ * a blob URL, and throws if the blob cannot be read into a non-empty data URL.
+ */
 async function blobUrlToDataUrl(url: string): Promise<string> {
   if (!url.startsWith("blob:")) return url;
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(url);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return url;
+  const res = await fetch(url);
+  if (res.ok === false) {
+    throw new Error(`Failed to fetch blob URL (${res.status})`);
   }
+  const blob = await res.blob();
+  if (blob.size === 0) {
+    throw new Error("Blob URL resolved to an empty blob");
+  }
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      const commaIdx = typeof result === "string" ? result.indexOf(",") : -1;
+      if (
+        typeof result === "string" &&
+        result.startsWith("data:") &&
+        commaIdx !== -1 &&
+        commaIdx < result.length - 1
+      ) {
+        resolve(result);
+      } else {
+        reject(reader.error ?? new Error("FileReader did not produce a valid data URL"));
+      }
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read blob as data URL"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function serializeEditorState(s = useEditorStore.getState()): Promise<AutosaveState> {
+  // Convert blob URLs to data URLs so they survive round-trip across sessions
+  const sourceImageUrl = s.sourceImageUrl ? await blobUrlToDataUrl(s.sourceImageUrl) : null;
+
+  // Also convert blob URLs inside image-type canvas objects
+  const objects = await Promise.all(
+    s.objects.map(async (obj) => {
+      const saved = withoutLiveStroke(obj);
+      if (saved.type === "image" && saved.attrs.src?.startsWith("blob:")) {
+        return {
+          ...saved,
+          attrs: { ...saved.attrs, src: await blobUrlToDataUrl(saved.attrs.src) },
+        };
+      }
+      return saved;
+    }),
+  );
+
+  return {
+    canvasSize: s.canvasSize,
+    layers: s.layers,
+    objects,
+    adjustments: s.adjustments,
+    filters: s.filters,
+    guides: s.guides,
+    sourceImageUrl,
+    sourceImageSize: s.sourceImageSize,
+    foregroundColor: s.foregroundColor,
+    backgroundColor: s.backgroundColor,
+  };
 }
 
 export async function saveEditorState(): Promise<void> {
   try {
-    const s = useEditorStore.getState();
-
-    // Convert blob URLs to data URLs so they survive localStorage round-trip
-    const sourceImageUrl = s.sourceImageUrl ? await blobUrlToDataUrl(s.sourceImageUrl) : null;
-
-    // Also convert blob URLs inside image-type canvas objects
-    const objects = await Promise.all(
-      s.objects.map(async (obj) => {
-        const saved = withoutLiveStroke(obj);
-        if (saved.type === "image" && saved.attrs.src?.startsWith("blob:")) {
-          return {
-            ...saved,
-            attrs: { ...saved.attrs, src: await blobUrlToDataUrl(saved.attrs.src) },
-          };
-        }
-        return saved;
-      }),
-    );
-
     const data: AutosaveData = {
       version: 1,
       timestamp: Date.now(),
-      state: {
-        canvasSize: s.canvasSize,
-        layers: s.layers,
-        objects,
-        adjustments: s.adjustments,
-        filters: s.filters,
-        guides: s.guides,
-        sourceImageUrl,
-        sourceImageSize: s.sourceImageSize,
-        foregroundColor: s.foregroundColor,
-        backgroundColor: s.backgroundColor,
-      },
+      state: await serializeEditorState(),
     };
 
     try {
@@ -895,8 +910,8 @@ export async function saveEditorState(): Promise<void> {
     } catch (storageErr) {
       console.warn("[SnapOtter] Autosave failed (localStorage quota may be exceeded):", storageErr);
     }
-  } catch {
-    // Serialization or fetch error
+  } catch (err) {
+    console.warn("[SnapOtter] Autosave serialization failed:", err);
   }
 }
 

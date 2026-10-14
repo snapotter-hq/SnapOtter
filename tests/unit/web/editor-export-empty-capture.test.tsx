@@ -60,6 +60,10 @@ vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
   return { ...actual, copyImageToClipboard };
 });
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
 vi.mock("@/components/editor/editor-canvas", () => ({ editorStageRefHolder: { current: {} } }));
 vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/editor/stage-capture")>()),
@@ -73,7 +77,8 @@ vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   },
 }));
 
-import { ExportDialog } from "@/components/editor/common/export-dialog";
+import { ExportDialog, saveEditorState } from "@/components/editor/common/export-dialog";
+import { captureHandledError } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
 
 const markClean = vi.fn();
@@ -84,12 +89,20 @@ beforeEach(() => {
   markClean.mockReset();
   toastError.mockReset();
   copyImageToClipboard.mockClear();
+  vi.mocked(captureHandledError).mockClear();
   capture.dataUrl = "data:image/png;base64,AA==";
   capture.blob = new Blob(["x"]);
   capture.throwOnEncode = null;
   capture.ratios = [];
   capture.giveContext = true;
-  useEditorStore.setState({ markClean, isDirty: true, canvasSize: { width: 1920, height: 1080 } });
+  useEditorStore.setState({
+    markClean,
+    isDirty: true,
+    canvasSize: { width: 1920, height: 1080 },
+    sourceImageUrl: null,
+    sourceImageSize: null,
+    objects: [],
+  });
   const realCreate = document.createElement.bind(document);
   vi.spyOn(document, "createElement").mockImplementation(((tag: string) =>
     tag === "canvas"
@@ -312,5 +325,337 @@ describe("export failures that reach the catch block (#2351)", () => {
       expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
     );
     expect(markClean).not.toHaveBeenCalled();
+  });
+});
+
+function clickSaveProject() {
+  fireEvent.click(screen.getByRole("button", { name: en.editor.ui.exportDialog.saveProject }));
+}
+
+async function savedProjectJson(): Promise<Record<string, unknown>> {
+  const calls = vi.mocked(URL.createObjectURL).mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  const blob = calls[calls.length - 1][0] as Blob;
+  const text = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
+describe("Save Project with a blob: source image (#2132)", () => {
+  it("converts blob: sourceImageUrl and image objects to data: URLs before writing and marking clean", async () => {
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/source-1",
+      sourceImageSize: { width: 1920, height: 1080 },
+      objects: [
+        {
+          id: "obj-1",
+          type: "image",
+          layerId: "layer-1",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            src: "blob:http://localhost:1351/stroke-1",
+            image: {} as HTMLCanvasElement,
+          },
+        },
+        {
+          id: "obj-2",
+          type: "image",
+          layerId: "layer-1",
+          attrs: {
+            x: 10,
+            y: 10,
+            width: 50,
+            height: 50,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            src: "data:image/png;base64,iVBORw0KGgo=",
+          },
+        },
+      ],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        blob: async () => new Blob([`pixels:${url}`], { type: "image/png" }),
+      })),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+    const project = await savedProjectJson();
+    expect(project.sourceImageUrl).toMatch(/^data:image\/png;base64,/);
+    const objects = project.objects as Array<{ attrs: { src: string; image?: unknown } }>;
+    expect(objects[0].attrs.src).toMatch(/^data:image\/png;base64,/);
+    expect(objects[0].attrs.image).toBeUndefined();
+    expect(objects[1].attrs.src).toBe("data:image/png;base64,iVBORw0KGgo=");
+  });
+
+  it("leaves a data: sourceImageUrl untouched without fetching it", async () => {
+    const dataUrl = "data:image/png;base64,iVBORw0KGgo=";
+    useEditorStore.setState({
+      sourceImageUrl: dataUrl,
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const project = await savedProjectJson();
+    expect(project.sourceImageUrl).toBe(dataUrl);
+  });
+
+  it("saves null sourceImageUrl when no source image is loaded", async () => {
+    useEditorStore.setState({
+      sourceImageUrl: null,
+      sourceImageSize: null,
+    });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const project = await savedProjectJson();
+    expect(project.sourceImageUrl).toBeNull();
+  });
+
+  it("does not mark clean if the document changes while Save Project is reading the blob", async () => {
+    let resolveBlob: (blob: Blob) => void = () => {};
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/slow-source",
+      sourceImageSize: { width: 1920, height: 1080 },
+      _historyVersion: 1,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        blob: () =>
+          new Promise<Blob>((resolve) => {
+            resolveBlob = resolve;
+          }),
+      })),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    useEditorStore.setState({ _historyVersion: 2 });
+    resolveBlob(new Blob(["pixels"], { type: "image/png" }));
+
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    expect(markClean).not.toHaveBeenCalled();
+  });
+
+  it("toasts and keeps the document dirty when fetching the blob: sourceImageUrl rejects", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/revoked",
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("toasts and keeps the document dirty when an image object's blob: src fails to fetch", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 1920, height: 1080 },
+      objects: [
+        {
+          id: "obj-broken",
+          type: "image",
+          layerId: "layer-1",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            src: "blob:http://localhost:1351/broken-stroke",
+          },
+        },
+      ],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("toasts and keeps the document dirty when the blob: URL resolves to an empty blob", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/empty",
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        blob: async () => new Blob([]),
+      })),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("toasts and keeps the document dirty when fetching the blob: URL answers not ok", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/missing",
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        blob: async () => new Blob(["not found"]),
+      })),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("toasts and keeps the document dirty when FileReader fails on the blob: URL", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/unreadable",
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    vi.spyOn(FileReader.prototype, "readAsDataURL").mockImplementation(function (this: FileReader) {
+      this.onerror?.(new ProgressEvent("error") as ProgressEvent<FileReader>);
+    });
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("toasts and keeps the document dirty when FileReader finishes with an empty data URL payload", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/truncated",
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    vi.spyOn(FileReader.prototype, "readAsDataURL").mockImplementation(function (this: FileReader) {
+      Object.defineProperty(this, "result", {
+        value: "data:image/png;base64,",
+        configurable: true,
+      });
+      this.onloadend?.(new ProgressEvent("loadend") as ProgressEvent<FileReader>);
+    });
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickSaveProject();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite autosave in localStorage with a dead blob: URL when fetch fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k),
+      clear: () => store.clear(),
+    });
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/revoked",
+      sourceImageSize: { width: 1920, height: 1080 },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    await saveEditorState();
+    expect(localStorage.getItem("snapotter-editor-autosave")).toBeNull();
+    expect(console.warn).toHaveBeenCalled();
   });
 });
