@@ -382,6 +382,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
       status: "completed",
       processedUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
     });
+    expect(useFileStore.getState().error).toBeNull();
 
     unmount();
   });
@@ -2038,8 +2039,8 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
   });
 
   // The other half of the claim: once a start has taken the refs over, the
-  // earlier run is superseded and a throw ends the start the #1821 way. (The
-  // earlier run's late 200 is #944's, whose sync onload has no run guard.)
+  // earlier run is superseded and a throw ends the start the #1821 way, so
+  // the earlier run's late answer finds no run to land on (#944).
   it("ends the run it took over when a start throws after its claim", () => {
     const file = clipFile();
     const { result, unmount } = startLiveRun([file]);
@@ -2057,6 +2058,436 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
     expect(state.cancelCurrentJob).toBeNull();
     expect(state.entries[0]).toMatchObject({ status: "failed", error: START_FAILURE });
     expect(xhrs).toHaveLength(1);
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(RESULT_200);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: START_FAILURE,
+      processedUrl: null,
+    });
+    unmount();
+  });
+});
+
+/**
+ * #944: settle tool-run entries by stable entry id rather than positional
+ * index or a blind status === "processing" sweep, and guard single-run
+ * xhr.onload against stale runs.
+ */
+describe("useToolProcessor entry-identity settle and stale onload guard (#944)", () => {
+  const RESULT_200 = {
+    jobId: "server-job",
+    downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+    originalSize: 64,
+    processedSize: 32,
+  };
+  const SECOND_ID = "55555555-5555-4555-8555-555555555555";
+
+  afterEach(() => {
+    vi.mocked(generateId).mockImplementation(() => JOB_ID);
+  });
+
+  function clipFile(name = "clip.mp4") {
+    return new File([new ArrayBuffer(64)], name, { type: "video/mp4" });
+  }
+
+  it("ignores a late sync 200 after a cancel 404 already settled the run as Canceled", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve({ ok: false, status: 404 } as Response)),
+    );
+    const file = clipFile();
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+
+    await act(async () => {
+      await result.current.cancelCurrentJob();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+    });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        ...RESULT_200,
+        savedFileId: "saved-1",
+        warning: "clamped",
+      });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+      processedUrl: null,
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(result.current.resultPayload).toBeNull();
+    expect(result.current.warning).toBeNull();
+    unmount();
+  });
+
+  it("ignores a predecessor run's late sync 200 and 202 once a successor run has started", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    vi.mocked(generateId).mockImplementation(() => SECOND_ID);
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().activeJobId).toBeNull();
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(RESULT_200);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+    });
+    expect(result.current.resultPayload).toBeNull();
+
+    act(() => {
+      xhrs[1].status = 200;
+      xhrs[1].responseText = JSON.stringify(RESULT_200);
+      xhrs[1].onload?.();
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT_200.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("does not write a sync 200 result onto a replacement file loaded after Clear all", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([fileB]);
+    });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        ...RESULT_200,
+        savedFileId: "saved-1",
+        warning: "clamped",
+      });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "pending",
+      processedUrl: null,
+      error: null,
+    });
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(result.current.resultPayload).toBeNull();
+    expect(result.current.warning).toBeNull();
+    unmount();
+  });
+
+  it("does not write an SSE completion onto a replacement file at the same index", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+    });
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => {
+      useFileStore.getState().setFiles([fileB]);
+    });
+
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: { ...RESULT_200, savedFileId: "saved-1", warning: "clamped" },
+      });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "pending",
+      processedUrl: null,
+      error: null,
+    });
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(result.current.resultPayload).toBeNull();
+    expect(result.current.warning).toBeNull();
+    unmount();
+  });
+
+  it("lands a sync result on the run's entry after files are reordered", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(RESULT_200);
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0].file.name).toBe("b.mp4");
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT_200.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("lands an SSE completion on the run's entry after files are reordered", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      sendSingleFrame({ phase: "complete", percent: 100, result: RESULT_200 });
+    });
+
+    expect(useFileStore.getState().entries[0].file.name).toBe("b.mp4");
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT_200.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("fails the run's entry after files are reordered on a sync error", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      xhrs[0].onerror?.();
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1].status).toBe("failed");
+    unmount();
+  });
+
+  it("fails the run's entry after files are reordered on an SSE failed frame", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      sendSingleFrame({ phase: "failed", percent: 0, error: "boom" });
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "boom",
+    });
+    unmount();
+  });
+
+  it("does not fail a replacement file when the earlier run errors after setFiles", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().setFiles([fileB]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      xhrs[0].onerror?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "processing",
+      error: null,
+    });
+    unmount();
+  });
+
+  it("spares a reordered live single run's entry when a second start throws before claim", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      // fileA moves to index 1; fileB is now at index 0 and selected.
+      useFileStore.getState().reverseFiles();
+      useFileStore.getState().setSelectedIndex(0);
+    });
+
+    let armed = true;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (armed && state.entries[0]?.status === "processing") {
+        armed = false;
+        throw new Error("second start broke");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => result.current.processFiles([fileB, fileA], { startS: 0, endS: 2 })),
+      ).toThrow("second start broke");
+    } finally {
+      unsubscribe();
+    }
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Something went wrong while tracking this job. Try again.",
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "processing",
+      error: null,
+    });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(RESULT_200);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: RESULT_200.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("fails an added file's early-throwing start while sparing a live batch's entries", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+    );
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    const fileC = clipFile("c.mp4");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    await act(async () => {
+      await result.current.processAllFiles([fileA, fileB], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().addFiles([fileC]);
+      useFileStore.getState().setSelectedIndex(2);
+    });
+
+    let armed = true;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (armed && state.entries[2]?.status === "processing") {
+        armed = false;
+        throw new Error("third file start broke");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => result.current.processFiles([fileA, fileB, fileC], { startS: 0, endS: 2 })),
+      ).toThrow("third file start broke");
+    } finally {
+      unsubscribe();
+    }
+
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+    expect(useFileStore.getState().entries[1].status).toBe("processing");
+    expect(useFileStore.getState().entries[2]).toMatchObject({
+      status: "failed",
+      error: "Something went wrong while tracking this job. Try again.",
+    });
+    unmount();
+  });
+
+  it("does not sweep a stranger entry left at processing when a run fails", () => {
+    const stranger = clipFile("stranger.mp4");
+    const target = clipFile("target.mp4");
+    useFileStore.getState().setFiles([stranger, target]);
+    // Orphaned at processing by an earlier unmounted run.
+    useFileStore.getState().updateEntry(0, { status: "processing" });
+    useFileStore.getState().setSelectedIndex(1);
+
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([stranger, target], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "failed", percent: 0, error: "boom" });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "processing",
+      error: null,
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "boom",
+    });
     unmount();
   });
 });

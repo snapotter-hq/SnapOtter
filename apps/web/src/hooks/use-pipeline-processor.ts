@@ -62,6 +62,11 @@ const SSE_STALL_TIMEOUT_MS = 300_000;
 // so a silent 30s on a fresh SSE means the request tail never arrived.
 const JOB_EVIDENCE_TIMEOUT_MS = 30_000;
 
+function findEntryIndex(entryId: string | null): number {
+  if (!entryId) return -1;
+  return useFileStore.getState().entries.findIndex((entry) => entry.id === entryId);
+}
+
 /**
  * Pipeline twin of use-tool-processor's #722/#750 recovery machinery. A dead
  * response after the upload finished does not mean a dead flow: the terminal
@@ -90,7 +95,8 @@ export function usePipelineProcessor() {
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jobEvidenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
-  const activeEntryIndexRef = useRef<number | null>(null);
+  const activeEntryIdRef = useRef<string | null>(null);
+  const activeEntryIdsRef = useRef<ReadonlySet<string> | null>(null);
   const asyncModeRef = useRef(false);
   const sawJobEvidenceRef = useRef(false);
   // Set on the user's cancel click once the server acknowledged it (#771).
@@ -119,7 +125,7 @@ export function usePipelineProcessor() {
 
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
-    activeEntryIndexRef.current = null;
+    activeEntryIdRef.current = null;
     setActiveJob(null, null);
   }, [setActiveJob]);
 
@@ -150,9 +156,10 @@ export function usePipelineProcessor() {
   // "processing": the Automate result pane gates its failure card on
   // status === "failed" and the thumbnail strip badges off the same status
   // (#1352, the pipeline twin of use-tool-processor's #799/#929 sweep; batch
-  // runs since #1699). The status guard leaves an already-settled entry and
-  // its error alone, and sweeping instead of indexing works after
-  // clearActiveJob has nulled activeEntryIndexRef.
+  // runs since #1699). Keyed by the entry ids captured at kickoff (#944), so
+  // reordering or a stranger entry left at "processing" by an earlier
+  // unmounted run cannot be swept with this run's message, and an
+  // already-settled entry and its error are left alone.
   //
   // Every exit calls this last, after its run-level teardown, and it never
   // throws: some exits run right after a store write threw (a broken
@@ -161,23 +168,27 @@ export function usePipelineProcessor() {
   // Each entry gets its own try, so one write that throws can't leave a
   // batch's later entries pulsing (#1779). Each throw is logged, and the
   // first is reported, once per settle rather than once per entry (#1812).
-  // `spare` is an entry a still-live run owns, left processing (#1911).
-  const settleProcessingEntries = useCallback((message: string, spare?: number) => {
-    const { entries, updateEntry } = useFileStore.getState();
-    let firstError: { cause: unknown } | null = null;
-    for (let i = 0; i < entries.length; i++) {
-      if (i === spare || entries[i]?.status !== "processing") continue;
-      try {
-        updateEntry(i, { status: "failed", error: message });
-      } catch (err) {
-        console.error("Failing the run's entry failed", err);
-        firstError ??= { cause: err };
+  const settleProcessingEntries = useCallback(
+    (message: string, entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current) => {
+      if (!entryIds || entryIds.size === 0) return;
+      const { entries, updateEntry } = useFileStore.getState();
+      let firstError: { cause: unknown } | null = null;
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (!entry || !entryIds.has(entry.id) || entry.status !== "processing") continue;
+        try {
+          updateEntry(i, { status: "failed", error: message });
+        } catch (err) {
+          console.error("Failing the run's entry failed", err);
+          firstError ??= { cause: err };
+        }
       }
-    }
-    if (firstError) {
-      reportRunEndFailure("Failing a pipeline run's entries failed", firstError.cause);
-    }
-  }, []);
+      if (firstError) {
+        reportRunEndFailure("Failing a pipeline run's entries failed", firstError.cause);
+      }
+    },
+    [],
+  );
 
   const startJobEvidenceTimer = useCallback(() => {
     clearJobEvidenceTimer();
@@ -344,54 +355,59 @@ export function usePipelineProcessor() {
   // guard (#1814) and the entries go last. The caller rethrows the kickoff's
   // throw, which reaches Sentry through the global handler, so only a
   // teardown that breaks as well is reported here (#1812).
-  const endRunAtStart = useCallback(() => {
-    clearStallTimer();
-    clearJobEvidenceTimer();
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    batchRunRef.current = null;
-    setProgress(IDLE_PROGRESS);
-    const trackingFailed = tRef.current.errors.jobTrackingFailed;
-    const teardownError = runEndWrites([
+  const endRunAtStart = useCallback(
+    (entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current) => {
+      clearStallTimer();
+      clearJobEvidenceTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      batchRunRef.current = null;
+      setProgress(IDLE_PROGRESS);
+      const trackingFailed = tRef.current.errors.jobTrackingFailed;
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(trackingFailed),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure("Ending a pipeline run after its start failed", teardownError.cause);
+      }
+      settleProcessingEntries(trackingFailed, entryIds);
+    },
+    [
+      clearStallTimer,
+      clearJobEvidenceTimer,
       clearActiveJob,
-      () => setError(trackingFailed),
-      () => setProcessing(false),
-    ]);
-    if (teardownError) {
-      reportRunEndFailure("Ending a pipeline run after its start failed", teardownError.cause);
-    }
-    settleProcessingEntries(trackingFailed);
-  }, [
-    clearStallTimer,
-    clearJobEvidenceTimer,
-    clearActiveJob,
-    settleProcessingEntries,
-    setError,
-    setProcessing,
-  ]);
+      settleProcessingEntries,
+      setError,
+      setProcessing,
+    ],
+  );
 
   // Ends a kickoff that threw before it claimed the run refs (#1911). They
   // still belong to the run that holds them, so endRunAtStart would end
   // that run instead. Only claimed refs are a failed start's to tear down;
   // with no live run there is nothing to spare. Behind a live run the
   // kickoff has only reset outcome state and marked entries processing, so
-  // it fails every entry left at processing except the live run's, and
-  // leaves the run, its processing flag and its error slot alone (a
-  // non-null setError also turns processing off). A batch run owns every
-  // entry, so behind one there is nothing to fail. The caller rethrows, so
-  // the start's throw is still reported.
-  const endStartBeforeClaim = useCallback(() => {
-    if (!activeJobIdRef.current) {
-      endRunAtStart();
-      return;
-    }
-    const liveEntry = activeEntryIndexRef.current;
-    if (liveEntry === null) return;
-    settleProcessingEntries(tRef.current.errors.jobTrackingFailed, liveEntry);
-  }, [endRunAtStart, settleProcessingEntries]);
+  // it fails only the entries this start touched that the live run doesn't
+  // own, and leaves the live run, its processing flag and its error slot
+  // alone (a non-null setError also turns processing off). The caller
+  // rethrows, so the start's throw is still reported.
+  const endStartBeforeClaim = useCallback(
+    (startEntryIds: ReadonlySet<string>) => {
+      if (!activeJobIdRef.current) {
+        endRunAtStart(startEntryIds);
+        return;
+      }
+      const liveIds = activeEntryIdsRef.current;
+      const orphanedIds = new Set([...startEntryIds].filter((id) => !liveIds?.has(id)));
+      settleProcessingEntries(tRef.current.errors.jobTrackingFailed, orphanedIds);
+    },
+    [endRunAtStart, settleProcessingEntries],
+  );
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -544,17 +560,18 @@ export function usePipelineProcessor() {
               } catch (_e) {
                 console.debug("Ignored xhr.abort error:", _e);
               }
-              const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
-
-              useFileStore.getState().updateEntry(idx, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
-                processedFilename: null,
-                status: "completed",
-                originalSize: result.originalSize,
-                processedSize: result.processedSize,
-                ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
-              });
+              const idx = findEntryIndex(activeEntryIdRef.current);
+              if (idx !== -1) {
+                useFileStore.getState().updateEntry(idx, {
+                  processedUrl: result.downloadUrl,
+                  processedPreviewUrl: result.previewUrl ?? null,
+                  processedFilename: null,
+                  status: "completed",
+                  originalSize: result.originalSize,
+                  processedSize: result.processedSize,
+                  ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+                });
+              }
               clearActiveJob();
               batchRunRef.current = null;
               setProcessing(false);
@@ -649,6 +666,8 @@ export function usePipelineProcessor() {
   const processSingle = useCallback(
     (file: File, steps: PipelineStep[]) => {
       const capturedIndex = useFileStore.getState().selectedIndex;
+      const capturedEntryId = useFileStore.getState().entries[capturedIndex]?.id ?? null;
+      const runEntryIds = new Set(capturedEntryId ? [capturedEntryId] : []);
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
@@ -668,7 +687,8 @@ export function usePipelineProcessor() {
         const clientJobId = generateId();
         activeJobIdRef.current = clientJobId;
         claimed = true;
-        activeEntryIndexRef.current = capturedIndex;
+        activeEntryIdRef.current = capturedEntryId;
+        activeEntryIdsRef.current = runEntryIds;
 
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
@@ -763,7 +783,7 @@ export function usePipelineProcessor() {
             ...(failure !== null ? [() => setError(failure)] : []),
             () => setProcessing(false),
           ]);
-          if (failure !== null) settleProcessingEntries(failure);
+          if (failure !== null) settleProcessingEntries(failure, runEntryIds);
           return teardownError;
         };
 
@@ -817,15 +837,18 @@ export function usePipelineProcessor() {
             }
             if (result) {
               try {
-                useFileStore.getState().updateEntry(capturedIndex, {
-                  processedUrl: result.downloadUrl,
-                  processedPreviewUrl: result.previewUrl ?? null,
-                  processedFilename: null,
-                  status: "completed",
-                  originalSize: result.originalSize,
-                  processedSize: result.processedSize,
-                  ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
-                });
+                const idx = findEntryIndex(capturedEntryId);
+                if (idx !== -1) {
+                  useFileStore.getState().updateEntry(idx, {
+                    processedUrl: result.downloadUrl,
+                    processedPreviewUrl: result.previewUrl ?? null,
+                    processedFilename: null,
+                    status: "completed",
+                    originalSize: result.originalSize,
+                    processedSize: result.processedSize,
+                    ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+                  });
+                }
               } catch (cause) {
                 handlingError = { cause };
               }
@@ -887,7 +910,7 @@ export function usePipelineProcessor() {
                 teardownError.cause,
               );
             }
-            settleProcessingEntries(t.errors.jobTrackingFailed);
+            settleProcessingEntries(t.errors.jobTrackingFailed, runEntryIds);
             throw handlingError.cause;
           }
 
@@ -929,8 +952,8 @@ export function usePipelineProcessor() {
         });
         xhr.send(formData);
       } catch (cause) {
-        if (claimed) endRunAtStart();
-        else endStartBeforeClaim();
+        if (claimed) endRunAtStart(runEntryIds);
+        else endStartBeforeClaim(runEntryIds);
         throw cause;
       }
     },
@@ -965,6 +988,9 @@ export function usePipelineProcessor() {
       }
 
       const { updateEntry, setBatchZip } = useFileStore.getState();
+      const priorEntries = useFileStore.getState().entries;
+      const capturedEntryIds = priorEntries.map((entry) => entry.id);
+      const runEntryIds = new Set(capturedEntryIds);
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
@@ -981,7 +1007,6 @@ export function usePipelineProcessor() {
         // exit sweeps it. Blob URLs are results an earlier batch unpacked from
         // its ZIP and nothing else holds them; a single run's server URL is
         // not ours to revoke.
-        const priorEntries = useFileStore.getState().entries;
         for (let i = 0; i < priorEntries.length; i++) {
           const staleUrl = priorEntries[i]?.processedUrl;
           if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
@@ -998,7 +1023,8 @@ export function usePipelineProcessor() {
         const clientJobId = generateId();
         activeJobIdRef.current = clientJobId;
         claimed = true;
-        activeEntryIndexRef.current = null;
+        activeEntryIdRef.current = null;
+        activeEntryIdsRef.current = runEntryIds;
 
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
@@ -1053,7 +1079,7 @@ export function usePipelineProcessor() {
             () => setError(message),
             () => setProcessing(false),
           ]);
-          settleProcessingEntries(message);
+          settleProcessingEntries(message, runEntryIds);
           if (teardownError) throw teardownError.cause;
         };
 
@@ -1089,8 +1115,9 @@ export function usePipelineProcessor() {
           // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
           setBatchZip(zipBlob, "batch-pipeline.zip");
 
-          const entries = useFileStore.getState().entries;
-          for (let i = 0; i < entries.length; i++) {
+          for (let i = 0; i < capturedEntryIds.length; i++) {
+            const entryIndex = findEntryIndex(capturedEntryIds[i]);
+            if (entryIndex === -1) continue;
             const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
@@ -1102,7 +1129,7 @@ export function usePipelineProcessor() {
                 processedSize = blob.size;
               }
 
-              updateEntry(i, {
+              updateEntry(entryIndex, {
                 processedUrl,
                 processedFilename: processedName,
                 processedSize,
@@ -1112,7 +1139,7 @@ export function usePipelineProcessor() {
             } else {
               // After a user cancel, a missing result is the cancel doing its
               // job, not a lookup failure (#771).
-              updateEntry(i, {
+              updateEntry(entryIndex, {
                 // No result for this file, so none may show: the pane's failure
                 // card only renders without a processedUrl (#1699).
                 processedUrl: null,
@@ -1144,7 +1171,7 @@ export function usePipelineProcessor() {
           } catch (cause) {
             const unsettled = useFileStore
               .getState()
-              .entries.some((entry) => entry.status === "processing");
+              .entries.some((entry) => runEntryIds.has(entry.id) && entry.status === "processing");
             if (activeJobIdRef.current === clientJobId && unsettled) {
               try {
                 failRun(t.errors.batchFailed);
@@ -1396,8 +1423,8 @@ export function usePipelineProcessor() {
         });
         xhr.send(formData);
       } catch (cause) {
-        if (claimed) endRunAtStart();
-        else endStartBeforeClaim();
+        if (claimed) endRunAtStart(runEntryIds);
+        else endStartBeforeClaim(runEntryIds);
         throw cause;
       }
     },

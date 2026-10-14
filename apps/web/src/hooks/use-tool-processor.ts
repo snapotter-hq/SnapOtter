@@ -110,6 +110,11 @@ const MIME_BY_EXT: Record<string, string> = {
   zip: "application/zip",
 };
 
+function findEntryIndex(entryId: string | null): number {
+  if (!entryId) return -1;
+  return useFileStore.getState().entries.findIndex((entry) => entry.id === entryId);
+}
+
 export function useToolProcessor(toolId: string) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -135,7 +140,8 @@ export function useToolProcessor(toolId: string) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
-  const activeEntryIndexRef = useRef<number | null>(null);
+  const activeEntryIdRef = useRef<string | null>(null);
+  const activeEntryIdsRef = useRef<ReadonlySet<string> | null>(null);
   const asyncModeRef = useRef(false);
   const reconnectSSERef = useRef<(force?: boolean) => void>(() => {});
   // Save mode captured at run start (#495). Only "overwrite" re-anchors
@@ -185,7 +191,7 @@ export function useToolProcessor(toolId: string) {
 
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
-    activeEntryIndexRef.current = null;
+    activeEntryIdRef.current = null;
     setActiveJob(null, null);
   }, [setActiveJob]);
 
@@ -214,9 +220,10 @@ export function useToolProcessor(toolId: string) {
 
   // A terminal failure must settle every entry its run left at "processing":
   // the tool page derives the pulse from that status and gates the failure
-  // screen on "failed" (#799, #929). Same sweep as the batch failRun; the
-  // status guard leaves already-settled results alone, and sweeping instead
-  // of indexing works after clearActiveJob has nulled activeEntryIndexRef.
+  // screen on "failed" (#799, #929). Keyed by the entry ids captured at
+  // kickoff (#944), so reordering or a stranger entry left at "processing" by
+  // an earlier unmounted run cannot be swept with this run's message, and
+  // already-settled results are left alone.
   //
   // Every exit calls this last, after its run-level teardown, and it never
   // throws: it's a store write, and when the store keeps throwing (#1354) a
@@ -225,14 +232,19 @@ export function useToolProcessor(toolId: string) {
   // The throw is reported as well as logged, or it never reaches Sentry
   // (#1812). Each entry gets its own try, so one write that throws can't
   // leave a batch's later entries pulsing (#1821, the twin of the pipeline's
-  // #1779), and the settle reports once, not once per entry. `spare` is an
-  // entry a still-live run owns, left processing (#1911).
+  // #1779), and the settle reports once, not once per entry.
   const settleProcessingEntries = useCallback(
-    (message: string, category?: FeedbackErrorCategory, spare?: number) => {
+    (
+      message: string,
+      category?: FeedbackErrorCategory,
+      entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
+    ) => {
+      if (!entryIds || entryIds.size === 0) return;
       const { entries, updateEntry } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
       for (let i = 0; i < entries.length; i++) {
-        if (i === spare || entries[i]?.status !== "processing") continue;
+        const entry = entries[i];
+        if (!entry || !entryIds.has(entry.id) || entry.status !== "processing") continue;
         try {
           updateEntry(i, { status: "failed", error: message, errorCategory: category ?? null });
         } catch (err) {
@@ -425,55 +437,64 @@ export function useToolProcessor(toolId: string) {
   // guard (#1791) and the entries go last (#1698). The caller rethrows the
   // kickoff's throw, which reaches Sentry through the global handler, so only
   // a teardown that breaks as well is reported here (#1812).
-  const endRunAtStart = useCallback(() => {
-    clearStallTimer();
-    clearJobEvidenceTimer();
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    batchRunRef.current = null;
-    setProgress(IDLE_PROGRESS);
-    const trackingFailed = tRef.current.errors.jobTrackingFailed;
-    const teardownError = runEndWrites([
+  const endRunAtStart = useCallback(
+    (entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current) => {
+      clearStallTimer();
+      clearJobEvidenceTimer();
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      batchRunRef.current = null;
+      setProgress(IDLE_PROGRESS);
+      const trackingFailed = tRef.current.errors.jobTrackingFailed;
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(trackingFailed),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its start failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
+      settleProcessingEntries(trackingFailed, undefined, entryIds);
+    },
+    [
+      toolId,
+      clearStallTimer,
+      clearJobEvidenceTimer,
       clearActiveJob,
-      () => setError(trackingFailed),
-      () => setProcessing(false),
-    ]);
-    if (teardownError) {
-      reportRunEndFailure("Ending a tool run after its start failed", teardownError.cause, toolId);
-    }
-    settleProcessingEntries(trackingFailed);
-  }, [
-    toolId,
-    clearStallTimer,
-    clearJobEvidenceTimer,
-    clearActiveJob,
-    settleProcessingEntries,
-    setError,
-    setProcessing,
-  ]);
+      settleProcessingEntries,
+      setError,
+      setProcessing,
+    ],
+  );
 
   // Ends a kickoff that threw before it claimed the run refs (#1911). They
   // still belong to the run that holds them, so endRunAtStart would end
   // that run instead. Only claimed refs are a failed start's to tear down;
   // with no live run there is nothing to spare. Behind a live run the
   // kickoff has only reset outcome state and marked entries processing, so
-  // it fails every entry left at processing except the live run's, and
-  // leaves the run, its processing flag and its error slot alone (a
-  // non-null setError also turns processing off). A batch run owns every
-  // entry, so behind one there is nothing to fail. The caller rethrows, so
-  // the start's throw is still reported.
-  const endStartBeforeClaim = useCallback(() => {
-    if (!activeJobIdRef.current) {
-      endRunAtStart();
-      return;
-    }
-    const liveEntry = activeEntryIndexRef.current;
-    if (liveEntry === null) return;
-    settleProcessingEntries(tRef.current.errors.jobTrackingFailed, undefined, liveEntry);
-  }, [endRunAtStart, settleProcessingEntries]);
+  // it fails only the entries this start touched that the live run doesn't
+  // own, and leaves the live run, its processing flag and its error slot
+  // alone (a non-null setError also turns processing off). The caller
+  // rethrows, so the start's throw is still reported.
+  const endStartBeforeClaim = useCallback(
+    (startEntryIds: ReadonlySet<string>) => {
+      if (!activeJobIdRef.current) {
+        endRunAtStart(startEntryIds);
+        return;
+      }
+      const liveIds = activeEntryIdsRef.current;
+      const orphanedIds = new Set([...startEntryIds].filter((id) => !liveIds?.has(id)));
+      settleProcessingEntries(tRef.current.errors.jobTrackingFailed, undefined, orphanedIds);
+    },
+    [endRunAtStart, settleProcessingEntries],
+  );
 
   const reconnectSSE = useCallback(
     (force = false) => {
@@ -632,33 +653,34 @@ export function useToolProcessor(toolId: string) {
               } catch (_e) {
                 console.debug("Ignored xhr.abort error:", _e);
               }
-              const idx = activeEntryIndexRef.current ?? useFileStore.getState().selectedIndex;
-
-              if (result.savedFileId) {
-                useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+              const idx = findEntryIndex(activeEntryIdRef.current);
+              if (idx !== -1) {
+                if (result.savedFileId) {
+                  useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+                }
+                useFileStore.getState().updateEntry(idx, {
+                  processedUrl: result.downloadUrl,
+                  processedPreviewUrl: result.previewUrl ?? null,
+                  processedFilename: null,
+                  resultNotes: pickResultNotes(result),
+                  status: "completed",
+                  originalSize: result.originalSize,
+                  processedSize: result.processedSize,
+                  ...(result.savedFileId && saveModeRef.current === "overwrite"
+                    ? { serverFileId: result.savedFileId }
+                    : {}),
+                });
+                // An auto-saved result is already in the library, so it was never at risk.
+                // Must follow the updateEntry above; see the `claimed` invariant in file-store.
+                if (result.savedFileId) useFileStore.getState().markClaimed(idx);
+                // After the store writes, as in landSyncResult: tools that
+                // render straight from the payload (histogram, sprite sheet)
+                // must not show a result beside the error a failed write ends
+                // the run with (#1739). Before the teardown, so a good run
+                // never ends processing with no payload.
+                setWarning(result.warning ?? null);
+                setResultPayload(result as unknown as Record<string, unknown>);
               }
-              useFileStore.getState().updateEntry(idx, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
-                processedFilename: null,
-                resultNotes: pickResultNotes(result),
-                status: "completed",
-                originalSize: result.originalSize,
-                processedSize: result.processedSize,
-                ...(result.savedFileId && saveModeRef.current === "overwrite"
-                  ? { serverFileId: result.savedFileId }
-                  : {}),
-              });
-              // An auto-saved result is already in the library, so it was never at risk.
-              // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-              if (result.savedFileId) useFileStore.getState().markClaimed(idx);
-              // After the store writes, as in landSyncResult: tools that
-              // render straight from the payload (histogram, sprite sheet)
-              // must not show a result beside the error a failed write ends
-              // the run with (#1739). Before the teardown, so a good run
-              // never ends processing with no payload.
-              setWarning(result.warning ?? null);
-              setResultPayload(result as unknown as Record<string, unknown>);
               clearActiveJob();
               setProcessing(false);
               setProgress(IDLE_PROGRESS);
@@ -823,6 +845,9 @@ export function useToolProcessor(toolId: string) {
       });
 
       const capturedIndex = useFileStore.getState().selectedIndex;
+      const capturedEntry = useFileStore.getState().entries[capturedIndex];
+      const capturedEntryId = capturedEntry?.id ?? null;
+      const runEntryIds = new Set(capturedEntryId ? [capturedEntryId] : []);
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
@@ -846,7 +871,8 @@ export function useToolProcessor(toolId: string) {
         const clientJobId = generateId();
         activeJobIdRef.current = clientJobId;
         claimed = true;
-        activeEntryIndexRef.current = capturedIndex;
+        activeEntryIdRef.current = capturedEntryId;
+        activeEntryIdsRef.current = runEntryIds;
         asyncModeRef.current = false;
 
         setProcessing(true);
@@ -884,7 +910,6 @@ export function useToolProcessor(toolId: string) {
         }
         formData.append("clientJobId", clientJobId);
 
-        const capturedEntry = useFileStore.getState().entries[capturedIndex];
         saveModeRef.current = useFileStore.getState().librarySaveMode;
         // skipLibrarySave lets a multi-phase tool suppress auto-saving an
         // intermediate output (e.g. remove-background's Phase 1 transparent
@@ -958,8 +983,9 @@ export function useToolProcessor(toolId: string) {
         // #1812).
         const failEntry = (message: string, category?: FeedbackErrorCategory) => {
           try {
-            if (useFileStore.getState().entries[capturedIndex]?.status === "processing") {
-              useFileStore.getState().updateEntry(capturedIndex, {
+            const idx = findEntryIndex(capturedEntryId);
+            if (idx !== -1 && useFileStore.getState().entries[idx]?.status === "processing") {
+              useFileStore.getState().updateEntry(idx, {
                 status: "failed",
                 error: message,
                 errorCategory: category ?? null,
@@ -995,10 +1021,12 @@ export function useToolProcessor(toolId: string) {
         // Writes a sync 2xx result the way the SSE completion branch does.
         // Any throw from here is ours, not the server's (#1354).
         const landSyncResult = (result: ProcessResult) => {
+          const idx = findEntryIndex(capturedEntryId);
+          if (idx === -1) return;
           if (result.savedFileId) {
             useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
           }
-          useFileStore.getState().updateEntry(capturedIndex, {
+          useFileStore.getState().updateEntry(idx, {
             processedUrl: result.downloadUrl,
             processedPreviewUrl: result.previewUrl ?? null,
             processedFilename: null,
@@ -1012,7 +1040,7 @@ export function useToolProcessor(toolId: string) {
           });
           // An auto-saved result is already in the library, so it was never at risk.
           // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-          if (result.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
+          if (result.savedFileId) useFileStore.getState().markClaimed(idx);
           // Last: tools that render straight from the payload (histogram, sprite
           // sheet) must not show a result beside the error a failed write ends
           // the run with.
@@ -1021,6 +1049,8 @@ export function useToolProcessor(toolId: string) {
         };
 
         xhr.onload = () => {
+          if (activeJobIdRef.current !== clientJobId) return;
+
           if (xhr.status === 202) {
             asyncModeRef.current = true;
             setActiveJob(clientJobId, cancelCurrentJob);
@@ -1160,8 +1190,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        if (claimed) endRunAtStart();
-        else endStartBeforeClaim();
+        if (claimed) endRunAtStart(runEntryIds);
+        else endStartBeforeClaim(runEntryIds);
         throw cause;
       }
     },
@@ -1228,6 +1258,9 @@ export function useToolProcessor(toolId: string) {
       let canceledByUser = false;
 
       const { updateEntry, setBatchZip } = useFileStore.getState();
+      const priorEntries = useFileStore.getState().entries;
+      const capturedEntryIds = priorEntries.map((entry) => entry.id);
+      const runEntryIds = new Set(capturedEntryIds);
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
@@ -1248,7 +1281,6 @@ export function useToolProcessor(toolId: string) {
         // before this run uploads, so a failed or absent result can't render a
         // previous run's output under the new run's filename and size (#746).
         // Revoke stale result blob URLs so they don't leak.
-        const priorEntries = useFileStore.getState().entries;
         for (let i = 0; i < priorEntries.length; i++) {
           const staleUrl = priorEntries[i]?.processedUrl;
           if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
@@ -1266,7 +1298,8 @@ export function useToolProcessor(toolId: string) {
         const clientJobId = generateId();
         activeJobIdRef.current = clientJobId;
         claimed = true;
-        activeEntryIndexRef.current = null;
+        activeEntryIdRef.current = null;
+        activeEntryIdsRef.current = runEntryIds;
         asyncModeRef.current = false;
 
         setProcessing(true);
@@ -1366,7 +1399,8 @@ export function useToolProcessor(toolId: string) {
             const runEntries = useFileStore.getState().entries;
             let settleError: { cause: unknown } | null = null;
             for (let i = 0; i < runEntries.length; i++) {
-              if (runEntries[i]?.status !== "processing") continue;
+              const entry = runEntries[i];
+              if (!entry || !runEntryIds.has(entry.id) || entry.status !== "processing") continue;
               try {
                 updateEntry(i, {
                   status: "failed",
@@ -1439,8 +1473,9 @@ export function useToolProcessor(toolId: string) {
           // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
           setBatchZip(zipBlob, `batch-${toolId}.zip`);
 
-          const entries = useFileStore.getState().entries;
-          for (let i = 0; i < entries.length; i++) {
+          for (let i = 0; i < capturedEntryIds.length; i++) {
+            const entryIndex = findEntryIndex(capturedEntryIds[i]);
+            if (entryIndex === -1) continue;
             const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
@@ -1457,7 +1492,7 @@ export function useToolProcessor(toolId: string) {
                 processedSize = blob.size;
               }
 
-              updateEntry(i, {
+              updateEntry(entryIndex, {
                 processedUrl,
                 processedFilename: processedName,
                 processedSize,
@@ -1476,7 +1511,7 @@ export function useToolProcessor(toolId: string) {
             } else {
               // After a user cancel, a missing result is the cancel doing its
               // job, not a lookup failure.
-              updateEntry(i, {
+              updateEntry(entryIndex, {
                 // Clear the result so hasProcessed goes false and the failure
                 // screen (guarded by !hasProcessed) renders instead of a stale
                 // previous result (#746).
@@ -1510,7 +1545,7 @@ export function useToolProcessor(toolId: string) {
           } catch (cause) {
             const unsettled = useFileStore
               .getState()
-              .entries.some((entry) => entry.status === "processing");
+              .entries.some((entry) => runEntryIds.has(entry.id) && entry.status === "processing");
             if (activeJobIdRef.current === clientJobId && unsettled) {
               try {
                 failRun(t.errors.batchFailed, settle.reason);
@@ -1800,8 +1835,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        if (claimed) endRunAtStart();
-        else endStartBeforeClaim();
+        if (claimed) endRunAtStart(runEntryIds);
+        else endStartBeforeClaim(runEntryIds);
         throw cause;
       }
     },

@@ -3237,3 +3237,318 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
     unmount();
   });
 });
+
+describe("usePipelineProcessor entry-identity settle (#944)", () => {
+  function pngFile(name: string) {
+    return new File([new ArrayBuffer(16)], name, { type: "image/png" });
+  }
+
+  it("does not write a sync 200 result onto a replacement file at the same index", () => {
+    const fileA = pngFile("a.png");
+    const fileB = pngFile("b.png");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(fileA, STEPS);
+    });
+
+    act(() => {
+      useFileStore.getState().setFiles([fileB]);
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "pending",
+      processedUrl: null,
+      error: null,
+    });
+    unmount();
+  });
+
+  it("does not write an SSE completion onto a replacement file at the same index", () => {
+    const fileA = pngFile("a.png");
+    const fileB = pngFile("b.png");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(fileA, STEPS);
+    });
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => {
+      useFileStore.getState().setFiles([fileB]);
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "pending",
+      processedUrl: null,
+      error: null,
+    });
+    unmount();
+  });
+
+  it("lands a sync result on the run's entry after files are reordered", () => {
+    const fileA = pngFile("a.png");
+    const fileB = pngFile("b.png");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(fileA, STEPS);
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0].file.name).toBe("b.png");
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("lands an SSE completion on the run's entry after files are reordered", () => {
+    const fileA = pngFile("a.png");
+    const fileB = pngFile("b.png");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(fileA, STEPS);
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+
+    expect(useFileStore.getState().entries[0].file.name).toBe("b.png");
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("settles failures on the run's entry after files are reordered", () => {
+    const fileA = pngFile("a.png");
+    const fileB = pngFile("b.png");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(fileA, STEPS);
+    });
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      sendSingleFrame({ phase: "failed", percent: 0, error: "Step 1: boom" });
+    });
+
+    expect(useFileStore.getState().entries[0].file.name).toBe("b.png");
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "Step 1: boom",
+    });
+    unmount();
+  });
+
+  it("spares a reordered live single run's entry when a second start throws before claim", () => {
+    const fileA = pngFile("a.png");
+    const fileB = pngFile("b.png");
+    useFileStore.getState().setFiles([fileA, fileB]);
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(fileA, STEPS);
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      useFileStore.getState().reverseFiles();
+      useFileStore.getState().setSelectedIndex(0);
+    });
+
+    let armed = true;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (armed && state.entries[0]?.status === "processing") {
+        armed = false;
+        throw new Error("second start broke");
+      }
+    });
+
+    try {
+      expect(() => act(() => result.current.processSingle(fileB, STEPS))).toThrow(
+        "second start broke",
+      );
+    } finally {
+      unsubscribe();
+    }
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Something went wrong while tracking this job. Try again.",
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "processing",
+      error: null,
+    });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "completed",
+      processedUrl: SINGLE_RESULT.downloadUrl,
+    });
+    unmount();
+  });
+
+  it("does not sweep a stranger entry left at processing when a pipeline run fails", () => {
+    const stranger = pngFile("stranger.png");
+    const target = pngFile("target.png");
+    useFileStore.getState().setFiles([stranger, target]);
+    // Orphaned at processing by an earlier unmounted tool run.
+    useFileStore.getState().updateEntry(0, { status: "processing" });
+    useFileStore.getState().setSelectedIndex(1);
+
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      result.current.processSingle(target, STEPS);
+    });
+
+    act(() => {
+      xhrs[0].onerror?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "processing",
+      error: null,
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "Processing was interrupted. Retry when reconnected.",
+    });
+    unmount();
+  });
+
+  it("settles pipeline batch ZIP results onto the original entries after files are reordered", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].file.name).toBe("second.jpg");
+    expect(entries[0].processedFilename).toBe("second_resize.jpg");
+    expect(entries[1].file.name).toBe("first.png");
+    expect(entries[1].processedFilename).toBe("first_resize.png");
+    unmount();
+  });
+
+  it("does not sweep a stranger entry added mid-batch when a pipeline batch fails", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      useFileStore.getState().addFiles([pngFile("stranger.png")]);
+      useFileStore.getState().updateEntry(2, { status: "processing" });
+      xhrs[0].onerror?.();
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].status).toBe("failed");
+    expect(entries[1].status).toBe("failed");
+    expect(entries[2]).toMatchObject({ status: "processing", error: null });
+    unmount();
+  });
+
+  it("skips a removed entry and settles the remaining pipeline batch entry from its original slot", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.name).toBe("second.jpg");
+    expect(entries[0].processedFilename).toBe("second_resize.jpg");
+    unmount();
+  });
+
+  it("keeps a settled pipeline batch's outcome when teardown throws alongside a stranger processing entry", async () => {
+    const captured = captureRejections();
+    const { unmount } = startBatchRun();
+    act(() => {
+      useFileStore.getState().addFiles([pngFile("stranger.png")]);
+      useFileStore.getState().updateEntry(2, { status: "processing" });
+    });
+
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+    });
+
+    try {
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 200;
+        xhrs[0].response = zipBlob();
+        xhrs[0].getResponseHeader = vi.fn((name: string) =>
+          name === "X-File-Results" ? encodedFileResults() : null,
+        );
+        xhrs[0].onload?.();
+      });
+
+      await settled(() =>
+        expect(captured.rejections).toEqual([
+          expect.objectContaining({ message: "teardown broke" }),
+        ]),
+      );
+      expect(useFileStore.getState().error).toBeNull();
+      expect(useFileStore.getState().entries.map((e) => e.status)).toEqual([
+        "completed",
+        "completed",
+        "processing",
+      ]);
+    } finally {
+      unsubscribe();
+      captured.restore();
+      unmount();
+    }
+  });
+});

@@ -2375,3 +2375,117 @@ describe("useToolProcessor ends a run whose exit writes throw (#1890)", () => {
     }
   });
 });
+
+describe("useToolProcessor batch entry-identity settle (#944)", () => {
+  it("settles batch ZIP results onto the original entries after files are reordered", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].file.name).toBe("second.jpg");
+    expect(entries[0].processedFilename).toBe("second_resize.jpg");
+    expect(entries[1].file.name).toBe("first.png");
+    expect(entries[1].processedFilename).toBe("first_resize.png");
+    unmount();
+  });
+
+  it("does not sweep a stranger entry added mid-batch when the batch fails", () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new ArrayBuffer(16)], "stranger.png", { type: "image/png" })]);
+      useFileStore.getState().updateEntry(2, { status: "processing" });
+      xhrs[0].onerror?.();
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0].status).toBe("failed");
+    expect(entries[1].status).toBe("failed");
+    expect(entries[2]).toMatchObject({ status: "processing", error: null });
+    unmount();
+  });
+
+  it("skips a removed entry and settles the remaining batch entry from its original slot", async () => {
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.name).toBe("second.jpg");
+    expect(entries[0].processedFilename).toBe("second_resize.jpg");
+    unmount();
+  });
+
+  it("keeps a settled batch's outcome when teardown throws alongside a stranger processing entry", async () => {
+    const captured = captureRejections();
+    const { unmount } = startBatchRun();
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new ArrayBuffer(16)], "stranger.png", { type: "image/png" })]);
+      useFileStore.getState().updateEntry(2, { status: "processing" });
+    });
+
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (prev.activeJobId && !state.activeJobId) throw new Error("teardown broke");
+    });
+
+    try {
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 200;
+        xhrs[0].response = zipBlob();
+        xhrs[0].getResponseHeader = vi.fn((name: string) =>
+          name === "X-File-Results" ? encodedFileResults() : null,
+        );
+        xhrs[0].onload?.();
+      });
+
+      await settled(() =>
+        expect(captured.rejections).toEqual([
+          expect.objectContaining({ message: "teardown broke" }),
+        ]),
+      );
+      expect(useFileStore.getState().error).toBeNull();
+      expect(useFileStore.getState().entries.map((e) => e.status)).toEqual([
+        "completed",
+        "completed",
+        "processing",
+      ]);
+    } finally {
+      unsubscribe();
+      captured.restore();
+      unmount();
+    }
+  });
+});
