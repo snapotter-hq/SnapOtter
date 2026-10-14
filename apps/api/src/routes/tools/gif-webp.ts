@@ -2,6 +2,7 @@ import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -23,13 +24,13 @@ export function registerGifWebp(app: FastifyInstance) {
         throw new InputValidationError("Only GIF and WebP inputs are supported");
       }
 
-      let pipeline = sharp(inputBuffer, { animated: true });
+      const anim = await readAnimationFor(inputBuffer, ext === ".gif" ? "webp" : "gif");
+      let pipeline = openAnimated(inputBuffer, anim);
 
       // Apply resize when below 100%
       if (settings.resizePercent < 100) {
-        const meta = await sharp(inputBuffer, { animated: true }).metadata();
-        const origW = meta.width ?? 1;
-        const target = Math.round(origW * (settings.resizePercent / 100));
+        const origW = anim.width || ((await sharp(inputBuffer).metadata()).width ?? 1);
+        const target = Math.max(1, Math.round(origW * (settings.resizePercent / 100)));
         pipeline = pipeline.resize(target);
       }
 

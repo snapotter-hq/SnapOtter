@@ -6,8 +6,9 @@ import { extname, join } from "node:path";
 import { promisify } from "node:util";
 import { convert } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
-import sharp, { type SharpOptions } from "sharp";
+import sharp from "sharp";
 import { z } from "zod";
+import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import {
   encodeBmp,
   encodeEps,
@@ -124,12 +125,11 @@ export function registerConvert(app: FastifyInstance) {
         }
 
         const inputExt = extname(filename).toLowerCase().replace(".", "");
-        const sharpOpts: SharpOptions = isSvgBuffer(inputBuffer) ? { density: 300 } : {};
         // Preserve animation frames when both input and output are animatable formats
-        if (ANIMATABLE_FORMATS.has(inputExt) && ANIMATABLE_FORMATS.has(settings.format)) {
-          sharpOpts.animated = true;
-        }
-        const image = sharp(inputBuffer, sharpOpts);
+        const image =
+          ANIMATABLE_FORMATS.has(inputExt) && ANIMATABLE_FORMATS.has(settings.format)
+            ? openAnimated(inputBuffer, await readAnimationFor(inputBuffer, settings.format))
+            : sharp(inputBuffer, isSvgBuffer(inputBuffer) ? { density: 300 } : {});
 
         let buffer: Buffer;
         if (settings.format === "psd") {
