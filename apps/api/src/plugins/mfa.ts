@@ -94,7 +94,14 @@ async function restoreMfaChallenge(
 ): Promise<void> {
   const remainingTtlMs = claimed.ttlMs - (Date.now() - claimed.claimedAt);
   if (remainingTtlMs > 0) {
-    await redis.set(challengeKey, claimed.payload, "PX", remainingTtlMs);
+    try {
+      await redis.set(challengeKey, claimed.payload, "PX", remainingTtlMs);
+    } catch (rollbackErr) {
+      logger.warn(
+        { err: rollbackErr, challengeKey },
+        "mfa: failed to restore challenge key after error",
+      );
+    }
   }
 }
 
@@ -240,9 +247,28 @@ local last = redis.call('GET', KEYS[1])
 local step = tonumber(ARGV[1])
 local ttlSec = tonumber(ARGV[2])
 if last and step <= tonumber(last) then
-  return 0
+  return nil
+end
+local prevTtl = -2
+if last then
+  prevTtl = redis.call('PTTL', KEYS[1])
 end
 redis.call('SET', KEYS[1], tostring(step), 'EX', ttlSec)
+return { last or '', tostring(prevTtl) }
+`;
+
+const RESTORE_TOTP_STEP_LUA = `
+local current = redis.call('GET', KEYS[1])
+if current ~= ARGV[1] then
+  return 0
+end
+local prevStep = ARGV[2]
+local remainingTtlMs = tonumber(ARGV[3])
+if prevStep ~= '' and remainingTtlMs > 0 then
+  redis.call('SET', KEYS[1], prevStep, 'PX', remainingTtlMs)
+else
+  redis.call('DEL', KEYS[1])
+end
 return 1
 `;
 
@@ -277,6 +303,77 @@ function totpStepKey(userId: string, secretBase32: string): string {
   return `mfa:totp-step:${userId}:${secretFingerprint}`;
 }
 
+interface ClaimedTotpStep {
+  key: string;
+  step: string;
+  previousStep: string | null;
+  previousTtlMs: number;
+  claimedAt: number;
+}
+
+async function claimTotpStep(
+  redis: ReturnType<typeof sharedRedis>,
+  userId: string,
+  secretBase32: string,
+  code: string,
+  timestamp = Date.now(),
+): Promise<ClaimedTotpStep | null> {
+  const step = matchTotpStep(secretBase32, code, timestamp);
+  if (step === null) return null;
+  const key = totpStepKey(userId, secretBase32);
+  const stepStr = String(step);
+  const claimedAt = Date.now();
+  const claimed = (await redis.eval(
+    CONSUME_TOTP_STEP_LUA,
+    1,
+    key,
+    stepStr,
+    String(TOTP_REPLAY_WINDOW_SECONDS),
+  )) as [string, string] | null;
+  if (!claimed) return null;
+  const [prevRaw, prevTtlRaw] = claimed;
+  const previousStep = prevRaw || null;
+  const parsedTtl = Number(prevTtlRaw);
+  const previousTtlMs =
+    previousStep === null
+      ? 0
+      : parsedTtl === -1
+        ? TOTP_REPLAY_WINDOW_SECONDS * 1000
+        : Math.max(0, parsedTtl);
+  return {
+    key,
+    step: stepStr,
+    previousStep,
+    previousTtlMs,
+    claimedAt,
+  };
+}
+
+async function restoreTotpStep(
+  redis: ReturnType<typeof sharedRedis>,
+  claimed: ClaimedTotpStep,
+): Promise<void> {
+  const remainingTtlMs =
+    claimed.previousStep !== null
+      ? Math.max(0, claimed.previousTtlMs - (Date.now() - claimed.claimedAt))
+      : 0;
+  try {
+    await redis.eval(
+      RESTORE_TOTP_STEP_LUA,
+      1,
+      claimed.key,
+      claimed.step,
+      claimed.previousStep ?? "",
+      String(remainingTtlMs),
+    );
+  } catch (rollbackErr) {
+    logger.warn(
+      { err: rollbackErr, key: claimed.key },
+      "mfa: failed to restore TOTP step key after error",
+    );
+  }
+}
+
 /**
  * Validates a TOTP code and atomically records its time step per user so the
  * same step (or any earlier step still inside the drift window) cannot be
@@ -288,16 +385,8 @@ export async function consumeTotpCode(
   code: string,
   timestamp = Date.now(),
 ): Promise<boolean> {
-  const step = matchTotpStep(secretBase32, code, timestamp);
-  if (step === null) return false;
-  const accepted = await sharedRedis().eval(
-    CONSUME_TOTP_STEP_LUA,
-    1,
-    totpStepKey(userId, secretBase32),
-    String(step),
-    String(TOTP_REPLAY_WINDOW_SECONDS),
-  );
-  return accepted === 1;
+  const claimed = await claimTotpStep(sharedRedis(), userId, secretBase32, code, timestamp);
+  return claimed !== null;
 }
 
 async function encryptSecret(secretBase32: string): Promise<string> {
@@ -582,7 +671,9 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const audit = auditFromRequest(request);
 
       // Validate the code and record its time step so it cannot be replayed (#2574)
-      if (!(await consumeTotpCode(user.id, secretBase32, code))) {
+      const redis = sharedRedis();
+      const claimedStep = await claimTotpStep(redis, user.id, secretBase32, code);
+      if (!claimedStep) {
         await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
@@ -598,7 +689,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           .set({ totpEnabled: true, updatedAt: new Date() })
           .where(eq(schema.users.id, user.id));
       } catch (err) {
-        await sharedRedis().del(totpStepKey(user.id, secretBase32));
+        await restoreTotpStep(redis, claimedStep);
         throw err;
       }
 
@@ -651,6 +742,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       let dbUser: typeof schema.users.$inferSelect | undefined;
       let secretBase32: string | null = null;
+      let claimedStep: ClaimedTotpStep | null = null;
       let verified = false;
       let recoveryUsed = false;
       let recoveryRace = false;
@@ -717,7 +809,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         }
 
         // Try TOTP code first (atomically refusing a replayed or earlier time step)
-        if (await consumeTotpCode(userId, secretBase32, code)) {
+        claimedStep = await claimTotpStep(redis, userId, secretBase32, code);
+        if (claimedStep) {
           verified = true;
         }
 
@@ -733,6 +826,9 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           }
         }
       } catch (err) {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
         await restoreMfaChallenge(redis, challengeKey, claimed);
         throw err;
       }
@@ -755,43 +851,56 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Clear any failed-attempt counter (the challenge key was deleted on claim)
-      await redis.del(attemptsKey);
-
       // Create session (same as normal login completion)
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
       const verifiedUser = dbUser;
 
-      const inserted = await db.transaction(async (tx) => {
-        const [lockedUser] = await tx
-          .select({ passwordHash: schema.users.passwordHash })
-          .from(schema.users)
-          .where(eq(schema.users.id, verifiedUser.id))
-          .for("share");
+      let inserted: "success" | "password_changed" | "password_removed";
+      try {
+        inserted = await db.transaction(async (tx) => {
+          const [lockedUser] = await tx
+            .select({ passwordHash: schema.users.passwordHash })
+            .from(schema.users)
+            .where(eq(schema.users.id, verifiedUser.id))
+            .for("share");
 
-        if (hashFingerprint) {
-          const { createHash } = await import("node:crypto");
-          const freshFingerprint = lockedUser?.passwordHash
-            ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
-            : null;
-          if (freshFingerprint !== hashFingerprint) {
+          if (hashFingerprint) {
+            const { createHash } = await import("node:crypto");
+            const freshFingerprint = lockedUser?.passwordHash
+              ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
+              : null;
+            if (freshFingerprint !== hashFingerprint) {
+              return lockedUser?.passwordHash ? "password_changed" : "password_removed";
+            }
+          } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
             return lockedUser?.passwordHash ? "password_changed" : "password_removed";
           }
-        } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
-          return lockedUser?.passwordHash ? "password_changed" : "password_removed";
-        }
 
-        await tx.insert(schema.sessions).values({
-          id: token,
-          userId: verifiedUser.id,
-          expiresAt,
+          await tx.insert(schema.sessions).values({
+            id: token,
+            userId: verifiedUser.id,
+            expiresAt,
+          });
+
+          return "success";
         });
+      } catch (err) {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
+        await restoreMfaChallenge(redis, challengeKey, claimed);
+        throw err;
+      }
 
-        return "success";
-      });
+      // Clear any failed-attempt counter once the transaction finishes (the
+      // challenge key was deleted on claim).
+      await redis.del(attemptsKey);
 
       if (inserted !== "success") {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
         await audit("MFA_VERIFY_FAILED", {
           userId: verifiedUser.id,
           username: verifiedUser.username,
@@ -874,6 +983,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       let dbUser: typeof schema.users.$inferSelect | undefined;
       let secretBase32: string | null = null;
+      let claimedStep: ClaimedTotpStep | null = null;
 
       try {
         [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
@@ -941,14 +1051,19 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           await redis.del(attemptsKey);
           return replyDecryptionFailed(request, reply, userId);
         }
+
+        claimedStep = await claimTotpStep(redis, userId, secretBase32, code);
       } catch (err) {
+        if (claimedStep) {
+          await restoreTotpStep(redis, claimedStep);
+        }
         await restoreMfaChallenge(redis, challengeKey, claimed);
         throw err;
       }
 
       const audit = auditFromRequest(request);
 
-      if (!(await consumeTotpCode(userId, secretBase32, code))) {
+      if (!claimedStep) {
         // Burn the enrollment after a few wrong codes so an attacker who already
         // holds valid credentials cannot grind TOTP guesses within the window,
         // or put the challenge back if attempts remain.
@@ -959,9 +1074,6 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "INVALID_CODE",
         });
       }
-
-      // Clear any failed-attempt counter (the challenge key was deleted on claim).
-      await redis.del(attemptsKey);
 
       // Activate MFA and create a session atomically inside the password-check transaction.
       const token = createSessionToken();
@@ -1003,12 +1115,17 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           return "success";
         });
       } catch (err) {
-        await redis.del(totpStepKey(verifiedUser.id, secretBase32));
+        await restoreTotpStep(redis, claimedStep);
+        await restoreMfaChallenge(redis, challengeKey, claimed);
         throw err;
       }
 
+      // Clear any failed-attempt counter once the transaction finishes (the
+      // challenge key was deleted on claim).
+      await redis.del(attemptsKey);
+
       if (inserted !== "success") {
-        await redis.del(totpStepKey(verifiedUser.id, secretBase32));
+        await restoreTotpStep(redis, claimedStep);
         await audit("MFA_VERIFY_FAILED", {
           userId: verifiedUser.id,
           username: verifiedUser.username,
@@ -1086,7 +1203,9 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       const audit = auditFromRequest(request);
 
-      if (!(await consumeTotpCode(user.id, secretBase32, code))) {
+      const redis = sharedRedis();
+      const claimedStep = await claimTotpStep(redis, user.id, secretBase32, code);
+      if (!claimedStep) {
         await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
@@ -1094,7 +1213,12 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      await clearUserMfa(user.id);
+      try {
+        await clearUserMfa(user.id);
+      } catch (err) {
+        await restoreTotpStep(redis, claimedStep);
+        throw err;
+      }
 
       await audit("MFA_DISABLED", { userId: user.id, username: user.username });
 

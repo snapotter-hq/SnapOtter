@@ -9,7 +9,9 @@ mockEnterpriseFeatures(["mfa"]);
 const { buildTestApp, createUserAndLogin } = await import("../test-server.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
-const { verifyRecoveryCode } = await import("../../../apps/api/src/plugins/mfa.js");
+const { verifyRecoveryCode, consumeTotpCode } = await import(
+  "../../../apps/api/src/plugins/mfa.js"
+);
 
 import type { TestApp } from "../test-server.js";
 
@@ -304,6 +306,119 @@ describe("MFA Race Condition #2328", () => {
       payload: { mfaToken, code: generateTotpCode(uri) },
     });
     expect(retryRes.statusCode).toBe(200);
+  });
+
+  it("restores the challenge, preserves attemptsKey, and restores the prior TOTP step if db.transaction throws on /mfa/complete (#2575)", async () => {
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+    const { userId, username, password, uri } = await createEnrolledUser();
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    // Record 2 wrong attempts before the transient DB failure.
+    for (let i = 0; i < 2; i++) {
+      const bad = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(bad.statusCode).toBe(401);
+      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
+    }
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("2");
+
+    const now = Date.now();
+    const prevStepCode = generateTotpCode(uri, now - 30_000);
+    const currentCode = generateTotpCode(uri, now);
+
+    const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(() => {
+      throw new Error("simulated transient session insert error");
+    });
+
+    try {
+      const errRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: currentCode },
+      });
+      expect(errRes.statusCode).toBe(500);
+    } finally {
+      txSpy.mockRestore();
+    }
+
+    // Both the challenge token and the failed-attempt count must survive the transient failure.
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("2");
+
+    // The prior step (consumed during /mfa/verify) must still be recorded as spent,
+    // not wiped by a blanket DEL when rolling back the failed current step.
+    const replayPrevRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: prevStepCode },
+    });
+    expect(replayPrevRes.statusCode).toBe(401);
+    expect(JSON.parse(replayPrevRes.body).code).toBe("INVALID_CODE");
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("3");
+
+    // Retrying with the same mfaToken and current-step TOTP code must succeed.
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: currentCode },
+    });
+    expect(retryRes.statusCode).toBe(200);
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+    // If a concurrent request advances the TOTP step to T+1 before a failing
+    // transaction's rollback runs, restoreTotpStep must not clobber T+1 back to T.
+    const loginRes2 = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken: mfaToken2 } = JSON.parse(loginRes2.body);
+    const parsedTotp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
+    const nextStepTs = now + 30_000;
+    const futureStepTs = now + 60_000;
+    const nextStepCode = generateTotpCode(uri, nextStepTs);
+    const futureStepCode = generateTotpCode(uri, futureStepTs);
+
+    const txAdvanceSpy = vi.spyOn(db, "transaction").mockImplementationOnce((async () => {
+      // Simulate another request consuming step T+2 while step T+1's DB write is in flight.
+      expect(
+        await consumeTotpCode(userId, parsedTotp.secret.base32, futureStepCode, futureStepTs),
+      ).toBe(true);
+      throw new Error("simulated DB failure after concurrent step advance");
+    }) as typeof db.transaction);
+
+    try {
+      const errRes2 = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken: mfaToken2, code: nextStepCode },
+      });
+      expect(errRes2.statusCode).toBe(500);
+    } finally {
+      txAdvanceSpy.mockRestore();
+    }
+
+    // Both T+1 and T+2 must remain blocked because T+2 superseded T+1 before rollback.
+    expect(await consumeTotpCode(userId, parsedTotp.secret.base32, nextStepCode, nextStepTs)).toBe(
+      false,
+    );
+    expect(
+      await consumeTotpCode(userId, parsedTotp.secret.base32, futureStepCode, futureStepTs),
+    ).toBe(false);
   });
 
   it("allows only one session and caps concurrent wrong guesses on /mfa/enroll-complete", async () => {

@@ -496,6 +496,77 @@ describe("POST /api/auth/mfa/disable", () => {
     });
     expect(res.statusCode).toBe(200);
   });
+
+  it("restores the prior TOTP step if clearUserMfa throws, so a retry with the same code succeeds while the prior step stays blocked (#2575)", async () => {
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+    const now = Date.now();
+    const prevCode = generateTotpCode(uri, now - 30_000);
+    const currentCode = generateTotpCode(uri, now);
+
+    const verifyRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: prevCode },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+
+    const updateSpy = vi.spyOn(db, "update").mockImplementationOnce(() => {
+      throw new Error("simulated clearUserMfa failure");
+    });
+
+    try {
+      const errRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: currentCode },
+      });
+      expect(errRes.statusCode).toBe(500);
+    } finally {
+      updateSpy.mockRestore();
+    }
+
+    const [userMid] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "admin"));
+    expect(userMid.totpEnabled).toBe(true);
+
+    // The prior step (used on /mfa/verify) must still be rejected as a replay.
+    const replayPrevRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: prevCode },
+    });
+    expect(replayPrevRes.statusCode).toBe(401);
+    expect(JSON.parse(replayPrevRes.body).code).toBe("INVALID_CODE");
+
+    // Retrying with the same current-step code succeeds once the DB fault clears.
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: currentCode },
+    });
+    expect(retryRes.statusCode).toBe(200);
+
+    const [userAfter] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, "admin"));
+    expect(userAfter.totpEnabled).toBe(false);
+  });
 });
 
 describe("POST /api/auth/users/:id/mfa/reset", () => {

@@ -97,6 +97,91 @@ describe("MFA window revoked by password change", () => {
     expect(completeBody.code).toBe("MFA_EXPIRED");
   });
 
+  it("burns the challenge, clears attemptsKey, and restores the prior TOTP step if the password changes or is removed after the initial read on /mfa/complete (#2575)", async () => {
+    for (const mode of ["password_changed", "password_removed"] as const) {
+      const username = `mfapwd_tx_${mode}_${Date.now()}`;
+      const { token: userToken, userId } = await createUserAndLogin(
+        testApp.app,
+        username,
+        "user",
+        "Password1!",
+      );
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${userToken}` },
+      });
+      const enrollData = JSON.parse(enrollRes.body);
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+      const now = Date.now();
+      const prevCode = generateTotpCode(enrollData.uri, now - 30_000);
+      const currentCode = generateTotpCode(enrollData.uri, now);
+
+      const enrollConfirmRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${userToken}` },
+        payload: { code: prevCode },
+      });
+      expect(enrollConfirmRes.statusCode).toBe(200);
+
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password: "Password1!" },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const { mfaToken } = JSON.parse(loginRes.body);
+
+      const badRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(badRes.statusCode).toBe(401);
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
+
+      const origTransaction = db.transaction.bind(db);
+      const txSpy = vi
+        .spyOn(db, "transaction")
+        // biome-ignore lint/suspicious/noExplicitAny: wrap drizzle transaction to simulate concurrent password write after initial select
+        .mockImplementationOnce((async (cb: any, config?: any) => {
+          await db
+            .update(schema.users)
+            .set({
+              passwordHash: mode === "password_changed" ? "rotated-hash-after-select" : null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.users.id, userId));
+          return origTransaction(cb, config);
+        }) as typeof db.transaction);
+
+      try {
+        const completeRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken, code: currentCode },
+        });
+        expect(completeRes.statusCode).toBe(401);
+        expect(JSON.parse(completeRes.body).code).toBe("MFA_EXPIRED");
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      // Challenge stays burned (not restored) and attemptsKey is cleaned up.
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+      // The prior step (from /mfa/verify) stays blocked, while the current step is released.
+      const parsedTotp = OTPAuth.URI.parse(enrollData.uri) as OTPAuth.TOTP;
+      expect(await consumeTotpCode(userId, parsedTotp.secret.base32, prevCode)).toBe(false);
+      expect(await consumeTotpCode(userId, parsedTotp.secret.base32, currentCode)).toBe(true);
+    }
+  });
+
   it("rejects a forced MFA enrollment completion if the password was changed after enrollment started", async () => {
     // 1. Create a user
     const username = `mfaforce_${Date.now()}`;
@@ -329,6 +414,20 @@ describe("MFA window revoked by password change", () => {
         const loginData = JSON.parse(loginRes.body);
         expect(loginData.requiresMfaEnrollment).toBe(true);
 
+        // Record 1 wrong attempt first to verify attemptsKey is cleared when the transaction aborts.
+        const badAttemptRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/enroll-complete",
+          payload: {
+            enrollmentToken: loginData.enrollmentToken,
+            code: "000000",
+          },
+        });
+        expect(badAttemptRes.statusCode).toBe(401);
+        expect(await sharedRedis().get(`mfa:enroll:attempts:${loginData.enrollmentToken}`)).toBe(
+          "1",
+        );
+
         const { createHash } = await import("node:crypto");
         const parsedTotp = OTPAuth.URI.parse(loginData.uri) as OTPAuth.TOTP;
         const secretFp = createHash("sha256")
@@ -378,6 +477,10 @@ describe("MFA window revoked by password change", () => {
         expect(userAfter.totpEnabled).toBe(false);
         expect(stepKeyDuringTx).toBeTruthy();
         expect(await sharedRedis().get(stepKey)).toBeNull();
+        expect(await sharedRedis().get(`mfa:enroll:${loginData.enrollmentToken}`)).toBeNull();
+        expect(
+          await sharedRedis().get(`mfa:enroll:attempts:${loginData.enrollmentToken}`),
+        ).toBeNull();
         expect(await consumeTotpCode(userId, parsedTotp.secret.base32, submittedCode)).toBe(true);
         await sharedRedis().del(stepKey);
 
@@ -430,6 +533,23 @@ describe("MFA window revoked by password change", () => {
       const errLoginData = JSON.parse(errLoginRes.body);
       expect(errLoginData.requiresMfaEnrollment).toBe(true);
 
+      // Spend 2 wrong attempts first so we can verify the counter survives a transaction failure.
+      for (let i = 0; i < 2; i++) {
+        const badRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/enroll-complete",
+          payload: {
+            enrollmentToken: errLoginData.enrollmentToken,
+            code: "000000",
+          },
+        });
+        expect(badRes.statusCode).toBe(401);
+        expect(JSON.parse(badRes.body).code).toBe("INVALID_CODE");
+      }
+      expect(await sharedRedis().get(`mfa:enroll:attempts:${errLoginData.enrollmentToken}`)).toBe(
+        "2",
+      );
+
       const origTransaction = db.transaction.bind(db);
       const txErrSpy = vi
         .spyOn(db, "transaction")
@@ -474,10 +594,26 @@ describe("MFA window revoked by password change", () => {
         .where(eq(schema.users.id, errUserId));
       expect(errUserAfter.totpEnabled).toBe(false);
 
-      const errParsedTotp = OTPAuth.URI.parse(errLoginData.uri) as OTPAuth.TOTP;
-      expect(await consumeTotpCode(errUserId, errParsedTotp.secret.base32, errSubmittedCode)).toBe(
-        true,
+      // The enrollment token and failed-attempt count must still be in Redis (#2575),
+      // and retrying the same enrollmentToken + TOTP code must succeed once the DB fault clears.
+      expect(await sharedRedis().get(`mfa:enroll:${errLoginData.enrollmentToken}`)).toBeTruthy();
+      expect(await sharedRedis().get(`mfa:enroll:attempts:${errLoginData.enrollmentToken}`)).toBe(
+        "2",
       );
+
+      const retryCompleteRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: {
+          enrollmentToken: errLoginData.enrollmentToken,
+          code: errSubmittedCode,
+        },
+      });
+      expect(retryCompleteRes.statusCode).toBe(200);
+      expect(await sharedRedis().get(`mfa:enroll:${errLoginData.enrollmentToken}`)).toBeNull();
+      expect(
+        await sharedRedis().get(`mfa:enroll:attempts:${errLoginData.enrollmentToken}`),
+      ).toBeNull();
     } finally {
       await db
         .update(schema.settings)
