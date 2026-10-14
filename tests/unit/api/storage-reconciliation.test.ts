@@ -22,9 +22,10 @@ describe("storage-reconciliation module exports", () => {
 });
 
 describe("storage-reconciliation structure", () => {
-  it("sums file sizes per user from userFiles", () => {
+  it("sums file sizes per user from userFiles without narrowing to a 32-bit int", () => {
     expect(source).toContain("schema.userFiles.userId");
     expect(source).toMatch(/sum\(\s*\$\{schema\.userFiles\.size\}/);
+    expect(source).not.toContain("::int");
   });
 
   it("updates storageUsed on the users table", () => {
@@ -37,7 +38,7 @@ describe("storage-reconciliation structure", () => {
   });
 
   it("corrects only users whose storageUsed differs from actual", () => {
-    expect(source).toMatch(/storageUsed\}\s*!=\s*\$\{row\.totalSize\}/);
+    expect(source).toMatch(/storageUsed\}\s*!=\s*\$\{totalSize\}/);
   });
 
   it("zeros out users with no files but nonzero storageUsed", () => {
@@ -48,5 +49,9 @@ describe("storage-reconciliation structure", () => {
   it("handles case where no users have files", () => {
     expect(source).toContain("// No users have files");
     expect(source).toMatch(/storageUsed\}\s*>\s*0/);
+  });
+
+  it("coerces bigint sum string from node-postgres to Number before updating storageUsed", () => {
+    expect(source).toContain("Number(row.totalSize)");
   });
 });

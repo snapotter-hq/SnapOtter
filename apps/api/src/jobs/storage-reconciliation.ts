@@ -13,7 +13,7 @@ export async function storageReconciliationJob(): Promise<void> {
   const actual = await db
     .select({
       userId: schema.userFiles.userId,
-      totalSize: sql<number>`coalesce(sum(${schema.userFiles.size}), 0)::int`,
+      totalSize: sql<number>`coalesce(sum(${schema.userFiles.size}), 0)`,
     })
     .from(schema.userFiles)
     .groupBy(schema.userFiles.userId);
@@ -21,11 +21,12 @@ export async function storageReconciliationJob(): Promise<void> {
   let updated = 0;
   for (const row of actual) {
     if (!row.userId) continue;
+    const totalSize = Number(row.totalSize);
     const result = await db
       .update(schema.users)
-      .set({ storageUsed: row.totalSize })
+      .set({ storageUsed: totalSize })
       .where(
-        and(eq(schema.users.id, row.userId), sql`${schema.users.storageUsed} != ${row.totalSize}`),
+        and(eq(schema.users.id, row.userId), sql`${schema.users.storageUsed} != ${totalSize}`),
       );
     if (result.rowCount) updated++;
   }

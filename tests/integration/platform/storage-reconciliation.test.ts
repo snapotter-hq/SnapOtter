@@ -24,24 +24,18 @@ let createdUserIds: string[] = [];
 let createdFileIds: string[] = [];
 
 afterEach(async () => {
-  if (createdFileIds.length > 0) {
-    await db
-      .delete(schema.userFiles)
-      .where(inArray(schema.userFiles.id, createdFileIds))
-      .catch(() => {});
+  try {
+    if (createdFileIds.length > 0) {
+      await db.delete(schema.userFiles).where(inArray(schema.userFiles.id, createdFileIds));
+    }
+    if (createdUserIds.length > 0) {
+      await db.delete(schema.userFiles).where(inArray(schema.userFiles.userId, createdUserIds));
+      await db.delete(schema.users).where(inArray(schema.users.id, createdUserIds));
+    }
+  } finally {
+    createdUserIds = [];
+    createdFileIds = [];
   }
-  if (createdUserIds.length > 0) {
-    await db
-      .delete(schema.userFiles)
-      .where(inArray(schema.userFiles.userId, createdUserIds))
-      .catch(() => {});
-    await db
-      .delete(schema.users)
-      .where(inArray(schema.users.id, createdUserIds))
-      .catch(() => {});
-  }
-  createdUserIds = [];
-  createdFileIds = [];
 });
 
 async function makeUser(storageUsed: number): Promise<string> {
@@ -213,5 +207,35 @@ describe("storageReconciliationJob (integration)", () => {
     const value = await storageOf(userId);
     expect(value).toBe(0);
     expect(Number.isInteger(value)).toBe(true);
+  });
+
+  it("reconciles a user whose library sum exceeds 2 GiB (32-bit signed integer limit) without failing (#1531)", async () => {
+    const heavyUser = await makeUser(0);
+    const otherUser = await makeUser(0);
+    await addFile(heavyUser, 1_000_000_000);
+    await addFile(heavyUser, 1_000_000_000);
+    await addFile(heavyUser, 1_000_000_000);
+    await addFile(otherUser, 500);
+
+    await storageReconciliationJob();
+
+    expect(await storageOf(heavyUser)).toBe(3_000_000_000);
+    expect(await storageOf(otherUser)).toBe(500);
+
+    // Second run with storageUsed already at 3_000_000_000 (> 2^31 - 1) must
+    // match the != guard and report 0 corrections.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    let logLines: string[] = [];
+    try {
+      await storageReconciliationJob();
+      logLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+    }
+
+    expect(await storageOf(heavyUser)).toBe(3_000_000_000);
+    expect(await storageOf(otherUser)).toBe(500);
+    const line = logLines.find((s) => s.includes("Storage reconciliation complete"));
+    expect(line).toContain("0 corrected");
   });
 });
