@@ -264,9 +264,8 @@ describe("demo mock API", () => {
  * the router on /login while the address bar reads /, and the demo rendering
  * the login screen it just bounced away from.
  *
- * tests/e2e-demo/demo-preview.spec.ts catches that, but only after a merge:
- * the demo deploy workflow runs on push to main, not on pull requests (#1128).
- * This assertion is the part that runs on the PR.
+ * tests/e2e-demo/demo-preview.spec.ts catches that in the browser, and this
+ * assertion pins the module-order contract directly in the unit suite (#1128).
  */
 describe("demo boot order", () => {
   const mainSource = readFileSync(path.resolve(process.cwd(), "apps/demo/src/main.tsx"), "utf8");

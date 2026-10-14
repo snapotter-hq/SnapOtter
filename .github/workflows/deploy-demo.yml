@@ -13,8 +13,33 @@ on:
       - "turbo.json"
       - "tsconfig.base.json"
       - ".github/actions/setup/**"
+      - ".github/actions/playwright-install/**"
+      - "docker/feature-manifest.json"
       - "playwright.demo.config.ts"
+      - "scripts/check-live-egress.mjs"
       - "tests/e2e-demo/**"
+      - "tests/playwright-run.ts"
+      - "tests/unit/infra/demo-theme.test.ts"
+      - "tests/unit/infra/demo-mock-api.test.ts"
+      - "tests/unit/infra/deploy-demo-workflow.test.ts"
+      - ".github/workflows/deploy-demo.yml"
+  pull_request:
+    paths:
+      - "apps/demo/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "turbo.json"
+      - "tsconfig.base.json"
+      - ".github/actions/setup/**"
+      - ".github/actions/playwright-install/**"
+      - "docker/feature-manifest.json"
+      - "playwright.demo.config.ts"
+      - "scripts/check-live-egress.mjs"
+      - "tests/e2e-demo/**"
+      - "tests/playwright-run.ts"
       - "tests/unit/infra/demo-theme.test.ts"
       - "tests/unit/infra/demo-mock-api.test.ts"
       - "tests/unit/infra/deploy-demo-workflow.test.ts"
@@ -22,17 +47,22 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-demo
+  group: deploy-demo-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  TESTCONTAINERS_RYUK_DISABLED: "true"
+
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Headroom for a degraded-apt-mirror day (#876): bounded install-deps
+    # attempts plus the smoke tests still fit.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup
@@ -46,13 +76,24 @@ jobs:
       - name: Build Demo
         run: pnpm --filter @snapotter/demo build
 
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
       - name: Install Playwright Chromium
-        run: pnpm playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-install
 
       - name: Smoke Test Demo
         run: pnpm playwright test --config playwright.demo.config.ts
 
       - name: Deploy to Cloudflare Pages
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: npx wrangler pages deploy apps/demo/dist --project-name snapotter-demo --branch main --commit-dirty=true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -62,4 +103,5 @@ jobs:
       # at the edge for the zone lands here too (#793). Web Analytics is kept
       # on purpose and allowlisted; anything else fails the run.
       - name: Verify the live site loads nothing third-party
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         run: node scripts/check-live-egress.mjs https://demo.snapotter.com/ --allow https://static.cloudflareinsights.com
