@@ -1,4 +1,10 @@
+import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
+
+const insertValues = vi.hoisted(() => vi.fn());
+const insert = vi.hoisted(() => vi.fn(() => ({ values: insertValues })));
+const auditFn = vi.hoisted(() => vi.fn());
+const reportError = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
@@ -12,14 +18,19 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {},
-  schema: {},
+  db: { insert },
+  schema: { apiKeys: {} },
 }));
 
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
-  auditFromRequest: () => vi.fn(),
+  auditFromRequest: () => auditFn,
   sanitizeAuditInput: (value: string) => value,
 }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return { ...actual, reportError };
+});
 
 vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
   sharedRedis: () => ({
@@ -38,7 +49,11 @@ vi.mock("../../../apps/api/src/lib/settings-helpers.js", () => ({
   getSettingString: vi.fn().mockResolvedValue("optional"),
 }));
 
-import { deriveApiKeyPermissionsForCreate } from "../../../apps/api/src/routes/api-keys.js";
+import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+import {
+  apiKeyRoutes,
+  deriveApiKeyPermissionsForCreate,
+} from "../../../apps/api/src/routes/api-keys.js";
 
 describe("deriveApiKeyPermissionsForCreate", () => {
   it("defaults a scoped caller's new key to the caller's effective scope", async () => {
@@ -80,5 +95,51 @@ describe("deriveApiKeyPermissionsForCreate", () => {
     });
 
     expect(scoped).toEqual({ permissions: null, invalid: [] });
+  });
+});
+
+describe("POST /api/v1/api-keys database failure handling", () => {
+  it("surfaces a database insert failure as a 500 and logs it instead of returning 409", async () => {
+    const dbErr = new Error("connection terminated unexpectedly");
+    insertValues.mockRejectedValueOnce(dbErr);
+    auditFn.mockReset();
+    reportError.mockReset();
+
+    const app = Fastify({ logger: false });
+    const logErrors: unknown[] = [];
+    app.addHook("onRequest", async (req) => {
+      req.user = { id: "u1", username: "admin", role: "admin" };
+      const origError = req.log.error.bind(req.log);
+      req.log.error = ((...args: unknown[]) => {
+        logErrors.push(args);
+        return (origError as (...a: unknown[]) => unknown)(...args);
+      }) as typeof req.log.error;
+    });
+    registerErrorHandler(app);
+    await apiKeyRoutes(app);
+    await app.ready();
+
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/api-keys",
+        payload: { name: "ci" },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: "Internal server error" });
+      expect(logErrors).toEqual([
+        [{ err: dbErr, url: "/api/v1/api-keys", method: "POST" }, "Unhandled request error"],
+      ]);
+      expect(reportError).toHaveBeenCalledWith(dbErr, {
+        source: "http",
+        route: "/api/v1/api-keys",
+        method: "POST",
+        statusCode: 500,
+      });
+      expect(auditFn).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
   });
 });

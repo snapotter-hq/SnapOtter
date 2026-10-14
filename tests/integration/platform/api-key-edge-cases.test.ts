@@ -3,7 +3,7 @@
  */
 
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -131,6 +131,49 @@ describe("API key creation validation", () => {
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body);
     expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("answers 500 when the database insert fails instead of a misleading 409", async () => {
+    const realInsert = db.insert.bind(db);
+    const spy = vi.spyOn(db, "insert").mockImplementation(((
+      table: Parameters<typeof db.insert>[0],
+    ) => {
+      if (table === schema.apiKeys) {
+        return {
+          values: () => Promise.reject(new Error("database unavailable")),
+        } as unknown as ReturnType<typeof db.insert>;
+      }
+      return realInsert(table);
+    }) as typeof db.insert);
+
+    try {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/api-keys",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name: "db-error-key" },
+      });
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).key).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+
+    const keys = await db
+      .select()
+      .from(schema.apiKeys)
+      .where(eq(schema.apiKeys.name, "db-error-key"));
+    expect(keys).toHaveLength(0);
+
+    const audits = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "API_KEY_CREATED"));
+    expect(
+      audits.some(
+        (row) => (row.details as Record<string, unknown> | null)?.keyName === "db-error-key",
+      ),
+    ).toBe(false);
   });
 });
 
