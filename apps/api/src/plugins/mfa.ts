@@ -497,7 +497,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { code } = parsed.data;
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "A valid TOTP code is required",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, user.id));
       if (!dbUser?.totpSecret) {
@@ -782,7 +788,14 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { enrollmentToken, code } = parsed.data;
+      const { enrollmentToken } = parsed.data;
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "Enrollment token and code are required",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       const redis = sharedRedis();
       const challengeKey = `mfa:enroll:${enrollmentToken}`;
@@ -982,7 +995,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           code: "VALIDATION_ERROR",
         });
       }
-      const { code } = parsed.data;
+      const code = normalizeMfaCode(parsed.data.code);
+      if (!code) {
+        return reply.status(400).send({
+          error: "Current TOTP code is required to disable MFA",
+          code: "VALIDATION_ERROR",
+        });
+      }
 
       const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, user.id));
       if (!dbUser?.totpEnabled || !dbUser.totpSecret) {

@@ -198,6 +198,43 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("enroll-complete accepts a TOTP typed with a space or dash, and refuses an empty code without costing an attempt (#2478)", async () => {
+    const { username, password, userId } = await createUnenrolledUser();
+    await setMfaPolicy("required");
+
+    const loginRes = await login(username, password);
+    const { enrollmentToken, uri } = JSON.parse(loginRes.body);
+
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    }
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    const failedForUser = auditRows.find((row) => {
+      const details = row.details as { userId?: string } | null;
+      return details?.userId === userId;
+    });
+    expect(failedForUser).toBeUndefined();
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: ` ${code.slice(0, 3)}-${code.slice(3)} ` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).token).toBeDefined();
+  });
 });
 
 describe("POST /api/auth/login MFA policy read failure (#815)", () => {

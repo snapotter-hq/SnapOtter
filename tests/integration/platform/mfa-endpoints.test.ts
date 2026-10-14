@@ -261,6 +261,43 @@ describe("POST /api/auth/mfa/verify", () => {
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).code).toBe("MFA_ALREADY_ENABLED");
   });
+
+  it("accepts a TOTP typed with a space or dash, and refuses an empty-after-normalization code with 400 (#2478)", async () => {
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    }
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(0);
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: ` ${code.slice(0, 3)}-${code.slice(3)} ` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
 });
 
 describe("POST /api/auth/mfa/disable", () => {
@@ -360,6 +397,49 @@ describe("POST /api/auth/mfa/disable", () => {
     expect(dbUser.totpEnabled).toBe(false);
     expect(dbUser.totpSecret).toBeNull();
     expect(dbUser.recoveryCodesHash).toBeNull();
+  });
+
+  it("accepts a TOTP typed with a space or dash, and refuses an empty-after-normalization code with 400 (#2478)", async () => {
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
+    const enrollRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll",
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const { uri } = JSON.parse(enrollRes.body);
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode(uri) },
+    });
+
+    for (const empty of [" ", "-", " - ", "--", "  ", "- -"]) {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: empty },
+      });
+      expect(res.statusCode, JSON.stringify(empty)).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    }
+
+    const auditLogs = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    expect(auditLogs).toHaveLength(0);
+
+    const code = generateTotpCode(uri);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: ` ${code.slice(0, 3)}-${code.slice(3)} ` },
+    });
+    expect(res.statusCode).toBe(200);
   });
 });
 
