@@ -1453,12 +1453,15 @@ def abandon_merge(sp_dir, plan, quarantine_dir, marker_path, bundle_id) -> None:
     breadcrumb in place if the rollback itself fails, so a venv this installer
     could not repair still gets reseeded on next boot.
     """
-    if not sp_dir or (not plan and not os.path.isdir(quarantine_dir)):
+    if not sp_dir or (not plan and not (quarantine_dir and os.path.isdir(quarantine_dir))):
         return
+    if marker_path:
+        with contextlib.suppress(OSError):
+            mark_venv_writing(marker_path, bundle_id)
     try:
-        mark_venv_writing(marker_path, bundle_id)
         rollback_reconciliation(sp_dir, plan, quarantine_dir)
-        clear_venv_writing(marker_path)
+        if marker_path:
+            clear_venv_writing(marker_path)
         sys.stderr.write("[install] rolled the venv back to its state before this bundle\n")
     except OSError as e:
         sys.stderr.write(
@@ -1470,31 +1473,94 @@ def abandon_merge(sp_dir, plan, quarantine_dir, marker_path, bundle_id) -> None:
 
 # -- Fixups (NCCL wheel) --
 
-def apply_fixups(staging_dir: str, venv_path: str) -> None:
+def apply_fixups(
+    staging_dir: str,
+    venv_path: str,
+    site_packages_dir: str = "",
+    reconciliation_plan=None,
+    quarantine_dir: str = "",
+    venv_writing_marker: str = "",
+    bundle_id: str = "",
+) -> None:
     """Install any wheels from fixups/ directory (local only, no network)."""
     fixups_dir = os.path.join(staging_dir, "fixups")
     if not os.path.isdir(fixups_dir):
         return
-    wheels = [f for f in os.listdir(fixups_dir) if f.endswith(".whl")]
+    plan = reconciliation_plan if reconciliation_plan is not None else []
+
+    def _abort(message: str) -> None:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        had_rollback_work = bool(
+            site_packages_dir
+            and (plan or (quarantine_dir and os.path.isdir(quarantine_dir)))
+        )
+        abandon_merge(
+            site_packages_dir, plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
+        if venv_writing_marker and not had_rollback_work:
+            with contextlib.suppress(OSError):
+                clear_venv_writing(venv_writing_marker)
+        fail(message)
+
+    try:
+        wheels = sorted(
+            f for f in os.listdir(fixups_dir)
+            if f.endswith(".whl") and not f.startswith(".")
+        )
+    except OSError as e:
+        _abort(f"Failed to read bundle fixups directory: {e}")
+        return
     if not wheels:
         return
     python_path = os.path.join(venv_path, "bin", "python3")
     if not os.path.exists(python_path):
+        _abort(
+            f"Failed to install bundle fixups: the AI environment's Python interpreter "
+            f"at {python_path} does not exist. Recreate the AI environment and retry."
+        )
         return
+    if venv_writing_marker:
+        try:
+            mark_venv_writing(venv_writing_marker, bundle_id)
+        except OSError as e:
+            _abort(f"Failed to record venv write marker before installing fixups: {e}")
+            return
     for wheel in wheels:
         pkg_name = wheel.split("-")[0]
         try:
             proc = subprocess.run(
                 [python_path, "-m", "pip", "install", "--no-index",
                  f"--find-links={fixups_dir}", pkg_name],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True, text=True, errors="replace", timeout=60,
             )
-            if proc.returncode != 0:
-                sys.stderr.write(f"[install] WARNING: fixup {pkg_name} failed to install: {proc.stderr}\n")
-                sys.stderr.flush()
-        except Exception as e:
-            sys.stderr.write(f"[install] WARNING: fixup {pkg_name} failed to execute: {e}\n")
-            sys.stderr.flush()
+        except subprocess.TimeoutExpired:
+            _abort(
+                f"Timed out while installing fixup wheel '{pkg_name}'. "
+                f"Please retry the install."
+            )
+            return
+        except OSError as e:
+            _abort(
+                f"Failed to install fixup wheel '{pkg_name}': the AI environment's Python "
+                f"interpreter at {python_path} could not be run ({e}). "
+                f"Recreate the AI environment and retry."
+            )
+            return
+        if proc.returncode != 0:
+            detail = (
+                (proc.stderr or "").strip()
+                or (proc.stdout or "").strip()
+                or f"pip exited with status {proc.returncode}"
+            )
+            _abort(f"Failed to install fixup wheel '{pkg_name}': {detail}")
+            return
+    if venv_writing_marker:
+        try:
+            clear_venv_writing(venv_writing_marker)
+        except OSError as e:
+            _abort(f"Failed to clear venv write marker after installing fixups: {e}")
+            return
 
 
 # -- installed.json management --
@@ -1803,7 +1869,15 @@ def _install() -> None:
 
     # -- Apply fixups --
     emit_progress(97, "Finalizing...")
-    apply_fixups(staging_dir, venv_path)
+    apply_fixups(
+        staging_dir,
+        venv_path,
+        site_packages_dir,
+        reconciliation_plan,
+        quarantine_dir,
+        venv_writing_marker,
+        bundle_id,
+    )
 
     # -- Verify the bundle actually imports --
     # File-copy completion does NOT prove the bundle works: an incomplete

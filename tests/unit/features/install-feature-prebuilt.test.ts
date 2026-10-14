@@ -792,3 +792,400 @@ with tempfile.TemporaryDirectory() as d:
     expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
   });
 });
+
+describe("fixup wheel installation and rollback (#2561)", () => {
+  function seedExistingTestPkg() {
+    mkdirSync(join(sitePackagesDir, "testpkg"), { recursive: true });
+    mkdirSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "# v0.9.0");
+    writeFileSync(
+      join(sitePackagesDir, "testpkg-0.9.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-0.9.0.dist-info/RECORD,,\n",
+    );
+  }
+
+  function createFixupRollbackTar(wheelName = "broken-1.0.0-py3-none-any.whl"): {
+    tarPath: string;
+    sha256: string;
+  } {
+    const buildDir = join(tempDir, "build-fixup-rollback");
+    mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
+    mkdirSync(join(buildDir, "fixups"), { recursive: true });
+    writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
+    writeFileSync(
+      join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-1.0.0.dist-info/RECORD,,\n",
+    );
+    writeFileSync(join(buildDir, "fixups", wheelName), "not-a-valid-wheel-zip");
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "face-detection",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: [],
+      }),
+    );
+    const tarPath = join(tempDir, "fixup-rollback.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    rmSync(buildDir, { recursive: true, force: true });
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+    return { tarPath, sha256 };
+  }
+
+  function expectRolledBackTestPkg() {
+    expect(readFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "utf-8")).toBe("# v0.9.0");
+    expect(existsSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "testpkg-1.0.0.dist-info"))).toBe(false);
+    expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeUndefined();
+  }
+
+  it("brackets fixup pip install with venv.writing and rolls back site-packages when pip exits non-zero", () => {
+    seedExistingTestPkg();
+    const { tarPath, sha256 } = createFixupRollbackTar();
+    writeManifest("face-detection", tarPath, sha256, { models: [] });
+
+    const markerSeenDuringPip = join(tempDir, "marker-seen.txt");
+    const binPy = join(venvDir, "bin", "python3");
+    unlinkSync(binPy);
+    writeFileSync(
+      binPy,
+      [
+        "#!/bin/sh",
+        'case "$*" in',
+        "  *sysconfig*)",
+        `    echo ${JSON.stringify(sitePackagesDir)}`,
+        "    ;;",
+        "  *pip*install*)",
+        `    if [ -f ${JSON.stringify(join(aiDir, "venv.writing"))} ]; then`,
+        `      cp ${JSON.stringify(join(aiDir, "venv.writing"))} ${JSON.stringify(markerSeenDuringPip)}`,
+        "    fi",
+        "    echo 'ERROR: Wheel broken-1.0.0-py3-none-any.whl is invalid' >&2",
+        "    exit 1",
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(binPy, 0o755);
+
+    const result = installBundle("face-detection", tarPath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString() ?? "").toMatch(
+      /Failed to install fixup wheel 'broken'.*Wheel broken-1\.0\.0-py3-none-any\.whl is invalid/s,
+    );
+    expect(existsSync(markerSeenDuringPip)).toBe(true);
+    expect(JSON.parse(readFileSync(markerSeenDuringPip, "utf-8")).bundleId).toBe("face-detection");
+    expectRolledBackTestPkg();
+  });
+
+  it("rolls back site-packages and fails when venv/bin/python3 is missing during apply_fixups", () => {
+    seedExistingTestPkg();
+    const { tarPath, sha256 } = createFixupRollbackTar();
+    writeManifest("face-detection", tarPath, sha256, { models: [] });
+
+    const binPy = join(venvDir, "bin", "python3");
+    unlinkSync(binPy);
+    writeFileSync(
+      binPy,
+      [
+        "#!/bin/sh",
+        'case "$*" in',
+        "  *sysconfig*)",
+        `    echo ${JSON.stringify(sitePackagesDir)}`,
+        `    rm -f ${JSON.stringify(binPy)}`,
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(binPy, 0o755);
+
+    const result = installBundle("face-detection", tarPath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString() ?? "").toMatch(/Python interpreter.*does not exist/i);
+    expectRolledBackTestPkg();
+  });
+
+  it("rolls back site-packages and fails when venv/bin/python3 raises OSError during apply_fixups", () => {
+    seedExistingTestPkg();
+    const { tarPath, sha256 } = createFixupRollbackTar();
+    writeManifest("face-detection", tarPath, sha256, { models: [] });
+
+    const binPy = join(venvDir, "bin", "python3");
+    unlinkSync(binPy);
+    writeFileSync(
+      binPy,
+      [
+        "#!/bin/sh",
+        'case "$*" in',
+        "  *sysconfig*)",
+        `    echo ${JSON.stringify(sitePackagesDir)}`,
+        `    printf '#!/nonexistent_interpreter_zzz\\n' > ${JSON.stringify(binPy)}`,
+        `    chmod 755 ${JSON.stringify(binPy)}`,
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(binPy, 0o755);
+
+    const result = installBundle("face-detection", tarPath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString() ?? "").toMatch(/could not be run/i);
+    expectRolledBackTestPkg();
+  });
+
+  it("rolls back and fails on TimeoutExpired or empty-stderr pip failure, and clears venv.writing on success", () => {
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, json, os, subprocess, tempfile
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def setup_case(d):
+    venv = os.path.join(d, "venv")
+    sp = os.path.join(venv, "lib", "python3.12", "site-packages")
+    quarantine = os.path.join(venv, ".superseded")
+    staging = os.path.join(d, "staging-face-detection")
+    marker = os.path.join(d, "venv.writing")
+    os.makedirs(os.path.join(venv, "bin"), exist_ok=True)
+    os.makedirs(sp, exist_ok=True)
+    os.makedirs(os.path.join(staging, "fixups"), exist_ok=True)
+    py = os.path.join(venv, "bin", "python3")
+    with open(py, "w") as f:
+        f.write("#!/bin/sh\\nexit 0\\n")
+    os.chmod(py, 0o755)
+    with open(os.path.join(staging, "fixups", "nvidia_nccl_cu12-2.21.5-py3-none-manylinux1_x86_64.whl"), "w") as f:
+        f.write("wheel")
+
+    # Seed a superseded distribution in quarantine and a placed one in sp
+    os.makedirs(os.path.join(sp, "pkg"), exist_ok=True)
+    os.makedirs(os.path.join(sp, "pkg-2.0.0.dist-info"), exist_ok=True)
+    with open(os.path.join(sp, "pkg", "__init__.py"), "w") as f:
+        f.write("v2")
+    with open(os.path.join(sp, "pkg-2.0.0.dist-info", "RECORD"), "w") as f:
+        f.write("pkg/__init__.py,,\\npkg-2.0.0.dist-info/RECORD,,\\n")
+
+    os.makedirs(os.path.join(quarantine, "pkg", "1.0.0", "pkg"), exist_ok=True)
+    os.makedirs(os.path.join(quarantine, "pkg", "1.0.0", "pkg-1.0.0.dist-info"), exist_ok=True)
+    with open(os.path.join(quarantine, "pkg", "1.0.0", "pkg", "__init__.py"), "w") as f:
+        f.write("v1")
+    with open(os.path.join(quarantine, "pkg", "1.0.0", "pkg-1.0.0.dist-info", "RECORD"), "w") as f:
+        f.write("pkg/__init__.py,,\\npkg-1.0.0.dist-info/RECORD,,\\n")
+
+    plan = [{
+        "name": "pkg",
+        "version": "2.0.0",
+        "dist_info": "pkg-2.0.0.dist-info",
+        "files": ["pkg/__init__.py", "pkg-2.0.0.dist-info/RECORD"],
+        "replaces": {"pkg", "pkg-2.0.0.dist-info"},
+        "superseded": [("1.0.0", "pkg-1.0.0.dist-info")],
+    }]
+    return venv, sp, quarantine, staging, marker, plan
+
+real_run = mod.subprocess.run
+errors = []
+def fake_fail(msg):
+    errors.append(msg)
+    raise SystemExit(1)
+mod.fail = fake_fail
+
+# 1. TimeoutExpired rolls back and clears marker
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    marker_during_call = []
+    def raise_timeout(*a, **kw):
+        marker_during_call.append(os.path.exists(marker))
+        raise subprocess.TimeoutExpired(cmd=a[0], timeout=60)
+    mod.subprocess.run = raise_timeout
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    assert marker_during_call == [True]
+    assert not os.path.exists(marker)
+    assert not os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v1"
+    assert "Timed out while installing fixup wheel 'nvidia_nccl_cu12'" in errors[-1]
+
+# 2. Non-zero exit with empty stderr/stdout reports exit status; whitespace stderr falls back to stdout
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    class FakeProc:
+        returncode = 2
+        stdout = ""
+        stderr = "   \\n"
+    mod.subprocess.run = lambda *a, **kw: FakeProc()
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    assert not os.path.exists(marker)
+    assert not os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v1"
+    assert "pip exited with status 2" in errors[-1]
+
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    class StdoutErrProc:
+        returncode = 1
+        stdout = "ERROR: Invalid wheel archive on stdout\\n"
+        stderr = "   \\n"
+    mod.subprocess.run = lambda *a, **kw: StdoutErrProc()
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    assert not os.path.exists(marker)
+    assert not os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v1"
+    assert "Invalid wheel archive on stdout" in errors[-1]
+
+# 3. Successful fixup install writes marker during pip and clears it afterward
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    # AppleDouble dotfiles in fixups/ are ignored rather than passed to pip
+    with open(os.path.join(staging, "fixups", "._nvidia_nccl_cu12-2.21.5-py3-none-manylinux1_x86_64.whl"), "w") as f:
+        f.write("appledouble")
+    seen = []
+    cmds = []
+    class OkProc:
+        returncode = 0
+        stdout = "Successfully installed nvidia_nccl_cu12"
+        stderr = ""
+    def ok_run(*a, **kw):
+        cmds.append(a[0])
+        seen.append(json.loads(open(marker).read())["bundleId"])
+        return OkProc()
+    mod.subprocess.run = ok_run
+    mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+    assert seen == ["face-detection"]
+    assert len(cmds) == 1 and cmds[0][-1] == "nvidia_nccl_cu12"
+    assert not os.path.exists(marker)
+    assert os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v2"
+
+# 4. Dotfile-only fixups/ directory is a no-op
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    os.unlink(os.path.join(staging, "fixups", "nvidia_nccl_cu12-2.21.5-py3-none-manylinux1_x86_64.whl"))
+    with open(os.path.join(staging, "fixups", "._ignored-1.0.0-py3-none-any.whl"), "w") as f:
+        f.write("appledouble")
+    called = []
+    mod.subprocess.run = lambda *a, **kw: called.append(a)
+    mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+    assert called == []
+    assert not os.path.exists(marker)
+
+# 5. OSError from os.listdir(fixups_dir) rolls back and fails
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    real_listdir = mod.os.listdir
+    def bad_listdir(p):
+        if p == os.path.join(staging, "fixups"):
+            raise OSError("permission denied reading fixups")
+        return real_listdir(p)
+    mod.os.listdir = bad_listdir
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.os.listdir = real_listdir
+    assert not os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v1"
+    assert "Failed to read bundle fixups directory" in errors[-1]
+
+# 6. OSError from mark_venv_writing rolls back without spawning pip
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    called = []
+    mod.subprocess.run = lambda *a, **kw: called.append(a)
+    missing_dir_marker = os.path.join(d, "missing-dir", "venv.writing")
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, missing_dir_marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    assert called == []
+    assert not os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v1"
+    assert "Failed to record venv write marker before installing fixups" in errors[-1]
+
+# 7. When rollback_reconciliation raises OSError during abort, venv.writing stays on disk
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    class FailProc:
+        returncode = 1
+        stdout = ""
+        stderr = "pip error"
+    mod.subprocess.run = lambda *a, **kw: FailProc()
+    real_rollback = mod.rollback_reconciliation
+    def broken_rollback(*a, **kw):
+        raise OSError("disk read-only during rollback")
+    mod.rollback_reconciliation = broken_rollback
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.rollback_reconciliation = real_rollback
+    assert os.path.exists(marker), "venv.writing must survive when rollback itself fails"
+    assert not os.path.exists(staging)
+
+# 8. OSError from clear_venv_writing after pip succeeds rolls back and fails
+with tempfile.TemporaryDirectory() as d:
+    venv, sp, quarantine, staging, marker, plan = setup_case(d)
+    class OkProc2:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+    mod.subprocess.run = lambda *a, **kw: OkProc2()
+    real_clear = mod.clear_venv_writing
+    calls = [0]
+    def fail_first_clear(m):
+        calls[0] += 1
+        if calls[0] == 1:
+            raise OSError("unlink EPERM")
+        real_clear(m)
+    mod.clear_venv_writing = fail_first_clear
+    try:
+        mod.apply_fixups(staging, venv, sp, plan, quarantine, marker, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.clear_venv_writing = real_clear
+    assert not os.path.exists(staging)
+    assert open(os.path.join(sp, "pkg", "__init__.py")).read() == "v1"
+    assert "Failed to clear venv write marker after installing fixups" in errors[-1]
+
+mod.subprocess.run = real_run
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
+});
