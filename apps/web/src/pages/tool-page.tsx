@@ -52,6 +52,8 @@ import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
 import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import {
   DOC_CANVAS_TOOLS,
   LIVE_PREVIEW_INPUT_OVERLAY_TOOLS,
@@ -233,6 +235,20 @@ function FileSelectionInfo({
   );
 }
 
+const TOOL_STORE_RESETS: ReadonlyArray<() => void> = [
+  () => useBase64Store.getState().reset(),
+  () => useCollageStore.getState().reset(),
+  () => useDuplicateStore.getState().reset(),
+  () => useMemeStore.getState().reset(),
+  () => usePassportPhotoStore.getState().reset(),
+  () => usePdfToImageStore.getState().reset(),
+  () => useQrStore.getState().reset(),
+  () => useSplitStore.getState().reset(),
+  () => useHtmlToImageStore.getState().reset(),
+  () => useMultiToolStore.getState().clear(),
+  () => useOrganizeStore.getState().clear(),
+];
+
 function ToolPageStoreReset({
   toolId,
   fromLibrary,
@@ -249,36 +265,72 @@ function ToolPageStoreReset({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
   useEffect(() => {
+    const previousToolId = resetToolIdRef.current;
     resetToolIdRef.current = toolId;
     if (setupToolIdRef.current !== toolId) {
       setupToolIdRef.current = toolId;
-      if (!fromLibrary) {
-        useFileStore.getState().reset();
+      const teardownError = runEndWrites([
+        ...(!fromLibrary ? [() => useFileStore.getState().reset()] : []),
+        ...TOOL_STORE_RESETS,
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          previousToolId ?? toolId,
+        );
       }
-      useBase64Store.getState().reset();
-      useCollageStore.getState().reset();
-      useDuplicateStore.getState().reset();
-      useMemeStore.getState().reset();
-      usePassportPhotoStore.getState().reset();
-      usePdfToImageStore.getState().reset();
-      useQrStore.getState().reset();
-      useSplitStore.getState().reset();
-      useHtmlToImageStore.getState().reset();
-      useOrganizeStore.getState().clear();
     }
 
-    // The editor session belongs to the tool route, not to the settings panel,
-    // which unmounts when the viewport crosses the mobile breakpoint (#1974, #2248).
     return () => {
       if (probeRef.current?.isConnected && latestToolIdRef.current === toolId) return;
       setupToolIdRef.current = undefined;
-      useMemeStore.getState().reset();
-      usePassportPhotoStore.getState().reset();
-      useMultiToolStore.getState().clear();
-      useOrganizeStore.getState().clear();
     };
   }, [toolId]);
 
+  return (
+    <span
+      ref={(el) => {
+        if (el) probeRef.current = el;
+      }}
+      hidden
+    />
+  );
+}
+
+/**
+ * Resets the file store and per-tool stores when ToolPage unmounts (#1122).
+ *
+ * Rendered as a sibling after ToolPageContent so React runs ToolSettings's
+ * unmount cleanups first (canceling any active server job while `processing`
+ * is still true) and then wipes the stores clean on the way out. In StrictMode,
+ * React's simulated unmount on initial mount runs while the DOM node is still
+ * connected; skipping that simulated pass preserves files pre-loaded into
+ * useFileStore before navigating here with `state: { fromLibrary: true }`.
+ */
+function ToolPageUnmountReset({
+  resetToolIdRef,
+}: {
+  resetToolIdRef: React.RefObject<string | undefined>;
+}) {
+  const probeRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(
+    () => () => {
+      if (probeRef.current?.isConnected) return;
+      const teardownError = runEndWrites([
+        () => useFileStore.getState().reset(),
+        ...TOOL_STORE_RESETS,
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          resetToolIdRef.current,
+        );
+      }
+    },
+    [resetToolIdRef],
+  );
   return (
     <span
       ref={(el) => {
@@ -303,6 +355,7 @@ export function ToolPage() {
         resetToolIdRef={resetToolIdRef}
       />
       <ToolPageContent resetToolIdRef={resetToolIdRef} />
+      <ToolPageUnmountReset resetToolIdRef={resetToolIdRef} />
     </>
   );
 }
