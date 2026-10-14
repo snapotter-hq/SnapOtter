@@ -102,43 +102,157 @@ export interface RemoveBgControlsProps {
    * False hides the option and treats a stored "image" as transparent.
    */
   allowImageBackground?: boolean;
+  initialControls?: RemoveBgControlState;
+  onControlsChange?: (controls: RemoveBgControlState) => void;
 }
+
+interface RemoveBgControlState {
+  subject: SubjectType;
+  quality: Quality;
+  isPassport: boolean;
+  chosenBgType: BackgroundType;
+  bgColor: string;
+  gradColor1: string;
+  gradColor2: string;
+  gradAngle: number;
+  bgImageFile: File | null;
+  blurEnabled: boolean;
+  blurIntensity: number;
+  shadowEnabled: boolean;
+  shadowOpacity: number;
+  edgeRefine: number;
+  decontaminate: boolean;
+  outputFormat: "png" | "webp" | "avif";
+  effectsOpen: boolean;
+}
+
+interface RemovalRefineRecord {
+  file: File | null;
+  model: string;
+  edgeRefine: number;
+  decontaminate: boolean;
+}
+
+function seedModelState(model: unknown): {
+  subject: SubjectType;
+  quality: Quality;
+  isPassport: boolean;
+} {
+  switch (model) {
+    case "birefnet-matting":
+      return { subject: "people", quality: "best", isPassport: false };
+    case "birefnet-hr-matting":
+      return { subject: "people", quality: "ultra", isPassport: false };
+    case "u2net":
+      return { subject: "people", quality: "fast", isPassport: false };
+    case "bria-rmbg":
+      return { subject: "products", quality: "balanced", isPassport: false };
+    case "birefnet-general-lite":
+      return { subject: "general", quality: "balanced", isPassport: false };
+    case "birefnet-general":
+      return { subject: "general", quality: "best", isPassport: false };
+    default:
+      return { subject: "people", quality: "balanced", isPassport: true };
+  }
+}
+
+function defaultControlState(settings?: Record<string, unknown>): RemoveBgControlState {
+  const modelState = seedModelState(settings?.model);
+  const blurEnabled = Boolean(settings?.blurEnabled);
+  const shadowEnabled = Boolean(settings?.shadowEnabled);
+  const edgeRefine = settings?.edgeRefine != null ? Number(settings.edgeRefine) : 0;
+  const decontaminate = Boolean(settings?.decontaminate);
+  return {
+    subject: modelState.subject,
+    quality: modelState.quality,
+    isPassport: modelState.isPassport,
+    chosenBgType: (settings?.backgroundType as BackgroundType) ?? "transparent",
+    bgColor: settings?.backgroundColor != null ? String(settings.backgroundColor) : "#FFFFFF",
+    gradColor1: settings?.gradientColor1 != null ? String(settings.gradientColor1) : "#667eea",
+    gradColor2: settings?.gradientColor2 != null ? String(settings.gradientColor2) : "#764ba2",
+    gradAngle: settings?.gradientAngle != null ? Number(settings.gradientAngle) : 180,
+    bgImageFile: settings?._bgImageFile instanceof File ? settings._bgImageFile : null,
+    blurEnabled,
+    blurIntensity: settings?.blurIntensity != null ? Number(settings.blurIntensity) : 50,
+    shadowEnabled,
+    shadowOpacity: settings?.shadowOpacity != null ? Number(settings.shadowOpacity) : 35,
+    edgeRefine,
+    decontaminate,
+    outputFormat: (settings?.outputFormat as "png" | "webp" | "avif") ?? "png",
+    effectsOpen: Boolean(blurEnabled || shadowEnabled || edgeRefine || decontaminate),
+  };
+}
+
+// Preserves RemoveBgSettings control selections and the recorded removalRefine
+// state when ToolPage swaps its mobile and desktop subtrees across 768px (#2489)
+// while the same files remain loaded in useFileStore.
+const removeBgSession: {
+  files: File[];
+  controls: RemoveBgControlState;
+  settings: Record<string, unknown>;
+  removalRefine: RemovalRefineRecord | null;
+} = {
+  files: [],
+  controls: defaultControlState(),
+  settings: {},
+  removalRefine: null,
+};
+
+function sameFileList(a: File[], b: File[]): boolean {
+  return a.length > 0 && a.length === b.length && a.every((f, i) => f === b[i]);
+}
+
+function resetRemoveBgSession(files: File[] = []): void {
+  removeBgSession.files = files;
+  removeBgSession.controls = defaultControlState();
+  removeBgSession.settings = {};
+  removeBgSession.removalRefine = null;
+}
+
+useFileStore.subscribe((state) => {
+  if (state.files.length === 0) {
+    resetRemoveBgSession();
+  }
+});
 
 export function RemoveBgControls({
   settings,
   onChange,
   allowImageBackground = true,
+  initialControls,
+  onControlsChange,
 }: RemoveBgControlsProps) {
   const { t } = useTranslation();
-  const [subject, setSubject] = useState<SubjectType>("people");
-  const [quality, setQuality] = useState<Quality>("balanced");
-  const [isPassport, setIsPassport] = useState(true);
+  const seed = initialControls ?? defaultControlState(settings);
+  const [subject, setSubject] = useState<SubjectType>(seed.subject);
+  const [quality, setQuality] = useState<Quality>(seed.quality);
+  const [isPassport, setIsPassport] = useState(seed.isPassport);
 
   // Background
-  const [chosenBgType, setBgType] = useState<BackgroundType>("transparent");
+  const [chosenBgType, setBgType] = useState<BackgroundType>(seed.chosenBgType);
   const bgType: BackgroundType =
     chosenBgType === "image" && !allowImageBackground ? "transparent" : chosenBgType;
-  const [bgColor, setBgColor] = useState("#FFFFFF");
-  const [gradColor1, setGradColor1] = useState("#667eea");
-  const [gradColor2, setGradColor2] = useState("#764ba2");
-  const [gradAngle, setGradAngle] = useState(180);
-  const [bgImageFile, setBgImageFile] = useState<File | null>(null);
+  const [bgColor, setBgColor] = useState(seed.bgColor);
+  const [gradColor1, setGradColor1] = useState(seed.gradColor1);
+  const [gradColor2, setGradColor2] = useState(seed.gradColor2);
+  const [gradAngle, setGradAngle] = useState(seed.gradAngle);
+  const [bgImageFile, setBgImageFile] = useState<File | null>(seed.bgImageFile);
 
   // Effects
-  const [blurEnabled, setBlurEnabled] = useState(false);
-  const [blurIntensity, setBlurIntensity] = useState(50);
-  const [shadowEnabled, setShadowEnabled] = useState(false);
-  const [shadowOpacity, setShadowOpacity] = useState(35);
+  const [blurEnabled, setBlurEnabled] = useState(seed.blurEnabled);
+  const [blurIntensity, setBlurIntensity] = useState(seed.blurIntensity);
+  const [shadowEnabled, setShadowEnabled] = useState(seed.shadowEnabled);
+  const [shadowOpacity, setShadowOpacity] = useState(seed.shadowOpacity);
 
   // Post-processing
-  const [edgeRefine, setEdgeRefine] = useState(0);
-  const [decontaminate, setDecontaminate] = useState(false);
+  const [edgeRefine, setEdgeRefine] = useState(seed.edgeRefine);
+  const [decontaminate, setDecontaminate] = useState(seed.decontaminate);
 
   // Output
-  const [outputFormat, setOutputFormat] = useState<"png" | "webp" | "avif">("png");
+  const [outputFormat, setOutputFormat] = useState<"png" | "webp" | "avif">(seed.outputFormat);
 
   // Expandable sections
-  const [effectsOpen, setEffectsOpen] = useState(false);
+  const [effectsOpen, setEffectsOpen] = useState(seed.effectsOpen);
 
   // Seed local state from preloaded settings exactly once. Pipeline steps (e.g.
   // a template) mount this control with non-default settings; without seeding,
@@ -146,13 +260,20 @@ export function RemoveBgControls({
   // Mirrors the initializedRef pattern in resize-settings / convert-settings.
   const initializedRef = useRef(false);
   useEffect(() => {
-    if (!settings || initializedRef.current) return;
+    if (initialControls || !settings || initializedRef.current) return;
     initializedRef.current = true;
+    if (settings.model != null) {
+      const modelState = seedModelState(settings.model);
+      setSubject(modelState.subject);
+      setQuality(modelState.quality);
+      setIsPassport(modelState.isPassport);
+    }
     if (settings.backgroundType != null) setBgType(settings.backgroundType as BackgroundType);
     if (settings.backgroundColor != null) setBgColor(String(settings.backgroundColor));
     if (settings.gradientColor1 != null) setGradColor1(String(settings.gradientColor1));
     if (settings.gradientColor2 != null) setGradColor2(String(settings.gradientColor2));
     if (settings.gradientAngle != null) setGradAngle(Number(settings.gradientAngle));
+    if (settings._bgImageFile instanceof File) setBgImageFile(settings._bgImageFile);
     if (settings.blurEnabled != null) setBlurEnabled(Boolean(settings.blurEnabled));
     if (settings.blurIntensity != null) setBlurIntensity(Number(settings.blurIntensity));
     if (settings.shadowEnabled != null) setShadowEnabled(Boolean(settings.shadowEnabled));
@@ -171,7 +292,7 @@ export function RemoveBgControls({
     ) {
       setEffectsOpen(true);
     }
-  }, [settings]);
+  }, [settings, initialControls]);
 
   // Filter quality options based on subject (Ultra only for People)
   const qualityOptions = ALL_QUALITY_OPTIONS.filter(
@@ -187,8 +308,10 @@ export function RemoveBgControls({
       : MODEL_MAP[subject][effectiveQuality] || "birefnet-general";
 
   const onChangeRef = useRef(onChange);
+  const onControlsChangeRef = useRef(onControlsChange);
   useEffect(() => {
     onChangeRef.current = onChange;
+    onControlsChangeRef.current = onControlsChange;
   });
 
   // Sync settings on every control change
@@ -237,6 +360,46 @@ export function RemoveBgControls({
     edgeRefine,
     decontaminate,
     outputFormat,
+  ]);
+
+  useEffect(() => {
+    onControlsChangeRef.current?.({
+      subject,
+      quality,
+      isPassport,
+      chosenBgType,
+      bgColor,
+      gradColor1,
+      gradColor2,
+      gradAngle,
+      bgImageFile,
+      blurEnabled,
+      blurIntensity,
+      shadowEnabled,
+      shadowOpacity,
+      edgeRefine,
+      decontaminate,
+      outputFormat,
+      effectsOpen,
+    });
+  }, [
+    subject,
+    quality,
+    isPassport,
+    chosenBgType,
+    bgColor,
+    gradColor1,
+    gradColor2,
+    gradAngle,
+    bgImageFile,
+    blurEnabled,
+    blurIntensity,
+    shadowEnabled,
+    shadowOpacity,
+    edgeRefine,
+    decontaminate,
+    outputFormat,
+    effectsOpen,
   ]);
 
   return (
@@ -700,7 +863,24 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     progress,
   } = useToolProcessor("remove-background");
 
-  const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const [initialControls] = useState<RemoveBgControlState>(() => {
+    const currentFiles = useFileStore.getState().files;
+    if (!sameFileList(removeBgSession.files, currentFiles)) {
+      resetRemoveBgSession(currentFiles);
+    }
+    return removeBgSession.controls;
+  });
+
+  const [settings, setSettingsState] = useState<Record<string, unknown>>(
+    () => removeBgSession.settings,
+  );
+  const setSettings = (next: Record<string, unknown>) => {
+    removeBgSession.settings = next;
+    setSettingsState(next);
+  };
+  const setControls = (next: RemoveBgControlState) => {
+    removeBgSession.controls = next;
+  };
 
   // Two-phase state: after Phase 1 (bg removal), store job info for Phase 2 (effects)
   const [bgJobId, setBgJobId] = useState<string | null>(null);
@@ -716,15 +896,25 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // The model and refinements the last single-file removal ran with. They are
   // sidecar options that Phase 2 cannot apply, so a change after the result
   // needs a new removal, and the panel says so (#2112, #2488).
-  const [removalRefine, setRemovalRefine] = useState<{
-    model: string;
-    edgeRefine: number;
-    decontaminate: boolean;
-  } | null>(null);
+  const [removalRefine, setRemovalRefineState] = useState<RemovalRefineRecord | null>(
+    () => removeBgSession.removalRefine,
+  );
+  const setRemovalRefine = (next: RemovalRefineRecord | null) => {
+    removeBgSession.removalRefine = next;
+    setRemovalRefineState(next);
+  };
   const runFileRef = useRef<File | null>(null);
   const expiredRerunInFlightRef = useRef(false);
   const [applyingEffects, setApplyingEffects] = useState(false);
   const [effectsError, setEffectsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (files.length > 0) {
+      removeBgSession.files = files;
+    } else {
+      resetRemoveBgSession();
+    }
+  }, [files]);
 
   // Create a blob URL for the uploaded background image (for CSS preview).
   // HEIC/HEIF files can't be displayed by browsers, so we decode them via the
@@ -785,12 +975,13 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   bgRemovedRef.current = bgRemoved;
 
   // The result was made with a different model or refinements than the controls
-  // now show. After a remount (for example, crossing the mobile/desktop layout
-  // breakpoint) the run's own values are gone while the result stays loaded, so
+  // now show. When the cutout arrived without a recorded run in this session,
   // the defaults are assumed: a change set afterwards may offer a re-run that
   // was not strictly needed, which costs a click, where saying nothing would
   // repeat the silent no-op.
-  const ranWith = removalRefine ?? {
+  const activeRemovalRefine =
+    removalRefine && removalRefine.file === (files[0] ?? null) ? removalRefine : null;
+  const ranWith = activeRemovalRefine ?? {
     model: "birefnet-portrait",
     edgeRefine: 0,
     decontaminate: false,
@@ -927,6 +1118,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     if (settings.decontaminate != null) phase1Settings.decontaminate = settings.decontaminate;
     runFileRef.current = files[0] ?? null;
     setRemovalRefine({
+      file: files[0] ?? null,
       model: String(settings.model ?? "birefnet-portrait"),
       edgeRefine: Number(settings.edgeRefine ?? 0),
       decontaminate: Boolean(settings.decontaminate),
@@ -1100,6 +1292,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         settings={settings}
         onChange={setSettings}
         allowImageBackground={files.length <= 1}
+        initialControls={initialControls}
+        onControlsChange={setControls}
       />
 
       {/* Errors */}

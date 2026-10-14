@@ -467,4 +467,75 @@ describe("ToolPage interactive canvases across the 768px breakpoint (#2248)", ()
       pageCount: 0,
     });
   });
+
+  it("keeps Remove Background controls and recorded removalRefine when resizing across 768px (#2489)", async () => {
+    useFeaturesStore.setState({
+      loaded: true,
+      bundles: [
+        {
+          id: "remove_bg",
+          name: "Background Removal",
+          description: "",
+          tools: ["remove-background"],
+          estimatedSize: "300 MB",
+          status: "installed",
+        },
+      ],
+    });
+
+    setMobileViewport(false);
+    renderToolPage("/image/remove-background");
+
+    await act(async () => {
+      useFileStore.getState().setFiles([new File(["img"], "portrait.png", { type: "image/png" })]);
+    });
+
+    fireEvent.click(await screen.findByText("Effects"));
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+
+    // Simulate a finished single-file removal for the loaded file.
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    await act(async () => {
+      useFileStore.getState().setProcessing(false);
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        processedUrl: "/api/v1/download/job-bg-2489/portrait_mask.png",
+        processedSize: 512,
+      });
+    });
+
+    expect(await screen.findByTestId("remove-background-download")).toBeInTheDocument();
+    expect(screen.queryByTestId("remove-background-refine-stale")).not.toBeInTheDocument();
+
+    // Resize below 768px (desktop -> mobile) and open the mobile settings sheet.
+    setMobileViewport(true);
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+
+    expect(await screen.findByTestId("remove-background-download")).toBeInTheDocument();
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("3");
+    expect(screen.getByText("Strong")).toBeVisible();
+    expect(screen.getByTestId("remove-background-decontaminate")).toBeChecked();
+    expect(screen.queryByTestId("remove-background-refine-stale")).not.toBeInTheDocument();
+
+    // Moving edge smoothing away from 3 flags the cutout as stale on mobile.
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "0" },
+    });
+    expect(screen.getByTestId("remove-background-refine-stale")).toBeInTheDocument();
+
+    // Resize back above 768px (mobile -> desktop): stale state and modified slider survive.
+    setMobileViewport(false);
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("0");
+    expect(screen.getByTestId("remove-background-decontaminate")).toBeChecked();
+    expect(screen.getByTestId("remove-background-refine-stale")).toBeInTheDocument();
+
+    // Restoring edge smoothing to 3 settles the stale notice.
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    expect(screen.queryByTestId("remove-background-refine-stale")).not.toBeInTheDocument();
+  });
 });

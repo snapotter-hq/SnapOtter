@@ -36,7 +36,7 @@ vi.mock("@/hooks/use-tool-processor", () => ({
   }),
 }));
 
-import { RemoveBgSettings } from "@/components/tools/remove-bg-settings";
+import { RemoveBgControls, RemoveBgSettings } from "@/components/tools/remove-bg-settings";
 import { useFileStore } from "@/stores/file-store";
 
 beforeEach(() => {
@@ -207,8 +207,8 @@ describe("remove-background refinements changed after the first run (#2112)", ()
 
   it("still offers to run again for a result restored after a remount", async () => {
     // Crossing the mobile/desktop layout breakpoint remounts the panel while
-    // the result stays loaded; the run's own values are gone, so the defaults
-    // are assumed and any refinement set afterwards counts as a change.
+    // the result stays loaded; the run's values survive the remount and any
+    // refinement set afterwards counts as a change.
     const first = render(<RemoveBgSettings />);
     await runAndLand(first);
     first.unmount();
@@ -221,6 +221,17 @@ describe("remove-background refinements changed after the first run (#2112)", ()
       target: { value: "1" },
     });
 
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("assumes default refinements and model when a cutout is already present without a recorded run", async () => {
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+    );
     expect(stale()).toBeInTheDocument();
   });
 
@@ -318,6 +329,144 @@ describe("remove-background refinements changed after the first run (#2112)", ()
       screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
     );
     expect(stale()).toBeInTheDocument();
+  });
+
+  it("preserves non-default controls and recorded removalRefine across a remount (#2489)", async () => {
+    deployment.beforeRun = true;
+    const first = render(<RemoveBgSettings />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].color }));
+    fireEvent.change(screen.getByPlaceholderText("#FF5500"), { target: { value: "#FF0000" } });
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByTestId("remove-background-decontaminate"));
+
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    expect(deployment.processFiles.mock.calls[0][1]).toEqual({
+      model: "birefnet-general",
+      edgeRefine: 3,
+      decontaminate: true,
+    });
+
+    deployment.beforeRun = false;
+    first.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download-effects");
+    expect(stale()).not.toBeInTheDocument();
+
+    // Crossing the 768px breakpoint unmounts and remounts RemoveBgSettings
+    // while the cutout remains in useFileStore.
+    first.unmount();
+    render(<RemoveBgSettings />);
+
+    await screen.findByTestId("remove-background-download-effects");
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("3");
+    expect(
+      screen.getByText(en.toolSettings["remove-background"].edgeSmoothingStrong),
+    ).toBeVisible();
+    expect(screen.getByTestId("remove-background-decontaminate")).toBeChecked();
+    expect(screen.getByDisplayValue("#FF0000")).toBeVisible();
+    expect(screen.getByTestId("remove-background-format-webp")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(stale()).not.toBeInTheDocument();
+
+    // Changing edge smoothing back to 0 after the remount must flag the cutout as stale,
+    // because the cutout was generated with edgeRefine: 3, decontaminate: true.
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "0" },
+    });
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "3" },
+    });
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("keeps a manually collapsed Effects section closed and resets when a different file is loaded before remounting (#2489)", async () => {
+    deployment.beforeRun = true;
+    const first = render(<RemoveBgSettings />);
+
+    await openEffects();
+    fireEvent.change(screen.getByTestId("remove-background-edge-refine"), {
+      target: { value: "2" },
+    });
+    // Collapse Effects while edgeRefine > 0 is active.
+    await openEffects();
+    expect(screen.queryByTestId("remove-background-edge-refine")).not.toBeInTheDocument();
+
+    first.unmount();
+    const second = render(<RemoveBgSettings />);
+    // Effects stays collapsed across the remount even though edgeRefine is 2.
+    expect(screen.queryByTestId("remove-background-edge-refine")).not.toBeInTheDocument();
+    await openEffects();
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("2");
+
+    // Replacing the file in useFileStore directly while unmounted resets controls to defaults.
+    second.unmount();
+    useFileStore
+      .getState()
+      .setFiles([new File([new Uint8Array([9, 8, 7])], "fresh.png", { type: "image/png" })]);
+    render(<RemoveBgSettings />);
+    expect(screen.queryByTestId("remove-background-edge-refine")).not.toBeInTheDocument();
+    await openEffects();
+    expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("0");
+  });
+
+  it.each([
+    "birefnet-portrait",
+    "birefnet-matting",
+    "birefnet-hr-matting",
+    "u2net",
+    "bria-rmbg",
+    "birefnet-general-lite",
+    "birefnet-general",
+  ] as const)("seeds RemoveBgControls model %s without resetting it on mount (#2489)", (model) => {
+    const onChange = vi.fn();
+    render(
+      <RemoveBgControls
+        settings={{
+          model,
+          backgroundType: "gradient",
+          gradientColor1: "#112233",
+          gradientColor2: "#445566",
+          gradientAngle: 90,
+          blurEnabled: true,
+          blurIntensity: 70,
+          shadowEnabled: true,
+          shadowOpacity: 80,
+          edgeRefine: 2,
+          decontaminate: true,
+          outputFormat: "avif",
+        }}
+        onChange={onChange}
+      />,
+    );
+
+    const emitted = onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(emitted).toEqual({
+      model,
+      backgroundType: "gradient",
+      gradientColor1: "#112233",
+      gradientColor2: "#445566",
+      gradientAngle: 90,
+      blurEnabled: true,
+      blurIntensity: 70,
+      shadowEnabled: true,
+      shadowOpacity: 80,
+      edgeRefine: 2,
+      decontaminate: true,
+      outputFormat: "avif",
+    });
   });
 });
 
