@@ -238,20 +238,30 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
 });
 
 describe("POST /api/auth/login MFA policy read failure (#815)", () => {
-  // Makes every settings-style select ({ value: ... } selection) throw while
-  // leaving full-row selects (users, sessions) untouched. getSettingString /
-  // getSettingNumber callers swallow the error internally and fall back to
-  // their defaults, so the only reader this breaks is the strict MFA policy
-  // read, which must NOT swallow it (#815).
+  // Faults only the mfaPolicy settings-table select while leaving other
+  // settings reads and full-row selects untouched (#815, #2517).
   function breakSettingsReads() {
     const originalSelect = db.select.bind(db);
     return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
       const selection = args[0] as Record<string, unknown> | undefined;
-      if (selection && "value" in selection) {
-        throw new Error("simulated settings store failure");
-      }
       // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
-      return (originalSelect as any)(...args);
+      const builder = (originalSelect as any)(...args);
+      if (selection && "value" in selection) {
+        const origFrom = builder.from.bind(builder);
+        builder.from = (...fromArgs: unknown[]) => {
+          const query = origFrom(...fromArgs);
+          const origWhere = query.where.bind(query);
+          query.where = (...whereArgs: unknown[]) => {
+            const filtered = origWhere(...whereArgs);
+            if (filtered.toSQL().params.includes("mfaPolicy")) {
+              throw new Error("simulated settings store failure");
+            }
+            return filtered;
+          };
+          return query;
+        };
+      }
+      return builder;
     });
   }
 

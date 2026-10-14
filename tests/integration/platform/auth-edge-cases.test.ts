@@ -4,7 +4,7 @@
  */
 
 import { asc, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { authAttempts } from "../../../apps/api/src/lib/metrics.js";
 import { normalizePassword } from "../../../apps/api/src/lib/password-form.js";
@@ -27,6 +27,33 @@ async function setSetting(key: string, value: string): Promise<void> {
 // Remove a global setting row so it cannot bleed into sibling tests in the fork.
 async function clearSetting(key: string): Promise<void> {
   await db.delete(schema.settings).where(eq(schema.settings.key, key));
+}
+
+// Faults only the settings-table select for `targetKey`, leaving earlier
+// settings reads (login throttle, MFA policy) and full-row selects intact.
+function breakSettingRead(targetKey: string) {
+  const originalSelect = db.select.bind(db);
+  return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+    const selection = args[0] as Record<string, unknown> | undefined;
+    // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+    const builder = (originalSelect as any)(...args);
+    if (selection && "value" in selection) {
+      const origFrom = builder.from.bind(builder);
+      builder.from = (...fromArgs: unknown[]) => {
+        const query = origFrom(...fromArgs);
+        const origWhere = query.where.bind(query);
+        query.where = (...whereArgs: unknown[]) => {
+          const filtered = origWhere(...whereArgs);
+          if (filtered.toSQL().params.includes(targetKey)) {
+            throw new Error(`simulated settings store failure for ${targetKey}`);
+          }
+          return filtered;
+        };
+        return query;
+      };
+    }
+    return builder;
+  });
 }
 
 beforeAll(async () => {
@@ -828,6 +855,105 @@ describe("Concurrent session limit", () => {
       await clearSetting("maxSessionsPerUser");
     }
   });
+
+  it("fails closed with 500 and creates no session when reading maxSessionsPerUser fails (#2517)", async () => {
+    const { username, password, id } = await createUser();
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      const t1 = await loginAs(username, password);
+      const selectSpy = breakSettingRead("maxSessionsPerUser");
+      try {
+        const res = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(res.statusCode).toBe(500);
+        expect(JSON.parse(res.body).token).toBeUndefined();
+        expect(String(res.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remaining.map((r) => r.id)).toEqual([t1]);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
+  it("rolls back the new session when FIFO eviction fails inside the login transaction (#2517)", async () => {
+    const { username, password, id } = await createUser();
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      const t1 = await loginAs(username, password);
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const res = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(res.statusCode).toBe(500);
+        expect(JSON.parse(res.body).token).toBeUndefined();
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remaining.map((r) => r.id)).toEqual([t1]);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
+  it("treats blank or out-of-range maxSessionsPerUser as disabled (0) rather than failing login (#2517)", async () => {
+    const { username, password, id } = await createUser();
+
+    try {
+      for (const bad of ["", "-1", "Infinity"]) {
+        await setSetting("maxSessionsPerUser", bad);
+        const token = await loginAs(username, password);
+        expect(token).toBeDefined();
+      }
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remaining).toHaveLength(3);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -858,6 +984,74 @@ describe("Session idle timeout", () => {
 
       const [row] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, token));
       expect(row).toBeUndefined();
+    } finally {
+      await clearSetting("sessionIdleTimeoutMinutes");
+    }
+  });
+
+  it("fails closed with 500 instead of authenticating an idle-expired session when reading sessionIdleTimeoutMinutes fails (#2517)", async () => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+
+    await db
+      .update(schema.sessions)
+      .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
+      .where(eq(schema.sessions.id, token));
+
+    await setSetting("sessionIdleTimeoutMinutes", "1");
+    try {
+      const selectSpy = breakSettingRead("sessionIdleTimeoutMinutes");
+      try {
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/api-keys",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(res.statusCode).toBe(500);
+
+        const sessionRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/auth/session",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(sessionRes.statusCode).toBe(500);
+        expect(JSON.parse(sessionRes.body).user).toBeUndefined();
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      // Once the DB recovers, the stale session is still rejected as IDLE_TIMEOUT.
+      const afterRecovery = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/api-keys",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(afterRecovery.statusCode).toBe(401);
+      expect(JSON.parse(afterRecovery.body).code).toBe("IDLE_TIMEOUT");
+    } finally {
+      await clearSetting("sessionIdleTimeoutMinutes");
+    }
+  });
+
+  it("treats blank or out-of-range sessionIdleTimeoutMinutes as disabled (0) (#2517)", async () => {
+    const { username, password } = await createUser();
+    const token = await loginAs(username, password);
+
+    await db
+      .update(schema.sessions)
+      .set({ lastActivity: new Date(Date.now() - 5 * 60 * 1000) })
+      .where(eq(schema.sessions.id, token));
+
+    try {
+      for (const bad of ["", "-1", "Infinity"]) {
+        await setSetting("sessionIdleTimeoutMinutes", bad);
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/api-keys",
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(res.statusCode).toBe(200);
+      }
     } finally {
       await clearSetting("sessionIdleTimeoutMinutes");
     }

@@ -878,6 +878,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Read before inserting the session so a failed settings query aborts
+      // with 500 instead of persisting an un-evicted session row (#2517).
+      const maxSessions = parseNumericSettingValue(
+        "maxSessionsPerUser",
+        await getSettingStrict("maxSessionsPerUser"),
+        0,
+      );
+
       // Create session
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
@@ -902,6 +910,22 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           expiresAt,
         });
 
+        // ── Concurrent session limit (FIFO eviction) ──────────────
+        if (maxSessions > 0) {
+          const sessions = await tx
+            .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
+            .from(schema.sessions)
+            .where(eq(schema.sessions.userId, user.id))
+            .orderBy(asc(schema.sessions.createdAt));
+
+          if (sessions.length > maxSessions) {
+            const toDelete = sessions.slice(0, sessions.length - maxSessions);
+            for (const s of toDelete) {
+              await tx.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
+            }
+          }
+        }
+
         return true;
       });
 
@@ -916,23 +940,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // Use a generic delay so this is not a timing oracle
         await recordThrottleFailure();
         return reply.status(401).send({ error: "Invalid credentials" });
-      }
-
-      // ── Concurrent session limit (FIFO eviction) ──────────────
-      const maxSessions = await getSettingNumber("maxSessionsPerUser");
-      if (maxSessions > 0) {
-        const sessions = await db
-          .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
-          .from(schema.sessions)
-          .where(eq(schema.sessions.userId, user.id))
-          .orderBy(asc(schema.sessions.createdAt));
-
-        if (sessions.length > maxSessions) {
-          const toDelete = sessions.slice(0, sessions.length - maxSessions);
-          for (const s of toDelete) {
-            await db.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
-          }
-        }
       }
 
       authAttempts.inc({ method: "password", result: "success" });
@@ -1933,7 +1940,11 @@ export async function authMiddleware(app: FastifyInstance): Promise<void> {
     }
 
     // ── Idle timeout enforcement ───────────────────────────────────
-    const idleTimeoutMinutes = await getSettingNumber("sessionIdleTimeoutMinutes");
+    const idleTimeoutMinutes = parseNumericSettingValue(
+      "sessionIdleTimeoutMinutes",
+      await getSettingStrict("sessionIdleTimeoutMinutes"),
+      0,
+    );
     if (idleTimeoutMinutes > 0) {
       const redis = sharedRedis();
       const idleKey = `session:idle:${token}`;
