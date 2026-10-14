@@ -1004,7 +1004,7 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       xhrs[0].ontimeout?.();
     });
 
-    expectEntryFailed("Request timed out - the server may be overloaded. Try again.");
+    expectEntryFailed("The upload timed out. Check your connection or try a smaller file.");
     unmount();
   });
 
@@ -1754,7 +1754,7 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
       xhrs[0].ontimeout?.();
     });
 
-    expectBatchFailed("Request timed out - the server may be overloaded. Try again.");
+    expectBatchFailed("The upload timed out. Check your connection or try a smaller file.");
     unmount();
   });
 
@@ -2579,7 +2579,7 @@ describe("usePipelineProcessor ends a run whose exit writes throw (#1890)", () =
   const INTERRUPTED = "Processing was interrupted. Retry when reconnected.";
   const UNCONFIRMED =
     "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
-  const TIMED_OUT = "Request timed out - the server may be overloaded. Try again.";
+  const TIMED_OUT = "The upload timed out. Check your connection or try a smaller file.";
   const HANDLER_FAILURE = "Something went wrong while tracking this job. Try again.";
   type FileStoreState = ReturnType<typeof useFileStore.getState>;
   let consoleError: ReturnType<typeof vi.spyOn>;

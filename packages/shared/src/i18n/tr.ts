@@ -5667,6 +5667,21 @@ export const tr: TranslationKeys = {
     requestTimedOut: "İstek zaman aşımına uğradı",
     runInterrupted: "İşlem kesintiye uğradı. Yeniden çalıştırın.",
     requestFailedWithStatus: "İstek başarısız oldu: {status}",
+    invalidServerResponse: "Sunucudan geçersiz yanıt",
+    batchFailed: "Toplu işlem başarısız oldu",
+    batchFailedWithStatus: "Toplu işlem başarısız oldu: {status}",
+    allFilesFailed: "Tüm dosyalar işlenemedi",
+    filesFailedSuffix_one: " (1 dosya başarısız oldu)",
+    filesFailedSuffix_other: " ({count} dosya başarısız oldu)",
+    uploadTimeout:
+      "Yükleme zaman aşımına uğradı. Bağlantınızı kontrol edin veya daha küçük bir dosya deneyin.",
+    processingInterrupted: "İşlem kesintiye uğradı. Yeniden bağlandığınızda tekrar deneyin.",
+    processingInterruptedUnconfirmed:
+      "İşlem kesintiye uğradı ve sunucu işi hiçbir zaman onaylamadı. Yeniden bağlandığınızda tekrar deneyin.",
+    resultNoLongerAvailable: "Tamamlanan sonuç artık mevcut değil. İşi tekrar çalıştırın.",
+    batchDownloadFailed: "Tamamlanan toplu iş indirilemedi. Sayfayı yenileyip tekrar deneyin.",
+    fileNotFoundInBatch: "Dosya toplu iş sonuçlarında bulunamadı",
+    noFilesSelected: "Dosya seçilmedi",
   },
   sidebar: {
     sponsor: "Bize destek olun",

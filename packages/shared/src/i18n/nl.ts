@@ -5679,6 +5679,24 @@ export const nl: TranslationKeys = {
     requestTimedOut: "Time-out van verzoek",
     runInterrupted: "De verwerking is onderbroken. Voer het opnieuw uit.",
     requestFailedWithStatus: "Verzoek mislukt: {status}",
+    invalidServerResponse: "Ongeldig antwoord van server",
+    batchFailed: "Batchverwerking mislukt",
+    batchFailedWithStatus: "Batchverwerking mislukt: {status}",
+    allFilesFailed: "Verwerking van alle bestanden is mislukt",
+    filesFailedSuffix_one: " (1 bestand mislukt)",
+    filesFailedSuffix_other: " ({count} bestanden mislukt)",
+    uploadTimeout:
+      "De time-out voor de upload is verstreken. Controleer je verbinding of probeer een kleiner bestand.",
+    processingInterrupted:
+      "De verwerking is onderbroken. Probeer het opnieuw zodra je weer verbonden bent.",
+    processingInterruptedUnconfirmed:
+      "De verwerking werd onderbroken en de server heeft de taak nooit bevestigd. Probeer het opnieuw zodra je weer verbonden bent.",
+    resultNoLongerAvailable:
+      "Het voltooide resultaat is niet meer beschikbaar. Voer de taak opnieuw uit.",
+    batchDownloadFailed:
+      "De voltooide batch kon niet worden gedownload. Vernieuw de pagina en probeer het opnieuw.",
+    fileNotFoundInBatch: "Bestand niet gevonden in batchresultaten",
+    noFilesSelected: "Geen bestanden geselecteerd",
   },
   sidebar: {
     sponsor: "Steun ons",

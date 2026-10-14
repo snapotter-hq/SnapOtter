@@ -5676,6 +5676,22 @@ export const it: TranslationKeys = {
     requestTimedOut: "Richiesta scaduta",
     runInterrupted: "L'elaborazione è stata interrotta. Eseguila di nuovo.",
     requestFailedWithStatus: "Richiesta non riuscita: {status}",
+    invalidServerResponse: "Risposta non valida dal server",
+    batchFailed: "Elaborazione in batch non riuscita",
+    batchFailedWithStatus: "Elaborazione in batch non riuscita: {status}",
+    allFilesFailed: "Elaborazione di tutti i file non riuscita",
+    filesFailedSuffix_one: " (1 file non riuscito)",
+    filesFailedSuffix_other: " ({count} file non riusciti)",
+    uploadTimeout:
+      "Timeout del caricamento. Controlla la tua connessione o prova con un file più piccolo.",
+    processingInterrupted: "L'elaborazione è stata interrotta. Riprova quando sarai riconnesso.",
+    processingInterruptedUnconfirmed:
+      "L'elaborazione è stata interrotta e il server non ha mai confermato il lavoro. Riprova quando sarai riconnesso.",
+    resultNoLongerAvailable:
+      "Il risultato completato non è più disponibile. Esegui di nuovo il lavoro.",
+    batchDownloadFailed: "Impossibile scaricare il batch completato. Aggiorna e riprova.",
+    fileNotFoundInBatch: "File non trovato nei risultati del batch",
+    noFilesSelected: "Nessun file selezionato",
   },
   sidebar: {
     sponsor: "Sostienici",

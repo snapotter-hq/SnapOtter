@@ -340,16 +340,16 @@ describe("useToolProcessor batch recovery (#750)", () => {
     });
 
     expect(useFileStore.getState().error).toBe(
-      "Request timed out - the server may be overloaded. Try again.",
+      "The upload timed out. Check your connection or try a smaller file.",
     );
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
-      error: "Request timed out - the server may be overloaded. Try again.",
+      error: "The upload timed out. Check your connection or try a smaller file.",
       errorCategory: "timeout",
     });
     expect(useFileStore.getState().entries[1]).toMatchObject({
       status: "failed",
-      error: "Request timed out - the server may be overloaded. Try again.",
+      error: "The upload timed out. Check your connection or try a smaller file.",
       errorCategory: "timeout",
     });
     expect(useFileStore.getState().processing).toBe(false);
@@ -1540,7 +1540,7 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
     });
 
     expectRunEnded(
-      "Request timed out - the server may be overloaded. Try again.",
+      "The upload timed out. Check your connection or try a smaller file.",
       "failed",
       "timeout",
     );

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { de } from "@snapotter/shared/i18n/de.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
@@ -257,6 +258,37 @@ describe("OCR async response handling", () => {
       MockEventSource.instances[0].emit({ type: "single", phase: "processing", percent: 40 }),
     ).toThrow("boom");
     await expect(promise).rejects.toThrow("Verarbeitung fehlgeschlagen");
+  });
+
+  it("falls back to the caller's locale for a blank failed frame or handling error (#1436)", async () => {
+    const failedFramePromise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    xhrs[0].status = 202;
+    xhrs[0].onload?.();
+    MockEventSource.instances[0].emit({ type: "single", phase: "failed", error: "" });
+    await expect(failedFramePromise).rejects.toThrow(de.errors.processingFailedNoDetail);
+
+    const trackingErrorPromise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      {
+        onUploadProgress: vi.fn(),
+        onProcessingProgress: () => {
+          throw new Error("boom");
+        },
+      },
+      { processingFailed: de.errors.processingFailed, t: de },
+    );
+    xhrs[1].status = 202;
+    xhrs[1].onload?.();
+    expect(() =>
+      MockEventSource.instances[1].emit({ type: "single", phase: "processing", percent: 40 }),
+    ).toThrow("boom");
+    await expect(trackingErrorPromise).rejects.toThrow(de.errors.jobTrackingFailed);
   });
 
   it("ignores a malformed frame and still resolves from the next good one", async () => {

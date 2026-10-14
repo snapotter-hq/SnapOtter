@@ -5702,6 +5702,24 @@ export const de: TranslationKeys = {
     requestTimedOut: "Zeitüberschreitung der Anfrage",
     runInterrupted: "Die Verarbeitung wurde unterbrochen. Führen Sie sie erneut aus.",
     requestFailedWithStatus: "Anfrage fehlgeschlagen: {status}",
+    invalidServerResponse: "Ungültige Antwort vom Server",
+    batchFailed: "Stapelverarbeitung fehlgeschlagen",
+    batchFailedWithStatus: "Stapelverarbeitung fehlgeschlagen: {status}",
+    allFilesFailed: "Verarbeitung aller Dateien fehlgeschlagen",
+    filesFailedSuffix_one: " (1 Datei fehlgeschlagen)",
+    filesFailedSuffix_other: " ({count} Dateien fehlgeschlagen)",
+    uploadTimeout:
+      "Zeitüberschreitung beim Hochladen. Überprüfen Sie Ihre Verbindung oder versuchen Sie es mit einer kleineren Datei.",
+    processingInterrupted:
+      "Die Verarbeitung wurde unterbrochen. Versuchen Sie es erneut, wenn Sie wieder verbunden sind.",
+    processingInterruptedUnconfirmed:
+      "Die Verarbeitung wurde unterbrochen und der Server hat den Auftrag nie bestätigt. Versuchen Sie es erneut, wenn Sie wieder verbunden sind.",
+    resultNoLongerAvailable:
+      "Das abgeschlossene Ergebnis ist nicht mehr verfügbar. Führen Sie den Auftrag erneut aus.",
+    batchDownloadFailed:
+      "Der abgeschlossene Stapel konnte nicht heruntergeladen werden. Aktualisieren Sie die Seite und versuchen Sie es erneut.",
+    fileNotFoundInBatch: "Datei nicht in den Stapelergebnissen gefunden",
+    noFilesSelected: "Keine Dateien ausgewählt",
   },
   sidebar: {
     sponsor: "Uns unterstützen",

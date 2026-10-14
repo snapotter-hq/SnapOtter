@@ -17,14 +17,6 @@ export interface ProgressFrame {
 }
 
 /**
- * The error a run ends with when handling a well-formed progress frame throws
- * (#1287). That is a client bug, not a server outcome, so the run ends right
- * away instead of sitting at "processing" until a stall timer fires. A frame
- * that fails to parse is the only kind a handler may ignore.
- */
-export const FRAME_HANDLING_FAILED = "Something went wrong while tracking this job. Try again.";
-
-/**
  * Why a tool result isn't one. Each reason reports under its own constant
  * message and exception type, so Sentry keeps a proxy's HTML page apart from
  * an API answer with nothing to download: it groups a stack by type, and every

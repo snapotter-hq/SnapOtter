@@ -5569,6 +5569,21 @@ export const ko: TranslationKeys = {
     requestTimedOut: "요청 시간이 초과되었습니다",
     runInterrupted: "처리가 중단되었습니다. 다시 실행하세요.",
     requestFailedWithStatus: "요청에 실패했습니다: {status}",
+    invalidServerResponse: "서버로부터 잘못된 응답을 받았습니다",
+    batchFailed: "일괄 처리 실패",
+    batchFailedWithStatus: "일괄 처리 실패: {status}",
+    allFilesFailed: "모든 파일 처리 실패",
+    filesFailedSuffix_one: " (1개 파일 실패)",
+    filesFailedSuffix_other: " ({count}개 파일 실패)",
+    uploadTimeout: "업로드 시간이 초과되었습니다. 연결을 확인하거나 더 작은 파일을 시도해 보세요.",
+    processingInterrupted: "처리가 중단되었습니다. 다시 연결되면 재시도하세요.",
+    processingInterruptedUnconfirmed:
+      "처리가 중단되었으며 서버가 작업을 확인하지 않았습니다. 다시 연결되면 다시 시도하세요.",
+    resultNoLongerAvailable: "완료된 결과를 더 이상 사용할 수 없습니다. 작업을 다시 실행하세요.",
+    batchDownloadFailed:
+      "완료된 일괄 결과를 다운로드할 수 없습니다. 새로고침한 후 다시 시도하세요.",
+    fileNotFoundInBatch: "일괄 처리 결과에서 파일을 찾을 수 없습니다",
+    noFilesSelected: "선택된 파일이 없습니다",
   },
   sidebar: {
     sponsor: "후원하기",

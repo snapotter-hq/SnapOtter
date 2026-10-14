@@ -1,7 +1,7 @@
 import { de } from "@snapotter/shared/i18n/de.js";
 import { en } from "@snapotter/shared/i18n/en.js";
 import { describe, expect, it } from "vitest";
-import { FRAME_HANDLING_FAILED, frameFailure, jobFailureMessage } from "@/lib/progress-frames";
+import { frameFailure, jobFailureMessage } from "@/lib/progress-frames";
 
 // Sign PDF and Erase Object subscribe to job progress outside any component,
 // so they report a failure without text and the component translates it here
@@ -32,12 +32,6 @@ describe("jobFailureMessage", () => {
       de.errors.invalidResponse,
     );
     expect(de.errors.invalidResponse).not.toBe(en.errors.invalidResponse);
-  });
-
-  it("keeps the English tracking message in step with the hooks' constant", () => {
-    // use-tool-processor and use-pipeline-processor still show FRAME_HANDLING_FAILED,
-    // so English users should see the same words from every tool.
-    expect(en.errors.jobTrackingFailed).toBe(FRAME_HANDLING_FAILED);
   });
 });
 

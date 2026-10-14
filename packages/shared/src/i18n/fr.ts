@@ -5693,6 +5693,22 @@ export const fr: TranslationKeys = {
     requestTimedOut: "Délai d'attente dépassé",
     runInterrupted: "Le traitement a été interrompu. Relancez-le.",
     requestFailedWithStatus: "Échec de la requête : {status}",
+    invalidServerResponse: "Réponse invalide du serveur",
+    batchFailed: "Le traitement par lots a échoué",
+    batchFailedWithStatus: "Le traitement par lots a échoué : {status}",
+    allFilesFailed: "Le traitement de tous les fichiers a échoué",
+    filesFailedSuffix_one: " (1 fichier a échoué)",
+    filesFailedSuffix_other: " ({count} fichiers ont échoué)",
+    uploadTimeout:
+      "Le téléversement a expiré. Vérifiez votre connexion ou essayez avec un fichier plus petit.",
+    processingInterrupted: "Le traitement a été interrompu. Réessayez une fois reconnecté.",
+    processingInterruptedUnconfirmed:
+      "Le traitement a été interrompu et le serveur n'a jamais confirmé la tâche. Réessayez une fois reconnecté.",
+    resultNoLongerAvailable:
+      "Le résultat terminé n'est plus disponible. Exécutez à nouveau la tâche.",
+    batchDownloadFailed: "Le lot terminé n'a pas pu être téléchargé. Actualisez et réessayez.",
+    fileNotFoundInBatch: "Fichier introuvable dans les résultats du lot",
+    noFilesSelected: "Aucun fichier sélectionné",
   },
   sidebar: {
     sponsor: "Soutenez-nous",

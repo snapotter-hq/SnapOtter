@@ -5654,6 +5654,21 @@ export const sv: TranslationKeys = {
     requestTimedOut: "Tidsgränsen för begäran överskreds",
     runInterrupted: "Bearbetningen avbröts. Kör den igen.",
     requestFailedWithStatus: "Begäran misslyckades: {status}",
+    invalidServerResponse: "Ogiltigt svar från servern",
+    batchFailed: "Satsbearbetning misslyckades",
+    batchFailedWithStatus: "Satsbearbetning misslyckades: {status}",
+    allFilesFailed: "Det gick inte att bearbeta alla filer",
+    filesFailedSuffix_one: " (1 fil misslyckades)",
+    filesFailedSuffix_other: " ({count} filer misslyckades)",
+    uploadTimeout:
+      "Tidsgränsen för uppladdningen har överskridits. Kontrollera din anslutning eller försök med en mindre fil.",
+    processingInterrupted: "Bearbetningen avbröts. Försök igen när du är ansluten.",
+    processingInterruptedUnconfirmed:
+      "Bearbetningen avbröts och servern bekräftade aldrig jobbet. Försök igen när du är ansluten.",
+    resultNoLongerAvailable: "Det färdiga resultatet är inte längre tillgängligt. Kör jobbet igen.",
+    batchDownloadFailed: "Den färdiga satsen kunde inte laddas ner. Uppdatera och försök igen.",
+    fileNotFoundInBatch: "Filen hittades inte i satsresultaten",
+    noFilesSelected: "Inga filer valda",
   },
   sidebar: {
     sponsor: "Stöd oss",

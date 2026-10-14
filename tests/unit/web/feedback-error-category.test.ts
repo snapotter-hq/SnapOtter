@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { de } from "@snapotter/shared/i18n/de.js";
+import { en } from "@snapotter/shared/i18n/en.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/image-preview", () => ({
@@ -31,6 +32,7 @@ describe("classifyFeedbackError", () => {
 
   it("still reads English server text when no category was stored", () => {
     expect(classifyFeedbackError("Request timed out", null)).toBe("timeout");
+    expect(classifyFeedbackError(en.errors.uploadTimeout, null)).toBe("timeout");
     expect(classifyFeedbackError("Unsupported file type", undefined)).toBe("unsupported_format");
   });
 });

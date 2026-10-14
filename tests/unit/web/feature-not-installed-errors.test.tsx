@@ -55,12 +55,17 @@ interface MockXhr {
 
 class MockEventSource {
   static OPEN = 1;
+  static instances: MockEventSource[] = [];
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
   readyState = MockEventSource.OPEN;
   close = vi.fn(() => {
     this.readyState = 2;
   });
+
+  constructor() {
+    MockEventSource.instances.push(this);
+  }
 }
 
 let xhrs: MockXhr[];
@@ -112,6 +117,7 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   xhrs = [];
+  MockEventSource.instances = [];
   vi.stubGlobal("EventSource", MockEventSource);
   vi.stubGlobal(
     "XMLHttpRequest",
@@ -161,7 +167,13 @@ describe("feature-not-installed errors are translated (#1410)", () => {
     const tokens = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
     for (const locale of SUPPORTED_LOCALES) {
       const errors = (await loadTranslations(locale.code)).errors as Record<string, string>;
-      for (const key of ["featureNotInstalledForTool", "featureNotInstalled"]) {
+      for (const key of [
+        "featureNotInstalledForTool",
+        "featureNotInstalled",
+        "processingFailedWithStatus",
+        "batchFailedWithStatus",
+        "filesFailedSuffix_other",
+      ]) {
         expect(tokens(errors[key]), `${locale.code} ${key}`).toEqual(tokens(enErrors[key]));
       }
     }
@@ -258,6 +270,240 @@ describe("feature-not-installed errors are translated (#1410)", () => {
     expect(view.result.current.value.error).toBe(
       format(deErrors.featureNotInstalled, { feature: "Future" }),
     );
+    view.unmount();
+  });
+});
+
+describe("processing hook errors are translated (#1436, #1923)", () => {
+  it("tool run: translates invalid 2xx response, status fallback, upload interruption, and upload timeout", async () => {
+    const file = new File([new ArrayBuffer(16)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const view = await renderInDe(() => useToolProcessor("resize"));
+
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = "not-json";
+      xhrs[0].onload?.();
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.invalidServerResponse);
+    expect(deErrors.invalidServerResponse).toBeTruthy();
+
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[1].status = 500;
+      xhrs[1].responseText = "<html>Bad Gateway</html>";
+      xhrs[1].onload?.();
+    });
+    expect(useFileStore.getState().error).toBe(
+      format(deErrors.processingFailedWithStatus, { status: 500 }),
+    );
+
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[2].status = 422;
+      xhrs[2].responseText = "{}";
+      xhrs[2].onload?.();
+    });
+    expect(useFileStore.getState().error).toBe(
+      format(deErrors.processingFailedWithStatus, { status: 422 }),
+    );
+
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[3].onerror?.();
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.processingInterrupted);
+    expect(deErrors.processingInterrupted).toBeTruthy();
+
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      xhrs[4].ontimeout?.();
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.uploadTimeout);
+    expect(deErrors.uploadTimeout).toBeTruthy();
+
+    act(() => {
+      view.result.current.value.processFiles([], {});
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.noFilesSelected);
+
+    view.unmount();
+  });
+
+  it("tool run: translates SSE failed frame without detail and sync result tracking failure", async () => {
+    const file = new File([new ArrayBuffer(16)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const view = await renderInDe(() => useToolProcessor("resize"));
+
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      const es = MockEventSource.instances.at(-1);
+      es?.onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "failed", error: "" }),
+      } as MessageEvent);
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.processingFailedNoDetail);
+
+    const origUpdate = useFileStore.getState().updateEntry;
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    useFileStore.setState({
+      updateEntry: () => {
+        throw new Error("store write failed");
+      },
+    });
+    try {
+      expect(() =>
+        act(() => {
+          xhrs[1].status = 200;
+          xhrs[1].responseText = JSON.stringify({
+            jobId: "j1",
+            downloadUrl: "/api/v1/download/j1/out.png",
+            originalSize: 16,
+            processedSize: 12,
+          });
+          xhrs[1].onload?.();
+        }),
+      ).toThrow("store write failed");
+    } finally {
+      useFileStore.setState({ updateEntry: origUpdate });
+    }
+    expect(useFileStore.getState().error).toBe(deErrors.jobTrackingFailed);
+
+    view.unmount();
+  });
+
+  it("tool batch: translates all-files-failed, status fallback, upload error, and upload timeout", async () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "a.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "b.png", { type: "image/png" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    const view = await renderInDe(() => useToolProcessor("resize"));
+
+    act(() => {
+      void view.result.current.value.processAllFiles(files, {});
+    });
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].onload?.();
+      const es = MockEventSource.instances.at(-1);
+      es?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          status: "failed",
+          totalFiles: 2,
+          completedFiles: 0,
+          failedFiles: 2,
+        }),
+      } as MessageEvent);
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.allFilesFailed);
+    expect(deErrors.allFilesFailed).toBeTruthy();
+
+    act(() => {
+      void view.result.current.value.processAllFiles(files, {});
+    });
+    act(() => {
+      xhrs[1].status = 400;
+      xhrs[1].response = "not-json";
+      xhrs[1].onload?.();
+    });
+    await vi.waitFor(
+      () =>
+        expect(useFileStore.getState().error).toBe(
+          format(deErrors.batchFailedWithStatus, { status: 400 }),
+        ),
+      { timeout: 3_000 },
+    );
+
+    act(() => {
+      void view.result.current.value.processAllFiles(files, {});
+    });
+    act(() => {
+      xhrs[2].onerror?.();
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.processingInterrupted);
+
+    act(() => {
+      void view.result.current.value.processAllFiles(files, {});
+    });
+    act(() => {
+      xhrs[3].ontimeout?.();
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.uploadTimeout);
+
+    view.unmount();
+  });
+
+  it("pipeline single and batch: translates invalid response, filesFailedSuffix, and upload timeout", async () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "a.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "b.png", { type: "image/png" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    const view = await renderInDe(() => usePipelineProcessor());
+
+    act(() => {
+      view.result.current.value.processSingle(files[0], [
+        { id: "s1", toolId: "resize", settings: {} },
+      ]);
+    });
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = "not-json";
+      xhrs[0].onload?.();
+    });
+    expect(view.result.current.value.error).toBe(deErrors.invalidServerResponse);
+
+    act(() => {
+      void view.result.current.value.processAll(files, [
+        { id: "s1", toolId: "resize", settings: {} },
+      ]);
+    });
+    act(() => {
+      const json = JSON.stringify({
+        errors: [
+          { filename: "a.png", error: "Kaputt" },
+          { filename: "b.png", error: "Kaputt" },
+        ],
+      });
+      xhrs[1].status = 422;
+      xhrs[1].response = new Blob([json], { type: "application/json" });
+      xhrs[1].onload?.();
+    });
+    await vi.waitFor(
+      () =>
+        expect(view.result.current.value.error).toBe(
+          `Kaputt${format(deErrors.filesFailedSuffix_other, { count: 2 })}`,
+        ),
+      { timeout: 3_000 },
+    );
+
+    act(() => {
+      void view.result.current.value.processAll(files, [
+        { id: "s1", toolId: "resize", settings: {} },
+      ]);
+    });
+    act(() => {
+      xhrs[2].ontimeout?.();
+    });
+    expect(view.result.current.value.error).toBe(deErrors.uploadTimeout);
+
     view.unmount();
   });
 });

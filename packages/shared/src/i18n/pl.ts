@@ -5675,6 +5675,23 @@ export const pl: TranslationKeys = {
     requestTimedOut: "Upłynął limit czasu żądania",
     runInterrupted: "Przetwarzanie zostało przerwane. Uruchom je ponownie.",
     requestFailedWithStatus: "Żądanie nie powiodło się: {status}",
+    invalidServerResponse: "Nieprawidłowa odpowiedź serwera",
+    batchFailed: "Przetwarzanie wsadowe nie powiodło się",
+    batchFailedWithStatus: "Przetwarzanie wsadowe nie powiodło się: {status}",
+    allFilesFailed: "Przetwarzanie wszystkich plików nie powiodło się",
+    filesFailedSuffix_one: " (1 plik zakończony błędem)",
+    filesFailedSuffix_other: " (nieudane pliki: {count})",
+    uploadTimeout:
+      "Przekroczono limit czasu przesyłania. Sprawdź połączenie lub wypróbuj mniejszy plik.",
+    processingInterrupted:
+      "Przetwarzanie zostało przerwane. Spróbuj ponownie po odzyskaniu połączenia.",
+    processingInterruptedUnconfirmed:
+      "Przetwarzanie zostało przerwane, a serwer nigdy nie potwierdził zadania. Spróbuj ponownie po odzyskaniu połączenia.",
+    resultNoLongerAvailable: "Ukończony wynik nie jest już dostępny. Uruchom zadanie ponownie.",
+    batchDownloadFailed:
+      "Nie udało się pobrać ukończonej partii. Odśwież stronę i spróbuj ponownie.",
+    fileNotFoundInBatch: "Nie znaleziono pliku w wynikach partii",
+    noFilesSelected: "Nie wybrano plików",
   },
   sidebar: {
     sponsor: "Wesprzyj nas",

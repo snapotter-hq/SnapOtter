@@ -9,11 +9,7 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
-import {
-  FRAME_HANDLING_FAILED,
-  failedFrameMessage,
-  type ProgressFrame,
-} from "@/lib/progress-frames";
+import { failedFrameMessage, type ProgressFrame } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -142,14 +138,27 @@ export function ocrOneFile(
           return;
         }
         if (data.phase === "failed") {
-          rejectOnce(new Error(failedFrameMessage(data, "OCR failed")));
+          rejectOnce(
+            new Error(
+              failedFrameMessage(
+                data,
+                messages.processingFailed ?? (messages.t ?? en).errors.processingFailedNoDetail,
+              ),
+            ),
+          );
           return;
         }
         if (typeof data.percent === "number") {
           callbacks.onProcessingProgress(data.percent, data.stage ?? "");
         }
       } catch (err) {
-        rejectOnce(new Error(messages.processingFailed ?? FRAME_HANDLING_FAILED));
+        rejectOnce(
+          new Error(
+            messages.t
+              ? messages.t.errors.jobTrackingFailed
+              : (messages.processingFailed ?? en.errors.jobTrackingFailed),
+          ),
+        );
         throw err;
       }
     };

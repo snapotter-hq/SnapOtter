@@ -270,7 +270,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
 
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
-      error: "Request timed out - the server may be overloaded. Try again.",
+      error: "The upload timed out. Check your connection or try a smaller file.",
       errorCategory: "timeout",
     });
     expect(useFileStore.getState().processing).toBe(false);
@@ -1148,7 +1148,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
     });
 
     expectRunEnded(
-      "Request timed out - the server may be overloaded. Try again.",
+      "The upload timed out. Check your connection or try a smaller file.",
       SYNC_SETTLE_REPORT,
     );
     unmount();
@@ -1333,7 +1333,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
  */
 describe("useToolProcessor ends a sync run whose error write throws (#1791)", () => {
   const INTERRUPTED = "Processing was interrupted. Retry when reconnected.";
-  const TIMED_OUT = "Request timed out - the server may be overloaded. Try again.";
+  const TIMED_OUT = "The upload timed out. Check your connection or try a smaller file.";
   const RESULT = {
     jobId: "server-job",
     downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
