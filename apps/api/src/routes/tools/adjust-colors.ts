@@ -8,6 +8,7 @@ import {
   sepia,
 } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -141,7 +142,14 @@ async function processColorAdjustments(
       break;
   }
 
-  const buffer = await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+  // vips_recomb (temperature/tint, colorChannels, sepia) outputs 32-bit float
+  // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
+  // values >= 1.0 clamp to white. Materialising through PNG casts back to
+  // 8-bit uchar first (#2586).
+  const finalImage = outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
+  const buffer = await finalImage
+    .toFormat(outputFormat.format, outputFormat.encoderOptions)
+    .toBuffer();
   return { buffer, filename, contentType: outputFormat.contentType };
 }
 

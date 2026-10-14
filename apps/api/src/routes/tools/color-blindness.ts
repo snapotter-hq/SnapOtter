@@ -1,5 +1,6 @@
 import { colorBlindness } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -29,7 +30,12 @@ export function registerColorBlindness(app: FastifyInstance) {
       const animation = await readAnimationFor(inputBuffer, outputFormat.format);
       const image = openAnimated(inputBuffer, animation);
       const result = await colorBlindness(image, { type: settings.simulationType });
-      const buffer = await result
+      // vips_recomb outputs 32-bit float bands (0..255), which LZW tiffsave
+      // writes as a float scRGB TIFF where values >= 1.0 clamp to white.
+      // Materialising through PNG casts back to 8-bit uchar first (#2586).
+      const finalImage =
+        outputFormat.format === "tiff" ? sharp(await result.png().toBuffer()) : result;
+      const buffer = await finalImage
         .toFormat(outputFormat.format, outputFormat.encoderOptions)
         .toBuffer();
 

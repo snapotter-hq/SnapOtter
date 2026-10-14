@@ -55,7 +55,15 @@ export function registerSharpening(app: FastifyInstance) {
           denoise: settings.denoise,
         });
 
-        return await image.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+        // vips_convolve (high-pass) on a 3-channel image outputs 32-bit float
+        // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
+        // values >= 1.0 clamp to white. Materialising through PNG casts back to
+        // 8-bit uchar first (#2586).
+        const finalImage =
+          outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
+        return await finalImage
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
+          .toBuffer();
       };
 
       const buffer =

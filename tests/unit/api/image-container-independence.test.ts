@@ -553,6 +553,85 @@ describe("transparency survives the container it arrived in (#1187)", () => {
     expect(opaqueOut.contentType).toBe("image/tiff");
     expect(opaqueOut.filename).toBe("photo_duotone.tiff");
   });
+
+  it.each(["lzw", "deflate"] as const)(
+    "preserves the alpha channel on a 4-channel %s TIFF across image routes (#2586)",
+    async (compression) => {
+      const png = await sharp(await transparentCorner())
+        .png()
+        .toBuffer();
+      const tiff = await sharp(png).tiff({ compression }).toBuffer();
+      const inMeta = await sharp(tiff).metadata();
+      expect(inMeta.format).toBe("tiff");
+      expect(inMeta.channels).toBe(4);
+      expect(inMeta.hasAlpha).toBe(true);
+
+      const cases: Array<[string, Record<string, unknown>]> = [
+        ["image-enhancement", {}],
+        ["adjust-colors", { brightness: 10, effect: "sepia" }],
+        ["color-blindness", {}],
+        ["sharpening", {}],
+        ["sharpening", { method: "high-pass", strength: 50, kernelSize: 3 }],
+        ["pixelate", { blockSize: 4 }],
+        ["vignette", { radius: 100, softness: 0 }],
+      ];
+
+      const opaquePng = await sharp({
+        create: { width: 20, height: 20, channels: 3, background: RED },
+      })
+        .png()
+        .toBuffer();
+      const opaqueTiff = await sharp(opaquePng).tiff({ compression }).toBuffer();
+
+      for (const [toolId, rawSettings] of cases) {
+        const config = getToolConfig(toolId);
+        if (!config) throw new Error(`${toolId} must be registered`);
+        const settings = config.settingsSchema.parse(rawSettings);
+        const [fromTiff, fromPng, opaqueFromTiff, opaqueFromPng] = await Promise.all([
+          config.process(tiff, settings, "corner.tiff"),
+          config.process(png, settings, "corner.png"),
+          config.process(opaqueTiff, settings, "opaque.tiff"),
+          config.process(opaquePng, settings, "opaque.png"),
+        ]);
+
+        expect(fromTiff.contentType, `${toolId} (${compression}) contentType`).toBe("image/tiff");
+        const meta = await sharp(fromTiff.buffer).metadata();
+        expect(meta.format, `${toolId} (${compression}) format`).toBe("tiff");
+        expect(meta.depth, `${toolId} (${compression}) depth`).toBe("uchar");
+        expect(meta.channels, `${toolId} (${compression}) channels`).toBe(4);
+        expect(meta.hasAlpha, `${toolId} (${compression}) hasAlpha`).toBe(true);
+        expect(
+          await alphaAt(fromTiff.buffer, 5, 5),
+          `${toolId} (${compression}) transparent corner`,
+        ).toBe(0);
+        expect(
+          await alphaAt(fromTiff.buffer, 40, 40),
+          `${toolId} (${compression}) opaque body`,
+        ).toBe(255);
+
+        const [decodedTiff, decodedPng] = await Promise.all([
+          decode(fromTiff.buffer),
+          decode(fromPng.buffer),
+        ]);
+        expect(
+          worstChannelDiff(decodedTiff, decodedPng),
+          `${toolId} (${compression}) matches PNG output`,
+        ).toBeLessThanOrEqual(2);
+
+        const opaqueMeta = await sharp(opaqueFromTiff.buffer).metadata();
+        expect(opaqueMeta.format, `${toolId} (${compression}) opaque format`).toBe("tiff");
+        expect(opaqueMeta.depth, `${toolId} (${compression}) opaque depth`).toBe("uchar");
+        const [decodedOpaqueTiff, decodedOpaquePng] = await Promise.all([
+          decode(opaqueFromTiff.buffer),
+          decode(opaqueFromPng.buffer),
+        ]);
+        expect(
+          worstChannelDiff(decodedOpaqueTiff, decodedOpaquePng),
+          `${toolId} (${compression}) opaque matches PNG output`,
+        ).toBeLessThanOrEqual(2);
+      }
+    },
+  );
 });
 
 describe("the container guard covers the image catalogue (#1190)", () => {

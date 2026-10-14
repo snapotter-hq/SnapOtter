@@ -6,6 +6,7 @@ const JPG = readFixture(fixtures.image.base.jpg100);
 const PNG = readFixture(fixtures.image.base.png200);
 const WEBP = readFixture(fixtures.image.base.webp50);
 const GIF = readFixture(fixtures.image.animated.gif);
+const TIFF = readFixture(fixtures.image.formats("tiff"));
 
 describe("resolveOutputFormat", () => {
   it("detects JPEG input and returns jpeg config", async () => {
@@ -71,7 +72,13 @@ describe("encoderOptions", () => {
     expect(result.encoderOptions).toEqual({ quality: 95, reuse: false });
   });
 
-  it("passes no reuse key to any other encoder", async () => {
+  it("asks for LZW compression when the output is a TIFF so alpha channels survive (#2586)", async () => {
+    const result = await resolveOutputFormat(TIFF, "image.tiff");
+    expect(result.format).toBe("tiff");
+    expect(result.encoderOptions).toEqual({ quality: 95, compression: "lzw" });
+  });
+
+  it("passes no reuse or compression key to any other encoder", async () => {
     for (const [label, buffer] of [
       ["jpeg", JPG],
       ["png", PNG],
@@ -86,7 +93,7 @@ describe("encoderOptions", () => {
   });
 
   it("keeps quality and encoderOptions.quality saying the same thing", async () => {
-    for (const buffer of [JPG, PNG, WEBP, GIF]) {
+    for (const buffer of [JPG, PNG, WEBP, GIF, TIFF]) {
       const result = await resolveOutputFormat(buffer, "image");
       expect(result.encoderOptions.quality).toBe(result.quality);
     }
@@ -99,6 +106,10 @@ describe("encoderOptions", () => {
     // through here rather than writing the bag out by hand, which is how the
     // two copies of the quality could drift apart.
     expect(outputFormatFor("gif", 80).encoderOptions).toEqual({ quality: 80, reuse: false });
+    expect(outputFormatFor("tiff", 80).encoderOptions).toEqual({
+      quality: 80,
+      compression: "lzw",
+    });
     expect(outputFormatFor("png")).toMatchObject({
       format: "png",
       extension: "png",

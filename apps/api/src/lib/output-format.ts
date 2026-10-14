@@ -17,10 +17,14 @@ export interface OutputFormat {
    * The whole option bag for `toFormat()`, so a route never has to know which
    * encoder it is about to drive: `.toFormat(f.format, f.encoderOptions)`.
    *
-   * It carries `quality` plus, for GIF, `reuse: false`. Sharp's GIF writer
-   * defaults to reusing the palette libvips read the input with, so a tool that
-   * introduces a colour the source never held cannot express it: a green border
-   * on a GIF came back as 76,105,113, with a 200 and no warning (issue #1190).
+   * It carries `quality` plus, for GIF, `reuse: false`, and for TIFF,
+   * `compression: "lzw"`. Sharp's GIF writer defaults to reusing the palette
+   * libvips read the input with, so a tool that introduces a colour the source
+   * never held cannot express it: a green border on a GIF came back as
+   * 76,105,113, with a 200 and no warning (issue #1190). Sharp's TIFF writer
+   * defaults to `compression: "jpeg"`, and JPEG-compressed TIFFs cannot store
+   * an alpha channel, so libvips drops band 3 on save and flattens transparent
+   * pixels to black (issue #2586).
    *
    * A fresh palette is not free, and the cost falls on the tools that needed it
    * least. Reuse hands an unchanged photographic animation back byte for byte,
@@ -40,6 +44,7 @@ export interface OutputFormat {
 export interface EncoderOptions {
   quality?: number;
   reuse?: false;
+  compression?: "lzw";
 }
 
 const FORMAT_MAP: Record<string, { format: SharpFormat; extension: string; contentType: string }> =
@@ -107,6 +112,11 @@ export function outputFormatFor(format: SharpFormat, quality?: number): OutputFo
     ...config,
     format,
     quality,
-    encoderOptions: format === "gif" ? { quality, reuse: false } : { quality },
+    encoderOptions:
+      format === "gif"
+        ? { quality, reuse: false }
+        : format === "tiff"
+          ? { quality, compression: "lzw" }
+          : { quality },
   };
 }
