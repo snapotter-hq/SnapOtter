@@ -5,7 +5,7 @@ SnapOtter runs well on small hardware: a Raspberry Pi 4 or 5, an old laptop, or 
 Two hard constraints up front:
 
 - **64-bit only.** The image is built for `linux/amd64` and `linux/arm64`. 32-bit ARM (`armv7`/`armhf`) is not supported, so first-generation Pis and the Pi Zero family are out.
-- **2 GB memory floor.** 512 MB cannot start the stack, and 1 GB fails on multi-file batches. 2 GB with 2 cores is the smallest configuration that works comfortably.
+- **2 GB memory floor (non-AI tools).** 512 MB cannot start the stack, and 1 GB fails on multi-file batches. 2 GB with 2 cores is the smallest configuration that runs the non-AI tools comfortably.
 
 ## What runs well on small hardware {#what-runs-well}
 
@@ -14,7 +14,7 @@ Every non-AI tool works on a 2 GB / 2-core machine: the whole Image and Files se
 Two workloads are the exceptions:
 
 - **Video re-encoding** (converting between codecs) is CPU-bound. A 1080p clip that takes ~40 s on a fast desktop CPU can take several minutes on a Pi-class CPU. Stream-copy operations stay instant.
-- **AI tools** need RAM (4 GB recommended) and disk (the larger bundles are 4-5 GB each), and the heavy ones (upscaling, photo restoration, background removal) are not practical on Pi-class CPUs. Light AI such as face detection and OCR is usable if you have the memory for it.
+- **AI tools** have per-bundle CPU memory floors: 2 GB of host RAM (0.5 GB free) for Face Detection and built-in Fast OCR, 4 GiB of configured effective memory for Accurate OCR, 4 GB of host RAM (2 to 3 GB free) for Transcription, Object Eraser & Colorize, Background Removal, Upscale & Enhance, and Photo Restoration, and 8 GB of host RAM (6 GB free) for High-Quality Inpainting. A 2 GB machine cannot run Whisper, RealESRGAN, rembg, or LaMa without being OOM-killed, so SnapOtter checks free memory before dispatching to the Python sidecar and refuses runs below the bundle floor immediately.
 
 Neither is installed or running unless you use it: with no AI bundles installed the app idles around 360 MB, and AI bundles only download when an admin enables them.
 

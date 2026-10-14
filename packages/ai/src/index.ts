@@ -15,6 +15,7 @@ export {
   getDocsDispatcher,
   initDispatcher,
   isGpuAvailable,
+  isNvidiaDevicePresent,
   PythonDispatcher,
   runDocsScript,
   shutdownDispatcher,
@@ -26,7 +27,15 @@ export { blurFaces, detectFaces } from "./face-detection.js";
 export { enhanceFaces } from "./face-enhancement.js";
 export type { FaceLandmarkPoint, FaceLandmarks, FaceLandmarksResult } from "./face-landmarks.js";
 export { detectFaceLandmarks } from "./face-landmarks.js";
-export { missingBundleForScript, SCRIPT_BUNDLE_MAP } from "./feature-gate.js";
+export type { SidecarMemoryOptions } from "./feature-gate.js";
+export {
+  availableSidecarMemoryBytes,
+  BUNDLE_CPU_FREE_MEMORY_BYTES,
+  missingBundleForScript,
+  SCRIPT_BUNDLE_MAP,
+  SCRIPT_TOOL_LABEL,
+  sidecarMemoryRefusal,
+} from "./feature-gate.js";
 export { type InpaintQuality, inpaint } from "./inpainting.js";
 export { type AiLogger, setAiLogger } from "./log.js";
 export { noiseRemoval } from "./noise-removal.js";

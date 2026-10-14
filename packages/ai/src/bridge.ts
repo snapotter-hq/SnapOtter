@@ -5,7 +5,11 @@ import { dirname, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
-import { missingBundleForScript } from "./feature-gate.js";
+import {
+  missingBundleForScript,
+  type SidecarMemoryOptions,
+  sidecarMemoryRefusal,
+} from "./feature-gate.js";
 import { aiLog } from "./log.js";
 import { acquireVenvRead, tryAcquireVenvRead } from "./venv-lock.js";
 
@@ -237,6 +241,17 @@ export interface PythonRunOptions {
   onProgress?: ProgressCallback;
   signal?: AbortSignal;
   timeout?: number;
+  memoryOptions?: SidecarMemoryOptions;
+}
+
+export function isNvidiaDevicePresent(
+  deviceExists: (path: string) => boolean = existsSync,
+): boolean {
+  const gpuEnv = process.env.SNAPOTTER_GPU?.trim().toLowerCase();
+  if (gpuEnv === "0" || gpuEnv === "false" || gpuEnv === "no") return false;
+  const visible = process.env.CUDA_VISIBLE_DEVICES?.trim();
+  if (visible === "" || visible === "-1" || visible?.toLowerCase() === "none") return false;
+  return deviceExists("/dev/nvidiactl") || deviceExists("/dev/nvidia0");
 }
 
 function pythonAbortError(): Error {
@@ -284,6 +299,7 @@ export class PythonDispatcher {
   private childReady = false;
   private childFailed = false;
   private gpuAvail = false;
+  private gpuProbed = false;
   private pending = new Map<string, PendingRequest>();
   private crashes = 0;
   private lastCrashTs = 0;
@@ -416,6 +432,7 @@ export class PythonDispatcher {
               if (this.child === proc) {
                 this.childReady = true;
                 this.gpuAvail = parsed.gpu === true;
+                this.gpuProbed = true;
                 this.crashes = 0;
                 aiLog.info(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
               }
@@ -900,6 +917,26 @@ export class PythonDispatcher {
       : null;
 
     const doRun = (): Promise<{ stdout: string; stderr: string }> => {
+      if (this.profile === "ai") {
+        const gpuAvailable =
+          options.memoryOptions?.gpuAvailable ??
+          (this.gpuProbed
+            ? this.gpuAvail
+            : isNvidiaDevicePresent(options.memoryOptions?.deviceExists));
+        const refusal = sidecarMemoryRefusal(scriptName, {
+          ...options.memoryOptions,
+          gpuAvailable,
+        });
+        if (refusal) {
+          return Promise.reject(
+            new SafeError(refusal, {
+              kind: "operational",
+              code: "insufficient-memory",
+            }),
+          );
+        }
+      }
+
       // Try persistent dispatcher first
       const dispatcherPromise = this.dispatcherRun(scriptName, args, options);
       if (dispatcherPromise) {

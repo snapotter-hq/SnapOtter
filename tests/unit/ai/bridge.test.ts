@@ -1580,7 +1580,9 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
   it("writes a JSON-line with id, script (without .py), and args to dispatcher stdin", async () => {
     const mock = await setupReadyDispatcher();
 
-    const promise = runPythonWithProgress("remove_bg.py", ["/tmp/in.png", "/tmp/out.png"]);
+    const promise = runPythonWithProgress("remove_bg.py", ["/tmp/in.png", "/tmp/out.png"], {
+      memoryOptions: { availableMemoryBytes: 8 * 1024 ** 3 },
+    });
     await new Promise((r) => setTimeout(r, 10));
 
     // Verify stdin received a JSON-line
@@ -1635,7 +1637,9 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
   it("strips .py extension from script name in dispatcher request", async () => {
     const mock = await setupReadyDispatcher();
 
-    const promise = runPythonWithProgress("upscale.py", ["/tmp/in.png"]);
+    const promise = runPythonWithProgress("upscale.py", ["/tmp/in.png"], {
+      memoryOptions: { availableMemoryBytes: 8 * 1024 ** 3 },
+    });
     await new Promise((r) => setTimeout(r, 10));
 
     const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
@@ -3523,5 +3527,101 @@ describe("bridge - parseStdoutJson boundary conditions", () => {
   it("handles JSON with only whitespace before the object", () => {
     const result = parseStdoutJson('   \n  \t  {"success": true}');
     expect(result).toEqual({ success: true });
+  });
+});
+
+describe("bridge - pre-dispatch sidecar memory floor (issue #1162)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("refuses a gated AI script before spawning or writing to Python when CPU free memory is below the bundle floor", async () => {
+    const { runPythonWithProgress, shutdownDispatcher } = await import(
+      "../../../packages/ai/src/bridge.js"
+    );
+    onTestFinished(() => shutdownDispatcher());
+
+    const settled = await runPythonWithProgress("upscale.py", ["/tmp/in.png", "/tmp/out.png"], {
+      memoryOptions: {
+        gpuAvailable: false,
+        availableMemoryBytes: 1.2 * 1024 ** 3,
+      },
+    }).catch((err: unknown) => err);
+
+    expect(spawn).not.toHaveBeenCalled();
+    expect(settled).toBeInstanceOf(Error);
+    const err = settled as Error & { isSafeMessage?: boolean; kind?: string; code?: string };
+    expect(err.message).toContain("upscale needs about 2.5 GB free");
+    expect(err.message).toContain("this host has 1.2 GB");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.code).toBe("insufficient-memory");
+  });
+
+  it("evaluates isNvidiaDevicePresent and respects SNAPOTTER_GPU and CUDA_VISIBLE_DEVICES overrides", async () => {
+    const { isNvidiaDevicePresent } = await import("../../../packages/ai/src/bridge.js");
+    const savedGpu = process.env.SNAPOTTER_GPU;
+    const savedVisible = process.env.CUDA_VISIBLE_DEVICES;
+    onTestFinished(() => {
+      if (savedGpu === undefined) delete process.env.SNAPOTTER_GPU;
+      else process.env.SNAPOTTER_GPU = savedGpu;
+      if (savedVisible === undefined) delete process.env.CUDA_VISIBLE_DEVICES;
+      else process.env.CUDA_VISIBLE_DEVICES = savedVisible;
+    });
+
+    delete process.env.SNAPOTTER_GPU;
+    delete process.env.CUDA_VISIBLE_DEVICES;
+    expect(isNvidiaDevicePresent((p) => p === "/dev/nvidiactl")).toBe(true);
+    expect(isNvidiaDevicePresent((p) => p === "/dev/nvidia0")).toBe(true);
+    expect(isNvidiaDevicePresent(() => false)).toBe(false);
+
+    process.env.SNAPOTTER_GPU = " false ";
+    expect(isNvidiaDevicePresent(() => true)).toBe(false);
+    delete process.env.SNAPOTTER_GPU;
+
+    for (const val of ["", "-1", "NONE"]) {
+      process.env.CUDA_VISIBLE_DEVICES = val;
+      expect(isNvidiaDevicePresent(() => true)).toBe(false);
+    }
+  });
+
+  it("uses probed dispatcher GPU state when ready and falls back to deviceExists on cold start", async () => {
+    const { initDispatcher, runPythonWithProgress, shutdownDispatcher } = await import(
+      "../../../packages/ai/src/bridge.js"
+    );
+    onTestFinished(() => shutdownDispatcher());
+
+    // Cold start with /dev/nvidiactl present bypasses the CPU memory floor
+    // (reaching runPerRequest's feature_not_installed check instead of insufficient-memory).
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    await expect(
+      runPythonWithProgress("upscale.py", ["/tmp/in.png"], {
+        memoryOptions: {
+          availableMemoryBytes: 1.0 * 1024 ** 3,
+          deviceExists: (p) => p === "/dev/nvidiactl",
+        },
+      }),
+    ).rejects.toThrow("feature_not_installed");
+
+    // Once the spawned dispatcher emits ready with gpu: false, the probed CPU
+    // state wins even if deviceExists returns true.
+    const initCpu = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await initCpu;
+
+    await expect(
+      runPythonWithProgress("upscale.py", ["/tmp/in.png"], {
+        memoryOptions: {
+          availableMemoryBytes: 1.0 * 1024 ** 3,
+          deviceExists: () => true,
+        },
+      }),
+    ).rejects.toThrow("upscale needs about 2.5 GB free on CPU hosts");
   });
 });

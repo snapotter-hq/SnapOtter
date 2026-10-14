@@ -281,7 +281,11 @@ describe("AI Bridge - runPythonWithProgress (dispatcher path)", () => {
   it("strips .py from script name in dispatcher request", async () => {
     const proc = await spawnReadyDispatcher();
 
-    bridge.runPythonWithProgress("remove_bg.py", []);
+    void bridge
+      .runPythonWithProgress("remove_bg.py", [], {
+        memoryOptions: { availableMemoryBytes: 8 * 1024 ** 3 },
+      })
+      .catch(() => {});
 
     const request = JSON.parse(proc.stdin._written[0].trim());
     expect(request.script).toBe("remove_bg");

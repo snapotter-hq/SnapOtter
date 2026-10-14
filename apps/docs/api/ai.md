@@ -55,15 +55,16 @@ The Docker image ships the application plus the common runtime. Large model arch
 
 Most AI tools require one or more feature bundles before they can run. The admin UI installs those by tool through `POST /api/v1/admin/tools/:toolId/features/install`, which resolves the full bundle list, skips bundles that are already installed, and queues only the missing downloads. For example, enabling Passport Photo on a fresh instance queues `background-removal` and `face-detection`; enabling it after Background Removal is already installed queues only `face-detection`. OCR is the exception because `fast` needs no pack; install its optional accurate runtime through the UI or `POST /api/v1/admin/features/ocr/install`.
 
-| Bundle | Size | Shared dependency group | Tools that use it |
-|--------|------|-------------------------|-------------------|
-| `background-removal` | 4-5 GB | rembg / BiRefNet background matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
-| `face-detection` | 200-300 MB | MediaPipe face detection and landmarks | blur-faces, red-eye-removal, smart-crop |
-| `object-eraser-colorize` | 1-2 GB | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
-| `upscale-enhance` | 5-6 GB | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
-| `photo-restoration` | 4-5 GB | scratch repair and restoration pipeline | restore-photo |
-| `ocr` | ~208-234 MiB download / ~409-488 MiB installed | Optional RapidOCR 3.9.1, ONNX Runtime 1.20.1, and pinned PP-OCR models | ocr, ocr-pdf (`balanced` and `best` only) |
-| `transcription` | ~600 MB | faster-whisper speech-to-text models | transcribe-audio, auto-subtitles |
+| Bundle | Size | CPU memory floor | Shared dependency group | Tools that use it |
+|--------|------|------------------|-------------------------|-------------------|
+| `background-removal` | 4-5 GB | 4 GB RAM (~2.5 GB free) | rembg / BiRefNet background matting | remove-background, passport-photo, transparency-fixer, background-replace, blur-background |
+| `face-detection` | 200-300 MB | 2 GB RAM (~0.5 GB free) | MediaPipe face detection and landmarks | blur-faces, red-eye-removal, smart-crop |
+| `object-eraser-colorize` | 1-2 GB | 4 GB RAM (~2 GB free) | LaMa inpainting/outpainting and DDColor | erase-object, colorize, ai-canvas-expand |
+| `inpaint-hq` | 5-7 GB | 8 GB RAM (~6 GB free) | Stable Diffusion 1.5 high-quality inpainting | erase-object (`qualityMode: "hq"`) |
+| `upscale-enhance` | 5-6 GB | 4 GB RAM (~2.5 GB free) | RealESRGAN, GFPGAN / CodeFormer, denoising | upscale, enhance-faces, noise-removal |
+| `photo-restoration` | 4-5 GB | 4 GB RAM (~3 GB free) | scratch repair and restoration pipeline | restore-photo |
+| `ocr` | ~208-234 MiB download / ~409-488 MiB installed | 4 GiB configured effective memory (`fast` runs on 2 GB) | Optional RapidOCR 3.9.1, ONNX Runtime 1.20.1, and pinned PP-OCR models | ocr, ocr-pdf (`balanced` and `best` only) |
+| `transcription` | ~600 MB | 4 GB RAM (~2 GB free) | faster-whisper speech-to-text models | transcribe-audio, auto-subtitles |
 
 Tools with cross-bundle dependencies:
 

@@ -118,7 +118,7 @@
   "faq.q4.q": "Are there any file size or usage limitations?",
   "faq.q4.a": "No artificial limits. You can process as many files as you want, at any size. The only constraint is your server's hardware resources.",
   "faq.q5.q": "What AI features are included?",
-  "faq.q5.a": "SnapOtter includes 19 local AI tools for background removal, upscaling, OCR, transcription, face detection, colorization, noise removal, photo restoration, and more. All models run on your hardware.",
+  "faq.q5.a": "SnapOtter includes 19 local AI tools for background removal, upscaling, OCR, transcription, face detection, colorization, noise removal, photo restoration, and more. All models run on your hardware (2 GB of RAM runs the non-AI tools, Fast OCR, and face detection; CPU AI bundles require 4 GB+ of RAM, or 8 GB for HQ inpainting).",
   "faq.q6.q": "Does SnapOtter collect any analytics?",
   "faq.q6.a": "Anonymous product analytics is on by default and never includes your files or their contents. Turn it off any time with a one-click admin toggle in Settings > System > Privacy.",
   "faq.q7.q": "Can I use SnapOtter in my company?",
