@@ -439,7 +439,10 @@ describe("site-packages import", () => {
       testBundleId,
       testVersion,
       { "mediapipe/face.tflite": "model-data" },
-      { "fakepkg/__init__.py": "# fake package" },
+      {
+        "fakepkg/__init__.py": "# fake package",
+        "mediapipe/__init__.py": "# fake mediapipe",
+      },
     );
   }
 
@@ -525,6 +528,95 @@ describe("site-packages import", () => {
 
     await expectRejectedImport(await buildSitePackagesArchive(), /outside the environment itself/i);
   });
+
+  it("fails the import and leaves no models or site-packages behind when a fixup wheel fails to install (#1237)", async () => {
+    const venvPath = join(aiDir, `venv-fixup-fail-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    const purelib = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    const tarDir = join(testRoot, `tar-src-${randomUUID()}`);
+    mkdirSync(join(tarDir, "models", "mediapipe"), { recursive: true });
+    mkdirSync(join(tarDir, "site-packages", "mediapipe"), { recursive: true });
+    mkdirSync(join(tarDir, "fixups"), { recursive: true });
+    writeFileSync(
+      join(tarDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: testBundleId,
+        version: testVersion,
+        models: ["mediapipe/face.tflite"],
+      }),
+    );
+    writeFileSync(join(tarDir, "models", "mediapipe", "face.tflite"), "model-data");
+    writeFileSync(join(tarDir, "site-packages", "mediapipe", "__init__.py"), "# fake mediapipe");
+    writeFileSync(join(tarDir, "fixups", "broken_nccl-1.0.0-py3-none-any.whl"), "corrupt-wheel");
+
+    const tarPath = join(testRoot, `bundle-${randomUUID()}.tar.gz`);
+    await tar.create({ gzip: true, file: tarPath, cwd: tarDir }, ["."]);
+
+    await expectRejectedImport(tarPath, /broken_nccl/i);
+    expect(existsSync(join(purelib, "mediapipe"))).toBe(false);
+  }, 30_000);
+
+  it("fails the import naming the failing module and stderr when a smokeImports entry fails (#1237)", async () => {
+    const venvPath = join(aiDir, `venv-smoke-fail-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    const purelib = execFileSync(
+      join(venvPath, "bin", "python3"),
+      ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+      { encoding: "utf-8" },
+    ).trim();
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    const tarPath = await createBundleTarWithSitePackages(
+      testBundleId,
+      testVersion,
+      { "mediapipe/face.tflite": "model-data" },
+      {
+        "mediapipe/__init__.py":
+          'raise ImportError("ABI mismatch: mediapipe native extension failed to load")\n',
+      },
+    );
+
+    await expectRejectedImport(tarPath, /mediapipe.*ABI mismatch/s);
+    expect(existsSync(join(purelib, "mediapipe"))).toBe(false);
+  }, 30_000);
+
+  it("honors SNAPOTTER_SKIP_INSTALL_SMOKE=1 when verifying offline bundle imports (#1237)", async () => {
+    const venvPath = join(aiDir, `venv-smoke-skip-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    const tarPath = await createBundleTarWithSitePackages(
+      testBundleId,
+      testVersion,
+      { "mediapipe/face.tflite": "model-data" },
+      {
+        "mediapipe/__init__.py": 'raise ImportError("skipped by env flag")\n',
+      },
+    );
+
+    await expectRejectedImport(tarPath, /mediapipe.*skipped by env flag/s);
+
+    process.env.SNAPOTTER_SKIP_INSTALL_SMOKE = "1";
+    try {
+      invalidateCache();
+      const result = await importBundleArchive(createReadStream(tarPath));
+      expect(result.bundleId).toBe(testBundleId);
+    } finally {
+      delete process.env.SNAPOTTER_SKIP_INSTALL_SMOKE;
+    }
+  }, 30_000);
 });
 
 describe("POST /api/v1/admin/features/import", () => {
@@ -590,6 +682,7 @@ describe("POST /api/v1/admin/features/import", () => {
 
   afterAll(async () => {
     if (app) await app.close();
+    rmSync(testRoot, { recursive: true, force: true });
   });
 
   it("registers a static rate limit for offline imports", () => {
@@ -872,4 +965,54 @@ describe("POST /api/v1/admin/features/import", () => {
     expect(recoverInterruptedInstalls()).toBe(true);
     expect(existsSync(existingUpload)).toBe(false);
   });
+
+  it("returns 400 and leaves installed state and models clean when a bundle fails smoke verification (#1237)", async () => {
+    const venvPath = join(aiDir, `venv-route-smoke-fail-${randomUUID()}`);
+    execFileSync(process.env.PYTHON || "python3", ["-m", "venv", "--without-pip", venvPath], {
+      stdio: "ignore",
+    });
+    process.env.PYTHON_VENV_PATH = venvPath;
+
+    try {
+      const tarPath = await createBundleTarWithSitePackages(
+        testBundleId,
+        testVersion,
+        { "mediapipe/route-face.tflite": "model-data" },
+        {
+          "mediapipe/__init__.py": 'raise ImportError("route-level smoke verification failure")\n',
+        },
+      );
+
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "broken-smoke.tar.gz",
+          contentType: "application/gzip",
+          content: readFileSync(tarPath),
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/features/import",
+        headers: {
+          "content-type": contentType,
+          authorization: `Bearer ${token}`,
+        },
+        payload: body,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toMatch(
+        /mediapipe.*route-level smoke verification failure/s,
+      );
+      expect(
+        JSON.parse(readFileSync(installedPath, "utf-8")).bundles[testBundleId],
+      ).toBeUndefined();
+      expect(existsSync(join(modelsDir, "mediapipe", "route-face.tflite"))).toBe(false);
+    } finally {
+      delete process.env.PYTHON_VENV_PATH;
+      rmSync(venvPath, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

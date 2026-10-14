@@ -134,6 +134,22 @@ describe("Feature bundle edge cases", () => {
       expect(bundle.enablesTools.length, `Bundle ${id} has no tools`).toBeGreaterThan(0);
     }
   });
+
+  it("every bundle declares a non-empty smokeImports list of valid Python module names (#1237)", () => {
+    for (const [id, bundle] of Object.entries(FEATURE_BUNDLES)) {
+      const smokeImports = (bundle as { smokeImports?: unknown }).smokeImports;
+      expect(Array.isArray(smokeImports), `Bundle ${id} missing smokeImports`).toBe(true);
+      expect(
+        (smokeImports as string[]).length,
+        `Bundle ${id} has empty smokeImports`,
+      ).toBeGreaterThan(0);
+      for (const mod of smokeImports as string[]) {
+        expect(mod, `Bundle ${id} has invalid smokeImport "${mod}"`).toMatch(
+          /^[A-Za-z_][A-Za-z0-9_.]*$/,
+        );
+      }
+    }
+  });
 });
 
 describe("getRequiredBundlesForTool", () => {

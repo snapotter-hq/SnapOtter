@@ -18,6 +18,7 @@ import {
   readSync,
   realpathSync,
   renameSync,
+  rmdirSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -988,6 +989,7 @@ interface ManifestBundle {
   models: ManifestModel[];
   archives?: Record<string, ManifestArchive>;
   targets?: Record<string, ManifestTarget>;
+  smokeImports?: string[];
 }
 
 interface Manifest {
@@ -1742,53 +1744,131 @@ export async function importBundleArchive(
       );
     }
 
-    // Resolve where site-packages must land, before moving anything: a
-    // rejected import must not leave models half-applied on disk (#1139).
+    // Resolve where site-packages and fixup wheels must land before moving
+    // anything: a rejected import must not leave models or site-packages
+    // half-applied on disk (#1139, #1237).
     const stagingSitePackages = join(stagingDir, "site-packages");
-    const sitePackagesDir = existsSync(stagingSitePackages)
-      ? resolveVenvSitePackages(sharedVenvPath())
-      : "";
-
-    // Move models/* into MODELS_DIR
-    const stagingModels = join(stagingDir, "models");
-    if (existsSync(stagingModels)) {
-      mkdirSync(MODELS_DIR, { recursive: true });
-      moveTreeRecursive(stagingModels, MODELS_DIR);
-    }
-
-    // Move site-packages/* into venv site-packages
-    if (sitePackagesDir) {
-      moveTreeRecursive(stagingSitePackages, sitePackagesDir);
-    }
-
-    // Apply fixups (NCCL wheel) if present
     const stagingFixups = join(stagingDir, "fixups");
-    if (existsSync(stagingFixups)) {
-      const wheels = readdirSync(stagingFixups).filter((f) => f.endsWith(".whl"));
-      if (wheels.length > 0) {
-        const venvPython = join(sharedVenvPath(), "bin", "python3");
-        for (const wheel of wheels) {
-          try {
-            execFileSync(
-              venvPython,
-              [
-                "-m",
-                "pip",
-                "install",
-                "--no-index",
-                `--find-links=${stagingFixups}`,
-                wheel.split("-")[0],
-              ],
-              {
-                stdio: ["ignore", "ignore", "ignore", installLockFd],
-                timeout: 30_000,
-              },
-            );
-          } catch {
-            // Non-fatal
+    const stagingModels = join(stagingDir, "models");
+    const hasSitePackages = assertOptionalDirectory(stagingSitePackages, "site-packages");
+    const hasFixupsDir = assertOptionalDirectory(stagingFixups, "fixups");
+    const hasModels = assertOptionalDirectory(stagingModels, "models");
+    const fixupWheels = hasFixupsDir
+      ? readdirSync(stagingFixups)
+          .filter((f) => f.endsWith(".whl") && !f.startsWith("."))
+          .sort()
+      : [];
+    const hasFixups = fixupWheels.length > 0;
+    const touchesVenv = hasSitePackages || hasFixups;
+    const venvPath = sharedVenvPath();
+    const sitePackagesDir = touchesVenv ? resolveVenvSitePackages(venvPath) : "";
+    const venvPython = join(venvPath, "bin", "python3");
+
+    const rollbackActions: Array<() => void> = [];
+    const installedFixupPackages: string[] = [];
+    try {
+      // Move site-packages/* into venv site-packages
+      if (hasSitePackages && sitePackagesDir) {
+        const spRollback = moveTreeWithRollback(
+          stagingSitePackages,
+          sitePackagesDir,
+          join(stagingDir, ".rollback-site-packages"),
+        );
+        rollbackActions.push(spRollback);
+      }
+
+      // Apply fixups (NCCL wheel) if present
+      if (hasFixups) {
+        for (const wheel of fixupWheels) {
+          const pkgName = wheel.split("-")[0];
+          const wasPresent =
+            Boolean(sitePackagesDir) && isDistributionInstalled(sitePackagesDir, pkgName);
+          if (!wasPresent) {
+            installedFixupPackages.push(pkgName);
           }
+          installFixupWheel(venvPython, stagingFixups, wheel, pkgName, installLockFd);
         }
       }
+
+      // Verify the bundle's Python modules actually import in the venv before
+      // placing models or recording the install (#1237).
+      if (touchesVenv && process.env.SNAPOTTER_SKIP_INSTALL_SMOKE !== "1") {
+        const manifestBundle = manifest.bundles[descriptor.bundleId];
+        const smokeImports =
+          manifestBundle?.smokeImports ?? FEATURE_BUNDLES[descriptor.bundleId]?.smokeImports ?? [];
+        verifyBundleSmokeImports(venvPath, descriptor.bundleId, smokeImports);
+      }
+
+      // Move models/* into MODELS_DIR only after Python package installation
+      // and smoke verification succeed.
+      if (hasModels) {
+        mkdirSync(MODELS_DIR, { recursive: true });
+        const modelsRollback = moveTreeWithRollback(
+          stagingModels,
+          MODELS_DIR,
+          join(stagingDir, ".rollback-models"),
+        );
+        rollbackActions.push(modelsRollback);
+      }
+    } catch (err) {
+      const rollbackErrors: string[] = [];
+      if (installedFixupPackages.length > 0) {
+        try {
+          const uninst = spawnSync(
+            venvPython,
+            ["-m", "pip", "uninstall", "-y", ...installedFixupPackages],
+            {
+              stdio: ["ignore", "pipe", "pipe", installLockFd],
+              timeout: 30_000,
+              encoding: "utf-8",
+            },
+          );
+          if (uninst.error || uninst.status !== 0) {
+            const detail =
+              uninst.stderr?.trim() ||
+              uninst.stdout?.trim() ||
+              uninst.error?.message ||
+              `pip uninstall exited with status ${String(uninst.status)}`;
+            logger.error(
+              {
+                err: uninst.error,
+                bundleId: descriptor.bundleId,
+                packages: installedFixupPackages,
+                detail,
+              },
+              "[feature-status] Failed to roll back fixup wheels after failed offline import",
+            );
+            rollbackErrors.push(`fixup wheel rollback failed (${detail})`);
+          }
+        } catch (uninstErr) {
+          logger.error(
+            {
+              err: uninstErr,
+              bundleId: descriptor.bundleId,
+              packages: installedFixupPackages,
+            },
+            "[feature-status] Failed to spawn pip uninstall during offline import rollback",
+          );
+          rollbackErrors.push(
+            `fixup wheel rollback failed (${uninstErr instanceof Error ? uninstErr.message : String(uninstErr)})`,
+          );
+        }
+      }
+      for (let i = rollbackActions.length - 1; i >= 0; i--) {
+        try {
+          rollbackActions[i]();
+        } catch (rbErr) {
+          logger.error(
+            { err: rbErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to roll back files after failed offline import",
+          );
+          rollbackErrors.push(rbErr instanceof Error ? rbErr.message : String(rbErr));
+        }
+      }
+      if (rollbackErrors.length > 0 && err instanceof Error) {
+        err.message = `${err.message} (rollback warnings: ${rollbackErrors.join("; ")})`;
+      }
+      throw err;
     }
 
     markInstalled(descriptor.bundleId, descriptor.version, descriptor.models);
@@ -1867,31 +1947,275 @@ function resolveVenvSitePackages(venvPath: string): string {
   return sitePackagesDir;
 }
 
-/** Recursively move entries from src into dest, merging directories. */
-function moveTreeRecursive(src: string, dest: string): void {
-  const entries = readdirSync(src, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = join(src, entry.name);
-    const destPath = join(dest, entry.name);
-    if (entry.isDirectory()) {
-      mkdirSync(destPath, { recursive: true });
-      moveTreeRecursive(srcPath, destPath);
+function assertOptionalDirectory(path: string, entryName: string): boolean {
+  let info: ReturnType<typeof lstatSync>;
+  try {
+    info = lstatSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw err;
+  }
+  if (!info.isDirectory()) {
+    throw new ImportValidationError(`Archive entry "${entryName}" must be a directory.`);
+  }
+  return true;
+}
+
+function isDistributionInstalled(sitePackagesDir: string, pkgName: string): boolean {
+  const normalizedPkg = pkgName.toLowerCase().replace(/[-_.]+/g, "_");
+  try {
+    return readdirSync(sitePackagesDir).some((name) => {
+      if (!name.endsWith(".dist-info")) return false;
+      const distName = name.slice(0, -".dist-info".length).split("-")[0] ?? "";
+      return distName.toLowerCase().replace(/[-_.]+/g, "_") === normalizedPkg;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function throwStorageOrValidationError(message: string, detail: string, error?: Error): never {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  if (
+    code === "ENOSPC" ||
+    code === "EDQUOT" ||
+    /no space left on device|disk quota exceeded|insufficient (disk|storage) space/i.test(detail)
+  ) {
+    throw Object.assign(new Error(message, error ? { cause: error } : undefined), {
+      code: code === "EDQUOT" ? "EDQUOT" : "ENOSPC",
+    });
+  }
+  throw new ImportValidationError(message);
+}
+
+/**
+ * Install one local wheel from the bundle's fixups/ directory into the shared
+ * venv without network access. Throws ImportValidationError naming the wheel
+ * and pip's stderr/stdout or timeout reason if installation fails (#1237).
+ */
+function installFixupWheel(
+  venvPython: string,
+  fixupsDir: string,
+  wheel: string,
+  pkgName: string,
+  installLockFd: number,
+): void {
+  if (!pkgName || !/^[A-Za-z0-9][A-Za-z0-9._]*$/.test(pkgName)) {
+    throw new ImportValidationError(
+      `Invalid fixup wheel filename "${wheel}": package name is malformed.`,
+    );
+  }
+  const result = spawnSync(
+    venvPython,
+    ["-m", "pip", "install", "--no-index", `--find-links=${fixupsDir}`, pkgName],
+    {
+      stdio: ["ignore", "pipe", "pipe", installLockFd],
+      timeout: 30_000,
+      encoding: "utf-8",
+    },
+  );
+  if (result.error || result.status !== 0) {
+    const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
+    const detail =
+      result.stderr?.trim() ||
+      result.stdout?.trim() ||
+      result.error?.message ||
+      `pip exited with status ${String(result.status)}`;
+    const message = timedOut
+      ? `Timed out while installing fixup wheel "${wheel}" (${pkgName}): ${detail}`
+      : `Failed to install fixup wheel "${wheel}" (${pkgName}): ${detail}`;
+    throwStorageOrValidationError(message, detail, result.error);
+  }
+}
+
+/**
+ * Verify that each of the bundle's smokeImports entries can be imported by the
+ * venv's Python interpreter before marking the bundle installed (#1237).
+ */
+function verifyBundleSmokeImports(
+  venvPath: string,
+  bundleId: string,
+  smokeImports: string[],
+): void {
+  const venvPython = join(venvPath, "bin", "python3");
+  for (const mod of smokeImports) {
+    if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(mod)) {
+      throw new ImportValidationError(
+        `Bundle "${bundleId}" declares an invalid smokeImport module name "${mod}".`,
+      );
+    }
+    const result = spawnSync(venvPython, ["-B", "-s", "-c", `import ${mod}`], {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60_000,
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PYTHONDONTWRITEBYTECODE: "1",
+        PYTHONNOUSERSITE: "1",
+        HF_HUB_OFFLINE: "1",
+        TRANSFORMERS_OFFLINE: "1",
+      },
+    });
+    if (result.error || result.status !== 0) {
+      const timedOut = (result.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT";
+      const detail =
+        result.stderr?.trim() ||
+        result.stdout?.trim() ||
+        result.error?.message ||
+        `python3 exited with status ${String(result.status)}`;
+      const message = timedOut
+        ? `Bundle "${bundleId}" timed out during post-import verification while importing "${mod}" (${detail}).`
+        : `Bundle "${bundleId}" failed post-import verification while importing "${mod}" (${detail}).`;
+      throwStorageOrValidationError(message, detail, result.error);
+    }
+  }
+}
+
+function moveEntryAcrossDevices(srcPath: string, destPath: string): void {
+  mkdirSync(dirname(destPath), { recursive: true });
+  try {
+    renameSync(srcPath, destPath);
+  } catch (err: unknown) {
+    // EXDEV: cross-device link (staging on different fs than dest).
+    // Staging is under AI_DIR so same-fs is expected, but fall back to
+    // copy+unlink for robustness (e.g. /tmp overlay mounts).
+    if ((err as NodeJS.ErrnoException).code === "EXDEV") {
+      copyFileSync(srcPath, destPath);
+      unlinkSync(srcPath);
     } else {
-      mkdirSync(dirname(destPath), { recursive: true });
+      throw err;
+    }
+  }
+}
+
+function lstatOrNull(path: string): ReturnType<typeof lstatSync> | null {
+  try {
+    return lstatSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+/**
+ * Recursively move entries from src into dest, merging directories while
+ * backing up any overwritten entries into backupDir so the caller can undo the
+ * move if a later verification step fails (#1237).
+ */
+function moveTreeWithRollback(src: string, dest: string, backupDir: string): () => void {
+  const placedFiles: string[] = [];
+  const backedUpEntries: Array<{ destPath: string; backupPath: string }> = [];
+  const createdDirs: string[] = [];
+
+  const ensureDirTracked = (dirPath: string): void => {
+    const missing: string[] = [];
+    let cur = resolve(dirPath);
+    while (true) {
+      const existing = lstatOrNull(cur);
+      if (existing) break;
+      missing.push(cur);
+      const parent = dirname(cur);
+      if (parent === cur) break;
+      cur = parent;
+    }
+    for (let i = missing.length - 1; i >= 0; i--) {
+      mkdirSync(missing[i]);
+      createdDirs.push(missing[i]);
+    }
+  };
+
+  const walk = (curSrc: string, curDest: string, curBackup: string): void => {
+    const entries = readdirSync(curSrc, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = join(curSrc, entry.name);
+      const destPath = join(curDest, entry.name);
+      const backupPath = join(curBackup, entry.name);
+      const existingDest = lstatOrNull(destPath);
+      if (entry.isDirectory()) {
+        if (existingDest && !existingDest.isDirectory()) {
+          mkdirSync(dirname(backupPath), { recursive: true });
+          renameSync(destPath, backupPath);
+          backedUpEntries.push({ destPath, backupPath });
+        }
+        ensureDirTracked(destPath);
+        walk(srcPath, destPath, backupPath);
+      } else {
+        ensureDirTracked(dirname(destPath));
+        if (existingDest) {
+          if (existingDest.isDirectory()) {
+            mkdirSync(dirname(backupPath), { recursive: true });
+            renameSync(destPath, backupPath);
+          } else {
+            moveEntryAcrossDevices(destPath, backupPath);
+          }
+          backedUpEntries.push({ destPath, backupPath });
+        }
+        moveEntryAcrossDevices(srcPath, destPath);
+        placedFiles.push(destPath);
+      }
+    }
+  };
+
+  const rollback = (): void => {
+    const errors: string[] = [];
+    for (let i = placedFiles.length - 1; i >= 0; i--) {
       try {
-        renameSync(srcPath, destPath);
-      } catch (err: unknown) {
-        // EXDEV: cross-device link (staging on different fs than MODELS_DIR).
-        // Staging is under AI_DIR so same-fs is expected, but fall back to
-        // copy+unlink for robustness (e.g. /tmp overlay mounts).
-        if ((err as NodeJS.ErrnoException).code === "EXDEV") {
-          copyFileSync(srcPath, destPath);
-          unlinkSync(srcPath);
-        } else {
-          throw err;
+        rmSync(placedFiles[i], { force: true });
+      } catch (err) {
+        errors.push(
+          `could not remove ${placedFiles[i]} (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+    }
+    for (let i = backedUpEntries.length - 1; i >= 0; i--) {
+      const { destPath, backupPath } = backedUpEntries[i];
+      try {
+        const backupStat = lstatOrNull(backupPath);
+        if (backupStat) {
+          if (backupStat.isDirectory()) {
+            rmSync(destPath, { recursive: true, force: true });
+            mkdirSync(dirname(destPath), { recursive: true });
+            renameSync(backupPath, destPath);
+          } else {
+            moveEntryAcrossDevices(backupPath, destPath);
+          }
+        }
+      } catch (err) {
+        errors.push(
+          `could not restore ${destPath} (${err instanceof Error ? err.message : String(err)})`,
+        );
+      }
+    }
+    for (let i = createdDirs.length - 1; i >= 0; i--) {
+      try {
+        rmdirSync(createdDirs[i]);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") {
+          errors.push(
+            `could not remove directory ${createdDirs[i]} (${err instanceof Error ? err.message : String(err)})`,
+          );
         }
       }
     }
+    if (errors.length > 0) {
+      throw new Error(errors.join("; "));
+    }
+  };
+
+  try {
+    walk(src, dest, backupDir);
+    return rollback;
+  } catch (err) {
+    try {
+      rollback();
+    } catch (rbErr) {
+      logger.error(
+        { err: rbErr, src, dest },
+        "[feature-status] Rollback after partial tree move failed",
+      );
+    }
+    throw err;
   }
 }
 

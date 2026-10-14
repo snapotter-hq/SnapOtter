@@ -298,6 +298,17 @@ describe("Feature manifest: enablesTools consistency with shared features", () =
       );
     }
   });
+
+  it("manifest smokeImports matches features.ts for each bundle (#1237)", async () => {
+    const { FEATURE_BUNDLES } = await import("@snapotter/shared");
+    for (const [id, bundle] of Object.entries<Record<string, unknown>>(bundles)) {
+      const manifestSmoke = [...(bundle.smokeImports as string[])];
+      const sharedSmoke = (FEATURE_BUNDLES[id] as { smokeImports?: string[] }).smokeImports;
+      expect(sharedSmoke, `${id}: features.ts smokeImports diverges from manifest`).toEqual(
+        manifestSmoke,
+      );
+    }
+  });
 });
 
 describe("OCR optional capability mapping", () => {

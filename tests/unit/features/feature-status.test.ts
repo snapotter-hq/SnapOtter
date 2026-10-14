@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   unlinkSync,
@@ -39,6 +40,7 @@ const fsFaults = vi.hoisted(() => ({
 
 const childProcessFaults = vi.hoisted(() => ({
   nextKernelLockFailure: null as string | null,
+  nextPipInstallTimeout: false,
   reseedOutcomes: [] as Array<"fail" | "success">,
   reseedCalls: [] as Array<{ stdio: unknown }>,
 }));
@@ -72,6 +74,26 @@ vi.mock("node:child_process", async (importOriginal) => {
           status: 1,
           stderr: Buffer.from(detail),
           stdout: Buffer.alloc(0),
+        };
+      }
+      if (
+        childProcessFaults.nextPipInstallTimeout &&
+        Array.isArray(args[1]) &&
+        args[1].includes("pip") &&
+        args[1].includes("install")
+      ) {
+        childProcessFaults.nextPipInstallTimeout = false;
+        const timeoutErr = Object.assign(new Error("spawnSync pip ETIMEDOUT"), {
+          code: "ETIMEDOUT",
+        });
+        return {
+          error: timeoutErr,
+          output: [null, "", ""],
+          pid: 43,
+          signal: "SIGTERM",
+          status: null,
+          stderr: "",
+          stdout: "",
         };
       }
       return actual.spawnSync(...args);
@@ -149,6 +171,7 @@ beforeEach(async () => {
   fsFaults.bakedBaseVenv = null;
   fsFaults.reseedScript = null;
   childProcessFaults.nextKernelLockFailure = null;
+  childProcessFaults.nextPipInstallTimeout = false;
   childProcessFaults.reseedOutcomes.length = 0;
   childProcessFaults.reseedCalls.length = 0;
   ocrRuntime.getCapability.mockReset();
@@ -2162,4 +2185,575 @@ describe("ensureAiDirs", () => {
       expect(existsSync(join(tempDir, "fresh-data"))).toBe(false);
     },
   );
+});
+
+describe("importBundleArchive fixups and smoke verification (#1237)", () => {
+  function setupFakeVenv(
+    options: {
+      pipBehavior?: "ok" | "fail-stderr" | "fail-stdout" | "fail-empty";
+      failImport?: string;
+    } = {},
+  ): { venvPath: string; sitePackagesDir: string } {
+    const venvPath = join(aiDir, "venv");
+    const rawSitePackagesDir = join(venvPath, "lib", "python3.12", "site-packages");
+    mkdirSync(rawSitePackagesDir, { recursive: true });
+    mkdirSync(join(venvPath, "bin"), { recursive: true });
+    const sitePackagesDir = realpathSync(rawSitePackagesDir);
+
+    const pipMode = options.pipBehavior ?? "ok";
+    const failMod = options.failImport ?? "";
+    const script = [
+      "#!/bin/sh",
+      'case "$*" in',
+      "  *sysconfig*)",
+      `    echo ${JSON.stringify(sitePackagesDir)}`,
+      "    exit 0",
+      "    ;;",
+      "  *-m\\ pip\\ install*)",
+      pipMode === "ok"
+        ? `    mkdir -p ${JSON.stringify(join(sitePackagesDir, "nccl_fixup"))}; printf '# installed by pip\\n' > ${JSON.stringify(join(sitePackagesDir, "nccl_fixup", "__init__.py"))}; exit 0`
+        : pipMode === "fail-stderr"
+          ? "    echo 'ERROR: fake_nccl-1.0.0-cp312-linux_x86_64.whl is not a supported wheel on this platform.' >&2; exit 1"
+          : pipMode === "fail-stdout"
+            ? "    echo 'ERROR: No matching distribution found for fake_nccl'; exit 1"
+            : "    exit 2",
+      "    ;;",
+      "  *-m\\ pip\\ uninstall*)",
+      `    rm -rf ${JSON.stringify(join(sitePackagesDir, "nccl_fixup"))}`,
+      "    exit 0",
+      "    ;;",
+      "  *import*)",
+      failMod
+        ? `    case "$*" in *"import ${failMod}"*) echo "ImportError: libnccl.so.2: cannot open shared object file for ${failMod}" >&2; exit 1 ;; esac`
+        : "    :",
+      '    for arg in "$@"; do',
+      '      case "$arg" in',
+      "        import\\ *)",
+      "          mod=$(printf '%s' \"$arg\" | sed 's/^import //')",
+      `          if [ ! -d "${sitePackagesDir}/$mod" ] && [ ! -f "${sitePackagesDir}/$mod.py" ]; then`,
+      "            echo \"ModuleNotFoundError: No module named '$mod'\" >&2",
+      "            exit 1",
+      "          fi",
+      "          ;;",
+      "      esac",
+      "    done",
+      "    exit 0",
+      "    ;;",
+      "esac",
+      "exit 0",
+      "",
+    ].join("\n");
+
+    const binPy = join(venvPath, "bin", "python3");
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+    return { venvPath, sitePackagesDir };
+  }
+
+  async function createTestArchive(options: {
+    bundleId?: string;
+    version?: string;
+    models?: Record<string, string>;
+    sitePackages?: Record<string, string>;
+    fixups?: Record<string, string>;
+  }): Promise<string> {
+    const { createRequire } = await import("node:module");
+    const apiRequire = createRequire(join(process.cwd(), "apps/api/package.json"));
+    const tar = apiRequire("tar") as {
+      create: (
+        opts: { gzip: boolean; file: string; cwd: string },
+        files: string[],
+      ) => Promise<void>;
+    };
+
+    const buildDir = mkdtempSync(join(tempDir, "bundle-src-"));
+    const bundleId = options.bundleId ?? "face-detection";
+    const version = options.version ?? "2.0.0-test";
+    const modelEntries = options.models ?? { "mediapipe/face.tflite": "model-weights" };
+
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId,
+        version,
+        models: Object.keys(modelEntries),
+      }),
+    );
+
+    for (const [rel, content] of Object.entries(modelEntries)) {
+      const full = join(buildDir, "models", rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, content);
+    }
+
+    if (options.sitePackages) {
+      for (const [rel, content] of Object.entries(options.sitePackages)) {
+        const full = join(buildDir, "site-packages", rel);
+        mkdirSync(join(full, ".."), { recursive: true });
+        writeFileSync(full, content);
+      }
+    }
+
+    if (options.fixups) {
+      for (const [rel, content] of Object.entries(options.fixups)) {
+        const full = join(buildDir, "fixups", rel);
+        mkdirSync(join(full, ".."), { recursive: true });
+        writeFileSync(full, content);
+      }
+    }
+
+    const tarPath = join(
+      tempDir,
+      `archive-${Date.now()}-${Math.random().toString(16).slice(2)}.tar.gz`,
+    );
+    await tar.create({ gzip: true, file: tarPath, cwd: buildDir }, ["."]);
+    return tarPath;
+  }
+
+  it("fails with ImportValidationError and leaves no models or site-packages behind when a fixup wheel fails to install", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "fail-stderr" });
+    mkdirSync(join(sitePackagesDir, "mediapipe"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "mediapipe", "__init__.py"), "# existing v1");
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# new v2",
+        "extra_pkg/__init__.py": "# extra",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "bad-wheel",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/fake_nccl.*not a supported wheel/i);
+
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "extra_pkg"))).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "mediapipe", "__init__.py"), "utf-8")).toBe(
+      "# existing v1",
+    );
+  });
+
+  it("fails with ImportValidationError naming the module and stderr and rolls back when a smokeImports module fails", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+    mkdirSync(join(sitePackagesDir, "existing_pkg"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "existing_pkg", "__init__.py"), "# keep me");
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# broken c-ext",
+        "existing_pkg/__init__.py": "# overwritten by bundle",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/mediapipe/);
+    expect((err as Error).message).toMatch(/libnccl\.so\.2/);
+
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "mediapipe"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "nccl_fixup"))).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "existing_pkg", "__init__.py"), "utf-8")).toBe(
+      "# keep me",
+    );
+  });
+
+  it("ignores AppleDouble dotfile wheels in fixups/ and succeeds when fixups and smokeImports pass", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe", "nccl_fixup"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# ok",
+      },
+      fixups: {
+        "._fake_nccl-1.0.0-cp312-linux_x86_64.whl": "appledouble-junk",
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "valid-wheel",
+      },
+    });
+
+    // If the ._fake_nccl dotfile were passed to pip, pkgName would be "._fake_nccl"
+    // or if no real wheel ran, nccl_fixup would be missing and smokeImports would fail.
+    const result = await mod.importBundleArchive(createReadStream(tarPath));
+    expect(result.bundleId).toBe("face-detection");
+    expect(mod.isFeatureInstalled("face-detection")).toBe(true);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "mediapipe", "__init__.py"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "nccl_fixup", "__init__.py"))).toBe(true);
+  });
+
+  it("honors SNAPOTTER_SKIP_INSTALL_SMOKE=1 for offline bundle imports", async () => {
+    const { createReadStream } = await import("node:fs");
+    setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# skipped smoke check",
+      },
+    });
+
+    await expect(mod.importBundleArchive(createReadStream(tarPath))).rejects.toThrow(
+      mod.ImportValidationError,
+    );
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+
+    process.env.SNAPOTTER_SKIP_INSTALL_SMOKE = "1";
+    try {
+      const result = await mod.importBundleArchive(createReadStream(tarPath));
+      expect(result.bundleId).toBe("face-detection");
+      expect(mod.isFeatureInstalled("face-detection")).toBe(true);
+    } finally {
+      delete process.env.SNAPOTTER_SKIP_INSTALL_SMOKE;
+    }
+  });
+
+  it("fails before moving models or spawning pip when a fixups-only archive targets a venv with no interpreter", async () => {
+    const { createReadStream } = await import("node:fs");
+    mkdirSync(join(aiDir, "venv"), { recursive: true });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/could not be queried/i);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+  });
+
+  it("reports a timeout and rolls back site-packages when a fixup wheel pip install times out", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    childProcessFaults.nextPipInstallTimeout = true;
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# staged",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/Timed out while installing fixup wheel.*fake_nccl/i);
+    expect(mod.isFeatureInstalled("face-detection")).toBe(false);
+    expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "mediapipe"))).toBe(false);
+  });
+
+  it("surfaces pip stdout or exit status when fixup wheel install fails without stderr", async () => {
+    const { createReadStream } = await import("node:fs");
+    setupFakeVenv({ pipBehavior: "fail-stdout" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarStdout = await createTestArchive({
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(tarStdout))).rejects.toThrow(
+      /No matching distribution found for fake_nccl/,
+    );
+
+    setupFakeVenv({ pipBehavior: "fail-empty" });
+    const tarEmpty = await createTestArchive({
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(tarEmpty))).rejects.toThrow(
+      /pip exited with status 2/,
+    );
+  });
+
+  it("rejects malformed fixup wheel filenames and invalid smokeImport module names", async () => {
+    const { createReadStream } = await import("node:fs");
+    setupFakeVenv({ pipBehavior: "ok" });
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const badWheelTar = await createTestArchive({
+      fixups: { "-flag_injection-1.0.0.whl": "wheel-bytes" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(badWheelTar))).rejects.toThrow(
+      /Invalid fixup wheel filename/i,
+    );
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe; import os"],
+          },
+        },
+      }),
+    );
+
+    const badSmokeTar = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# ok" },
+    });
+    await expect(mod.importBundleArchive(createReadStream(badSmokeTar))).rejects.toThrow(
+      /invalid smokeImport module name/i,
+    );
+  });
+
+  it("preserves a pre-existing fixup distribution on rollback and falls back to FEATURE_BUNDLES.smokeImports when manifest omits smokeImports", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+
+    // Pre-seed fake_nccl-1.0.0.dist-info and nccl_fixup so it looks already installed
+    mkdirSync(join(sitePackagesDir, "fake_nccl-1.0.0.dist-info"), { recursive: true });
+    mkdirSync(join(sitePackagesDir, "nccl_fixup"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "nccl_fixup", "__init__.py"), "# pre-existing nccl");
+    mkdirSync(join(sitePackagesDir, "existing_parent"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "existing_parent", "keep.py"), "# keep");
+
+    // Manifest entry omits smokeImports; importBundleArchive must fall back to
+    // FEATURE_BUNDLES["face-detection"].smokeImports (["mediapipe"]).
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# broken",
+        "existing_parent/new_child/deep/mod.py": "# nested new",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes",
+      },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/mediapipe/);
+
+    // Pre-existing fake_nccl distribution was NOT uninstalled by rollback
+    expect(existsSync(join(sitePackagesDir, "nccl_fixup", "__init__.py"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "fake_nccl-1.0.0.dist-info"))).toBe(true);
+    // Nested newly created directories were pruned, while existing_parent survived
+    expect(existsSync(join(sitePackagesDir, "existing_parent", "new_child"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "existing_parent", "keep.py"))).toBe(true);
+  });
+
+  it("surfaces ENOSPC from fixup wheel install with code ENOSPC for 507 classification", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath } = setupFakeVenv({ pipBehavior: "ok" });
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      "printf '# installed by pip\\n'",
+      "echo 'ERROR: Could not install packages due to an OSError: [Errno 28] No space left on device' >&2; exit 1 #",
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as NodeJS.ErrnoException).code).toBe("ENOSPC");
+    expect((err as Error).message).toMatch(/No space left on device/i);
+  });
+
+  it("logs and appends rollback warnings when pip uninstall fails during rollback", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath } = setupFakeVenv({ pipBehavior: "ok", failImport: "mediapipe" });
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      /(\*-m\\ pip\\ uninstall\*[\s\S]*?)exit 0/,
+      "$1echo 'ERROR: uninstall lock failure' >&2; exit 1",
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# fail" },
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/rollback warnings:.*uninstall lock failure/i);
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("rejects archives where fixups, site-packages, or models is a regular file with ImportValidationError", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { createRequire } = await import("node:module");
+    const apiRequire = createRequire(join(process.cwd(), "apps/api/package.json"));
+    const tar = apiRequire("tar") as {
+      create: (
+        opts: { gzip: boolean; file: string; cwd: string },
+        files: string[],
+      ) => Promise<void>;
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const buildDir = mkdtempSync(join(tempDir, "bundle-file-fixups-"));
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({ bundleId: "face-detection", version: "1.0.0", models: [] }),
+    );
+    writeFileSync(join(buildDir, "fixups"), "not-a-directory");
+    const tarPath = join(tempDir, `file-fixups-${Date.now()}.tar.gz`);
+    await tar.create({ gzip: true, file: tarPath, cwd: buildDir }, ["."]);
+
+    const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(mod.ImportValidationError);
+    expect((err as Error).message).toMatch(/Archive entry "fixups" must be a directory/i);
+  });
 });
