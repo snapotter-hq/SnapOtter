@@ -40,6 +40,40 @@ GFPGAN_MODEL_PATH = os.environ.get(
     os.path.join(_MODELS_BASE, "gfpgan", "GFPGANv1.3.pth"),
 )
 
+GPU_TILE_SIZE = 512
+CPU_TILE_SIZE = 256
+FALLBACK_CPU_TILE_SIZE = 128
+OOM_ERROR_PATTERNS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "failed to allocate",
+)
+
+
+def default_tile_size(use_gpu: bool) -> int:
+    """Return the initial Real-ESRGAN tile size for the active device.
+
+    CPU inference runs in fp32 (half=False), so starting at 256px quarters per-tile
+    activation memory instead of waiting for a CUDA-style RuntimeError that never
+    fires before the Linux OOM killer sends SIGKILL (#2513).
+    """
+    return GPU_TILE_SIZE if use_gpu else CPU_TILE_SIZE
+
+
+def fallback_tile_size(current_tile: int) -> int:
+    """Return a smaller tile size when an OOM RuntimeError is caught."""
+    return FALLBACK_CPU_TILE_SIZE if current_tile <= CPU_TILE_SIZE else CPU_TILE_SIZE
+
+
+def is_oom_error(error: BaseException) -> bool:
+    """Return True for CUDA or CPU memory allocation failures."""
+    if isinstance(error, MemoryError):
+        return True
+    msg = str(error).lower()
+    return any(pattern in msg for pattern in OOM_ERROR_PATTERNS)
+
 
 def realesrgan_failure_message(error: BaseException) -> str:
     """Say what actually went wrong with Real-ESRGAN, and what to do about it.
@@ -51,6 +85,11 @@ def realesrgan_failure_message(error: BaseException) -> str:
     shape that really means "not installed"; anything else is an install that is
     there and broken, which needs a reinstall rather than an install.
     """
+    if is_oom_error(error):
+        return (
+            f"Real-ESRGAN ran out of memory: {error}. "
+            "Try a smaller image, lower scale factor, or use model=lanczos for basic upscaling."
+        )
     missing = isinstance(error, (ModuleNotFoundError, FileNotFoundError))
     remedy = (
         "Install the upscale-enhance feature"
@@ -152,7 +191,7 @@ def main():
                         num_grow_ch=32,
                         scale=4,
                     )
-                    tile_size = 512
+                    tile_size = default_tile_size(use_gpu)
                     upsampler = RealESRGANer(
                         scale=4,
                         model_path=REALESRGAN_MODEL_PATH,
@@ -175,16 +214,20 @@ def main():
                     def _enhance():
                         try:
                             return upsampler.enhance(img_array, outscale=scale)
-                        except RuntimeError as oom_err:
-                            if "out of memory" not in str(oom_err).lower():
+                        except (RuntimeError, MemoryError) as oom_err:
+                            if not is_oom_error(oom_err):
                                 raise
-                            torch.cuda.empty_cache()
+                            retry_tile = fallback_tile_size(upsampler.tile)
+                            if retry_tile >= upsampler.tile:
+                                raise
+                            if use_gpu:
+                                torch.cuda.empty_cache()
                             print(
-                                f"[upscale] OOM with tile={tile_size}, retrying with tile=256",
+                                f"[upscale] OOM with tile={upsampler.tile}, retrying with tile={retry_tile}",
                                 file=sys.stderr,
                                 flush=True,
                             )
-                            upsampler.tile = 256
+                            upsampler.tile = retry_tile
                             return upsampler.enhance(img_array, outscale=scale)
 
                     output_array, _ = run_with_heartbeat(
@@ -225,17 +268,21 @@ def main():
                                 only_center_face=False,
                                 paste_back=True,
                             )
-                        except RuntimeError as oom_err:
-                            if "out of memory" not in str(oom_err).lower():
+                        except (RuntimeError, MemoryError) as oom_err:
+                            if not is_oom_error(oom_err):
                                 raise
-                            torch.cuda.empty_cache()
+                            retry_tile = fallback_tile_size(upsampler.tile)
+                            if retry_tile >= upsampler.tile:
+                                raise
+                            if use_gpu:
+                                torch.cuda.empty_cache()
                             print(
-                                "[upscale] OOM during face enhance, retrying with tile=256",
+                                f"[upscale] OOM during face enhance, retrying with tile={retry_tile}",
                                 file=sys.stderr,
                                 flush=True,
                             )
                             emit_progress(84, "Retrying face enhancement")
-                            upsampler.tile = 256
+                            upsampler.tile = retry_tile
                             face_enhancer.bg_upsampler = upsampler
                             _, _, face_output = face_enhancer.enhance(
                                 img_array,
@@ -253,7 +300,7 @@ def main():
                         os.close(stdout_fd)
                     sys.stdout = sys.__stdout__
 
-            except (ImportError, FileNotFoundError, RuntimeError, OSError) as e:
+            except (ImportError, FileNotFoundError, RuntimeError, MemoryError, OSError) as e:
                 import traceback
                 print(f"[upscale] Real-ESRGAN failed: {e}", file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)

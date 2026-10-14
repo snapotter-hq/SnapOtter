@@ -1,5 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => {
   const mockSharp = vi.fn(() => ({
@@ -22,13 +26,18 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => ({
   isGpuAvailable: vi.fn().mockReturnValue(false),
 }));
 
+import { isToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import {
   isGpuAvailable,
   parseStdoutJson,
   runPythonWithProgress,
 } from "../../../packages/ai/src/bridge.js";
-import { upscale } from "../../../packages/ai/src/upscaling.js";
+import {
+  MAX_CPU_UPSCALE_MP,
+  MAX_CPU_UPSCALE_OUTPUT_MP,
+  upscale,
+} from "../../../packages/ai/src/upscaling.js";
 
 const FAKE_INPUT = Buffer.from("fake-small-image");
 const FAKE_OUTPUT_DIR = "/tmp/test-upscale";
@@ -459,6 +468,336 @@ describe("upscale", () => {
       );
 
       await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("segmentation fault");
+    });
+  });
+
+  describe("CPU pixel limits (issue #2513)", () => {
+    afterEach(() => {
+      delete process.env.MAX_CPU_UPSCALE_MP;
+    });
+
+    it("exports MAX_CPU_UPSCALE_MP=4 and MAX_CPU_UPSCALE_OUTPUT_MP=64", () => {
+      expect(MAX_CPU_UPSCALE_MP).toBe(4);
+      expect(MAX_CPU_UPSCALE_OUTPUT_MP).toBe(64);
+    });
+
+    it("rejects a 12 MP (4000x3000) input on CPU before writing input_upscale.png or spawning Python", async () => {
+      const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer,
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+
+      let caught: unknown;
+      try {
+        await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 });
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(isToolInputError(caught)).toBe(true);
+      expect((caught as Error).message).toMatch(/12\.0 MP.*max 4 MP on CPU/i);
+      expect(toBuffer).not.toHaveBeenCalled();
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(runPythonWithProgress).not.toHaveBeenCalled();
+    });
+
+    it("allows a 12 MP (4000x3000) input when a GPU is available", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(true);
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toMatchObject({
+        width: 1600,
+        height: 1200,
+      });
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects CPU upscale when output megapixels exceed MAX_CPU_UPSCALE_OUTPUT_MP (e.g. 3 MP at 8x = 192 MP)", async () => {
+      const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer,
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 1500 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+
+      let caught: unknown;
+      try {
+        await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 8 });
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(isToolInputError(caught)).toBe(true);
+      expect((caught as Error).message).toMatch(/192\.0 MP at 8x.*max 64 MP on CPU/i);
+      expect(toBuffer).not.toHaveBeenCalled();
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(runPythonWithProgress).not.toHaveBeenCalled();
+    });
+
+    it("honors MAX_CPU_UPSCALE_MP env override and disables the CPU cap when set to 0", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+
+      process.env.MAX_CPU_UPSCALE_MP = "0";
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toBeDefined();
+
+      process.env.MAX_CPU_UPSCALE_MP = "2";
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        /12\.0 MP.*max 2 MP on CPU/i,
+      );
+
+      // Proportional output ceiling when MAX_CPU_UPSCALE_MP=2 -> maxCpuOutputMp = 32 MP
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 1500, height: 1000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 6 })).rejects.toThrow(
+        /54\.0 MP at 6x.*max 32 MP on CPU/i,
+      );
+
+      // Invalid/negative env values fall back to default 4 MP ceiling
+      process.env.MAX_CPU_UPSCALE_MP = "-2";
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).resolves.toBeDefined();
+      process.env.MAX_CPU_UPSCALE_MP = "invalid";
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).resolves.toBeDefined();
+    });
+
+    it("allows exact 4.0 MP input at 4x (64.0 MP output) on CPU and formats near-boundary 4.02 MP with 2 decimals", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 2000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toBeDefined();
+
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2010, height: 2000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        /4\.02 MP, max 4 MP on CPU/,
+      );
+    });
+
+    it("exempts model=lanczos from the 4 MP AI input cap on CPU while still enforcing the 64 MP output cap", async () => {
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      vi.mocked(isGpuAvailable).mockReturnValue(false);
+
+      // 12 MP at 2x = 48 MP output (<= 64 MP): allowed for lanczos
+      await expect(
+        upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2, model: "lanczos" }),
+      ).resolves.toBeDefined();
+
+      // 12 MP at 4x = 192 MP output (> 64 MP): still rejected on CPU
+      await expect(
+        upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4, model: "lanczos" }),
+      ).rejects.toThrow(/192\.0 MP at 4x.*max 64 MP on CPU/i);
+    });
+  });
+
+  describe.skipIf(!hasPython)("upscale.py CPU vs GPU tile sizing (issue #2513)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pyDir = resolve(here, "../../../packages/ai/python");
+
+    it("uses 256px fp32 tiles on CPU and 512px fp16 tiles on GPU, with CPU OOM fallback to 128 without empty_cache", () => {
+      const script = `
+import importlib.util, json, os, sys, tempfile, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+spec = importlib.util.spec_from_file_location("upscale_mod", os.path.join(py_dir, "upscale.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+assert mod.default_tile_size(False) == 256, f"expected CPU tile 256, got {mod.default_tile_size(False)}"
+assert mod.default_tile_size(True) == 512, f"expected GPU tile 512, got {mod.default_tile_size(True)}"
+assert mod.fallback_tile_size(512) == 256
+assert mod.fallback_tile_size(256) == 128
+assert mod.is_oom_error(RuntimeError("DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.")) is True
+assert mod.is_oom_error(MemoryError("unable to allocate array")) is True
+
+with tempfile.TemporaryDirectory() as tmp:
+    weights_path = os.path.join(tmp, "RealESRGAN_x4plus.pth")
+    gfpgan_path = os.path.join(tmp, "GFPGANv1.3.pth")
+    with open(weights_path, "wb") as f:
+        f.write(b"weights")
+    with open(gfpgan_path, "wb") as f:
+        f.write(b"gfpgan")
+    mod.REALESRGAN_MODEL_PATH = weights_path
+    mod.GFPGAN_MODEL_PATH = gfpgan_path
+
+    # Stub PIL, numpy, basicsr, realesrgan, gfpgan, offline_guard, gpu, torch
+    pil_mod = types.ModuleType("PIL")
+    class FakeImageObj:
+        width = 64
+        height = 64
+        size = (128, 128)
+        def convert(self, mode, **kw): return self
+        def save(self, path, **kw):
+            with open(path, "wb") as f: f.write(b"png")
+    class FakeImageMod:
+        ADAPTIVE = 1
+        LANCZOS = 1
+        @staticmethod
+        def open(path): return FakeImageObj()
+        @staticmethod
+        def fromarray(arr): return FakeImageObj()
+    pil_mod.Image = FakeImageMod
+    sys.modules["PIL"] = pil_mod
+
+    np_mod = types.ModuleType("numpy")
+    np_mod.array = lambda img: "fake_rgb_array"
+    sys.modules["numpy"] = np_mod
+
+    basicsr_mod = types.ModuleType("basicsr")
+    basicsr_archs = types.ModuleType("basicsr.archs")
+    basicsr_rrdb = types.ModuleType("basicsr.archs.rrdbnet_arch")
+    basicsr_rrdb.RRDBNet = lambda **kw: ("rrdb", kw)
+    sys.modules["basicsr"] = basicsr_mod
+    sys.modules["basicsr.archs"] = basicsr_archs
+    sys.modules["basicsr.archs.rrdbnet_arch"] = basicsr_rrdb
+
+    recorded = []
+    face_recorded = []
+    empty_cache_calls = []
+
+    torch_mod = types.ModuleType("torch")
+    torch_mod.device = lambda name: f"device:{name}"
+    torch_cuda = types.SimpleNamespace(empty_cache=lambda: empty_cache_calls.append(1))
+    torch_mod.cuda = torch_cuda
+    sys.modules["torch"] = torch_mod
+
+    gpu_state = {"avail": False}
+    gpu_mod = types.ModuleType("gpu")
+    gpu_mod.torch_gpu_available = lambda: gpu_state["avail"]
+    sys.modules["gpu"] = gpu_mod
+
+    fail_first = {"active": True, "face_oom": False}
+    class FakeRealESRGANer:
+        def __init__(self, **kw):
+            self.tile = kw["tile"]
+            self.half = kw["half"]
+            self.device = kw["device"]
+            recorded.append({"init_tile": self.tile, "half": self.half, "device": self.device, "enhance_tiles": []})
+        def enhance(self, img_array, outscale=2):
+            recorded[-1]["enhance_tiles"].append(self.tile)
+            if fail_first["active"] and len(recorded[-1]["enhance_tiles"]) == 1:
+                raise RuntimeError("DefaultCPUAllocator: not enough memory: tried to allocate 600MB")
+            return ("out_arr", None)
+
+    realesrgan_mod = types.ModuleType("realesrgan")
+    realesrgan_mod.RealESRGANer = FakeRealESRGANer
+    sys.modules["realesrgan"] = realesrgan_mod
+
+    class FakeGFPGANer:
+        def __init__(self, **kw):
+            self.bg_upsampler = kw["bg_upsampler"]
+            face_recorded.append({"enhance_tiles": []})
+        def enhance(self, img_array, **kw):
+            face_recorded[-1]["enhance_tiles"].append(self.bg_upsampler.tile)
+            if fail_first["face_oom"] and len(face_recorded[-1]["enhance_tiles"]) == 1:
+                raise RuntimeError("DefaultCPUAllocator: not enough memory")
+            return (None, None, "face_out_arr")
+
+    gfpgan_mod = types.ModuleType("gfpgan")
+    gfpgan_mod.GFPGANer = FakeGFPGANer
+    sys.modules["gfpgan"] = gfpgan_mod
+
+    offline_mod = types.ModuleType("offline_guard")
+    offline_mod.prepare_gfpgan_helper_weights = lambda base: None
+    sys.modules["offline_guard"] = offline_mod
+
+    in_path = os.path.join(tmp, "in.png")
+    out_path = os.path.join(tmp, "out.png")
+    with open(in_path, "wb") as f:
+        f.write(b"in")
+
+    # 1) CPU run with OOM retry (real DefaultCPUAllocator: not enough memory string):
+    #    starts at tile=256, retries at tile=128, does NOT call empty_cache
+    sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan"})]
+    mod.main()
+    assert len(recorded) == 1
+    assert recorded[0]["init_tile"] == 256
+    assert recorded[0]["half"] is False
+    assert recorded[0]["device"] == "device:cpu"
+    assert recorded[0]["enhance_tiles"] == [256, 128], recorded[0]
+    assert len(empty_cache_calls) == 0, f"expected 0 empty_cache calls on CPU, got {len(empty_cache_calls)}"
+
+    # 2) CPU run where _enhance succeeds at 256 and faceEnhance hits OOM at 256 -> retries at 128 without empty_cache
+    fail_first["active"] = False
+    fail_first["face_oom"] = True
+    sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan", "faceEnhance": True})]
+    mod.main()
+    assert len(recorded) == 2
+    assert recorded[1]["enhance_tiles"] == [256]
+    assert face_recorded[-1]["enhance_tiles"] == [256, 128], face_recorded[-1]
+    assert len(empty_cache_calls) == 0
+
+    # 3) GPU run with OOM retry: starts at tile=512, retries at tile=256, calls empty_cache
+    fail_first["active"] = True
+    fail_first["face_oom"] = False
+    gpu_state["avail"] = True
+    sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan"})]
+    mod.main()
+    assert len(recorded) == 3
+    assert recorded[2]["init_tile"] == 512
+    assert recorded[2]["half"] is True
+    assert recorded[2]["device"] == "device:cuda"
+    assert recorded[2]["enhance_tiles"] == [512, 256], recorded[2]
+    assert len(empty_cache_calls) == 1, f"expected 1 empty_cache call on GPU, got {len(empty_cache_calls)}"
+
+print("TILE_OK")
+`;
+      const res = spawnSync(pythonBin as string, ["-c", script], {
+        encoding: "utf8",
+        timeout: 15_000,
+      });
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("TILE_OK");
     });
   });
 });

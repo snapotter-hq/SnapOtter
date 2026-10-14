@@ -64,3 +64,31 @@ def test_a_runtime_failure_points_at_a_repair_rather_than_an_install():
 
     assert "Install the upscale-enhance feature" not in message
     assert "Reset AI Environment" in message
+
+
+def test_default_and_fallback_tile_sizes_distinguish_cpu_and_gpu():
+    upscale = load_upscale()
+
+    assert upscale.default_tile_size(False) == 256
+    assert upscale.default_tile_size(True) == 512
+    assert upscale.fallback_tile_size(512) == 256
+    assert upscale.fallback_tile_size(256) == 128
+
+
+def test_oom_errors_report_memory_remedy_rather_than_reinstall():
+    upscale = load_upscale()
+
+    cpu_oom = RuntimeError(
+        "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+    )
+    assert upscale.is_oom_error(cpu_oom) is True
+    assert upscale.is_oom_error(MemoryError("unable to allocate array")) is True
+    assert upscale.is_oom_error(RuntimeError("CUDA error: no kernel image")) is False
+
+    message = upscale.realesrgan_failure_message(cpu_oom)
+    assert "out of memory" in message.lower()
+    assert "Reinstall" not in message
+    assert "Reset AI Environment" not in message
+    assert "model=lanczos" in message
+
+
