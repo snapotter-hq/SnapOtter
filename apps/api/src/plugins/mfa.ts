@@ -885,14 +885,10 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Activate MFA and clear any failed-attempt counter (the challenge key was deleted on claim).
-      await db
-        .update(schema.users)
-        .set({ totpEnabled: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, userId));
+      // Clear any failed-attempt counter (the challenge key was deleted on claim).
       await redis.del(attemptsKey);
 
-      // Create a session, same as the complete route's login completion.
+      // Activate MFA and create a session atomically inside the password-check transaction.
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
       const verifiedUser = dbUser;
@@ -909,10 +905,17 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           const freshFingerprint = lockedUser?.passwordHash
             ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
             : null;
-          if (freshFingerprint !== hashFingerprint) return false;
+          if (freshFingerprint !== hashFingerprint) {
+            return lockedUser?.passwordHash ? "password_changed" : "password_removed";
+          }
         } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
-          return false;
+          return lockedUser?.passwordHash ? "password_changed" : "password_removed";
         }
+
+        await tx
+          .update(schema.users)
+          .set({ totpEnabled: true, updatedAt: new Date() })
+          .where(eq(schema.users.id, verifiedUser.id));
 
         await tx.insert(schema.sessions).values({
           id: token,
@@ -920,10 +923,15 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           expiresAt,
         });
 
-        return true;
+        return "success";
       });
 
-      if (!inserted) {
+      if (inserted !== "success") {
+        await audit("MFA_VERIFY_FAILED", {
+          userId: verifiedUser.id,
+          username: verifiedUser.username,
+          reason: inserted,
+        });
         return reply.status(401).send({
           error: "Enrollment challenge expired or invalid",
           code: "MFA_EXPIRED",
