@@ -46,6 +46,22 @@ function makePayload(settings: Record<string, unknown>, buffer?: Buffer, filenam
   return { body, contentType };
 }
 
+async function frameCentres(buffer: Buffer): Promise<string[]> {
+  const { data, info } = await sharp(buffer, { animated: true })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const meta = await sharp(buffer, { animated: true }).metadata();
+  const pages = meta.pages ?? 1;
+  const pageHeight = meta.pageHeight ?? info.height;
+  const width = info.width;
+
+  return Array.from({ length: pages }, (_, page) => {
+    const y = page * pageHeight + Math.floor(pageHeight / 2);
+    const offset = (y * width + Math.floor(width / 2)) * info.channels;
+    return `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
+  });
+}
+
 // ── Metadata endpoint ─────────────────────────────────────────────
 describe("POST /api/v1/tools/image/gif-tools/info", () => {
   it("returns metadata for an animated GIF", async () => {
@@ -273,13 +289,15 @@ describe("Reverse mode", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
 
-    // Download and verify it still has 3 frames
+    // Download and verify it still has 3 frames with reversed frame colours (#1221)
     const dlRes = await app.inject({
       method: "GET",
       url: result.downloadUrl,
     });
     const meta = await sharp(dlRes.rawPayload).metadata();
     expect(meta.pages).toBe(3);
+    const sourceCentres = await frameCentres(animatedGif);
+    expect(await frameCentres(dlRes.rawPayload)).toEqual([...sourceCentres].reverse());
   });
 });
 
@@ -376,6 +394,13 @@ describe("Rotate mode", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+    const sourceCentres = await frameCentres(animatedGif);
+    expect(await frameCentres(dlRes.rawPayload)).toEqual(sourceCentres);
   });
 
   it("rotates 180 degrees", async () => {

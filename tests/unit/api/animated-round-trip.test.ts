@@ -8,6 +8,7 @@ import { registerColorBlindness } from "../../../apps/api/src/routes/tools/color
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
 import { registerCrop } from "../../../apps/api/src/routes/tools/crop.js";
 import { registerDuotone } from "../../../apps/api/src/routes/tools/duotone.js";
+import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
 import { registerImagePad } from "../../../apps/api/src/routes/tools/image-pad.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
@@ -47,6 +48,7 @@ beforeAll(() => {
   registerCompress(app);
   registerCrop(app);
   registerDuotone(app);
+  registerGifTools(app);
   registerImageEnhancement(app);
   registerImagePad(app);
   registerOptimizeForWeb(app);
@@ -523,5 +525,93 @@ describe("still images are untouched by the animated path (#1083)", () => {
     const shape = await frameShape(out);
 
     expect(shape).toEqual({ pages: 1, width: 200, pageHeight: 150 });
+  });
+});
+
+describe("gif-tools reverse and rotate preserve each frame's colours (#1221)", () => {
+  const FRAME_COLOURS = ["220,30,30", "30,200,60", "40,60,220"] as const;
+
+  async function rgbThreeFrameGif(): Promise<Buffer> {
+    const frames = await Promise.all(
+      [
+        { r: 220, g: 30, b: 30 },
+        { r: 30, g: 200, b: 60 },
+        { r: 40, g: 60, b: 220 },
+      ].map((background) =>
+        sharp({
+          create: { width: 40, height: 24, channels: 3, background },
+        })
+          .png()
+          .toBuffer(),
+      ),
+    );
+    return await sharp(frames, { join: { across: 1, animated: true } })
+      .gif({ delay: FRAME_DELAYS, loop: FRAME_LOOP })
+      .toBuffer();
+  }
+
+  async function frameCentres(buffer: Buffer): Promise<string[]> {
+    const { data, info } = await sharp(buffer, { animated: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const meta = await sharp(buffer, { animated: true }).metadata();
+    const pages = meta.pages ?? 1;
+    const pageHeight = meta.pageHeight ?? info.height;
+    const width = info.width;
+
+    return Array.from({ length: pages }, (_, page) => {
+      const y = page * pageHeight + Math.floor(pageHeight / 2);
+      const offset = (y * width + Math.floor(width / 2)) * info.channels;
+      return `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
+    });
+  }
+
+  async function runGifTools(settings: Record<string, unknown>, input?: Buffer): Promise<Buffer> {
+    const config = getToolConfig("gif-tools");
+    if (!config) throw new Error("gif-tools must be registered");
+    const result = await config.process(
+      input ?? (await rgbThreeFrameGif()),
+      config.settingsSchema.parse(settings),
+      "rgb.gif",
+    );
+    return result.buffer;
+  }
+
+  it("reverse flips frame colours and delays without painting every frame in the last frame's palette", async () => {
+    const out = await runGifTools({ mode: "reverse", speedFactor: 2, loop: 4 });
+
+    expect(await frameCentres(out)).toEqual([...FRAME_COLOURS].reverse());
+    expect(await frameTiming(out)).toEqual({
+      delay: [100, 60, 40],
+      loop: 4,
+    });
+  });
+
+  it("rotate 90 degrees keeps every frame's colour and swaps frame dimensions", async () => {
+    const out = await runGifTools({ mode: "rotate", angle: 90, loop: 3 });
+
+    expect(await frameCentres(out)).toEqual([...FRAME_COLOURS]);
+    expect(await frameShape(out)).toEqual({ pages: 3, width: 24, pageHeight: 40 });
+    expect(await frameTiming(out)).toEqual({ delay: FRAME_DELAYS, loop: 3 });
+  });
+
+  it("rotate with horizontal and vertical flips keeps every frame's colour and order", async () => {
+    const out = await runGifTools({ mode: "rotate", flipH: true, flipV: true, loop: 2 });
+
+    expect(await frameCentres(out)).toEqual([...FRAME_COLOURS]);
+    expect(await frameTiming(out)).toEqual({ delay: FRAME_DELAYS, loop: 2 });
+  });
+
+  it("rotate 90 degrees on a single-frame GIF keeps its colour and swaps dimensions", async () => {
+    const singleGif = await sharp({
+      create: { width: 40, height: 24, channels: 3, background: { r: 30, g: 200, b: 60 } },
+    })
+      .gif()
+      .toBuffer();
+
+    const out = await runGifTools({ mode: "rotate", angle: 90 }, singleGif);
+
+    expect(await frameCentres(out)).toEqual(["30,200,60"]);
+    expect(await frameShape(out)).toEqual({ pages: 1, width: 24, pageHeight: 40 });
   });
 });
