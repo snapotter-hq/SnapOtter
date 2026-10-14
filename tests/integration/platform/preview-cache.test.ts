@@ -185,6 +185,7 @@ describe("stored-file preview when the stored file is gone (#1439)", () => {
   it.each([
     ["audio", "gone.wav", "audio/wav", () => readFixture(fixtures.audio.tiny("wav"))],
     ["video", "gone.mp4", "video/mp4", () => readFixture(fixtures.video.tiny("mp4"))],
+    ["pdf", "gone.pdf", "application/pdf", () => readFixture(fixtures.document.pdf2)],
   ])(
     "answers a missing %s file with a 500, without running ffmpeg",
     async (_kind, name, type, content) => {
