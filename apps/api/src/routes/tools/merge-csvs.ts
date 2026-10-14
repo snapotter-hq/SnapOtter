@@ -32,7 +32,10 @@ export function registerMergeCsvs(app: FastifyInstance) {
       const fields = firstResult.meta.fields ?? [];
       const fieldSet = new Set(fields);
       const detectedDelimiter = firstResult.meta.delimiter || ",";
-      const allRows: Record<string, unknown>[] = [...firstResult.data];
+      const allRows: Record<string, unknown>[] = [];
+      for (const row of firstResult.data) {
+        allRows.push(row);
+      }
 
       // Parse remaining files and validate headers match
       for (let i = 1; i < ctx.inputs.length; i++) {
@@ -49,7 +52,9 @@ export function registerMergeCsvs(app: FastifyInstance) {
           throw new InputValidationError(`${input.filename} has different columns`);
         }
 
-        allRows.push(...result.data);
+        for (const row of result.data) {
+          allRows.push(row);
+        }
       }
 
       // Unparse preserving the first file's field order and delimiter
