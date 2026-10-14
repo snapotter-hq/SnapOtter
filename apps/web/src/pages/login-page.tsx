@@ -647,11 +647,13 @@ export function LoginPage() {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  maxLength={6}
+                  maxLength={20}
                   autoComplete="one-time-code"
                   placeholder={t.settings.security.twoFactorCodePlaceholder}
                   value={enrollmentCode}
-                  onChange={(e) => setEnrollmentCode(e.target.value.replace(/[^0-9]/g, ""))}
+                  onChange={(e) =>
+                    setEnrollmentCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))
+                  }
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !enrollmentLoading && enrollmentCode.length >= 6)
                       handleEnrollComplete();

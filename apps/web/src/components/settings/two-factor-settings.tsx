@@ -246,9 +246,9 @@ export function TwoFactorSettings() {
               type="text"
               inputMode="numeric"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
+              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
               placeholder={t.settings.security.twoFactorCodePlaceholder}
-              maxLength={6}
+              maxLength={20}
               className="w-40 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground tracking-widest"
             />
           </div>
@@ -292,9 +292,9 @@ export function TwoFactorSettings() {
             type="text"
             inputMode="numeric"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
+            onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
             placeholder={t.settings.security.twoFactorCodePlaceholder}
-            maxLength={6}
+            maxLength={20}
             aria-label={t.settings.security.twoFactorEnterCode}
             className="w-40 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground tracking-widest"
           />

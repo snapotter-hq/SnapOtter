@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const useAuth = vi.hoisted(() => vi.fn());
@@ -335,4 +336,42 @@ describe("TwoFactorSettings", () => {
     fireEvent.change(codeInput, { target: { value: "999999" } });
     expect(submitButton).not.toBeDisabled();
   });
+
+  it.each(["123 456", "123-456", " 123456", " 123-456 ", "12345678"])(
+    "keeps all 6 digits (and caps at 6) when %j is pasted into the enrollment verify input (#2480)",
+    async (pasted) => {
+      useAuth.mockReturnValue({ totpEnabled: false });
+      respondToEnroll();
+
+      render(<TwoFactorSettings />);
+      const codeInput = await startEnrollment();
+      const user = userEvent.setup();
+      await user.click(codeInput);
+      await user.paste(pasted);
+
+      expect(codeInput.value).toBe("123456");
+      expect(screen.getByRole("button", { name: /confirm and enable/i })).toBeEnabled();
+    },
+  );
+
+  it.each(["654 321", "654-321", " 654321", " 654-321 ", "65432199"])(
+    "keeps all 6 digits (and caps at 6) when %j is pasted into the disable input (#2480)",
+    async (pasted) => {
+      useAuth.mockReturnValue({ totpEnabled: true });
+
+      render(<TwoFactorSettings />);
+      fireEvent.click(screen.getByRole("button", { name: /disable two-factor authentication/i }));
+
+      const codeInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+      const user = userEvent.setup();
+      await user.click(codeInput);
+      await user.paste(pasted);
+
+      expect(codeInput.value).toBe("654321");
+      const submitButtons = screen.getAllByRole("button", {
+        name: /disable two-factor authentication/i,
+      });
+      expect(submitButtons[submitButtons.length - 1]).toBeEnabled();
+    },
+  );
 });
