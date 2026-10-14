@@ -139,6 +139,7 @@ export interface ProgressSubscription {
 export function subscribeExportJobProgress(
   jobId: string,
   handlers: ProgressHandlers,
+  toolId = "editor-export",
 ): ProgressSubscription {
   let es: EventSource | null = null;
   let stall: ReturnType<typeof setTimeout> | null = null;
@@ -198,7 +199,7 @@ export function subscribeExportJobProgress(
           completed = checkToolResult<ConvertResult>(data.result);
         } catch (err) {
           cleanup();
-          reportMalformedResult(err, { toolId: "editor-export" });
+          reportMalformedResult(err, { toolId });
           handlers.onFailed({ reason: "invalidResponse" });
           return;
         }
