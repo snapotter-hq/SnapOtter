@@ -28,6 +28,7 @@ import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
+import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -84,6 +85,9 @@ export function registerEraseObject(app: FastifyInstance) {
       // The web client always names the mask part mask.png.
       const uniqueName = createUniqueNamer();
       const disconnect = trackClientDisconnect(request, reply);
+      let parsedParts = false;
+      let uploadsCleaned = false;
+      let enqueued = false;
 
       try {
         try {
@@ -116,6 +120,7 @@ export function registerEraseObject(app: FastifyInstance) {
           const failure = multipartFailure(err);
           return reply.status(failure.status).send(failure.body);
         }
+        parsedParts = true;
 
         const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
         if (clientJobIdField === null) {
@@ -152,6 +157,7 @@ export function registerEraseObject(app: FastifyInstance) {
             uploadKeys: [uploadedImageKey, maskKey],
             log: request.log,
           });
+          uploadsCleaned = true;
           return;
         }
 
@@ -250,6 +256,7 @@ export function registerEraseObject(app: FastifyInstance) {
             uploadKeys: [uploadedImageKey, imageKey, maskKey],
             log: request.log,
           });
+          uploadsCleaned = true;
           return;
         }
 
@@ -270,24 +277,31 @@ export function registerEraseObject(app: FastifyInstance) {
             uploadKeys: [uploadedImageKey, imageKey, maskKey],
             log: request.log,
           });
+          uploadsCleaned = true;
           return;
         }
 
         // Enqueue with both image and mask as inputRefs; the worker handler
         // reads them via getObjectBuffer.
-        await enqueueToolJob({
-          jobId,
-          toolId,
-          userId,
-          pool: "ai",
-          inputRefs: [imageKey, maskKey],
-          filename,
-          settings: { format, quality, qualityMode },
-          clientJobId: clientJobId ?? undefined,
-          fileId: fileId ?? undefined,
-          saveMode,
-          kind: "ai-tool",
-        });
+        enqueued = true;
+        try {
+          await enqueueToolJob({
+            jobId,
+            toolId,
+            userId,
+            pool: "ai",
+            inputRefs: [imageKey, maskKey],
+            filename,
+            settings: { format, quality, qualityMode },
+            clientJobId: clientJobId ?? undefined,
+            fileId: fileId ?? undefined,
+            saveMode,
+            kind: "ai-tool",
+          });
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
 
         if (await disconnect.armCancelAfterEnqueue(jobId, request.log)) {
           return;
@@ -296,6 +310,9 @@ export function registerEraseObject(app: FastifyInstance) {
         return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
       } finally {
         disconnect.release();
+        if (parsedParts && !enqueued && !uploadsCleaned) {
+          await discardUnenqueuedUploads(jobId, request.log);
+        }
       }
     },
   );

@@ -24,6 +24,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -144,98 +145,109 @@ export function registerBlurBackground(app: FastifyInstance) {
         return reply.status(failure.status).send(failure.body);
       }
 
-      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
-      if (clientJobIdField === null) {
-        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
-      }
-      clientJobId = clientJobIdField ?? null;
-
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      if (!inputKey) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const { getObjectBuffer, putObject } = await import("../../lib/object-storage.js");
-      fileBuffer = await getObjectBuffer(inputKey);
-
-      if (!fileBuffer || fileBuffer.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      let settings: z.infer<typeof settingsSchema>;
+      let enqueued = false;
       try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
         }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
+        clientJobId = clientJobIdField ?? null;
 
-      try {
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
         }
-        if (needsCliDecode(validation.format)) {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
         }
-        fileBuffer = await autoOrient(fileBuffer);
-      } catch (err) {
-        if (isDecoderUnavailable(err)) throw err;
-        request.log.error({ err, toolId }, "Input decoding failed");
-        return reply.status(422).send({
-          error: "Processing failed",
-          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
-        });
+
+        if (!inputKey) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const { getObjectBuffer, putObject } = await import("../../lib/object-storage.js");
+        fileBuffer = await getObjectBuffer(inputKey);
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const validation = await validateImageBuffer(fileBuffer, filename);
+        if (!validation.valid) {
+          return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+        }
+
+        let settings: z.infer<typeof settingsSchema>;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        try {
+          if (validation.format === "heif") {
+            fileBuffer = await decodeHeic(fileBuffer);
+            const ext = filename.match(/\.[^.]+$/)?.[0];
+            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+          }
+          if (needsCliDecode(validation.format)) {
+            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+            const ext = filename.match(/\.[^.]+$/)?.[0];
+            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+          }
+          fileBuffer = await autoOrient(fileBuffer);
+        } catch (err) {
+          if (isDecoderUnavailable(err)) throw err;
+          request.log.error({ err, toolId }, "Input decoding failed");
+          return reply.status(422).send({
+            error: "Processing failed",
+            details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+          });
+        }
+
+        const decodedKey = `uploads/${jobId}/${filename}`;
+        if (decodedKey !== inputKey) {
+          await putObject(decodedKey, fileBuffer);
+          inputKey = decodedKey;
+        } else {
+          await putObject(inputKey, fileBuffer);
+        }
+
+        enqueued = true;
+        try {
+          await enqueueToolJob({
+            jobId,
+            toolId,
+            userId,
+            pool: "ai",
+            inputRefs: [inputKey],
+            filename,
+            settings,
+            clientJobId: clientJobId ?? undefined,
+            fileId: fileId ?? undefined,
+            saveMode,
+            kind: "ai-tool",
+          });
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
+
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        if (!enqueued) await discardUnenqueuedUploads(jobId, request.log);
       }
-
-      const decodedKey = `uploads/${jobId}/${filename}`;
-      if (decodedKey !== inputKey) {
-        await putObject(decodedKey, fileBuffer);
-        inputKey = decodedKey;
-      } else {
-        await putObject(inputKey, fileBuffer);
-      }
-
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings,
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 }

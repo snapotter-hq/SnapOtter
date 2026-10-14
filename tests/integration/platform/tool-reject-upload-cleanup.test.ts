@@ -19,7 +19,9 @@ import {
 } from "../test-server.js";
 
 const PNG = readFixture(fixtures.image.base.png200);
+const PDF = readFixture(fixtures.document.pdf2);
 const RESIZE = apiToolPath("resize");
+const SIGN_PDF = apiToolPath("sign-pdf");
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -44,17 +46,24 @@ function uploadDirs(): Set<string> {
   }
 }
 
-async function post(parts: Parameters<typeof createMultipartPayload>[0]) {
+async function post(parts: Parameters<typeof createMultipartPayload>[0], url = RESIZE) {
   const { body, contentType } = createMultipartPayload(parts);
   return app.inject({
     method: "POST",
-    url: RESIZE,
+    url,
     headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
     body,
   });
 }
 
 const file = { name: "file", filename: "image.png", contentType: "image/png", content: PNG };
+const pdfFile = {
+  name: "file",
+  filename: "document.pdf",
+  contentType: "application/pdf",
+  content: PDF,
+};
+const sigFile = { name: "sig0", filename: "sig0.png", contentType: "image/png", content: PNG };
 const corrupt = { ...file, content: Buffer.from("not a png at all") };
 
 // The discard runs in the handler's finally, after the response is already
@@ -89,5 +98,57 @@ describe("tool-factory discards the upload of a rejected request", () => {
     // the upload a moment after the response, not before it.
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(uploadDirs().has(jobId)).toBe(true);
+  });
+});
+
+describe("custom tool route (sign-pdf) discards the upload of a rejected request (#2599)", () => {
+  it.each([
+    ["an invalid saveMode", [pdfFile, sigFile, { name: "saveMode", content: "bogus" }]],
+    ["an invalid clientJobId", [pdfFile, sigFile, { name: "clientJobId", content: "has space" }]],
+    ["missing placements", [pdfFile, sigFile]],
+    ["placements that aren't JSON", [pdfFile, sigFile, { name: "placements", content: "{bad" }]],
+    [
+      "a placement referencing a missing signature",
+      [
+        pdfFile,
+        sigFile,
+        {
+          name: "placements",
+          content: JSON.stringify([{ sig: 1, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }]),
+        },
+      ],
+    ],
+    [
+      "a corrupt PDF file",
+      [
+        { ...pdfFile, content: Buffer.from("not a pdf") },
+        sigFile,
+        {
+          name: "placements",
+          content: JSON.stringify([{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }]),
+        },
+      ],
+    ],
+    [
+      "a corrupt signature image",
+      [
+        pdfFile,
+        { ...sigFile, content: Buffer.from("not a png") },
+        {
+          name: "placements",
+          content: JSON.stringify([{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }]),
+        },
+      ],
+    ],
+  ] as const)("leaves no uploads dir behind for %s", async (_label, parts) => {
+    const before = uploadDirs();
+
+    const res = await post([...parts], SIGN_PDF);
+
+    expect(res.statusCode).toBe(400);
+    await vi.waitFor(
+      () => expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]),
+      { timeout: 5_000 },
+    );
   });
 });

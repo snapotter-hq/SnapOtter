@@ -23,6 +23,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -181,110 +182,122 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
         return reply.status(failure.status).send(failure.body);
       }
 
-      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
-      if (clientJobIdField === null) {
-        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
-      }
-      clientJobId = clientJobIdField ?? null;
-
-      // Stamp the client-facing alias before any pre-enqueue work (#892): a
-      // cancel landing between parse and enqueueToolJob needs a durable pointer
-      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-      if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
-      }
-
-      const saveMode = parseSaveModeField(saveModeRaw);
-      if (saveMode === null) {
-        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-      }
-
-      if (!inputKey) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const fileBuffer = await getObjectBuffer(inputKey);
-      if (!fileBuffer || fileBuffer.length === 0) {
-        return reply.status(400).send({ error: "No image file provided" });
-      }
-
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-
-      // Detect animation WITHOUT decoding/orienting (those flatten an animation
-      // to one frame). Reject stills and enforce the frame cap before enqueue.
-      let animation: { animated: boolean; frames: number };
+      let enqueued = false;
       try {
-        animation = await detectAnimation(fileBuffer, filename);
-      } catch (err) {
-        return reply.status(400).send({
-          error: `Invalid image: ${stripInternalPaths(err instanceof Error ? err.message : "unreadable")}`,
-        });
-      }
-      if (!animation.animated) {
-        return reply.status(400).send({
-          error: "This tool only handles animated images. Use Remove Background for still images.",
-          code: "NOT_ANIMATED",
-        });
-      }
-      const cap = env.GIF_BG_MAX_FRAMES;
-      if (cap > 0 && animation.frames > cap) {
-        return reply.status(400).send({
-          error: `Animation has ${animation.frames} frames, over the ${cap}-frame limit.`,
-          code: "TOO_MANY_FRAMES",
-        });
-      }
-
-      let settings: Settings;
-      try {
-        const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-        const result = settingsSchema.safeParse(parsed);
-        if (!result.success) {
-          return reply
-            .status(400)
-            .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+        const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+        if (clientJobIdField === null) {
+          return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
         }
-        settings = result.data;
-      } catch {
-        return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
+        clientJobId = clientJobIdField ?? null;
 
-      // Stage the background image for the "image" effect.
-      let bgImageKey: string | undefined;
-      if (settings.backgroundType === "image") {
-        if (!bgBuffer || bgBuffer.length === 0) {
-          return reply
-            .status(400)
-            .send({ error: "A background image is required for the image background." });
+        // Stamp the client-facing alias before any pre-enqueue work (#892): a
+        // cancel landing between parse and enqueueToolJob needs a durable pointer
+        // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+        if (clientJobId && clientJobId !== jobId) {
+          await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
         }
-        const bgValidation = await validateImageBuffer(bgBuffer, bgName);
-        if (!bgValidation.valid) {
-          return reply
-            .status(400)
-            .send({ error: `Invalid background image: ${bgValidation.reason}` });
+
+        const saveMode = parseSaveModeField(saveModeRaw);
+        if (saveMode === null) {
+          return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
         }
-        bgImageKey = `uploads/${jobId}/bg-${bgName}`;
-        await putObject(bgImageKey, bgBuffer);
+
+        if (!inputKey) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const fileBuffer = await getObjectBuffer(inputKey);
+        if (!fileBuffer || fileBuffer.length === 0) {
+          return reply.status(400).send({ error: "No image file provided" });
+        }
+
+        const validation = await validateImageBuffer(fileBuffer, filename);
+        if (!validation.valid) {
+          return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+        }
+
+        // Detect animation WITHOUT decoding/orienting (those flatten an animation
+        // to one frame). Reject stills and enforce the frame cap before enqueue.
+        let animation: { animated: boolean; frames: number };
+        try {
+          animation = await detectAnimation(fileBuffer, filename);
+        } catch (err) {
+          return reply.status(400).send({
+            error: `Invalid image: ${stripInternalPaths(err instanceof Error ? err.message : "unreadable")}`,
+          });
+        }
+        if (!animation.animated) {
+          return reply.status(400).send({
+            error:
+              "This tool only handles animated images. Use Remove Background for still images.",
+            code: "NOT_ANIMATED",
+          });
+        }
+        const cap = env.GIF_BG_MAX_FRAMES;
+        if (cap > 0 && animation.frames > cap) {
+          return reply.status(400).send({
+            error: `Animation has ${animation.frames} frames, over the ${cap}-frame limit.`,
+            code: "TOO_MANY_FRAMES",
+          });
+        }
+
+        let settings: Settings;
+        try {
+          const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
+          const result = settingsSchema.safeParse(parsed);
+          if (!result.success) {
+            return reply
+              .status(400)
+              .send({ error: "Invalid settings", details: formatZodErrors(result.error.issues) });
+          }
+          settings = result.data;
+        } catch {
+          return reply.status(400).send({ error: "Settings must be valid JSON" });
+        }
+
+        // Stage the background image for the "image" effect.
+        let bgImageKey: string | undefined;
+        if (settings.backgroundType === "image") {
+          if (!bgBuffer || bgBuffer.length === 0) {
+            return reply
+              .status(400)
+              .send({ error: "A background image is required for the image background." });
+          }
+          const bgValidation = await validateImageBuffer(bgBuffer, bgName);
+          if (!bgValidation.valid) {
+            return reply
+              .status(400)
+              .send({ error: `Invalid background image: ${bgValidation.reason}` });
+          }
+          bgImageKey = `uploads/${jobId}/bg-${bgName}`;
+          await putObject(bgImageKey, bgBuffer);
+        }
+
+        enqueued = true;
+        try {
+          await enqueueToolJob({
+            jobId,
+            toolId,
+            userId,
+            pool: "ai",
+            inputRefs: [inputKey],
+            filename,
+            settings: { ...settings, bgImageKey },
+            dbSettings: settings, // keep the internal bgImageKey out of the audit row
+            clientJobId: clientJobId ?? undefined,
+            fileId: fileId ?? undefined,
+            saveMode,
+            kind: "ai-tool",
+          });
+        } catch (err) {
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+          throw err;
+        }
+
+        return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
+      } finally {
+        if (!enqueued) await discardUnenqueuedUploads(jobId, request.log);
       }
-
-      await enqueueToolJob({
-        jobId,
-        toolId,
-        userId,
-        pool: "ai",
-        inputRefs: [inputKey],
-        filename,
-        settings: { ...settings, bgImageKey },
-        dbSettings: settings, // keep the internal bgImageKey out of the audit row
-        clientJobId: clientJobId ?? undefined,
-        fileId: fileId ?? undefined,
-        saveMode,
-        kind: "ai-tool",
-      });
-
-      return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     },
   );
 

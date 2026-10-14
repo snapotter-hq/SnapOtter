@@ -20,6 +20,7 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer } from "../../lib/object-storage.js";
+import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
@@ -102,95 +103,106 @@ export function registerSignPdf(app: FastifyInstance) {
       return reply.status(failure.status).send(failure.body);
     }
 
-    const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
-    if (clientJobIdField === null) {
-      return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
-    }
-    clientJobId = clientJobIdField ?? null;
-
-    // Stamp the client-facing alias before any pre-enqueue work (#892): a
-    // cancel landing between parse and enqueueToolJob needs a durable pointer
-    // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
-    if (clientJobId && clientJobId !== jobId) {
-      await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" });
-    }
-
-    const saveMode = parseSaveModeField(saveModeRaw);
-    if (saveMode === null) {
-      return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
-    }
-
-    if (!pdfKey) return reply.status(400).send({ error: "No PDF file provided" });
-    if (!placementsRaw) return reply.status(400).send({ error: "No placements provided" });
-
-    let parsed: z.infer<typeof settingsSchema>;
+    let enqueued = false;
     try {
-      parsed = settingsSchema.parse({ placements: JSON.parse(placementsRaw) });
-    } catch (err) {
-      return reply.status(400).send({
-        error: "Invalid placements",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
-
-    const sigIndexes = new Set(sigParts.map((s) => s.index));
-    for (const p of parsed.placements) {
-      if (!sigIndexes.has(p.sig)) {
-        return reply
-          .status(400)
-          .send({ error: `Missing signature image for placement (sig ${p.sig})` });
+      const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
+      if (clientJobIdField === null) {
+        return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
       }
-    }
+      clientJobId = clientJobIdField ?? null;
 
-    const pdfBuffer = await getObjectBuffer(pdfKey);
-    try {
-      // Signing needs a readable PDF; reject encrypted ones up front (the
-      // "unlock first" guidance rides in details) with the same policy the
-      // factory gives other PDF-only tools, instead of failing in the worker.
-      await inputHandlerFor("document").prepare(pdfBuffer, filename, {
-        scratchDir: tmpdir(),
-        rejectPasswordProtected: true,
-      });
-    } catch (err) {
-      // A broken qpdf is the server's fault, not a bad document: keep its 503,
-      // code, and operator hint, and report it (#1403).
-      if (err instanceof InputValidationError && err.statusCode >= 500) {
-        reportEngineUnavailable(err, TOOL_ID, request.log);
-        return reply.status(err.statusCode).send({
-          error: err.message,
-          ...(err.details && { details: err.details }),
-          ...(err.code && { code: err.code }),
+      // Stamp the client-facing alias before any pre-enqueue work (#892): a
+      // cancel landing between parse and enqueueToolJob needs a durable pointer
+      // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
+      if (clientJobId && clientJobId !== jobId) {
+        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" });
+      }
+
+      const saveMode = parseSaveModeField(saveModeRaw);
+      if (saveMode === null) {
+        return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
+      }
+
+      if (!pdfKey) return reply.status(400).send({ error: "No PDF file provided" });
+      if (!placementsRaw) return reply.status(400).send({ error: "No placements provided" });
+
+      let parsed: z.infer<typeof settingsSchema>;
+      try {
+        parsed = settingsSchema.parse({ placements: JSON.parse(placementsRaw) });
+      } catch (err) {
+        return reply.status(400).send({
+          error: "Invalid placements",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
-      return reply.status(400).send({
-        error: "Invalid PDF",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-      });
-    }
 
-    const orderedSigKeys: string[] = [];
-    for (const s of [...sigParts].sort((a, b) => a.index - b.index)) {
-      const buf = await getObjectBuffer(s.key);
-      const v = await validateImageBuffer(buf, `sig${s.index}.png`);
-      if (!v.valid) {
-        return reply.status(400).send({ error: `Invalid signature image: ${v.reason}` });
+      const sigIndexes = new Set(sigParts.map((s) => s.index));
+      for (const p of parsed.placements) {
+        if (!sigIndexes.has(p.sig)) {
+          return reply
+            .status(400)
+            .send({ error: `Missing signature image for placement (sig ${p.sig})` });
+        }
       }
-      orderedSigKeys.push(s.key);
-    }
 
-    await enqueueToolJob({
-      jobId,
-      toolId: TOOL_ID,
-      userId,
-      pool: "docs",
-      inputRefs: [pdfKey, ...orderedSigKeys],
-      filename,
-      settings: { placements: parsed.placements },
-      clientJobId: clientJobId ?? undefined,
-      fileId: fileId ?? undefined,
-      saveMode,
-      kind: "ai-tool",
-    });
+      const pdfBuffer = await getObjectBuffer(pdfKey);
+      try {
+        // Signing needs a readable PDF; reject encrypted ones up front (the
+        // "unlock first" guidance rides in details) with the same policy the
+        // factory gives other PDF-only tools, instead of failing in the worker.
+        await inputHandlerFor("document").prepare(pdfBuffer, filename, {
+          scratchDir: tmpdir(),
+          rejectPasswordProtected: true,
+        });
+      } catch (err) {
+        // A broken qpdf is the server's fault, not a bad document: keep its 503,
+        // code, and operator hint, and report it (#1403).
+        if (err instanceof InputValidationError && err.statusCode >= 500) {
+          reportEngineUnavailable(err, TOOL_ID, request.log);
+          return reply.status(err.statusCode).send({
+            error: err.message,
+            ...(err.details && { details: err.details }),
+            ...(err.code && { code: err.code }),
+          });
+        }
+        return reply.status(400).send({
+          error: "Invalid PDF",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
+      }
+
+      const orderedSigKeys: string[] = [];
+      for (const s of [...sigParts].sort((a, b) => a.index - b.index)) {
+        const buf = await getObjectBuffer(s.key);
+        const v = await validateImageBuffer(buf, `sig${s.index}.png`);
+        if (!v.valid) {
+          return reply.status(400).send({ error: `Invalid signature image: ${v.reason}` });
+        }
+        orderedSigKeys.push(s.key);
+      }
+
+      enqueued = true;
+      try {
+        await enqueueToolJob({
+          jobId,
+          toolId: TOOL_ID,
+          userId,
+          pool: "docs",
+          inputRefs: [pdfKey, ...orderedSigKeys],
+          filename,
+          settings: { placements: parsed.placements },
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        });
+      } catch (err) {
+        if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
+        throw err;
+      }
+    } finally {
+      if (!enqueued) await discardUnenqueuedUploads(jobId, request.log);
+    }
 
     try {
       const result = await waitForJob("docs", jobId);
