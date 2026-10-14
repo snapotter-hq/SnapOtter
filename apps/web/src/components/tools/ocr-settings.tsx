@@ -7,7 +7,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
-import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
+import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
 import { failedFrameMessage, type ProgressFrame } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
@@ -60,12 +60,7 @@ export function ocrOneFile(
     const clientJobId = generateId();
     let settled = false;
     let asyncMode = false;
-    // The browser finished sending the body: the last progress event or
-    // upload.onload, whichever it fires first. Only the 202 proves a job exists,
-    // so this decides between aborting and waiting, never to cancel by itself.
-    let uploadDone = false;
-    // A stop landed in the window after the upload and before the 202.
-    let cancelOnAnswer = false;
+    const abandonedJob = trackAbandonedJob(clientJobId, "ocr");
     let stallTimer: ReturnType<typeof setTimeout> | null = null;
     let es: EventSource | null = null;
 
@@ -149,6 +144,7 @@ export function ocrOneFile(
           return;
         }
         if (typeof data.percent === "number") {
+          abandonedJob.onAccepted();
           callbacks.onProcessingProgress(data.percent, data.stage ?? "");
         }
       } catch (err) {
@@ -179,25 +175,20 @@ export function ocrOneFile(
     xhr.timeout = 600_000;
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return;
-      // Firefox fires upload.onload only once the answer starts, so the last
-      // progress event is the only signal there that the body is with the server.
-      if (e.loaded >= e.total) uploadDone = true;
+      abandonedJob.onUploadProgress(e);
+      if (settled) return;
       callbacks.onUploadProgress((e.loaded / e.total) * 100);
     };
     xhr.upload.onload = () => {
-      uploadDone = true;
+      abandonedJob.onUploadLoad();
     };
     xhr.onload = () => {
       // The BullMQ worker owns long OCR jobs. Keep the progress subscription
       // alive and resolve from buildLegacyResultPayload(resultPayload).text.
       if (xhr.status === 202) {
         asyncMode = true;
-        // The scan was stopped while the server was still working on the upload:
-        // now that a job is known to exist, cancel it (#2136).
-        if (cancelOnAnswer) {
-          void cancelAbandonedJob(clientJobId, "ocr");
-          return;
-        }
+        abandonedJob.onAccepted();
+        if (settled) return;
         armStallTimer();
         return;
       }
@@ -240,17 +231,11 @@ export function ocrOneFile(
     // the server already took async, whose XHR is done and won't abort. The
     // error never reaches the UI: the scan writes nothing more for this file.
     callbacks.onStoppable?.(() => {
-      // Only a file the server queued has a job to cancel, and only one that is
-      // still unsettled has a job still running (#2093).
-      // Posted first, so a teardown step that throws can't leave the job running.
-      if (asyncMode && !settled) void cancelAbandonedJob(clientJobId, "ocr");
-      // The browser has sent the whole body and the server hasn't answered: it may be
-      // validating and decoding, and will still enqueue. Aborting would leave
-      // that job running with nothing to cancel it by, so the request stays open
-      // and the cancel goes out when the 202 arrives (#2136).
-      else if (uploadDone && !settled) cancelOnAnswer = true;
+      // Only an unsettled file has a job or upload in flight (#2093, #2136).
+      // Evaluated first, so a teardown step that throws can't leave the job running.
+      const keepRequest = !settled && abandonedJob.keepRequestOnStop();
       rejectOnce(new Error("OCR scan stopped"));
-      if (!cancelOnAnswer) xhr.abort();
+      if (!keepRequest) xhr.abort();
     });
     xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
     for (const [key, value] of formatHeaders()) {

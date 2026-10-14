@@ -21,6 +21,77 @@ const MESSAGES = {
   },
 } as const;
 
+export type AbandonedJobToolId = keyof typeof MESSAGES;
+
+export interface AbandonedJobTracker {
+  /**
+   * Record an upload progress event. Firefox fires `upload.onload` only once
+   * the response starts, so the final progress event (`loaded >= total`) also
+   * counts as the browser having sent the whole body (#2136).
+   */
+  onUploadProgress: (event: { lengthComputable?: boolean; loaded: number; total: number }) => void;
+  /** Record `xhr.upload.onload`. */
+  onUploadLoad: () => void;
+  /**
+   * Record that the server has the job (a 202 response or a progress frame).
+   * If the run was already stopped after the upload finished, cancels the job now.
+   */
+  onAccepted: () => void;
+  /**
+   * Stop an in-flight run. Cancels immediately if the server already accepted
+   * the job; otherwise, if the upload finished, arms a cancel for when the 202
+   * arrives and returns `true` so the caller keeps the request open instead of
+   * aborting it (#2093, #2136, #2239).
+   */
+  keepRequestOnStop: () => boolean;
+}
+
+/**
+ * Tracks the upload and acceptance state of one tool request so a stop in any
+ * window cancels the server job without racing the alias insert (#2093, #2136,
+ * #2239).
+ */
+export function trackAbandonedJob(
+  clientJobId: string,
+  toolId: AbandonedJobToolId,
+): AbandonedJobTracker {
+  let uploadDone = false;
+  let accepted = false;
+  let cancelOnAnswer = false;
+  let stopped = false;
+
+  return {
+    onUploadProgress(event) {
+      if (event.lengthComputable && event.loaded >= event.total) {
+        uploadDone = true;
+      }
+    },
+    onUploadLoad() {
+      uploadDone = true;
+    },
+    onAccepted() {
+      accepted = true;
+      if (cancelOnAnswer) {
+        cancelOnAnswer = false;
+        void cancelAbandonedJob(clientJobId, toolId);
+      }
+    },
+    keepRequestOnStop() {
+      if (stopped) return false;
+      stopped = true;
+      if (accepted) {
+        void cancelAbandonedJob(clientJobId, toolId);
+        return false;
+      }
+      if (uploadDone) {
+        cancelOnAnswer = true;
+        return true;
+      }
+      return false;
+    },
+  };
+}
+
 /**
  * Asks the server to stop the job of a run the client gave up on: its own
  * handling broke (#1960), or the user left while a queued file was still
@@ -33,7 +104,7 @@ const MESSAGES = {
  */
 export async function cancelAbandonedJob(
   clientJobId: string,
-  toolId: keyof typeof MESSAGES,
+  toolId: AbandonedJobToolId,
 ): Promise<void> {
   const messages = MESSAGES[toolId];
   try {

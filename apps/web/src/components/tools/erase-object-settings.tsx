@@ -8,7 +8,7 @@ import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
-import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
+import { cancelAbandonedJob, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
 import {
@@ -288,27 +288,32 @@ export function EraseObjectSettings({
       // (#1893).
       const xhr = new XMLHttpRequest();
       let abandoned = false;
-      // Set once the server has answered 202: from then on a job exists for
-      // this file, and dropping the file has to cancel it (#2093).
-      let accepted = false;
-      // The browser finished sending the body (the last progress event or
-      // upload.onload, whichever it fires first). A stop in the
-      // window after that and before the 202 can't abort: the server may still be
-      // validating and decoding, and will enqueue a job nothing could cancel. The
-      // request stays open and the cancel goes out when the 202 arrives (#2136).
-      let uploadDone = false;
-      let cancelOnAnswer = false;
+      let settled = false;
+      const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
+      const resolveOnce = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const rejectOnce = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      };
       const abandon = (err: Error) => {
         abandoned = true;
-        reject(err);
+        rejectOnce(err);
         xhr.abort();
       };
 
       const subscription = subscribeEraseObjectJobProgress(clientJobId, {
-        onProgress,
+        onProgress: (percent) => {
+          abandonedJob.onAccepted();
+          onProgress(percent);
+        },
         onComplete: (r) => {
           applyResult(r);
-          resolve();
+          resolveOnce();
         },
         onFailed: (failure) => {
           if (abandoned) return;
@@ -323,13 +328,11 @@ export function EraseObjectSettings({
       // the batch has already decided to write nothing more for it.
       onStoppable(() => {
         // First, so a teardown step that throws can't leave the job running.
-        const keepRequest = uploadDone && !accepted;
-        if (keepRequest) cancelOnAnswer = true;
-        if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
+        const keepRequest = !settled && abandonedJob.keepRequestOnStop();
         stopProgress();
         if (keepRequest) {
           abandoned = true;
-          reject(new Error("Erase Object batch stopped"));
+          rejectOnce(new Error("Erase Object batch stopped"));
           return;
         }
         abandon(new Error("Erase Object batch stopped"));
@@ -350,18 +353,13 @@ export function EraseObjectSettings({
       // uploading (#1959). xhr.timeout still bounds the request as a whole.
       xhr.upload.onprogress = (e) => {
         subscription.touch();
-        // Firefox fires upload.onload only once the answer starts, so the last
-        // progress event is the only signal there that the body is with the server.
-        if (e.lengthComputable && e.loaded >= e.total) uploadDone = true;
+        abandonedJob.onUploadProgress(e);
       };
       xhr.upload.onload = () => {
-        uploadDone = true;
+        abandonedJob.onUploadLoad();
       };
       xhr.onload = () => {
-        if (xhr.status === 202) {
-          accepted = true;
-          if (cancelOnAnswer) void cancelAbandonedJob(clientJobId, "erase-object");
-        }
+        if (xhr.status === 202) abandonedJob.onAccepted();
         if (abandoned || xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -373,21 +371,21 @@ export function EraseObjectSettings({
           try {
             result = parseResultBody<Record<string, unknown>>(xhr.responseText);
           } catch (err) {
-            reject(new Error(t.errors.invalidResponse));
+            rejectOnce(new Error(t.errors.invalidResponse));
             reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
             return;
           }
           try {
             applyResult(result);
           } catch (err) {
-            reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+            rejectOnce(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
             throw err;
           }
-          resolve();
+          resolveOnce();
         } else {
           try {
             const body = JSON.parse(xhr.responseText);
-            reject(
+            rejectOnce(
               new Error(
                 typeof body.error === "string"
                   ? body.error
@@ -397,19 +395,21 @@ export function EraseObjectSettings({
               ),
             );
           } catch {
-            reject(new Error(format(t.errors.processingFailedWithStatus, { status: xhr.status })));
+            rejectOnce(
+              new Error(format(t.errors.processingFailedWithStatus, { status: xhr.status })),
+            );
           }
         }
       };
       xhr.onerror = () => {
         if (abandoned) return;
         stopProgress();
-        reject(new Error(t.errors.network));
+        rejectOnce(new Error(t.errors.network));
       };
       xhr.ontimeout = () => {
         if (abandoned) return;
         stopProgress();
-        reject(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
+        rejectOnce(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
       };
       xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
       for (const [key, value] of formatHeaders()) {
@@ -530,21 +530,14 @@ export function EraseObjectSettings({
     // its request, and anything the request answers after that is dropped.
     const xhr = new XMLHttpRequest();
     let abandoned = false;
-    // See the batch path: once the server has answered 202 a job exists, and
-    // a library run's job would still save over or beside the original (#2093).
-    let accepted = false;
-    // See the batch path: a file dropped after the upload finished and before the
-    // 202 keeps its request open, and the cancel goes out when the 202 arrives (#2136).
-    let uploadDone = false;
-    let cancelOnAnswer = false;
+    const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
     const abandonRequest = () => {
       abandoned = true;
       xhr.abort();
     };
     const dropRequest = () => {
-      if (uploadDone && !accepted) {
+      if (abandonedJob.keepRequestOnStop()) {
         abandoned = true;
-        cancelOnAnswer = true;
         return;
       }
       abandonRequest();
@@ -552,6 +545,7 @@ export function EraseObjectSettings({
 
     const subscription = subscribeEraseObjectJobProgress(clientJobId, {
       onProgress: (percent) => {
+        abandonedJob.onAccepted();
         setProgressPhase("processing");
         setProgressPercent(15 + (percent / 100) * 85);
       },
@@ -589,15 +583,7 @@ export function EraseObjectSettings({
       // each step gets its own guard so one that throws can't leave the run at
       // processing. The first error is reported once.
       let stopError: { cause: unknown } | null = null;
-      for (const step of [
-        dropRequest,
-        () => {
-          if (accepted) void cancelAbandonedJob(clientJobId, "erase-object");
-        },
-        stopProgress,
-        () => {},
-        finishUi,
-      ]) {
+      for (const step of [dropRequest, stopProgress, finishUi]) {
         try {
           step();
         } catch (err) {
@@ -633,15 +619,13 @@ export function EraseObjectSettings({
       // See the batch path: upload bytes moving keep the stall timer from
       // cutting the upload off (#1959).
       subscription.touch();
-      if (e.lengthComputable) {
-        // Firefox fires upload.onload only once the answer starts, so the last
-        // progress event is the only signal there that the body is with the server.
-        if (e.loaded >= e.total) uploadDone = true;
-        if (!abandoned) setProgressPercent((e.loaded / e.total) * 15);
+      abandonedJob.onUploadProgress(e);
+      if (e.lengthComputable && !abandoned) {
+        setProgressPercent((e.loaded / e.total) * 15);
       }
     };
     xhr.upload.onload = () => {
-      uploadDone = true;
+      abandonedJob.onUploadLoad();
       // Firefox fires this after a stop, once the answer starts: the run is over,
       // and a new one may be on the panel by now.
       if (abandoned) return;
@@ -650,10 +634,7 @@ export function EraseObjectSettings({
     };
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
-      if (xhr.status === 202) {
-        accepted = true;
-        if (cancelOnAnswer) void cancelAbandonedJob(clientJobId, "erase-object");
-      }
+      if (xhr.status === 202) abandonedJob.onAccepted();
       if (abandoned || xhr.status === 202) return;
 
       endWatch();

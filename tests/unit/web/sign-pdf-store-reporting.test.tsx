@@ -65,7 +65,10 @@ class FakeXhr {
   body: FormData | null = null;
   aborted = false;
   /** The browser's upload channel: progress events while the body is sent. */
-  upload: { onprogress: ((event: ProgressEvent) => void) | null } = { onprogress: null };
+  upload: {
+    onprogress: ((event: ProgressEvent) => void) | null;
+    onload: (() => void) | null;
+  } = { onprogress: null, onload: null };
   /** A browser sends no upload events to a handler attached after send(). */
   uploadHandlerAtSend = false;
 
@@ -89,10 +92,19 @@ class FakeXhr {
     this.aborted = true;
   }
 
+  /** The browser finished sending the body; the server hasn't answered yet. */
+  uploadFinished() {
+    act(() => {
+      this.upload.onload?.();
+    });
+  }
+
   /** Report upload bytes moving, as the browser does while the PDF is sent. */
   uploadProgress(loaded: number, total: number) {
     act(() => {
-      this.upload.onprogress?.(new ProgressEvent("progress", { loaded, total }));
+      this.upload.onprogress?.(
+        new ProgressEvent("progress", { loaded, total, lengthComputable: true }),
+      );
     });
   }
 
@@ -1505,6 +1517,165 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     FakeXhr.instances = [];
     await apply();
     expect(screen.queryByText(en.errors.runInterrupted)).not.toBeInTheDocument();
+  });
+
+  // The browser has sent the whole body and the server hasn't answered: it may be
+  // validating the PDF and signatures or waiting in waitForJob, and will enqueue.
+  // Aborting would leave that job running with nothing to cancel it by, so the
+  // request stays open and the cancel goes out when the 202 arrives (#2239).
+  it("keeps the request after the upload finished and cancels when the 202 arrives (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadFinished();
+
+    cleanup();
+
+    expect(xhr.aborted).toBe(false);
+    expect(FakeEventSource.instances[0].readyState).toBe(FakeEventSource.OPEN);
+    expect(cancelPosts()).toHaveLength(0);
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(useFileStore.getState().processing).toBe(false);
+
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const clientJobId = xhr.body?.get("clientJobId") as string;
+    await waitFor(() => expect(cancelPosts()).toHaveLength(1));
+    expect(cancelPosts()[0][0]).toBe(`/api/v1/jobs/${clientJobId}/cancel`);
+    expect(cancelPosts()[0][1]).toMatchObject({ method: "POST" });
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+  });
+
+  // sign-pdf waits in waitForJob before answering 202, so a progress frame from
+  // the worker during that window is often the first proof the job exists.
+  it("cancels and closes the kept request when a progress frame arrives after unmount (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadFinished();
+    const clientJobId = xhr.body?.get("clientJobId") as string;
+
+    cleanup();
+    expect(xhr.aborted).toBe(false);
+    expect(cancelPosts()).toHaveLength(0);
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "processing", percent: 20 }),
+      });
+    });
+
+    await waitFor(() => expect(cancelPosts()).toHaveLength(1));
+    expect(cancelPosts()[0][0]).toBe(`/api/v1/jobs/${clientJobId}/cancel`);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(xhr.aborted).toBe(true);
+  });
+
+  // Firefox fires upload.onload only once the answer starts, so the last upload
+  // progress event is all the panel has to go on.
+  it("treats the final upload progress event as the upload being done (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadProgress(100, 100);
+
+    cleanup();
+
+    expect(xhr.aborted).toBe(false);
+    expect(cancelPosts()).toHaveLength(0);
+
+    // Firefox fires upload.onload once the response starts, after the stop.
+    xhr.uploadFinished();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const clientJobId = xhr.body?.get("clientJobId") as string;
+    await waitFor(() => expect(cancelPosts()).toHaveLength(1));
+    expect(cancelPosts()[0][0]).toBe(`/api/v1/jobs/${clientJobId}/cancel`);
+  });
+
+  it("aborts when the upload progress shows the body is only partly sent (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadProgress(40, 100);
+
+    cleanup();
+
+    expect(xhr.aborted).toBe(true);
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("aborts when an upload progress event has lengthComputable false (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    act(() => {
+      xhr.upload.onprogress?.(
+        new ProgressEvent("progress", { loaded: 0, total: 0, lengthComputable: false }),
+      );
+    });
+
+    cleanup();
+
+    expect(xhr.aborted).toBe(true);
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("sends no cancel when the answer to a stopped, uploaded file is not a 202 (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadFinished();
+
+    cleanup();
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(cancelPosts()).toHaveLength(0);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("ignores a kept request's late answer or error once a new run has started (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadFinished();
+
+    cleanup();
+    act(() => {
+      useFileStore.getState().setError(null);
+      useFileStore.getState().setProcessing(true);
+    });
+
+    xhr.respond(422, { error: "Processing failed" });
+    act(() => xhr.onerror?.());
+    act(() => xhr.ontimeout?.());
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("cancels once and aborts when a progress frame arrived after the upload finished (#2239)", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.uploadFinished();
+    const clientJobId = xhr.body?.get("clientJobId") as string;
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "processing", percent: 40 }),
+      });
+    });
+
+    cleanup();
+
+    expect(xhr.aborted).toBe(true);
+    expect(cancelPosts()).toHaveLength(1);
+    expect(cancelPosts()[0][0]).toBe(`/api/v1/jobs/${clientJobId}/cancel`);
+
+    // Even if a late 202 slips past abort(), it does not fire a second cancel.
+    act(() => {
+      xhr.status = 202;
+      xhr.responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhr.onload?.();
+    });
+    expect(cancelPosts()).toHaveLength(1);
   });
 
   it("settles the run and sends no request when cut off during signature export", async () => {

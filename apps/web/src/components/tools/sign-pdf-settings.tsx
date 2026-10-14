@@ -7,7 +7,7 @@ import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
-import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
+import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
 import {
   checkToolResult,
@@ -421,12 +421,14 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // timeout, or 4xx replaces that error with its own (#1958).
     const xhr = new XMLHttpRequest();
     let abandoned = false;
-    // Set once a 202 or a progress frame proves the server has the job: an
-    // unmount after that cancels it (#2313).
-    let accepted = false;
-    const abandonRequest = () => {
+    // Tracks upload completion and server acceptance (a 202 or a progress frame)
+    // so an unmount after the upload keeps the request open until the 202 and
+    // cancels the job (#2239, #2313).
+    const abandonedJob = trackAbandonedJob(clientJobId, "sign-pdf");
+    const abandonRequest = (keepRequest = false) => {
       settled = true;
       abandoned = true;
+      if (keepRequest) return;
       try {
         xhr.abort();
       } catch (_e) {
@@ -436,14 +438,27 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
     const subscription = subscribeSignPdfJobProgress(clientJobId, {
       onProgress: (percent) => {
-        accepted = true;
+        abandonedJob.onAccepted();
+        if (abandoned) {
+          stopProgress();
+          abandonRequest();
+          return;
+        }
         setProgress(percent);
       },
       onComplete: (r) => {
+        if (abandoned) {
+          abandonRequest();
+          return;
+        }
         landResult(r);
         endRun();
       },
       onFailed: (failure) => {
+        if (abandoned) {
+          abandonRequest();
+          return;
+        }
         abandonRequest();
         // A failure with a reason shows one of our translated messages; a
         // server message is English and classifies from its text.
@@ -453,6 +468,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         );
       },
       onStall: () => {
+        if (abandoned) {
+          abandonRequest();
+          return;
+        }
         abandonRequest();
         failRun(sp.stall, "timeout");
       },
@@ -460,11 +479,15 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     const stopProgress = subscription.stop;
     stopRunRef.current = () => {
       runOwnedRef.current = false;
-      if (accepted) void cancelAbandonedJob(clientJobId, "sign-pdf");
+      const keepRequest = abandonedJob.keepRequestOnStop();
       try {
-        stopProgress();
+        // When the upload finished and the server hasn't accepted the job yet,
+        // keep both the request and the stream open: sign-pdf waits in
+        // waitForJob before answering 202, so the worker's progress frame may
+        // be the first proof the job exists (#2239).
+        if (!keepRequest) stopProgress();
       } finally {
-        abandonRequest();
+        abandonRequest(keepRequest);
         if (useFileStore.getState().processing) {
           failEntry(t.errors.runInterrupted, "processing_error");
         }
@@ -490,11 +513,21 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // The stall timer is armed before the upload starts, and on a quiet stream
     // only this keeps it from cutting off a large PDF that is still uploading
     // (#1968). xhr.timeout still bounds the request as a whole.
-    xhr.upload.onprogress = () => subscription.touch();
+    xhr.upload.onprogress = (e) => {
+      subscription.touch();
+      abandonedJob.onUploadProgress(e);
+    };
+    xhr.upload.onload = () => {
+      abandonedJob.onUploadLoad();
+    };
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
-      if (xhr.status === 202) accepted = true;
-      if (abandoned || xhr.status === 202) return;
+      if (xhr.status === 202) abandonedJob.onAccepted();
+      if (abandoned) {
+        stopProgress();
+        return;
+      }
+      if (xhr.status === 202) return;
       stopProgress();
       if (xhr.status >= 200 && xhr.status < 300) {
         // Only a body that isn't a result is the server's fault, and it gets
@@ -546,13 +579,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       failRun(message, xhr.status === 413 ? "upload_error" : undefined);
     };
     xhr.onerror = () => {
-      if (abandoned) return;
       stopProgress();
+      if (abandoned) return;
       failRun(t.errors.network, "upload_error");
     };
     xhr.ontimeout = () => {
-      if (abandoned) return;
       stopProgress();
+      if (abandoned) return;
       failRun(sp.timeout, "timeout");
     };
     xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));

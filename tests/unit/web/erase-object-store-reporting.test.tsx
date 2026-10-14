@@ -1948,6 +1948,25 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(useFileStore.getState().processing).toBe(false);
     expect(entry(0).status).toBe("pending");
   });
+
+  it("sends no cancel when the files go in the same tick a 202 batch file completes (#2239)", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+    first.respond(202, { jobId: "queued", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-tool.png")]);
+    });
+    await act(async () => {});
+
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
 });
 
 describe("erase-object single file: leaving the page mid-run (#1975)", () => {
