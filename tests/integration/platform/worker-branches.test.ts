@@ -28,7 +28,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // Makes the finalize die before its own failure handling (readBatchCounters
 // runs outside the packaging try/catch), so the worker failed-handler safety
 // net is the only thing standing between a crash and a hung degraded client.
-const batchProgressMock = vi.hoisted(() => ({ failCountersForParentId: null as string | null }));
+const batchProgressMock = vi.hoisted(() => ({
+  failCountersForParentId: null as string | null,
+  failRecordOutcomeForParentId: null as string | null,
+}));
 
 vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) => {
   const actual =
@@ -40,6 +43,66 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) =
         throw new Error("injected counters outage");
       }
       return actual.readBatchCounters(parentId);
+    },
+    recordChildOutcome: async (
+      parentId: string,
+      totalFiles: number,
+      filename: string,
+      error?: string,
+    ) => {
+      if (batchProgressMock.failRecordOutcomeForParentId === parentId) {
+        throw new Error("injected record outcome outage");
+      }
+      return actual.recordChildOutcome(parentId, totalFiles, filename, error);
+    },
+  };
+});
+
+const progressMock = vi.hoisted(() => ({
+  failCancelGuardedOnceFor: new Set<string>(),
+  failPublishEphemeralFor: null as string | null,
+  failUpdateSingleFor: null as string | null,
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
+  return {
+    ...actual,
+    cancelSingleJobGuarded: async (args: Parameters<typeof actual.cancelSingleJobGuarded>[0]) => {
+      if (progressMock.failCancelGuardedOnceFor.delete(args.jobId)) {
+        throw new Error("injected cancel guarded outage");
+      }
+      return actual.cancelSingleJobGuarded(args);
+    },
+    publishEphemeral: (payload: Parameters<typeof actual.publishEphemeral>[0]) => {
+      if (progressMock.failPublishEphemeralFor === payload.jobId) {
+        throw new Error("injected ephemeral publish outage");
+      }
+      return actual.publishEphemeral(payload);
+    },
+    updateSingleFileProgress: async (
+      progress: Parameters<typeof actual.updateSingleFileProgress>[0],
+    ) => {
+      if (progressMock.failUpdateSingleFor === progress.jobId) {
+        throw new Error("injected update single progress outage");
+      }
+      return actual.updateSingleFileProgress(progress);
+    },
+  };
+});
+
+const reported = vi.hoisted(() => ({ errors: [] as unknown[] }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: async (
+      err: unknown,
+      ctx: Parameters<typeof actual.reportError>[1],
+    ): Promise<void> => {
+      reported.errors.push(err);
+      return actual.reportError(err, ctx);
     },
   };
 });
@@ -923,6 +986,208 @@ describe("pipeline finalize", () => {
       return row?.status === "failed" ? row : undefined;
     });
     expect(clientRow.completedAt).not.toBeNull();
+  }, 30_000);
+
+  it("the failed-handler safety net settles a crashed canceled finalize as canceled (#836)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
+    await db.insert(schema.jobs).values([
+      {
+        id: `${jobId}-s0`,
+        type: "pipeline-step",
+        status: "completed",
+        toolId: "resize",
+        pool: "image",
+        inputRefs: [],
+        outputRefs: ["outputs/seed/mid.png"],
+        bytesIn: 10,
+        bytesOut: 8,
+      },
+      {
+        id: `${jobId}-s1`,
+        type: "pipeline-step",
+        status: "canceled",
+        toolId: "compress",
+        pool: "image",
+        inputRefs: [],
+        error: { message: "Canceled" },
+      },
+      {
+        id: jobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+      },
+    ]);
+    await markBatchCanceled(clientJobId);
+
+    // Fault both guarded writes inside the finalize and throw from the
+    // ephemeral publish so the finalize job hard-fails with neither row
+    // settled; the failed-handler safety net must consult the step rows and
+    // settle both as canceled rather than "Pipeline processing failed".
+    progressMock.failCancelGuardedOnceFor.add(jobId);
+    progressMock.failCancelGuardedOnceFor.add(clientJobId);
+    progressMock.failPublishEphemeralFor = clientJobId;
+    try {
+      await getQueue("image").add(
+        "pipeline-finalize",
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 2,
+          filename: "chain.png",
+          clientJobId,
+        }),
+        { jobId, attempts: 1 },
+      );
+
+      const frame = await terminalFrame(clientJobId);
+      expect(frame.type).toBe("single");
+      expect(frame.phase).toBe("failed");
+      expect(frame.error).toBe("Canceled");
+
+      const flowRow = await terminalRow(jobId);
+      expect(flowRow.status).toBe("canceled");
+      expect(flowRow.error?.message).toBe("Canceled");
+
+      const aliasRow = await terminalRow(clientJobId);
+      expect(aliasRow.status).toBe("canceled");
+      expect(aliasRow.error?.message).toBe("Canceled");
+    } finally {
+      progressMock.failCancelGuardedOnceFor.clear();
+      progressMock.failPublishEphemeralFor = null;
+    }
+  }, 30_000);
+
+  it("the failed-handler safety net keeps the failed label when an earlier step failed before a canceled step (#836)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
+    await db.insert(schema.jobs).values([
+      {
+        id: `${jobId}-s0`,
+        type: "pipeline-step",
+        status: "failed",
+        toolId: "resize",
+        pool: "image",
+        inputRefs: [],
+        error: { message: "boom" },
+      },
+      {
+        id: `${jobId}-s1`,
+        type: "pipeline-step",
+        status: "canceled",
+        toolId: "compress",
+        pool: "image",
+        inputRefs: [],
+        error: { message: "Canceled" },
+      },
+      {
+        id: jobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+      },
+    ]);
+
+    progressMock.failUpdateSingleFor = clientJobId;
+    try {
+      await getQueue("image").add(
+        "pipeline-finalize",
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 2,
+          filename: "chain.png",
+          clientJobId,
+        }),
+        { jobId, attempts: 1 },
+      );
+
+      const frame = await terminalFrame(clientJobId);
+      expect(frame.phase).toBe("failed");
+      expect(frame.error).toBe("Pipeline processing failed");
+
+      const flowRow = await terminalRow(jobId);
+      expect(flowRow.status).toBe("failed");
+      expect(flowRow.error?.message).toBe("Step 1: boom");
+
+      const aliasRow = await terminalRow(clientJobId);
+      expect(aliasRow.status).toBe("failed");
+      expect(aliasRow.error?.message).toBe("Pipeline processing failed");
+    } finally {
+      progressMock.failUpdateSingleFor = null;
+    }
+  }, 30_000);
+
+  it("survives a batch counter fault after settling a canceled pipeline-batch file (#836)", async () => {
+    const jobId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-s0`,
+      type: "pipeline-step",
+      status: "canceled",
+      toolId: "resize",
+      pool: "image",
+      inputRefs: [],
+      error: { message: "Canceled" },
+    });
+
+    batchProgressMock.failRecordOutcomeForParentId = batchParent;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "chain.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.error?.message).toBe("Canceled");
+
+      const returned = await waitFor(async () => {
+        const job = await getQueue("image").getJob(jobId);
+        return job?.returnvalue ?? undefined;
+      });
+      expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
+      expect(events[0].status).toBe("canceled");
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected record outcome outage",
+        ),
+      ).toBe(true);
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
   }, 30_000);
 });
 

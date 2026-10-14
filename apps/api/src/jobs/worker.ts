@@ -1301,9 +1301,19 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 
     // Batch progress (pipeline-batch only): the canceled file counts like a
     // failed one; batch-finalize turns the canceled rows into #767's
-    // partial-ZIP semantics.
+    // partial-ZIP semantics. Caught like settleGuarded (#836): a Redis blip
+    // on the batch counters after the terminal writes must not fail the
+    // finalize job or drop its canceled analytics and result payload.
     if (data.parentId && data.totalFiles !== undefined) {
-      await recordChildOutcome(data.parentId, data.totalFiles, data.filename, "Canceled");
+      try {
+        await recordChildOutcome(data.parentId, data.totalFiles, data.filename, "Canceled");
+      } catch (err) {
+        logger.error(
+          { err, jobId: data.jobId, parentId: data.parentId },
+          "canceled pipeline batch outcome write failed",
+        );
+        void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+      }
     }
 
     if (analyticsEnabled()) {
@@ -1904,6 +1914,25 @@ function jobAgeMs(job: Job): number | undefined {
   return job.processedOn ? job.processedOn - job.timestamp : undefined;
 }
 
+/**
+ * Whether a pipeline flow's durable step rows show that the first
+ * non-completed step was canceled (#836). Mirrors processPipelineFinalize's
+ * own step scan so the failed-handler safety net and the finalize agree on
+ * #770's too-late rule without reading the expiring Redis cancel flag.
+ */
+async function isCanceledPipelineFlow(jobId: string, totalSteps: number): Promise<boolean> {
+  for (let i = 0; i < totalSteps; i++) {
+    const [row] = await db
+      .select({ status: schema.jobs.status })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${jobId}-s${i}`));
+    if (row?.status !== "completed") {
+      return row?.status === "canceled";
+    }
+  }
+  return false;
+}
+
 export function startWorkers(): void {
   const concurrency = Math.max(1, Math.floor(resolveConcurrency(env) / 2));
 
@@ -1995,18 +2024,33 @@ export function startWorkers(): void {
       // SSE channel (clientJobId) and the authoritative flow row can differ,
       // so both get the guarded write; a committed completion is never
       // downgraded, and the frame is announced only for a transition this
-      // call owned. Since #888 the cancel dual-write catches its own faults
-      // and the finalize survives them, so canceled runs no longer land
-      // here; this net covers crashes and stall evictions only.
+      // call owned. Step rows decide the label (#836): if the first
+      // non-completed step is canceled, both ids settle through
+      // cancelSingleJobGuarded rather than failSingleJobGuarded, matching the
+      // finalize's own too-late rule.
       if (data?.kind === "pipeline-finalize") {
-        const netFail = (jobId: string) =>
-          failSingleJobGuarded({ jobId, message: "Pipeline processing failed" }).catch((netErr) => {
-            logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
-            void reportError(netErr, { source: "worker", pool, jobId });
+        void isCanceledPipelineFlow(data.jobId, data.totalSteps ?? 0)
+          .catch((probeErr) => {
+            logger.error(
+              { err: probeErr, jobId: data.jobId },
+              "pipeline-finalize safety net step probe failed; falling back to failed label",
+            );
+            void reportError(probeErr, { source: "worker", pool, jobId: data.jobId });
+            return false;
+          })
+          .then((canceled) => {
+            const netSettle = (jobId: string) =>
+              (canceled
+                ? cancelSingleJobGuarded({ jobId })
+                : failSingleJobGuarded({ jobId, message: "Pipeline processing failed" })
+              ).catch((netErr) => {
+                logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
+                void reportError(netErr, { source: "worker", pool, jobId });
+              });
+            const frameId = data.clientJobId ?? data.jobId;
+            void netSettle(frameId);
+            if (frameId !== data.jobId) void netSettle(data.jobId);
           });
-        const frameId = data.clientJobId ?? data.jobId;
-        void netFail(frameId);
-        if (frameId !== data.jobId) void netFail(data.jobId);
       }
       const pf = (err as { pythonFrames?: unknown }).pythonFrames;
       if (Array.isArray(pf) && pf.length) {
