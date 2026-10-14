@@ -23,6 +23,8 @@ function formatOpts(format: SharpFormat, quality: number): Record<string, unknow
 
 export interface CompressResult {
   image: Sharp;
+  /** Encoded bytes from the target-size search, set when `targetSizeBytes` is used. */
+  buffer?: Buffer;
   /** Set only when a target size forced the image below its original dimensions. */
   resizedTo?: { width: number; height: number };
 }
@@ -75,6 +77,7 @@ export async function compressDetailed(
 
 interface CompressionCandidate {
   quality: number;
+  buffer: Buffer;
 }
 
 /** Re-open the source, keeping frames when the caller is compressing an animation. */
@@ -95,8 +98,8 @@ async function findBestQuality(
   if (format === "gif") {
     let pipeline = openSource(inputBuffer, animated);
     if (resize) pipeline = pipeline.resize(resize.width, resize.height);
-    const size = (await pipeline.toFormat(format, formatOpts(format, 100)).toBuffer()).length;
-    return size <= targetBytes ? { quality: 100 } : null;
+    const buffer = await pipeline.toFormat(format, formatOpts(format, 100)).toBuffer();
+    return buffer.length <= targetBytes ? { quality: 100, buffer } : null;
   }
 
   let low = 1;
@@ -112,7 +115,7 @@ async function findBestQuality(
     const resultSize = resultBuffer.length;
 
     if (resultSize <= targetBytes) {
-      best = { quality: mid };
+      best = { quality: mid, buffer: resultBuffer };
       if ((targetBytes - resultSize) / targetBytes <= tolerance) break;
       low = mid + 1;
     } else {
@@ -136,6 +139,7 @@ async function compressToTargetSize(
         format,
         formatOpts(format, fullSizeCandidate.quality),
       ),
+      buffer: fullSizeCandidate.buffer,
     };
   }
 
@@ -165,6 +169,7 @@ async function compressToTargetSize(
         image: openSource(inputBuffer, animated)
           .resize(newWidth, newHeight)
           .toFormat(format, formatOpts(format, candidate.quality)),
+        buffer: candidate.buffer,
         resizedTo: dims,
       };
     }

@@ -1,5 +1,5 @@
 import { compressDetailed } from "@snapotter/image-engine";
-import { kbToBytes } from "@snapotter/shared";
+import { kbToBytes, SafeError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
@@ -33,7 +33,16 @@ async function runCompress(inputBuffer: Buffer, settings: CompressSettings, file
   }
 
   const result = await compressDetailed(image, compressOptions);
-  const buffer = await result.image.toBuffer();
+  const buffer = result.buffer ?? (await result.image.toBuffer());
+  if (
+    compressOptions.targetSizeBytes !== undefined &&
+    buffer.length > compressOptions.targetSizeBytes
+  ) {
+    throw new SafeError("Compressed image exceeded target size", {
+      kind: "bug",
+      code: "TARGET_SIZE_EXCEEDED",
+    });
+  }
   return {
     buffer,
     filename,

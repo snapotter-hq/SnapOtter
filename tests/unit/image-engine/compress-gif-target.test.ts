@@ -109,7 +109,9 @@ describe("GIF target-size compression (#1183)", () => {
     });
 
     expect(result.resizedTo).toBeUndefined();
-    const out = await result.image.toBuffer();
+    expect(result.buffer).toBeInstanceOf(Buffer);
+    expect(encodes.n).toBe(1);
+    const out = result.buffer as Buffer;
     expect(out.length).toBeLessThanOrEqual(gif.length * 2);
     expect((await sharp(out).metadata()).pages).toBe(3);
   });
@@ -125,7 +127,10 @@ describe("GIF target-size compression (#1183)", () => {
     });
 
     expect(result.resizedTo).toBeDefined();
-    const out = await result.image.toBuffer();
+    expect(result.buffer).toBeInstanceOf(Buffer);
+    expect(encodes.n).toBeGreaterThan(1);
+    expect(encodes.n).toBeLessThanOrEqual(9);
+    const out = result.buffer as Buffer;
     expect(out.length).toBeLessThanOrEqual(target);
     const meta = await sharp(out).metadata();
     expect(meta.pages).toBe(3);
