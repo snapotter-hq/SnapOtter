@@ -150,7 +150,10 @@ describe("smart-crop sidecar-free processing", () => {
     });
 
     const outputUrl = await outputUrlFor(res);
-    expect(mocks.detectFaces).toHaveBeenCalledWith(expect.any(Buffer), { sensitivity: 0.75 });
+    expect(mocks.detectFaces).toHaveBeenCalledWith(expect.any(Buffer), {
+      sensitivity: 0.75,
+      toolId: "smart-crop",
+    });
 
     const download = await downloadOutput(outputUrl);
     const meta = await sharp(download.rawPayload).metadata();

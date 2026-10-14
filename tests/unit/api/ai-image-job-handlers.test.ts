@@ -291,14 +291,14 @@ describe("AI image job handlers", () => {
       1,
       PNG,
       SCRATCH_DIR,
-      { model: "birefnet-hr-matting" },
+      { model: "birefnet-hr-matting", toolId: "transparency-fixer" },
       expect.any(Function),
     );
     expect(removeBackground).toHaveBeenNthCalledWith(
       2,
       PNG,
       SCRATCH_DIR,
-      { model: "birefnet-general" },
+      { model: "birefnet-general", toolId: "transparency-fixer" },
       expect.any(Function),
     );
     expect(ctx.report).toHaveBeenCalledWith(5, "Retrying with fallback model (birefnet-general)");
