@@ -156,6 +156,11 @@ export async function evaluateAlerts(): Promise<void> {
     const result = await deliverWebhook(dest.url, authHeader, alerts, { maxRetries: 1 });
     if (result?.success !== false) {
       delivered++;
+    } else {
+      logger.error(
+        { name: dest.name, statusCode: result.statusCode, error: result.error },
+        "alert-evaluator: webhook delivery failed",
+      );
     }
   }
 

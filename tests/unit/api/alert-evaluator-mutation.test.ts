@@ -511,6 +511,7 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
     it("passes maxRetries: 1 to every webhook delivery", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
       getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
@@ -526,6 +527,8 @@ describe("alert-evaluator.ts mutation coverage", () => {
         [{ condition: "backup_never_run" }],
         { maxRetries: 1 },
       );
+      expect(loggerMock.error).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
     });
 
     it("decrypts an encrypted auth header before delivery", async () => {
@@ -625,11 +628,23 @@ describe("alert-evaluator.ts mutation coverage", () => {
       expect(logSpy).not.toHaveBeenCalled();
     });
 
-    it("does not log completion when deliverWebhook returns success: false", async () => {
+    it("logs error details and does not log completion when deliverWebhook returns success: false", async () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const { evaluateAlerts } = await loadAlertEvaluator();
-      getSettingStringMock.mockResolvedValueOnce(healthyDestinations()).mockResolvedValueOnce("");
+      getSettingStringMock
+        .mockResolvedValueOnce(
+          JSON.stringify([
+            {
+              name: "Ops Alerts",
+              url: "https://example.test/alerts",
+              authHeader: "",
+              enabled: true,
+              type: "alerts",
+            },
+          ]),
+        )
+        .mockResolvedValueOnce("");
       statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
       selectMock.mockReturnValue(queryChain([{ count: 0 }]));
       getActiveLicenseMock.mockReturnValue(null);
@@ -638,6 +653,12 @@ describe("alert-evaluator.ts mutation coverage", () => {
       await evaluateAlerts();
 
       expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+      expect(loggerMock.error).toHaveBeenCalledTimes(1);
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { name: "Ops Alerts", statusCode: 500, error: "HTTP 500" },
+        "alert-evaluator: webhook delivery failed",
+      );
+      expect(reportErrorMock).not.toHaveBeenCalled();
       expect(logSpy).not.toHaveBeenCalled();
     });
   });

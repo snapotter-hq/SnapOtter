@@ -177,6 +177,7 @@ describe("alert evaluator behavior", () => {
       ]),
       { maxRetries: 1 },
     );
+    expect(loggerMock.error).not.toHaveBeenCalled();
   });
 
   it("treats a thrown isFeatureEnabled as unlicensed and returns early", async () => {
@@ -396,7 +397,7 @@ describe("alert evaluator behavior", () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  it("does not log completion when deliverWebhook returns success: false for every destination", async () => {
+  it("logs delivery failure without raw URL and does not log completion when deliverWebhook returns success: false for every destination", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
@@ -405,7 +406,8 @@ describe("alert evaluator behavior", () => {
       .mockResolvedValueOnce(
         JSON.stringify([
           {
-            url: "https://example.test/alerts",
+            name: "Ops Alerts",
+            url: "https://hooks.slack.com/services/T000/B000/SECRET",
             authHeader: "",
             enabled: true,
             type: "alerts",
@@ -421,7 +423,57 @@ describe("alert evaluator behavior", () => {
     await evaluateAlerts();
 
     expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { name: "Ops Alerts", statusCode: 500, error: "HTTP 500" },
+      "alert-evaluator: webhook delivery failed",
+    );
+    expect(JSON.stringify(loggerMock.error.mock.calls)).not.toContain("SECRET");
+    expect(reportErrorMock).not.toHaveBeenCalled();
     expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("logs failure for a failing destination while still delivering and logging completion for healthy destinations", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const { evaluateAlerts } = await loadAlertEvaluator();
+
+    getSettingStringMock
+      .mockResolvedValueOnce(
+        JSON.stringify([
+          {
+            name: "Down Hook",
+            url: "https://example.test/down",
+            authHeader: "",
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Up Hook",
+            url: "https://example.test/up",
+            authHeader: "",
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce("");
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue(null);
+    deliverWebhookMock
+      .mockResolvedValueOnce({ success: false, statusCode: undefined, error: "fetch failed" })
+      .mockResolvedValueOnce({ success: true, statusCode: 200 });
+
+    await evaluateAlerts();
+
+    expect(deliverWebhookMock).toHaveBeenCalledTimes(2);
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      { name: "Down Hook", statusCode: undefined, error: "fetch failed" },
+      "alert-evaluator: webhook delivery failed",
+    );
+    expect(logSpy).toHaveBeenCalledWith("Alert evaluation complete: 1 alert(s) delivered");
   });
 
   it("skips a destination whose authHeader fails to decrypt while still delivering to other destinations", async () => {
