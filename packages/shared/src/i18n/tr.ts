@@ -1912,7 +1912,7 @@ export const tr: TranslationKeys = {
       effectsExpired:
         "Önceki arka plan kaldırma işleminin süresi doldu, bu yüzden yeniden çalıştırılıyor. Bittiğinde efektleri uygulayın.",
       refineChanged:
-        "Kenar yumuşatma ve renk arındırma, arka plan kaldırılırken uygulanır. Yeni ayarları kullanmak için yeniden çalıştırın.",
+        "Konu, kalite, kenar yumuşatma ve renk arındırma, arka plan kaldırılırken uygulanır. Yeni ayarları kullanmak için yeniden çalıştırın.",
     },
     "remove-gif-background": {
       quality: "Kalite",

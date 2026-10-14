@@ -1899,7 +1899,7 @@ export const es: TranslationKeys = {
       effectsExpired:
         "La eliminación de fondo anterior caducó, así que se está ejecutando de nuevo. Aplica los efectos cuando termine.",
       refineChanged:
-        "El suavizado de bordes y la descontaminación de color se aplican al quitar el fondo. Vuelve a ejecutarlo para usar los nuevos ajustes.",
+        "El sujeto, la calidad, el suavizado de bordes y la descontaminación de color se aplican al quitar el fondo. Vuelve a ejecutarlo para usar los nuevos ajustes.",
     },
     "remove-gif-background": {
       quality: "Calidad",

@@ -1915,7 +1915,7 @@ export const nl: TranslationKeys = {
       effectsExpired:
         "De eerdere achtergrondverwijdering is verlopen, dus die wordt opnieuw uitgevoerd. Pas de effecten toe zodra dat klaar is.",
       refineChanged:
-        "Randverzachting en kleurdecontaminatie worden toegepast bij het verwijderen van de achtergrond. Voer het opnieuw uit om de nieuwe instellingen te gebruiken.",
+        "Onderwerp, kwaliteit, randverzachting en kleurdecontaminatie worden toegepast bij het verwijderen van de achtergrond. Voer het opnieuw uit om de nieuwe instellingen te gebruiken.",
     },
     "remove-gif-background": {
       quality: "Kwaliteit",

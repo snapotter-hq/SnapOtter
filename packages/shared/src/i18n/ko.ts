@@ -1847,7 +1847,7 @@ export const ko: TranslationKeys = {
       effectsExpired:
         "이전 배경 제거가 만료되어 다시 실행하고 있습니다. 완료되면 효과를 적용하세요.",
       refineChanged:
-        "가장자리 다듬기와 색 오염 제거는 배경을 제거할 때 적용됩니다. 새 설정을 사용하려면 다시 실행하세요.",
+        "피사체, 품질, 가장자리 다듬기, 색 오염 제거는 배경을 제거할 때 적용됩니다. 새 설정을 사용하려면 다시 실행하세요.",
     },
     "remove-gif-background": {
       quality: "품질",

@@ -234,6 +234,91 @@ describe("remove-background refinements changed after the first run (#2112)", ()
 
     expect(stale()).not.toBeInTheDocument();
   });
+
+  it("offers to run again when Subject changes the model, and clears when switched back (#2488)", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
+    expect(stale()).not.toBeInTheDocument();
+  });
+
+  it("offers to run again when Passport or Quality changes the model and re-runs with the new model (#2488)", async () => {
+    const view = render(<RemoveBgSettings />);
+    await runAndLand(view);
+
+    // Uncheck Passport / ID photo and switch Quality from HD (birefnet-portrait) to Max (birefnet-matting).
+    fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
+
+    // Re-checking Passport returns the model to birefnet-portrait and clears the notice.
+    fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
+    expect(stale()).not.toBeInTheDocument();
+
+    // Uncheck Passport again so model is birefnet-matting, then re-run.
+    fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
+    expect(stale()).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("remove-background-rerun"));
+
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(2));
+    const [, settings, options] = deployment.processFiles.mock.calls[1];
+    expect(settings).toEqual({ model: "birefnet-matting" });
+    expect(options).toEqual({ skipLibrarySave: true });
+
+    // Land the second run: notice clears while model stays birefnet-matting, and
+    // reappears if Quality is moved back to HD (birefnet-portrait).
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].hd }));
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("assumes the default model after a remount and offers to run again when Subject changes (#2488)", async () => {
+    const first = render(<RemoveBgSettings />);
+    await runAndLand(first);
+    first.unmount();
+
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].general }),
+    );
+    expect(stale()).toBeInTheDocument();
+  });
+
+  it("records a non-default model on the first run and offers to run again if switched back to People (#2488)", async () => {
+    deployment.beforeRun = true;
+    const view = render(<RemoveBgSettings />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+    expect(deployment.processFiles.mock.calls[0][1]).toEqual({ model: "bria-rmbg" });
+
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    expect(stale()).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
+    expect(stale()).toBeInTheDocument();
+  });
 });
 
 describe("remove-background output format routing (#720)", () => {

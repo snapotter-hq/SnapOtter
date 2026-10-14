@@ -713,10 +713,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // swapping files (during the run or after it) must not leave the download
   // and effects acting on another file's job (#2107).
   const [bgResultFile, setBgResultFile] = useState<File | null>(null);
-  // The refinements the last single-file removal ran with. They are sidecar
-  // options that Phase 2 cannot apply, so a change after the result needs a new
-  // removal, and the panel says so (#2112).
+  // The model and refinements the last single-file removal ran with. They are
+  // sidecar options that Phase 2 cannot apply, so a change after the result
+  // needs a new removal, and the panel says so (#2112, #2488).
   const [removalRefine, setRemovalRefine] = useState<{
+    model: string;
     edgeRefine: number;
     decontaminate: boolean;
   } | null>(null);
@@ -780,16 +781,21 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     files.length === 1 &&
     files[0] === bgResultFile;
 
-  // The result was made with different refinements than the controls now show.
-  // After a remount (for example, crossing the mobile/desktop layout breakpoint)
-  // the run's own values are gone while the result stays loaded, so the defaults
-  // are assumed: a refinement set afterwards may offer a re-run that was not
-  // strictly needed, which costs a click, where saying nothing would repeat the
-  // silent no-op.
-  const ranWith = removalRefine ?? { edgeRefine: 0, decontaminate: false };
+  // The result was made with a different model or refinements than the controls
+  // now show. After a remount (for example, crossing the mobile/desktop layout
+  // breakpoint) the run's own values are gone while the result stays loaded, so
+  // the defaults are assumed: a change set afterwards may offer a re-run that
+  // was not strictly needed, which costs a click, where saying nothing would
+  // repeat the silent no-op.
+  const ranWith = removalRefine ?? {
+    model: "birefnet-portrait",
+    edgeRefine: 0,
+    decontaminate: false,
+  };
   const refineChanged =
     bgRemoved &&
-    (Number(settings.edgeRefine ?? 0) !== ranWith.edgeRefine ||
+    (String(settings.model ?? "birefnet-portrait") !== ranWith.model ||
+      Number(settings.edgeRefine ?? 0) !== ranWith.edgeRefine ||
       Boolean(settings.decontaminate) !== ranWith.decontaminate);
 
   // Whether the user has configured any compositing effect.
@@ -917,6 +923,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     if (settings.decontaminate != null) phase1Settings.decontaminate = settings.decontaminate;
     runFileRef.current = files[0] ?? null;
     setRemovalRefine({
+      model: String(settings.model ?? "birefnet-portrait"),
       edgeRefine: Number(settings.edgeRefine ?? 0),
       decontaminate: Boolean(settings.decontaminate),
     });

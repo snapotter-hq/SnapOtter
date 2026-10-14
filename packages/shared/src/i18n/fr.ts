@@ -1919,7 +1919,7 @@ export const fr: TranslationKeys = {
       effectsExpired:
         "La suppression d'arrière-plan précédente a expiré, elle est donc relancée. Appliquez les effets une fois qu'elle est terminée.",
       refineChanged:
-        "Le lissage des contours et la décontamination des couleurs s'appliquent lors de la suppression de l'arrière-plan. Relancez-la pour utiliser les nouveaux réglages.",
+        "Le sujet, la qualité, le lissage des contours et la décontamination des couleurs s'appliquent lors de la suppression de l'arrière-plan. Relancez-la pour utiliser les nouveaux réglages.",
     },
     "remove-gif-background": {
       quality: "Qualité",

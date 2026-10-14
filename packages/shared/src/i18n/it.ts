@@ -1912,7 +1912,7 @@ export const it: TranslationKeys = {
       effectsExpired:
         "La rimozione dello sfondo precedente è scaduta, quindi viene eseguita di nuovo. Applica gli effetti quando ha finito.",
       refineChanged:
-        "La levigatura dei bordi e la decontaminazione del colore vengono applicate quando lo sfondo viene rimosso. Eseguila di nuovo per usare le nuove impostazioni.",
+        "Il soggetto, la qualità, la levigatura dei bordi e la decontaminazione del colore vengono applicati quando lo sfondo viene rimosso. Eseguila di nuovo per usare le nuove impostazioni.",
     },
     "remove-gif-background": {
       quality: "Qualità",

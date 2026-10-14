@@ -1907,7 +1907,7 @@ export const id: TranslationKeys = {
       effectsExpired:
         "Penghapusan latar belakang sebelumnya sudah kedaluwarsa, jadi sedang dijalankan ulang. Terapkan efek setelah selesai.",
       refineChanged:
-        "Penghalusan tepi dan dekontaminasi warna diterapkan saat latar belakang dihapus. Jalankan lagi untuk memakai pengaturan baru.",
+        "Subjek, kualitas, penghalusan tepi, dan dekontaminasi warna diterapkan saat latar belakang dihapus. Jalankan lagi untuk memakai pengaturan baru.",
     },
     "remove-gif-background": {
       quality: "Kualitas",

@@ -1913,7 +1913,7 @@ export const pl: TranslationKeys = {
       effectsExpired:
         "Poprzednie usuwanie tła wygasło, więc jest uruchamiane ponownie. Zastosuj efekty, gdy się zakończy.",
       refineChanged:
-        "Wygładzanie krawędzi i dekontaminacja kolorów są stosowane podczas usuwania tła. Uruchom usuwanie ponownie, aby użyć nowych ustawień.",
+        "Obiekt, jakość, wygładzanie krawędzi i dekontaminacja kolorów są stosowane podczas usuwania tła. Uruchom usuwanie ponownie, aby użyć nowych ustawień.",
     },
     "remove-gif-background": {
       quality: "Jakość",

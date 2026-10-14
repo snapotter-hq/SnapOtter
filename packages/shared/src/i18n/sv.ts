@@ -1906,7 +1906,7 @@ export const sv: TranslationKeys = {
       effectsExpired:
         "Den tidigare bakgrundsborttagningen har gått ut, så den körs igen. Tillämpa effekterna när den är klar.",
       refineChanged:
-        "Kantutjämning och färgdekontaminering tillämpas när bakgrunden tas bort. Kör borttagningen igen för att använda de nya inställningarna.",
+        "Motiv, kvalitet, kantutjämning och färgdekontaminering tillämpas när bakgrunden tas bort. Kör borttagningen igen för att använda de nya inställningarna.",
     },
     "remove-gif-background": {
       quality: "Kvalitet",
