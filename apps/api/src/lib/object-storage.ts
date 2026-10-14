@@ -228,11 +228,29 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
     return;
   }
   await assertLocalCapacity();
+  const p = localPath(key);
+  const stagingDir = join(dirname(p), ".snapotter-staging");
+  const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
+  let stagingOwned = false;
   try {
-    const p = localPath(key);
     await mkdir(dirname(p), { recursive: true });
-    await writeFile(p, data);
+    await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+    try {
+      await writeFile(stagingPath, data, { flag: "wx", mode: 0o600 });
+      stagingOwned = true;
+    } catch (writeErr) {
+      if ((writeErr as NodeJS.ErrnoException | null)?.syscall !== "open") {
+        stagingOwned = true;
+      }
+      throw writeErr;
+    }
+    await rename(stagingPath, p);
+    await rmdir(stagingDir).catch(() => {});
   } catch (err) {
+    if (stagingOwned) {
+      await unlink(stagingPath).catch(() => {});
+    }
+    await rmdir(stagingDir).catch(() => {});
     throw localWriteFault(err);
   }
 }

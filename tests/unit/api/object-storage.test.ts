@@ -31,6 +31,8 @@ describe("object-storage (local backend)", () => {
   const failureJobId = `stream-failure-${process.pid}`;
   const semanticsJobId = `stream-semantics-${process.pid}`;
   const collisionJobId = `stream-collision-${process.pid}`;
+  const putPartialJobId = `put-partial-${process.pid}`;
+  const putCollisionJobId = `put-collision-${process.pid}`;
   const copyDir = mkdtempSync(join(tmpdir(), "snapotter-object-copy-"));
 
   const jobEntries = (jobId: string): string[] => {
@@ -50,6 +52,8 @@ describe("object-storage (local backend)", () => {
     await deletePrefix(`outputs/${failureJobId}`).catch(() => {});
     await deletePrefix(`outputs/${semanticsJobId}`).catch(() => {});
     await deletePrefix(`outputs/${collisionJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${putPartialJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${putCollisionJobId}`).catch(() => {});
     rmSync(copyDir, { recursive: true, force: true });
   });
 
@@ -169,6 +173,118 @@ describe("object-storage (local backend)", () => {
       });
     } finally {
       rmSync(blocker, { force: true });
+    }
+  });
+
+  // #1494: putObject wrote straight to the final key, so an ENOSPC mid-write
+  // left a non-empty truncated file that stranded-job reconciliation adopted.
+  it("stages putObject writes and unlinks a partial write on ENOSPC so nothing is left at the key", async () => {
+    const partialKey = `outputs/${putPartialJobId}/out.png`;
+    const committedKey = `outputs/${putPartialJobId}/existing.png`;
+    const stagingDir = join(env.WORKSPACE_PATH, "outputs", putPartialJobId, ".snapotter-staging");
+    await putObject(committedKey, Buffer.from("committed"));
+    expect(jobEntries(putPartialJobId)).toEqual(["existing.png"]);
+    let midWriteObjects: Array<{ key: string; size: number }> = [];
+    let midWriteStagingEntries: string[] = [];
+
+    vi.resetModules();
+    let isolatedStorage!: typeof import("../../../apps/api/src/lib/object-storage.js");
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        writeFile: async (
+          target: Parameters<typeof actual.writeFile>[0],
+          _data: Parameters<typeof actual.writeFile>[1],
+          options?: Parameters<typeof actual.writeFile>[2],
+        ) => {
+          await actual.writeFile(target, Buffer.from("trunc"), options);
+          midWriteObjects = (await isolatedStorage.listObjects(`outputs/${putPartialJobId}`)).map(
+            (o) => ({ key: o.key, size: o.size }),
+          );
+          midWriteStagingEntries = readdirSync(stagingDir);
+          throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
+            code: "ENOSPC",
+            syscall: "write",
+          });
+        },
+      };
+    });
+
+    try {
+      isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(
+        isolatedStorage.putObject(partialKey, Buffer.from("complete image bytes")),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-full",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOSPC" }),
+      });
+      // Even before catch unlinks the partial file (simulating a crash mid-write),
+      // staging inside .snapotter-staging/ keeps listObjects from seeing it.
+      expect(midWriteObjects).toEqual([{ key: committedKey, size: 9 }]);
+      expect(midWriteStagingEntries).toEqual([expect.stringMatching(/^out\.png\..+\.partial$/)]);
+      await expect(isolatedStorage.objectExists(partialKey)).resolves.toBe(false);
+      expect(jobEntries(putPartialJobId)).toEqual(["existing.png"]);
+
+      midWriteObjects = [];
+      midWriteStagingEntries = [];
+      await expect(
+        isolatedStorage.putObject(committedKey, Buffer.from("replacement bytes")),
+      ).rejects.toMatchObject({
+        code: "storage-full",
+        statusCode: 503,
+      });
+      expect(midWriteObjects).toEqual([{ key: committedKey, size: 9 }]);
+      expect(midWriteStagingEntries).toEqual([
+        expect.stringMatching(/^existing\.png\..+\.partial$/),
+      ]);
+      await expect(isolatedStorage.getObjectBuffer(committedKey)).resolves.toEqual(
+        Buffer.from("committed"),
+      );
+      await expect(
+        isolatedStorage.listObjects(`outputs/${putPartialJobId}`),
+      ).resolves.toMatchObject([{ key: committedKey, size: 9 }]);
+      expect(jobEntries(putPartialJobId)).toEqual(["existing.png"]);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+      await deletePrefix(`outputs/${putPartialJobId}`).catch(() => {});
+    }
+  });
+
+  it("does not delete an unowned staging file when putObject hits an exclusive-create collision", async () => {
+    const collisionId = "00000000-0000-4000-8000-000000000002";
+    const destinationKey = `outputs/${putCollisionJobId}/target.bin`;
+    const stagingDir = join(env.WORKSPACE_PATH, "outputs", putCollisionJobId, ".snapotter-staging");
+    const stagingPath = join(stagingDir, `target.bin.${collisionId}.partial`);
+    await putObject(destinationKey, Buffer.from("committed"));
+    await mkdir(stagingDir, { recursive: true });
+    await writeFile(stagingPath, Buffer.from("owned by another writer"));
+    vi.resetModules();
+    vi.doMock("node:crypto", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:crypto")>();
+      return { ...actual, randomUUID: () => collisionId };
+    });
+
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(
+        isolatedStorage.putObject(destinationKey, Buffer.from("fresh")),
+      ).rejects.toMatchObject({
+        code: "storage-write-failed",
+        cause: expect.objectContaining({ code: "EEXIST" }),
+      });
+      expect(readFileSync(stagingPath).toString()).toBe("owned by another writer");
+      await expect(isolatedStorage.getObjectBuffer(destinationKey)).resolves.toEqual(
+        Buffer.from("committed"),
+      );
+    } finally {
+      vi.doUnmock("node:crypto");
+      vi.resetModules();
+      await deletePrefix(`outputs/${putCollisionJobId}`).catch(() => {});
     }
   });
 
