@@ -194,12 +194,87 @@ def same_filesystem(a: str, b: str) -> bool:
 
 # -- Venv site-packages discovery --
 
+def _probe_site_packages_dir(venv_path: str) -> tuple:
+    """Resolve venv_path's site-packages directory through its own interpreter.
+
+    Mirrors resolveVenvSitePackages in apps/api/src/lib/feature-status.ts (#1139):
+    asks <venv>/bin/python3 for sysconfig.get_paths()['purelib'], refuses a
+    resolved path outside venv_path (e.g. a symlinked system python3 with no
+    pyvenv.cfg reporting the host's site-packages), and requires the directory
+    to exist on disk. Returns (site_packages_dir, error_message).
+    """
+    venv_python = os.path.join(venv_path, "bin", "python3")
+    if not os.path.exists(venv_python):
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} could not be queried "
+            f"({venv_python} does not exist). Recreate the AI environment and retry.",
+        )
+    try:
+        result = subprocess.run(
+            [venv_python, "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} could not be queried ({e}). "
+            f"Recreate the AI environment and retry.",
+        )
+    stdout = getattr(result, "stdout", None) or ""
+    stderr = getattr(result, "stderr", None) or ""
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if result.returncode != 0 or not lines:
+        detail = stderr.strip() or f"python3 exited with status {result.returncode}"
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} could not be queried ({detail}). "
+            f"Recreate the AI environment and retry.",
+        )
+    raw_site_packages = lines[-1]
+    try:
+        is_abs = os.path.isabs(raw_site_packages)
+        site_packages = os.path.realpath(raw_site_packages) if is_abs else ""
+        resolved_venv = os.path.realpath(venv_path)
+        is_dir = os.path.isdir(site_packages) if site_packages else False
+    except (OSError, ValueError) as e:
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} returned an invalid "
+            f"site-packages path ({e}). Recreate the AI environment and retry.",
+        )
+    if not is_abs:
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} reported a non-absolute "
+            f"site-packages path ({raw_site_packages}). Recreate the AI environment and retry.",
+        )
+    if not site_packages.startswith(resolved_venv + os.sep):
+        return (
+            "",
+            f"The AI environment's Python interpreter at {venv_path} reports a site-packages "
+            f"directory ({site_packages}) outside the environment itself. "
+            f"Recreate the AI environment and retry.",
+        )
+    if not is_dir:
+        return (
+            "",
+            f"The AI environment at {venv_path} has no site-packages directory at {site_packages}. "
+            f"Recreate the AI environment and retry.",
+        )
+    return (site_packages, "")
+
+
 def get_site_packages_dir(venv_path: str) -> str:
     """Find the site-packages directory inside a Python venv."""
-    matches = glob.glob(os.path.join(venv_path, "lib", "python*", "site-packages"))
-    if matches:
-        return matches[0]
-    return ""
+    site_packages, _err = _probe_site_packages_dir(venv_path)
+    return site_packages
+
+
+_default_get_site_packages_dir = get_site_packages_dir
 
 
 # -- SHA256 verification --
@@ -1642,7 +1717,30 @@ def _install() -> None:
 
     # -- Move site-packages --
     emit_progress(92, "Installing packages...")
-    site_packages_dir = get_site_packages_dir(venv_path)
+    has_staging_sp = os.path.isdir(staging_sp)
+    smoke_imports = bundle.get("smokeImports") or []
+    run_smoke = bool(smoke_imports) and os.environ.get("SNAPOTTER_SKIP_INSTALL_SMOKE") != "1"
+    venv_python = os.path.join(venv_path, "bin", "python3")
+    site_packages_dir = ""
+    if has_staging_sp:
+        if get_site_packages_dir is _default_get_site_packages_dir:
+            site_packages_dir, sp_err = _probe_site_packages_dir(venv_path)
+        else:
+            site_packages_dir = get_site_packages_dir(venv_path)
+            sp_err = ""
+        if not site_packages_dir:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            fail(
+                sp_err
+                or f"The AI environment at {venv_path} has no usable site-packages directory. "
+                f"Recreate the AI environment and retry."
+            )
+    if run_smoke and not os.path.exists(venv_python):
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        fail(
+            f"Installation verification failed: the AI environment's Python interpreter "
+            f"at {venv_python} does not exist. Recreate the AI environment and retry."
+        )
     venv_writing_marker = os.path.join(ai_dir, "venv.writing")
     # Superseded versions wait here until the install is verified. It sits inside
     # the venv so every move is a same-filesystem rename rather than a copy of
@@ -1652,7 +1750,7 @@ def _install() -> None:
     reconciliation_plan = []
 
     try:
-        if os.path.isdir(staging_sp) and site_packages_dir:
+        if has_staging_sp:
             # Breadcrumb the destructive shared-venv write. If the process is
             # killed mid-move (OOM/SIGKILL/power loss), move_tree can leave the
             # venv torn, which breaks OTHER installed tools. The marker survives
@@ -1714,16 +1812,28 @@ def _install() -> None:
     # fails at first use. Import the bundle's key native libraries in the venv
     # now; if that fails, refuse to mark the bundle installed so the user gets a
     # clear retry instead of a silently broken tool.
-    smoke_imports = bundle.get("smokeImports") or []
-    if smoke_imports and os.environ.get("SNAPOTTER_SKIP_INSTALL_SMOKE") != "1":
+    if run_smoke:
         emit_progress(99, "Verifying installation...")
-        venv_python = os.path.join(venv_path, "bin", "python3")
-        if os.path.exists(venv_python):
-            import_stmt = "\n".join(f"import {mod}" for mod in smoke_imports)
+        if not os.path.exists(venv_python):
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            abandon_merge(
+                site_packages_dir, reconciliation_plan, quarantine_dir,
+                venv_writing_marker, bundle_id,
+            )
+            fail(
+                f"Installation verification failed: the AI environment's Python interpreter "
+                f"at {venv_python} does not exist. Recreate the AI environment and retry."
+            )
+        import_stmt = "\n".join(f"import {mod}" for mod in smoke_imports)
+
+        def _run_smoke_import():
             try:
-                proc = subprocess.run(
+                return subprocess.run(
                     [venv_python, "-c", import_stmt],
-                    capture_output=True, text=True, timeout=300,
+                    capture_output=True,
+                    text=True,
+                    errors="replace",
+                    timeout=300,
                 )
             except subprocess.TimeoutExpired:
                 shutil.rmtree(staging_dir, ignore_errors=True)
@@ -1732,89 +1842,96 @@ def _install() -> None:
                     venv_writing_marker, bundle_id,
                 )
                 fail("Installation verification timed out. Please retry the install.")
-
-            # Auto-remediation for native linux/LXC users without CUDA libraries
-            if proc.returncode != 0 and "onnxruntime" in smoke_imports:
-                stderr_output = (proc.stderr or "")
-                # onnxruntime-gpu on CPU-only Debian/Ubuntu fails to load its C extensions
-                # resulting in missing attributes or missing libcudart/libcudnn errors.
-                if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
-                    emit_progress(99, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
-                    fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "onnxruntime==1.20.1"]
-                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
-                    if fix_proc.returncode == 0 and site_packages_dir and os.path.isdir(site_packages_dir):
-                        for name in os.listdir(site_packages_dir):
-                            if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
-                                shutil.rmtree(os.path.join(site_packages_dir, name), ignore_errors=True)
-                    elif fix_proc.returncode != 0:
-                        emit_progress(99, "Fallback onnxruntime installation failed")
-
-                    # Re-run smoke test after fallback
-                    proc = subprocess.run(
-                        [venv_python, "-c", import_stmt],
-                        capture_output=True, text=True, timeout=300,
-                    )
-
-            # Auto-remediation for broken cv2 (OpenCV conflict)
-            if proc.returncode != 0:
-                stderr_output = (proc.stderr or "")
-                # The bundle might contain conflicting cv2 binaries due to mediapipe vs rembg requirements
-                if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
-                    emit_progress(99, "OpenCV conflict detected; applying headless fallback...")
-                    fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
-                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, timeout=120)
-                    if fix_proc.returncode != 0:
-                        emit_progress(99, "Fallback opencv installation failed")
-
-                    # Clean up other opencv dist-info to prevent pip from getting confused
-                    clean_cmd = [venv_python, "-c",
-                        "import os, shutil, site; "
-                        "bad = [(sp, n) for sp in site.getsitepackages() if os.path.exists(sp) "
-                        "for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and not n.startswith('opencv_contrib_python_headless-') and n.endswith('.dist-info')]; "
-                        "for sp, n in bad: shutil.rmtree(os.path.join(sp, n), ignore_errors=True)"
-                    ]
-                    subprocess.run(clean_cmd, capture_output=True, text=True, timeout=60)
-
-                    # Re-run smoke test after fallback
-                    proc = subprocess.run(
-                        [venv_python, "-c", import_stmt],
-                        capture_output=True, text=True, timeout=300,
-                    )
-
-            if proc.returncode != 0:
+            except OSError as e:
                 shutil.rmtree(staging_dir, ignore_errors=True)
                 abandon_merge(
                     site_packages_dir, reconciliation_plan, quarantine_dir,
                     venv_writing_marker, bundle_id,
                 )
-                tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
-                bundle_py = str(bundle_meta.get("pythonVersion", "")).strip()
-                bundle_py_mm = ".".join(bundle_py.split(".")[:2]) if "." in bundle_py else ""
-                venv_py_mm = _venv_python_major_minor(venv_python)
-                mismatch_note = ""
-                if bundle_py_mm and venv_py_mm and bundle_py_mm != venv_py_mm:
-                    mismatch_note = (
-                        f"Bundle requires Python {bundle_py_mm}, but the AI venv at "
-                        f"{venv_path} is running Python {venv_py_mm}.\n\n"
-                    )
-                if can_reseed_venv():
-                    recovery_hint = (
-                        "This usually means an interrupted or corrupted install. Retry the "
-                        "install; if it keeps failing, use Settings > AI Features > Reset AI "
-                        "Environment, then reinstall."
-                    )
-                else:
-                    recovery_hint = (
-                        "This usually means an interrupted install or a host Python/base-package "
-                        f"mismatch in {venv_path}. Retry the install, or rebuild {venv_path} "
-                        "with the Python version and basePackages from docker/feature-manifest.json."
-                    )
                 fail(
-                    "Installation verification failed: the bundle installed but its "
-                    "libraries could not be loaded, so the tool would not work.\n"
-                    f"{tail}\n\n"
-                    f"{mismatch_note}{recovery_hint}"
+                    f"Installation verification failed: the AI environment's Python interpreter "
+                    f"at {venv_python} could not be run ({e}). Recreate the AI environment and retry."
                 )
+
+        proc = _run_smoke_import()
+
+        # Auto-remediation for native linux/LXC users without CUDA libraries
+        if proc.returncode != 0 and "onnxruntime" in smoke_imports:
+            stderr_output = (proc.stderr or "")
+            # onnxruntime-gpu on CPU-only Debian/Ubuntu fails to load its C extensions
+            # resulting in missing attributes or missing libcudart/libcudnn errors.
+            if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
+                emit_progress(99, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
+                fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "onnxruntime==1.20.1"]
+                fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
+                sp_for_cleanup = site_packages_dir or get_site_packages_dir(venv_path)
+                if fix_proc.returncode == 0 and sp_for_cleanup and os.path.isdir(sp_for_cleanup):
+                    for name in os.listdir(sp_for_cleanup):
+                        if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
+                            shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
+                elif fix_proc.returncode != 0:
+                    emit_progress(99, "Fallback onnxruntime installation failed")
+
+                # Re-run smoke test after fallback
+                proc = _run_smoke_import()
+
+        # Auto-remediation for broken cv2 (OpenCV conflict)
+        if proc.returncode != 0:
+            stderr_output = (proc.stderr or "")
+            # The bundle might contain conflicting cv2 binaries due to mediapipe vs rembg requirements
+            if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
+                emit_progress(99, "OpenCV conflict detected; applying headless fallback...")
+                fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
+                fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
+                if fix_proc.returncode != 0:
+                    emit_progress(99, "Fallback opencv installation failed")
+
+                # Clean up other opencv dist-info to prevent pip from getting confused
+                clean_cmd = [venv_python, "-c",
+                    "import os, shutil, site; "
+                    "bad = [(sp, n) for sp in site.getsitepackages() if os.path.exists(sp) "
+                    "for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and not n.startswith('opencv_contrib_python_headless-') and n.endswith('.dist-info')]; "
+                    "for sp, n in bad: shutil.rmtree(os.path.join(sp, n), ignore_errors=True)"
+                ]
+                subprocess.run(clean_cmd, capture_output=True, text=True, errors="replace", timeout=60)
+
+                # Re-run smoke test after fallback
+                proc = _run_smoke_import()
+
+        if proc.returncode != 0:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            abandon_merge(
+                site_packages_dir, reconciliation_plan, quarantine_dir,
+                venv_writing_marker, bundle_id,
+            )
+            tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
+            bundle_py = str(bundle_meta.get("pythonVersion", "")).strip()
+            bundle_py_mm = ".".join(bundle_py.split(".")[:2]) if "." in bundle_py else ""
+            venv_py_mm = _venv_python_major_minor(venv_python)
+            mismatch_note = ""
+            if bundle_py_mm and venv_py_mm and bundle_py_mm != venv_py_mm:
+                mismatch_note = (
+                    f"Bundle requires Python {bundle_py_mm}, but the AI venv at "
+                    f"{venv_path} is running Python {venv_py_mm}.\n\n"
+                )
+            if can_reseed_venv():
+                recovery_hint = (
+                    "This usually means an interrupted or corrupted install. Retry the "
+                    "install; if it keeps failing, use Settings > AI Features > Reset AI "
+                    "Environment, then reinstall."
+                )
+            else:
+                recovery_hint = (
+                    "This usually means an interrupted install or a host Python/base-package "
+                    f"mismatch in {venv_path}. Retry the install, or rebuild {venv_path} "
+                    "with the Python version and basePackages from docker/feature-manifest.json."
+                )
+            fail(
+                "Installation verification failed: the bundle installed but its "
+                "libraries could not be loaded, so the tool would not work.\n"
+                f"{tail}\n\n"
+                f"{mismatch_note}{recovery_hint}"
+            )
 
     # -- Write installed.json --
     emit_progress(98, "Recording installation...")

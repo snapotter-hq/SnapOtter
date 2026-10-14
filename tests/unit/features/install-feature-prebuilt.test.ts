@@ -1,19 +1,39 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const scriptPath = join(process.cwd(), "packages/ai/python/install_feature.py");
+
+const hostPython = (() => {
+  const out = execFileSync(
+    "python3",
+    [
+      "-c",
+      [
+        "import json, os, sys, sysconfig",
+        "scheme = 'venv' if 'venv' in sysconfig.get_scheme_names() else 'posix_prefix'",
+        "rel_sp = os.path.relpath(sysconfig.get_path('purelib', scheme, vars={'base': '/v', 'platbase': '/v'}), '/v')",
+        "base_exe = getattr(sys, '_base_executable', None) or sys.executable",
+        "print(json.dumps({'executable': base_exe, 'relSitePackages': rel_sp}))",
+      ].join("; "),
+    ],
+    { encoding: "utf-8" },
+  ).trim();
+  return JSON.parse(out) as { executable: string; relSitePackages: string };
+})();
 
 let tempDir: string;
 let aiDir: string;
@@ -27,10 +47,16 @@ beforeEach(() => {
   aiDir = join(tempDir, "ai");
   modelsDir = join(aiDir, "models");
   venvDir = join(aiDir, "venv");
-  sitePackagesDir = join(venvDir, "lib", "python3.12", "site-packages");
+  sitePackagesDir = join(venvDir, hostPython.relSitePackages);
   manifestPath = join(tempDir, "feature-manifest.json");
 
   mkdirSync(sitePackagesDir, { recursive: true });
+  mkdirSync(join(venvDir, "bin"), { recursive: true });
+  symlinkSync(hostPython.executable, join(venvDir, "bin", "python3"));
+  writeFileSync(
+    join(venvDir, "pyvenv.cfg"),
+    `home = ${dirname(hostPython.executable)}\ninclude-system-site-packages = false\n`,
+  );
   mkdirSync(modelsDir, { recursive: true });
   mkdirSync(join(aiDir, "staging"), { recursive: true });
   writeFileSync(join(aiDir, "installed.json"), JSON.stringify({ bundles: {} }));
@@ -95,11 +121,20 @@ function writeManifest(
   writeFileSync(manifestPath, JSON.stringify(manifest));
 }
 
-/** Put a real python3 at venv/bin/python3 so the post-install smoke check runs. */
+/** Ensure venv/bin/python3 and pyvenv.cfg exist so the venv interpreter runs. */
 function linkVenvPython() {
-  const py = execFileSync("python3", ["-c", "import sys; print(sys.executable)"]).toString().trim();
-  mkdirSync(join(venvDir, "bin"), { recursive: true });
-  symlinkSync(py, join(venvDir, "bin", "python3"));
+  const binPy = join(venvDir, "bin", "python3");
+  if (!existsSync(binPy)) {
+    mkdirSync(join(venvDir, "bin"), { recursive: true });
+    symlinkSync(hostPython.executable, binPy);
+  }
+  const cfgPath = join(venvDir, "pyvenv.cfg");
+  if (!existsSync(cfgPath)) {
+    writeFileSync(
+      cfgPath,
+      `home = ${dirname(hostPython.executable)}\ninclude-system-site-packages = false\n`,
+    );
+  }
 }
 
 describe("install_feature.py prebuilt mode", () => {
@@ -175,7 +210,7 @@ describe("install_feature.py prebuilt mode", () => {
   it("passes the post-install smoke import check and clears the venv-writing breadcrumb", () => {
     linkVenvPython();
     const { tarPath, sha256 } = createTestTar("face-detection");
-    writeManifest("face-detection", tarPath, sha256, { smokeImports: ["json", "sys"] });
+    writeManifest("face-detection", tarPath, sha256, { smokeImports: ["json", "sys", "testpkg"] });
 
     const result = spawnSync("python3", [scriptPath, "face-detection", manifestPath, modelsDir], {
       env: {
@@ -490,5 +525,270 @@ with tempfile.TemporaryDirectory() as d:
     // Native installs have no /usr/local/bin/reseed-ai-venv.sh, so telling the
     // user to click Reset AI Environment is misleading (#1248 Bug 3, #796).
     expect(stderr).not.toContain("Reset AI Environment");
+  });
+});
+
+describe("site-packages resolution and smoke verification (#1236)", () => {
+  function expectRejectedInstall(result: ReturnType<typeof installBundle>, pattern: RegExp) {
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString() ?? "").toMatch(pattern);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeUndefined();
+    expect(existsSync(join(modelsDir, "testmodel", "weights.bin"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
+  }
+
+  it("fails the install before moving models or opening venv.writing when the venv has no interpreter", () => {
+    unlinkSync(join(venvDir, "bin", "python3"));
+    rmSync(sitePackagesDir, { recursive: true, force: true });
+
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256, { smokeImports: ["testpkg"] });
+
+    expectRejectedInstall(installBundle("face-detection", tarPath), /could not be queried/i);
+  });
+
+  it("fails the install when the venv interpreter reports a site-packages directory outside the venv", () => {
+    // Symlinked host python3 without pyvenv.cfg answers with the host's own
+    // site-packages outside venvDir.
+    unlinkSync(join(venvDir, "pyvenv.cfg"));
+
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+
+    expectRejectedInstall(
+      installBundle("face-detection", tarPath),
+      /outside the environment itself/i,
+    );
+  });
+
+  it("fails the install when the venv interpreter names a site-packages directory that does not exist", () => {
+    rmSync(sitePackagesDir, { recursive: true, force: true });
+
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+
+    expectRejectedInstall(
+      installBundle("face-detection", tarPath),
+      /has no site-packages directory/i,
+    );
+  });
+
+  it("fails the install with the interpreter stderr when querying sysconfig exits non-zero", () => {
+    const binPy = join(venvDir, "bin", "python3");
+    unlinkSync(binPy);
+    writeFileSync(binPy, "#!/bin/sh\necho 'corrupt python runtime' >&2\nexit 1\n");
+    chmodSync(binPy, 0o755);
+
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+
+    expectRejectedInstall(installBundle("face-detection", tarPath), /corrupt python runtime/i);
+  });
+
+  it("places site-packages into the path reported by sysconfig even when it does not match lib/python*/site-packages", () => {
+    rmSync(sitePackagesDir, { recursive: true, force: true });
+    const customSp = join(venvDir, "custom-platlib", "packages");
+    mkdirSync(customSp, { recursive: true });
+
+    const binPy = join(venvDir, "bin", "python3");
+    unlinkSync(binPy);
+    writeFileSync(
+      binPy,
+      `#!/bin/sh\necho "pth warning on stdout"\necho ${JSON.stringify(customSp)}\n`,
+    );
+    chmodSync(binPy, 0o755);
+
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+
+    const result = installBundle("face-detection", tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+    expect(existsSync(join(customSp, "testpkg", "__init__.py"))).toBe(true);
+    expect(existsSync(join(modelsDir, "testmodel", "weights.bin"))).toBe(true);
+  });
+
+  it("fails smoke verification instead of skipping it when venv/bin/python3 is missing on a models-only bundle", () => {
+    unlinkSync(join(venvDir, "bin", "python3"));
+
+    const buildDir = join(tempDir, "build-models-only");
+    mkdirSync(join(buildDir, "models", "testmodel"), { recursive: true });
+    writeFileSync(join(buildDir, "models", "testmodel", "weights.bin"), "model-weights");
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "face-detection",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: ["testmodel"],
+      }),
+    );
+    const tarPath = join(tempDir, "models-only.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+    writeManifest("face-detection", tarPath, sha256, { smokeImports: ["json"] });
+
+    const result = installBundle("face-detection", tarPath);
+    expectRejectedInstall(result, /verification failed.*does not exist/i);
+  });
+
+  it("rolls back site-packages and fails when venv/bin/python3 raises OSError during smoke verification", () => {
+    // Seed an existing version of testpkg in the venv so abandon_merge has a
+    // superseded version to restore on rollback.
+    mkdirSync(join(sitePackagesDir, "testpkg"), { recursive: true });
+    mkdirSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "# v0.9.0");
+    writeFileSync(
+      join(sitePackagesDir, "testpkg-0.9.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-0.9.0.dist-info/RECORD,,\n",
+    );
+
+    const buildDir = join(tempDir, "build-rollback");
+    mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
+    writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
+    writeFileSync(
+      join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-1.0.0.dist-info/RECORD,,\n",
+    );
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "face-detection",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: [],
+      }),
+    );
+    const tarPath = join(tempDir, "rollback-smoke.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+    writeManifest("face-detection", tarPath, sha256, {
+      models: [],
+      smokeImports: ["testpkg"],
+    });
+
+    // Wrapper answers sysconfig purelib on first invocation, then rewrites its
+    // shebang to a nonexistent interpreter so the smoke-import spawn raises
+    // FileNotFoundError (OSError) deterministically even when running as root.
+    const binPy = join(venvDir, "bin", "python3");
+    unlinkSync(binPy);
+    writeFileSync(
+      binPy,
+      [
+        "#!/bin/sh",
+        'case "$*" in',
+        "  *sysconfig*)",
+        `    echo ${JSON.stringify(sitePackagesDir)}`,
+        `    printf '#!/nonexistent_interpreter_zzz\\n' > ${JSON.stringify(binPy)}`,
+        `    chmod 755 ${JSON.stringify(binPy)}`,
+        "    ;;",
+        "esac",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(binPy, 0o755);
+
+    const result = installBundle("face-detection", tarPath);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString() ?? "").toMatch(/could not be run/i);
+    expect(readFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "utf-8")).toBe("# v0.9.0");
+    expect(existsSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "testpkg-1.0.0.dist-info"))).toBe(false);
+    expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeUndefined();
+  });
+
+  it("returns empty string and diagnostic reason on timeout, OSError, empty stdout, relative path, symlink escape, or non-directory", () => {
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, os, subprocess, tempfile
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+with tempfile.TemporaryDirectory() as d:
+    venv = os.path.join(d, "venv")
+    outside = os.path.join(d, "outside")
+    os.makedirs(os.path.join(venv, "bin"), exist_ok=True)
+    os.makedirs(outside, exist_ok=True)
+    py = os.path.join(venv, "bin", "python3")
+    with open(py, "w") as f:
+        f.write("#!/bin/sh\\nexit 0\\n")
+    os.chmod(py, 0o755)
+
+    real_run = mod.subprocess.run
+
+    def raise_timeout(*a, **kw):
+        raise subprocess.TimeoutExpired(cmd=a[0], timeout=10)
+    mod.subprocess.run = raise_timeout
+    assert mod.get_site_packages_dir(venv) == ""
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "could not be queried" in err
+
+    def raise_oserror(*a, **kw):
+        raise OSError("exec format error")
+    mod.subprocess.run = raise_oserror
+    assert mod.get_site_packages_dir(venv) == ""
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "exec format error" in err
+
+    class FakeResult:
+        def __init__(self, returncode, stdout="", stderr=""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    mod.subprocess.run = lambda *a, **kw: FakeResult(0, "   \\n")
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "python3 exited with status 0" in err
+
+    mod.subprocess.run = lambda *a, **kw: FakeResult(2, "", "")
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "python3 exited with status 2" in err
+
+    mod.subprocess.run = lambda *a, **kw: FakeResult(0, "relative/site-packages\\n")
+    assert mod.get_site_packages_dir(venv) == ""
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "non-absolute" in err
+
+    mod.subprocess.run = lambda *a, **kw: FakeResult(0, venv + "\\n")
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "outside the environment itself" in err
+
+    escaped_link = os.path.join(venv, "lib", "python3.12", "site-packages")
+    os.makedirs(os.path.dirname(escaped_link), exist_ok=True)
+    os.symlink(outside, escaped_link)
+    mod.subprocess.run = lambda *a, **kw: FakeResult(0, escaped_link + "\\n")
+    assert mod.get_site_packages_dir(venv) == ""
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "outside the environment itself" in err
+
+    file_sp = os.path.join(venv, "lib", "python3.12", "not-a-dir")
+    with open(file_sp, "w") as f:
+        f.write("file")
+    mod.subprocess.run = lambda *a, **kw: FakeResult(0, file_sp + "\\n")
+    sp, err = mod._probe_site_packages_dir(venv)
+    assert sp == "" and "has no site-packages directory" in err
+
+    mod.subprocess.run = real_run
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
   });
 });
