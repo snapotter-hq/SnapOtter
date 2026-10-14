@@ -206,11 +206,23 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const [padOpen, setPadOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<{
+    entryId: string | undefined;
+    message: string;
+  } | null>(null);
+  const [localDownload, setLocalDownload] = useState<{
+    entryId: string | undefined;
+    url: string;
+  } | null>(null);
+  const [staleEntryId, setStaleEntryId] = useState<string | null>(null);
   const stopRunRef = useRef<() => void>(() => {});
   /** Set while this panel owns the store's processing flag; see endRun. */
   const runOwnedRef = useRef(false);
+
+  const setError = (message: string | null, entryId = currentEntry?.id) =>
+    setLocalError(message === null ? null : { entryId, message });
+  const setDownloadUrl = (url: string | null, entryId = currentEntry?.id) =>
+    setLocalDownload(url === null ? null : { entryId, url });
 
   // Tear down the whole run if the panel unmounts mid-job, not just its SSE.
   //
@@ -235,12 +247,18 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
   const refresh = () => setSigs(listSignatures());
 
+  const markPlacementsEdited = () => {
+    setDownloadUrl(null);
+    setStaleEntryId(currentEntry?.id ?? null);
+  };
+
   const handleSavePad = (dataUrl: string, remember: boolean) => {
     const sig: SavedSignature = remember
       ? addSignature(dataUrl)
       : { id: safeRandomUUID(), dataUrl, createdAt: Date.now() };
     if (remember) refresh();
     signProps?.canvasRef.current?.addSignature(sig);
+    markPlacementsEdited();
     setPadOpen(false);
   };
 
@@ -289,6 +307,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       useFileStore.getState().setError(null);
     }
     setDownloadUrl(null);
+    setStaleEntryId(null);
     setProgress(0);
     setProcessing(true);
     // The state above draws this panel; the copy below is what the navigation
@@ -336,7 +355,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       if (runFailed) return;
       runFailed = true;
       let teardown: { cause: unknown } | null = null;
-      for (const write of [() => setError(message), endRun]) {
+      for (const write of [() => setError(message, capturedEntryId), endRun]) {
         try {
           write();
         } catch (cause) {
@@ -392,7 +411,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       if (typeof r.savedFileId === "string") useFileStore.getState().markClaimed(capturedIndex);
       // Last, so a throw above never leaves the link up beside the error the
       // run ends with (#1354).
-      setDownloadUrl(url);
+      setDownloadUrl(url, capturedEntryId);
     };
 
     // The request outlives a progress stream that gave up on the run (a failed
@@ -543,7 +562,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     xhr.send(form);
   };
 
-  const shownError = error ?? storeError;
+  const downloadUrl =
+    localDownload && localDownload.entryId === currentEntry?.id ? localDownload.url : null;
+  const error = localError && localError.entryId === currentEntry?.id ? localError.message : null;
+  const isStale = staleEntryId !== null && staleEntryId === currentEntry?.id;
+  const effectiveDownloadUrl = isStale ? null : (downloadUrl ?? currentEntry?.processedUrl ?? null);
+  const shownError = error ?? currentEntry?.error ?? storeError;
 
   return (
     <div className="space-y-4">
@@ -556,7 +580,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
             <div key={s.id} className="group relative">
               <button
                 type="button"
-                onClick={() => signProps?.canvasRef.current?.addSignature(s)}
+                onClick={() => {
+                  signProps?.canvasRef.current?.addSignature(s);
+                  markPlacementsEdited();
+                }}
                 className="h-9 min-w-[60px] rounded border border-border bg-background p-1"
               >
                 <img
@@ -598,7 +625,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         <button
           type="button"
           disabled={!signProps?.hasSelection}
-          onClick={() => signProps?.canvasRef.current?.deleteSelected()}
+          onClick={() => {
+            signProps?.canvasRef.current?.deleteSelected();
+            markPlacementsEdited();
+          }}
           className="mt-2 rounded border border-border px-2 py-1 text-xs text-destructive disabled:opacity-40"
         >
           ✕ {t.common.delete}
@@ -610,9 +640,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
       {shownError && <p className="text-sm text-destructive">{shownError}</p>}
 
-      {downloadUrl ? (
+      {effectiveDownloadUrl ? (
         <ResultDownloadLink
-          href={downloadUrl}
+          href={effectiveDownloadUrl}
           className="block w-full rounded-lg bg-primary py-2.5 text-center font-semibold text-primary-foreground"
         >
           {sp.downloadSigned}

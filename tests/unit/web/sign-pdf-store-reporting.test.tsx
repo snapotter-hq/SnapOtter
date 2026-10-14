@@ -23,6 +23,7 @@ import type { SignCanvasRef } from "@/components/tools/sign-canvas";
 import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
 import { useWorkInFlight } from "@/hooks/use-work-in-flight";
 import { captureHandledError } from "@/lib/analytics";
+import * as signatureStore from "@/lib/signature-store";
 import { useFileStore } from "@/stores/file-store";
 
 /**
@@ -121,10 +122,10 @@ function fakeCanvas(overrides: Partial<SignCanvasRef> = {}): SignCanvasRef {
   };
 }
 
-function renderPanel(canvas: SignCanvasRef = fakeCanvas()) {
+function renderPanel(canvas: SignCanvasRef = fakeCanvas(), hasSelection = false) {
   return render(
     <SignPdfSettings
-      signProps={{ canvasRef: { current: canvas }, hasSelection: false, placementCount: 1 }}
+      signProps={{ canvasRef: { current: canvas }, hasSelection, placementCount: 1 }}
     />,
   );
 }
@@ -228,19 +229,97 @@ describe("sign-pdf reports its run to the file store", () => {
   });
 
   it("takes the result off the entry when a second run starts", async () => {
-    renderPanel();
+    renderPanel(fakeCanvas(), true);
     (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
     act(() => useFileStore.getState().markClaimed(0));
 
-    // The panel swaps to its download link on success, so drive the second run
-    // through the store the way a fresh panel would see it.
+    // Editing placements swaps the panel back from its download link to Apply
+    // while the previous result and claim are still on the entry.
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry().claimed).toBe(true);
+
     FakeXhr.instances = [];
-    cleanup();
-    renderPanel();
     await apply();
 
     expect(entry().processedUrl).toBeNull();
     expect(entry().claimed).toBe(false);
+  });
+
+  it("swaps back to Apply when placing a saved signature after a completed run", async () => {
+    const listSpy = vi
+      .spyOn(signatureStore, "listSignatures")
+      .mockReturnValue([{ id: "sig-1", dataUrl: "data:image/png;base64,sig", createdAt: 1 }]);
+    try {
+      renderPanel();
+      (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+      expect(screen.getByRole("link", { name: /download signed pdf/i })).toBeInTheDocument();
+
+      const savedSigImg = screen.getByAltText(/saved signature/i);
+      fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+    } finally {
+      listSpy.mockRestore();
+    }
+  });
+
+  it("swaps back to Apply when saving a new signature from the pad after a completed run", async () => {
+    renderPanel();
+    (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+    expect(screen.getByRole("link", { name: /download signed pdf/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /\+ new/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+    const fileInput = document.querySelector(
+      'input[accept="image/png,image/jpeg"]',
+    ) as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: { files: [new File(["png"], "sig.png", { type: "image/png" })] },
+    });
+    const saveBtn = await screen.findByRole("button", { name: /save & place/i });
+    await waitFor(() => expect(saveBtn).toBeEnabled());
+    fireEvent.click(saveBtn);
+
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+  });
+
+  it("scopes the download link, error, and edited state to the selected entry", async () => {
+    useFileStore.getState().setFiles([pdf("contract.pdf"), pdf("lease.pdf")]);
+    renderPanel(fakeCanvas(), true);
+
+    (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+    expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+      "href",
+      DOWNLOAD_URL,
+    );
+
+    // Selecting the second, unsigned PDF hides the first PDF's download link.
+    act(() => useFileStore.getState().setSelectedIndex(1));
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+
+    // Failing the second PDF shows its error on entry 1 only.
+    FakeXhr.instances = [];
+    (await apply()).respond(422, { error: "Processing failed" });
+    expect(screen.getByText("Processing failed")).toBeInTheDocument();
+
+    // Switching back to entry 0 restores its download link without entry 1's error.
+    act(() => useFileStore.getState().setSelectedIndex(0));
+    expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+      "href",
+      DOWNLOAD_URL,
+    );
+
+    // Replacing the file set clears the old entry's download link and error while mounted.
+    act(() => useFileStore.getState().setFiles([pdf("fresh.pdf")]));
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Processing failed")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
   });
 
   it("claims the entry when the result auto-saved to the library", async () => {
@@ -1522,6 +1601,12 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     expect(entry().processedUrl).toBe(DOWNLOAD_URL);
     expect(useFileStore.getState().error).toBeNull();
     expect(cancelPosts()).toHaveLength(0);
+    // Crossing the 768px breakpoint remounts the panel (#2512): the signed PDF
+    // link stays on screen instead of reverting to Apply & Download.
+    renderPanel();
+    const link = screen.getByRole("link", { name: /download signed pdf/i });
+    expect(link).toHaveAttribute("href", DOWNLOAD_URL);
+    expect(screen.queryByRole("button", { name: /apply & download/i })).not.toBeInTheDocument();
   });
 
   it("leaves an accepted run's streamed result and failure alone when the panel unmounts afterwards", async () => {
@@ -1541,6 +1626,13 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     expect(entry().error).toBe("sidecar died");
     expect(useFileStore.getState().error).toBeNull();
     expect(cancelPosts()).toHaveLength(0);
+    // Crossing the 768px breakpoint remounts the panel (#2512): the run's
+    // failure message stays visible and clears when a retry starts.
+    renderPanel();
+    expect(screen.getByText("sidecar died")).toBeInTheDocument();
+    FakeXhr.instances = [];
+    await apply();
+    expect(screen.queryByText("sidecar died")).not.toBeInTheDocument();
   });
 
   it("leaves a panel that never ran alone", () => {

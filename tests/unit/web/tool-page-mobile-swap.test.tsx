@@ -283,6 +283,55 @@ describe("ToolPage interactive canvases across the 768px breakpoint (#2248)", ()
     expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
   });
 
+  it("keeps the signed PDF download link in Sign PDF when rotating across 768px (#2512)", async () => {
+    addSignature("data:image/png;base64,sig");
+    renderToolPage("/pdf/sign-pdf");
+
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" })]);
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "/api/v1/download/job-1/contract_signed.pdf",
+        processedFilename: "contract_signed.pdf",
+        status: "completed",
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+    const mobileLink = await screen.findByRole("link", { name: /Download signed PDF/i });
+    expect(mobileLink).toHaveAttribute("href", "/api/v1/download/job-1/contract_signed.pdf");
+
+    setMobileViewport(false);
+
+    const desktopLink = screen.getByRole("link", { name: /Download signed PDF/i });
+    expect(desktopLink).toHaveAttribute("href", "/api/v1/download/job-1/contract_signed.pdf");
+    expect(screen.queryByRole("button", { name: /Apply & Download/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the failed-run error message in Sign PDF when rotating across 768px (#2512)", async () => {
+    addSignature("data:image/png;base64,sig");
+    renderToolPage("/pdf/sign-pdf");
+
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" })]);
+      useFileStore.getState().updateEntry(0, {
+        status: "failed",
+        error: "PDF is password-protected",
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+    expect(await screen.findByText("PDF is password-protected")).toBeInTheDocument();
+
+    setMobileViewport(false);
+
+    expect(screen.getByText("PDF is password-protected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Report issue/i })).toBeInTheDocument();
+  });
+
   it("keeps painted strokes in Erase Object when rotating across 768px", async () => {
     useFeaturesStore.setState({
       loaded: true,

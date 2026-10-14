@@ -121,6 +121,11 @@ test.describe("Sign PDF tool", () => {
     await apply.click();
     await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
     expect(submittedBody).toContain('"page":0');
+
+    // #2512: rotating across 768px after the sign finishes remounts SignPdfSettings;
+    // the signed PDF download link must stay visible in the desktop sidebar.
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
   });
 
   // #1969: a failed sign marks its entry failed, which turns on the page's
@@ -158,6 +163,15 @@ test.describe("Sign PDF tool", () => {
     await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(0);
     // The placement survived, so the user can retry straight away.
     await expect(apply).toBeEnabled();
+
+    // #2512: rotating across 768px after a failed sign remounts SignPdfSettings;
+    // the error message must stay visible alongside Report issue.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    await expect(
+      page.locator("p.text-destructive").filter({ hasText: "Processing failed" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Report issue" })).toBeVisible();
   });
 
   // Stamping calls the Python sidecar (doc_sign, which needs PyMuPDF). The e2e
