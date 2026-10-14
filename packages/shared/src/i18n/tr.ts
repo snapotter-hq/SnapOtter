@@ -5298,6 +5298,8 @@ export const tr: TranslationKeys = {
     login: "Giriş Yap",
     logout: "Çıkış yap",
     logoutFailed: "Çıkış yapılamadı. Tekrar deneyin.",
+    idpLogoutFailed:
+      "SnapOtter oturumunuz kapatıldı, ancak SSO sağlayıcınızdaki oturumunuz hâlâ açık olabilir. Oradan da çıkış yapın.",
     username: "Kullanıcı adı",
     password: "Parola",
     loginButton: "Giriş Yap",

@@ -77,6 +77,17 @@ describe("logoutDestination", () => {
       expect(logoutDestination(value)).toBe(appUrl("/login"));
     },
   );
+
+  it("adds the idp_logout_failed notice when idpLogout is 'failed' (#1800)", () => {
+    expect(logoutDestination(undefined, "failed")).toBe(appUrl("/login?notice=idp_logout_failed"));
+  });
+
+  it.each([undefined, null, "ok", true, 1])(
+    "sends an unrecognized idpLogout (%j) to the plain login page (#1800)",
+    (idpLogout) => {
+      expect(logoutDestination(undefined, idpLogout)).toBe(appUrl("/login"));
+    },
+  );
 });
 
 // window.location.href assignment, captured instead of navigating jsdom.
@@ -193,5 +204,13 @@ describe.each([
     await logOut();
 
     expect(navigatedTo).toEqual([appUrl("/login")]);
+  });
+
+  it("lands on /login?notice=idp_logout_failed when the API reports idpLogout: 'failed' (#1800)", async () => {
+    stubLogoutResponse({ ok: true, idpLogout: "failed" });
+
+    await logOut();
+
+    expect(navigatedTo).toEqual([appUrl("/login?notice=idp_logout_failed")]);
   });
 });

@@ -5238,6 +5238,8 @@ export const ja: TranslationKeys = {
     login: "ログイン",
     logout: "ログアウト",
     logoutFailed: "ログアウトできませんでした。もう一度お試しください。",
+    idpLogoutFailed:
+      "SnapOtterからはログアウトしましたが、SSOプロバイダーのセッションが開いたままの可能性があります。そちらからもログアウトしてください。",
     username: "ユーザー名",
     password: "パスワード",
     loginButton: "ログイン",

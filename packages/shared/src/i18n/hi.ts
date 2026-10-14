@@ -5074,6 +5074,8 @@ export const hi: TranslationKeys = {
     login: "लॉगिन",
     logout: "लॉग आउट",
     logoutFailed: "साइन आउट नहीं हो सका। फिर से कोशिश करें।",
+    idpLogoutFailed:
+      "आप SnapOtter से साइन आउट हो गए हैं, लेकिन आपका SSO प्रोवाइडर सत्र अभी भी खुला हो सकता है। वहां से भी साइन आउट करें।",
     username: "यूज़रनेम",
     password: "पासवर्ड",
     loginButton: "लॉगिन",

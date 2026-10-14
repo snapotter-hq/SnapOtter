@@ -5206,6 +5206,8 @@ export const ko: TranslationKeys = {
     login: "로그인",
     logout: "로그아웃",
     logoutFailed: "로그아웃하지 못했습니다. 다시 시도하세요.",
+    idpLogoutFailed:
+      "SnapOtter에서 로그아웃되었지만 SSO 제공자 세션이 아직 열려 있을 수 있습니다. 해당 서비스에서도 로그아웃하세요.",
     username: "사용자명",
     password: "비밀번호",
     loginButton: "로그인",

@@ -5244,6 +5244,8 @@ export const ar: TranslationKeys = {
     login: "تسجيل الدخول",
     logout: "تسجيل الخروج",
     logoutFailed: "تعذّر تسجيل خروجك. حاول مرة أخرى.",
+    idpLogoutFailed:
+      "تم تسجيل خروجك من SnapOtter، لكن قد تظل جلستك لدى مزود SSO مفتوحة. سجّل الخروج من هناك أيضًا.",
     username: "اسم المستخدم",
     password: "كلمة المرور",
     loginButton: "تسجيل الدخول",

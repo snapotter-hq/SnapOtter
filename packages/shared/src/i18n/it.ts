@@ -5307,6 +5307,8 @@ export const it: TranslationKeys = {
     login: "Accedi",
     logout: "Esci",
     logoutFailed: "Impossibile disconnetterti. Riprova.",
+    idpLogoutFailed:
+      "Hai effettuato la disconnessione da SnapOtter, ma la sessione del provider SSO potrebbe essere ancora aperta. Disconnettiti anche da lì.",
     username: "Nome utente",
     password: "Password",
     loginButton: "Accedi",

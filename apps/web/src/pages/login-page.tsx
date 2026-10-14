@@ -282,6 +282,7 @@ export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState<"idp_logout_failed" | null>(null);
   const [loading, setLoading] = useState(false);
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
   const [mfaToken, setMfaToken] = useState("");
@@ -336,6 +337,15 @@ export function LoginPage() {
       };
       setError(errorMessages[authError] || t.auth.oidcGenericError);
       setSearchParams({}, { replace: true });
+      return;
+    }
+
+    const authNotice = searchParams.get("notice");
+    if (authNotice) {
+      if (authNotice === "idp_logout_failed") {
+        setNotice("idp_logout_failed");
+      }
+      setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, t, later]);
 
@@ -343,6 +353,7 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setNotice(null);
     let navigating = false;
     try {
       const res = await fetch(appUrl("/api/auth/login"), {
@@ -544,6 +555,14 @@ export function LoginPage() {
             </h1>
             <h2 className="text-2xl font-bold mt-4 text-foreground">{t.auth.login}</h2>
           </div>
+          {notice === "idp_logout_failed" && (
+            <p
+              role="status"
+              className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground"
+            >
+              {t.auth.idpLogoutFailed}
+            </p>
+          )}
           {ssoEnforced && (oidcEnabled || samlEnabled) && (
             <div className="space-y-3">
               {oidcEnabled && (

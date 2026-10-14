@@ -5276,6 +5276,8 @@ export const vi: TranslationKeys = {
     login: "Đăng nhập",
     logout: "Đăng xuất",
     logoutFailed: "Không thể đăng xuất. Vui lòng thử lại.",
+    idpLogoutFailed:
+      "Bạn đã đăng xuất khỏi SnapOtter, nhưng phiên tại nhà cung cấp SSO có thể vẫn đang mở. Hãy đăng xuất ở đó nữa.",
     username: "Tên đăng nhập",
     password: "Mật khẩu",
     loginButton: "Đăng nhập",

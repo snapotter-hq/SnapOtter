@@ -606,9 +606,10 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   async function expectLoggedOutLocally(
     res: Awaited<ReturnType<typeof logoutWithSession>>,
     sessionToken: string,
+    extra: { idpLogout?: "failed" } = {},
   ) {
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true });
+    expect(res.json()).toEqual({ ok: true, ...extra });
     expect(res.cookies.find((c) => c.name === "snapotter-session")).toMatchObject({
       path: "/",
       value: "",
@@ -636,8 +637,9 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
   // A throw here leaves the IdP session open, so the next SSO sign-in skips
   // the IdP prompt and logout looks broken. The user still gets a local
-  // logout, and the fault reaches Sentry instead of vanishing (#1514).
-  it("still logs out locally and reports the fault when building the IdP logout URL throws (#1514)", async () => {
+  // logout, the response flags the open IdP session (#1800), and the fault
+  // reaches Sentry instead of vanishing (#1514).
+  it("still logs out locally and reports the fault when building the IdP logout URL throws (#1514, #1800)", async () => {
     const sessionToken = await oidcSessionWithWarmCache();
     const fault = new Error("simulated serverMetadata fault");
     const spy = vi.spyOn(oidcModule, "getOidcEndSessionEndpoint").mockRejectedValue(fault);
@@ -645,7 +647,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       const res = await logoutWithSession(sessionToken);
 
       expect(spy).toHaveBeenCalledTimes(1);
-      await expectLoggedOutLocally(res, sessionToken);
+      await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
       expect(reportErrorSpy).toHaveBeenCalledWith(fault, {
         source: "http",
@@ -725,7 +727,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     return err as Error;
   }
 
-  it("still logs out locally and reports when cold-cache discovery fails (#1787)", async () => {
+  it("still logs out locally and reports when cold-cache discovery fails (#1787, #1800)", async () => {
     const sessionToken = await oidcSessionWithWarmCache();
     oidcModule.resetOidcDiscoveryCacheForTests();
     // The mock IdP 404s every discovery document outside its root issuer.
@@ -733,7 +735,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     try {
       const res = await logoutWithSession(sessionToken);
 
-      await expectLoggedOutLocally(res, sessionToken);
+      await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
       const err = expectReportedDiscoveryFault("OIDC_DISCOVERY_FAILED");
       expect(err.cause).toBeInstanceOf(Error);
     } finally {
@@ -815,14 +817,14 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     `not a url ${SCHEME_MARKER}?p=B2C_1_signin`,
     `<script>alert("${SCHEME_MARKER}")</script>`,
   ])(
-    "logs out locally and reports when the end_session_endpoint is not a valid URL: %s (#1788, #1887)",
+    "logs out locally and reports when the end_session_endpoint is not a valid URL: %s (#1788, #1887, #1800)",
     async (endpoint) => {
       const sessionToken = await oidcSessionWithWarmCache();
       const spy = vi.spyOn(oidcModule, "getOidcEndSessionEndpoint").mockResolvedValue(endpoint);
       try {
         const res = await logoutWithSession(sessionToken);
 
-        await expectLoggedOutLocally(res, sessionToken);
+        await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
         expect(res.body).not.toContain(SCHEME_MARKER);
         expectReportedInvalidEndpointFault();
       } finally {
@@ -919,11 +921,11 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   // or data: endpoint went out as logoutUrl and the web app assigned it to
   // window.location.href, running it in SnapOtter's origin.
   it.each(["javascript", "javascriptUpper", "data", "vbscript", "file"])(
-    "omits logoutUrl, logs out locally, and reports when the end_session_endpoint is a %s: URL (#1855)",
+    "omits logoutUrl, logs out locally, and reports when the end_session_endpoint is a %s: URL (#1855, #1800)",
     async (key) => {
       const { res, sessionToken } = await logoutWithEndSessionEndpoint(key);
 
-      await expectLoggedOutLocally(res, sessionToken);
+      await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
       expect(res.body).not.toContain(SCHEME_MARKER);
       expectReportedSchemeFault();
     },
@@ -931,10 +933,10 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
 
   // A relative endpoint has no scheme to check: it fails the URL parse, the
   // #1788 path, and gets that path's constant-message fault (#1887).
-  it("omits logoutUrl, logs out locally, and reports when the end_session_endpoint is relative (#1855, #1887)", async () => {
+  it("omits logoutUrl, logs out locally, and reports when the end_session_endpoint is relative (#1855, #1887, #1800)", async () => {
     const { res, sessionToken } = await logoutWithEndSessionEndpoint("relative");
 
-    await expectLoggedOutLocally(res, sessionToken);
+    await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
     expect(res.body).not.toContain(SCHEME_MARKER);
     expectReportedInvalidEndpointFault();
   });
@@ -967,14 +969,14 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
   // same answer. A local-dev IdP on http needs an http EXTERNAL_URL to be
   // discovered at all, so it keeps working (the case above).
   it.each(["http", "javascript"])(
-    "omits logoutUrl and reports a %s end_session_endpoint when EXTERNAL_URL is https (#1855)",
+    "omits logoutUrl and reports a %s end_session_endpoint when EXTERNAL_URL is https (#1855, #1800)",
     async (key) => {
       const { res, sessionToken } = await logoutWithEndSessionEndpoint(
         key,
         "https://snapotter.example.test",
       );
 
-      await expectLoggedOutLocally(res, sessionToken);
+      await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
       expectReportedSchemeFault();
     },
   );
@@ -1007,7 +1009,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     }
   });
 
-  it("gives up on a cold-cache discovery the IdP never answers, logs out locally, and reports it (#1787)", async () => {
+  it("gives up on a cold-cache discovery the IdP never answers, logs out locally, and reports it (#1787, #1800)", async () => {
     const sessionToken = await oidcSessionWithWarmCache();
     oidcModule.resetOidcDiscoveryCacheForTests();
     (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}/hang`;
@@ -1020,7 +1022,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
       // click would otherwise sit on.
       expect(elapsed).toBeLessThan(10_000);
       expect(hungResponses.length).toBeGreaterThan(0);
-      await expectLoggedOutLocally(res, sessionToken);
+      await expectLoggedOutLocally(res, sessionToken, { idpLogout: "failed" });
       expectReportedDiscoveryFault("OIDC_DISCOVERY_TIMEOUT");
     } finally {
       (env as any).OIDC_ISSUER_URL = `http://localhost:${mockPort}`;

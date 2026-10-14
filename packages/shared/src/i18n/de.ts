@@ -5326,6 +5326,8 @@ export const de: TranslationKeys = {
     login: "Anmelden",
     logout: "Abmelden",
     logoutFailed: "Abmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    idpLogoutFailed:
+      "Sie wurden bei SnapOtter abgemeldet, Ihre Sitzung beim SSO-Anbieter ist aber möglicherweise noch aktiv. Melden Sie sich auch dort ab.",
     username: "Benutzername",
     password: "Passwort",
     loginButton: "Anmelden",

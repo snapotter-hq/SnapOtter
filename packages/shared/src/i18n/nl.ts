@@ -5309,6 +5309,8 @@ export const nl: TranslationKeys = {
     login: "Inloggen",
     logout: "Uitloggen",
     logoutFailed: "Uitloggen is mislukt. Probeer het opnieuw.",
+    idpLogoutFailed:
+      "Je bent uitgelogd bij SnapOtter, maar je sessie bij de SSO-provider staat mogelijk nog open. Log daar ook uit.",
     username: "Gebruikersnaam",
     password: "Wachtwoord",
     loginButton: "Inloggen",

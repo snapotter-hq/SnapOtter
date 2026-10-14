@@ -5288,6 +5288,8 @@ export const sv: TranslationKeys = {
     login: "Logga in",
     logout: "Logga ut",
     logoutFailed: "Det gick inte att logga ut. Försök igen.",
+    idpLogoutFailed:
+      "Du har loggats ut från SnapOtter, men din session hos SSO-leverantören kan fortfarande vara öppen. Logga ut där också.",
     username: "Användarnamn",
     password: "Lösenord",
     loginButton: "Logga in",

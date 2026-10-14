@@ -5300,6 +5300,8 @@ export const ru: TranslationKeys = {
     login: "Вход",
     logout: "Выйти",
     logoutFailed: "Не удалось выйти. Попробуйте ещё раз.",
+    idpLogoutFailed:
+      "Вы вышли из SnapOtter, но сессия у провайдера SSO может оставаться открытой. Выйдите из неё тоже.",
     username: "Имя пользователя",
     password: "Пароль",
     loginButton: "Войти",

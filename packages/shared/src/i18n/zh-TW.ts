@@ -4988,6 +4988,8 @@ export const zhTW: TranslationKeys = {
     login: "登入",
     logout: "登出",
     logoutFailed: "無法登出。請再試一次。",
+    idpLogoutFailed:
+      "您已登出 SnapOtter，但 SSO 提供者的工作階段可能仍處於開啟狀態。請一併從該處登出。",
     username: "使用者名稱",
     password: "密碼",
     loginButton: "登入",

@@ -5211,6 +5211,8 @@ export const th: TranslationKeys = {
     login: "เข้าสู่ระบบ",
     logout: "ออกจากระบบ",
     logoutFailed: "ออกจากระบบไม่สำเร็จ ลองอีกครั้ง",
+    idpLogoutFailed:
+      "คุณออกจากระบบ SnapOtter แล้ว แต่เซสชันของผู้ให้บริการ SSO อาจยังเปิดอยู่ กรุณาออกจากระบบที่นั่นด้วย",
     username: "ชื่อผู้ใช้",
     password: "รหัสผ่าน",
     loginButton: "เข้าสู่ระบบ",

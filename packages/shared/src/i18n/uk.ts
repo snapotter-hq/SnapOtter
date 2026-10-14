@@ -5299,6 +5299,8 @@ export const uk: TranslationKeys = {
     login: "Вхід",
     logout: "Вийти",
     logoutFailed: "Не вдалося вийти. Спробуйте ще раз.",
+    idpLogoutFailed:
+      "Ви вийшли зі SnapOtter, але сесія у постачальника SSO може залишатися відкритою. Вийдіть і звідти.",
     username: "Ім'я користувача",
     password: "Пароль",
     loginButton: "Увійти",

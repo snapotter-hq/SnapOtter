@@ -32,5 +32,5 @@ export async function logout(): Promise<string | null> {
     clearToken();
     localStorage.removeItem("snapotter-username");
   } catch {}
-  return logoutDestination(data.logoutUrl);
+  return logoutDestination(data.logoutUrl, data.idpLogout);
 }

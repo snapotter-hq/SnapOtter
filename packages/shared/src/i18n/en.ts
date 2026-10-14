@@ -5216,6 +5216,8 @@ export const en = {
     login: "Login",
     logout: "Log out",
     logoutFailed: "Couldn't sign you out. Try again.",
+    idpLogoutFailed:
+      "You're signed out of SnapOtter, but your SSO provider session may still be open. Sign out there too.",
     username: "Username",
     password: "Password",
     loginButton: "Login",

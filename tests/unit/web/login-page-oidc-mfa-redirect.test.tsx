@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +14,7 @@ import { LoginPage } from "@/pages/login-page";
 afterEach(() => {
   cleanup();
   useAuth.mockReset();
+  vi.unstubAllGlobals();
 });
 
 function LocationProbe({ onChange }: { onChange: (search: string) => void }) {
@@ -79,6 +80,52 @@ describe("LoginPage OIDC/SAML MFA redirect handling", () => {
     renderLoginPage("/login?error=mfa_enrollment_required", (search) => {
       currentSearch = search;
     });
+    await waitFor(() => expect(currentSearch).toBe(""));
+  });
+
+  it("tells the user the SSO provider session may still be open on ?notice=idp_logout_failed and strips the param (#1800)", async () => {
+    let currentSearch = "";
+    renderLoginPage("/login?notice=idp_logout_failed", (search) => {
+      currentSearch = search;
+    });
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "You're signed out of SnapOtter, but your SSO provider session may still be open. Sign out there too.",
+    );
+    await waitFor(() => expect(currentSearch).toBe(""));
+  });
+
+  it("clears the idp_logout_failed notice when the login form is submitted (#1800)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: async () => ({ error: "Invalid credentials" }),
+      }),
+    );
+    renderLoginPage("/login?notice=idp_logout_failed");
+    expect(screen.getByRole("status")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid username or password/i)).toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+  });
+
+  it("ignores an unknown notice value and still strips the param (#1800)", async () => {
+    let currentSearch = "";
+    renderLoginPage("/login?notice=something_else", (search) => {
+      currentSearch = search;
+    });
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText(/authentication error/i)).not.toBeInTheDocument();
     await waitFor(() => expect(currentSearch).toBe(""));
   });
 });

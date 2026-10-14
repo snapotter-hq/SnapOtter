@@ -970,6 +970,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const token = extractToken(request);
     const user = getAuthUser(request);
     let logoutUrl: string | undefined;
+    let idpLogout: "failed" | undefined;
 
     if (token) {
       const [session] = await db
@@ -983,7 +984,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         // discovery yet runs it now instead of skipping the IdP (#1787). A
         // throw is a fault (a failed or timed-out discovery, or a broken
         // import): the session below is still destroyed, but the IdP session
-        // stays open, so report it.
+        // stays open, so report it and tell the caller (#1800).
         try {
           const { getOidcEndSessionEndpoint } = await import("./oidc.js");
           const endSessionEndpoint = await getOidcEndSessionEndpoint();
@@ -1027,6 +1028,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             logoutUrl = url.toString();
           }
         } catch (err) {
+          idpLogout = "failed";
           request.log.error(
             { err, userId: session.userId },
             "logout: failed to build the OIDC logout URL; IdP session left open",
@@ -1054,7 +1056,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await auditFromRequest(request)("LOGOUT", { userId: user?.id });
-    return reply.send({ ok: true, ...(logoutUrl && { logoutUrl }) });
+    return reply.send({
+      ok: true,
+      ...(logoutUrl && { logoutUrl }),
+      ...(idpLogout && { idpLogout }),
+    });
   });
 
   // GET /api/auth/session

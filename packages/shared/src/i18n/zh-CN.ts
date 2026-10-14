@@ -4988,6 +4988,8 @@ export const zhCN: TranslationKeys = {
     login: "登录",
     logout: "退出登录",
     logoutFailed: "无法退出登录。请重试。",
+    idpLogoutFailed:
+      "您已退出 SnapOtter，但 SSO 提供商的会话可能仍处于打开状态。请同时在提供商处退出登录。",
     username: "用户名",
     password: "密码",
     loginButton: "登录",

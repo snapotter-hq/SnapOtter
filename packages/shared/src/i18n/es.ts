@@ -5297,6 +5297,8 @@ export const es: TranslationKeys = {
     login: "Iniciar sesión",
     logout: "Cerrar sesión",
     logoutFailed: "No se pudo cerrar la sesión. Inténtalo de nuevo.",
+    idpLogoutFailed:
+      "Cerraste sesión en SnapOtter, pero tu sesión del proveedor de SSO puede seguir abierta. Cierra sesión allí también.",
     username: "Nombre de usuario",
     password: "Contraseña",
     loginButton: "Iniciar sesión",

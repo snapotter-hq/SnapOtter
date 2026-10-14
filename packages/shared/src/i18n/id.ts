@@ -5288,6 +5288,8 @@ export const id: TranslationKeys = {
     login: "Masuk",
     logout: "Keluar",
     logoutFailed: "Gagal keluar. Coba lagi.",
+    idpLogoutFailed:
+      "Anda telah keluar dari SnapOtter, tetapi sesi penyedia SSO Anda mungkin masih terbuka. Keluar juga dari sana.",
     username: "Nama pengguna",
     password: "Kata sandi",
     loginButton: "Masuk",

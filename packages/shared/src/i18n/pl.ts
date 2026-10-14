@@ -5305,6 +5305,8 @@ export const pl: TranslationKeys = {
     login: "Logowanie",
     logout: "Wyloguj",
     logoutFailed: "Nie udało się wylogować. Spróbuj ponownie.",
+    idpLogoutFailed:
+      "Wylogowano z SnapOtter, ale sesja u dostawcy SSO może nadal być otwarta. Wyloguj się również tam.",
     username: "Nazwa użytkownika",
     password: "Hasło",
     loginButton: "Zaloguj",
