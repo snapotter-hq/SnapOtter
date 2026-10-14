@@ -18,6 +18,7 @@ test.describe("Copy Merged", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await loadTestImage(page);
     await page.locator("canvas").first().waitFor({ state: "visible" });
+    await page.evaluate(() => navigator.clipboard.writeText("before-copy"));
 
     await openCopyMerged(page);
 
@@ -37,6 +38,51 @@ test.describe("Copy Merged", () => {
     });
     expect(size).toEqual({ width: 200, height: 150 });
     await expect(page.getByText(COPY_FAILED)).toHaveCount(0);
+  });
+
+  test("copies the whole document, not the zoomed and panned view (#1978)", async ({
+    editorPage: page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await loadTestImage(page);
+    await page.locator("canvas").first().click();
+    // Zoom in so the stage's own transform is far from identity. Fit-to-screen
+    // has already centred the image with a pan offset.
+    await page.keyboard.press("Control+Equal");
+    await page.keyboard.press("Control+Equal");
+    await page.evaluate(() => navigator.clipboard.writeText("before-copy"));
+
+    await page.keyboard.press("Control+Shift+C");
+
+    // The fixture is a solid (255, 100, 50) 200x150 PNG, so every pixel of the
+    // copy, corners included, has to be that colour. A viewport copy has the
+    // image shifted and scaled, leaving transparent workspace in the corners.
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const items = await navigator.clipboard.read();
+          return items.flatMap((item) => [...item.types]);
+        }),
+      )
+      .toContain("image/png");
+    const copy = await page.evaluate(async () => {
+      const [item] = await navigator.clipboard.read();
+      const bitmap = await createImageBitmap(await item.getType("image/png"));
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no 2d context");
+      ctx.drawImage(bitmap, 0, 0);
+      const at = (x: number, y: number) => [...ctx.getImageData(x, y, 1, 1).data];
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        pixels: [at(0, 0), at(199, 0), at(0, 149), at(199, 149), at(100, 75)],
+      };
+    });
+    expect(copy.width).toBe(200);
+    expect(copy.height).toBe(150);
+    for (const pixel of copy.pixels) expect(pixel).toEqual([255, 100, 50, 255]);
   });
 
   test("says so when the browser has no image clipboard", async ({ editorPage: page }) => {

@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * #1944: Copy Merged (Ctrl/Cmd+Shift+C) said nothing when the copy failed,
  * which is every time on a plain-http install with no async Clipboard API,
  * and the Edit menu's Copy Merged row ran plain Copy (copyObjects) instead.
+ * #1978: it exported the Stage through its zoom/pan transform, so it copied
+ * the viewport instead of the document.
  */
 
 const storage = vi.hoisted(() => new Map<string, string>());
@@ -51,9 +53,39 @@ const INITIAL_STATE = useEditorStore.getState();
 
 const PNG = () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });
 
-function fakeStage(toBlob: () => Promise<unknown> = async () => PNG()) {
-  stageHolder.current = { toBlob: vi.fn(toBlob) };
-  return stageHolder.current as { toBlob: ReturnType<typeof vi.fn> };
+type FakeCanvas = { toBlob: (cb: (blob: Blob | null) => void, type?: string) => void };
+
+function fakeStage(toBlob: FakeCanvas["toBlob"] = (cb) => cb(PNG())) {
+  const state = { width: 800, height: 600, scaleX: 2.5, scaleY: 2.5, x: 140, y: 90 };
+  let capturedAt: typeof state | null = null;
+  const canvas = { toBlob: vi.fn(toBlob) };
+  const stage = {
+    width: () => state.width,
+    height: () => state.height,
+    scaleX: () => state.scaleX,
+    scaleY: () => state.scaleY,
+    x: () => state.x,
+    y: () => state.y,
+    size: vi.fn(({ width, height }: { width: number; height: number }) => {
+      state.width = width;
+      state.height = height;
+    }),
+    scale: vi.fn(({ x, y }: { x: number; y: number }) => {
+      state.scaleX = x;
+      state.scaleY = y;
+    }),
+    position: vi.fn(({ x, y }: { x: number; y: number }) => {
+      state.x = x;
+      state.y = y;
+    }),
+    draw: vi.fn(),
+    toCanvas: vi.fn(() => {
+      capturedAt = { ...state };
+      return canvas;
+    }),
+  };
+  stageHolder.current = stage;
+  return { stage, canvas, state, capturedAt: () => capturedAt };
 }
 
 function pressCopyMerged() {
@@ -125,9 +157,8 @@ describe("Copy Merged shortcut (#1944)", () => {
   });
 
   it("says the copy failed and logs why when the stage can't be exported", async () => {
-    // Konva's toBlob rejects with the canvas's SecurityError; its toDataURL
-    // would swallow it and return "".
-    fakeStage(async () => {
+    // A tainted canvas's toBlob throws SecurityError synchronously.
+    const { state } = fakeStage(() => {
       throw new DOMException("The canvas has been tainted", "SecurityError");
     });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -139,10 +170,45 @@ describe("Copy Merged shortcut (#1944)", () => {
     expect(copyImage).not.toHaveBeenCalled();
     expect(await screen.findByText(COPY_FAILED)).toBeInTheDocument();
     expect(logged).toHaveBeenCalledWith(expect.any(String), expect.any(DOMException));
+    expect(state).toEqual({
+      width: 800,
+      height: 600,
+      scaleX: 2.5,
+      scaleY: 2.5,
+      x: 140,
+      y: 90,
+    });
   });
 
-  it("says the copy failed when the export comes back empty", async () => {
-    fakeStage(async () => null);
+  it("restores the stage transform and shows the toast when stage.toCanvas throws", async () => {
+    const { stage, state } = fakeStage();
+    stage.toCanvas.mockImplementation(() => {
+      throw new RangeError("Invalid array length");
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderShortcuts();
+
+    pressCopyMerged();
+    await settle();
+
+    expect(copyImage).not.toHaveBeenCalled();
+    expect(await screen.findByText(COPY_FAILED)).toBeInTheDocument();
+    expect(logged).toHaveBeenCalledWith(expect.any(String), expect.any(RangeError));
+    expect(state).toEqual({
+      width: 800,
+      height: 600,
+      scaleX: 2.5,
+      scaleY: 2.5,
+      x: 140,
+      y: 90,
+    });
+  });
+
+  it.each([
+    ["null", null],
+    ["zero-byte blob", new Blob([], { type: "image/png" })],
+  ])("says the copy failed when the export comes back as %s", async (_label, empty) => {
+    fakeStage((cb) => cb(empty));
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     renderShortcuts();
 
@@ -196,9 +262,9 @@ describe("Copy Merged shortcut (#1944)", () => {
   });
 });
 
-describe("Edit > Copy Merged (#1944)", () => {
-  it("copies the merged image, not the selected objects", async () => {
-    const stage = fakeStage();
+describe("Edit > Copy Merged (#1944, #1978)", () => {
+  it("copies the merged document without the stage's zoom and pan transform, not the selected objects", async () => {
+    const { stage, canvas, state, capturedAt } = fakeStage();
     copyImage.mockResolvedValue(true);
     const copyObjects = vi.fn();
     useEditorStore.setState({ copyObjects, canvasSize: { width: 321, height: 123 } });
@@ -208,17 +274,31 @@ describe("Edit > Copy Merged (#1944)", () => {
     await settle();
 
     expect(copyObjects).not.toHaveBeenCalled();
-    expect(stage.toBlob).toHaveBeenCalledTimes(1);
-    expect(stage.toBlob).toHaveBeenCalledWith(
-      expect.objectContaining({
-        x: 0,
-        y: 0,
-        width: 321,
-        height: 123,
-        pixelRatio: 1,
-        mimeType: "image/png",
-      }),
-    );
+    expect(stage.toCanvas).toHaveBeenCalledTimes(1);
+    expect(stage.toCanvas).toHaveBeenCalledWith({
+      x: 0,
+      y: 0,
+      width: 321,
+      height: 123,
+      pixelRatio: 1,
+    });
+    expect(capturedAt()).toEqual({
+      width: 321,
+      height: 123,
+      scaleX: 1,
+      scaleY: 1,
+      x: 0,
+      y: 0,
+    });
+    expect(state).toEqual({
+      width: 800,
+      height: 600,
+      scaleX: 2.5,
+      scaleY: 2.5,
+      x: 140,
+      y: 90,
+    });
+    expect(canvas.toBlob).toHaveBeenCalledWith(expect.any(Function), "image/png");
     expect(copyImage).toHaveBeenCalledTimes(1);
   });
 
