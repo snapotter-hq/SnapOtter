@@ -1493,6 +1493,7 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
 
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(entry().errorCategory).toBe("processing_error");
     expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
     expect(useFileStore.getState().processing).toBe(false);
     // The server never accepted a job, so there is nothing to cancel.
@@ -1530,6 +1531,7 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     expect(FakeXhr.instances).toHaveLength(0);
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(entry().errorCategory).toBe("processing_error");
     expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
     expect(useFileStore.getState().processing).toBe(false);
   });
@@ -1554,7 +1556,7 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     expect(FakeXhr.instances).toHaveLength(0);
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.errors.runInterrupted);
-    expect(entry().errorCategory).toBeNull();
+    expect(entry().errorCategory).toBe("processing_error");
     expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
   });
 
@@ -1572,6 +1574,7 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     expect(cancelPosts()[0][1]).toMatchObject({ method: "POST" });
     expect(entry().status).toBe("failed");
     expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(entry().errorCategory).toBe("processing_error");
   });
 
   it("counts a progress frame as the server having the job", async () => {

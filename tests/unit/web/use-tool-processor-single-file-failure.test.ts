@@ -444,6 +444,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Processing was interrupted. Retry when reconnected.",
+      errorCategory: "processing_error",
     });
     expect(useFileStore.getState().processing).toBe(false);
 
@@ -469,6 +470,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
       status: "failed",
       error:
         "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
+      errorCategory: "upload_error",
     });
     expect(useFileStore.getState().processing).toBe(false);
 

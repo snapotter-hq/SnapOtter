@@ -143,7 +143,11 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
     const state = useFileStore.getState();
     expect(state.processing).toBe(false);
     expect(state.error).toBe(INTERRUPTED);
-    expect(state.entries[0]).toMatchObject({ status: "failed", error: INTERRUPTED });
+    expect(state.entries[0]).toMatchObject({
+      status: "failed",
+      error: INTERRUPTED,
+      errorCategory: "processing_error",
+    });
     expect(state.activeJobId).toBeNull();
     expect(cancelPosts()).toHaveLength(1);
     expect(cancelPosts()[0][1]).toMatchObject({ method: "POST" });
@@ -167,7 +171,11 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
     expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
     const state = useFileStore.getState();
     expect(state.processing).toBe(false);
-    expect(state.entries[0].status).toBe("failed");
+    expect(state.entries[0]).toMatchObject({
+      status: "failed",
+      error: INTERRUPTED,
+      errorCategory: "processing_error",
+    });
     expect(state.activeJobId).toBeNull();
     expect(cancelPosts()).toHaveLength(1);
   });
@@ -185,7 +193,10 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
 
     const state = useFileStore.getState();
     expect(state.processing).toBe(false);
-    expect(state.entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+    expect(state.entries).toMatchObject([
+      { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+      { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+    ]);
     expect(state.activeJobId).toBeNull();
     expect(cancelPosts()).toHaveLength(1);
     // Not the "server never confirmed" signal the evidence timer reports.
@@ -227,7 +238,11 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
       const state = useFileStore.getState();
       expect(state.processing).toBe(false);
       expect(state.error).toBe(INTERRUPTED);
-      expect(state.entries[0]).toMatchObject({ status: "failed", error: INTERRUPTED });
+      expect(state.entries[0]).toMatchObject({
+        status: "failed",
+        error: INTERRUPTED,
+        errorCategory: "processing_error",
+      });
       expect(state.activeJobId).toBeNull();
       expect(cancelPosts()).toHaveLength(1);
 
@@ -251,7 +266,11 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
 
       expect(xhrs[0].abort).toHaveBeenCalled();
       expect(useFileStore.getState().processing).toBe(false);
-      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: INTERRUPTED,
+        errorCategory: "processing_error",
+      });
       expect(cancelPosts()).toHaveLength(1);
     });
 
@@ -268,7 +287,10 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
       hook.rerender({ toolId: "png-to-webp" });
 
       expect(useFileStore.getState().processing).toBe(false);
-      expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+      expect(useFileStore.getState().entries).toMatchObject([
+        { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+        { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+      ]);
       expect(vi.mocked(track)).toHaveBeenCalledWith(
         "batch_processed",
         expect.objectContaining({ tool_id: "jpg-to-png", reason: "panel-unmounted" }),
@@ -460,7 +482,10 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
       expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
         "Ending a tool run after its panel unmounted failed",
       );
-      expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+      expect(useFileStore.getState().entries).toMatchObject([
+        { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+        { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+      ]);
     } finally {
       useFileStore.setState({ setProcessing: real });
     }

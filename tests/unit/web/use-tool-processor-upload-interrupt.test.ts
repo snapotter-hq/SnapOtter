@@ -201,6 +201,10 @@ describe("useToolProcessor upload interruption (#722)", () => {
     expect(useFileStore.getState().error).toBe(
       "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
     );
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      errorCategory: "upload_error",
+    });
     expect(useFileStore.getState().processing).toBe(false);
     expect(useFileStore.getState().activeJobId).toBeNull();
 

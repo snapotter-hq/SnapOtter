@@ -298,7 +298,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     stopRunRef.current = () => {
       runOwnedRef.current = false;
       if (useFileStore.getState().processing) {
-        failEntry(t.errors.runInterrupted);
+        failEntry(t.errors.runInterrupted, "processing_error");
       }
     };
 
@@ -466,7 +466,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       } finally {
         abandonRequest();
         if (useFileStore.getState().processing) {
-          failEntry(t.errors.runInterrupted);
+          failEntry(t.errors.runInterrupted, "processing_error");
         }
       }
     };

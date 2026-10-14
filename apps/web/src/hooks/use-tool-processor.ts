@@ -162,7 +162,7 @@ export function useToolProcessor(toolId: string) {
     // like every other outcome (#1161). Reports whether it acted, like
     // cancelLocally: a stale closure refuses and the timer's caller falls
     // through to the single-run settle.
-    abandon: (message: string, reason?: string) => boolean;
+    abandon: (message: string, reason?: string, category?: FeedbackErrorCategory) => boolean;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
@@ -228,13 +228,13 @@ export function useToolProcessor(toolId: string) {
   // #1779), and the settle reports once, not once per entry. `spare` is an
   // entry a still-live run owns, left processing (#1911).
   const settleProcessingEntries = useCallback(
-    (message: string, spare?: number) => {
+    (message: string, category?: FeedbackErrorCategory, spare?: number) => {
       const { entries, updateEntry } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
       for (let i = 0; i < entries.length; i++) {
         if (i === spare || entries[i]?.status !== "processing") continue;
         try {
-          updateEntry(i, { status: "failed", error: message });
+          updateEntry(i, { status: "failed", error: message, errorCategory: category ?? null });
         } catch (err) {
           console.error("Failing the run's entry failed", err);
           firstError ??= { cause: err };
@@ -260,7 +260,7 @@ export function useToolProcessor(toolId: string) {
       // behind would swallow a later run's cancel-404 settle (#767). A batch
       // run ends through its own failure path, which clears the closure and
       // reports the outcome to batch_processed (#1161).
-      if (batchRunRef.current?.abandon(message)) return;
+      if (batchRunRef.current?.abandon(message, "unconfirmed", "upload_error")) return;
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
@@ -276,7 +276,7 @@ export function useToolProcessor(toolId: string) {
         () => setError(message),
         () => setProcessing(false),
       ]);
-      settleProcessingEntries(message);
+      settleProcessingEntries(message, "upload_error");
       if (teardownError) throw teardownError.cause;
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
@@ -472,7 +472,7 @@ export function useToolProcessor(toolId: string) {
     }
     const liveEntry = activeEntryIndexRef.current;
     if (liveEntry === null) return;
-    settleProcessingEntries(tRef.current.errors.jobTrackingFailed, liveEntry);
+    settleProcessingEntries(tRef.current.errors.jobTrackingFailed, undefined, liveEntry);
   }, [endRunAtStart, settleProcessingEntries]);
 
   const reconnectSSE = useCallback(
@@ -565,7 +565,7 @@ export function useToolProcessor(toolId: string) {
                   () => setError(message),
                   () => setProcessing(false),
                 ]);
-                settleProcessingEntries(message);
+                settleProcessingEntries(message, "processing_error");
                 // The run has ended, so the catch below leaves it alone and
                 // passes the throw on (#1890).
                 if (teardownError) throw teardownError.cause;
@@ -748,7 +748,9 @@ export function useToolProcessor(toolId: string) {
         // failRun rethrows a teardown error by design, for callers in a timer.
         // Out of an effect cleanup it would reach the app's error boundary.
         try {
-          if (batchRun.abandon(t.errors.runInterrupted, "panel-unmounted")) return;
+          if (batchRun.abandon(t.errors.runInterrupted, "panel-unmounted", "processing_error")) {
+            return;
+          }
         } catch (cause) {
           reportRunEndFailure("Ending a tool run after its panel unmounted failed", cause, toolId);
           // failRun got as far as clearing the job: the run is over.
@@ -759,7 +761,7 @@ export function useToolProcessor(toolId: string) {
         clearActiveJob,
         () => setError(t.errors.runInterrupted),
         () => setProcessing(false),
-        () => settleProcessingEntries(t.errors.runInterrupted),
+        () => settleProcessingEntries(t.errors.runInterrupted, "processing_error"),
       ]);
       if (teardownError) {
         reportRunEndFailure(
@@ -1599,10 +1601,10 @@ export function useToolProcessor(toolId: string) {
             failRun("Canceled", "canceled");
             return true;
           },
-          abandon: (message, reason = "unconfirmed") => {
+          abandon: (message, reason = "unconfirmed", category) => {
             if (activeJobIdRef.current !== clientJobId) return false;
             if (settling) return true;
-            failRun(message, reason);
+            failRun(message, reason, category);
             return true;
           },
           onTerminal: (frame) => {

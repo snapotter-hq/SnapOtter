@@ -23,6 +23,15 @@ describe("classifyFeedbackError", () => {
   it("uses the category the failure was stored with over the text", () => {
     expect(classifyFeedbackError(de.errors.requestTimedOut, "timeout")).toBe("timeout");
     expect(classifyFeedbackError(de.errors.fileTooLarge, "upload_error")).toBe("upload_error");
+    expect(classifyFeedbackError(en.errors.runInterrupted, "processing_error")).toBe(
+      "processing_error",
+    );
+    expect(classifyFeedbackError(de.errors.runInterrupted, "processing_error")).toBe(
+      "processing_error",
+    );
+    expect(classifyFeedbackError(de.errors.processingInterruptedUnconfirmed, "upload_error")).toBe(
+      "upload_error",
+    );
   });
 
   it("reports unknown when there is no message, whatever category is left", () => {

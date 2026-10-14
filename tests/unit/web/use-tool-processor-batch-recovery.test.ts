@@ -374,9 +374,13 @@ describe("useToolProcessor batch recovery (#750)", () => {
       vi.advanceTimersByTime(30_001);
     });
 
-    expect(useFileStore.getState().error).toBe(
-      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
-    );
+    const message =
+      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
+    expect(useFileStore.getState().error).toBe(message);
+    expect(useFileStore.getState().entries).toMatchObject([
+      { status: "failed", error: message, errorCategory: "upload_error" },
+      { status: "failed", error: message, errorCategory: "upload_error" },
+    ]);
     expect(useFileStore.getState().processing).toBe(false);
 
     unmount();
@@ -442,10 +446,15 @@ describe("useToolProcessor batch recovery (#750)", () => {
 
     // The single run is the one the timer belongs to: it settles, and the
     // old batch does not get a spurious batch_processed on its behalf.
+    const message =
+      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
     expect(useFileStore.getState().processing).toBe(false);
-    expect(useFileStore.getState().error).toBe(
-      "Processing was interrupted and the server never confirmed the job. Retry when reconnected.",
-    );
+    expect(useFileStore.getState().error).toBe(message);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: message,
+      errorCategory: "upload_error",
+    });
     expect(vi.mocked(track)).not.toHaveBeenCalledWith(
       "batch_processed",
       expect.objectContaining({ reason: "unconfirmed" }),
@@ -1619,8 +1628,10 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
       // The entries settle regardless, instead of pulsing behind a run whose
       // teardown died partway.
       const entries = useFileStore.getState().entries;
-      expect(entries.map((e) => e.status)).toEqual(["failed", "failed"]);
-      expect(entries[0].error).toBe(message);
+      expect(entries).toMatchObject([
+        { status: "failed", error: message, errorCategory: "upload_error" },
+        { status: "failed", error: message, errorCategory: "upload_error" },
+      ]);
       unmount();
     } finally {
       useFileStore.setState({ setError: realSetError });
@@ -1639,8 +1650,16 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
     const message =
       "Processing was interrupted and the server never confirmed the job. Retry when reconnected.";
     const entries = useFileStore.getState().entries;
-    expect(entries[0]).toMatchObject({ status: "failed", error: message, errorCategory: null });
-    expect(entries[1]).toMatchObject({ status: "failed", error: message, errorCategory: null });
+    expect(entries[0]).toMatchObject({
+      status: "failed",
+      error: message,
+      errorCategory: "upload_error",
+    });
+    expect(entries[1]).toMatchObject({
+      status: "failed",
+      error: message,
+      errorCategory: "upload_error",
+    });
     expect(useFileStore.getState().processing).toBe(false);
     expect(consoleError).not.toHaveBeenCalled();
     unmount();
