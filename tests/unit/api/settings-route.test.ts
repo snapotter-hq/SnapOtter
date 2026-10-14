@@ -4,6 +4,7 @@
  * Tests the GET all settings, PUT upsert settings, and GET single setting
  * logic including HTML tag validation, auth requirements, and error handling.
  */
+import Fastify from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
@@ -195,5 +196,317 @@ describe("settings route logic", () => {
     it("does not match numeric comparisons", () => {
       expect(HTML_TAG_PATTERN.test("5 > 3")).toBe(false);
     });
+  });
+});
+
+describe("settingsRoutes decryption failure handling (#2534)", () => {
+  it("omits undecryptable $ENC$ rows from GET /api/v1/settings, logs, and reports an operational SafeError", async () => {
+    vi.resetModules();
+    const reportErrorSpy = vi.fn().mockResolvedValue(undefined);
+    const errorLogSpy = vi.fn();
+
+    vi.doMock("drizzle-orm", () => ({
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "b".repeat(64),
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+      const actual: Record<string, unknown> = await importOriginal();
+      return { ...actual, reportError: reportErrorSpy };
+    });
+
+    const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+    const wrongKeyCiphertext = await encrypt("dark", "a".repeat(64));
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () =>
+            Promise.resolve([
+              { key: "defaultTheme", value: wrongKeyCiphertext, updatedAt: new Date() },
+              { key: "defaultLocale", value: "en", updatedAt: new Date() },
+            ]),
+        }),
+      },
+      schema: { settings: { key: "settings.key" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async () => {},
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+    vi.spyOn(app.log, "error").mockImplementation(errorLogSpy);
+
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/settings" });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ settings: { defaultLocale: "en" } });
+      expect(res.body).not.toContain("$ENC$");
+      expect(errorLogSpy).toHaveBeenCalledWith(
+        { key: "defaultTheme" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      const [err, ctx] = reportErrorSpy.mock.calls[0];
+      expect(classifyError(err, "http")).toBe("operational");
+      expect(err).toMatchObject({ code: "SETTING_DECRYPTION_FAILED", statusCode: 500 });
+      expect(ctx).toMatchObject({
+        source: "http",
+        route: "/api/v1/settings",
+        method: "GET",
+        statusCode: 500,
+        subsystem: "settings",
+      });
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("returns 500 DECRYPTION_FAILED on GET /api/v1/settings/:key when decryptSetting returns null", async () => {
+    vi.resetModules();
+    const reportErrorSpy = vi.fn().mockResolvedValue(undefined);
+    const errorLogSpy = vi.fn();
+
+    vi.doMock("drizzle-orm", () => ({
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+      const actual: Record<string, unknown> = await importOriginal();
+      return { ...actual, reportError: reportErrorSpy };
+    });
+
+    const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+    const ciphertext = await encrypt("dark", "a".repeat(64));
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () =>
+              Promise.resolve([{ key: "defaultTheme", value: ciphertext, updatedAt: new Date() }]),
+          }),
+        }),
+      },
+      schema: { settings: { key: "settings.key" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async () => {},
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+    vi.spyOn(app.log, "error").mockImplementation(errorLogSpy);
+
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/settings/defaultTheme" });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({
+        error: "Failed to decrypt setting",
+        code: "DECRYPTION_FAILED",
+      });
+      expect(res.body).not.toContain("$ENC$");
+      expect(errorLogSpy).toHaveBeenCalledWith(
+        { key: "defaultTheme" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      const [err, ctx] = reportErrorSpy.mock.calls[0];
+      expect(classifyError(err, "http")).toBe("operational");
+      expect(err).toMatchObject({ code: "SETTING_DECRYPTION_FAILED", statusCode: 500 });
+      expect(ctx).toMatchObject({
+        source: "http",
+        route: "/api/v1/settings/:key",
+        method: "GET",
+        statusCode: 500,
+        subsystem: "settings",
+      });
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("decrypts an $ENC$ value on GET /api/v1/settings and GET /api/v1/settings/:key when DATA_ENCRYPTION_KEY_PREVIOUS matches", async () => {
+    vi.resetModules();
+    const reportErrorSpy = vi.fn().mockResolvedValue(undefined);
+    const keyA = "a".repeat(64);
+    const keyB = "b".repeat(64);
+
+    vi.doMock("drizzle-orm", () => ({
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: keyB,
+        DATA_ENCRYPTION_KEY_PREVIOUS: keyA,
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+      const actual: Record<string, unknown> = await importOriginal();
+      return { ...actual, reportError: reportErrorSpy };
+    });
+
+    const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+    const rotatedCiphertext = await encrypt("dark", keyA);
+    const updatedAt = new Date("2026-10-14T00:00:00.000Z");
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => {
+            const rows = [{ key: "defaultTheme", value: rotatedCiphertext, updatedAt }];
+            return Object.assign(Promise.resolve(rows), {
+              where: () => Promise.resolve(rows),
+            });
+          },
+        }),
+      },
+      schema: { settings: { key: "settings.key" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async () => {},
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+    const errorLogSpy = vi.spyOn(app.log, "error");
+
+    try {
+      const listRes = await app.inject({ method: "GET", url: "/api/v1/settings" });
+      expect(listRes.statusCode).toBe(200);
+      expect(listRes.json()).toEqual({ settings: { defaultTheme: "dark" } });
+
+      const keyRes = await app.inject({ method: "GET", url: "/api/v1/settings/defaultTheme" });
+      expect(keyRes.statusCode).toBe(200);
+      expect(keyRes.json()).toEqual({
+        key: "defaultTheme",
+        value: "dark",
+        updatedAt: updatedAt.toISOString(),
+      });
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(errorLogSpy).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("short-circuits redacted policies to ******** without attempting decryption", async () => {
+    vi.resetModules();
+    const reportErrorSpy = vi.fn().mockResolvedValue(undefined);
+    const errorLogSpy = vi.fn();
+
+    vi.doMock("drizzle-orm", () => ({
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+      const actual: Record<string, unknown> = await importOriginal();
+      return { ...actual, reportError: reportErrorSpy };
+    });
+
+    const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+    const ciphertext = await encrypt("secret", "a".repeat(64));
+    const updatedAt = new Date("2026-10-14T00:00:00.000Z");
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => {
+            const rows = [{ key: "oidc_client_secret", value: ciphertext, updatedAt }];
+            return Object.assign(Promise.resolve(rows), {
+              where: () => Promise.resolve(rows),
+            });
+          },
+        }),
+      },
+      schema: { settings: { key: "settings.key" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async () => {},
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+    vi.spyOn(app.log, "error").mockImplementation(errorLogSpy);
+
+    try {
+      const listRes = await app.inject({ method: "GET", url: "/api/v1/settings" });
+      expect(listRes.statusCode).toBe(200);
+      expect(listRes.json()).toEqual({ settings: { oidc_client_secret: "********" } });
+
+      const keyRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/settings/oidc_client_secret",
+      });
+      expect(keyRes.statusCode).toBe(200);
+      expect(keyRes.json()).toEqual({
+        key: "oidc_client_secret",
+        value: "********",
+        updatedAt: updatedAt.toISOString(),
+      });
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(errorLogSpy).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
   });
 });

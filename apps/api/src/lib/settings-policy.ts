@@ -121,7 +121,7 @@ const readonly = (options: Pick<SettingPolicy, "encrypted" | "redacted"> = {}): 
  * Security-sensitive keys must be added here deliberately so a new runtime
  * consumer cannot silently inherit the coarse settings:write permission.
  */
-const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
+export const SETTING_POLICIES: Readonly<Record<string, SettingPolicy>> = {
   defaultTheme: general(z.enum(["light", "dark", "system"])),
   defaultLocale: general(localeSetting),
   defaultToolView: general(z.enum(["sidebar", "fullscreen"])),

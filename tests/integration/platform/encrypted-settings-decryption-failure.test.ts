@@ -71,6 +71,7 @@ afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "siem_consecutive_failures"));
   await db.delete(schema.settings).where(eq(schema.settings.key, "siem_last_forwarded_at"));
   await db.delete(schema.settings).where(eq(schema.settings.key, "backup_last_completed"));
+  await db.delete(schema.settings).where(eq(schema.settings.key, "defaultTheme"));
 });
 
 afterAll(async () => {
@@ -316,6 +317,95 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
       expect(reportErrorSpy).not.toHaveBeenCalled();
       expect(pinoLogError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("GET /api/v1/settings and GET /api/v1/settings/:key (#2534)", () => {
+    it("omits an undecryptable $ENC$ row from GET /api/v1/settings, logs, and reports an operational error", async () => {
+      await upsertSetting("defaultTheme", await encrypt("dark", KEY_A));
+
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).settings.defaultTheme).toBeUndefined();
+      expect(res.body).not.toContain("$ENC$");
+      expect(appLogError).toHaveBeenCalledTimes(1);
+      expect(appLogError).toHaveBeenCalledWith(
+        { key: "defaultTheme" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      const [err, ctx] = reportErrorSpy.mock.calls[0];
+      expect(classifyError(err, "http")).toBe("operational");
+      expect(err).toMatchObject({ code: "SETTING_DECRYPTION_FAILED", statusCode: 500 });
+      expect(ctx).toMatchObject({
+        source: "http",
+        route: "/api/v1/settings",
+        method: "GET",
+        statusCode: 500,
+        subsystem: "settings",
+      });
+    });
+
+    it("returns 500 DECRYPTION_FAILED on GET /api/v1/settings/:key instead of raw $ENC$ ciphertext", async () => {
+      await upsertSetting("defaultTheme", await encrypt("dark", KEY_A));
+
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/settings/defaultTheme",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Failed to decrypt setting",
+        code: "DECRYPTION_FAILED",
+      });
+      expect(res.body).not.toContain("$ENC$");
+      expect(appLogError).toHaveBeenCalledTimes(1);
+      expect(appLogError).toHaveBeenCalledWith(
+        { key: "defaultTheme" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+      expect(reportErrorSpy).toHaveBeenCalledTimes(1);
+      const [err, ctx] = reportErrorSpy.mock.calls[0];
+      expect(classifyError(err, "http")).toBe("operational");
+      expect(err).toMatchObject({ code: "SETTING_DECRYPTION_FAILED", statusCode: 500 });
+      expect(ctx).toMatchObject({
+        source: "http",
+        route: "/api/v1/settings/:key",
+        method: "GET",
+        statusCode: 500,
+        subsystem: "settings",
+      });
+    });
+
+    it("decrypts an $ENC$ row via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation", async () => {
+      env.DATA_ENCRYPTION_KEY = KEY_B;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+      await upsertSetting("defaultTheme", await encrypt("dark", KEY_A));
+
+      const listRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(listRes.statusCode).toBe(200);
+      expect(JSON.parse(listRes.body).settings.defaultTheme).toBe("dark");
+
+      const keyRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/settings/defaultTheme",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(keyRes.statusCode).toBe(200);
+      expect(JSON.parse(keyRes.body).value).toBe("dark");
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(appLogError).not.toHaveBeenCalled();
     });
   });
 });

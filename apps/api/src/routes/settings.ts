@@ -6,6 +6,7 @@
  * GET  /api/v1/settings/:key — Get a specific setting
  */
 
+import { SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -13,6 +14,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
 import { decryptSetting, encrypt } from "../lib/encryption.js";
+import { reportError } from "../lib/error-report.js";
 import {
   getSettingPolicy,
   prepareSetting,
@@ -44,8 +46,34 @@ function hasSettingAuthority(
   return effectivePermissions.has(authority);
 }
 
-async function decryptIfNeeded(value: string): Promise<string> {
-  return (await decryptSetting(value)) ?? value;
+async function decryptIfNeeded(
+  request: FastifyRequest,
+  key: string,
+  value: string,
+): Promise<string | null> {
+  const decrypted = await decryptSetting(value);
+  if (decrypted === null) {
+    request.log.error(
+      { key },
+      "settings: stored setting could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+    );
+    void reportError(
+      new SafeError("Failed to decrypt setting", {
+        kind: "operational",
+        code: "SETTING_DECRYPTION_FAILED",
+        statusCode: 500,
+      }),
+      {
+        source: "http",
+        route: request.routeOptions?.url,
+        method: request.method,
+        statusCode: 500,
+        subsystem: "settings",
+      },
+    );
+    return null;
+  }
+  return decrypted;
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
@@ -70,7 +98,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           settings[row.key] = "********";
           continue;
         }
-        settings[row.key] = await decryptIfNeeded(row.value);
+        const decrypted = await decryptIfNeeded(request, row.key, row.value);
+        if (decrypted === null) continue;
+        settings[row.key] = decrypted;
       }
 
       return reply.send({ settings });
@@ -261,9 +291,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      let value = "********";
+      if (!policy.redacted) {
+        const decrypted = await decryptIfNeeded(request, storageKey, row.value);
+        if (decrypted === null) {
+          return reply.status(500).send({
+            error: "Failed to decrypt setting",
+            code: "DECRYPTION_FAILED",
+          });
+        }
+        value = decrypted;
+      }
+
       return reply.send({
         key: storageKey,
-        value: policy.redacted ? "********" : await decryptIfNeeded(row.value),
+        value,
         updatedAt: row.updatedAt.toISOString(),
       });
     },

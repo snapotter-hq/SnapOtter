@@ -3,6 +3,7 @@ import {
   getSettingPolicy,
   isConfigExportableSetting,
   prepareSetting,
+  SETTING_POLICIES,
 } from "../../../apps/api/src/lib/settings-policy.js";
 
 describe("settings policy registry", () => {
@@ -95,5 +96,15 @@ describe("settings policy registry", () => {
     expect(getSettingPolicy("loginThrottleWindowSeconds")?.write).toBe("security:manage");
     expect(getSettingPolicy("auditRetentionDays")?.write).toBe("compliance:manage");
     expect(getSettingPolicy("oidc_client_secret")?.write).toBe("full-admin");
+  });
+
+  it("marks every encrypted setting policy as redacted (#2534)", () => {
+    const encryptedEntries = Object.entries(SETTING_POLICIES).filter(
+      ([, policy]) => policy.encrypted,
+    );
+    expect(encryptedEntries.length).toBeGreaterThan(0);
+    for (const [key, policy] of encryptedEntries) {
+      expect(policy.redacted, `${key} has encrypted: true without redacted: true`).toBe(true);
+    }
   });
 });
