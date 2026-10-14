@@ -33,22 +33,25 @@ export async function storageReconciliationJob(): Promise<void> {
 
   // Zero out users who have no files but a nonzero storageUsed counter
   const usersWithFiles = actual.filter((r) => r.userId != null).map((r) => r.userId as string);
+  let zeroChanged = 0;
   if (usersWithFiles.length > 0) {
-    await db
+    const zeroResult = await db
       .update(schema.users)
       .set({ storageUsed: 0 })
       .where(
-        and(sql`${schema.users.storageUsed} > 0`, notInArray(schema.users.id, usersWithFiles)),
+        and(sql`${schema.users.storageUsed} != 0`, notInArray(schema.users.id, usersWithFiles)),
       );
+    zeroChanged = zeroResult.rowCount ?? 0;
   } else {
-    // No users have files -- zero everyone
-    await db
+    // No users have files: zero everyone
+    const zeroResult = await db
       .update(schema.users)
       .set({ storageUsed: 0 })
-      .where(sql`${schema.users.storageUsed} > 0`);
+      .where(sql`${schema.users.storageUsed} != 0`);
+    zeroChanged = zeroResult.rowCount ?? 0;
   }
+  updated += zeroChanged;
+  const checked = usersWithFiles.length + zeroChanged;
 
-  console.log(
-    `Storage reconciliation complete: ${actual.length} users checked, ${updated} corrected`,
-  );
+  console.log(`Storage reconciliation complete: ${checked} users checked, ${updated} corrected`);
 }

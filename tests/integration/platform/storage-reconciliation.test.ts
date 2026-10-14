@@ -114,44 +114,77 @@ describe("storageReconciliationJob (integration)", () => {
     // was not counted as a correction.
     expect(await storageOf(userId)).toBe(1234);
     const line = logLines.find((s) => s.includes("reconciliation"));
-    expect(line).toBeDefined();
-    // Exactly the correct user contributes 0 corrections from this pair.
-    expect(line as string).toContain("Storage reconciliation complete");
+    expect(line).toBe("Storage reconciliation complete: 1 users checked, 0 corrected");
   });
 
-  it("skips the null-userId group without crashing and still reconciles real users", async () => {
+  it("skips the null-userId group without crashing, excludes it from checked count, and still reconciles real users", async () => {
     const userId = await makeUser(0);
     await addFile(userId, 700);
     // Orphaned file with no owner: grouped under a null userId and skipped.
     await addFile(null, 999);
 
-    await expect(storageReconciliationJob()).resolves.toBeUndefined();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    let logLines: string[] = [];
+    try {
+      await expect(storageReconciliationJob()).resolves.toBeUndefined();
+      logLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+    }
 
     expect(await storageOf(userId)).toBe(700);
+    const line = logLines.find((s) => s.includes("Storage reconciliation complete"));
+    expect(line).toBe("Storage reconciliation complete: 1 users checked, 1 corrected");
   });
 
-  it("zeros a user with a stale counter but no files while others keep theirs (notInArray branch)", async () => {
-    const withFiles = await makeUser(0);
+  it("zeros positive and negative stale counters on fileless users and counts them as corrections (notInArray branch)", async () => {
+    const withFiles = await makeUser(300);
     await addFile(withFiles, 300);
-    // Has a nonzero counter but zero files: must be zeroed.
-    const stale = await makeUser(5_000);
+    // Has positive and negative nonzero counters with zero files: both must be zeroed.
+    const stalePositive = await makeUser(5_000);
+    const staleNegative = await makeUser(-500);
+    const alreadyZero = await makeUser(0);
 
-    await storageReconciliationJob();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    let logLines: string[] = [];
+    try {
+      await storageReconciliationJob();
+      logLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+    }
 
     expect(await storageOf(withFiles)).toBe(300);
-    expect(await storageOf(stale)).toBe(0);
+    expect(await storageOf(stalePositive)).toBe(0);
+    expect(await storageOf(staleNegative)).toBe(0);
+    expect(await storageOf(alreadyZero)).toBe(0);
+    const line = logLines.find((s) => s.includes("Storage reconciliation complete"));
+    expect(line).toBe("Storage reconciliation complete: 3 users checked, 2 corrected");
   });
 
-  it("zeros every stale counter when no user in the DB has any files (else branch)", async () => {
+  it("zeros every positive and negative stale counter when no user in the DB has any files and counts them (else branch)", async () => {
     // Force the else branch: remove ALL userFiles so `actual` is empty.
     await db.delete(schema.userFiles);
     createdFileIds = [];
 
-    const stale = await makeUser(7_777);
+    const stalePositive = await makeUser(7_777);
+    const staleNegative = await makeUser(-500);
+    const alreadyZero = await makeUser(0);
 
-    await storageReconciliationJob();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    let logLines: string[] = [];
+    try {
+      await storageReconciliationJob();
+      logLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+    }
 
-    expect(await storageOf(stale)).toBe(0);
+    expect(await storageOf(stalePositive)).toBe(0);
+    expect(await storageOf(staleNegative)).toBe(0);
+    expect(await storageOf(alreadyZero)).toBe(0);
+    const line = logLines.find((s) => s.includes("Storage reconciliation complete"));
+    expect(line).toBe("Storage reconciliation complete: 2 users checked, 2 corrected");
   });
 
   it("does not touch a fileless user whose counter is already 0 in the else branch", async () => {
@@ -160,10 +193,19 @@ describe("storageReconciliationJob (integration)", () => {
 
     const zeroed = await makeUser(0);
 
-    // Should be a no-op (WHERE storageUsed > 0 excludes it); still 0 afterwards.
-    await storageReconciliationJob();
+    // Should be a no-op (WHERE storageUsed != 0 excludes it); still 0 afterwards.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    let logLines: string[] = [];
+    try {
+      await storageReconciliationJob();
+      logLines = logSpy.mock.calls.map((c) => String(c[0]));
+    } finally {
+      logSpy.mockRestore();
+    }
 
     expect(await storageOf(zeroed)).toBe(0);
+    const line = logLines.find((s) => s.includes("Storage reconciliation complete"));
+    expect(line).toBe("Storage reconciliation complete: 0 users checked, 0 corrected");
   });
 
   it("sums multiple files across two users independently", async () => {
