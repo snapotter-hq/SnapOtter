@@ -11,7 +11,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
-import type { LibrarySaveMode } from "@snapotter/shared";
+import { type LibrarySaveMode, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
@@ -204,6 +204,47 @@ class AutoSaveCanceledError extends Error {
 }
 
 /**
+ * Deletes a staged library blob when the version row will not be committed
+ * (user cancel, quota refusal, or database error). No `user_files` row points
+ * at `storedName`, so a failed delete leaves a permanent orphan: log it with
+ * the job and blob context and report `STAGED_DISCARD_FAILED` (#2583).
+ */
+async function discardStagedBlob(
+  opts: AutoSaveOpts,
+  storedName: string,
+  logMessage: string,
+): Promise<void> {
+  try {
+    const { deleteStoredFile } = await import("../lib/file-storage.js");
+    await deleteStoredFile(storedName);
+  } catch (cleanupErr) {
+    logger.error(
+      {
+        err: cleanupErr,
+        jobId: opts.jobId,
+        storedName,
+        fileId: opts.fileId,
+        toolId: opts.toolId,
+      },
+      logMessage,
+    );
+    void reportError(
+      new SafeError("Could not discard a staged upload", {
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: cleanupErr,
+      }),
+      {
+        source: "worker",
+        toolId: opts.toolId,
+        jobId: opts.jobId,
+        subsystem: "upload-storage",
+      },
+    );
+  }
+}
+
+/**
  * Auto-save a processed output to the persistent user file library when a
  * fileId is provided. The tool is appended to the parent's toolChain either
  * way; saveMode decides the linkage (issue #495):
@@ -225,7 +266,7 @@ export async function autoSaveToLibrary(
 
   let storedName: string | undefined;
   try {
-    const { deleteStoredFile, saveFile } = await import("../lib/file-storage.js");
+    const { saveFile } = await import("../lib/file-storage.js");
     const { quotaRefusal } = await import("../lib/quota.js");
 
     const [parent] = await db
@@ -278,16 +319,11 @@ export async function autoSaveToLibrary(
     // The last point a cancel can stop the save (#2143). Past it the version
     // row goes in, and a cancel is too late.
     if (opts.userCancel?.aborted) {
-      try {
-        await deleteStoredFile(storedName);
-      } catch (err) {
-        // Nothing references the blob, so this is the only record of it.
-        logger.error(
-          { err, jobId: opts.jobId, storedName, fileId: opts.fileId, toolId: opts.toolId },
-          "canceled library auto-save could not remove its blob; it is an orphan",
-        );
-        void reportError(err, { source: "worker", toolId: opts.toolId, jobId: opts.jobId });
-      }
+      await discardStagedBlob(
+        opts,
+        storedName,
+        "canceled library auto-save could not remove its blob; it is an orphan",
+      );
       throw new AutoSaveCanceledError();
     }
 
@@ -320,18 +356,11 @@ export async function autoSaveToLibrary(
 
     if (result.error) {
       if (storedName) {
-        await deleteStoredFile(storedName).catch((cleanupErr) => {
-          logger.error(
-            {
-              err: cleanupErr,
-              jobId: opts.jobId,
-              storedName,
-              fileId: opts.fileId,
-              toolId: opts.toolId,
-            },
-            "Failed to delete orphaned file during quota rejection",
-          );
-        });
+        await discardStagedBlob(
+          opts,
+          storedName,
+          "Failed to delete orphaned file during quota rejection",
+        );
       }
       if (opts.userCancel?.aborted) throw new AutoSaveCanceledError();
       return result;
@@ -344,19 +373,11 @@ export async function autoSaveToLibrary(
     // removes its outputs (#2143).
     if (err instanceof AutoSaveCanceledError) throw err;
     if (storedName) {
-      const { deleteStoredFile } = await import("../lib/file-storage.js");
-      await deleteStoredFile(storedName).catch((cleanupErr) => {
-        logger.error(
-          {
-            err: cleanupErr,
-            jobId: opts.jobId,
-            storedName,
-            fileId: opts.fileId,
-            toolId: opts.toolId,
-          },
-          "Failed to delete orphaned file after auto-save error",
-        );
-      });
+      await discardStagedBlob(
+        opts,
+        storedName,
+        "Failed to delete orphaned file after auto-save error",
+      );
     }
     logger.warn(
       { err, jobId: opts.jobId, storedName, fileId: opts.fileId, toolId: opts.toolId },

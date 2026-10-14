@@ -56,16 +56,30 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 
 // What the worker hands the Sentry path, per job, so a swallowed cleanup fault
 // can be shown to have been reported.
-const reported = vi.hoisted(() => [] as Array<{ jobId?: string; message: string }>);
+const reported = vi.hoisted(
+  () =>
+    [] as Array<{
+      jobId?: string;
+      message: string;
+      code?: string;
+      causeMessage?: string;
+      subsystem?: string;
+    }>,
+);
 
 vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
   return {
     ...actual,
     reportError: async (err: unknown, ctx: Parameters<typeof actual.reportError>[1]) => {
+      const cause = (err as { cause?: unknown } | null)?.cause;
       reported.push({
         jobId: ctx.jobId,
         message: err instanceof Error ? err.message : String(err),
+        code: (err as { code?: string } | null)?.code,
+        causeMessage:
+          cause instanceof Error ? cause.message : cause !== undefined ? String(cause) : undefined,
+        subsystem: ctx.subsystem,
       });
       return actual.reportError(err, ctx);
     },
@@ -723,9 +737,13 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       );
       expect(orphanLogs).toHaveLength(1);
       expect(orphanLogs[0]?.[0]).toMatchObject({ storedName: hook.storedName, fileId });
-      expect(reported.filter((r) => r.jobId === jobId).map((r) => r.message)).toContain(
-        "injected blob delete outage",
-      );
+      expect(reported.filter((r) => r.jobId === jobId)).toContainEqual({
+        jobId,
+        message: "Could not discard a staged upload",
+        code: "STAGED_DISCARD_FAILED",
+        causeMessage: "injected blob delete outage",
+        subsystem: "upload-storage",
+      });
       // The fault was real: the blob is still there under the logged name.
       if (!hook.storedName) throw new Error("the library save never wrote its blob");
       await expect(readStoredFile(hook.storedName)).resolves.toBeInstanceOf(Buffer);

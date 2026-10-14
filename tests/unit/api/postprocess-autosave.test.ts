@@ -15,11 +15,13 @@ const stubs = vi.hoisted(() => ({
   deleted: [] as string[],
   deleteError: null as Error | null,
   insertError: null as Error | null,
+  quotaError: null as string | null,
   // Each one aborts from inside a step of the save, so a test can place the
   // cancel on either side of the checks under test.
   abortDuringLookup: null as AbortController | null,
   abortDuringSave: null as AbortController | null,
   abortDuringProbe: null as AbortController | null,
+  abortDuringQuota: null as AbortController | null,
   abortDuringInsert: null as AbortController | null,
 }));
 
@@ -64,7 +66,10 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("../../../apps/api/src/lib/quota.js", () => ({
-  quotaRefusal: vi.fn(async () => null),
+  quotaRefusal: vi.fn(async () => {
+    stubs.abortDuringQuota?.abort();
+    return stubs.quotaError;
+  }),
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({ putObject: vi.fn() }));
@@ -128,9 +133,11 @@ beforeEach(() => {
   stubs.deleted.length = 0;
   stubs.deleteError = null;
   stubs.insertError = null;
+  stubs.quotaError = null;
   stubs.abortDuringLookup = null;
   stubs.abortDuringSave = null;
   stubs.abortDuringProbe = null;
+  stubs.abortDuringQuota = null;
   stubs.abortDuringInsert = null;
   loggerMock.error.mockReset();
   loggerMock.warn.mockReset();
@@ -233,20 +240,170 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
     expect(stubs.inserted).toEqual([]);
     expect(loggerMock.error).toHaveBeenCalledTimes(1);
     expect(loggerMock.error).toHaveBeenCalledWith(
-      expect.objectContaining({
+      {
         err: stubs.deleteError,
         jobId: "job-1",
         storedName: "stored-out.pdf",
         fileId: "file-1",
-      }),
-      expect.stringContaining("blob"),
+        toolId: "compress",
+      },
+      "canceled library auto-save could not remove its blob; it is an orphan",
     );
     // The orphan is logged once, as an orphan, not again as a failed save.
     expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
     expect(reportErrorMock).toHaveBeenCalledWith(
-      stubs.deleteError,
-      expect.objectContaining({ source: "worker", toolId: "compress", jobId: "job-1" }),
+      expect.objectContaining({
+        name: "SafeError",
+        message: "Could not discard a staged upload",
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: stubs.deleteError,
+      }),
+      {
+        source: "worker",
+        toolId: "compress",
+        jobId: "job-1",
+        subsystem: "upload-storage",
+      },
     );
+  });
+
+  it("discards the staged blob cleanly without reporting when quota rejects the save (#2583)", async () => {
+    stubs.quotaError = "Storage quota exceeded. Please delete some files.";
+
+    await expect(autoSaveToLibrary(opts())).resolves.toEqual({
+      error: "Storage quota exceeded. Please delete some files.",
+    });
+
+    expect(stubs.inserted).toEqual([]);
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("reports STAGED_DISCARD_FAILED when quota rejection cannot delete the staged blob (#2583)", async () => {
+    stubs.quotaError = "Storage quota exceeded. Please delete some files.";
+    stubs.deleteError = new Error("injected storage outage");
+
+    await expect(autoSaveToLibrary(opts())).resolves.toEqual({
+      error: "Storage quota exceeded. Please delete some files.",
+    });
+
+    expect(stubs.inserted).toEqual([]);
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      {
+        err: stubs.deleteError,
+        jobId: "job-1",
+        storedName: "stored-out.pdf",
+        fileId: "file-1",
+        toolId: "compress",
+      },
+      "Failed to delete orphaned file during quota rejection",
+    );
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "SafeError",
+        message: "Could not discard a staged upload",
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: stubs.deleteError,
+      }),
+      {
+        source: "worker",
+        toolId: "compress",
+        jobId: "job-1",
+        subsystem: "upload-storage",
+      },
+    );
+  });
+
+  it("reports STAGED_DISCARD_FAILED and throws Canceled when quota rejection and cancel coincide and blob delete fails (#2583)", async () => {
+    const ac = new AbortController();
+    stubs.abortDuringQuota = ac;
+    stubs.quotaError = "Storage quota exceeded. Please delete some files.";
+    stubs.deleteError = new Error("injected storage outage");
+
+    await expect(autoSaveToLibrary(opts({ userCancel: ac.signal }))).rejects.toThrow("Canceled");
+
+    expect(stubs.inserted).toEqual([]);
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      {
+        err: stubs.deleteError,
+        jobId: "job-1",
+        storedName: "stored-out.pdf",
+        fileId: "file-1",
+        toolId: "compress",
+      },
+      "Failed to delete orphaned file during quota rejection",
+    );
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "SafeError",
+        message: "Could not discard a staged upload",
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: stubs.deleteError,
+      }),
+      {
+        source: "worker",
+        toolId: "compress",
+        jobId: "job-1",
+        subsystem: "upload-storage",
+      },
+    );
+  });
+
+  it("reports both STAGED_DISCARD_FAILED and the save fault when transaction error cleanup fails (#2583)", async () => {
+    stubs.insertError = new Error("injected insert outage");
+    stubs.deleteError = new Error("injected storage outage");
+
+    await expect(autoSaveToLibrary(opts())).resolves.toEqual({
+      error: "An unexpected system error prevented saving to your library.",
+    });
+
+    expect(stubs.inserted).toEqual([]);
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      {
+        err: stubs.deleteError,
+        jobId: "job-1",
+        storedName: "stored-out.pdf",
+        fileId: "file-1",
+        toolId: "compress",
+      },
+      "Failed to delete orphaned file after auto-save error",
+    );
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledTimes(2);
+    expect(reportErrorMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        name: "SafeError",
+        message: "Could not discard a staged upload",
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: stubs.deleteError,
+      }),
+      {
+        source: "worker",
+        toolId: "compress",
+        jobId: "job-1",
+        subsystem: "upload-storage",
+      },
+    );
+    expect(reportErrorMock).toHaveBeenNthCalledWith(2, stubs.insertError, {
+      source: "worker",
+      toolId: "compress",
+      jobId: "job-1",
+    });
   });
 
   it("keeps a failed save non-fatal and logs the blob it wrote when no cancel landed", async () => {
@@ -300,6 +457,7 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
     );
 
     expect(stubs.inserted).toEqual([]);
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
     expect(loggerMock.warn).toHaveBeenCalledWith(
       expect.objectContaining({
         err: stubs.insertError,
@@ -308,6 +466,49 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
       }),
       expect.stringContaining("auto-save failed"),
     );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(stubs.insertError, {
+      source: "worker",
+      toolId: "compress",
+      jobId: "job-1",
+    });
+  });
+
+  it("reports both STAGED_DISCARD_FAILED and the save fault, then rejects when transaction error, cancel, and blob delete failure all coincide (#2583)", async () => {
+    const ac = new AbortController();
+    stubs.abortDuringInsert = ac;
+    stubs.insertError = new Error("injected insert outage");
+    stubs.deleteError = new Error("injected storage outage");
+
+    await expect(autoSaveToLibrary(opts({ userCancel: ac.signal }))).rejects.toBe(
+      stubs.insertError,
+    );
+
+    expect(stubs.inserted).toEqual([]);
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledTimes(2);
+    expect(reportErrorMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        name: "SafeError",
+        message: "Could not discard a staged upload",
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: stubs.deleteError,
+      }),
+      {
+        source: "worker",
+        toolId: "compress",
+        jobId: "job-1",
+        subsystem: "upload-storage",
+      },
+    );
+    expect(reportErrorMock).toHaveBeenNthCalledWith(2, stubs.insertError, {
+      source: "worker",
+      toolId: "compress",
+      jobId: "job-1",
+    });
   });
 
   it("saves as before when no signal is given", async () => {
