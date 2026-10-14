@@ -10,7 +10,8 @@ import { pipeline } from "node:stream/promises";
 import archiver from "archiver";
 import { eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
-import { readStoredFile } from "../lib/file-storage.js";
+import { isStorageServiceFault, readStoredFile } from "../lib/file-storage.js";
+import { logger } from "../lib/logger.js";
 import { putObjectStream } from "../lib/object-storage.js";
 
 export async function gdprExportJob(userId: string, jobId: string): Promise<{ outputRef: string }> {
@@ -63,62 +64,94 @@ export async function gdprExportJob(userId: string, jobId: string): Promise<{ ou
   passthrough.on("data", (chunk: Buffer) => chunks.push(chunk));
 
   const pipelineDone = pipeline(archive, passthrough);
+  pipelineDone.catch(() => {});
 
-  archive.append(JSON.stringify(profile, null, 2), { name: "profile.json" });
+  try {
+    archive.append(JSON.stringify(profile, null, 2), { name: "profile.json" });
 
-  archive.append(
-    JSON.stringify(
-      files.map((f) => ({
-        ...f,
-        createdAt: f.createdAt?.toISOString(),
-      })),
-      null,
-      2,
-    ),
-    { name: "files.json" },
-  );
+    archive.append(
+      JSON.stringify(
+        files.map((f) => ({
+          ...f,
+          createdAt: f.createdAt?.toISOString(),
+        })),
+        null,
+        2,
+      ),
+      { name: "files.json" },
+    );
 
-  archive.append(
-    JSON.stringify(
-      jobs.map((j) => ({
-        ...j,
-        createdAt: j.createdAt?.toISOString(),
-        startedAt: j.startedAt?.toISOString(),
-        completedAt: j.completedAt?.toISOString(),
-        deleteAfter: j.deleteAfter?.toISOString(),
-      })),
-      null,
-      2,
-    ),
-    { name: "jobs.json" },
-  );
+    archive.append(
+      JSON.stringify(
+        jobs.map((j) => ({
+          ...j,
+          createdAt: j.createdAt?.toISOString(),
+          startedAt: j.startedAt?.toISOString(),
+          completedAt: j.completedAt?.toISOString(),
+          deleteAfter: j.deleteAfter?.toISOString(),
+        })),
+        null,
+        2,
+      ),
+      { name: "jobs.json" },
+    );
 
-  archive.append(
-    JSON.stringify(
-      auditEntries.map((a) => ({
-        ...a,
-        createdAt: a.createdAt?.toISOString(),
-      })),
-      null,
-      2,
-    ),
-    { name: "audit-log.json" },
-  );
+    archive.append(
+      JSON.stringify(
+        auditEntries.map((a) => ({
+          ...a,
+          createdAt: a.createdAt?.toISOString(),
+        })),
+        null,
+        2,
+      ),
+      { name: "audit-log.json" },
+    );
 
-  // 6. Copy library file contents into the ZIP
-  for (const file of files) {
-    try {
-      const buffer = await readStoredFile(file.storedName);
+    // 6. Copy library file contents into the ZIP
+    const missingFiles: Array<{ id: string; originalName: string; storedName: string }> = [];
+    for (const file of files) {
+      let buffer: Buffer;
+      try {
+        buffer = await readStoredFile(file.storedName);
+      } catch (e) {
+        // A storage service fault (rotated S3 credentials, bucket policy change,
+        // S3 5xx, vanished bucket) or a local filesystem fault other than ENOENT
+        // (EACCES, EIO, ERR_FS_FILE_TOO_LARGE) must fail the export rather than
+        // ship an archive with library files silently missing (#975). A genuinely
+        // missing blob or a poisoned stored_name from a 1.x SQLite import logs a
+        // warning and goes into missing-files.json so the archive declares its
+        // own gaps.
+        const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
+        if ((syscall && code !== "ENOENT") || code === "ERR_FS_FILE_TOO_LARGE") throw e;
+        if (isStorageServiceFault(e)) throw e;
+        logger.warn(
+          { jobId, userId, fileId: file.id, storedName: file.storedName },
+          "gdpr export: stored library blob missing, skipping",
+        );
+        missingFiles.push({
+          id: file.id,
+          originalName: file.originalName,
+          storedName: file.storedName,
+        });
+        continue;
+      }
       archive.append(buffer, {
         name: `library-files/${file.id}_${file.originalName}`,
       });
-    } catch {
-      // File may have been cleaned up; skip silently
     }
-  }
 
-  await archive.finalize();
-  await pipelineDone;
+    if (missingFiles.length > 0) {
+      archive.append(JSON.stringify(missingFiles, null, 2), { name: "missing-files.json" });
+    }
+
+    await Promise.all([archive.finalize(), pipelineDone]);
+  } catch (err) {
+    archive.abort();
+    passthrough.destroy();
+    await pipelineDone.catch(() => {});
+    throw err;
+  }
 
   // 7. Write ZIP to object storage. Staged and renamed (putObjectStream), not a
   // direct write: stranded-job reconciliation adopts whatever archive sits in
