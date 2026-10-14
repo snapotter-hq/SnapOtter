@@ -138,6 +138,10 @@ const ALERT_FLOORS: Record<string, string | Record<string, string>> = {
   // GHSA-73wf-gq98-2v4g: prototype write via an untrusted stats file, and
   // GHSA-c83g-rgw3-j3cx: unbounded query cache growth.
   browserslist: "4.28.7",
+  // GHSA-w27v-7q3p-w38r and GHSA-4vpr-x523-8j87: removeScripts bypasses in SVGO.
+  svgo: "4.1.0",
+  // GHSA-7w5x-hrqm-74c2 (1.7.1) and GHSA-r4xh-jqrq-34v2 (1.9.0): TOML parser DoS.
+  "smol-toml": "1.9.0",
 };
 
 function floorFor(floors: string | Record<string, string>, version: Version): string | undefined {
@@ -178,6 +182,7 @@ describe("Dependabot alert floors (issue #835)", () => {
       ["api fastify", api.dependencies?.fastify, "5.12.2"],
       ["api js-yaml", api.dependencies?.["js-yaml"], "4.3.1"],
       ["override js-yaml", overrides["js-yaml"], "4.3.1"],
+      ["override astro>svgo", overrides["astro>svgo"], "4.1.0"],
       ["override fast-uri", overrides["fast-uri"], "4.1.3"],
       ["override qs", overrides.qs, "6.16.0"],
       ["override postcss", overrides.postcss, "8.5.23"],

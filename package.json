@@ -109,7 +109,7 @@
     "overrides": {
       "fast-uri": ">=4.1.3",
       "astro>sharp": ">=0.35.4",
-      "astro>svgo": "4.0.2",
+      "astro>svgo": ">=4.1.0",
       "exceljs>unzipper": "0.12.5",
       "handlebars": ">=4.7.9",
       "glob": ">=10.5.0",

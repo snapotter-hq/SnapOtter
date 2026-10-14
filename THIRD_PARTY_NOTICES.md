@@ -143,8 +143,8 @@ Package authors retain all rights granted by their respective licenses.
 
 ## BSD-2-Clause
 
-- [css-select@5.2.2](https://github.com/fb55/css-select#readme)
-- [css-what@6.2.2](https://github.com/fb55/css-what#readme)
+- [css-select@6.0.0](https://github.com/fb55/css-select#readme)
+- [css-what@7.0.0](https://github.com/fb55/css-what#readme)
 - [domelementtype@2.3.0](https://github.com/fb55/domelementtype#readme)
 - [domhandler@5.0.3](https://github.com/fb55/domhandler#readme)
 - [domutils@3.2.2](https://github.com/fb55/domutils#readme)
@@ -165,9 +165,9 @@ Package authors retain all rights granted by their respective licenses.
 - [light-my-request@6.6.0](https://github.com/fastify/light-my-request#readme)
 - [protobufjs@8.6.6](https://github.com/protobufjs/protobuf.js#readme)
 - [secure-json-parse@4.1.0](https://github.com/fastify/secure-json-parse#readme)
-- [smol-toml@1.7.0](https://github.com/squirrelchat/smol-toml#readme)
+- [smol-toml@1.9.1](https://github.com/squirrelchat/smol-toml#readme)
 - [source-map@0.6.1](https://github.com/mozilla/source-map)
-- [source-map-js@1.2.1](https://github.com/7rulnik/source-map-js)
+- [source-map-js@1.2.1,1.2.2](https://github.com/7rulnik/source-map-js)
 - [wavesurfer.js@7.12.11](https://wavesurfer.xyz)
 
 ## BlueOak-1.0.0
@@ -179,7 +179,7 @@ Package authors retain all rights granted by their respective licenses.
 - [minimatch@10.2.5](https://github.com/isaacs/minimatch#readme)
 - [minipass@7.1.3](https://github.com/isaacs/minipass#readme)
 - [path-scurry@2.0.2](https://github.com/isaacs/path-scurry#readme)
-- [sax@1.6.0](https://github.com/isaacs/sax-js#readme)
+- [sax@1.6.0,1.6.1](https://github.com/isaacs/sax-js#readme)
 - [tar@7.5.22](https://github.com/isaacs/node-tar#readme)
 - [yallist@5.0.0](https://github.com/isaacs/yallist#readme)
 
@@ -701,7 +701,7 @@ Package authors retain all rights granted by their respective licenses.
 - [strip-ansi@6.0.1](https://github.com/chalk/strip-ansi#readme)
 - [strip-json-comments@2.0.1](https://github.com/sindresorhus/strip-json-comments#readme)
 - [strnum@2.4.1](https://github.com/NaturalIntelligence/strnum#readme)
-- [svgo@4.0.2](https://svgo.dev)
+- [svgo@4.1.0](https://svgo.dev)
 - [tagged-tag@1.0.0](https://github.com/sindresorhus/tagged-tag#readme)
 - [tailwind-merge@2.6.1](https://github.com/dcastil/tailwind-merge)
 - [tar-fs@2.1.5](https://github.com/mafintosh/tar-fs)
