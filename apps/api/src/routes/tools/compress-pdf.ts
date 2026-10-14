@@ -4,6 +4,7 @@ import { gsCompressPdfTuned } from "@snapotter/doc-engine";
 import { kbToBytes } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { scrubPdfProducerFile } from "../../lib/pdf-producer.js";
 import { createToolRoute } from "../tool-factory.js";
 
 // Mirrors the image "compress" tool: compress by a quality slider or to a
@@ -62,6 +63,7 @@ export function registerCompressPdf(app: FastifyInstance) {
           const { dpi, qFactor } = paramsForQuality(key);
           const path = join(ctx.scratchDir, `cand-q${key}.pdf`);
           await gsCompressPdfTuned(inPath, path, dpi, qFactor);
+          await scrubPdfProducerFile(path);
           const entry = { path, size: (await stat(path)).size };
           cache.set(key, entry);
           return entry;
@@ -99,6 +101,7 @@ export function registerCompressPdf(app: FastifyInstance) {
         ctx.report(10, "Compressing");
         const { dpi, qFactor } = paramsForQuality(settings.quality ?? 75);
         await gsCompressPdfTuned(inPath, outPath, dpi, qFactor);
+        await scrubPdfProducerFile(outPath);
         // A "Compress" tool must never enlarge the file.
         if ((await stat(outPath)).size >= input.buffer.length) {
           await writeFile(outPath, input.buffer);

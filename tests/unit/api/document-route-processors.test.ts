@@ -30,9 +30,11 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 }));
 
 vi.mock("@snapotter/doc-engine", () => ({
+  gsCompressPdfTuned: vi.fn(),
   htmlToPdfPy: vi.fn(),
   pdfFlattenPy: vi.fn(),
   pdfRedactPy: vi.fn(async () => ({ found: 3 })),
+  pdfScrubProducerPy: vi.fn(),
   pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
   qpdfAvailable: vi.fn(() => false),
   qpdfCheck: vi.fn(),
@@ -43,9 +45,18 @@ vi.mock("@snapotter/doc-engine", () => ({
   sofficeAvailable: vi.fn(() => false),
 }));
 
-import { htmlToPdfPy, pdfFlattenPy, pdfRedactPy, pdfTextPy } from "@snapotter/doc-engine";
+import { writeFile } from "node:fs/promises";
+import {
+  gsCompressPdfTuned,
+  htmlToPdfPy,
+  pdfFlattenPy,
+  pdfRedactPy,
+  pdfScrubProducerPy,
+  pdfTextPy,
+} from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
 import { registerFlattenPdf } from "../../../apps/api/src/routes/tools/flatten-pdf.js";
 import { registerHtmlToPdf } from "../../../apps/api/src/routes/tools/html-to-pdf.js";
 import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdown-to-pdf.js";
@@ -315,5 +326,187 @@ describe("redact-pdf route processor (no PyMuPDF)", () => {
         report: vi.fn(),
       }),
     ).rejects.toThrow("redact-pdf is v2-only");
+  });
+});
+
+describe("compress-pdf route processor (#1373)", () => {
+  function createCompressCtx(scratchDir: string, input: Buffer, settings: Record<string, unknown>) {
+    return {
+      inputs: [{ buffer: input, filename: "doc.pdf", ref: "uploads/job/input" }],
+      settings,
+      scratchDir,
+      signal: new AbortController().signal,
+      report: vi.fn(),
+    };
+  }
+
+  it("scrubs each targetSize candidate before measuring so binary search and targetMet use post-scrub bytes", async () => {
+    // Target is 1 KB (1000 bytes); input is 2000 bytes.
+    // At q>=50 Ghostscript writes 990 bytes (under 1000), and the Producer scrub
+    // adds 20 bytes -> 1010 bytes (over 1000). At q<50 Ghostscript writes 800
+    // bytes -> 820 bytes after scrub (fits 1000). Without scrubbing inside runQ,
+    // the search would accept q=50 at 990 bytes and ship 1010 bytes > target.
+    vi.mocked(gsCompressPdfTuned).mockImplementation(
+      async (_inPath: string, outPath: string, dpi: number) => {
+        const size = dpi >= 300 ? 990 : 800;
+        await writeFile(outPath, Buffer.alloc(size, 0x41));
+      },
+    );
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (inPath: string, outPath: string) => {
+      const orig = await readFile(inPath);
+      await writeFile(outPath, Buffer.concat([orig, Buffer.alloc(20, 0x53)]));
+    });
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(2000, 0x49);
+      const ctx = createCompressCtx(scratchDir, input, {
+        mode: "targetSize",
+        targetSizeKb: 1,
+      });
+      const result = await config?.processV2?.(ctx);
+      const outBytes = await readFile(result?.scratchPath as string);
+      expect(outBytes.length).toBe(820);
+      expect(result?.resultPayload).toEqual({ targetKb: 1, targetMet: true });
+    });
+  });
+
+  it("reports targetMet=false and falls back to untouched input when scrub pushes every candidate over target and input size", async () => {
+    // Input is 955 bytes, target is 0.95 KB (950 bytes).
+    // Ghostscript writes 940 bytes (<= 950 target and < 955 input), and the
+    // Producer scrub adds 20 bytes -> 960 bytes (> 950 target and >= 955 input).
+    // Without scrubbing before measuring, this would keep the 960-byte file and
+    // report targetMet=true; with the fix, never-enlarge falls back to the
+    // 955-byte input and reports targetMet=false.
+    vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, Buffer.alloc(940, 0x41));
+    });
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (inPath: string, outPath: string) => {
+      const orig = await readFile(inPath);
+      await writeFile(outPath, Buffer.concat([orig, Buffer.alloc(20, 0x53)]));
+    });
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(955, 0x49);
+      const ctx = createCompressCtx(scratchDir, input, {
+        mode: "targetSize",
+        targetSizeKb: 0.95,
+      });
+      const result = await config?.processV2?.(ctx);
+      const outBytes = await readFile(result?.scratchPath as string);
+      expect(outBytes.equals(input)).toBe(true);
+      expect(result?.resultPayload).toEqual({ targetKb: 0.95, targetMet: false });
+    });
+  });
+
+  it("reports targetMet=false when scrub pushes the smallest candidate over target while staying smaller than input", async () => {
+    // Input is 2000 bytes, target is 1 KB (1000 bytes).
+    // Ghostscript writes 990 bytes at every q, and the Producer scrub adds 20
+    // bytes -> 1010 bytes (< 2000 input, > 1000 target). The 1010-byte scrubbed
+    // candidate is kept, and targetMet is false.
+    vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, Buffer.alloc(990, 0x41));
+    });
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (inPath: string, outPath: string) => {
+      const orig = await readFile(inPath);
+      await writeFile(outPath, Buffer.concat([orig, Buffer.alloc(20, 0x53)]));
+    });
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(2000, 0x49);
+      const ctx = createCompressCtx(scratchDir, input, {
+        mode: "targetSize",
+        targetSizeKb: 1,
+      });
+      const result = await config?.processV2?.(ctx);
+      const outBytes = await readFile(result?.scratchPath as string);
+      expect(outBytes.length).toBe(1010);
+      expect(result?.resultPayload).toEqual({ targetKb: 1, targetMet: false });
+    });
+  });
+
+  it("applies quality-mode never-enlarge after the Producer scrub and keeps scrubbed output when smaller", async () => {
+    // Input is 1000 bytes. First call: Ghostscript writes 990 bytes (< 1000), and
+    // the scrub rewrites it to 1010 bytes (>= 1000) -> falls back to 1000-byte input.
+    // Second call: Ghostscript writes 600 bytes, scrub rewrites to 620 bytes (< 1000)
+    // -> keeps the 620-byte scrubbed file.
+    vi.mocked(gsCompressPdfTuned)
+      .mockImplementationOnce(async (_inPath: string, outPath: string) => {
+        await writeFile(outPath, Buffer.alloc(990, 0x41));
+      })
+      .mockImplementationOnce(async (_inPath: string, outPath: string) => {
+        await writeFile(outPath, Buffer.alloc(600, 0x41));
+      });
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (inPath: string, outPath: string) => {
+      const orig = await readFile(inPath);
+      await writeFile(outPath, Buffer.concat([orig, Buffer.alloc(20, 0x53)]));
+    });
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(1000, 0x49);
+      const ctx = createCompressCtx(scratchDir, input, {
+        mode: "quality",
+        quality: 75,
+      });
+      const result = await config?.processV2?.(ctx);
+      const outBytes = await readFile(result?.scratchPath as string);
+      expect(outBytes.equals(input)).toBe(true);
+    });
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(1000, 0x49);
+      const ctx = createCompressCtx(scratchDir, input, {
+        mode: "quality",
+        quality: 75,
+      });
+      const result = await config?.processV2?.(ctx);
+      const outBytes = await readFile(result?.scratchPath as string);
+      expect(outBytes.length).toBe(620);
+    });
+  });
+
+  it("keeps the Ghostscript candidate and cleans up the sibling temp file when the Producer scrub fails", async () => {
+    const candidate = Buffer.alloc(600, 0x43);
+    vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, candidate);
+    });
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, Buffer.from("partial"));
+      throw new Error("PyMuPDF not installed");
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    try {
+      await withScratch(async (scratchDir) => {
+        const input = Buffer.alloc(1000, 0x49);
+        const ctx = createCompressCtx(scratchDir, input, {
+          mode: "quality",
+          quality: 75,
+        });
+        const result = await config?.processV2?.(ctx);
+        const outPath = result?.scratchPath as string;
+        expect((await readFile(outPath)).equals(candidate)).toBe(true);
+        await expect(readFile(`${outPath}.scrub.pdf`)).rejects.toThrow();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("[pdf-scrub] keeping original metadata: PyMuPDF not installed"),
+        );
+      });
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

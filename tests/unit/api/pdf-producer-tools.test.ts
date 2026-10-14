@@ -11,7 +11,15 @@ describe("SCRUB_PDF_PRODUCER_TOOLS covers presets of scrubbed bases", () => {
       (p) => SCRUB_PDF_PRODUCER_TOOLS.has(p.base) && !SCRUB_PDF_PRODUCER_TOOLS.has(p.id),
     ).map((p) => p.id);
     expect(missing).toEqual([]);
-    expect(SCRUB_PDF_PRODUCER_TOOLS.has("compress-pdf-to-1mb")).toBe(true);
+  });
+
+  it("excludes compress-pdf and its presets from worker post-scrubbing so never-enlarge and targetMet hold (#1373)", () => {
+    expect(SCRUB_PDF_PRODUCER_TOOLS.has("compress-pdf")).toBe(false);
+    const pdfPresets = COMPRESS_PRESETS.filter((p) => p.base === "compress-pdf");
+    expect(pdfPresets.length).toBeGreaterThan(0);
+    for (const preset of pdfPresets) {
+      expect(SCRUB_PDF_PRODUCER_TOOLS.has(preset.id)).toBe(false);
+    }
   });
 
   it("includes every image-to-pdf conversion preset", () => {
