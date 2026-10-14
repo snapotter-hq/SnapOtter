@@ -30,9 +30,9 @@ import type { TestApp } from "../test-server.js";
 
 let testApp: TestApp;
 
-function generateTotpCode(uri: string): string {
+function generateTotpCode(uri: string, timestamp = Date.now()): string {
   const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
-  return totp.generate();
+  return totp.generate({ timestamp });
 }
 
 async function setMfaPolicy(value: "optional" | "admins_only" | "required"): Promise<void> {
@@ -234,6 +234,71 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).token).toBeDefined();
+  });
+
+  it("refuses replaying the TOTP step used on enroll-complete on a subsequent login challenge or disable (#2574)", async () => {
+    const { username, password } = await createUnenrolledUser();
+    await setMfaPolicy("required");
+
+    const loginRes = await login(username, password);
+    const { enrollmentToken, uri } = JSON.parse(loginRes.body);
+
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+    const now = Date.now();
+    const enrollCode = generateTotpCode(uri, now);
+    const prevCode = generateTotpCode(uri, now - 30_000);
+    const nextCode = generateTotpCode(uri, now + 30_000);
+
+    const completeRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: enrollCode },
+    });
+    expect(completeRes.statusCode).toBe(200);
+    const { token: sessionToken } = JSON.parse(completeRes.body);
+
+    // Open a login challenge for the now-enrolled user.
+    const nextLoginRes = await login(username, password);
+    expect(nextLoginRes.statusCode).toBe(200);
+    const { mfaToken } = JSON.parse(nextLoginRes.body);
+
+    // Replaying the enrollment code (or an earlier step in its window) on /mfa/complete is refused.
+    const replayComplete = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: enrollCode },
+    });
+    expect(replayComplete.statusCode).toBe(401);
+    expect(JSON.parse(replayComplete.body).code).toBe("INVALID_CODE");
+
+    const earlierComplete = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: prevCode },
+    });
+    expect(earlierComplete.statusCode).toBe(401);
+    expect(JSON.parse(earlierComplete.body).code).toBe("INVALID_CODE");
+
+    // Replaying the enrollment code on /mfa/disable is also refused.
+    const replayDisable = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${sessionToken}` },
+      payload: { code: enrollCode },
+    });
+    expect(replayDisable.statusCode).toBe(401);
+    expect(JSON.parse(replayDisable.body).code).toBe("INVALID_CODE");
+
+    // Advancing to the next 30s step succeeds on /mfa/complete.
+    const nextRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: nextCode },
+    });
+    expect(nextRes.statusCode).toBe(200);
   });
 });
 

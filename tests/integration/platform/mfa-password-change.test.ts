@@ -8,15 +8,25 @@ mockEnterpriseFeatures(["mfa"]);
 
 const { buildTestApp, createUserAndLogin, loginAsAdmin } = await import("../test-server.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
+const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { consumeTotpCode } = await import("../../../apps/api/src/plugins/mfa.js");
 
 import type { TestApp } from "../test-server.js";
 
 let testApp: TestApp;
 let adminToken: string;
 
-function generateTotpCode(uri: string): string {
+function generateTotpCode(uri: string, timestamp = Date.now()): string {
   const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
-  return totp.generate();
+  return totp.generate({ timestamp });
+}
+
+async function generatePrevStepTotpCode(uri: string): Promise<string> {
+  const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+  if (remainingMs < 2_000) {
+    await new Promise((r) => setTimeout(r, remainingMs + 50));
+  }
+  return generateTotpCode(uri, Date.now() - 30_000);
 }
 
 beforeAll(async () => {
@@ -44,7 +54,7 @@ describe("MFA window revoked by password change", () => {
       headers: { authorization: `Bearer ${userToken}` },
     });
     const enrollData = JSON.parse(enrollRes.body);
-    const totpCode = generateTotpCode(enrollData.uri);
+    const totpCode = await generatePrevStepTotpCode(enrollData.uri);
     const enrollConfirmRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/verify",
@@ -177,7 +187,7 @@ describe("MFA window revoked by password change", () => {
       headers: { authorization: `Bearer ${userToken}` },
     });
     const enrollData = JSON.parse(enrollRes.body);
-    const totpCode = generateTotpCode(enrollData.uri);
+    const totpCode = await generatePrevStepTotpCode(enrollData.uri);
     const enrollConfirmRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/verify",
@@ -319,11 +329,21 @@ describe("MFA window revoked by password change", () => {
         const loginData = JSON.parse(loginRes.body);
         expect(loginData.requiresMfaEnrollment).toBe(true);
 
+        const { createHash } = await import("node:crypto");
+        const parsedTotp = OTPAuth.URI.parse(loginData.uri) as OTPAuth.TOTP;
+        const secretFp = createHash("sha256")
+          .update(parsedTotp.secret.base32)
+          .digest("hex")
+          .slice(0, 16);
+        const stepKey = `mfa:totp-step:${userId}:${secretFp}`;
+        let stepKeyDuringTx: string | null = null;
+
         const origTransaction = db.transaction.bind(db);
         const txSpy = vi
           .spyOn(db, "transaction")
           // biome-ignore lint/suspicious/noExplicitAny: wrap drizzle transaction to simulate concurrent password write after initial select
           .mockImplementationOnce((async (cb: any, config?: any) => {
+            stepKeyDuringTx = await sharedRedis().get(stepKey);
             await db
               .update(schema.users)
               .set({
@@ -334,13 +354,14 @@ describe("MFA window revoked by password change", () => {
             return origTransaction(cb, config);
           }) as typeof db.transaction);
 
+        const submittedCode = generateTotpCode(loginData.uri);
         try {
           const completeRes = await testApp.app.inject({
             method: "POST",
             url: "/api/auth/mfa/enroll-complete",
             payload: {
               enrollmentToken: loginData.enrollmentToken,
-              code: generateTotpCode(loginData.uri),
+              code: submittedCode,
             },
           });
 
@@ -350,9 +371,15 @@ describe("MFA window revoked by password change", () => {
           txSpy.mockRestore();
         }
 
-        // Enrollment did not complete, so totpEnabled must stay false and no session is minted.
+        // Enrollment did not complete, so totpEnabled must stay false, no session is minted,
+        // and the TOTP step key in Redis (present when db.transaction started) is cleared
+        // so the step is not left consumed (#2574).
         const [userAfter] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
         expect(userAfter.totpEnabled).toBe(false);
+        expect(stepKeyDuringTx).toBeTruthy();
+        expect(await sharedRedis().get(stepKey)).toBeNull();
+        expect(await consumeTotpCode(userId, parsedTotp.secret.base32, submittedCode)).toBe(true);
+        await sharedRedis().del(stepKey);
 
         const sessionsAfter = await db
           .select()
@@ -426,13 +453,14 @@ describe("MFA window revoked by password change", () => {
           }, config);
         }) as typeof db.transaction);
 
+      const errSubmittedCode = generateTotpCode(errLoginData.uri);
       try {
         const errCompleteRes = await testApp.app.inject({
           method: "POST",
           url: "/api/auth/mfa/enroll-complete",
           payload: {
             enrollmentToken: errLoginData.enrollmentToken,
-            code: generateTotpCode(errLoginData.uri),
+            code: errSubmittedCode,
           },
         });
         expect(errCompleteRes.statusCode).toBe(500);
@@ -445,6 +473,11 @@ describe("MFA window revoked by password change", () => {
         .from(schema.users)
         .where(eq(schema.users.id, errUserId));
       expect(errUserAfter.totpEnabled).toBe(false);
+
+      const errParsedTotp = OTPAuth.URI.parse(errLoginData.uri) as OTPAuth.TOTP;
+      expect(await consumeTotpCode(errUserId, errParsedTotp.secret.base32, errSubmittedCode)).toBe(
+        true,
+      );
     } finally {
       await db
         .update(schema.settings)

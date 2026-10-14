@@ -13,9 +13,17 @@ const { verifyRecoveryCode } = await import("../../../apps/api/src/plugins/mfa.j
 
 import type { TestApp } from "../test-server.js";
 
-function generateTotpCode(uri: string): string {
+function generateTotpCode(uri: string, timestamp = Date.now()): string {
   const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
-  return totp.generate();
+  return totp.generate({ timestamp });
+}
+
+async function generatePrevStepTotpCode(uri: string): Promise<string> {
+  const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+  if (remainingMs < 2_000) {
+    await new Promise((r) => setTimeout(r, remainingMs + 50));
+  }
+  return generateTotpCode(uri, Date.now() - 30_000);
 }
 
 describe("MFA Race Condition #2328", () => {
@@ -63,7 +71,7 @@ describe("MFA Race Condition #2328", () => {
       method: "POST",
       url: "/api/auth/mfa/verify",
       headers: { authorization: `Bearer ${userToken}` },
-      payload: { code: generateTotpCode(uri) },
+      payload: { code: await generatePrevStepTotpCode(uri) },
     });
     expect(verifyRes.statusCode).toBe(200);
 

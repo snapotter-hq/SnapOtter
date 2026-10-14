@@ -56,9 +56,17 @@ async function startOidcLoginAndGetStateCookie() {
   return { cookieValue, state };
 }
 
-function generateTotpCode(uri: string): string {
+function generateTotpCode(uri: string, timestamp = Date.now()): string {
   const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
-  return totp.generate();
+  return totp.generate({ timestamp });
+}
+
+async function generatePrevStepTotpCode(uri: string): Promise<string> {
+  const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+  if (remainingMs < 2_000) {
+    await new Promise((r) => setTimeout(r, remainingMs + 50));
+  }
+  return generateTotpCode(uri, Date.now() - 30_000);
 }
 
 async function insertOidcUser(opts: { role?: string; totpEnabled?: boolean } = {}) {
@@ -113,7 +121,7 @@ async function insertAndEnrollOidcUser(opts: { role?: string } = {}) {
     method: "POST",
     url: "/api/auth/mfa/verify",
     headers: { authorization: `Bearer ${sessionToken}` },
-    payload: { code: generateTotpCode(uri) },
+    payload: { code: await generatePrevStepTotpCode(uri) },
   });
   expect(verifyRes.statusCode).toBe(200);
 

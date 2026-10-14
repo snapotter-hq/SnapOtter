@@ -581,8 +581,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       const audit = auditFromRequest(request);
 
-      // Validate the code
-      if (!verifyTotpCode(secretBase32, code)) {
+      // Validate the code and record its time step so it cannot be replayed (#2574)
+      if (!(await consumeTotpCode(user.id, secretBase32, code))) {
         await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",
@@ -590,11 +590,17 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Activate MFA
-      await db
-        .update(schema.users)
-        .set({ totpEnabled: true, updatedAt: new Date() })
-        .where(eq(schema.users.id, user.id));
+      // Activate MFA (if the DB write fails, release the consumed step so a retry
+      // within the same 30s window is not rejected as a replay)
+      try {
+        await db
+          .update(schema.users)
+          .set({ totpEnabled: true, updatedAt: new Date() })
+          .where(eq(schema.users.id, user.id));
+      } catch (err) {
+        await sharedRedis().del(totpStepKey(user.id, secretBase32));
+        throw err;
+      }
 
       await audit("MFA_ENROLLED", { userId: user.id, username: user.username });
 
@@ -942,7 +948,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       const audit = auditFromRequest(request);
 
-      if (!verifyTotpCode(secretBase32, code)) {
+      if (!(await consumeTotpCode(userId, secretBase32, code))) {
         // Burn the enrollment after a few wrong codes so an attacker who already
         // holds valid credentials cannot grind TOTP guesses within the window,
         // or put the challenge back if attempts remain.
@@ -962,40 +968,47 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
       const verifiedUser = dbUser;
 
-      const inserted = await db.transaction(async (tx) => {
-        const [lockedUser] = await tx
-          .select({ passwordHash: schema.users.passwordHash })
-          .from(schema.users)
-          .where(eq(schema.users.id, verifiedUser.id))
-          .for("share");
+      let inserted: "success" | "password_changed" | "password_removed";
+      try {
+        inserted = await db.transaction(async (tx) => {
+          const [lockedUser] = await tx
+            .select({ passwordHash: schema.users.passwordHash })
+            .from(schema.users)
+            .where(eq(schema.users.id, verifiedUser.id))
+            .for("share");
 
-        if (hashFingerprint) {
-          const { createHash } = await import("node:crypto");
-          const freshFingerprint = lockedUser?.passwordHash
-            ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
-            : null;
-          if (freshFingerprint !== hashFingerprint) {
+          if (hashFingerprint) {
+            const { createHash } = await import("node:crypto");
+            const freshFingerprint = lockedUser?.passwordHash
+              ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
+              : null;
+            if (freshFingerprint !== hashFingerprint) {
+              return lockedUser?.passwordHash ? "password_changed" : "password_removed";
+            }
+          } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
             return lockedUser?.passwordHash ? "password_changed" : "password_removed";
           }
-        } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
-          return lockedUser?.passwordHash ? "password_changed" : "password_removed";
-        }
 
-        await tx
-          .update(schema.users)
-          .set({ totpEnabled: true, updatedAt: new Date() })
-          .where(eq(schema.users.id, verifiedUser.id));
+          await tx
+            .update(schema.users)
+            .set({ totpEnabled: true, updatedAt: new Date() })
+            .where(eq(schema.users.id, verifiedUser.id));
 
-        await tx.insert(schema.sessions).values({
-          id: token,
-          userId: verifiedUser.id,
-          expiresAt,
+          await tx.insert(schema.sessions).values({
+            id: token,
+            userId: verifiedUser.id,
+            expiresAt,
+          });
+
+          return "success";
         });
-
-        return "success";
-      });
+      } catch (err) {
+        await redis.del(totpStepKey(verifiedUser.id, secretBase32));
+        throw err;
+      }
 
       if (inserted !== "success") {
+        await redis.del(totpStepKey(verifiedUser.id, secretBase32));
         await audit("MFA_VERIFY_FAILED", {
           userId: verifiedUser.id,
           username: verifiedUser.username,
