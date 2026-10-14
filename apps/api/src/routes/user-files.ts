@@ -139,6 +139,33 @@ function sendOverQuota(reply: FastifyReply, message: string) {
   return reply.status(413).send({ error: message, code: "STORAGE_QUOTA_EXCEEDED" });
 }
 
+/**
+ * Deletes a blob written before a library commit that then failed or was
+ * refused. No row points at it, so one this can't delete is orphaned for good:
+ * report it, don't just warn (#1472). It's wrapped so orphans group on their
+ * own in Sentry, and so an S3 connection reset isn't taken for this client
+ * hanging up. The client still gets the refusal or fault that caused the
+ * discard.
+ */
+function discardStagedBlob(request: FastifyRequest, route: string, storedName: string) {
+  return deleteStoredFile(storedName).catch((err) => {
+    request.log.error({ err, storedName }, "Failed to discard a staged upload");
+    void reportError(
+      new SafeError("Could not discard a staged upload", {
+        kind: "operational",
+        code: "STAGED_DISCARD_FAILED",
+        cause: err,
+      }),
+      {
+        source: "http",
+        route,
+        method: "POST",
+        subsystem: "upload-storage",
+      },
+    );
+  });
+}
+
 // ── Route registration ─────────────────────────────────────────────
 
 export async function userFileRoutes(app: FastifyInstance): Promise<void> {
@@ -238,30 +265,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       // error response always means nothing was saved.
       const staged: { storedName: string; values: typeof schema.userFiles.$inferInsert }[] = [];
       let stagedBytes = 0;
-      // The request has already failed and no row points at a staged blob, so
-      // one this can't delete is orphaned for good: report it, don't just warn
-      // (#1472). It's wrapped so orphans group on their own in Sentry, and so
-      // an S3 connection reset isn't taken for this client hanging up. The
-      // client still gets the refusal that caused the discard.
       const discardStaged = async () => {
         await Promise.all(
           staged.map(({ storedName }) =>
-            deleteStoredFile(storedName).catch((err) => {
-              request.log.error({ err, storedName }, "Failed to discard a staged upload");
-              void reportError(
-                new SafeError("Could not discard a staged upload", {
-                  kind: "operational",
-                  code: "STAGED_DISCARD_FAILED",
-                  cause: err,
-                }),
-                {
-                  source: "http",
-                  route: "/api/v1/files/upload",
-                  method: "POST",
-                  subsystem: "upload-storage",
-                },
-              );
-            }),
+            discardStagedBlob(request, "/api/v1/files/upload", storedName),
           ),
         );
       };
@@ -941,44 +948,55 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     const dimensions = measuredDimensions(isValidImage ? validation : null);
 
     // Re-check quota with actual file size before persisting
-    const resultOverQuota = await quotaRefusal(db, userId, safeResultBuffer.length);
+    const fileSize = safeResultBuffer.length;
+    const resultOverQuota = await quotaRefusal(db, userId, fileSize);
     if (resultOverQuota) return sendOverQuota(reply, resultOverQuota);
 
     // Persist to disk
     const storedName = await saveFile(safeResultBuffer, resultName);
 
-    // Create DB record
+    // Lock the quota rows, insert the version row, and charge storage_used in
+    // one transaction (#1537), matching /api/v1/files/upload (#1473).
     const id = randomUUID();
-    const fileSize = safeResultBuffer.length;
+    let committed:
+      | { row: typeof schema.userFiles.$inferSelect | undefined }
+      | { overQuota: string };
     try {
-      await db.insert(schema.userFiles).values({
-        id,
-        userId,
-        originalName: resultName,
-        storedName,
-        mimeType,
-        size: fileSize,
-        width: dimensions.width,
-        height: dimensions.height,
-        version: nextVersion,
-        parentId,
-        toolChain: newChain,
+      committed = await db.transaction(async (tx) => {
+        const overQuota = await quotaRefusal(tx, userId, fileSize, true);
+        if (overQuota) return { overQuota };
+        const [inserted] = await tx
+          .insert(schema.userFiles)
+          .values({
+            id,
+            userId,
+            originalName: resultName,
+            storedName,
+            mimeType,
+            size: fileSize,
+            width: dimensions.width,
+            height: dimensions.height,
+            version: nextVersion,
+            parentId,
+            toolChain: newChain,
+          })
+          .returning();
+        await tx
+          .update(schema.users)
+          .set({ storageUsed: sql`${schema.users.storageUsed} + ${fileSize}` })
+          .where(eq(schema.users.id, userId));
+        return { row: inserted };
       });
-    } catch {
-      return reply.status(409).send({ error: "Failed to save result record" });
+    } catch (err) {
+      await discardStagedBlob(request, "/api/v1/files/save-result", storedName);
+      throw err;
+    }
+    if ("overQuota" in committed) {
+      await discardStagedBlob(request, "/api/v1/files/save-result", storedName);
+      return sendOverQuota(reply, committed.overQuota);
     }
 
-    // Increment the user's pre-computed storage counter
-    if (userId) {
-      await db
-        .update(schema.users)
-        .set({ storageUsed: sql`${schema.users.storageUsed} + ${fileSize}` })
-        .where(eq(schema.users.id, userId));
-    }
-
-    const [row] = await db.select().from(schema.userFiles).where(eq(schema.userFiles.id, id));
-
-    return reply.status(201).send({ file: row ? serializeFile(row) : null });
+    return reply.status(201).send({ file: committed.row ? serializeFile(committed.row) : null });
   });
 
   app.log.info("User file routes registered");

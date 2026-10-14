@@ -332,6 +332,66 @@ describe("a staged blob that can't be discarded", () => {
       await Promise.all(hooks.savedNames.map((name) => deleteStoredFile(name)));
     }
   });
+
+  it("reports STAGED_DISCARD_FAILED and still answers 500 when save-result can't discard a failed commit's blob (#1537)", async () => {
+    const parentRes = await upload([png("parent.png")]);
+    expect(parentRes.statusCode).toBe(201);
+    const parentId = (JSON.parse(parentRes.body).files as { id: string }[])[0].id;
+    keptIds.push(parentId);
+    keptBlobs.push(...hooks.savedNames);
+    hooks.savedNames.length = 0;
+
+    const before = await dbState();
+    hooks.failDeleteOf = 1;
+    const realInsert = db.insert.bind(db);
+    vi.spyOn(db, "insert").mockImplementation(((table: unknown) => {
+      if (table === schema.userFiles) {
+        throw new Error("connection reset during save-result insert");
+      }
+      return realInsert(table as never);
+    }) as typeof db.insert);
+    const realTx = db.transaction.bind(db);
+    vi.spyOn(db, "transaction").mockImplementationOnce(((fn: Parameters<typeof realTx>[0]) =>
+      realTx(async (tx) => {
+        await fn(tx);
+        throw new Error("connection reset during save-result commit");
+      })) as typeof db.transaction);
+
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "parentId", content: parentId },
+        { name: "toolId", content: "resize" },
+        { name: "file", filename: "result.png", contentType: "image/png", content: PNG },
+      ]);
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        payload: body,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(await dbState()).toEqual(before);
+      expect(hooks.savedNames).toHaveLength(1);
+      expect(await survivingBlobs()).toEqual([hooks.savedNames[0]]);
+      expect(hooks.reportError).toHaveBeenCalledTimes(1);
+      expect(hooks.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "STAGED_DISCARD_FAILED",
+          cause: expect.objectContaining({ code: "EBUSY" }),
+        }),
+        expect.objectContaining({
+          source: "http",
+          route: "/api/v1/files/save-result",
+          method: "POST",
+          subsystem: "upload-storage",
+        }),
+      );
+    } finally {
+      hooks.failDeleteOf = 0;
+      await Promise.all(hooks.savedNames.map((name) => deleteStoredFile(name)));
+    }
+  });
 });
 
 // The web app tells a full library from an oversized file by this code

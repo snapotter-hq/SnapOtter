@@ -165,75 +165,75 @@ describe("a database fault in the quota check is a 500, not a 413 (#1473)", () =
   });
 });
 
+/**
+ * Lock a row the way a slow upload's commit would, in a transaction of its
+ * own, until release() is called.
+ */
+async function holdRowLock(table: "users" | "teams", id: string) {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let locked!: () => void;
+  const isLocked = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const done = db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT 1 FROM ${sql.identifier(table)} WHERE id = ${id} FOR UPDATE`);
+    locked();
+    await released;
+  });
+  await isLocked;
+  return async () => {
+    release();
+    await done;
+  };
+}
+
+async function sessionsWaitingOnALock(): Promise<number> {
+  const { rows } = await db.execute(
+    sql`SELECT count(*)::int AS n FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+  );
+  return Number((rows[0] as { n: number }).n);
+}
+
+/**
+ * Start the uploads while a row they need is locked, wait until both are
+ * queued on it (so both have passed every check that runs before the
+ * commit), then let them go. Deterministic: without the commit's locked
+ * re-check, both land.
+ */
+async function raceBehindLock(
+  release: () => Promise<void>,
+  uploads: Array<() => ReturnType<typeof upload>>,
+) {
+  let settled = 0;
+  const pending = uploads.map((start) =>
+    start().finally(() => {
+      settled++;
+    }),
+  );
+  let bothQueued = false;
+  try {
+    await vi.waitFor(
+      async () => {
+        if ((await sessionsWaitingOnALock()) >= uploads.length) {
+          bothQueued = true;
+          return;
+        }
+        if (settled === uploads.length) return;
+        throw new Error("the uploads haven't reached the lock yet");
+      },
+      { timeout: 10_000, interval: 20 },
+    );
+  } finally {
+    await release();
+  }
+  return { results: await Promise.all(pending), bothQueued };
+}
+
 describe("the quota holds under concurrent uploads (#1473)", () => {
-  /**
-   * Lock a row the way a slow upload's commit would, in a transaction of its
-   * own, until release() is called.
-   */
-  async function holdRowLock(table: "users" | "teams", id: string) {
-    let release!: () => void;
-    const released = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let locked!: () => void;
-    const isLocked = new Promise<void>((resolve) => {
-      locked = resolve;
-    });
-    const done = db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT 1 FROM ${sql.identifier(table)} WHERE id = ${id} FOR UPDATE`);
-      locked();
-      await released;
-    });
-    await isLocked;
-    return async () => {
-      release();
-      await done;
-    };
-  }
-
-  async function sessionsWaitingOnALock(): Promise<number> {
-    const { rows } = await db.execute(
-      sql`SELECT count(*)::int AS n FROM pg_stat_activity
-          WHERE datname = current_database() AND wait_event_type = 'Lock'`,
-    );
-    return Number((rows[0] as { n: number }).n);
-  }
-
-  /**
-   * Start the uploads while a row they need is locked, wait until both are
-   * queued on it (so both have passed every check that runs before the
-   * commit), then let them go. Deterministic: without the commit's locked
-   * re-check, both land.
-   */
-  async function raceBehindLock(
-    release: () => Promise<void>,
-    uploads: Array<() => ReturnType<typeof upload>>,
-  ) {
-    let settled = 0;
-    const pending = uploads.map((start) =>
-      start().finally(() => {
-        settled++;
-      }),
-    );
-    let bothQueued = false;
-    try {
-      await vi.waitFor(
-        async () => {
-          if ((await sessionsWaitingOnALock()) >= uploads.length) {
-            bothQueued = true;
-            return;
-          }
-          if (settled === uploads.length) return;
-          throw new Error("the uploads haven't reached the lock yet");
-        },
-        { timeout: 10_000, interval: 20 },
-      );
-    } finally {
-      await release();
-    }
-    return { results: await Promise.all(pending), bothQueued };
-  }
-
   it("refuses one of two uploads that each fit the user's quota but not together", async () => {
     const before = await libraryState([adminId]);
     await db
@@ -393,7 +393,7 @@ describe("a request the multipart parser rejects is a 4xx (#1473)", () => {
   });
 });
 
-describe("save-result answers quota refusals and faults the same way (#1473)", () => {
+describe("save-result answers quota refusals and faults the same way (#1473, #1537)", () => {
   let parentId: string;
 
   beforeAll(async () => {
@@ -402,16 +402,16 @@ describe("save-result answers quota refusals and faults the same way (#1473)", (
     parentId = JSON.parse(res.body).files[0].id;
   });
 
-  function saveResult() {
+  function saveResult(token = adminToken, targetParentId = parentId) {
     const { body, contentType } = createMultipartPayload([
-      { name: "parentId", content: parentId },
+      { name: "parentId", content: targetParentId },
       { name: "toolId", content: "resize" },
       { name: "file", filename: "result.png", contentType: "image/png", content: PNG },
     ]);
     return testApp.app.inject({
       method: "POST",
       url: "/api/v1/files/save-result",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      headers: { authorization: `Bearer ${token}`, "content-type": contentType },
       payload: body,
     });
   }
@@ -453,5 +453,131 @@ describe("save-result answers quota refusals and faults the same way (#1473)", (
     expect(JSON.parse(res.body).error).toMatch(/^Storage quota exceeded/);
     expect(JSON.parse(res.body).code).toBe("STORAGE_QUOTA_EXCEEDED");
     expect(hooks.savedNames).toEqual([]);
+  });
+
+  it("refuses one of two concurrent save-result calls that each fit the user's quota but not together (#1537)", async () => {
+    const before = await libraryState([adminId]);
+    await setAdminQuota((used) => used + PNG.length + Math.floor(PNG.length / 2));
+
+    const { results, bothQueued } = await raceBehindLock(await holdRowLock("users", adminId), [
+      () => saveResult(),
+      () => saveResult(),
+    ]);
+
+    expect(bothQueued, "both saves should queue on the user's row").toBe(true);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 413]);
+    const refused = results.find((r) => r.statusCode === 413);
+    expect(JSON.parse(refused?.body ?? "{}").error).toMatch(/^Storage quota exceeded/);
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("STORAGE_QUOTA_EXCEEDED");
+    expect(await libraryState([adminId])).toEqual({
+      rows: before.rows + 1,
+      storageUsed: before.storageUsed + PNG.length,
+    });
+    expect(hooks.savedNames).toHaveLength(2);
+    expect(await survivingBlobs()).toHaveLength(1);
+  });
+
+  it("refuses one of two members' concurrent save-result calls that each fit the team's quota but not together (#1537)", async () => {
+    const teamId = "t1537-save-quota";
+    await db.insert(schema.teams).values({ id: teamId, name: "Quota1537" }).onConflictDoNothing();
+    const first = await createUserAndLogin(testApp.app, "quota1537a");
+    const second = await createUserAndLogin(testApp.app, "quota1537b");
+    const members = [first.userId, second.userId];
+    await db.update(schema.users).set({ team: teamId }).where(inArray(schema.users.id, members));
+
+    const firstUpload = await upload(first.token, [png("p1.png")]);
+    const secondUpload = await upload(second.token, [png("p2.png")]);
+    expect(firstUpload.statusCode).toBe(201);
+    expect(secondUpload.statusCode).toBe(201);
+    const firstParentId = JSON.parse(firstUpload.body).files[0].id as string;
+    const secondParentId = JSON.parse(secondUpload.body).files[0].id as string;
+    hooks.savedNames.length = 0;
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`coalesce(sum(${schema.users.storageUsed}), 0)` })
+      .from(schema.users)
+      .where(eq(schema.users.team, teamId));
+    await db
+      .update(schema.teams)
+      .set({ storageQuota: Number(total) + PNG.length + Math.floor(PNG.length / 2) })
+      .where(eq(schema.teams.id, teamId));
+    const before = await libraryState(members);
+
+    const { results, bothQueued } = await raceBehindLock(await holdRowLock("teams", teamId), [
+      () => saveResult(first.token, firstParentId),
+      () => saveResult(second.token, secondParentId),
+    ]);
+
+    expect(bothQueued, "both saves should queue on the team's row").toBe(true);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([201, 413]);
+    const refused = results.find((r) => r.statusCode === 413);
+    expect(JSON.parse(refused?.body ?? "{}").error).toMatch(/^Team storage quota exceeded/);
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("STORAGE_QUOTA_EXCEEDED");
+    expect(await libraryState(members)).toEqual({
+      rows: before.rows + 1,
+      storageUsed: before.storageUsed + PNG.length,
+    });
+    expect(hooks.savedNames).toHaveLength(2);
+    expect(await survivingBlobs()).toHaveLength(1);
+  });
+
+  it("answers 500 (not 409) and deletes the blob when inserting the user_files row fails (#1537)", async () => {
+    const before = await libraryState([adminId]);
+    const realInsert = db.insert.bind(db);
+    vi.spyOn(db, "insert").mockImplementation(((table: unknown) => {
+      if (table === schema.userFiles) {
+        throw new Error("connection terminated during insert");
+      }
+      return realInsert(table as never);
+    }) as typeof db.insert);
+    const realTx = db.transaction.bind(db);
+    vi.spyOn(db, "transaction").mockImplementationOnce(((fn: Parameters<typeof realTx>[0]) =>
+      realTx(async (tx) => {
+        const realTxInsert = tx.insert.bind(tx);
+        vi.spyOn(tx, "insert").mockImplementation(((table: unknown) => {
+          if (table === schema.userFiles) {
+            throw new Error("connection terminated during insert");
+          }
+          return realTxInsert(table as never);
+        }) as typeof tx.insert);
+        return fn(tx);
+      })) as typeof db.transaction);
+
+    const res = await saveResult();
+
+    expect(res.statusCode).toBe(500);
+    expect(await libraryState([adminId])).toEqual(before);
+    expect(hooks.savedNames).toHaveLength(1);
+    expect(await survivingBlobs()).toEqual([]);
+  });
+
+  it("rolls back the inserted row and deletes the blob when charging storage_used fails (#1537)", async () => {
+    const before = await libraryState([adminId]);
+    const realUpdate = db.update.bind(db);
+    vi.spyOn(db, "update").mockImplementation(((table: unknown) => {
+      if (table === schema.users) {
+        throw new Error("connection terminated during storage_used update");
+      }
+      return realUpdate(table as never);
+    }) as typeof db.update);
+    const realTx = db.transaction.bind(db);
+    vi.spyOn(db, "transaction").mockImplementationOnce(((fn: Parameters<typeof realTx>[0]) =>
+      realTx(async (tx) => {
+        const realTxUpdate = tx.update.bind(tx);
+        vi.spyOn(tx, "update").mockImplementation(((table: unknown) => {
+          if (table === schema.users) {
+            throw new Error("connection terminated during storage_used update");
+          }
+          return realTxUpdate(table as never);
+        }) as typeof tx.update);
+        return fn(tx);
+      })) as typeof db.transaction);
+
+    const res = await saveResult();
+
+    expect(res.statusCode).toBe(500);
+    expect(await libraryState([adminId])).toEqual(before);
+    expect(hooks.savedNames).toHaveLength(1);
+    expect(await survivingBlobs()).toEqual([]);
   });
 });
