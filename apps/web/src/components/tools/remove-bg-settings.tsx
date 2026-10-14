@@ -722,6 +722,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     decontaminate: boolean;
   } | null>(null);
   const runFileRef = useRef<File | null>(null);
+  const expiredRerunInFlightRef = useRef(false);
   const [applyingEffects, setApplyingEffects] = useState(false);
   const [effectsError, setEffectsError] = useState<string | null>(null);
 
@@ -780,6 +781,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     Boolean(downloadUrl) &&
     files.length === 1 &&
     files[0] === bgResultFile;
+  const bgRemovedRef = useRef(bgRemoved);
+  bgRemovedRef.current = bgRemoved;
 
   // The result was made with a different model or refinements than the controls
   // now show. After a remount (for example, crossing the mobile/desktop layout
@@ -890,6 +893,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // Phase 1: Run AI background removal
   const handleRemoveBg = () => {
     // Reset Phase 2 state
+    expiredRerunInFlightRef.current = false;
     setBgJobId(null);
     setBgFilename(null);
     setBgOriginalUrl(null);
@@ -950,6 +954,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       setBgResultFile(loaded);
       setBgJobId(jobId);
       // A fresh removal settles any "expired, running again" note (#2119).
+      expiredRerunInFlightRef.current = false;
       setEffectsError(null);
       // Derive the cached filenames from the mask filename
       const baseName = filename.replace(/_mask\.png$|_nobg\.png$/, "");
@@ -963,8 +968,28 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // A removal that failed or was cancelled leaves its own error on screen; the
   // "expired, running again" note would sit beside it saying otherwise (#2119).
   useEffect(() => {
-    if (error) setEffectsError(null);
+    if (error) {
+      expiredRerunInFlightRef.current = false;
+      setEffectsError(null);
+    }
   }, [error]);
+
+  // Undo or a file swap discards the Phase 1 cutout, so any Phase 2 error from
+  // it has to clear too, while keeping the 410 expired notice up for the file
+  // whose automatic re-run is still in flight (#2490).
+  useEffect(() => {
+    if (bgRemoved) return;
+    if (
+      expiredRerunInFlightRef.current &&
+      (processing || Boolean(downloadUrl)) &&
+      files.length === 1 &&
+      files[0] === runFileRef.current
+    ) {
+      return;
+    }
+    expiredRerunInFlightRef.current = false;
+    setEffectsError(null);
+  }, [bgRemoved, processing, downloadUrl, files]);
 
   // Phase 2: Apply effects and download
   const handleDownloadWithEffects = async () => {
@@ -1019,11 +1044,13 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         // (#2119). Remove the background again so effects have something to
         // read; the note holds until that run's result arrives.
         if (body?.code === "BACKGROUND_REMOVAL_EXPIRED") {
-          // The user may have swapped the file while this request ran; the
-          // removal below would then upload the old one into the new entry.
+          // The user may have swapped the file or undone the cutout while this
+          // request ran; the removal below would then upload the old one into
+          // the new entry or restart an undone run (#2490).
           const live = useFileStore.getState().files;
-          if (live.length === 0 || live[0] !== files[0]) return;
+          if (live.length !== 1 || live[0] !== files[0] || !bgRemovedRef.current) return;
           handleRemoveBg();
+          expiredRerunInFlightRef.current = true;
           setEffectsError(t.toolSettings["remove-background"].effectsExpired);
           return;
         }
@@ -1054,11 +1081,14 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       a.click();
       document.body.removeChild(a);
     } catch (err) {
-      setEffectsError(
-        err instanceof Error
-          ? err.message
-          : t.toolSettings["remove-background"].effectsProcessingFailed,
-      );
+      const live = useFileStore.getState().files;
+      if (live.length === 1 && live[0] === files[0] && bgRemovedRef.current) {
+        setEffectsError(
+          err instanceof Error
+            ? err.message
+            : t.toolSettings["remove-background"].effectsProcessingFailed,
+        );
+      }
     } finally {
       setApplyingEffects(false);
     }

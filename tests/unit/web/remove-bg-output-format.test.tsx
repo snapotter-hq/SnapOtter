@@ -474,4 +474,121 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     expect(deployment.processFiles).not.toHaveBeenCalled();
     expect(screen.queryByText(note())).toBeNull();
   });
+
+  it("clears a Phase 2 effectsError when Undo clears the cutout (#2490)", async () => {
+    const view = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    // Undo clears the entry's processed URL without starting a new removal.
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+
+    expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("clears a Phase 2 effectsError when the loaded file is replaced (#2490)", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([new File([new Uint8Array([4, 5, 6])], "other.png", { type: "image/png" })]);
+    });
+
+    expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("clears the 410 expired notice if the file is replaced while the automatic re-run is in flight (#2490)", async () => {
+    await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([new File([new Uint8Array([4, 5, 6])], "other.png", { type: "image/png" })]);
+    });
+
+    expect(screen.queryByText(note())).toBeNull();
+  });
+
+  it("clears the 410 expired notice if Undo clears the state while the automatic re-run is in flight (#2490)", async () => {
+    const view = await applyEffects(expired);
+    expect(await screen.findByText(note())).toBeVisible();
+
+    // Real in-flight re-run state: processedUrl is cleared while processing is true.
+    deployment.beforeRun = true;
+    deployment.processing = true;
+    view.rerender(<RemoveBgSettings />);
+    expect(screen.getByText(note())).toBeVisible();
+
+    // Undo / reset clears processing with no result URL.
+    deployment.processing = false;
+    view.rerender(<RemoveBgSettings />);
+
+    expect(screen.queryByText(note())).toBeNull();
+  });
+
+  it("clears effectsError when a second file is added and keeps it cleared when removed (#2490)", async () => {
+    await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new Uint8Array([4, 5, 6])], "second.png", { type: "image/png" })]);
+    });
+
+    expect(screen.queryByText("disk on fire")).toBeNull();
+
+    // Removing the second file restores the original single-file cutout without bringing back the old error.
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(screen.getByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("does not surface an in-flight Phase 2 error or 410 re-run if Undo ran before the response arrived (#2490)", async () => {
+    let answer!: (response: unknown) => void;
+    const fetch = vi.fn().mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    vi.stubGlobal("fetch", fetch);
+    const view = render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    // User clicks Undo while the effects request is still in flight.
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+
+    await act(async () => {
+      answer({ ok: false, status: 500, json: async () => ({ error: "late 500" }) });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText("late 500")).toBeNull();
+
+    // Restore the cutout, start another effects request, Undo while in flight, and settle with 410.
+    fetch.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    deployment.beforeRun = false;
+    view.rerender(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+    deployment.beforeRun = true;
+    view.rerender(<RemoveBgSettings />);
+
+    await act(async () => {
+      answer({ ok: false, status: 410, json: async () => expired.body });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(deployment.processFiles).not.toHaveBeenCalled();
+    expect(screen.queryByText(note())).toBeNull();
+  });
 });
