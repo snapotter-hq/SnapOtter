@@ -1867,6 +1867,8 @@ export const ja: TranslationKeys = {
         "以前の背景除去の有効期限が切れたため、再実行しています。完了したらエフェクトを適用してください。",
       refineChanged:
         "被写体、品質、エッジの平滑化、色の汚染除去は、背景を削除するときに適用されます。新しい設定を使うには、もう一度実行してください。",
+      backgroundImageRequired: "続行するには背景画像を選択してください。",
+      invalidHexColor: "#FF5500 や #F50 のような 16 進数のカラーコードを入力してください。",
     },
     "remove-gif-background": {
       quality: "品質",

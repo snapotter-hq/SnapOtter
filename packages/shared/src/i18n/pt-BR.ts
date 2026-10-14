@@ -1914,6 +1914,8 @@ export const ptBR: TranslationKeys = {
         "A remoção de fundo anterior expirou, então está sendo executada de novo. Aplique os efeitos quando terminar.",
       refineChanged:
         "O assunto, a qualidade, a suavização de bordas e a descontaminação de cor são aplicados quando o fundo é removido. Execute novamente para usar as novas configurações.",
+      backgroundImageRequired: "Escolha uma imagem de fundo para continuar.",
+      invalidHexColor: "Use uma cor hexadecimal como #FF5500 ou #F50.",
     },
     "remove-gif-background": {
       quality: "Qualidade",

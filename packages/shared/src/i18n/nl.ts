@@ -1916,6 +1916,8 @@ export const nl: TranslationKeys = {
         "De eerdere achtergrondverwijdering is verlopen, dus die wordt opnieuw uitgevoerd. Pas de effecten toe zodra dat klaar is.",
       refineChanged:
         "Onderwerp, kwaliteit, randverzachting en kleurdecontaminatie worden toegepast bij het verwijderen van de achtergrond. Voer het opnieuw uit om de nieuwe instellingen te gebruiken.",
+      backgroundImageRequired: "Kies een achtergrondafbeelding om door te gaan.",
+      invalidHexColor: "Gebruik een hex-kleur zoals #FF5500 of #F50.",
     },
     "remove-gif-background": {
       quality: "Kwaliteit",

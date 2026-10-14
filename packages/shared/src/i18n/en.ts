@@ -1856,6 +1856,8 @@ export const en = {
         "The earlier background removal expired, so it is being run again. Apply the effects once it's done.",
       refineChanged:
         "Subject, quality, edge smoothing, and color decontamination are applied when the background is removed. Run it again to use the new settings.",
+      backgroundImageRequired: "Choose a background image to continue.",
+      invalidHexColor: "Use a hex color such as #FF5500 or #F50.",
     },
     "remove-gif-background": {
       quality: "Quality",

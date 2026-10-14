@@ -1900,6 +1900,8 @@ export const es: TranslationKeys = {
         "La eliminación de fondo anterior caducó, así que se está ejecutando de nuevo. Aplica los efectos cuando termine.",
       refineChanged:
         "El sujeto, la calidad, el suavizado de bordes y la descontaminación de color se aplican al quitar el fondo. Vuelve a ejecutarlo para usar los nuevos ajustes.",
+      backgroundImageRequired: "Elige una imagen de fondo para continuar.",
+      invalidHexColor: "Usa un color hexadecimal como #FF5500 o #F50.",
     },
     "remove-gif-background": {
       quality: "Calidad",

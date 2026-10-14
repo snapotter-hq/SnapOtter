@@ -1908,6 +1908,8 @@ export const id: TranslationKeys = {
         "Penghapusan latar belakang sebelumnya sudah kedaluwarsa, jadi sedang dijalankan ulang. Terapkan efek setelah selesai.",
       refineChanged:
         "Subjek, kualitas, penghalusan tepi, dan dekontaminasi warna diterapkan saat latar belakang dihapus. Jalankan lagi untuk memakai pengaturan baru.",
+      backgroundImageRequired: "Pilih gambar latar belakang untuk melanjutkan.",
+      invalidHexColor: "Gunakan warna heksadesimal seperti #FF5500 atau #F50.",
     },
     "remove-gif-background": {
       quality: "Kualitas",

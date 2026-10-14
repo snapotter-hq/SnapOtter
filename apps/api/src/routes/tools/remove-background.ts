@@ -6,6 +6,7 @@ import { removeBackground } from "@snapotter/ai";
 import {
   BG_REMOVAL_MODELS,
   getBundleForTool,
+  HEX_COLOR_PATTERN,
   hasServerErrorStatus,
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
@@ -25,7 +26,6 @@ import {
   applyEffects,
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
-  HEX_COLOR_PATTERN,
 } from "../../lib/bg-effects.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";

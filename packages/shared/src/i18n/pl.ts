@@ -1914,6 +1914,8 @@ export const pl: TranslationKeys = {
         "Poprzednie usuwanie tła wygasło, więc jest uruchamiane ponownie. Zastosuj efekty, gdy się zakończy.",
       refineChanged:
         "Obiekt, jakość, wygładzanie krawędzi i dekontaminacja kolorów są stosowane podczas usuwania tła. Uruchom usuwanie ponownie, aby użyć nowych ustawień.",
+      backgroundImageRequired: "Wybierz obraz tła, aby kontynuować.",
+      invalidHexColor: "Użyj koloru szesnastkowego, np. #FF5500 lub #F50.",
     },
     "remove-gif-background": {
       quality: "Jakość",

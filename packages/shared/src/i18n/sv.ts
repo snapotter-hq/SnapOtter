@@ -1907,6 +1907,8 @@ export const sv: TranslationKeys = {
         "Den tidigare bakgrundsborttagningen har gått ut, så den körs igen. Tillämpa effekterna när den är klar.",
       refineChanged:
         "Motiv, kvalitet, kantutjämning och färgdekontaminering tillämpas när bakgrunden tas bort. Kör borttagningen igen för att använda de nya inställningarna.",
+      backgroundImageRequired: "Välj en bakgrundsbild för att fortsätta.",
+      invalidHexColor: "Använd en hex-färg som #FF5500 eller #F50.",
     },
     "remove-gif-background": {
       quality: "Kvalitet",

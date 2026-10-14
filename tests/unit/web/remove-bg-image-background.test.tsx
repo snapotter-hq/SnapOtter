@@ -5,15 +5,19 @@ import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const processor = vi.hoisted(() => ({ processAllFiles: vi.fn() }));
+const processor = vi.hoisted(() => ({
+  processFiles: vi.fn(),
+  processAllFiles: vi.fn(),
+  downloadUrl: null as string | null,
+}));
 
 vi.mock("@/hooks/use-tool-processor", () => ({
   useToolProcessor: () => ({
-    processFiles: vi.fn(),
+    processFiles: processor.processFiles,
     processAllFiles: processor.processAllFiles,
     processing: false,
     error: null,
-    downloadUrl: null,
+    downloadUrl: processor.downloadUrl,
     originalSize: null,
     processedSize: null,
     progress: { phase: "idle", percent: 0, stage: "", elapsed: 0 },
@@ -34,11 +38,14 @@ const png = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type
 beforeEach(() => {
   URL.createObjectURL = vi.fn(() => "blob:mock");
   URL.revokeObjectURL = vi.fn();
+  processor.processFiles.mockClear();
   processor.processAllFiles.mockClear();
+  processor.downloadUrl = null;
 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   useFileStore.getState().setFiles([]);
 });
 
@@ -116,5 +123,136 @@ describe("remove-background image background option (#2074)", () => {
 
     act(() => useFileStore.getState().setFiles([png("a.png")]));
     expect(screen.getByRole("button", { name: imageLabel })).toBeInTheDocument();
+  });
+});
+
+describe("remove-background incomplete image and invalid color validation (#2280)", () => {
+  it("disables Download and shows a hint when Image background has no file, then enables once chosen", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    processor.downloadUrl = "/api/v1/download/JOB123/a_mask.png";
+    useFileStore.getState().setFiles([png("a.png")]);
+
+    render(<RemoveBgSettings />);
+    await screen.findByTestId("remove-background-download");
+
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+
+    const downloadBtn = await screen.findByTestId("remove-background-download-effects");
+    expect(downloadBtn).toBeDisabled();
+    expect(
+      screen.getByText(en.toolSettings["remove-background"].backgroundImageRequired),
+    ).toBeVisible();
+
+    fireEvent.click(downloadBtn);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [png("bg.png")] } });
+
+    expect(
+      screen.queryByText(en.toolSettings["remove-background"].backgroundImageRequired),
+    ).toBeNull();
+    expect(downloadBtn).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].remove }));
+    expect(
+      screen.getByText(en.toolSettings["remove-background"].backgroundImageRequired),
+    ).toBeVisible();
+    expect(downloadBtn).toBeDisabled();
+  });
+
+  it("disables Submit before Phase 1 when Image background has no file or Color is invalid", () => {
+    useFileStore.getState().setFiles([png("a.png")]);
+    render(<RemoveBgSettings />);
+
+    const submitBtn = screen.getByTestId("remove-background-submit");
+    expect(submitBtn).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+    expect(submitBtn).toBeDisabled();
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [png("bg.png")] } });
+    expect(submitBtn).toBeEnabled();
+
+    // Switching to Color and typing an invalid hex also disables Phase 1 Submit
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].color }));
+    const colorInput = screen.getByPlaceholderText("#FF5500");
+    fireEvent.change(colorInput, { target: { value: "#FF" } });
+    expect(submitBtn).toBeDisabled();
+
+    // Switching away to Transparent while bgColor holds "#FF" must not crash and re-enables Submit
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].transparent }));
+    expect(submitBtn).toBeEnabled();
+  });
+
+  it("validates the free-text color input, disables Download/Rerun on invalid hex, and normalizes CSS preview", async () => {
+    const onBgPreview = vi.fn();
+    processor.downloadUrl = "/api/v1/download/JOB123/a_mask.png";
+    useFileStore.getState().setFiles([png("a.png")]);
+
+    render(<RemoveBgSettings onBgPreview={onBgPreview} />);
+    await screen.findByTestId("remove-background-download");
+
+    // Change Subject so the Phase 2 rerun button appears
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    const rerunBtn = screen.getByTestId("remove-background-rerun");
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].color }));
+    const colorInput = screen.getByPlaceholderText("#FF5500");
+    const downloadBtn = await screen.findByTestId("remove-background-download-effects");
+
+    // Half-typed hex color (#FF)
+    fireEvent.change(colorInput, { target: { value: "#FF" } });
+    expect(colorInput).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(en.toolSettings["remove-background"].invalidHexColor)).toBeVisible();
+    expect(downloadBtn).toBeDisabled();
+    expect(rerunBtn).toBeDisabled();
+    expect(onBgPreview).toHaveBeenLastCalledWith({ showCheckerboard: true });
+
+    // Empty string (must not fall back to #FFFFFF and look valid)
+    fireEvent.change(colorInput, { target: { value: "" } });
+    expect(colorInput).toHaveAttribute("aria-invalid", "true");
+    expect(downloadBtn).toBeDisabled();
+    expect(rerunBtn).toBeDisabled();
+    expect(onBgPreview).toHaveBeenLastCalledWith({ showCheckerboard: true });
+
+    // Valid 3-digit shorthand and hashless 6-digit hex accepted by HEX_COLOR_PATTERN
+    fireEvent.change(colorInput, { target: { value: "FF5500" } });
+    expect(colorInput).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText(en.toolSettings["remove-background"].invalidHexColor)).toBeNull();
+    expect(downloadBtn).toBeEnabled();
+    expect(rerunBtn).toBeEnabled();
+    expect(onBgPreview).toHaveBeenLastCalledWith({ containerBackground: "#ff5500" });
+
+    fireEvent.change(colorInput, { target: { value: "#F50" } });
+    expect(colorInput).toHaveAttribute("aria-invalid", "false");
+    expect(downloadBtn).toBeEnabled();
+    expect(onBgPreview).toHaveBeenLastCalledWith({ containerBackground: "#ff5500" });
+
+    // Surrounding whitespace is trimmed just like the server's hexColor schema
+    fireEvent.change(colorInput, { target: { value: " #00AAFF " } });
+    expect(colorInput).toHaveAttribute("aria-invalid", "false");
+    expect(downloadBtn).toBeEnabled();
+    expect(onBgPreview).toHaveBeenLastCalledWith({ containerBackground: "#00aaff" });
+  });
+
+  it.each([
+    { gradientColor1: "not-hex", gradientColor2: "#764ba2" },
+    { gradientColor1: "#667eea", gradientColor2: "not-hex" },
+  ])("shows an inline error when a seeded gradient color is invalid (%o)", (stops) => {
+    render(
+      <RemoveBgControls
+        settings={{
+          backgroundType: "gradient",
+          ...stops,
+        }}
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByText(en.toolSettings["remove-background"].invalidHexColor)).toBeVisible();
   });
 });

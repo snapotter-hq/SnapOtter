@@ -1913,6 +1913,8 @@ export const tr: TranslationKeys = {
         "Önceki arka plan kaldırma işleminin süresi doldu, bu yüzden yeniden çalıştırılıyor. Bittiğinde efektleri uygulayın.",
       refineChanged:
         "Konu, kalite, kenar yumuşatma ve renk arındırma, arka plan kaldırılırken uygulanır. Yeni ayarları kullanmak için yeniden çalıştırın.",
+      backgroundImageRequired: "Devam etmek için bir arka plan görseli seçin.",
+      invalidHexColor: "#FF5500 veya #F50 gibi bir onaltılık renk kullanın.",
     },
     "remove-gif-background": {
       quality: "Kalite",

@@ -1,3 +1,4 @@
+import { HEX_COLOR_PATTERN, normalizeHexColor } from "@snapotter/shared";
 import {
   ChevronDown,
   ChevronRight,
@@ -237,6 +238,18 @@ export function RemoveBgControls({
   const [gradColor2, setGradColor2] = useState(seed.gradColor2);
   const [gradAngle, setGradAngle] = useState(seed.gradAngle);
   const [bgImageFile, setBgImageFile] = useState<File | null>(seed.bgImageFile);
+
+  const trimmedBgColor = bgColor.trim();
+  const trimmedGradColor1 = gradColor1.trim();
+  const trimmedGradColor2 = gradColor2.trim();
+  const isValidBgColor = HEX_COLOR_PATTERN.test(trimmedBgColor);
+  const isValidGradColor1 = HEX_COLOR_PATTERN.test(trimmedGradColor1);
+  const isValidGradColor2 = HEX_COLOR_PATTERN.test(trimmedGradColor2);
+  const isValidGradColor = isValidGradColor1 && isValidGradColor2;
+  const isImageValid = bgImageFile !== null;
+  const normalizedBgColor = isValidBgColor ? normalizeHexColor(trimmedBgColor) : null;
+  const normalizedGradColor1 = isValidGradColor1 ? normalizeHexColor(trimmedGradColor1) : null;
+  const normalizedGradColor2 = isValidGradColor2 ? normalizeHexColor(trimmedGradColor2) : null;
 
   // Effects
   const [blurEnabled, setBlurEnabled] = useState(seed.blurEnabled);
@@ -482,13 +495,17 @@ export function RemoveBgControls({
           <BgTypeButton
             active={bgType === "color"}
             onClick={() => setBgType("color")}
-            color={bgColor}
+            color={normalizedBgColor ?? undefined}
             label={t.toolSettings["remove-bg"].color}
           />
           <BgTypeButton
             active={bgType === "gradient"}
             onClick={() => setBgType("gradient")}
-            gradient={{ color1: gradColor1, color2: gradColor2 }}
+            gradient={
+              normalizedGradColor1 && normalizedGradColor2
+                ? { color1: normalizedGradColor1, color2: normalizedGradColor2 }
+                : undefined
+            }
             label={t.toolSettings["remove-bg"].gradient}
           />
           {allowImageBackground && (
@@ -511,7 +528,9 @@ export function RemoveBgControls({
                   type="button"
                   onClick={() => setBgColor(preset.color)}
                   className={`w-7 h-7 rounded border-2 transition-all ${
-                    bgColor === preset.color ? "border-primary scale-110" : "border-border"
+                    normalizedBgColor === preset.color.toLowerCase()
+                      ? "border-primary scale-110"
+                      : "border-border"
                   }`}
                   style={{ backgroundColor: preset.color }}
                   title={t.toolSettings["remove-background"].colorPresets[preset.id]}
@@ -521,7 +540,7 @@ export function RemoveBgControls({
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={bgColor}
+                value={normalizedBgColor ?? "#ffffff"}
                 onChange={(e) => setBgColor(e.target.value)}
                 className="w-7 h-7 rounded border border-border cursor-pointer"
               />
@@ -530,9 +549,17 @@ export function RemoveBgControls({
                 value={bgColor}
                 onChange={(e) => setBgColor(e.target.value)}
                 placeholder="#FF5500"
-                className="flex-1 px-2 py-1 rounded border border-border bg-background text-xs text-foreground"
+                aria-invalid={!isValidBgColor}
+                className={`flex-1 px-2 py-1 rounded border bg-background text-xs text-foreground ${
+                  !isValidBgColor ? "border-destructive" : "border-border"
+                }`}
               />
             </div>
+            {!isValidBgColor && (
+              <p className="text-xs text-destructive-ink">
+                {t.toolSettings["remove-background"].invalidHexColor}
+              </p>
+            )}
           </div>
         )}
 
@@ -549,7 +576,8 @@ export function RemoveBgControls({
                     setGradColor2(preset.color2);
                   }}
                   className={`w-7 h-7 rounded border-2 transition-all ${
-                    gradColor1 === preset.color1 && gradColor2 === preset.color2
+                    normalizedGradColor1 === preset.color1.toLowerCase() &&
+                    normalizedGradColor2 === preset.color2.toLowerCase()
                       ? "border-primary scale-110"
                       : "border-border"
                   }`}
@@ -563,7 +591,7 @@ export function RemoveBgControls({
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={gradColor1}
+                value={normalizedGradColor1 ?? "#667eea"}
                 onChange={(e) => setGradColor1(e.target.value)}
                 className="w-7 h-7 rounded border border-border cursor-pointer"
                 title={t.toolSettings["remove-bg"].startColor}
@@ -573,12 +601,17 @@ export function RemoveBgControls({
               </span>
               <input
                 type="color"
-                value={gradColor2}
+                value={normalizedGradColor2 ?? "#764ba2"}
                 onChange={(e) => setGradColor2(e.target.value)}
                 className="w-7 h-7 rounded border border-border cursor-pointer"
                 title={t.toolSettings["remove-bg"].endColor}
               />
             </div>
+            {!isValidGradColor && (
+              <p className="text-xs text-destructive-ink">
+                {t.toolSettings["remove-background"].invalidHexColor}
+              </p>
+            )}
             <div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">
@@ -600,7 +633,7 @@ export function RemoveBgControls({
 
         {/* Image upload */}
         {bgType === "image" && (
-          <div className="ps-1">
+          <div className="space-y-1.5 ps-1">
             {bgImageFile ? (
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-foreground truncate flex-1">{bgImageFile.name}</span>
@@ -613,19 +646,26 @@ export function RemoveBgControls({
                 </button>
               </div>
             ) : (
-              <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-xs text-muted-foreground cursor-pointer hover:border-primary/50 hover:text-foreground transition-colors">
-                <Upload className="h-3.5 w-3.5" />
-                {t.toolSettings["remove-bg"].chooseBackgroundImage}
-                <input
-                  type="file"
-                  accept="image/*,.avif,.heic,.heif,.hif"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setBgImageFile(file);
-                  }}
-                />
-              </label>
+              <>
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-xs text-muted-foreground cursor-pointer hover:border-primary/50 hover:text-foreground transition-colors">
+                  <Upload className="h-3.5 w-3.5" />
+                  {t.toolSettings["remove-bg"].chooseBackgroundImage}
+                  <input
+                    type="file"
+                    accept="image/*,.avif,.heic,.heif,.hif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setBgImageFile(file);
+                    }}
+                  />
+                </label>
+                {!isImageValid && (
+                  <p className="text-xs text-muted-foreground">
+                    {t.toolSettings["remove-background"].backgroundImageRequired}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
@@ -962,6 +1002,22 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     }
   }, [settings._bgImageFile]);
 
+  const bgType = (settings.backgroundType as string | undefined) ?? "transparent";
+  const bgColor =
+    typeof settings.backgroundColor === "string" ? settings.backgroundColor.trim() : "";
+  const gradColor1 =
+    typeof settings.gradientColor1 === "string" ? settings.gradientColor1.trim() : "";
+  const gradColor2 =
+    typeof settings.gradientColor2 === "string" ? settings.gradientColor2.trim() : "";
+  const bgImageFile = settings._bgImageFile instanceof File ? settings._bgImageFile : undefined;
+
+  const isValidBgColor = bgType !== "color" || HEX_COLOR_PATTERN.test(bgColor);
+  const isValidGradColor =
+    bgType !== "gradient" ||
+    (HEX_COLOR_PATTERN.test(gradColor1) && HEX_COLOR_PATTERN.test(gradColor2));
+  const isImageValid = bgType !== "image" || bgImageFile !== undefined;
+  const isInputValid = isValidBgColor && isValidGradColor && isImageValid;
+
   const hasFile = files.length > 0;
   // A result counts while its file is the one loaded and the processor still
   // holds it: Undo clears the processed URL and has to take Phase 2 with it.
@@ -1017,7 +1073,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   useEffect(() => {
     if (!bgRemoved || !onBgPreview) return;
 
-    const bgType = (settings.backgroundType as string) || "transparent";
     const blurEnabled = settings.blurEnabled as boolean;
     const blurIntensity = (settings.blurIntensity as number) ?? 50;
     const shadowEnabled = settings.shadowEnabled as boolean;
@@ -1040,11 +1095,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     } else if (blurEnabled && (bgType === "transparent" || bgType === "blur")) {
       preview.backgroundSrc = bgOriginalUrl || undefined;
       preview.backgroundBlur = `blur(${sigma}px)`;
-    } else if (bgType === "color") {
-      preview.containerBackground = (settings.backgroundColor as string) || "#FFFFFF";
-    } else if (bgType === "gradient") {
-      const c1 = (settings.gradientColor1 as string) || "#667eea";
-      const c2 = (settings.gradientColor2 as string) || "#764ba2";
+    } else if (bgType === "color" && isValidBgColor) {
+      preview.containerBackground = normalizeHexColor(bgColor);
+    } else if (bgType === "gradient" && isValidGradColor) {
+      const c1 = normalizeHexColor(gradColor1);
+      const c2 = normalizeHexColor(gradColor2);
       const angle = (settings.gradientAngle as number) ?? 180;
       preview.containerBackground = `linear-gradient(${angle}deg, ${c1}, ${c2})`;
     } else {
@@ -1062,10 +1117,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     onBgPreview(preview);
   }, [
     bgRemoved,
-    settings.backgroundType,
-    settings.backgroundColor,
-    settings.gradientColor1,
-    settings.gradientColor2,
+    bgType,
+    bgColor,
+    gradColor1,
+    gradColor2,
+    isValidBgColor,
+    isValidGradColor,
     settings.gradientAngle,
     settings.blurEnabled,
     settings.blurIntensity,
@@ -1185,7 +1242,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
   // Phase 2: Apply effects and download
   const handleDownloadWithEffects = async () => {
-    if (!bgRemoved || !bgJobId || !bgFilename) return;
+    if (!bgRemoved || !bgJobId || !bgFilename || !isInputValid) return;
 
     // Library file this run derives from (when opened from the file library):
     // the effects request is the FINAL step, so it carries the save choice.
@@ -1331,7 +1388,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
           type="button"
           data-testid="remove-background-submit"
           onClick={handleRemoveBg}
-          disabled={!hasFile || processing}
+          disabled={!hasFile || processing || !isInputValid}
           className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {files.length > 1
@@ -1359,7 +1416,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
                 onClick={handleRemoveBg}
                 // Mid-request it would drop the result the effects request is
                 // still rendering from.
-                disabled={applyingEffects}
+                disabled={applyingEffects || !isInputValid}
                 className="w-full py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t.toolSettings["remove-background"].submit}
@@ -1371,7 +1428,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
               type="button"
               data-testid="remove-background-download-effects"
               onClick={handleDownloadWithEffects}
-              disabled={applyingEffects}
+              disabled={applyingEffects || !isInputValid}
               className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Download className="h-4 w-4" />

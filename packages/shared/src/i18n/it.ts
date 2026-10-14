@@ -1913,6 +1913,8 @@ export const it: TranslationKeys = {
         "La rimozione dello sfondo precedente è scaduta, quindi viene eseguita di nuovo. Applica gli effetti quando ha finito.",
       refineChanged:
         "Il soggetto, la qualità, la levigatura dei bordi e la decontaminazione del colore vengono applicati quando lo sfondo viene rimosso. Eseguila di nuovo per usare le nuove impostazioni.",
+      backgroundImageRequired: "Scegli un'immagine di sfondo per continuare.",
+      invalidHexColor: "Usa un colore esadecimale come #FF5500 o #F50.",
     },
     "remove-gif-background": {
       quality: "Qualità",

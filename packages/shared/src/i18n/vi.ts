@@ -1910,6 +1910,8 @@ export const vi: TranslationKeys = {
         "Lần xóa nền trước đã hết hạn nên đang được chạy lại. Hãy áp dụng hiệu ứng khi xong.",
       refineChanged:
         "Chủ thể, chất lượng, làm mịn viền và khử nhiễm màu được áp dụng khi xóa nền. Hãy chạy lại để dùng các cài đặt mới.",
+      backgroundImageRequired: "Hãy chọn ảnh nền để tiếp tục.",
+      invalidHexColor: "Hãy dùng mã màu hex như #FF5500 hoặc #F50.",
     },
     "remove-gif-background": {
       quality: "Chất lượng",

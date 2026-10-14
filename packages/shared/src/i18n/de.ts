@@ -1920,6 +1920,8 @@ export const de: TranslationKeys = {
         "Die frühere Hintergrundentfernung ist abgelaufen und wird daher erneut ausgeführt. Wenden Sie die Effekte an, sobald sie fertig ist.",
       refineChanged:
         "Motiv, Qualität, Kantenglättung und Farbdekontamination werden beim Entfernen des Hintergrunds angewendet. Führen Sie die Entfernung erneut aus, um die neuen Einstellungen zu verwenden.",
+      backgroundImageRequired: "Wählen Sie ein Hintergrundbild aus, um fortzufahren.",
+      invalidHexColor: "Verwenden Sie eine Hex-Farbe wie #FF5500 oder #F50.",
     },
     "remove-gif-background": {
       quality: "Qualität",

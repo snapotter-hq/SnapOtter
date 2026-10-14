@@ -1920,6 +1920,8 @@ export const fr: TranslationKeys = {
         "La suppression d'arrière-plan précédente a expiré, elle est donc relancée. Appliquez les effets une fois qu'elle est terminée.",
       refineChanged:
         "Le sujet, la qualité, le lissage des contours et la décontamination des couleurs s'appliquent lors de la suppression de l'arrière-plan. Relancez-la pour utiliser les nouveaux réglages.",
+      backgroundImageRequired: "Choisissez une image d'arrière-plan pour continuer.",
+      invalidHexColor: "Utilisez une couleur hexadécimale telle que #FF5500 ou #F50.",
     },
     "remove-gif-background": {
       quality: "Qualité",

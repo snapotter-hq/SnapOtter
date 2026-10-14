@@ -1668,6 +1668,8 @@ export const zhTW: TranslationKeys = {
       effectsProcessingFailed: "效果處理失敗",
       effectsExpired: "先前的背景移除已過期，正在重新執行。完成後再套用效果。",
       refineChanged: "主體、品質、邊緣平滑與色彩去污會在移除背景時套用。請重新執行以使用新的設定。",
+      backgroundImageRequired: "請選擇背景圖片以繼續。",
+      invalidHexColor: "請使用十六進位顏色，例如 #FF5500 或 #F50。",
     },
     "remove-gif-background": {
       quality: "品質",
