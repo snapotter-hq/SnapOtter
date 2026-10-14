@@ -1,8 +1,8 @@
 ---
 description: "Lokale ontwikkelomgeving opzetten, commando's, codeconventies en hoe je een nieuwe tool aan SnapOtter toevoegt."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: f8e939b4ce8e
+i18n_output_hash: 0ff2f6c739cb
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Voeg een `data-testid`-attribuut toe aan je actieknop (zoals hierboven getoond) 
 
 De screenshottests staan nul gewijzigde pixels toe, en een nieuwe tool verandert wat ze renderen: het aantal tools op de startpagina en in de catalogus, een nieuwe kaart in het raster en een eigen pagina waarop `tests/e2e/gui-visual-tools.spec.ts` faalt met "snapshot doesn't exist" totdat die een baseline heeft. Werk de baselines bij in dezelfde PR als de tool, zodat de nachtelijke visuele vergelijking groen blijft.
 
-Linux-baselines komen uit CI. Push je branch en start daarop de update:
+CI genereert zowel de `linux`- (`ubuntu-latest`) als de `darwin`-baselines (`macos-latest`). Push je branch en start daarop de update:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-De workflow opent een concept-PR tegen `main` met de opnieuw gegenereerde PNG's. In de beschrijving staat een `gh run download`-opdracht; voer die uit vanuit de root van je checkout om de PNG's in je branch te zetten, commit ze en sluit de concept-PR. Gebruik `update_snapshots=all` als `changed` een screenshot mist waarvan je verwachtte dat die zou veranderen. Starten vereist schrijfrechten op de repository, dus als je branch op een fork staat, zet dan in de PR dat er een baseline-update nodig is en een maintainer start die.
+Elke OS-stap uploadt een `visual-baselines-linux-<run-id>-<attempt>`- of `visual-baselines-darwin-<run-id>-<attempt>`-artefact en opent een concept-PR (`chore/visual-baselines-linux-...` en `chore/visual-baselines-darwin-...`) tegen `main` met de opnieuw gegenereerde PNG's. In de beschrijving van elke concept-PR staat een `gh run download`-opdracht; voer ze allebei uit vanuit de root van je checkout om de PNG's in je branch te zetten, commit ze en sluit de concept-PR's. Gebruik `update_snapshots=all` als `changed` een screenshot mist waarvan je verwachtte dat die zou veranderen. Starten vereist schrijfrechten op de repository, dus als je branch op een fork staat, zet dan in de PR dat er een baseline-update nodig is en een maintainer start die.
 
-Werk op een Mac ook de darwin-baselines bij:
+Op een Mac kun je de `darwin`-baselines voor snellere iteratie ook lokaal bijwerken:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Werk je niet op een Mac, zeg dat dan in de PR en een maintainer voegt ze toe. Open in elk geval elke nieuwe of gewijzigde PNG voordat je hem commit: een baseline legt vast wat er gerenderd werd, kapot of niet.
+Open in elk geval elke nieuwe of gewijzigde PNG voordat je hem commit: een baseline legt vast wat er gerenderd werd, kapot of niet.
 
 Een release heeft hier niets van nodig. De appversie is gemaskeerd in elke screenshot die hem toont, dus een nieuwe versie verandert geen enkele baseline.
 

@@ -1,8 +1,8 @@
 ---
 description: "Lokalna konfiguracja środowiska developerskiego, komendy, konwencje kodu oraz jak dodać nowe narzędzie do SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: 648dca93f9db
+i18n_output_hash: 51efc9165801
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Dodaj atrybut `data-testid` do swojego przycisku akcji (jak pokazano powyżej), 
 
 Testy zrzutów ekranu nie dopuszczają żadnego zmienionego piksela, a nowe narzędzie zmienia to, co renderują: liczbę narzędzi na stronie głównej i w katalogu, nową kartę w siatce oraz własną stronę, na której `tests/e2e/gui-visual-tools.spec.ts` kończy się błędem "snapshot doesn't exist", dopóki nie ma ona wzorca. Odśwież wzorce w tym samym PR co narzędzie, żeby nocne porównanie wizualne pozostało zielone.
 
-Wzorce dla Linuksa pochodzą z CI. Wypchnij swoją gałąź, a następnie uruchom na niej odświeżenie:
+CI generuje wzorce zarówno dla `linux` (`ubuntu-latest`), jak i `darwin` (`macos-latest`). Wypchnij swoją gałąź, a następnie uruchom na niej odświeżenie:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Workflow otwiera szkic PR do `main` z wygenerowanymi na nowo plikami PNG. W jego opisie jest polecenie `gh run download`; uruchom je w katalogu głównym swojego checkoutu, aby pobrać pliki PNG do swojej gałęzi, zatwierdź je i zamknij szkic PR. Użyj `update_snapshots=all`, jeśli `changed` pominie zrzut, który według ciebie powinien się zmienić. Uruchomienie wymaga uprawnień zapisu do repozytorium, więc jeśli twoja gałąź jest na forku, napisz w PR, że potrzebuje odświeżenia wzorców, a maintainer je uruchomi.
+Każdy przebieg systemu operacyjnego wysyła artefakt `visual-baselines-linux-<run-id>-<attempt>` lub `visual-baselines-darwin-<run-id>-<attempt>` i otwiera szkic PR (`chore/visual-baselines-linux-...` oraz `chore/visual-baselines-darwin-...`) do `main` z wygenerowanymi na nowo plikami PNG. W opisie każdego szkicu PR znajduje się polecenie `gh run download`; uruchom oba w katalogu głównym swojego checkoutu, aby pobrać pliki PNG do swojej gałęzi, zatwierdź je i zamknij szkice PR. Użyj `update_snapshots=all`, jeśli `changed` pominie zrzut, który według ciebie powinien się zmienić. Uruchomienie wymaga uprawnień zapisu do repozytorium, więc jeśli twoja gałąź jest na forku, napisz w PR, że potrzebuje odświeżenia wzorców, a maintainer je uruchomi.
 
-Na Macu odśwież też wzorce darwin:
+Na Macu możesz też odświeżyć wzorce `darwin` lokalnie, aby szybciej iterować:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Jeśli nie masz Maca, napisz o tym w PR, a maintainer je doda. Tak czy inaczej, otwórz każdy nowy lub zmieniony plik PNG przed zatwierdzeniem: wzorzec zapisuje to, co zostało wyrenderowane, zepsute czy nie.
+Tak czy inaczej, otwórz każdy nowy lub zmieniony plik PNG przed zatwierdzeniem: wzorzec zapisuje to, co zostało wyrenderowane, zepsute czy nie.
 
 Wydanie nie wymaga niczego z tego. Wersja aplikacji jest zamaskowana na każdym zrzucie, który ją pokazuje, więc jej podbicie nie zmienia żadnego wzorca.
 

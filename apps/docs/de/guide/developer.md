@@ -1,8 +1,8 @@
 ---
 description: "Lokales Entwicklungs-Setup, Befehle, Code-Konventionen und wie man ein neues Tool zu SnapOtter hinzufügt."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: 1aff0a0fd957
+i18n_output_hash: db44dce0e0bd
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Füge deinem Aktions-Button ein `data-testid`-Attribut hinzu (wie oben gezeigt),
 
 Die Screenshot-Tests erlauben null geänderte Pixel, und ein neues Tool ändert, was sie rendern: die Tool-Zahlen auf der Startseite und im Katalog, eine neue Karte im Raster und eine eigene Seite, an der `tests/e2e/gui-visual-tools.spec.ts` mit "snapshot doesn't exist" scheitert, bis sie eine Baseline hat. Aktualisiere die Baselines im selben PR wie das Tool, damit der nächtliche visuelle Vergleich grün bleibt.
 
-Linux-Baselines kommen aus der CI. Pushe deinen Branch und starte die Aktualisierung darauf:
+Die CI erzeugt sowohl die `linux`- (`ubuntu-latest`) als auch die `darwin`-Baselines (`macos-latest`). Pushe deinen Branch und starte die Aktualisierung darauf:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Der Workflow öffnet einen Draft-PR gegen `main` mit den neu erzeugten PNGs. In seiner Beschreibung steht ein `gh run download`-Befehl; führe ihn im Wurzelverzeichnis deines Checkouts aus, um die PNGs in deinen Branch zu holen, committe sie und schließe den Draft-PR. Nimm stattdessen `update_snapshots=all`, wenn `changed` einen Screenshot verpasst, der sich deiner Erwartung nach ändern sollte. Zum Starten brauchst du Schreibrechte am Repository; liegt dein Branch in einem Fork, schreib in den PR, dass er eine Baseline-Aktualisierung braucht, und ein Maintainer startet sie.
+Jeder Betriebssystem-Zweig lädt ein Artefakt `visual-baselines-linux-<run-id>-<attempt>` bzw. `visual-baselines-darwin-<run-id>-<attempt>` hoch und öffnet einen Draft-PR (`chore/visual-baselines-linux-...` und `chore/visual-baselines-darwin-...`) gegen `main` mit den neu erzeugten PNGs. In der Beschreibung jedes Draft-PRs steht ein `gh run download`-Befehl; führe beide im Wurzelverzeichnis deines Checkouts aus, um die PNGs in deinen Branch zu holen, committe sie und schließe die Draft-PRs. Nimm stattdessen `update_snapshots=all`, wenn `changed` einen Screenshot verpasst, der sich deiner Erwartung nach ändern sollte. Zum Starten brauchst du Schreibrechte am Repository; liegt dein Branch in einem Fork, schreib in den PR, dass er eine Baseline-Aktualisierung braucht, und ein Maintainer startet sie.
 
-Auf einem Mac aktualisierst du auch die darwin-Baselines:
+Auf einem Mac kannst du die `darwin`-Baselines für schnelleres Iterieren auch lokal aktualisieren:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Wenn du keinen Mac hast, sag es im PR, und ein Maintainer ergänzt sie. Öffne in jedem Fall jedes neue oder geänderte PNG, bevor du es committest: Eine Baseline hält fest, was gerendert wurde, kaputt oder nicht.
+Öffne in jedem Fall jedes neue oder geänderte PNG, bevor du es committest: Eine Baseline hält fest, was gerendert wurde, kaputt oder nicht.
 
 Ein Release braucht nichts davon. Die App-Version ist in jedem Screenshot, der sie zeigt, maskiert, daher ändert ein Versionssprung keine Baseline.
 

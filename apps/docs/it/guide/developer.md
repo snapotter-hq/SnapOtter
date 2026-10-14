@@ -1,8 +1,8 @@
 ---
 description: "Configurazione dell'ambiente di sviluppo locale, comandi, convenzioni di codice e come aggiungere un nuovo strumento a SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: a505794ce109
+i18n_output_hash: 9c23b2783595
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Aggiungi un attributo `data-testid` al tuo pulsante di azione (come mostrato sop
 
 I test con screenshot non ammettono alcun pixel modificato, e un nuovo strumento cambia ciò che mostrano: i conteggi degli strumenti nella home e nel catalogo, una nuova scheda nella griglia e una pagina tutta sua su cui `tests/e2e/gui-visual-tools.spec.ts` fallisce con "snapshot doesn't exist" finché non ha una baseline. Aggiorna le baseline nella stessa PR dello strumento, così il confronto visivo notturno resta verde.
 
-Le baseline Linux arrivano dalla CI. Fai push del tuo branch, poi avvia l'aggiornamento su di esso:
+La CI genera sia le baseline `linux` (`ubuntu-latest`) sia quelle `darwin` (`macos-latest`). Fai push del tuo branch, poi avvia l'aggiornamento su di esso:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Il workflow apre una PR in bozza verso `main` con i PNG rigenerati. La sua descrizione contiene un comando `gh run download`; eseguilo dalla radice del tuo checkout per portare i PNG nel tuo branch, fai commit e chiudi la PR in bozza. Usa invece `update_snapshots=all` se `changed` salta uno screenshot che ti aspettavi cambiasse. L'avvio richiede accesso in scrittura al repository, quindi se il tuo branch è su un fork, scrivi nella PR che serve un aggiornamento delle baseline e un maintainer lo avvierà.
+Ogni job per sistema operativo carica un artefatto `visual-baselines-linux-<run-id>-<attempt>` o `visual-baselines-darwin-<run-id>-<attempt>` e apre una PR in bozza (`chore/visual-baselines-linux-...` e `chore/visual-baselines-darwin-...`) verso `main` con i PNG rigenerati. La descrizione di ciascuna PR in bozza contiene un comando `gh run download`; eseguili entrambi dalla radice del tuo checkout per portare i PNG nel tuo branch, fai commit e chiudi le PR in bozza. Usa invece `update_snapshots=all` se `changed` salta uno screenshot che ti aspettavi cambiasse. L'avvio richiede accesso in scrittura al repository, quindi se il tuo branch è su un fork, scrivi nella PR che serve un aggiornamento delle baseline e un maintainer lo avvierà.
 
-Su un Mac, aggiorna anche le baseline darwin:
+Su un Mac puoi anche aggiornare localmente le baseline `darwin` per iterare più rapidamente:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Se non sei su un Mac, dillo nella PR e un maintainer le aggiungerà. In ogni caso, apri ogni PNG nuovo o modificato prima di fare commit: una baseline registra ciò che è stato renderizzato, rotto o no.
+In ogni caso, apri ogni PNG nuovo o modificato prima di fare commit: una baseline registra ciò che è stato renderizzato, rotto o no.
 
 Una release non richiede nulla di tutto questo. La versione dell'app è mascherata in ogni screenshot che la mostra, quindi cambiarla non modifica nessuna baseline.
 

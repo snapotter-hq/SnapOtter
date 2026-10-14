@@ -1,8 +1,8 @@
 ---
 description: "Yerel geliştirme kurulumu, komutlar, kod kuralları ve SnapOtter'a yeni bir araç ekleme."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: d3dfe2907fbb
+i18n_output_hash: aa782420ba00
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ E2e testlerin güvenilir biçimde hedefleyebilmesi için eylem düğmenize bir `
 
 Ekran görüntüsü testleri hiçbir pikselin değişmesine izin vermez ve yeni bir araç, testlerin oluşturduğu görüntüyü değiştirir: ana sayfadaki ve katalogdaki araç sayıları, ızgaradaki yeni bir kart ve referansı olana kadar `tests/e2e/gui-visual-tools.spec.ts` dosyasının "snapshot doesn't exist" hatasıyla başarısız olduğu kendi sayfası. Gece çalışan görsel karşılaştırmanın yeşil kalması için referansları araçla aynı PR'da yenileyin.
 
-Linux referansları CI'dan gelir. Dalınızı gönderin, ardından yenilemeyi o dal üzerinde başlatın:
+CI hem `linux` (`ubuntu-latest`) hem de `darwin` (`macos-latest`) referanslarını oluşturur. Dalınızı gönderin, ardından yenilemeyi o dal üzerinde başlatın:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-İş akışı, yeniden oluşturulan PNG'lerle `main` dalına karşı taslak bir PR açar. Açıklamasında bir `gh run download` komutu bulunur; PNG'leri dalınıza almak için bunu checkout'unuzun kök dizininde çalıştırın, commit edin ve taslak PR'ı kapatın. Değişmesini beklediğiniz bir görüntüyü `changed` kaçırırsa bunun yerine `update_snapshots=all` kullanın. Başlatmak için depoya yazma erişimi gerekir; dalınız bir fork'taysa PR'da referans yenilemesi gerektiğini belirtin, bir maintainer çalıştıracaktır.
+Her işletim sistemi işi bir `visual-baselines-linux-<run-id>-<attempt>` veya `visual-baselines-darwin-<run-id>-<attempt>` yapıtı yükler ve yeniden oluşturulan PNG'lerle `main` dalına karşı taslak bir PR (`chore/visual-baselines-linux-...` ve `chore/visual-baselines-darwin-...`) açar. Her taslak PR'ın açıklamasında bir `gh run download` komutu bulunur; PNG'leri dalınıza almak için ikisini de checkout'unuzun kök dizininde çalıştırın, commit edin ve taslak PR'ları kapatın. Değişmesini beklediğiniz bir görüntüyü `changed` kaçırırsa bunun yerine `update_snapshots=all` kullanın. Başlatmak için depoya yazma erişimi gerekir; dalınız bir fork'taysa PR'da referans yenilemesi gerektiğini belirtin, bir maintainer çalıştıracaktır.
 
-Mac kullanıyorsanız darwin referanslarını da yenileyin:
+Mac kullanıyorsanız daha hızlı deneme yapmak için `darwin` referanslarını yerel olarak da yenileyebilirsiniz:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Mac kullanmıyorsanız bunu PR'da belirtin, bir maintainer onları ekleyecektir. Her durumda, commit etmeden önce her yeni veya değişmiş PNG'yi açın: referans, bozuk olsun olmasın, ne oluşturulduysa onu kaydeder.
+Her durumda, commit etmeden önce her yeni veya değişmiş PNG'yi açın: referans, bozuk olsun olmasın, ne oluşturulduysa onu kaydeder.
 
 Bir sürüm için bunların hiçbiri gerekmez. Uygulama sürümü, onu gösteren her ekran görüntüsünde maskelenir, bu yüzden sürümü yükseltmek hiçbir referansı değiştirmez.
 

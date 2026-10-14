@@ -5,8 +5,9 @@ import { expect, test } from "./helpers";
 // Visual baseline per tool page, generated from the shared TOOLS catalog.
 //
 // Runs in the chromium-visual project only. Baselines are platform-suffixed:
-// darwin baselines come from local runs, linux baselines from the
-// update-visual-baselines workflow (which opens a PR with refreshed goldens).
+// the update-visual-baselines workflow regenerates both linux (ubuntu-latest)
+// and darwin (macos-latest) baselines and opens per-OS PRs with refreshed
+// goldens; darwin baselines can also be regenerated locally on macOS.
 // AI tool pages capture whatever the default install state shows, which in CI
 // is the install prompt.
 // ---------------------------------------------------------------------------

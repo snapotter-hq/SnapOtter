@@ -1,8 +1,8 @@
 ---
 description: "Configuração de ambiente de desenvolvimento local, comandos, convenções de código e como adicionar uma nova ferramenta ao SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: 3c036b74e396
+i18n_output_hash: 7893907d6365
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Adicione um atributo `data-testid` ao seu botão de ação (como mostrado acima)
 
 Os testes de captura de tela não permitem nenhum pixel alterado, e uma ferramenta nova muda o que eles renderizam: a contagem de ferramentas na página inicial e no catálogo, um card novo na grade e uma página própria em que `tests/e2e/gui-visual-tools.spec.ts` falha com "snapshot doesn't exist" até ela ter uma baseline. Atualize as baselines no mesmo PR da ferramenta, para que a comparação visual noturna continue verde.
 
-As baselines de Linux vêm da CI. Envie seu branch e dispare a atualização nele:
+A CI gera tanto as baselines `linux` (`ubuntu-latest`) quanto as `darwin` (`macos-latest`). Envie seu branch e dispare a atualização nele:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-O workflow abre um PR de rascunho contra `main` com os PNGs regenerados. A descrição dele traz um comando `gh run download`; rode-o na raiz do seu checkout para trazer os PNGs para o seu branch, faça o commit e feche o PR de rascunho. Use `update_snapshots=all` se `changed` deixar passar uma captura que você esperava que mudasse. Disparar o workflow exige acesso de escrita ao repositório; se o seu branch estiver em um fork, diga no PR que ele precisa de uma atualização de baselines e um mantenedor vai dispará-la.
+Cada job de sistema operacional envia um artefato `visual-baselines-linux-<run-id>-<attempt>` ou `visual-baselines-darwin-<run-id>-<attempt>` e abre um PR de rascunho (`chore/visual-baselines-linux-...` e `chore/visual-baselines-darwin-...`) contra `main` com os PNGs regenerados. A descrição de cada PR de rascunho traz um comando `gh run download`; rode ambos na raiz do seu checkout para trazer os PNGs para o seu branch, faça o commit e feche os PRs de rascunho. Use `update_snapshots=all` se `changed` deixar passar uma captura que você esperava que mudasse. Disparar o workflow exige acesso de escrita ao repositório; se o seu branch estiver em um fork, diga no PR que ele precisa de uma atualização de baselines e um mantenedor vai dispará-la.
 
-Em um Mac, atualize também as baselines darwin:
+Em um Mac, você também pode atualizar as baselines `darwin` localmente para iterar mais rápido:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Se você não estiver em um Mac, diga isso no PR e um mantenedor vai adicioná-las. De qualquer forma, abra cada PNG novo ou alterado antes de fazer o commit: uma baseline registra o que foi renderizado, quebrado ou não.
+De qualquer forma, abra cada PNG novo ou alterado antes de fazer o commit: uma baseline registra o que foi renderizado, quebrado ou não.
 
 Uma release não precisa de nada disso. A versão do app é mascarada em todas as capturas que a mostram, então mudá-la não altera nenhuma baseline.
 

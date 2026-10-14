@@ -1,8 +1,8 @@
 ---
 description: "Thiết lập môi trường phát triển cục bộ, lệnh, quy ước mã, và cách thêm một công cụ mới vào SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: 7ce3a1183f27
+i18n_output_hash: 37b697f534e2
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Thêm một thuộc tính `data-testid` vào nút hành động của bạn (nh�
 
 Các kiểm thử ảnh chụp màn hình không cho phép thay đổi dù chỉ một điểm ảnh, và một công cụ mới sẽ thay đổi những gì chúng hiển thị: số lượng công cụ trên trang chủ và trong danh mục, một thẻ mới trong lưới, và trang riêng của công cụ, nơi `tests/e2e/gui-visual-tools.spec.ts` thất bại với "snapshot doesn't exist" cho đến khi trang có ảnh chuẩn. Hãy cập nhật ảnh chuẩn trong cùng PR với công cụ để phép so sánh trực quan hằng đêm vẫn xanh.
 
-Ảnh chuẩn Linux được tạo trên CI. Hãy push nhánh của bạn, rồi chạy cập nhật trên nhánh đó:
+CI tạo cả ảnh chuẩn `linux` (`ubuntu-latest`) lẫn `darwin` (`macos-latest`). Hãy push nhánh của bạn, rồi chạy cập nhật trên nhánh đó:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Workflow sẽ mở một PR nháp nhắm vào `main` với các PNG được tạo lại. Phần mô tả của nó có lệnh `gh run download`; hãy chạy lệnh đó từ thư mục gốc của bản checkout để đưa các PNG vào nhánh của bạn, commit chúng rồi đóng PR nháp. Dùng `update_snapshots=all` thay thế nếu `changed` bỏ sót một ảnh mà bạn cho là sẽ thay đổi. Việc chạy cần quyền ghi vào kho mã, nên nếu nhánh của bạn nằm trên fork, hãy ghi trong PR rằng cần cập nhật ảnh chuẩn và một maintainer sẽ chạy nó.
+Mỗi nhánh hệ điều hành sẽ tải lên gói kết quả `visual-baselines-linux-<run-id>-<attempt>` hoặc `visual-baselines-darwin-<run-id>-<attempt>` và mở một PR nháp (`chore/visual-baselines-linux-...` và `chore/visual-baselines-darwin-...`) nhắm vào `main` với các PNG được tạo lại. Phần mô tả của mỗi PR nháp có lệnh `gh run download`; hãy chạy cả hai lệnh từ thư mục gốc của bản checkout để đưa các PNG vào nhánh của bạn, commit chúng rồi đóng các PR nháp. Dùng `update_snapshots=all` thay thế nếu `changed` bỏ sót một ảnh mà bạn cho là sẽ thay đổi. Việc chạy cần quyền ghi vào kho mã, nên nếu nhánh của bạn nằm trên fork, hãy ghi trong PR rằng cần cập nhật ảnh chuẩn và một maintainer sẽ chạy nó.
 
-Trên Mac, hãy cập nhật cả ảnh chuẩn darwin:
+Trên Mac, bạn cũng có thể cập nhật ảnh chuẩn `darwin` cục bộ để thử nghiệm nhanh hơn:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Nếu bạn không dùng Mac, hãy nói rõ trong PR và một maintainer sẽ bổ sung. Dù thế nào, hãy mở từng PNG mới hoặc đã thay đổi trước khi commit: ảnh chuẩn ghi lại mọi thứ đã được hiển thị, dù hỏng hay không.
+Dù thế nào, hãy mở từng PNG mới hoặc đã thay đổi trước khi commit: ảnh chuẩn ghi lại mọi thứ đã được hiển thị, dù hỏng hay không.
 
 Một bản phát hành không cần làm gì trong số này. Phiên bản ứng dụng được che trong mọi ảnh chụp màn hình có hiển thị nó, nên việc tăng phiên bản không làm thay đổi ảnh chuẩn nào.
 

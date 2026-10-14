@@ -1,8 +1,8 @@
 ---
 description: "Lokal utvecklingskonfiguration, kommandon, kodkonventioner och hur du lägger till ett nytt verktyg i SnapOtter."
-i18n_source_hash: 56acc1bf9a9b
+i18n_source_hash: 6068cbd7915e
 i18n_provenance: machine
-i18n_output_hash: e95aa750ab7c
+i18n_output_hash: 169efb8a4f10
 i18n_hash_version: 2
 ---
 
@@ -211,21 +211,21 @@ Lägg till ett `data-testid`-attribut till din åtgärdsknapp (som visas ovan) s
 
 Skärmdumpstesterna tillåter noll ändrade pixlar, och ett nytt verktyg ändrar vad de renderar: antalet verktyg på startsidan och i katalogen, ett nytt kort i rutnätet och en egen sida där `tests/e2e/gui-visual-tools.spec.ts` misslyckas med "snapshot doesn't exist" tills den har en baslinje. Uppdatera baslinjerna i samma PR som verktyget, så att den nattliga visuella jämförelsen förblir grön.
 
-Linux-baslinjerna kommer från CI. Pusha din gren och starta uppdateringen på den:
+CI genererar både `linux`- (`ubuntu-latest`) och `darwin`-baslinjerna (`macos-latest`). Pusha din gren och starta uppdateringen på den:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-Arbetsflödet öppnar en utkast-PR mot `main` med de omgenererade PNG-filerna. I beskrivningen finns ett `gh run download`-kommando; kör det från roten av din checkout för att lägga PNG-filerna i din gren, committa dem och stäng utkast-PR:en. Använd `update_snapshots=all` i stället om `changed` missar en skärmdump som du väntade dig skulle ändras. Att starta det kräver skrivbehörighet till repot, så om din gren ligger på en fork, skriv i PR:en att den behöver en baslinjeuppdatering så startar en maintainer den.
+Varje OS-jobb laddar upp en `visual-baselines-linux-<run-id>-<attempt>`- eller `visual-baselines-darwin-<run-id>-<attempt>`-artefakt och öppnar en utkast-PR (`chore/visual-baselines-linux-...` och `chore/visual-baselines-darwin-...`) mot `main` med de omgenererade PNG-filerna. I beskrivningen för varje utkast-PR finns ett `gh run download`-kommando; kör båda från roten av din checkout för att lägga PNG-filerna i din gren, committa dem och stäng utkast-PR:erna. Använd `update_snapshots=all` i stället om `changed` missar en skärmdump som du väntade dig skulle ändras. Att starta det kräver skrivbehörighet till repot, så om din gren ligger på en fork, skriv i PR:en att den behöver en baslinjeuppdatering så startar en maintainer den.
 
-På en Mac uppdaterar du även darwin-baslinjerna:
+På en Mac kan du även uppdatera `darwin`-baslinjerna lokalt för snabbare iteration:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-Om du inte sitter på en Mac, säg det i PR:en så lägger en maintainer till dem. Öppna i vilket fall varje ny eller ändrad PNG innan du committar den: en baslinje sparar det som renderades, trasigt eller inte.
+Öppna i vilket fall varje ny eller ändrad PNG innan du committar den: en baslinje sparar det som renderades, trasigt eller inte.
 
 En release behöver inget av detta. Appversionen är maskerad i varje skärmdump som visar den, så en ny version ändrar ingen baslinje.
 

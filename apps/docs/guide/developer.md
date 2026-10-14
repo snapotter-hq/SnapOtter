@@ -207,21 +207,21 @@ Add a `data-testid` attribute to your action button (as shown above) so e2e test
 
 The screenshot tests allow zero changed pixels, and a new tool changes what they render: the tool counts on the home page and catalog, a new card in the grid, and a page of its own that `tests/e2e/gui-visual-tools.spec.ts` fails on with "snapshot doesn't exist" until it has a baseline. Refresh the baselines in the same PR as the tool, so the nightly visual comparison stays green.
 
-Linux baselines come from CI. Push your branch, then dispatch the refresh on it:
+CI generates both the `linux` (`ubuntu-latest`) and `darwin` (`macos-latest`) baselines. Push your branch, then dispatch the refresh on it:
 
 ```bash
 gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapshots=changed
 ```
 
-The workflow opens a draft PR against `main` with the regenerated PNGs. Its body has a `gh run download` command; run that from your checkout root to drop the PNGs into your branch, commit them, and close the draft PR. Use `update_snapshots=all` instead if `changed` misses a shot you expected to move. Dispatching needs write access to the repository, so if your branch lives on a fork, say in the PR that it needs a baseline refresh and a maintainer will run it.
+Each OS leg uploads a `visual-baselines-linux-<run-id>-<attempt>` or `visual-baselines-darwin-<run-id>-<attempt>` artifact and opens a draft PR (`chore/visual-baselines-linux-...` and `chore/visual-baselines-darwin-...`) against `main` with the regenerated PNGs. Each draft PR body has a `gh run download` command; run both from your checkout root to drop the PNGs into your branch, commit them, and close the draft PRs. Use `update_snapshots=all` instead if `changed` misses a shot you expected to move. Dispatching needs write access to the repository, so if your branch lives on a fork, say in the PR that it needs a baseline refresh and a maintainer will run it.
 
-On a Mac, refresh the darwin baselines too:
+On a Mac, you can also refresh the `darwin` baselines locally for faster iteration:
 
 ```bash
 pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
-If you aren't on a Mac, say so in the PR and a maintainer will add them. Either way, open every new or changed PNG before you commit it: a baseline records whatever rendered, broken or not.
+Either way, open every new or changed PNG before you commit it: a baseline records whatever rendered, broken or not.
 
 A release needs none of this. The app version is masked in every screenshot that shows it, so bumping it changes no baseline.
 
