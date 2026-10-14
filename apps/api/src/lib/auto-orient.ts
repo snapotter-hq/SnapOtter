@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
-import sharp, { type Metadata } from "sharp";
+import sharp, { type Metadata, type Sharp } from "sharp";
+import { assertGifWorkload } from "./gif-limits.js";
 import { logger } from "./logger.js";
 import { resolveOutputFormat } from "./output-format.js";
 
@@ -25,15 +26,27 @@ import { resolveOutputFormat } from "./output-format.js";
 function isLosslessWebP(buffer: Buffer): boolean {
   if (buffer.length < 16 || buffer.toString("ascii", 0, 4) !== "RIFF") return false;
 
+  let sawLosslessFrame = false;
   let offset = 12;
   while (offset + 8 <= buffer.length) {
     const chunkType = buffer.toString("ascii", offset, offset + 4);
     if (chunkType === "VP8L") return true;
     if (chunkType === "VP8 ") return false;
     const chunkLength = buffer.readUInt32LE(offset + 4);
+    if (chunkType === "ANMF") {
+      const frameEnd = Math.min(buffer.length, offset + 8 + chunkLength);
+      let subOffset = offset + 24;
+      while (subOffset + 8 <= frameEnd) {
+        const subType = buffer.toString("ascii", subOffset, subOffset + 4);
+        if (subType === "VP8 ") return false;
+        if (subType === "VP8L") sawLosslessFrame = true;
+        const subLength = buffer.readUInt32LE(subOffset + 4);
+        subOffset += 8 + subLength + (subLength % 2);
+      }
+    }
     offset += 8 + chunkLength + (chunkLength % 2);
   }
-  return false;
+  return sawLosslessFrame;
 }
 
 export async function autoOrient(
@@ -64,7 +77,6 @@ export async function autoOrient(
     // default (~80) before any tool the user asked for has run.
     const output = await resolveOutputFormat(buffer, "");
     const encoderOptions: Record<string, unknown> = { ...output.encoderOptions };
-    let pipeline = sharp(buffer).rotate();
 
     if (output.format === "webp" && isLosslessWebP(buffer)) {
       encoderOptions.lossless = true;
@@ -72,8 +84,28 @@ export async function autoOrient(
       encoderOptions.compression = meta.compression || "lzw";
     }
 
-    if (meta.depth === "ushort" && meta.space) {
-      pipeline = pipeline.toColorspace(meta.space);
+    const pages = meta.pages ?? 1;
+    let pipeline: Sharp;
+    if (pages > 1 && (output.format === "webp" || output.format === "gif")) {
+      assertGifWorkload(
+        { width: meta.width, height: meta.height, pages },
+        output.format === "webp" ? "Animated WebP input" : "GIF input",
+      );
+      // Sharp refuses to rotate multi-page images for 90/270 degree turns, and
+      // rotating a stacked strip 180 degrees or flipping it vertically reverses
+      // the frame order (#1260). Rotate each frame individually and rejoin.
+      const frames: Buffer[] = [];
+      for (let page = 0; page < pages; page++) {
+        frames.push(await sharp(buffer, { page, pages: 1 }).rotate().png().toBuffer());
+      }
+      pipeline = sharp(frames, { join: { across: 1, animated: true } });
+      if (meta.delay !== undefined) encoderOptions.delay = meta.delay;
+      if (meta.loop !== undefined) encoderOptions.loop = meta.loop;
+    } else {
+      pipeline = sharp(buffer).rotate();
+      if (meta.depth === "ushort" && meta.space) {
+        pipeline = pipeline.toColorspace(meta.space);
+      }
     }
 
     return await pipeline.toFormat(output.format, encoderOptions).toBuffer();
@@ -81,7 +113,13 @@ export async function autoOrient(
     // The tool's own decode of the same buffer is expected to reject it. A warn
     // here with no failed-job line after it points at an encode-side bug.
     log.warn(
-      { err, orientation: meta.orientation, format: meta.format, bytes: buffer.length },
+      {
+        err,
+        orientation: meta.orientation,
+        format: meta.format,
+        pages: meta.pages,
+        bytes: buffer.length,
+      },
       "autoOrient: rotation failed, passing image through unrotated",
     );
     return buffer;

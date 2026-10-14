@@ -189,4 +189,90 @@ describe("EXIF auto-orientation in factory path", () => {
     expect(outMeta.width).toBe(20);
     expect(outMeta.height).toBe(40);
   });
+
+  it("rotates every frame of an animated WebP with orientation 6 in factory path (#1260)", async () => {
+    const colors: [number, number, number][] = [
+      [255, 0, 0],
+      [0, 255, 0],
+      [0, 0, 255],
+    ];
+    const frames = await Promise.all(
+      colors.map(async ([r, g, b]) => {
+        const raw = Buffer.alloc(32 * 24 * 3, 0);
+        for (let y = 0; y < 24; y++) {
+          for (let x = 0; x < 16; x++) {
+            const idx = (y * 32 + x) * 3;
+            raw[idx] = r;
+            raw[idx + 1] = g;
+            raw[idx + 2] = b;
+          }
+        }
+        return sharp(raw, { raw: { width: 32, height: 24, channels: 3 } })
+          .png()
+          .toBuffer();
+      }),
+    );
+
+    const rotatedWebp = await sharp(frames, { join: { across: 1, animated: true } })
+      .withMetadata({ orientation: 6 })
+      .webp({ delay: [80, 120, 200], loop: 3, lossless: true })
+      .toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "rotated-anim.webp",
+        contentType: "image/webp",
+        content: rotatedWebp,
+      },
+      { name: "settings", content: JSON.stringify({ mode: "quality", quality: 95 }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+
+    const outMeta = await sharp(dlRes.rawPayload, { animated: true }).metadata();
+    expect(outMeta.orientation ?? 1).toBe(1);
+    expect(outMeta.pages).toBe(3);
+    expect(outMeta.width).toBe(24);
+    expect(outMeta.pageHeight).toBe(32);
+    expect(outMeta.delay).toEqual([80, 120, 200]);
+    expect(outMeta.loop).toBe(3);
+
+    for (let page = 0; page < 3; page++) {
+      const { data, info } = await sharp(dlRes.rawPayload, { page, pages: 1 })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const topIdx = (4 * info.width + 12) * info.channels;
+      const bottomIdx = (28 * info.width + 12) * info.channels;
+      // After lossy WebP compression in `compress`, the frame's primary channel
+      // stays > 200 while the other two channels stay < 50.
+      for (let c = 0; c < 3; c++) {
+        if (c === page) {
+          expect(data[topIdx + c]).toBeGreaterThan(200);
+        } else {
+          expect(data[topIdx + c]).toBeLessThan(50);
+        }
+        expect(data[bottomIdx + c]).toBeLessThan(30);
+      }
+    }
+  });
 });
