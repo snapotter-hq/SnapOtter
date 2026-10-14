@@ -920,7 +920,41 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
     unmount();
   });
 
-  it("falls back to a generic message for a failed frame with no error", () => {
+  it("shows the operator hint a failed frame carries (#2544)", () => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    act(() => {
+      sendSingleFrame({
+        phase: "failed",
+        percent: 0,
+        error: "PDF processing is unavailable on this server because qpdf could not be started.",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH: it must point at an executable qpdf binary.",
+      });
+    });
+
+    expectEntryFailed(
+      "PDF processing is unavailable on this server because qpdf could not be started.: " +
+        "Check QPDF_PATH: it must point at an executable qpdf binary.",
+    );
+    unmount();
+  });
+
+  it.each([
+    ["no error", { phase: "failed", percent: 0 }],
+    ["an empty error", { phase: "failed", percent: 0, error: "" }],
+    ["a blank error", { phase: "failed", percent: 0, error: "   " }],
+    [
+      "a blank error with a hint",
+      { phase: "failed", percent: 0, error: "   ", details: "Check QPDF_PATH." },
+    ],
+  ])("falls back to a generic message for a failed frame with %s (#2544)", (_label, frame) => {
     const { unmount } = startSingleRun();
     act(() => {
       xhrs[0].upload.onload?.();
@@ -928,7 +962,7 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
     });
 
     act(() => {
-      sendSingleFrame({ phase: "failed", percent: 0 });
+      sendSingleFrame(frame);
     });
 
     expectEntryFailed("Processing failed");

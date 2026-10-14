@@ -10,6 +10,7 @@ import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import { format, plural } from "@/lib/format";
 import {
   checkToolResult,
+  failedFrameMessage,
   type ProgressFrame,
   parseResultBody,
   reportMalformedResult,
@@ -562,7 +563,7 @@ export function usePipelineProcessor() {
             }
 
             if (data.phase === "failed") {
-              endFailedRun(data.error || tRef.current.errors.processingFailedNoDetail);
+              endFailedRun(failedFrameMessage(data, tRef.current.errors.processingFailedNoDetail));
               return;
             }
 
