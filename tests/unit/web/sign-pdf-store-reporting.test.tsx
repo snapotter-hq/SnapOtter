@@ -165,6 +165,11 @@ beforeEach(() => {
   FakeEventSource.instances = [];
   vi.stubGlobal("XMLHttpRequest", FakeXhr);
   vi.stubGlobal("EventSource", FakeEventSource);
+  // Unmounting mid-run asks the server to cancel an accepted job (#2313); no server here.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
   vi.mocked(captureHandledError).mockClear();
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([pdf("contract.pdf")]);
@@ -1310,6 +1315,211 @@ describe("sign-pdf counts upload progress as a sign of life", () => {
       expect(entry().processedUrl).toBe(DOWNLOAD_URL);
     } finally {
       stalls.restore();
+    }
+  });
+});
+
+/**
+ * #2313: unmounting cleared the file store's flag (#1122) but left everything else
+ * about a cut-off sign unsaid. Crossing the layout breakpoint remounts the panel,
+ * whose state is local, so the new one showed an idle submit button while the
+ * server went on signing a PDF nobody would collect, and the entry stayed pending.
+ */
+describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (#2313)", () => {
+  const fetchMock = vi.fn<typeof fetch>(
+    async () => new Response(JSON.stringify({ canceled: true })),
+  );
+  const cancelPosts = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/cancel"));
+
+  beforeEach(() => {
+    fetchMock.mockClear();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  it("fails the entry and leaves a message when the sign is cut off mid-upload", async () => {
+    renderPanel();
+    await apply();
+    expect(entry().status).toBe("pending");
+
+    cleanup();
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
+    expect(useFileStore.getState().processing).toBe(false);
+    // The server never accepted a job, so there is nothing to cancel.
+    expect(cancelPosts()).toHaveLength(0);
+    // A remounted panel (crossing the layout breakpoint) shows the message, and
+    // retrying clears it.
+    renderPanel();
+    expect(screen.getByText(en.errors.runInterrupted)).toBeInTheDocument();
+    FakeXhr.instances = [];
+    await apply();
+    expect(screen.queryByText(en.errors.runInterrupted)).not.toBeInTheDocument();
+  });
+
+  it("settles the run and sends no request when cut off during signature export", async () => {
+    let resolveExport: (value: { pngs: Blob[]; placements: SignPlacement[] }) => void = () => {};
+    renderPanel(
+      fakeCanvas({
+        exportPlacements: () =>
+          new Promise((resolve) => {
+            resolveExport = resolve;
+          }),
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+    expect(useFileStore.getState().processing).toBe(true);
+
+    cleanup();
+    await act(async () => {
+      resolveExport({
+        pngs: [new Blob(["png"], { type: "image/png" })],
+        placements: [PLACEMENT],
+      });
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("keeps the interrupted error when signature export rejects after unmount", async () => {
+    let rejectExport: (reason: unknown) => void = () => {};
+    renderPanel(
+      fakeCanvas({
+        exportPlacements: () =>
+          new Promise((_resolve, reject) => {
+            rejectExport = reject;
+          }),
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+
+    cleanup();
+    await act(async () => {
+      rejectExport(new Error("canvas unmounted"));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.runInterrupted);
+    expect(entry().errorCategory).toBeNull();
+    expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
+  });
+
+  it("closes the stream and cancels the job once the server has accepted it", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const clientJobId = xhr.body?.get("clientJobId") as string;
+
+    cleanup();
+
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(cancelPosts()).toHaveLength(1);
+    expect(cancelPosts()[0][0]).toBe(`/api/v1/jobs/${clientJobId}/cancel`);
+    expect(cancelPosts()[0][1]).toMatchObject({ method: "POST" });
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.runInterrupted);
+  });
+
+  it("counts a progress frame as the server having the job", async () => {
+    renderPanel();
+    const xhr = await apply();
+    const clientJobId = xhr.body?.get("clientJobId") as string;
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "processing", percent: 40 }),
+      });
+    });
+
+    cleanup();
+
+    expect(cancelPosts()).toHaveLength(1);
+    expect(cancelPosts()[0][0]).toBe(`/api/v1/jobs/${clientJobId}/cancel`);
+  });
+
+  it("leaves a finished run's result alone when the panel unmounts afterwards", async () => {
+    renderPanel();
+    (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+    expect(entry().status).toBe("completed");
+
+    cleanup();
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("leaves an accepted run's streamed result and failure alone when the panel unmounts afterwards", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify(FAILED_FRAME),
+      });
+    });
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe("sidecar died");
+
+    cleanup();
+
+    expect(entry().error).toBe("sidecar died");
+    expect(useFileStore.getState().error).toBeNull();
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("leaves a panel that never ran alone", () => {
+    renderPanel();
+
+    cleanup();
+
+    expect(entry().status).toBe("pending");
+    expect(useFileStore.getState().error).toBeNull();
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("writes nothing into a store the user already cleared, while still stopping the run", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    act(() => useFileStore.getState().reset());
+
+    cleanup();
+
+    expect(xhr.aborted).toBe(true);
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(cancelPosts()).toHaveLength(1);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries).toHaveLength(0);
+  });
+
+  it("reports a cancel for an abandoned Sign PDF job that finds no job", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      fetchMock.mockResolvedValueOnce(new Response("{}", { status: 404 }));
+      renderPanel();
+      const xhr = await apply();
+      xhr.respond(202, { jobId: "job-1", async: true });
+
+      cleanup();
+      await waitFor(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+      expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+        "Cancel for an abandoned Sign PDF job found no job",
+      );
+      expect(vi.mocked(captureHandledError).mock.calls[0][1]).toEqual({
+        error_class: "operational",
+        tool_id: "sign-pdf",
+        status_code: "404",
+      });
+    } finally {
+      consoleWarn.mockRestore();
     }
   });
 });

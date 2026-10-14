@@ -15,6 +15,10 @@ const MESSAGES = {
     missing: "Cancel for an abandoned OCR job found no job",
     failed: "Canceling an abandoned OCR job failed",
   },
+  "sign-pdf": {
+    missing: "Cancel for an abandoned Sign PDF job found no job",
+    failed: "Canceling an abandoned Sign PDF job failed",
+  },
 } as const;
 
 /**

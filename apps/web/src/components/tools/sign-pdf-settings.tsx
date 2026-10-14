@@ -1,11 +1,13 @@
 import { type FeedbackErrorCategory, SafeError } from "@snapotter/shared";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { cancelAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
 import {
   checkToolResult,
@@ -199,15 +201,14 @@ export interface SignProps {
 export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const { t } = useTranslation();
   const sp = t.toolSettings["sign-pdf"];
-  const { currentEntry } = useFileStore();
+  const { currentEntry, error: storeError } = useFileStore();
   const [sigs, setSigs] = useState<SavedSignature[]>(() => listSignatures());
   const [padOpen, setPadOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const progressCleanupRef = useRef<(() => void) | null>(null);
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const stopRunRef = useRef<() => void>(() => {});
   /** Set while this panel owns the store's processing flag; see endRun. */
   const runOwnedRef = useRef(false);
 
@@ -222,16 +223,14 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   // there is no request left to abort, and the SSE that would have ended the
   // run goes with this panel: the flag would stay on with nothing left to clear
   // it, and the guard would warn forever about a sign that is over (#1122).
-  useEffect(
-    () => () => {
-      progressCleanupRef.current?.();
-      xhrRef.current?.abort();
-      if (runOwnedRef.current) {
-        runOwnedRef.current = false;
-        useFileStore.getState().setProcessing(false);
-      }
-    },
-    [],
+  //
+  // Crossing the layout breakpoint also remounts this panel, whose own state is
+  // local, so useSettleOnUnmount leaves the interrupted message on the store,
+  // stopRunRef marks the entry failed, and a job the server already took is
+  // canceled (#2313).
+  useSettleOnUnmount(
+    () => runOwnedRef.current,
+    () => stopRunRef.current(),
   );
 
   const refresh = () => setSigs(listSignatures());
@@ -262,7 +261,33 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // a reorder, and leaves alone a fresh file that took the slot.
     const capturedEntryId = useFileStore.getState().entries[capturedIndex]?.id;
 
+    const failEntry = (message: string, category?: FeedbackErrorCategory) => {
+      try {
+        const { entries, updateEntry } = useFileStore.getState();
+        const index = entries.findIndex((e) => e.id === capturedEntryId);
+        if (index !== -1 && entries[index].status === "pending") {
+          updateEntry(index, { status: "failed", error: message, errorCategory: category ?? null });
+        }
+      } catch (err) {
+        console.error("Failing the Sign PDF run's entry failed", err);
+        // The console alone never reaches Sentry (#1882).
+        reportRunEndFailure("Failing a Sign PDF run's entry failed", err, "sign-pdf");
+      }
+    };
+
+    // Set before the run claims the store flag, so an unmount during setup never
+    // runs the previous run's closure (#2313).
+    stopRunRef.current = () => {
+      runOwnedRef.current = false;
+      if (useFileStore.getState().processing) {
+        failEntry(t.errors.runInterrupted);
+      }
+    };
+
     setError(null);
+    if (useFileStore.getState().error !== null) {
+      useFileStore.getState().setError(null);
+    }
     setDownloadUrl(null);
     setProgress(0);
     setProcessing(true);
@@ -313,17 +338,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           teardown ??= { cause };
         }
       }
-      try {
-        const { entries, updateEntry } = useFileStore.getState();
-        const index = entries.findIndex((e) => e.id === capturedEntryId);
-        if (index !== -1 && entries[index].status === "pending") {
-          updateEntry(index, { status: "failed", error: message, errorCategory: category ?? null });
-        }
-      } catch (err) {
-        console.error("Failing the Sign PDF run's entry failed", err);
-        // The console alone never reaches Sentry (#1882).
-        reportRunEndFailure("Failing a Sign PDF run's entry failed", err, "sign-pdf");
-      }
+      failEntry(message, category);
       if (teardown) throw teardown.cause;
     };
 
@@ -338,17 +353,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       );
       return null;
     });
+    if (!runOwnedRef.current) return;
     if (!exported) {
       failRun(sp.exportFailed, "processing_error");
       return;
     }
     const { pngs, placements } = exported;
     const clientJobId = generateId();
-
-    const finish = () => {
-      progressCleanupRef.current = null;
-      endRun();
-    };
 
     /**
      * A fast sign answers twice: waitForJob returns 200 and the worker has
@@ -385,10 +396,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // signed PDF's link up beside the stall error and a late network error,
     // timeout, or 4xx replaces that error with its own (#1958).
     const xhr = new XMLHttpRequest();
-    // Held so the unmount cleanup can abort it. Nothing clears the ref: abort
-    // on a request that is already done does nothing.
-    xhrRef.current = xhr;
     let abandoned = false;
+    // Set once a 202 or a progress frame proves the server has the job: an
+    // unmount after that cancels it (#2313).
+    let accepted = false;
     const abandonRequest = () => {
       settled = true;
       abandoned = true;
@@ -400,14 +411,16 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     };
 
     const subscription = subscribeSignPdfJobProgress(clientJobId, {
-      onProgress: (percent) => setProgress(percent),
+      onProgress: (percent) => {
+        accepted = true;
+        setProgress(percent);
+      },
       onComplete: (r) => {
         landResult(r);
-        finish();
+        endRun();
       },
       onFailed: (failure) => {
         abandonRequest();
-        progressCleanupRef.current = null;
         // A failure with a reason shows one of our translated messages; a
         // server message is English and classifies from its text.
         failRun(
@@ -417,12 +430,22 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       },
       onStall: () => {
         abandonRequest();
-        progressCleanupRef.current = null;
         failRun(sp.stall, "timeout");
       },
     });
     const stopProgress = subscription.stop;
-    progressCleanupRef.current = stopProgress;
+    stopRunRef.current = () => {
+      runOwnedRef.current = false;
+      if (accepted) void cancelAbandonedJob(clientJobId, "sign-pdf");
+      try {
+        stopProgress();
+      } finally {
+        abandonRequest();
+        if (useFileStore.getState().processing) {
+          failEntry(t.errors.runInterrupted);
+        }
+      }
+    };
 
     const form = new FormData();
     form.append("file", file);
@@ -446,9 +469,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     xhr.upload.onprogress = () => subscription.touch();
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
+      if (xhr.status === 202) accepted = true;
       if (abandoned || xhr.status === 202) return;
       stopProgress();
-      progressCleanupRef.current = null;
       if (xhr.status >= 200 && xhr.status < 300) {
         // Only a body that isn't a result is the server's fault, and it gets
         // reported (#1740). A throw while landing a good result is our own
@@ -501,13 +524,11 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     xhr.onerror = () => {
       if (abandoned) return;
       stopProgress();
-      progressCleanupRef.current = null;
       failRun(t.errors.network, "upload_error");
     };
     xhr.ontimeout = () => {
       if (abandoned) return;
       stopProgress();
-      progressCleanupRef.current = null;
       failRun(sp.timeout, "timeout");
     };
     xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));
@@ -516,6 +537,8 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     });
     xhr.send(form);
   };
+
+  const shownError = error ?? storeError;
 
   return (
     <div className="space-y-4">
@@ -580,7 +603,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
       <p className="text-[11px] text-muted-foreground">{sp.disclaimer}</p>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {shownError && <p className="text-sm text-destructive">{shownError}</p>}
 
       {downloadUrl ? (
         <ResultDownloadLink
