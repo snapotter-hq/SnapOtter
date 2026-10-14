@@ -25,8 +25,10 @@ def main():
         import pymupdf
 
         pymupdf.set_messages(stream=sys.stderr)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        # Degraded mode: MuPDF noise will share the JSON channel. Leave a
+        # breadcrumb on stderr so the failed redirect is visible in bridge logs.
+        print(f"[doc_to_word] pymupdf message redirect unavailable: {exc}", file=sys.stderr)
     try:
         install_pdf2docx_layout_fixes()
         cv = Converter(path)
