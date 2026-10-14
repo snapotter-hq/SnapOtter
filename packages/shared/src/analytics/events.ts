@@ -100,9 +100,9 @@ export interface EditorExportedProperties {
   status: "completed" | "failed";
   /** Why a failed attempt made no file, absent on completed ones: a canvas the browser
    * could not back or read back (`no-context`, `tainted`), no stage to capture, a
-   * server conversion that was refused or unreachable (`server-convert`) or still
-   * running when the server answered (`server-pending`, #2171), the download of the
-   * encoded file, or an unexpected error (`bug`). */
+   * server conversion that was refused, failed, or unreachable (`server-convert`) or
+   * timed out / was closed before a queued conversion finished (`server-pending`,
+   * #2171), the download of the encoded file, or an unexpected error (`bug`). */
   reason?:
     | "no-context"
     | "tainted"

@@ -14,6 +14,7 @@ import {
   Download,
   FileDown,
   FileUp,
+  Loader2,
   Lock,
   Save,
   Unlock,
@@ -33,7 +34,17 @@ import {
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { captureHandledError, track } from "@/lib/analytics";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { format } from "@/lib/format";
+import {
+  checkToolResult,
+  frameFailure,
+  type JobFailure,
+  jobFailureMessage,
+  MalformedResultError,
+  type ProgressFrame,
+  reportMalformedResult,
+} from "@/lib/progress-frames";
 import { cn, copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
@@ -94,8 +105,140 @@ function getMimeType(format: ExportFormat): string {
 // encodes the whole document again. On every keystroke it cost a full render and
 // captured half-typed sizes (#2174). The 200 px thumbnail stays immediate.
 const ESTIMATE_DEBOUNCE_MS = 300;
+const SSE_STALL_TIMEOUT_MS = 5 * 60_000;
 
 type ExportFailureReason = NonNullable<EditorExportedProperties["reason"]>;
+
+/** A result checkToolResult passed: it always carries a download URL. */
+type ConvertResult = Record<string, unknown> & { downloadUrl: string };
+
+interface ProgressHandlers {
+  onProgress?: (percent: number) => void;
+  onComplete: (result: ConvertResult) => void;
+  onFailed: (failure: JobFailure) => void;
+  onStall: () => void;
+}
+
+/** A live progress subscription. */
+export interface ProgressSubscription {
+  /** End it: close the stream and drop the stall timer. Safe to call twice. */
+  stop: () => void;
+  /** Count something outside the stream as a sign of life and restart the stall timer. */
+  touch: () => void;
+  /** Whether the initial EventSource connection was created without throwing. */
+  opened: boolean;
+}
+
+/**
+ * Subscribe to async (202) server-convert job progress (#2171). Reconnects on
+ * tab refocus (the progress endpoint replays the terminal frame from Redis and,
+ * after that cache expires, from the durable job record) and arms a stall
+ * timeout so a wedged job fails with a message instead of leaving the dialog
+ * stuck.
+ */
+export function subscribeExportJobProgress(
+  jobId: string,
+  handlers: ProgressHandlers,
+): ProgressSubscription {
+  let es: EventSource | null = null;
+  let stall: ReturnType<typeof setTimeout> | null = null;
+  let reconnect: ReturnType<typeof setTimeout> | null = null;
+  let done = false;
+
+  const onVisible = () => {
+    if (done || document.visibilityState !== "visible") return;
+    if (es && es.readyState === EventSource.OPEN) return;
+    if (reconnect) clearTimeout(reconnect);
+    reconnect = setTimeout(() => {
+      reconnect = null;
+      open();
+    }, 500);
+  };
+
+  const cleanup = () => {
+    if (done) return;
+    done = true;
+    if (stall) clearTimeout(stall);
+    stall = null;
+    if (reconnect) clearTimeout(reconnect);
+    reconnect = null;
+    if (es) es.close();
+    es = null;
+    document.removeEventListener("visibilitychange", onVisible);
+  };
+
+  const resetStall = () => {
+    if (done) return;
+    if (stall) clearTimeout(stall);
+    stall = setTimeout(() => {
+      cleanup();
+      handlers.onStall();
+    }, SSE_STALL_TIMEOUT_MS);
+  };
+
+  function open() {
+    if (done) return;
+    if (es && es.readyState === EventSource.OPEN) return;
+    if (es) es.close();
+    try {
+      es = new EventSource(appUrl(`/api/v1/jobs/${jobId}/progress`));
+    } catch {
+      return;
+    }
+    es.onmessage = (event) => {
+      let data: ProgressFrame;
+      try {
+        data = resolveServerUrls(JSON.parse(event.data));
+      } catch {
+        return;
+      }
+      let completed: ConvertResult | null = null;
+      if (data.type === "single" && data.phase === "complete") {
+        try {
+          completed = checkToolResult<ConvertResult>(data.result);
+        } catch (err) {
+          cleanup();
+          reportMalformedResult(err, { toolId: "editor-export" });
+          handlers.onFailed({ reason: "invalidResponse" });
+          return;
+        }
+      }
+      try {
+        if (data.type === "heartbeat") {
+          resetStall();
+          return;
+        }
+        if (data.type !== "single") return;
+        resetStall();
+        if (completed) {
+          cleanup();
+          handlers.onComplete(completed);
+          return;
+        }
+        if (data.phase === "failed") {
+          cleanup();
+          handlers.onFailed(frameFailure(data.error, data.details));
+          return;
+        }
+        if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
+      } catch (err) {
+        cleanup();
+        try {
+          handlers.onFailed({ reason: "trackingFailed" });
+        } catch {
+          // onFailed may be what threw; the original error is rethrown below.
+        }
+        throw err;
+      }
+    };
+    es.onerror = () => {};
+  }
+
+  document.addEventListener("visibilitychange", onVisible);
+  open();
+  resetStall();
+  return { stop: cleanup, touch: resetStall, opened: es !== null };
+}
 
 // The canvas the file is made from: exactly `width` x `height` (at least 1 px a
 // side), on white unless the format keeps transparency. The two axes scale on their
@@ -172,7 +315,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [exporting, setExporting] = useState(false);
+  const exportingRef = useRef(false);
+  const stopExportRef = useRef<() => void>(() => {});
   const later = useTimeouts();
+
+  useEffect(() => () => stopExportRef.current(), []);
 
   const aspectRatio = canvasSize.width / canvasSize.height;
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -325,7 +473,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   // the outcome is known (#2174): it used to fire on the click, so a canvas the
   // browser couldn't encode or a server error still counted as an export.
   const handleExport = useCallback(() => {
+    if (exportingRef.current) return;
+    let reported = false;
     const report = (status: "completed" | "failed", reason?: ExportFailureReason) => {
+      if (reported) return;
+      reported = true;
       const properties = {
         output_format: settings.format,
         status,
@@ -348,6 +500,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       markClean();
       report("completed");
     };
+    const finishExport = () => {
+      exportingRef.current = false;
+      setExporting(false);
+    };
     const formatOption = FORMAT_OPTIONS.find((o) => o.value === settings.format);
 
     const failure = guardCapture(() => {
@@ -360,38 +516,229 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
       // Formats the Canvas API cannot encode go to the server as PNG.
       if (formatOption?.needsServerConvert) {
-        canvas.toBlob(async (blob) => {
-          if (!blob || blob.size === 0) {
-            reportEmptyExport();
-            report("failed", "no-context");
-            return;
-          }
-          const formData = new FormData();
-          formData.append("file", blob, "export.png");
-          formData.append(
-            "settings",
-            JSON.stringify({ format: settings.format, quality: settings.quality }),
-          );
-          try {
-            const res = await fetch(appUrl(apiToolPath("convert")), {
-              method: "POST",
-              body: formData,
-            });
-            if (!res.ok) throw new Error("Server convert failed");
-            const json = resolveServerUrls(await res.json());
-            // A conversion that outlives the server's sync wait answers 202 with no
-            // file yet, and the dialog doesn't follow the job (#2171).
-            if (!json.downloadUrl) {
-              console.error("Server-side export answered before the file was ready");
-              report("failed", "server-pending");
+        exportingRef.current = true;
+        setExporting(true);
+        const controller = new AbortController();
+        let stopped = false;
+        stopExportRef.current = () => {
+          stopped = true;
+          exportingRef.current = false;
+          controller.abort();
+          report("failed", "server-pending");
+        };
+        try {
+          canvas.toBlob(async (blob) => {
+            if (stopped) return;
+            if (!blob || blob.size === 0) {
+              stopExportRef.current = () => {};
+              finishExport();
+              reportEmptyExport();
+              report("failed", "no-context");
               return;
             }
-            download(json.downloadUrl);
-          } catch (err) {
-            console.error("Server-side export failed:", err);
-            report("failed", "server-convert");
-          }
-        }, "image/png");
+            const formData = new FormData();
+            formData.append("file", blob, "export.png");
+            formData.append(
+              "settings",
+              JSON.stringify({ format: settings.format, quality: settings.quality }),
+            );
+            let res: Response;
+            try {
+              res = await fetch(appUrl(apiToolPath("convert")), {
+                method: "POST",
+                headers: formatHeaders(),
+                body: formData,
+                signal: controller.signal,
+              });
+            } catch (err) {
+              if (stopped) return;
+              stopExportRef.current = () => {};
+              finishExport();
+              console.error("Server-side export failed:", err);
+              toast.error(t.editor.ui.exportDialog.exportFailed);
+              void captureHandledError(
+                new SafeError("Server-side export request failed", {
+                  kind: "operational",
+                  cause: err,
+                }),
+                { error_class: "operational", tool_id: "editor-export" },
+              );
+              report("failed", "server-convert");
+              return;
+            }
+            if (stopped) return;
+
+            if (!res.ok) {
+              const body =
+                typeof res.json === "function" ? await res.json().catch(() => null) : null;
+              if (stopped) return;
+              stopExportRef.current = () => {};
+              finishExport();
+              const message = failedAnswerMessage(
+                t,
+                body,
+                res.status,
+                t.editor.ui.exportDialog.exportFailed,
+              );
+              console.error("Server-side export failed:", res.status, body);
+              toast.error(message);
+              void captureHandledError(
+                new SafeError("Server-side export failed", {
+                  kind: "operational",
+                  statusCode: res.status,
+                }),
+                { error_class: "operational", tool_id: "editor-export" },
+              );
+              report("failed", "server-convert");
+              return;
+            }
+
+            let rawBody: unknown;
+            try {
+              rawBody = resolveServerUrls(await res.json());
+            } catch (err) {
+              if (stopped) return;
+              stopExportRef.current = () => {};
+              finishExport();
+              console.error("Server-side export failed:", err);
+              reportMalformedResult(new MalformedResultError("notAnObject"), {
+                status: res.status,
+                toolId: "editor-export",
+              });
+              toast.error(t.errors.invalidResponse);
+              report("failed", "server-convert");
+              return;
+            }
+            if (stopped) return;
+
+            const isAsyncAccepted =
+              res.status === 202 ||
+              (typeof rawBody === "object" &&
+                rawBody !== null &&
+                !Array.isArray(rawBody) &&
+                (rawBody as Record<string, unknown>).async === true);
+
+            if (isAsyncAccepted) {
+              const jobId =
+                typeof (rawBody as Record<string, unknown> | null)?.jobId === "string"
+                  ? ((rawBody as Record<string, unknown>).jobId as string)
+                  : "";
+              if (!jobId) {
+                stopExportRef.current = () => {};
+                finishExport();
+                console.error("Server-side export answered 202 without a jobId");
+                reportMalformedResult(new MalformedResultError("missingResultField"), {
+                  status: res.status,
+                  toolId: "editor-export",
+                });
+                toast.error(t.errors.invalidResponse);
+                report("failed", "server-convert");
+                return;
+              }
+              if (typeof EventSource !== "function") {
+                stopExportRef.current = () => {};
+                finishExport();
+                console.error("Server-side export answered before the file was ready");
+                toast.error(t.editor.ui.exportDialog.exportFailed);
+                void captureHandledError(
+                  new SafeError("Server-side export progress stream unavailable", {
+                    kind: "operational",
+                  }),
+                  { error_class: "operational", tool_id: "editor-export" },
+                );
+                report("failed", "server-pending");
+                return;
+              }
+              let failedOnce = false;
+              const subscription = subscribeExportJobProgress(jobId, {
+                onComplete: (result) => {
+                  stopExportRef.current = () => {};
+                  finishExport();
+                  download(result.downloadUrl);
+                },
+                onFailed: (failure) => {
+                  if (failedOnce) return;
+                  failedOnce = true;
+                  stopExportRef.current = () => {};
+                  finishExport();
+                  const isTrackingBug = "reason" in failure && failure.reason === "trackingFailed";
+                  console.error("Server-side export failed:", failure);
+                  toast.error(jobFailureMessage(failure, t.errors));
+                  if (isTrackingBug) {
+                    void captureHandledError(
+                      new SafeError("Editor export failed", { kind: "bug" }),
+                      {
+                        error_class: "bug",
+                        tool_id: "editor-export",
+                      },
+                    );
+                  }
+                  report("failed", isTrackingBug ? "bug" : "server-convert");
+                },
+                onStall: () => {
+                  stopExportRef.current = () => {};
+                  finishExport();
+                  toast.error(t.errors.timeout);
+                  void captureHandledError(
+                    new SafeError("Server-side export timed out waiting for job progress", {
+                      kind: "operational",
+                    }),
+                    { error_class: "operational", tool_id: "editor-export" },
+                  );
+                  report("failed", "server-pending");
+                },
+              });
+              if (!subscription.opened) {
+                subscription.stop();
+                stopExportRef.current = () => {};
+                finishExport();
+                console.error("Server-side export answered before the file was ready");
+                toast.error(t.editor.ui.exportDialog.exportFailed);
+                void captureHandledError(
+                  new SafeError("Server-side export progress stream unavailable", {
+                    kind: "operational",
+                  }),
+                  { error_class: "operational", tool_id: "editor-export" },
+                );
+                report("failed", "server-pending");
+                return;
+              }
+              stopExportRef.current = () => {
+                stopped = true;
+                exportingRef.current = false;
+                subscription.stop();
+                report("failed", "server-pending");
+              };
+              return;
+            }
+
+            let result: ConvertResult;
+            try {
+              result = checkToolResult<ConvertResult>(rawBody);
+            } catch (err) {
+              stopExportRef.current = () => {};
+              finishExport();
+              console.error("Server-side export returned no download URL");
+              reportMalformedResult(err, { status: res.status, toolId: "editor-export" });
+              toast.error(t.errors.invalidResponse);
+              report("failed", "server-convert");
+              return;
+            }
+            stopExportRef.current = () => {};
+            finishExport();
+            try {
+              download(result.downloadUrl);
+            } catch (err) {
+              console.error("Server-side export failed:", err);
+              handleUnexpectedError(err);
+              report("failed", "bug");
+            }
+          }, "image/png");
+        } catch (err) {
+          stopExportRef.current = () => {};
+          finishExport();
+          throw err;
+        }
         return;
       }
 
@@ -423,7 +770,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         });
     });
     if (failure) report("failed", failure);
-  }, [settings, canvasSize, markClean, reportEmptyExport, guardCapture, handleUnexpectedError]);
+  }, [settings, canvasSize, markClean, reportEmptyExport, guardCapture, handleUnexpectedError, t]);
 
   // Copy a transparent PNG at the requested size through the Konva stage.
   const handleCopyToClipboard = useCallback(async () => {
@@ -753,9 +1100,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={handleExport}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
+              disabled={exporting}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              <Download size={14} />
+              {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               {t.editor.ui.exportDialog.exportButton}
             </button>
             <button

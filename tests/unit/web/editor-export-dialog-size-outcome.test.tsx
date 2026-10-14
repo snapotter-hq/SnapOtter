@@ -422,7 +422,7 @@ describe("editor_exported carries the outcome (#2174)", () => {
     expect(markClean).not.toHaveBeenCalled();
   });
 
-  it("counts a server conversion the API refused as a failed export", async () => {
+  it("counts a server conversion the API refused as a failed export, toasts, and reports to Sentry", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(
       "fetch",
@@ -431,17 +431,22 @@ describe("editor_exported carries the outcome (#2174)", () => {
     render(<ExportDialog onClose={() => {}} />);
     pickFormat("AVIF");
     clickExport();
-    await waitFor(() => expect(console.error).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(reported.message).toBe("Server-side export failed");
+    expect((reported as { statusCode?: number }).statusCode).toBe(500);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "editor-export" });
     expect(await exported()).toEqual([
       { output_format: "avif", status: "failed", reason: "server-convert" },
     ]);
     expect(markClean).not.toHaveBeenCalled();
   });
 
-  // The convert route answers 202 with no file once a job outlives its sync wait,
-  // and the dialog doesn't follow the job yet (#2171). That gets its own reason so
-  // a slow server isn't counted as a refusal.
-  it("counts a conversion the server answered before it finished as a failed export", async () => {
+  // When EventSource is unavailable, a 202 cannot be followed and fails as server-pending.
+  it("counts a conversion the server answered before it finished as a failed export when EventSource is unavailable", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal(
       "fetch",
@@ -455,7 +460,10 @@ describe("editor_exported carries the outcome (#2174)", () => {
     render(<ExportDialog onClose={() => {}} />);
     pickFormat("AVIF");
     clickExport();
-    await waitFor(() => expect(console.error).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
     expect(await exported()).toEqual([
       { output_format: "avif", status: "failed", reason: "server-pending" },
     ]);
@@ -614,5 +622,582 @@ describe("the size estimate waits for typing to stop (#2174)", () => {
       vi.advanceTimersByTime(ESTIMATE_DEBOUNCE_MS);
     });
     expect(fullCaptures()).toHaveLength(1);
+  });
+});
+
+class FakeEventSource {
+  static OPEN = 1;
+  static instances: FakeEventSource[] = [];
+
+  readonly url: string;
+  readyState = FakeEventSource.OPEN;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+
+  constructor(url: string) {
+    this.url = url;
+    FakeEventSource.instances.push(this);
+  }
+
+  close() {
+    this.readyState = 2;
+  }
+}
+
+describe("server-converted formats follow 202 progress and surface errors (#2171)", () => {
+  beforeEach(() => {
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it.each(["AVIF", "TIFF", "GIF", "JXL"] as const)(
+    "follows a 202 %s export through SSE progress to completion and marks clean only when the download URL arrives",
+    async (label) => {
+      const ext = label.toLowerCase();
+      const fetchSpy = vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: `job-${ext}`, async: true }),
+      }));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      render(<ExportDialog onClose={() => {}} />);
+      pickFormat(label);
+      clickExport();
+
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+      const es = FakeEventSource.instances[0];
+      expect(es.url).toBe(`/api/v1/jobs/job-${ext}/progress`);
+      expect(markClean).not.toHaveBeenCalled();
+      expect(await exported()).toEqual([]);
+
+      // While the job is running on the server, the Export button is disabled so
+      // clicking again cannot queue another conversion.
+      const exportBtn = screen.getByRole("button", {
+        name: en.editor.ui.exportDialog.exportButton,
+      });
+      expect(exportBtn).toBeDisabled();
+      fireEvent.click(exportBtn);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        es.onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+        });
+      });
+      expect(markClean).not.toHaveBeenCalled();
+
+      act(() => {
+        es.onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: `/api/v1/download/job-${ext}/export.${ext}` },
+          }),
+        });
+      });
+
+      await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+      expect(toastError).not.toHaveBeenCalled();
+      expect(es.readyState).toBe(2);
+      expect(exportBtn).toBeEnabled();
+      expect(await exported()).toEqual([{ output_format: ext, status: "completed" }]);
+    },
+  );
+
+  it("surfaces the worker's error message in a toast when a 202 export fails on the stream", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: "job-fail", async: true }),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("JXL");
+    clickExport();
+
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "failed",
+          error: "Encoder out of memory",
+          details: "Try smaller dimensions",
+        }),
+      });
+    });
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith("Encoder out of memory: Try smaller dimensions"),
+    );
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "jxl", status: "failed", reason: "server-convert" },
+    ]);
+    expect(
+      screen.getByRole("button", { name: en.editor.ui.exportDialog.exportButton }),
+    ).toBeEnabled();
+  });
+
+  it("falls back to translated processingFailedNoDetail when a 202 failed frame has no error text", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: "job-bare-fail", async: true }),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("TIFF");
+    clickExport();
+
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "failed", error: "   " }),
+      });
+    });
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.errors.processingFailedNoDetail),
+    );
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "tiff", status: "failed", reason: "server-convert" },
+    ]);
+  });
+
+  it("reports a malformed completed SSE frame without a downloadUrl and toasts invalidResponse", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: "job-malformed-sse", async: true }),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("GIF");
+    clickExport();
+
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(en.errors.invalidResponse));
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "gif", status: "failed", reason: "server-convert" },
+    ]);
+  });
+
+  it("toasts a timeout error and reports server-pending when a 202 progress stream stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 202,
+          json: async () => ({ jobId: "job-stall", async: true }),
+        })),
+      );
+      render(<ExportDialog onClose={() => {}} />);
+      pickFormat("AVIF");
+      clickExport();
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(FakeEventSource.instances).toHaveLength(1);
+
+      act(() => {
+        vi.advanceTimersByTime(5 * 60_000);
+      });
+
+      expect(toastError).toHaveBeenCalledWith(en.errors.timeout);
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      expect(markClean).not.toHaveBeenCalled();
+      expect(await exported()).toEqual([
+        { output_format: "avif", status: "failed", reason: "server-pending" },
+      ]);
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reconnects the 202 progress stream when the tab becomes visible after a drop", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 202,
+          json: async () => ({ jobId: "job-vis", async: true }),
+        })),
+      );
+      render(<ExportDialog onClose={() => {}} />);
+      pickFormat("AVIF");
+      clickExport();
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(FakeEventSource.instances).toHaveLength(1);
+      FakeEventSource.instances[0].close();
+
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        writable: true,
+        configurable: true,
+      });
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+        vi.advanceTimersByTime(500);
+      });
+
+      expect(FakeEventSource.instances).toHaveLength(2);
+      act(() => {
+        FakeEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: "/api/v1/download/job-vis/export.avif" },
+          }),
+        });
+      });
+
+      expect(markClean).toHaveBeenCalledTimes(1);
+      expect(await exported()).toEqual([{ output_format: "avif", status: "completed" }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("closes the 202 progress stream and clears its timers when the dialog unmounts", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 202,
+          json: async () => ({ jobId: "job-unmount", async: true }),
+        })),
+      );
+      const { unmount } = render(<ExportDialog onClose={() => {}} />);
+      pickFormat("AVIF");
+      clickExport();
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(FakeEventSource.instances).toHaveLength(1);
+
+      unmount();
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+
+      act(() => {
+        vi.advanceTimersByTime(10 * 60_000);
+      });
+      expect(toastError).not.toHaveBeenCalled();
+      expect(markClean).not.toHaveBeenCalled();
+      expect(await exported()).toEqual([
+        { output_format: "avif", status: "failed", reason: "server-pending" },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    [
+      "a 400 error with details",
+      400,
+      { error: "Invalid settings", details: "quality: out of range" },
+      "Invalid settings: quality: out of range",
+    ],
+    [
+      "a 422 error with details alone",
+      422,
+      { details: "Image exceeds maximum allowed megapixels" },
+      "Image exceeds maximum allowed megapixels",
+    ],
+    ["a 413 payload too large", 413, { error: "Payload Too Large" }, en.errors.fileTooLarge],
+    [
+      "an object error body",
+      500,
+      { error: { code: "INTERNAL" } },
+      en.editor.ui.exportDialog.exportFailed,
+    ],
+  ])(
+    "turns %s into a readable toast via parseApiError/failedAnswerMessage",
+    async (_label, status, body, expectedMessage) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: false,
+          status,
+          json: async () => body,
+        })),
+      );
+      render(<ExportDialog onClose={() => {}} />);
+      pickFormat("AVIF");
+      clickExport();
+
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith(expectedMessage));
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      expect(markClean).not.toHaveBeenCalled();
+      expect(await exported()).toEqual([
+        { output_format: "avif", status: "failed", reason: "server-convert" },
+      ]);
+    },
+  );
+
+  it("toasts and reports to Sentry when the server-convert fetch rejects with a network error", async () => {
+    const networkErr = new TypeError("Failed to fetch");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw networkErr;
+      }),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(reported.message).toBe("Server-side export request failed");
+    expect(reported.cause).toBe(networkErr);
+    expect(tags).toEqual({ error_class: "operational", tool_id: "editor-export" });
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "avif", status: "failed", reason: "server-convert" },
+    ]);
+  });
+
+  it("reports a malformed 200 response with no downloadUrl and toasts invalidResponse", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(en.errors.invalidResponse));
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "avif", status: "failed", reason: "server-convert" },
+    ]);
+  });
+
+  it("reports a malformed 202 response with no jobId and toasts invalidResponse", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ async: true }),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(en.errors.invalidResponse));
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "avif", status: "failed", reason: "server-convert" },
+    ]);
+  });
+
+  it("reports a 200 response whose body is not valid JSON and toasts invalidResponse", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError("Unexpected token '<'");
+        },
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(en.errors.invalidResponse));
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "avif", status: "failed", reason: "server-convert" },
+    ]);
+  });
+
+  it("aborts an in-flight convert fetch when the dialog unmounts before the server answers", async () => {
+    let signal: AbortSignal | undefined;
+    let rejectFetch: (err: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            signal = init?.signal ?? undefined;
+            rejectFetch = reject;
+          }),
+      ),
+    );
+    const { unmount } = render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal?.aborted).toBe(false);
+
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    rejectFetch(new DOMException("Aborted", "AbortError"));
+    await act(async () => {});
+
+    expect(toastError).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "avif", status: "failed", reason: "server-pending" },
+    ]);
+  });
+
+  it("forwards auth headers on the server-convert POST request", async () => {
+    const store = new Map<string, string>([["snapotter-token", "tok-secret"]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k),
+      clear: () => store.clear(),
+    });
+    let sentHeaders: Headers | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        sentHeaders = init?.headers as Headers | undefined;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ downloadUrl: "/api/v1/download/job/export.avif" }),
+        };
+      }),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(sentHeaders?.get("Authorization")).toBe("Bearer tok-secret");
+  });
+
+  it("fails immediately as server-pending when the EventSource constructor throws", async () => {
+    vi.stubGlobal(
+      "EventSource",
+      class {
+        constructor() {
+          throw new DOMException("Blocked by CSP", "SecurityError");
+        }
+      },
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: "job-csp", async: true }),
+      })),
+    );
+
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(markClean).not.toHaveBeenCalled();
+    expect(await exported()).toEqual([
+      { output_format: "avif", status: "failed", reason: "server-pending" },
+    ]);
+  });
+
+  it("reports a bug and toasts exportFailed when download() throws on a sync 200 server conversion", async () => {
+    markClean.mockImplementationOnce(() => {
+      throw new Error("store subscriber broke");
+    });
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(await exported()).toEqual([{ output_format: "avif", status: "failed", reason: "bug" }]);
+  });
+
+  it("reports a bug and toasts jobTrackingFailed when download() throws on a 202 completion frame", async () => {
+    markClean.mockImplementationOnce(() => {
+      throw new Error("store subscriber broke");
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: "job-track-err", async: true }),
+      })),
+    );
+    render(<ExportDialog onClose={() => {}} />);
+    pickFormat("AVIF");
+    clickExport();
+
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    expect(() =>
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: "/api/v1/download/job-track-err/export.avif" },
+        }),
+      }),
+    ).toThrow("store subscriber broke");
+
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(toastError).toHaveBeenCalledWith(en.errors.jobTrackingFailed);
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(await exported()).toEqual([{ output_format: "avif", status: "failed", reason: "bug" }]);
   });
 });

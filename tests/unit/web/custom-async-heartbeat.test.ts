@@ -6,6 +6,7 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+import { subscribeExportJobProgress } from "@/components/editor/common/export-dialog";
 import { subscribeEraseObjectJobProgress } from "@/components/tools/erase-object-settings";
 import { subscribeSignPdfJobProgress } from "@/components/tools/sign-pdf-settings";
 import { captureHandledError } from "@/lib/analytics";
@@ -41,6 +42,11 @@ const subscribers = [
     "sign-pdf",
     (...args: Parameters<typeof subscribeSignPdfJobProgress>) =>
       subscribeSignPdfJobProgress(...args).stop,
+  ],
+  [
+    "editor-export",
+    (...args: Parameters<typeof subscribeExportJobProgress>) =>
+      subscribeExportJobProgress(...args).stop,
   ],
 ] as const;
 
@@ -313,6 +319,7 @@ describe.each(subscribers)(
 const touchSubscribers = [
   ["erase-object", subscribeEraseObjectJobProgress],
   ["sign-pdf", subscribeSignPdfJobProgress],
+  ["editor-export", subscribeExportJobProgress],
 ] as const;
 
 describe.each(touchSubscribers)("%s async progress: touch", (_name, subscribe) => {
