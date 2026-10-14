@@ -3,7 +3,8 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  PointerSensor,
+  KeyboardSensor,
+  MouseSensor,
   TouchSensor,
   useDraggable,
   useDroppable,
@@ -202,13 +203,18 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
   const [activeDragCell, setActiveDragCell] = useState<number | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const cellIndex = event.active.data.current?.cellIndex as number | undefined;
     if (cellIndex != null) setActiveDragCell(cellIndex);
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragCell(null);
   }, []);
 
   const handleDragEnd = useCallback(
@@ -249,7 +255,12 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
       onKeyDown={(e) => e.key === "Escape" && store.setSelectedCell(null)}
     >
       <div className="relative w-full max-w-[800px] max-h-full" style={aspectStyle}>
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
           <div
             className="w-full h-full rounded-lg overflow-hidden shadow-lg"
             style={{
@@ -525,7 +536,12 @@ function CollageCell({
           className="absolute top-1.5 right-1.5 flex items-center gap-1"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"
@@ -560,7 +576,8 @@ function CollageCell({
             {...listeners}
             {...attributes}
             aria-label={t.a11y.dragToReorder}
-            className="bg-black/50 backdrop-blur-sm text-white rounded p-1 cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors"
+            style={{ WebkitTouchCallout: "none" }}
+            className="bg-black/50 backdrop-blur-sm text-white rounded p-1 select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing hover:bg-black/70 transition-colors"
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
@@ -578,8 +595,12 @@ function CollageCell({
           )}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
           onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <input
             type="range"

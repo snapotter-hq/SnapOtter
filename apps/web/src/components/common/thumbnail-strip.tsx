@@ -3,7 +3,8 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -324,7 +325,8 @@ function SortableThumbTile({
         {...listeners}
         aria-label={dragLabel}
         title={dragLabel}
-        className="absolute top-0 start-0 flex h-4 w-4 items-center justify-center rounded-ee bg-background/70 text-muted-foreground cursor-grab active:cursor-grabbing hover:bg-background hover:text-foreground focus:opacity-100"
+        style={{ WebkitTouchCallout: "none" }}
+        className="absolute top-0 start-0 flex h-4 w-4 items-center justify-center rounded-ee bg-background/70 text-muted-foreground select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing hover:bg-background hover:text-foreground focus:opacity-100"
         onClick={(e) => e.stopPropagation()}
       >
         <GripVertical className="h-3 w-3" />
@@ -353,7 +355,8 @@ export function ThumbnailStrip({
   const { t } = useTranslation();
   const selectedRef = useRef<HTMLButtonElement>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

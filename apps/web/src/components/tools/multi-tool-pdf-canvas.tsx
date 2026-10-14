@@ -3,7 +3,7 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -225,7 +225,8 @@ const PlanCard = memo(function PlanCard({
           <img
             src={thumb}
             alt=""
-            className="absolute top-1/2 left-1/2 max-w-none max-h-none object-contain"
+            draggable={false}
+            className="absolute top-1/2 left-1/2 max-w-none max-h-none object-contain pointer-events-none select-none"
             style={{
               width: tw,
               height: th,
@@ -241,7 +242,8 @@ const PlanCard = memo(function PlanCard({
       <div className="flex items-center justify-between px-0.5 pt-1">
         <button
           type="button"
-          className="p-1 rounded hover:bg-muted text-muted-foreground font-medium text-[10px]"
+          style={{ WebkitTouchCallout: "none" }}
+          className="p-1 rounded hover:bg-muted text-muted-foreground font-medium text-[10px] select-none [-webkit-touch-callout:none]"
           aria-label={label}
           data-testid={`multi-tool-grip-${index}`}
           {...attributes}
@@ -280,7 +282,8 @@ const PlanCard = memo(function PlanCard({
           clicking through. Non-focusable and non-announced: the grip button
           above carries the keyboard-drag a11y role. */}
       <span
-        className="absolute top-1.5 left-1.5 right-1.5 bottom-7 opacity-0 cursor-grab active:cursor-grabbing"
+        style={{ WebkitTouchCallout: "none" }}
+        className="absolute top-1.5 left-1.5 right-1.5 bottom-7 opacity-0 select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing"
         aria-hidden="true"
         {...listeners}
       />
@@ -503,7 +506,7 @@ export function MultiToolPdfCanvas() {
   useEffect(() => syncFiles(files), [files, syncFiles]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );

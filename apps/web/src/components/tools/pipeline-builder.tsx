@@ -3,7 +3,8 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -101,9 +102,13 @@ function SortableStep({
             <span
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted text-muted-foreground"
+              style={{ WebkitTouchCallout: "none" }}
+              className="select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted text-muted-foreground"
               onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                listeners?.onKeyDown?.(e);
+              }}
             >
               <GripVertical className="h-4 w-4" />
             </span>
@@ -185,7 +190,8 @@ export function PipelineBuilder({
     uploadedModality ?? null,
   );
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

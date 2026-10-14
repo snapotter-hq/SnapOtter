@@ -372,4 +372,198 @@ describe("PDF multi-tool editor regressions", () => {
       ],
     });
   });
+
+  describe("touch and mouse reordering (#2596)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    });
+
+    function mockTileRect(el: HTMLElement, index: number) {
+      const left = index * 160;
+      const top = 0;
+      const width = 152;
+      const height = 220;
+      vi.spyOn(el, "getBoundingClientRect").mockReturnValue({
+        x: left,
+        y: top,
+        left,
+        top,
+        right: left + width,
+        bottom: top + height,
+        width,
+        height,
+        toJSON: () => ({}),
+      });
+    }
+
+    async function renderSortablePlan() {
+      await seedPrimary();
+      act(() => {
+        useMultiToolStore.getState().patchDoc(0, {
+          thumbs: { 1: "data:image/jpeg;base64,p1", 2: "data:image/jpeg;base64,p2" },
+        });
+      });
+      const tile0 = screen.getByTestId("multi-tool-page-0");
+      const tile1 = screen.getByTestId("multi-tool-page-1");
+      mockTileRect(tile0, 0);
+      mockTileRect(tile1, 1);
+      return { tile0, tile1 };
+    }
+
+    it("reorders pages when the grip or thumbnail overlay is press-and-held on touch across pointerdown and pointercancel", async () => {
+      await renderSortablePlan();
+      const grip0 = screen.getByTestId("multi-tool-grip-0");
+      expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([1, 2]);
+
+      act(() => {
+        fireEvent.pointerDown(grip0, {
+          pointerId: 1,
+          pointerType: "touch",
+          isPrimary: true,
+          button: 0,
+          clientX: 70,
+          clientY: 100,
+        });
+        fireEvent.touchStart(grip0, {
+          touches: [{ identifier: 0, clientX: 70, clientY: 100 }],
+        });
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(250);
+      });
+
+      act(() => {
+        fireEvent.pointerCancel(grip0, { pointerId: 1, pointerType: "touch", isPrimary: true });
+        fireEvent.touchMove(grip0, {
+          touches: [{ identifier: 0, clientX: 230, clientY: 100 }],
+        });
+      });
+
+      await act(async () => {
+        fireEvent.touchEnd(grip0, {
+          changedTouches: [{ identifier: 0, clientX: 230, clientY: 100 }],
+        });
+      });
+
+      await waitFor(() => {
+        expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([2, 1]);
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(60);
+      });
+
+      // Also verify dragging via the thumbnail drag overlay span
+      const tile0 = screen.getByTestId("multi-tool-page-0");
+      const tile1 = screen.getByTestId("multi-tool-page-1");
+      mockTileRect(tile0, 0);
+      mockTileRect(tile1, 1);
+      const overlay0 = tile0.querySelector('span[aria-hidden="true"]') as HTMLElement;
+      expect(overlay0).not.toBeNull();
+
+      act(() => {
+        fireEvent.pointerDown(overlay0, {
+          pointerId: 2,
+          pointerType: "touch",
+          isPrimary: true,
+          button: 0,
+          clientX: 70,
+          clientY: 100,
+        });
+        fireEvent.touchStart(overlay0, {
+          touches: [{ identifier: 1, clientX: 70, clientY: 100 }],
+        });
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(250);
+      });
+
+      act(() => {
+        fireEvent.pointerCancel(overlay0, { pointerId: 2, pointerType: "touch", isPrimary: true });
+        fireEvent.touchMove(overlay0, {
+          touches: [{ identifier: 1, clientX: 230, clientY: 100 }],
+        });
+      });
+
+      await act(async () => {
+        fireEvent.touchEnd(overlay0, {
+          changedTouches: [{ identifier: 1, clientX: 230, clientY: 100 }],
+        });
+      });
+
+      await waitFor(() => {
+        expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([1, 2]);
+      });
+    });
+
+    it("cancels touch drag on an immediate swipe so scrolling does not reorder pages", async () => {
+      await renderSortablePlan();
+      const grip0 = screen.getByTestId("multi-tool-grip-0");
+
+      act(() => {
+        fireEvent.touchStart(grip0, {
+          touches: [{ identifier: 0, clientX: 70, clientY: 100 }],
+        });
+        fireEvent.touchMove(grip0, {
+          touches: [{ identifier: 0, clientX: 70, clientY: 150 }],
+        });
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(250);
+        fireEvent.touchMove(grip0, {
+          touches: [{ identifier: 0, clientX: 230, clientY: 100 }],
+        });
+        fireEvent.touchEnd(grip0, {
+          changedTouches: [{ identifier: 0, clientX: 230, clientY: 100 }],
+        });
+      });
+
+      expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([1, 2]);
+    });
+
+    it("reorders pages on a desktop mouse drag", async () => {
+      await renderSortablePlan();
+      const grip0 = screen.getByTestId("multi-tool-grip-0");
+
+      act(() => {
+        fireEvent.mouseDown(grip0, { button: 0, clientX: 70, clientY: 100 });
+        fireEvent.mouseMove(document, { clientX: 80, clientY: 100 });
+      });
+
+      act(() => {
+        fireEvent.mouseMove(document, { clientX: 230, clientY: 100 });
+      });
+
+      await act(async () => {
+        fireEvent.mouseUp(document, { clientX: 230, clientY: 100 });
+      });
+
+      await waitFor(() => {
+        expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([2, 1]);
+      });
+    });
+
+    it("marks rendered thumbnail images non-draggable and suppresses iOS touch callout on drag surfaces", async () => {
+      const { tile0 } = await renderSortablePlan();
+      const grip0 = screen.getByTestId("multi-tool-grip-0");
+      const overlay0 = tile0.querySelector('span[aria-hidden="true"]') as HTMLElement;
+      const img = tile0.querySelector("img") as HTMLImageElement;
+
+      expect(img).toHaveAttribute("draggable", "false");
+      expect(img.className).toContain("pointer-events-none");
+      expect(img.className).toContain("select-none");
+      expect(grip0.className).toContain("select-none");
+      expect(grip0.className).toContain("[-webkit-touch-callout:none]");
+      expect(overlay0.className).toContain("select-none");
+      expect(overlay0.className).toContain("[-webkit-touch-callout:none]");
+    });
+  });
 });

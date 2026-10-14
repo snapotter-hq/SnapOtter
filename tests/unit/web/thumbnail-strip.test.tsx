@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.stubGlobal("URL", {
@@ -153,5 +154,164 @@ describe("ThumbnailStrip", () => {
       "Scaled down to fit the size target",
     );
     expect(tile("fit.jpg").getAttribute("aria-describedby")).toBeNull();
+  });
+
+  describe("touch and mouse reordering (#2596)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    function mockSortableRects(handles: HTMLElement[]) {
+      handles.forEach((handle, i) => {
+        const wrapper = handle.parentElement as HTMLElement;
+        const left = i * 60;
+        const top = 0;
+        const width = 52;
+        const height = 38;
+        vi.spyOn(wrapper, "getBoundingClientRect").mockReturnValue({
+          x: left,
+          y: top,
+          left,
+          top,
+          right: left + width,
+          bottom: top + height,
+          width,
+          height,
+          toJSON: () => ({}),
+        });
+      });
+    }
+
+    it("reorders thumbnails on a touch press-and-hold even when the browser fires pointerdown and pointercancel", async () => {
+      const entries = stage("a.png", "b.png", "c.png");
+      const onReorder = vi.fn();
+      render(
+        <ThumbnailStrip
+          entries={entries}
+          selectedIndex={0}
+          onSelect={() => {}}
+          onReorder={onReorder}
+        />,
+      );
+
+      const handles = screen.getAllByLabelText(/drag to reorder/i);
+      mockSortableRects(handles);
+      const handle0 = handles[0];
+
+      act(() => {
+        fireEvent.pointerDown(handle0, {
+          pointerId: 1,
+          pointerType: "touch",
+          isPrimary: true,
+          button: 0,
+          clientX: 20,
+          clientY: 19,
+        });
+        fireEvent.touchStart(handle0, {
+          touches: [{ identifier: 0, clientX: 20, clientY: 19 }],
+        });
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(250);
+      });
+
+      act(() => {
+        fireEvent.pointerCancel(handle0, { pointerId: 1, pointerType: "touch", isPrimary: true });
+        fireEvent.touchMove(handle0, {
+          touches: [{ identifier: 0, clientX: 85, clientY: 19 }],
+        });
+      });
+
+      await act(async () => {
+        fireEvent.touchEnd(handle0, {
+          changedTouches: [{ identifier: 0, clientX: 85, clientY: 19 }],
+        });
+      });
+
+      await waitFor(() => {
+        expect(onReorder).toHaveBeenCalledWith(0, 1);
+      });
+      expect(handle0.className).toContain("select-none");
+      expect(handle0.className).toContain("[-webkit-touch-callout:none]");
+    });
+
+    it("cancels touch drag on an immediate swipe so scrolling does not reorder thumbnails", async () => {
+      const entries = stage("a.png", "b.png", "c.png");
+      const onReorder = vi.fn();
+      render(
+        <ThumbnailStrip
+          entries={entries}
+          selectedIndex={0}
+          onSelect={() => {}}
+          onReorder={onReorder}
+        />,
+      );
+
+      const handles = screen.getAllByLabelText(/drag to reorder/i);
+      mockSortableRects(handles);
+      const handle0 = handles[0];
+
+      act(() => {
+        fireEvent.touchStart(handle0, {
+          touches: [{ identifier: 0, clientX: 20, clientY: 19 }],
+        });
+        fireEvent.touchMove(handle0, {
+          touches: [{ identifier: 0, clientX: 60, clientY: 19 }],
+        });
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(250);
+        fireEvent.touchMove(handle0, {
+          touches: [{ identifier: 0, clientX: 85, clientY: 19 }],
+        });
+        fireEvent.touchEnd(handle0, {
+          changedTouches: [{ identifier: 0, clientX: 85, clientY: 19 }],
+        });
+      });
+
+      expect(onReorder).not.toHaveBeenCalled();
+    });
+
+    it("reorders thumbnails on a desktop mouse drag", async () => {
+      const entries = stage("a.png", "b.png", "c.png");
+      const onReorder = vi.fn();
+      render(
+        <ThumbnailStrip
+          entries={entries}
+          selectedIndex={0}
+          onSelect={() => {}}
+          onReorder={onReorder}
+        />,
+      );
+
+      const handles = screen.getAllByLabelText(/drag to reorder/i);
+      mockSortableRects(handles);
+      const handle0 = handles[0];
+
+      act(() => {
+        fireEvent.mouseDown(handle0, { button: 0, clientX: 20, clientY: 19 });
+        fireEvent.mouseMove(document, { clientX: 30, clientY: 19 });
+      });
+
+      act(() => {
+        fireEvent.mouseMove(document, { clientX: 145, clientY: 19 });
+      });
+
+      await act(async () => {
+        fireEvent.mouseUp(document, { clientX: 145, clientY: 19 });
+      });
+
+      await waitFor(() => {
+        expect(onReorder).toHaveBeenCalledWith(0, 2);
+      });
+    });
   });
 });

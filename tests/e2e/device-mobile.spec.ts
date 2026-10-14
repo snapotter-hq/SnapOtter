@@ -425,6 +425,148 @@ test.describe("@mobile Organize PDF on a phone", () => {
   });
 });
 
+test.describe("@mobile Automate pipeline on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("reorders pipeline steps when a grip is press-and-held and dragged on touch (#2596)", async ({
+    loggedInPage: page,
+    browserName,
+  }) => {
+    await page.goto("/automate");
+    const addToolFab = page.getByRole("button", { name: /add tool/i });
+    await expect(addToolFab).toBeVisible({ timeout: 15_000 });
+
+    await addToolFab.click();
+    const search = page.getByPlaceholder("Search tools...");
+    await expect(search).toBeVisible({ timeout: 5_000 });
+    await search.fill("Resize Image");
+    await page
+      .getByRole("button", { name: /resize image/i })
+      .first()
+      .click();
+    await expect(page.getByTitle("Remove")).toHaveCount(1, { timeout: 5_000 });
+
+    await addToolFab.click();
+    await expect(search).toBeVisible({ timeout: 5_000 });
+    await search.fill("Compress Image");
+    await page
+      .getByRole("button", { name: /compress image/i })
+      .first()
+      .click();
+    await expect(page.getByTitle("Remove")).toHaveCount(2, { timeout: 5_000 });
+
+    // Collapse the newly added step so both sortable cards have compact header height.
+    await page.getByText("Compress Image").first().click();
+
+    const handles = page.locator('span[aria-roledescription="sortable"]');
+    await expect(handles).toHaveCount(2);
+
+    const box1 = await handles.nth(0).boundingBox();
+    const box2 = await handles.nth(1).boundingBox();
+    expect(box1).not.toBeNull();
+    expect(box2).not.toBeNull();
+    if (!box1 || !box2) return;
+
+    const startX = Math.round(box1.x + box1.width / 2);
+    const startY = Math.round(box1.y + box1.height / 2);
+    const endX = Math.round(box2.x + box2.width / 2);
+    const endY = Math.round(box2.y + box2.height / 2 + 12);
+
+    if (browserName === "chromium") {
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: startX, y: startY, id: 0 }],
+        });
+        await page.waitForTimeout(300);
+        const steps = 8;
+        for (let i = 1; i <= steps; i += 1) {
+          const x = Math.round(startX + ((endX - startX) * i) / steps);
+          const y = Math.round(startY + ((endY - startY) * i) / steps);
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [{ x, y, id: 0 }],
+          });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+      } finally {
+        await cdp.detach().catch(() => {});
+      }
+    } else {
+      await page.evaluate(
+        async ({ sx, sy, ex, ey }) => {
+          const target = document.querySelector(
+            'span[aria-roledescription="sortable"]',
+          ) as HTMLElement | null;
+          if (!target) throw new Error("sortable grip missing");
+          const dispatchTouch = (
+            type: "touchstart" | "touchmove" | "touchend",
+            x: number,
+            y: number,
+          ) => {
+            const point = { identifier: 0, target, clientX: x, clientY: y, pageX: x, pageY: y };
+            const active = type === "touchend" ? [] : [point];
+            const ev = Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+              touches: active,
+              targetTouches: active,
+              changedTouches: [point],
+              clientX: x,
+              clientY: y,
+            });
+            target.dispatchEvent(ev);
+          };
+          target.dispatchEvent(
+            new PointerEvent("pointerdown", {
+              bubbles: true,
+              cancelable: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+              button: 0,
+              clientX: sx,
+              clientY: sy,
+            }),
+          );
+          dispatchTouch("touchstart", sx, sy);
+          await new Promise((r) => setTimeout(r, 300));
+          target.dispatchEvent(
+            new PointerEvent("pointercancel", {
+              bubbles: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+            }),
+          );
+          const steps = 8;
+          for (let i = 1; i <= steps; i += 1) {
+            const x = Math.round(sx + ((ex - sx) * i) / steps);
+            const y = Math.round(sy + ((ey - sy) * i) / steps);
+            dispatchTouch("touchmove", x, y);
+            await new Promise((r) => setTimeout(r, 16));
+          }
+          dispatchTouch("touchend", ex, ey);
+        },
+        { sx: startX, sy: startY, ex: endX, ey: endY },
+      );
+    }
+
+    await expect
+      .poll(async () =>
+        page
+          .locator('span[aria-roledescription="sortable"]')
+          .evaluateAll((els) =>
+            els.map((el) => el.parentElement?.querySelector("span.text-sm")?.textContent?.trim()),
+          ),
+      )
+      .toEqual([expect.stringMatching(/compress/i), expect.stringMatching(/resize/i)]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // #2192: more phone views were taller than the preview area and covered the
 // "Process" peek bar or the Settings button. The bars now stack above the preview
