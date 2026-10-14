@@ -15,11 +15,17 @@ try:
     import numpy as np
     import cv2
     from PIL import Image
+    _IMPORT_ERROR = None
 except ImportError as _e:
-    _msg = str(_e)
-    _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
-    print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
-    sys.exit(1)
+    np = None
+    cv2 = None
+    Image = None
+    _IMPORT_ERROR = _e
+    if __name__ == "__main__":
+        _msg = str(_e)
+        _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
+        print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
+        sys.exit(1)
 
 
 def emit_progress(percent, stage):
@@ -48,6 +54,7 @@ DDCOLOR_MODEL_PATH = os.environ.get(
 )
 
 LAMA_MODEL_SIZE = 512
+LAMA_TILE_OVERLAP = 128
 CODEFORMER_SIZE = 512
 
 # Content-adaptive gating (#723). Restoration used to run every step on every
@@ -270,64 +277,126 @@ def _inpaint_padded(img_rgb, mask, session):
     return result[:h, :w]
 
 
-def _make_cosine_window(size):
-    x = np.linspace(0, np.pi, size)
-    w1d = (1 - np.cos(x)) / 2
-    return np.outer(w1d, w1d).astype(np.float32)
+def _tile_grid(h, w, tile_size=LAMA_MODEL_SIZE, overlap=LAMA_TILE_OVERLAP):
+    """Return fixed-grid tile bounds (y_start, y_end, x_start, x_end) for an h x w image.
+
+    Adjacent tiles step by tile_size - overlap and never shift backward at the
+    far boundary, so every interior overlap is exactly `overlap` pixels wide.
+    """
+    if h <= 0 or w <= 0:
+        raise ValueError(f"Image dimensions must be positive: got ({h}, {w})")
+    if tile_size <= 0 or overlap < 0 or overlap * 2 > tile_size:
+        raise ValueError(
+            f"Require tile_size > 0 and 0 <= overlap <= tile_size // 2: got tile_size={tile_size}, overlap={overlap}"
+        )
+
+    step = tile_size - overlap
+    tiles_y = max(1, (h - overlap + step - 1) // step)
+    tiles_x = max(1, (w - overlap + step - 1) // step)
+
+    tiles = []
+    for ty in range(tiles_y):
+        y_start = ty * step
+        y_end = min(y_start + tile_size, h)
+        for tx in range(tiles_x):
+            x_start = tx * step
+            x_end = min(x_start + tile_size, w)
+            tiles.append((y_start, y_end, x_start, x_end))
+    return tiles
 
 
-def _inpaint_tiled(img_rgb, mask, session):
+def _tile_edge_ramps(y_start, y_end, x_start, x_end, h, w, overlap):
+    """Build 1D vertical and horizontal blend ramps for a single tile.
+
+    Only edges shared with an adjacent tile are ramped; edges that coincide with
+    the outer image boundary stay at 1.0 so border and corner pixels are never
+    attenuated.
+    """
+    th = y_end - y_start
+    tw = x_end - x_start
+    ramp_y = [1.0] * th
+    ramp_x = [1.0] * tw
+
+    if overlap > 0:
+        if y_start > 0:
+            for i in range(overlap):
+                ramp_y[i] *= (i + 1) / (overlap + 1)
+        if y_end < h:
+            for i in range(overlap):
+                ramp_y[th - 1 - i] *= (i + 1) / (overlap + 1)
+        if x_start > 0:
+            for i in range(overlap):
+                ramp_x[i] *= (i + 1) / (overlap + 1)
+        if x_end < w:
+            for i in range(overlap):
+                ramp_x[tw - 1 - i] *= (i + 1) / (overlap + 1)
+
+    return ramp_y, ramp_x
+
+
+def _build_tile_weight_map(h, w, tile_size=LAMA_MODEL_SIZE, overlap=LAMA_TILE_OVERLAP):
+    """Accumulate the 2D tile blending weight map for an h x w image."""
+    tiles = _tile_grid(h, w, tile_size=tile_size, overlap=overlap)
+    weight = [[0.0] * w for _ in range(h)]
+
+    for y_start, y_end, x_start, x_end in tiles:
+        ramp_y, ramp_x = _tile_edge_ramps(y_start, y_end, x_start, x_end, h, w, overlap)
+        for r, ry in enumerate(ramp_y):
+            row = weight[y_start + r]
+            for c, rx in enumerate(ramp_x):
+                row[x_start + c] += ry * rx
+
+    return weight
+
+
+def _inpaint_tiled(img_rgb, mask, session, tile_size=LAMA_MODEL_SIZE, overlap=LAMA_TILE_OVERLAP):
     h, w = img_rgb.shape[:2]
-    sz = LAMA_MODEL_SIZE
-    stride = 384
-    window = _make_cosine_window(sz)
+    tiles = _tile_grid(h, w, tile_size=tile_size, overlap=overlap)
 
     result_sum = np.zeros((h, w, 3), dtype=np.float64)
     weight_sum = np.zeros((h, w), dtype=np.float64)
 
-    y_starts = list(range(0, max(h - sz, 0) + 1, stride))
-    if len(y_starts) == 0 or y_starts[-1] + sz < h:
-        y_starts.append(max(0, h - sz))
+    for y_start, y_end, x_start, x_end in tiles:
+        th = y_end - y_start
+        tw = x_end - x_start
+        pad_h = tile_size - th
+        pad_w = tile_size - tw
 
-    x_starts = list(range(0, max(w - sz, 0) + 1, stride))
-    if len(x_starts) == 0 or x_starts[-1] + sz < w:
-        x_starts.append(max(0, w - sz))
+        tile_img = img_rgb[y_start:y_end, x_start:x_end]
+        tile_mask = mask[y_start:y_end, x_start:x_end]
 
-    for y in y_starts:
-        for x in x_starts:
-            y2 = y + sz
-            x2 = x + sz
+        if pad_h > 0 or pad_w > 0:
+            tile_img = cv2.copyMakeBorder(
+                tile_img,
+                0, pad_h, 0, pad_w,
+                cv2.BORDER_REFLECT_101)
+            tile_mask = cv2.copyMakeBorder(
+                tile_mask,
+                0, pad_h, 0, pad_w,
+                cv2.BORDER_CONSTANT, value=0)
 
-            # Pad if tile extends beyond image
-            if y2 > h or x2 > w:
-                tile_img = cv2.copyMakeBorder(
-                    img_rgb[y:min(y2, h), x:min(x2, w)],
-                    0, max(0, y2 - h), 0, max(0, x2 - w),
-                    cv2.BORDER_REFLECT_101)
-                tile_mask = cv2.copyMakeBorder(
-                    mask[y:min(y2, h), x:min(x2, w)],
-                    0, max(0, y2 - h), 0, max(0, x2 - w),
-                    cv2.BORDER_CONSTANT, value=0)
-            else:
-                tile_img = img_rgb[y:y2, x:x2]
-                tile_mask = mask[y:y2, x:x2]
+        if np.count_nonzero(tile_mask) == 0:
+            tile_result = tile_img.astype(np.float64)
+        else:
+            tile_result = _lama_single(session, tile_img, tile_mask).astype(np.float64)
 
-            if np.count_nonzero(tile_mask) == 0:
-                tile_result = tile_img.astype(np.float64)
-            else:
-                tile_result = _lama_single(session, tile_img, tile_mask).astype(np.float64)
+        ramp_y, ramp_x = _tile_edge_ramps(y_start, y_end, x_start, x_end, h, w, overlap)
+        win = np.outer(
+            np.asarray(ramp_y, dtype=np.float64),
+            np.asarray(ramp_x, dtype=np.float64),
+        )
 
-            # Clip to actual image bounds
-            ey = min(y2, h) - y
-            ex = min(x2, w) - x
-            win = window[:ey, :ex]
+        result_sum[y_start:y_end, x_start:x_end] += tile_result[:th, :tw] * win[:, :, np.newaxis]
+        weight_sum[y_start:y_end, x_start:x_end] += win
 
-            result_sum[y:y+ey, x:x+ex] += tile_result[:ey, :ex] * win[:, :, np.newaxis]
-            weight_sum[y:y+ey, x:x+ex] += win
-
-    weight_sum = np.maximum(weight_sum, 1e-8)
+    w_min = float(weight_sum.min())
+    w_max = float(weight_sum.max())
+    if not (w_min > 0.5 and w_max < 2.5):
+        raise RuntimeError(
+            f"Malformed tile blend weight map: min={w_min:.6f}, max={w_max:.6f}"
+        )
     result = result_sum / weight_sum[:, :, np.newaxis]
-    return np.clip(result, 0, 255).astype(np.uint8)
+    return np.rint(np.clip(result, 0, 255)).astype(np.uint8)
 
 
 # ── CodeFormer face enhancement ──────────────────────────────────────
@@ -674,6 +743,12 @@ def colorize_bw(img_bgr, intensity=0.85):
 # ── Main pipeline ─────────────────────────────────────────────────────
 
 def main():
+    if _IMPORT_ERROR is not None:
+        _msg = str(_IMPORT_ERROR)
+        _hint = "Fix with: apt-get install -y libgl1" if "libGL" in _msg else "Install opencv-python-headless, numpy, and Pillow."
+        print(json.dumps({"error": f"Missing dependency: {_msg}. {_hint}"}))
+        sys.exit(1)
+
     input_path = sys.argv[1]
     output_path = sys.argv[2]
     settings = json.loads(sys.argv[3]) if len(sys.argv) > 3 else {}

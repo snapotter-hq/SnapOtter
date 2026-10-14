@@ -84,3 +84,40 @@ def test_the_floor_gates_detection():
         assert np.count_nonzero(restore.detect_scratches(img)) == 0
     finally:
         restore.SCRATCH_RESPONSE_FLOOR = original
+
+
+# ── tiled LaMa inpainting partition-of-unity weights (#2588) ──────────
+
+def test_tiled_inpaint_preserves_top_left_border_and_seams(monkeypatch):
+    weights = restore._build_tile_weight_map(1100, 1100)
+    flat = [v for row in weights for v in row]
+    assert abs(min(flat) - 1.0) < 1e-9
+    assert abs(max(flat) - 1.0) < 1e-9
+
+    seen_shapes = []
+
+    def fake_lama_single(_session, tile_rgb, tile_mask):
+        seen_shapes.append((tile_rgb.shape, tile_mask.shape))
+        out = tile_rgb.copy()
+        out[tile_mask > 0] = (180, 140, 100)
+        return out
+
+    monkeypatch.setattr(restore, "_lama_single", fake_lama_single)
+
+    img = np.full((600, 700, 3), (180, 140, 100), dtype=np.uint8)
+    mask = np.zeros((600, 700), dtype=np.uint8)
+    # Damage on row 0, col 0, and across the 512px tile boundary in the left column,
+    # leaving the bottom-right tile (384:600, 384:700) unmasked (count_nonzero == 0).
+    img[0, :] = 255
+    mask[0, :] = 255
+    img[:, 0] = 255
+    mask[:, 0] = 255
+    img[511:513, :300] = 255
+    mask[511:513, :300] = 255
+
+    repaired = restore._inpaint_tiled(img, mask, session=None)
+    assert repaired.shape == (600, 700, 3)
+    assert len(seen_shapes) == 3
+    assert all(s == ((512, 512, 3), (512, 512)) for s in seen_shapes)
+    assert np.all(repaired == (180, 140, 100))
+
