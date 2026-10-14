@@ -11,6 +11,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   utimesSync,
@@ -23,6 +24,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const SCRIPT = resolve("scripts/visual-baselines-pr.sh");
 const WORKFLOW = resolve(".github/workflows/update-visual-baselines.yml");
+const PLAYWRIGHT_INSTALL = resolve(".github/actions/playwright-install/install.sh");
 const PLAYWRIGHT_CONFIG = resolve("playwright.config.ts");
 const SHOTS = "tests/e2e/__screenshots__/gui-visual-tools.spec.ts";
 const CHANGED = `${SHOTS}/tool-resize-linux.png`;
@@ -533,6 +535,42 @@ describe("update-visual-baselines.yml", () => {
     const cache = steps.find((step) => step.uses?.startsWith("actions/cache@"));
     expect(cache?.with?.path).toContain("~/.cache/ms-playwright");
     expect(cache?.with?.path).toContain("~/Library/Caches/ms-playwright");
+
+    const install = find((step) => step.uses === "./.github/actions/playwright-install");
+    expect(install).toBeLessThan(regenerate);
+    expect(steps.filter((step) => /playwright install\b/.test(step.run ?? ""))).toEqual([]);
+  });
+
+  it("skips Linux apt install-deps when playwright-install runs on macOS (#2483)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pw-install-"));
+    cleanups.push(dir);
+    const bin = join(dir, "bin");
+    const log = join(dir, "calls.log");
+    mkdirSync(bin);
+    stub(join(bin, "pnpm"), `printf 'pnpm %s\\n' "$*" >> "${log}"`);
+    stub(join(bin, "timeout"), `shift 3; "$@"`);
+
+    stub(join(bin, "uname"), "echo Darwin");
+    const darwin = spawnSync("bash", [PLAYWRIGHT_INSTALL], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BROWSERS: "chromium" },
+    });
+    expect(darwin.status, darwin.stderr).toBe(0);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual([
+      "pnpm playwright install chromium",
+    ]);
+
+    writeFileSync(log, "");
+    stub(join(bin, "uname"), "echo Linux");
+    const linux = spawnSync("bash", [PLAYWRIGHT_INSTALL], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BROWSERS: "chromium" },
+    });
+    expect(linux.status, linux.stderr).toBe(0);
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual([
+      "pnpm playwright install chromium",
+      "pnpm playwright install-deps chromium",
+    ]);
   });
 
   it("keeps going past a failing regenerate step, then fails the job", () => {
@@ -576,10 +614,11 @@ describe("update-visual-baselines.yml", () => {
     }
   });
 
-  it("runs exactly the projects that write @visual baselines", () => {
-    // The maintained baselines come from VISUAL_SPECS and the device specs.
-    // A device project that grep-inverts @visual writes none, and the legacy
-    // lane (LEGACY_VISUAL_SPECS) has none maintained anywhere.
+  it("runs exactly the projects and spec files that write @visual baselines (#2483)", () => {
+    // The maintained baselines come from VISUAL_SPECS and device-visual.spec.ts.
+    // A device project that grep-inverts @visual writes none, the other
+    // DEVICE_SPECS files (device-mobile, device-tablet, device-a11y) write
+    // none, and the legacy lane (LEGACY_VISUAL_SPECS) has none maintained.
     const config = readFileSync(PLAYWRIGHT_CONFIG, "utf8");
     const blocks = config.split(/\n {4}\{\n/).slice(1);
     const visualProjects = blocks
@@ -593,6 +632,13 @@ describe("update-visual-baselines.yml", () => {
     );
     expect(projects).toEqual([...visualProjects].sort());
     expect(run).not.toMatch(/webkit|firefox/);
+
+    const visualSpecs = readdirSync(resolve("tests/e2e"))
+      .filter((file) => /^(?:gui-visual-|device-visual).*\.spec\.ts$/.test(file))
+      .map((file) => `tests/e2e/${file}`)
+      .sort();
+    const specArgs = [...run.matchAll(/\btests\/e2e\/\S+\.spec\.ts\b/g)].map((m) => m[0]).sort();
+    expect(specArgs).toEqual(visualSpecs);
   });
 
   it("uploads the PNGs before it tries to push them, even after a failure", () => {

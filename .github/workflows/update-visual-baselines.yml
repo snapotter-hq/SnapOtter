@@ -107,10 +107,11 @@ jobs:
             ~/Library/Caches/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
       - name: Install Playwright browsers
-        run: pnpm playwright install --with-deps chromium
-      # Only projects that write @visual baselines run here. The webkit device
-      # projects grep-invert @visual (playwright.config.ts), so they could only
-      # add failures; nightly runs them as functional tests.
+        uses: ./.github/actions/playwright-install
+      # Only projects and spec files that write @visual baselines run here. The
+      # webkit device projects grep-invert @visual (playwright.config.ts), and
+      # the other DEVICE_SPECS files (device-mobile, device-tablet, device-a11y)
+      # are functional/a11y tests that write no baselines; nightly runs them.
       - name: Regenerate baselines (desktop + chromium device projects)
         id: regenerate
         # One failing test must not cost the PNGs every other test wrote. The
@@ -119,7 +120,7 @@ jobs:
         # failure while there's still job time left to do that.
         continue-on-error: true
         timeout-minutes: 100
-        run: pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium "--update-snapshots=$UPDATE_SNAPSHOTS"
+        run: pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium "--update-snapshots=$UPDATE_SNAPSHOTS"
         env:
           PW_WORKERS: "2"
       - name: Collect regenerated baselines
