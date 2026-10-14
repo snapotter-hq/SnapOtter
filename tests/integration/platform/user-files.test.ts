@@ -6,9 +6,38 @@
  */
 
 import { chmod, unlink } from "node:fs/promises";
+import { gzipSync } from "node:zlib";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+const hooks = vi.hoisted(() => ({
+  reportError: vi.fn(),
+  svgUnexpectedError: false,
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: (...args: Parameters<typeof actual.reportError>) => {
+      hooks.reportError(...args);
+      return actual.reportError(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  return {
+    ...actual,
+    sanitizeSvg: (buffer: Buffer) => {
+      if (hooks.svgUnexpectedError) throw new Error("simulated sanitizer crash");
+      return actual.sanitizeSvg(buffer);
+    },
+  };
+});
+
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { getStoredFilePath } from "../../../apps/api/src/lib/file-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -27,6 +56,13 @@ const TINY_PNG = readFixture(fixtures.image.edge.px1);
 // intentionally returns {valid: true, width: 0, height: 0} for it without decoding,
 // since real decoding happens lazily elsewhere. Used to cover the 0x0-vs-null bug.
 const BMP = readFixture(fixtures.image.formats("bmp"));
+const SVGZ_BOMB = gzipSync(
+  Buffer.concat([
+    Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">'),
+    Buffer.alloc(51 * 1024 * 1024, 0x20),
+    Buffer.from("</svg>"),
+  ]),
+);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -131,6 +167,33 @@ describe("File upload", () => {
     expect(result.files).toHaveLength(1);
     expect(result.files[0].width).toBeNull();
     expect(result.files[0].height).toBeNull();
+  });
+
+  it("rejects an .svgz upload that decompresses past the 50 MiB cap with 400 and no Sentry report (#2429, #2582)", async () => {
+    hooks.reportError.mockClear();
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "upload-bomb.svgz",
+        contentType: "image/svg+xml",
+        content: SVGZ_BOMB,
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/52428800|larger than/i);
+    expect(hooks.reportError).not.toHaveBeenCalled();
   });
 });
 
@@ -685,5 +748,238 @@ describe("Save result", () => {
     expect(detail.versions.length).toBe(3);
     expect(detail.versions[0].version).toBe(1);
     expect(detail.versions[2].version).toBe(3);
+  });
+
+  // Regression test for #2582: gunzipSync(..., { maxOutputLength: 50 MiB }) throws
+  // RangeError (ERR_BUFFER_TOO_LARGE) when an .svgz result decompresses past the cap.
+  // save-result must answer 400 without reporting to Sentry or creating a version row,
+  // matching /api/v1/files/upload (#2429).
+  it("rejects an .svgz result that decompresses past the 50 MiB cap with 400 and no Sentry report (#2582)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-svgz-bomb.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    hooks.reportError.mockClear();
+
+    const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+      { name: "file", filename: "result.svgz", contentType: "image/svg+xml", content: SVGZ_BOMB },
+      { name: "parentId", content: parentId },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+      body: saveBody,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/52428800|larger than/i);
+    expect(hooks.reportError).not.toHaveBeenCalled();
+
+    const detailRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${parentId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(detailRes.statusCode).toBe(200);
+    expect(JSON.parse(detailRes.body).versions).toHaveLength(1);
+  });
+
+  it("rejects corrupt, truncated, and over-element-cap SVG/SVGZ results with 400 and no Sentry report", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-svg-errors.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    const validSvgz = gzipSync(
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+    );
+    // 1. Z_DATA_ERROR: valid gzip stream with a corrupted CRC32 trailer byte
+    const corruptSvgz = Buffer.from(validSvgz);
+    corruptSvgz[corruptSvgz.length - 8] ^= 0xff;
+    // 2. Z_BUF_ERROR: valid gzip stream truncated mid-stream
+    const truncatedSvgz = validSvgz.subarray(0, validSvgz.length - 6);
+    // 3. statusCode === 400: SVG over the 5000-element cap
+    const overElementCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+    );
+
+    for (const [filename, content, expectedError] of [
+      ["corrupt.svgz", corruptSvgz, /incorrect data check/i],
+      ["truncated.svgz", truncatedSvgz, /unexpected end of file/i],
+      ["too-many-elements.svg", overElementCapSvg, /element count/i],
+    ] as const) {
+      hooks.reportError.mockClear();
+      const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+        { name: "file", filename, contentType: "image/svg+xml", content },
+        { name: "parentId", content: parentId },
+        { name: "toolId", content: "compress" },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+        body: saveBody,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).error).toMatch(expectedError);
+      expect(hooks.reportError).not.toHaveBeenCalled();
+    }
+
+    const detailRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${parentId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(detailRes.statusCode).toBe(200);
+    expect(JSON.parse(detailRes.body).versions).toHaveLength(1);
+  });
+
+  it("answers 500 and calls reportError when sanitizeSvg throws an unexpected error on save-result", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "parent-for-svg-500.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    hooks.reportError.mockClear();
+    hooks.svgUnexpectedError = true;
+    try {
+      const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "result.svg",
+          contentType: "image/svg+xml",
+          content: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+        },
+        { name: "parentId", content: parentId },
+        { name: "toolId", content: "compress" },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+        body: saveBody,
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(hooks.reportError).toHaveBeenCalledTimes(1);
+      expect(hooks.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "simulated sanitizer crash" }),
+        expect.objectContaining({
+          source: "http",
+          route: "/api/v1/files/save-result",
+          method: "POST",
+          statusCode: 500,
+        }),
+      );
+    } finally {
+      hooks.svgUnexpectedError = false;
+    }
+  });
+
+  it("decompresses valid .svgz to .svg and keeps non-SVG .svgz as opaque on save-result", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "vector-parent.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const parentId = JSON.parse(uploadRes.body).files[0].id;
+
+    const validSvgz = gzipSync(
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect/></svg>'),
+    );
+    const { body: v2Body, contentType: v2Ct } = createMultipartPayload([
+      { name: "file", filename: "result.svgz", contentType: "image/svg+xml", content: validSvgz },
+      { name: "parentId", content: parentId },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const v2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v2Ct, authorization: `Bearer ${adminToken}` },
+      body: v2Body,
+    });
+    expect(v2Res.statusCode).toBe(201);
+    const v2 = JSON.parse(v2Res.body).file;
+    expect(v2.originalName).toBe("vector-parent.svg");
+
+    const opaqueSvgz = gzipSync(Buffer.from("plain text inside gzip, not an SVG"));
+    const { body: v3Body, contentType: v3Ct } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "opaque.svgz",
+        contentType: "application/octet-stream",
+        content: opaqueSvgz,
+      },
+      { name: "parentId", content: v2.id },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const v3Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v3Ct, authorization: `Bearer ${adminToken}` },
+      body: v3Body,
+    });
+    expect(v3Res.statusCode).toBe(201);
+    const v3 = JSON.parse(v3Res.body).file;
+    expect(v3.originalName).toBe("vector-parent.svgz");
   });
 });

@@ -166,6 +166,23 @@ function discardStagedBlob(request: FastifyRequest, route: string, storedName: s
   });
 }
 
+/**
+ * True when an error thrown from decompressSvgz() or sanitizeSvg() is a client
+ * input rejection (400) rather than an unexpected sanitizer crash (500):
+ *  - statusCode === 400 from sanitizeSvg() size/element caps
+ *  - Z_DATA_ERROR / Z_BUF_ERROR from malformed or truncated gzip streams
+ *  - RangeError (ERR_BUFFER_TOO_LARGE) when gunzipSync hits MAX_SVGZ_DECOMPRESSED_SIZE
+ */
+function isSvgzClientError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  return (
+    (err as { statusCode?: number }).statusCode === 400 ||
+    (err as { code?: string }).code === "Z_DATA_ERROR" ||
+    (err as { code?: string }).code === "Z_BUF_ERROR" ||
+    err instanceof RangeError
+  );
+}
+
 // ── Route registration ─────────────────────────────────────────────
 
 export async function userFileRoutes(app: FastifyInstance): Promise<void> {
@@ -315,19 +332,14 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
                 }
               }
             } catch (err) {
-              if ((err as Error).message.includes("SVGZ file does not contain")) {
+              if ((err as { message?: string })?.message?.includes("SVGZ file does not contain")) {
                 // Not a valid SVG inside, let it fall through to be stored as octet-stream
                 request.log.warn(
                   { err, filename: part.filename },
                   "Uploaded .svgz file does not contain SVG, storing as opaque file",
                 );
                 safeBuffer = buffer;
-              } else if (
-                (err as { statusCode?: number }).statusCode === 400 ||
-                (err as { code?: string }).code === "Z_DATA_ERROR" ||
-                (err as { code?: string }).code === "Z_BUF_ERROR" ||
-                err instanceof RangeError
-              ) {
+              } else if (isSvgzClientError(err)) {
                 request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardStaged();
                 return reply.status(400).send({ error: (err as Error).message });
@@ -882,17 +894,13 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           }
         }
       } catch (err) {
-        if ((err as Error).message.includes("SVGZ file does not contain")) {
+        if ((err as { message?: string })?.message?.includes("SVGZ file does not contain")) {
           request.log.warn(
             { err, filename },
             "Result .svgz file does not contain SVG, storing as opaque file",
           );
           safeResultBuffer = fileBuffer;
-        } else if (
-          (err as { statusCode?: number }).statusCode === 400 ||
-          (err as { code?: string }).code === "Z_DATA_ERROR" ||
-          (err as { code?: string }).code === "Z_BUF_ERROR"
-        ) {
+        } else if (isSvgzClientError(err)) {
           request.log.warn({ err, filename }, "SVGZ decompression failed");
           return reply.status(400).send({ error: (err as Error).message });
         } else {
