@@ -1843,20 +1843,6 @@ def _install() -> None:
                 copy_activity_cb=make_copy_activity_reporter(92, "Installing packages..."),
             )
             clear_venv_writing(venv_writing_marker)
-
-        # -- Move models --
-        emit_progress(95, "Installing models...")
-        staging_models = os.path.join(staging_dir, "models")
-        if os.path.isdir(staging_models):
-            os.makedirs(models_dir, exist_ok=True)
-            # Model bundles are a handful of multi-GB files, so report every
-            # entry; the byte reporter covers the inside of each copy.
-            move_tree(
-                staging_models,
-                models_dir,
-                progress_cb=make_move_reporter(95, "Installing models...", every=1),
-                copy_activity_cb=make_copy_activity_reporter(95, "Installing models..."),
-            )
     except OSError as e:
         shutil.rmtree(staging_dir, ignore_errors=True)
         abandon_merge(
@@ -1868,7 +1854,7 @@ def _install() -> None:
         fail(f"Failed to install bundle files: {e}")
 
     # -- Apply fixups --
-    emit_progress(97, "Finalizing...")
+    emit_progress(93, "Finalizing...")
     apply_fixups(
         staging_dir,
         venv_path,
@@ -1887,7 +1873,7 @@ def _install() -> None:
     # now; if that fails, refuse to mark the bundle installed so the user gets a
     # clear retry instead of a silently broken tool.
     if run_smoke:
-        emit_progress(99, "Verifying installation...")
+        emit_progress(94, "Verifying installation...")
         if not os.path.exists(venv_python):
             shutil.rmtree(staging_dir, ignore_errors=True)
             abandon_merge(
@@ -1935,7 +1921,7 @@ def _install() -> None:
             # onnxruntime-gpu on CPU-only Debian/Ubuntu fails to load its C extensions
             # resulting in missing attributes or missing libcudart/libcudnn errors.
             if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
-                emit_progress(99, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
+                emit_progress(94, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
                 fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "onnxruntime==1.20.1"]
                 fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
                 sp_for_cleanup = site_packages_dir or get_site_packages_dir(venv_path)
@@ -1944,7 +1930,7 @@ def _install() -> None:
                         if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
                             shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
                 elif fix_proc.returncode != 0:
-                    emit_progress(99, "Fallback onnxruntime installation failed")
+                    emit_progress(94, "Fallback onnxruntime installation failed")
 
                 # Re-run smoke test after fallback
                 proc = _run_smoke_import()
@@ -1954,11 +1940,11 @@ def _install() -> None:
             stderr_output = (proc.stderr or "")
             # The bundle might contain conflicting cv2 binaries due to mediapipe vs rembg requirements
             if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
-                emit_progress(99, "OpenCV conflict detected; applying headless fallback...")
+                emit_progress(94, "OpenCV conflict detected; applying headless fallback...")
                 fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
                 fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
                 if fix_proc.returncode != 0:
-                    emit_progress(99, "Fallback opencv installation failed")
+                    emit_progress(94, "Fallback opencv installation failed")
 
                 # Clean up other opencv dist-info to prevent pip from getting confused
                 clean_cmd = [venv_python, "-c",
@@ -2006,6 +1992,30 @@ def _install() -> None:
                 f"{tail}\n\n"
                 f"{mismatch_note}{recovery_hint}"
             )
+
+    # -- Move models --
+    emit_progress(95, "Installing models...")
+    staging_models = os.path.join(staging_dir, "models")
+    try:
+        if os.path.isdir(staging_models):
+            os.makedirs(models_dir, exist_ok=True)
+            # Model bundles are a handful of multi-GB files, so report every
+            # entry; the byte reporter covers the inside of each copy.
+            move_tree(
+                staging_models,
+                models_dir,
+                progress_cb=make_move_reporter(95, "Installing models...", every=1),
+                copy_activity_cb=make_copy_activity_reporter(95, "Installing models..."),
+            )
+    except OSError as e:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        abandon_merge(
+            site_packages_dir, reconciliation_plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
+        if getattr(e, "errno", None) == errno.ENOSPC:
+            fail("Ran out of disk space while installing the bundle. Free up space and retry.")
+        fail(f"Failed to install bundle files: {e}")
 
     # -- Write installed.json --
     emit_progress(98, "Recording installation...")

@@ -227,6 +227,37 @@ describe("install_feature.py prebuilt mode", () => {
     expect(installed.bundles["face-detection"]).toBeDefined();
     // The breadcrumb is cleared once the venv write completes cleanly.
     expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+
+    const progressFrames = (result.stderr?.toString() ?? "").split("\n").flatMap((line) => {
+      try {
+        const parsed = JSON.parse(line) as { progress?: number; stage?: string };
+        return typeof parsed.progress === "number" ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    });
+    const percents = progressFrames.map((f) => f.progress as number);
+    expect(percents).toEqual([...percents].sort((a, b) => a - b));
+    const stageOrder = progressFrames
+      .map((f) => f.stage)
+      .filter((s) =>
+        [
+          "Installing packages...",
+          "Finalizing...",
+          "Verifying installation...",
+          "Installing models...",
+          "Recording installation...",
+          "Complete",
+        ].includes(s ?? ""),
+      );
+    expect(stageOrder).toEqual([
+      "Installing packages...",
+      "Finalizing...",
+      "Verifying installation...",
+      "Installing models...",
+      "Recording installation...",
+      "Complete",
+    ]);
   });
 
   it("fails the install (and does NOT record it) when the smoke import cannot load", () => {
@@ -251,6 +282,8 @@ describe("install_feature.py prebuilt mode", () => {
     // Not marked installed, so the tool shows as needing install and a retry is clean.
     const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
     expect(installed.bundles["face-detection"]).toBeUndefined();
+    expect(existsSync(join(modelsDir, "testmodel", "weights.bin"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
   });
 
   it("honors SNAPOTTER_SKIP_INSTALL_SMOKE=1 as a safety valve for false positives", () => {
@@ -647,8 +680,10 @@ describe("site-packages resolution and smoke verification (#1236)", () => {
     );
 
     const buildDir = join(tempDir, "build-rollback");
+    mkdirSync(join(buildDir, "models", "testmodel"), { recursive: true });
     mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
     mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
+    writeFileSync(join(buildDir, "models", "testmodel", "weights.bin"), "model-weights");
     writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
     writeFileSync(
       join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
@@ -662,14 +697,13 @@ describe("site-packages resolution and smoke verification (#1236)", () => {
         arch: "amd64-gpu",
         imageVersion: "2.0.0",
         pythonVersion: "3.12",
-        models: [],
+        models: ["testmodel"],
       }),
     );
     const tarPath = join(tempDir, "rollback-smoke.tar.gz");
     execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
     const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
     writeManifest("face-detection", tarPath, sha256, {
-      models: [],
       smokeImports: ["testpkg"],
     });
 
@@ -701,6 +735,7 @@ describe("site-packages resolution and smoke verification (#1236)", () => {
     expect(readFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "utf-8")).toBe("# v0.9.0");
     expect(existsSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"))).toBe(true);
     expect(existsSync(join(sitePackagesDir, "testpkg-1.0.0.dist-info"))).toBe(false);
+    expect(existsSync(join(modelsDir, "testmodel", "weights.bin"))).toBe(false);
     expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
     expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
     expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
@@ -809,9 +844,11 @@ describe("fixup wheel installation and rollback (#2561)", () => {
     sha256: string;
   } {
     const buildDir = join(tempDir, "build-fixup-rollback");
+    mkdirSync(join(buildDir, "models", "testmodel"), { recursive: true });
     mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
     mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
     mkdirSync(join(buildDir, "fixups"), { recursive: true });
+    writeFileSync(join(buildDir, "models", "testmodel", "weights.bin"), "model-weights");
     writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
     writeFileSync(
       join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
@@ -826,7 +863,7 @@ describe("fixup wheel installation and rollback (#2561)", () => {
         arch: "amd64-gpu",
         imageVersion: "2.0.0",
         pythonVersion: "3.12",
-        models: [],
+        models: ["testmodel"],
       }),
     );
     const tarPath = join(tempDir, "fixup-rollback.tar.gz");
@@ -840,6 +877,7 @@ describe("fixup wheel installation and rollback (#2561)", () => {
     expect(readFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "utf-8")).toBe("# v0.9.0");
     expect(existsSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"))).toBe(true);
     expect(existsSync(join(sitePackagesDir, "testpkg-1.0.0.dist-info"))).toBe(false);
+    expect(existsSync(join(modelsDir, "testmodel", "weights.bin"))).toBe(false);
     expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
     expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
     expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
@@ -1182,6 +1220,135 @@ with tempfile.TemporaryDirectory() as d:
     assert "Failed to clear venv write marker after installing fixups" in errors[-1]
 
 mod.subprocess.run = real_run
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
+
+  it("rolls back site-packages and leaves models_dir untouched when smoke verification fails or moving models raises OSError (#2562)", () => {
+    seedExistingTestPkg();
+    const buildDir = join(tempDir, "build-smoke-models-rollback");
+    mkdirSync(join(buildDir, "models", "testmodel"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
+    writeFileSync(join(buildDir, "models", "testmodel", "weights.bin"), "model-weights");
+    writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
+    writeFileSync(
+      join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-1.0.0.dist-info/RECORD,,\n",
+    );
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "face-detection",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: ["testmodel"],
+      }),
+    );
+    const tarPath = join(tempDir, "smoke-models-rollback.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    rmSync(buildDir, { recursive: true, force: true });
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+
+    // 1. Smoke import fails with non-zero exit code: neither site-packages nor modelsDir retains files.
+    writeManifest("face-detection", tarPath, sha256, {
+      smokeImports: ["snapotter_not_a_real_module_zzz"],
+    });
+    const failedSmoke = installBundle("face-detection", tarPath);
+    expect(failedSmoke.status).not.toBe(0);
+    expect(failedSmoke.stderr?.toString() ?? "").toMatch(/verification failed/i);
+    expectRolledBackTestPkg();
+
+    // 2. Smoke import passes, but moving models into modelsDir raises OSError (modelsDir is a file):
+    // site-packages is still rolled back cleanly and installed.json is not updated.
+    rmSync(modelsDir, { recursive: true, force: true });
+    writeFileSync(modelsDir, "blocking-file-at-models-dir");
+    writeManifest("face-detection", tarPath, sha256, {
+      smokeImports: ["testpkg"],
+    });
+    const failedMove = installBundle("face-detection", tarPath);
+    expect(failedMove.status).not.toBe(0);
+    expect(failedMove.stderr?.toString() ?? "").toMatch(/Failed to install bundle files/i);
+    expect(readFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "utf-8")).toBe("# v0.9.0");
+    expect(existsSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "testpkg-1.0.0.dist-info"))).toBe(false);
+    expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["face-detection"]).toBeUndefined();
+
+    // 3. Smoke import TimeoutExpired and ENOSPC during model move also roll back cleanly without leaving models.
+    unlinkSync(modelsDir);
+    mkdirSync(modelsDir, { recursive: true });
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import errno, importlib.util, json, os, subprocess, sys
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+errors = []
+def fake_fail(msg):
+    errors.append(msg)
+    raise SystemExit(1)
+mod.fail = fake_fail
+mod.emit_progress = lambda p, s: None
+
+os.environ["PYTHON_VENV_PATH"] = ${JSON.stringify(venvDir)}
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = ${JSON.stringify(tarPath)}
+sys.argv = ["install_feature.py", "face-detection", ${JSON.stringify(manifestPath)}, ${JSON.stringify(modelsDir)}]
+
+real_run = mod.subprocess.run
+def timeout_on_smoke(cmd, *a, **kw):
+    if "-c" in cmd and "import testpkg" in cmd[-1]:
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=300)
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = timeout_on_smoke
+try:
+    mod._install()
+    assert False, "expected SystemExit on smoke timeout"
+except SystemExit:
+    pass
+finally:
+    mod.subprocess.run = real_run
+
+assert "Installation verification timed out" in errors[-1], errors[-1]
+assert not os.path.exists(os.path.join(${JSON.stringify(modelsDir)}, "testmodel", "weights.bin"))
+assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "staging-face-detection"))
+assert not os.path.exists(os.path.join(${JSON.stringify(venvDir)}, ".superseded"))
+assert open(os.path.join(${JSON.stringify(sitePackagesDir)}, "testpkg", "__init__.py")).read() == "# v0.9.0"
+
+real_move_tree = mod.move_tree
+def enospc_on_models(src, dst, *a, **kw):
+    if dst == ${JSON.stringify(modelsDir)}:
+        raise OSError(errno.ENOSPC, "No space left on device")
+    return real_move_tree(src, dst, *a, **kw)
+
+mod.move_tree = enospc_on_models
+try:
+    mod._install()
+    assert False, "expected SystemExit on models ENOSPC"
+except SystemExit:
+    pass
+finally:
+    mod.move_tree = real_move_tree
+
+assert "Ran out of disk space while installing the bundle" in errors[-1], errors[-1]
+assert not os.path.exists(os.path.join(${JSON.stringify(modelsDir)}, "testmodel", "weights.bin"))
+assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "staging-face-detection"))
+assert not os.path.exists(os.path.join(${JSON.stringify(venvDir)}, ".superseded"))
+assert open(os.path.join(${JSON.stringify(sitePackagesDir)}, "testpkg", "__init__.py")).read() == "# v0.9.0"
 `,
       ],
       { encoding: "utf-8" },
