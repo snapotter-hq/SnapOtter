@@ -968,6 +968,166 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
     });
   });
 
+  describe("TOTP replay protection (#2327)", () => {
+    async function enrollAdminForTotp(): Promise<OTPAuth.TOTP> {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const { uri } = JSON.parse(enrollRes.body);
+      const totp = OTPAuth.URI.parse(uri) as OTPAuth.TOTP;
+      const verifyRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: totp.generate() },
+      });
+      expect(verifyRes.statusCode).toBe(200);
+      return totp;
+    }
+
+    async function challenge(): Promise<string> {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: "admin", password: "Adminpass1" },
+      });
+      return JSON.parse(res.body).mfaToken as string;
+    }
+
+    function complete(mfaToken: string, code: string) {
+      return testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code },
+      });
+    }
+
+    it("refuses a TOTP step that already completed a challenge (or an earlier step) and accepts the next step", async () => {
+      const totp = await enrollAdminForTotp();
+      const [first, second, third] = [await challenge(), await challenge(), await challenge()];
+
+      // Ensure at least 5s remain in the 30s TOTP period after scrypt logins
+      // complete so prevCode stays at delta=-1 through the assertions below.
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+
+      const now = Date.now();
+      const prevCode = totp.generate({ timestamp: now - 30_000 });
+      const currentCode = totp.generate({ timestamp: now });
+      const nextCode = totp.generate({ timestamp: now + 30_000 });
+
+      // First challenge succeeds with the current step's code.
+      const firstRes = await complete(first, currentCode);
+      expect(firstRes.statusCode).toBe(200);
+      const { token: sessionToken, user: firstUser } = JSON.parse(firstRes.body);
+
+      // The recorded step key in Redis carries a bounded replay-window TTL (<= 120s).
+      const { createHash } = await import("node:crypto");
+      const secretFp = createHash("sha256").update(totp.secret.base32).digest("hex").slice(0, 16);
+      const stepPttl = await sharedRedis().pttl(`mfa:totp-step:${firstUser.id}:${secretFp}`);
+      expect(stepPttl).toBeGreaterThan(0);
+      expect(stepPttl).toBeLessThanOrEqual(120_000);
+
+      await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+
+      // Replaying the same code on a second challenge is refused and audited.
+      const replayRes = await complete(second, currentCode);
+      expect(replayRes.statusCode).toBe(401);
+      expect(JSON.parse(replayRes.body).code).toBe("INVALID_CODE");
+
+      const failedAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+      expect(failedAudits).toHaveLength(1);
+
+      // An earlier step still inside the +-1 drift window is also refused.
+      const earlierStepRes = await complete(second, prevCode);
+      expect(earlierStepRes.statusCode).toBe(401);
+      expect(JSON.parse(earlierStepRes.body).code).toBe("INVALID_CODE");
+
+      // Replaying the login code to disable MFA is also refused.
+      const disableReplayRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${sessionToken}` },
+        payload: { code: currentCode },
+      });
+      expect(disableReplayRes.statusCode).toBe(401);
+      expect(JSON.parse(disableReplayRes.body).code).toBe("INVALID_CODE");
+
+      // Advancing to the next 30s step succeeds on the second challenge.
+      const nextStepRes = await complete(second, nextCode);
+      expect(nextStepRes.statusCode).toBe(200);
+
+      // And that newly accepted step cannot be replayed on a third challenge.
+      const nextReplayRes = await complete(third, nextCode);
+      expect(nextReplayRes.statusCode).toBe(401);
+      expect(JSON.parse(nextReplayRes.body).code).toBe("INVALID_CODE");
+    });
+
+    it("lets only one of two simultaneous challenges in when both submit the same TOTP code", async () => {
+      const totp = await enrollAdminForTotp();
+      const [adminRow] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, "admin"));
+      const sessionsBefore = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, adminRow.id));
+      const [first, second] = [await challenge(), await challenge()];
+
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 3_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+      const code = totp.generate();
+
+      const [a, b] = await Promise.all([complete(first, code), complete(second, code)]);
+
+      expect([a.statusCode, b.statusCode].sort()).toEqual([200, 401]);
+      const winner = a.statusCode === 200 ? a : b;
+      const loser = a.statusCode === 401 ? a : b;
+      expect(JSON.parse(winner.body).token).toBeDefined();
+      expect(JSON.parse(loser.body).code).toBe("INVALID_CODE");
+
+      const sessionsAfter = await db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, adminRow.id));
+      expect(sessionsAfter).toHaveLength(sessionsBefore.length + 1);
+    });
+
+    it("does not block a fresh enrollment's current step after disabling and re-enrolling MFA", async () => {
+      const firstTotp = await enrollAdminForTotp();
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+
+      // Consume the current step on the first enrollment by disabling MFA.
+      const disableRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/disable",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { code: firstTotp.generate() },
+      });
+      expect(disableRes.statusCode).toBe(200);
+
+      // Re-enroll with a new secret in the same 30s period and complete a login
+      // with the current step's code: the new secret has its own replay key.
+      const secondTotp = await enrollAdminForTotp();
+      const mfaToken = await challenge();
+      const completeRes = await complete(mfaToken, secondTotp.generate());
+      expect(completeRes.statusCode).toBe(200);
+    });
+  });
+
   it("sets the session cookie when the TOTP step completes, so the token isn't the only credential (#2053)", async () => {
     const enrollRes = await testApp.app.inject({
       method: "POST",

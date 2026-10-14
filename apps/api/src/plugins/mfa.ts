@@ -227,11 +227,77 @@ export function createTotp(username: string, secretBase32?: string): OTPAuth.TOT
   });
 }
 
-export function verifyTotpCode(secretBase32: string, code: string): boolean {
+/**
+ * Window in which a matched TOTP time step (counter + delta, with window=1 and
+ * 30s period) could still fall inside a future validate() check: a step at
+ * counter+1 remains in [counter'-1, counter'+1] until counter' passes counter+2
+ * (up to 3 periods = 90s; 120s adds one full period of margin).
+ */
+const TOTP_REPLAY_WINDOW_SECONDS = 120;
+
+const CONSUME_TOTP_STEP_LUA = `
+local last = redis.call('GET', KEYS[1])
+local step = tonumber(ARGV[1])
+local ttlSec = tonumber(ARGV[2])
+if last and step <= tonumber(last) then
+  return 0
+end
+redis.call('SET', KEYS[1], tostring(step), 'EX', ttlSec)
+return 1
+`;
+
+export function matchTotpStep(
+  secretBase32: string,
+  code: string,
+  timestamp = Date.now(),
+): number | null {
   const totp = createTotp("verify", secretBase32);
   // Allow 1-step window in either direction for clock drift
-  const delta = totp.validate({ token: code, window: 1 });
-  return delta !== null;
+  const delta = totp.validate({ token: code, window: 1, timestamp });
+  if (delta === null) return null;
+  return totp.counter({ timestamp }) + delta;
+}
+
+export function verifyTotpCode(
+  secretBase32: string,
+  code: string,
+  lastAcceptedStep?: number | null,
+  timestamp = Date.now(),
+): boolean {
+  const step = matchTotpStep(secretBase32, code, timestamp);
+  if (step === null) return false;
+  if (lastAcceptedStep !== undefined && lastAcceptedStep !== null && step <= lastAcceptedStep) {
+    return false;
+  }
+  return true;
+}
+
+function totpStepKey(userId: string, secretBase32: string): string {
+  const secretFingerprint = createHash("sha256").update(secretBase32).digest("hex").slice(0, 16);
+  return `mfa:totp-step:${userId}:${secretFingerprint}`;
+}
+
+/**
+ * Validates a TOTP code and atomically records its time step per user so the
+ * same step (or any earlier step still inside the drift window) cannot be
+ * replayed across challenges or routes (RFC 6238 section 5.2, #2327).
+ */
+export async function consumeTotpCode(
+  userId: string,
+  secretBase32: string,
+  code: string,
+  timestamp = Date.now(),
+): Promise<boolean> {
+  const step = matchTotpStep(secretBase32, code, timestamp);
+  if (step === null) return false;
+  const accepted = await sharedRedis().eval(
+    CONSUME_TOTP_STEP_LUA,
+    1,
+    totpStepKey(userId, secretBase32),
+    String(step),
+    String(TOTP_REPLAY_WINDOW_SECONDS),
+  );
+  return accepted === 1;
 }
 
 async function encryptSecret(secretBase32: string): Promise<string> {
@@ -644,8 +710,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           return replyDecryptionFailed(request, reply, userId);
         }
 
-        // Try TOTP code first
-        if (verifyTotpCode(secretBase32, code)) {
+        // Try TOTP code first (atomically refusing a replayed or earlier time step)
+        if (await consumeTotpCode(userId, secretBase32, code)) {
           verified = true;
         }
 
@@ -1007,7 +1073,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       const audit = auditFromRequest(request);
 
-      if (!verifyTotpCode(secretBase32, code)) {
+      if (!(await consumeTotpCode(user.id, secretBase32, code))) {
         await audit("MFA_VERIFY_FAILED", { userId: user.id, username: user.username });
         return reply.status(401).send({
           error: "Invalid TOTP code",

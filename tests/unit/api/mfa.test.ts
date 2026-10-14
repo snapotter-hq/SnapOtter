@@ -4,6 +4,7 @@ import {
   createTotp,
   hashRecoveryCodes,
   isMfaRequiredForUser,
+  matchTotpStep,
   resolveExternalLoginMfaOutcome,
   verifyRecoveryCode,
   verifyTotpCode,
@@ -83,6 +84,36 @@ describe("MFA", () => {
       // Generate code for the current period
       const code = totp.generate();
       expect(verifyTotpCode(secret.base32, code)).toBe(true);
+    });
+
+    it("refuses a code whose time step is at or before lastAcceptedStep and accepts a later step (#2327)", () => {
+      const totp = createTotp("testuser");
+      const secret = totp.secret.base32;
+      const now = 1_700_000_010_000;
+      const currentStep = totp.counter({ timestamp: now });
+      const prevCode = totp.generate({ timestamp: now - 30_000 });
+      const currentCode = totp.generate({ timestamp: now });
+      const nextCode = totp.generate({ timestamp: now + 30_000 });
+
+      expect(verifyTotpCode(secret, currentCode, null, now)).toBe(true);
+      expect(verifyTotpCode(secret, currentCode, currentStep - 1, now)).toBe(true);
+      expect(verifyTotpCode(secret, currentCode, currentStep, now)).toBe(false);
+      expect(verifyTotpCode(secret, prevCode, currentStep, now)).toBe(false);
+      expect(verifyTotpCode(secret, nextCode, currentStep, now)).toBe(true);
+    });
+
+    it("matchTotpStep returns counter + delta across the [-1, +1] window and null outside it (#2327)", () => {
+      const totp = createTotp("testuser");
+      const secret = totp.secret.base32;
+      const now = 1_700_000_010_000;
+      const step = totp.counter({ timestamp: now });
+
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now - 30_000 }), now)).toBe(step - 1);
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now }), now)).toBe(step);
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now + 30_000 }), now)).toBe(step + 1);
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now - 60_000 }), now)).toBeNull();
+      expect(matchTotpStep(secret, totp.generate({ timestamp: now + 60_000 }), now)).toBeNull();
+      expect(matchTotpStep(secret, "000000", now)).toBeNull();
     });
   });
 
