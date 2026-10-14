@@ -14,7 +14,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { decryptSetting, encrypt } from "../../lib/encryption.js";
+import { decryptSetting, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { reportError } from "../../lib/error-report.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
@@ -181,8 +181,14 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       const dest = { ...parsed.data };
       if (!(await validateWebhookDestinationUrl(dest.url, reply))) return;
 
-      // Encrypt the auth header before storage
-      if (dest.authHeader && env.DATA_ENCRYPTION_KEY) {
+      // GET masks a non-empty authHeader as "***"; preserve the stored secret
+      // when a client echoes the mask back on update (#2531).
+      if (dest.authHeader === "***") {
+        const existingAuth = destinations[index].authHeader;
+        dest.authHeader = typeof existingAuth === "string" ? existingAuth : "";
+      }
+      if (dest.authHeader && env.DATA_ENCRYPTION_KEY && !isEncrypted(dest.authHeader)) {
+        // Encrypt the auth header before storage
         dest.authHeader = await encrypt(dest.authHeader, env.DATA_ENCRYPTION_KEY);
       }
 

@@ -4,8 +4,9 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { encrypt } from "../../lib/encryption.js";
+import { encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { logger } from "../../lib/logger.js";
 import { requirePermission } from "../../permissions.js";
 
 const configSchema = z.object({
@@ -18,6 +19,20 @@ const configSchema = z.object({
 export type SiemConfig = z.infer<typeof configSchema>;
 
 const SETTINGS_KEY = "siem_config";
+
+function parseSiemConfig(raw: string): SiemConfig | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      logger.warn({ key: SETTINGS_KEY }, "siem: stored siem_config is not a JSON object");
+      return null;
+    }
+    return parsed as SiemConfig;
+  } catch (err) {
+    logger.warn({ err, key: SETTINGS_KEY }, "siem: failed to parse stored siem_config JSON");
+    return null;
+  }
+}
 
 export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/v1/enterprise/siem/config
@@ -81,18 +96,25 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
 
       const config = { ...parsed.data };
 
-      // Encrypt the auth header before storage if encryption key is set
-      if (config.authHeader && env.DATA_ENCRYPTION_KEY) {
+      const [existing] = await db
+        .select()
+        .from(schema.settings)
+        .where(eq(schema.settings.key, SETTINGS_KEY));
+
+      // GET masks a non-empty authHeader as "***"; preserve the stored secret
+      // when a client echoes the mask back on update (#2531).
+      if (config.authHeader === "***") {
+        const existingConfig = existing ? parseSiemConfig(existing.value) : null;
+        config.authHeader =
+          typeof existingConfig?.authHeader === "string" ? existingConfig.authHeader : "";
+      }
+      if (config.authHeader && env.DATA_ENCRYPTION_KEY && !isEncrypted(config.authHeader)) {
+        // Encrypt the auth header before storage if encryption key is set
         config.authHeader = await encrypt(config.authHeader, env.DATA_ENCRYPTION_KEY);
       }
 
       const value = JSON.stringify(config);
       const now = new Date();
-
-      const [existing] = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, SETTINGS_KEY));
 
       if (existing) {
         await db
@@ -128,9 +150,5 @@ export async function readSiemConfig(): Promise<SiemConfig | null> {
 
   if (!row) return null;
 
-  try {
-    return JSON.parse(row.value) as SiemConfig;
-  } catch {
-    return null;
-  }
+  return parseSiemConfig(row.value);
 }

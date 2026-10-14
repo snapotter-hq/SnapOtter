@@ -256,4 +256,120 @@ describe("SIEM config with enterprise license", () => {
     expect(body.authHeader).toBe("***");
     expect(body.authHeader).not.toContain("super-secret-value");
   });
+
+  it("PUT preserves stored authHeader when masked *** is echoed back (#2531)", async () => {
+    const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+
+    await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://siem.example.com/input",
+        authHeader: "Splunk super-secret-value",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+
+    const getRes = await enterpriseApp.app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+    });
+    const masked = JSON.parse(getRes.body);
+    expect(masked.authHeader).toBe("***");
+
+    const updateRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        ...masked,
+        webhookUrl: "https://siem.example.com/updated-input",
+        flushIntervalSeconds: 90,
+      },
+    });
+    expect(updateRes.statusCode).toBe(200);
+
+    const saved = await readSiemConfig();
+    expect(saved?.webhookUrl).toBe("https://siem.example.com/updated-input");
+    expect(saved?.flushIntervalSeconds).toBe(90);
+    expect(saved?.authHeader).toBe("Splunk super-secret-value");
+
+    // Sending an empty authHeader clears the stored secret
+    const clearRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        ...masked,
+        webhookUrl: "https://siem.example.com/updated-input",
+        authHeader: "",
+      },
+    });
+    expect(clearRes.statusCode).toBe(200);
+    expect((await readSiemConfig())?.authHeader).toBe("");
+  });
+
+  it("PUT does not store literal *** when no prior siem_config row exists or row is corrupt (#2531)", async () => {
+    const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+    await db.delete(schema.settings).where(eq(schema.settings.key, "siem_config"));
+
+    const res = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://siem.example.com/fresh",
+        authHeader: "***",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const saved = await readSiemConfig();
+    expect(saved?.authHeader).toBe("");
+
+    // Corrupt existing JSON row also falls back to empty string instead of storing ***
+    await db
+      .update(schema.settings)
+      .set({ value: "{corrupt-json" })
+      .where(eq(schema.settings.key, "siem_config"));
+
+    const corruptRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://siem.example.com/recovered",
+        authHeader: "***",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+    expect(corruptRes.statusCode).toBe(200);
+    expect((await readSiemConfig())?.authHeader).toBe("");
+
+    // Non-string authHeader or array JSON in stored row also falls back to empty string
+    await db
+      .update(schema.settings)
+      .set({ value: JSON.stringify({ webhookUrl: "https://siem.example.com/x", authHeader: 123 }) })
+      .where(eq(schema.settings.key, "siem_config"));
+
+    const nonStringRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/siem/config",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: {
+        webhookUrl: "https://siem.example.com/non-string",
+        authHeader: "***",
+        flushIntervalSeconds: 30,
+        enabled: true,
+      },
+    });
+    expect(nonStringRes.statusCode).toBe(200);
+    expect((await readSiemConfig())?.authHeader).toBe("");
+  });
 });

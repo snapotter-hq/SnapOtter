@@ -97,7 +97,7 @@ describe("webhook management", () => {
     beforeAll(async () => {
       vi.resetModules();
       const { mockEnterpriseFeatures } = await import("../../helpers/enterprise-mock.js");
-      mockEnterpriseFeatures(["admin_alerts", "webhooks"]);
+      mockEnterpriseFeatures(["admin_alerts", "webhooks", "siem_forwarding"]);
       const testServer = await import("../test-server.js");
       testApp = await testServer.buildTestApp();
       adminToken = await testServer.loginAsAdmin(testApp.app);
@@ -292,6 +292,251 @@ describe("webhook management", () => {
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
       expect(body.destinations).toEqual([]);
+    });
+
+    it("PUT /api/v1/enterprise/webhooks/:index preserves encrypted authHeader when masked *** is echoed back (#2531)", async () => {
+      const { env } = await import("../../../apps/api/src/config.js");
+      const { decryptSetting } = await import("../../../apps/api/src/lib/encryption.js");
+      const prevKey = env.DATA_ENCRYPTION_KEY;
+      env.DATA_ENCRYPTION_KEY = "a".repeat(64);
+
+      try {
+        const createRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            name: "Ops Alerts",
+            url: "https://example.com/alerts",
+            authHeader: "Bearer real-webhook-token",
+            type: "alerts",
+          },
+        });
+        expect(createRes.statusCode).toBe(201);
+
+        const [beforeRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const storedBefore = JSON.parse(beforeRow.value) as Array<{ authHeader: string }>;
+        expect(storedBefore[0].authHeader.startsWith("$ENC$")).toBe(true);
+        expect(await decryptSetting(storedBefore[0].authHeader)).toBe("Bearer real-webhook-token");
+
+        const getRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(getRes.statusCode).toBe(200);
+        const [maskedDest] = JSON.parse(getRes.body).destinations;
+        expect(maskedDest.authHeader).toBe("***");
+
+        const putRes = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            ...maskedDest,
+            url: "https://example.com/alerts-v2",
+            enabled: false,
+          },
+        });
+        expect(putRes.statusCode).toBe(200);
+
+        const [afterRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const storedAfter = JSON.parse(afterRow.value) as Array<{
+          url: string;
+          enabled: boolean;
+          authHeader: string;
+        }>;
+        expect(storedAfter[0].url).toBe("https://example.com/alerts-v2");
+        expect(storedAfter[0].enabled).toBe(false);
+        expect(storedAfter[0].authHeader).toBe(storedBefore[0].authHeader);
+        expect(await decryptSetting(storedAfter[0].authHeader)).toBe("Bearer real-webhook-token");
+
+        // Replacing authHeader with a new non-masked secret encrypts the new secret
+        const rotateRes = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            ...maskedDest,
+            url: "https://example.com/alerts-v2",
+            authHeader: "Bearer rotated-webhook-token",
+          },
+        });
+        expect(rotateRes.statusCode).toBe(200);
+
+        const [rotatedRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const storedRotated = JSON.parse(rotatedRow.value) as Array<{ authHeader: string }>;
+        expect(await decryptSetting(storedRotated[0].authHeader)).toBe(
+          "Bearer rotated-webhook-token",
+        );
+
+        // Sending empty string clears authHeader
+        const clearRes = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            ...maskedDest,
+            url: "https://example.com/alerts-v2",
+            authHeader: "",
+          },
+        });
+        expect(clearRes.statusCode).toBe(200);
+
+        const [clearedRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const storedCleared = JSON.parse(clearedRow.value) as Array<{ authHeader: string }>;
+        expect(storedCleared[0].authHeader).toBe("");
+
+        // Echoing *** when stored authHeader is empty keeps it empty instead of storing literal ***
+        const maskOnEmptyRes = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            ...maskedDest,
+            url: "https://example.com/alerts-v3",
+            authHeader: "***",
+          },
+        });
+        expect(maskOnEmptyRes.statusCode).toBe(200);
+
+        const [afterEmptyMaskRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const storedAfterEmptyMask = JSON.parse(afterEmptyMaskRow.value) as Array<{
+          url: string;
+          authHeader: string;
+        }>;
+        expect(storedAfterEmptyMask[0].url).toBe("https://example.com/alerts-v3");
+        expect(storedAfterEmptyMask[0].authHeader).toBe("");
+
+        // Multi-destination index isolation: updating index 1 with *** preserves index 1's own secret and leaves index 0 untouched
+        await db.delete(schema.settings).where(eq(schema.settings.key, "webhook_destinations"));
+        await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            name: "Hook Zero",
+            url: "https://example.com/hook-0",
+            authHeader: "Bearer token-zero",
+            type: "alerts",
+          },
+        });
+        await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            name: "Hook One",
+            url: "https://example.com/hook-1",
+            authHeader: "Bearer token-one",
+            type: "siem",
+          },
+        });
+
+        const [twoBeforeRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const twoBefore = JSON.parse(twoBeforeRow.value) as Array<{ authHeader: string }>;
+
+        const putIndex1Res = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/1",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            name: "Hook One Updated",
+            url: "https://example.com/hook-1-v2",
+            authHeader: "***",
+            type: "siem",
+          },
+        });
+        expect(putIndex1Res.statusCode).toBe(200);
+
+        const [twoAfterRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        const twoAfter = JSON.parse(twoAfterRow.value) as Array<{ authHeader: string }>;
+        expect(twoAfter[0].authHeader).toBe(twoBefore[0].authHeader);
+        expect(twoAfter[1].authHeader).toBe(twoBefore[1].authHeader);
+        expect(await decryptSetting(twoAfter[0].authHeader)).toBe("Bearer token-zero");
+        expect(await decryptSetting(twoAfter[1].authHeader)).toBe("Bearer token-one");
+      } finally {
+        env.DATA_ENCRYPTION_KEY = prevKey;
+        await db.delete(schema.settings).where(eq(schema.settings.key, "webhook_destinations"));
+      }
+    });
+
+    it("PUT /api/v1/enterprise/siem/config preserves encrypted authHeader when masked *** is echoed back (#2531)", async () => {
+      const { env } = await import("../../../apps/api/src/config.js");
+      const { decryptSetting } = await import("../../../apps/api/src/lib/encryption.js");
+      const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+      const prevKey = env.DATA_ENCRYPTION_KEY;
+      env.DATA_ENCRYPTION_KEY = "a".repeat(64);
+
+      try {
+        const saveRes = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/siem/config",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            webhookUrl: "https://example.com/siem",
+            authHeader: "Bearer real-siem-token",
+            flushIntervalSeconds: 30,
+            enabled: true,
+          },
+        });
+        expect(saveRes.statusCode).toBe(200);
+
+        const beforeConfig = await readSiemConfig();
+        expect(beforeConfig?.authHeader.startsWith("$ENC$")).toBe(true);
+        expect(await decryptSetting(beforeConfig?.authHeader ?? "")).toBe("Bearer real-siem-token");
+
+        const getRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/siem/config",
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(getRes.statusCode).toBe(200);
+        const maskedConfig = JSON.parse(getRes.body);
+        expect(maskedConfig.authHeader).toBe("***");
+
+        const updateRes = await testApp.app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/siem/config",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            ...maskedConfig,
+            webhookUrl: "https://example.com/siem-v2",
+            flushIntervalSeconds: 60,
+          },
+        });
+        expect(updateRes.statusCode).toBe(200);
+
+        const afterConfig = await readSiemConfig();
+        expect(afterConfig?.webhookUrl).toBe("https://example.com/siem-v2");
+        expect(afterConfig?.flushIntervalSeconds).toBe(60);
+        expect(afterConfig?.authHeader).toBe(beforeConfig?.authHeader);
+        expect(await decryptSetting(afterConfig?.authHeader ?? "")).toBe("Bearer real-siem-token");
+      } finally {
+        env.DATA_ENCRYPTION_KEY = prevKey;
+        await db.delete(schema.settings).where(eq(schema.settings.key, "siem_config"));
+      }
     });
   });
 });
