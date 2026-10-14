@@ -5649,7 +5649,7 @@ export const ru: TranslationKeys = {
     passwordNoControlCharacters: "Пароль не должен содержать управляющие символы.",
     passwordTooLong: "Пароль слишком длинный (максимум: {maxLength}).",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "Пароль слишком длинный (макс. {maxLength} символов). Администратор должен его сбросить.",
     tooManyRequests: "Слишком много попыток. Подождите минуту и попробуйте снова.",
     escalationDenied: "Для этого нужно больше прав, чем есть у вашей роли.",
     featureNotLicensed: "Для этого нужна корпоративная лицензия.",

@@ -5587,7 +5587,7 @@ export const ar: TranslationKeys = {
     passwordNoControlCharacters: "يجب ألا تحتوي كلمة المرور على أحرف تحكم.",
     passwordTooLong: "يجب ألا يزيد عدد أحرف كلمة المرور عن {maxLength}.",
     passwordTooLongAdminReset:
-      "Password is too long (max {maxLength} characters). An admin must reset it.",
+      "كلمة المرور طويلة جدًا (بحد أقصى {maxLength} من الأحرف). يجب على المسؤول إعادة تعيينها.",
     tooManyRequests: "محاولات كثيرة جدًا. انتظر دقيقة ثم حاول مرة أخرى.",
     escalationDenied: "يتطلب هذا صلاحيات أعلى من صلاحيات دورك.",
     featureNotLicensed: "يتطلب هذا ترخيص المؤسسات.",
