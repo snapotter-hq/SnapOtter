@@ -25,6 +25,7 @@ export interface TranscriptionResult {
 export interface TranscribeOptions {
   language: string;
   signal?: AbortSignal;
+  toolId?: string;
 }
 
 export async function transcribeAudio(
@@ -41,6 +42,7 @@ export async function transcribeAudio(
     timeout: 30 * 60_000,
     onProgress,
     signal: opts.signal,
+    ...(opts.toolId ? { toolId: opts.toolId } : {}),
   });
 
   const result = parseStdoutJson(stdout);

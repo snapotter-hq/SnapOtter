@@ -55,6 +55,7 @@ import { runOcrRuntime } from "../../../packages/ai/src/ocr-runtime-dispatcher.j
 import { removeRedEye } from "../../../packages/ai/src/red-eye-removal.js";
 import { restorePhoto } from "../../../packages/ai/src/restoration.js";
 import { runAdaptiveTesseract } from "../../../packages/ai/src/tesseract.js";
+import { transcribeAudio } from "../../../packages/ai/src/transcription.js";
 import { upscale } from "../../../packages/ai/src/upscaling.js";
 
 const FAKE_INPUT = Buffer.from("fake-image-data");
@@ -2051,5 +2052,113 @@ describe("OOM propagation through all tools", () => {
 
   it("propagates OOM through detectFaces", async () => {
     await expect(detectFaces(FAKE_INPUT)).rejects.toThrow("out of memory");
+  });
+});
+
+describe("toolId forwarding to runPythonWithProgress (issue #2524)", () => {
+  it("detectFaceLandmarks defaults toolId to passport-photo so Step 1 checks the 2.5 GB background-removal floor up front", async () => {
+    vi.mocked(parseStdoutJson).mockReturnValue({
+      success: true,
+      faceDetected: true,
+      landmarks: null,
+      imageWidth: 800,
+      imageHeight: 600,
+    });
+
+    await detectFaceLandmarks(FAKE_INPUT);
+
+    expect(runPythonWithProgress).toHaveBeenCalledWith(
+      "face_landmarks.py",
+      expect.any(Array),
+      expect.objectContaining({ toolId: "passport-photo" }),
+    );
+  });
+
+  it("removeBackground forwards caller toolId to both primary and OOM-fallback calls without serializing toolId into Python args", async () => {
+    vi.mocked(runPythonWithProgress)
+      .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+      .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+    vi.mocked(parseStdoutJson).mockReturnValue({ success: true });
+
+    await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+      model: "birefnet-general",
+      toolId: "transparency-fixer",
+    });
+
+    expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+    const [, primaryArgs, primaryOpts] = vi.mocked(runPythonWithProgress).mock.calls[0];
+    const [, fallbackArgs, fallbackOpts] = vi.mocked(runPythonWithProgress).mock.calls[1];
+    expect(JSON.parse(primaryArgs[2])).toEqual({ model: "birefnet-general" });
+    expect(JSON.parse(fallbackArgs[2])).toEqual({ model: "u2net" });
+    expect(primaryOpts).toEqual(expect.objectContaining({ toolId: "transparency-fixer" }));
+    expect(fallbackOpts).toEqual(expect.objectContaining({ toolId: "transparency-fixer" }));
+  });
+
+  it("transcribeAudio forwards caller toolId (e.g. auto-subtitles) to runPythonWithProgress", async () => {
+    vi.mocked(parseStdoutJson).mockReturnValue({
+      success: true,
+      language: "en",
+      segments: [],
+      text: "hello",
+    });
+
+    await transcribeAudio("/tmp/in.wav", { language: "en", toolId: "auto-subtitles" });
+
+    expect(runPythonWithProgress).toHaveBeenCalledWith(
+      "transcribe.py",
+      ["/tmp/in.wav", JSON.stringify({ language: "en", task: "transcribe" })],
+      expect.objectContaining({ toolId: "auto-subtitles" }),
+    );
+  });
+
+  it("detectFaces defaults toolId to smart-crop and blurFaces, enhanceFaces, and noiseRemoval forward toolId without serializing it", async () => {
+    vi.mocked(parseStdoutJson).mockReturnValue({
+      success: true,
+      facesDetected: 0,
+      faces: [],
+      width: 800,
+      height: 600,
+      format: "png",
+      tier: "balanced",
+      model: "gfpgan",
+    });
+
+    await detectFaces(FAKE_INPUT, { sensitivity: 0.4 });
+    expect(vi.mocked(runPythonWithProgress).mock.calls[0][1][2]).toBe(
+      JSON.stringify({ sensitivity: 0.4, detectOnly: true }),
+    );
+    expect(vi.mocked(runPythonWithProgress).mock.calls[0][2]).toEqual(
+      expect.objectContaining({ toolId: "smart-crop" }),
+    );
+
+    vi.mocked(runPythonWithProgress).mockClear();
+    await blurFaces(FAKE_INPUT, FAKE_OUTPUT_DIR, { blurRadius: 20, toolId: "blur-faces" });
+    expect(JSON.parse(vi.mocked(runPythonWithProgress).mock.calls[0][1][2])).toEqual({
+      blurRadius: 20,
+    });
+    expect(vi.mocked(runPythonWithProgress).mock.calls[0][2]).toEqual(
+      expect.objectContaining({ toolId: "blur-faces" }),
+    );
+
+    vi.mocked(runPythonWithProgress).mockClear();
+    await enhanceFaces(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "gfpgan" });
+    expect(JSON.parse(vi.mocked(runPythonWithProgress).mock.calls[0][1][2])).toEqual({
+      model: "gfpgan",
+    });
+    expect(vi.mocked(runPythonWithProgress).mock.calls[0][2]).toEqual(
+      expect.objectContaining({ toolId: "enhance-faces" }),
+    );
+
+    vi.mocked(runPythonWithProgress).mockClear();
+    await noiseRemoval(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+      tier: "quality",
+      toolId: "image-enhancement",
+    });
+    expect(JSON.parse(vi.mocked(runPythonWithProgress).mock.calls[0][1][2])).toEqual({
+      tier: "quality",
+    });
+    expect(vi.mocked(runPythonWithProgress).mock.calls[0][2]).toEqual(
+      expect.objectContaining({ toolId: "image-enhancement" }),
+    );
   });
 });

@@ -3624,4 +3624,82 @@ describe("bridge - pre-dispatch sidecar memory floor (issue #1162)", () => {
       }),
     ).rejects.toThrow("upscale needs about 2.5 GB free on CPU hosts");
   });
+
+  it("uses per-framework GPU readiness from dispatcher.py and caller toolId in pre-dispatch refusals (issue #2524)", async () => {
+    const { initDispatcher, runPythonWithProgress, shutdownDispatcher } = await import(
+      "../../../packages/ai/src/bridge.js"
+    );
+    onTestFinished(() => shutdownDispatcher());
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const initReady = initDispatcher();
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        '{"ready": true, "gpu": true, "gpuFrameworks": {"torch": false, "onnx": true, "ctranslate2": false}}\n',
+      ),
+    );
+    await initReady;
+
+    // Torch script (upscale.py) is refused at 1.5 GiB because gpuFrameworks.torch is false.
+    await expect(
+      runPythonWithProgress("upscale.py", ["/tmp/in.png"], {
+        memoryOptions: { availableMemoryBytes: 1.5 * 1024 ** 3 },
+      }),
+    ).rejects.toThrow("upscale needs about 2.5 GB free on CPU hosts, this host has 1.5 GB");
+    expect(mock.stdinWrites).toHaveLength(0);
+
+    // CTranslate2 script (transcribe.py) with toolId="auto-subtitles" is refused naming auto-subtitles.
+    await expect(
+      runPythonWithProgress("transcribe.py", ["/tmp/in.wav", "{}"], {
+        toolId: "auto-subtitles",
+        memoryOptions: { availableMemoryBytes: 1.2 * 1024 ** 3 },
+      }),
+    ).rejects.toThrow("auto-subtitles needs about 2 GB free on CPU hosts, this host has 1.2 GB");
+    expect(mock.stdinWrites).toHaveLength(0);
+
+    // passport-photo Step 1 (face_landmarks.py) with toolId="passport-photo" is refused at 1.2 GiB
+    // when ONNX GPU is unavailable.
+    await expect(
+      runPythonWithProgress("face_landmarks.py", ["/tmp/in.png", "unused", "{}"], {
+        toolId: "passport-photo",
+        memoryOptions: {
+          gpuAvailable: false,
+          availableMemoryBytes: 1.2 * 1024 ** 3,
+        },
+      }),
+    ).rejects.toThrow("passport-photo needs about 2.5 GB free on CPU hosts, this host has 1.2 GB");
+    expect(mock.stdinWrites).toHaveLength(0);
+
+    // ONNX script (remove_bg.py) proceeds to dispatcher stdin at 1.5 GiB because gpuFrameworks.onnx is true.
+    const onnxPromise = runPythonWithProgress("remove_bg.py", ["/tmp/in.png", "/tmp/out.png"], {
+      toolId: "background-replace",
+      memoryOptions: { availableMemoryBytes: 1.5 * 1024 ** 3 },
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mock.stdinWrites.length).toBe(1);
+    const req = JSON.parse(mock.stdinWrites[0].trim());
+    mock.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: req.id, exitCode: 0, stdout: '{"success": true}' })}\n`),
+    );
+    await expect(onnxPromise).resolves.toMatchObject({ stdout: '{"success": true}' });
+
+    // Shutting down the dispatcher (as routes/features.ts does after a bundle install)
+    // clears the stale gpuFrameworks map so newly installed GPU frameworks re-probe
+    // via cold-start deviceExists until the replacement dispatcher signals ready.
+    shutdownDispatcher();
+    const mockAfterInstall = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mockAfterInstall.process);
+    await expect(
+      runPythonWithProgress("upscale.py", ["/tmp/in.png"], {
+        memoryOptions: {
+          availableMemoryBytes: 1.5 * 1024 ** 3,
+          deviceExists: (p) => p === "/dev/nvidiactl",
+        },
+      }),
+    ).rejects.toThrow("feature_not_installed");
+  });
 });

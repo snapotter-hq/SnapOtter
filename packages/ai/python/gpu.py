@@ -20,7 +20,7 @@ def _nvidia_smi_gpu_name():
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired):
         pass
     return None
 
@@ -71,14 +71,18 @@ def _try_torch_cuda():
     """Check GPU via torch.cuda. Returns True if CUDA is usable."""
     try:
         import torch
-    except ImportError as e:
+    except Exception as e:
         print(f"[gpu] torch not importable: {e}", file=sys.stderr, flush=True)
         return False
 
-    if torch.cuda.is_available():
-        name = torch.cuda.get_device_name(0)
-        print(f"[gpu] CUDA available via torch: {name}", file=sys.stderr, flush=True)
-        return True
+    try:
+        if torch.cuda.is_available():
+            name = torch.cuda.get_device_name(0)
+            print(f"[gpu] CUDA available via torch: {name}", file=sys.stderr, flush=True)
+            return True
+    except Exception as e:
+        print(f"[gpu] torch CUDA probe failed: {e}", file=sys.stderr, flush=True)
+        return False
 
     # CUDA not available -- diagnose why.
     cuda_version = getattr(torch.version, "cuda", None)
@@ -123,7 +127,7 @@ def _try_onnx_cuda():
                   file=sys.stderr, flush=True)
             return True
         return False
-    except (ImportError, FileNotFoundError, subprocess.TimeoutExpired):
+    except Exception:
         return False
 
 
@@ -154,6 +158,28 @@ def ctranslate2_gpu_available():
         return ctranslate2.get_cuda_device_count() > 0
     except Exception:
         return False
+
+
+def onnx_gpu_available():
+    """True iff ONNX Runtime itself can use CUDA (honors the SNAPOTTER_GPU override).
+
+    ONNX-based tools (background removal, LaMa inpainting/outpainting, DDColor)
+    require CUDAExecutionProvider in onnxruntime plus a usable GPU, not merely a
+    CUDA-enabled torch build (#490).
+    """
+    if _override_disables_gpu():
+        return False
+    return _try_onnx_cuda()
+
+
+def gpu_frameworks_available():
+    """Return per-framework CUDA availability for the sidecar readiness payload."""
+    return {
+        "torch": bool(torch_gpu_available()),
+        "onnx": bool(onnx_gpu_available()),
+        "ctranslate2": bool(ctranslate2_gpu_available()),
+    }
+
 
 
 def onnx_providers():

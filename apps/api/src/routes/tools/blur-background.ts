@@ -43,7 +43,7 @@ registerAiJobHandler("blur-background", async (input, data, ctx) => {
   const subjectPng = await removeBackground(
     input,
     ctx.scratchDir,
-    { signal: ctx.signal },
+    { signal: ctx.signal, toolId: "blur-background" },
     (percent, stage) => {
       // Scale rembg progress into 5..80 range
       const scaled = 5 + Math.round(percent * 0.75);

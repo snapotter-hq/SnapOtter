@@ -81,3 +81,34 @@ def test_ctranslate2_gpu_available_false_when_not_installed(monkeypatch):
     monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
     monkeypatch.setitem(sys.modules, "ctranslate2", None)
     assert gpu.ctranslate2_gpu_available() is False
+
+
+def test_onnx_gpu_available_true_when_onnx_can_use_cuda(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    monkeypatch.setattr(gpu, "_try_onnx_cuda", lambda: True)
+    assert gpu.onnx_gpu_available() is True
+
+
+def test_onnx_gpu_available_false_when_override_disables_gpu(monkeypatch):
+    monkeypatch.setenv("SNAPOTTER_GPU", "0")
+    monkeypatch.setattr(gpu, "_try_onnx_cuda", lambda: True)
+    assert gpu.onnx_gpu_available() is False
+
+
+def test_onnx_gpu_available_false_when_onnx_is_cpu_only(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    monkeypatch.setattr(gpu, "_try_onnx_cuda", lambda: False)
+    assert gpu.onnx_gpu_available() is False
+
+
+def test_gpu_frameworks_available_reports_each_framework_independently(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    monkeypatch.setattr(gpu, "torch_gpu_available", lambda: False)
+    monkeypatch.setattr(gpu, "onnx_gpu_available", lambda: True)
+    monkeypatch.setattr(gpu, "ctranslate2_gpu_available", lambda: False)
+    assert gpu.gpu_frameworks_available() == {
+        "torch": False,
+        "onnx": True,
+        "ctranslate2": False,
+    }
+

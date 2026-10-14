@@ -133,7 +133,10 @@ async function processFace(
   inputBuffer: Buffer,
   settings: z.output<typeof settingsSchema>,
 ): Promise<Buffer> {
-  const result = await detectFaces(inputBuffer, { sensitivity: settings.sensitivity });
+  const result = await detectFaces(inputBuffer, {
+    sensitivity: settings.sensitivity,
+    toolId: "smart-crop",
+  });
 
   if (result.facesDetected === 0) {
     return processSubject(inputBuffer, { ...settings, strategy: "attention" });

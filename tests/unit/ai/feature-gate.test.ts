@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -5,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   availableSidecarMemoryBytes,
   BUNDLE_CPU_FREE_MEMORY_BYTES,
+  BUNDLE_GPU_FRAMEWORK,
+  isFrameworkGpuAvailable,
   missingBundleForScript,
   SCRIPT_BUNDLE_MAP,
+  SCRIPT_GPU_FRAMEWORK,
   SCRIPT_TOOL_LABEL,
   sidecarMemoryRefusal,
 } from "../../../packages/ai/src/feature-gate.js";
 import { FEATURE_BUNDLES } from "../../../packages/shared/src/features.js";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 let tempDir: string;
 let savedDataDir: string | undefined;
@@ -361,4 +366,210 @@ describe("per-bundle CPU memory floor (issue #1162)", () => {
     expect(lowResource).toContain("2 GB of host RAM (0.5 GB free)");
     expect(aiDocs).toMatch(/\| Bundle \| Size \| CPU memory floor \|/i);
   });
+
+  it("checks per-framework GPU availability so ONNX-only CUDA does not skip the CPU floor for torch or ctranslate2 scripts (issue #2524)", () => {
+    expect(Object.keys(SCRIPT_GPU_FRAMEWORK).sort()).toEqual(Object.keys(SCRIPT_BUNDLE_MAP).sort());
+    expect(Object.keys(BUNDLE_GPU_FRAMEWORK).sort()).toEqual(Object.keys(FEATURE_BUNDLES).sort());
+
+    const onnxOnlyGpu = {
+      gpuAvailable: true,
+      gpuFrameworks: { torch: false, onnx: true, ctranslate2: false },
+      availableMemoryBytes: 1.5 * GIB,
+    };
+
+    // Torch scripts still run on CPU when torch lacks CUDA, so their CPU floor applies.
+    for (const torchScript of [
+      "upscale.py",
+      "enhance_faces.py",
+      "noise_removal.py",
+      "restore.py",
+      "inpaint_hq.py",
+    ]) {
+      expect(sidecarMemoryRefusal(torchScript, onnxOnlyGpu), torchScript).toContain(
+        "free on CPU hosts, this host has 1.5 GB",
+      );
+    }
+
+    // CTranslate2 transcription also runs on CPU when ctranslate2 lacks CUDA.
+    expect(sidecarMemoryRefusal("transcribe.py", onnxOnlyGpu)).toContain(
+      "transcribe-audio needs about 2 GB free on CPU hosts, this host has 1.5 GB",
+    );
+
+    // ONNX scripts run on GPU when onnxruntime has CUDAExecutionProvider.
+    for (const onnxScript of [
+      "remove_bg.py",
+      "gif_remove_bg.py",
+      "inpaint.py",
+      "outpaint.py",
+      "colorize.py",
+    ]) {
+      expect(sidecarMemoryRefusal(onnxScript, onnxOnlyGpu), onnxScript).toBeNull();
+    }
+
+    // Conversely, when torch and ctranslate2 have CUDA but onnxruntime is CPU-only (#490),
+    // torch and ctranslate2 scripts skip the CPU floor while ONNX scripts enforce it.
+    const torchAndCtranslateGpu = {
+      gpuAvailable: true,
+      gpuFrameworks: { torch: true, onnx: false, ctranslate2: true },
+      availableMemoryBytes: 1.5 * GIB,
+    };
+    expect(sidecarMemoryRefusal("upscale.py", torchAndCtranslateGpu)).toBeNull();
+    expect(sidecarMemoryRefusal("transcribe.py", torchAndCtranslateGpu)).toBeNull();
+    expect(sidecarMemoryRefusal("remove_bg.py", torchAndCtranslateGpu)).toContain(
+      "remove-background needs about 2.5 GB free on CPU hosts, this host has 1.5 GB",
+    );
+
+    // MediaPipe face-detection scripts always run on CPU even when all GPU frameworks are present.
+    expect(
+      sidecarMemoryRefusal("detect_faces.py", {
+        gpuAvailable: true,
+        gpuFrameworks: { torch: true, onnx: true, ctranslate2: true },
+        availableMemoryBytes: 0.3 * GIB,
+      }),
+    ).toContain("blur-faces needs about 0.5 GB free on CPU hosts");
+  });
+
+  it("uses caller toolId for shared scripts and checks multi-bundle floors up front for passport-photo (issue #2524)", () => {
+    expect(
+      sidecarMemoryRefusal("transcribe.py", {
+        toolId: "auto-subtitles",
+        gpuAvailable: false,
+        availableMemoryBytes: 1.2 * GIB,
+      }),
+    ).toContain("auto-subtitles needs about 2 GB free on CPU hosts, this host has 1.2 GB");
+
+    expect(
+      sidecarMemoryRefusal("remove_bg.py", {
+        toolId: "background-replace",
+        gpuAvailable: false,
+        availableMemoryBytes: 1.2 * GIB,
+      }),
+    ).toContain("background-replace needs about 2.5 GB free on CPU hosts, this host has 1.2 GB");
+
+    expect(
+      sidecarMemoryRefusal("detect_faces.py", {
+        toolId: "smart-crop",
+        gpuAvailable: false,
+        availableMemoryBytes: 0.3 * GIB,
+      }),
+    ).toContain("smart-crop needs about 0.5 GB free on CPU hosts, this host has 0.3 GB");
+
+    // Step 1 of passport-photo (face_landmarks.py) checks the 2.5 GB background-removal
+    // floor up front on CPU hosts instead of passing at 0.5 GB and failing in Step 2.
+    expect(
+      sidecarMemoryRefusal("face_landmarks.py", {
+        toolId: "passport-photo",
+        gpuAvailable: false,
+        availableMemoryBytes: 1.2 * GIB,
+      }),
+    ).toContain("passport-photo needs about 2.5 GB free on CPU hosts, this host has 1.2 GB");
+
+    // When ONNX has CUDA, background-removal runs in VRAM so passport-photo only needs
+    // the 0.5 GB MediaPipe CPU floor for face_landmarks.py.
+    expect(
+      sidecarMemoryRefusal("face_landmarks.py", {
+        toolId: "passport-photo",
+        gpuAvailable: true,
+        gpuFrameworks: { torch: false, onnx: true, ctranslate2: false },
+        availableMemoryBytes: 1.2 * GIB,
+      }),
+    ).toBeNull();
+
+    // When only torch has CUDA (ONNX is CPU-only), passport-photo still needs 2.5 GB on CPU.
+    expect(
+      sidecarMemoryRefusal("face_landmarks.py", {
+        toolId: "passport-photo",
+        gpuAvailable: true,
+        gpuFrameworks: { torch: true, onnx: false, ctranslate2: false },
+        availableMemoryBytes: 1.2 * GIB,
+      }),
+    ).toContain("passport-photo needs about 2.5 GB free on CPU hosts, this host has 1.2 GB");
+
+    // enhance-faces requires upscale-enhance (torch, 2.5 GB) + face-detection (MediaPipe CPU, 0.5 GB).
+    // When torch has CUDA, the 2.5 GB floor is skipped, leaving only the 0.5 GB CPU floor.
+    expect(
+      sidecarMemoryRefusal("enhance_faces.py", {
+        toolId: "enhance-faces",
+        gpuAvailable: true,
+        gpuFrameworks: { torch: true, onnx: false, ctranslate2: false },
+        availableMemoryBytes: 1.0 * GIB,
+      }),
+    ).toBeNull();
+    expect(
+      sidecarMemoryRefusal("enhance_faces.py", {
+        toolId: "enhance-faces",
+        gpuAvailable: true,
+        gpuFrameworks: { torch: true, onnx: true, ctranslate2: true },
+        availableMemoryBytes: 0.3 * GIB,
+      }),
+    ).toContain("enhance-faces needs about 0.5 GB free on CPU hosts, this host has 0.3 GB");
+
+    // inpaint_hq.py stays scoped to inpaint-hq (torch) even when toolId="erase-object" is passed.
+    expect(
+      sidecarMemoryRefusal("inpaint_hq.py", {
+        toolId: "erase-object",
+        gpuAvailable: true,
+        gpuFrameworks: { torch: true, onnx: false, ctranslate2: false },
+        availableMemoryBytes: 1.5 * GIB,
+      }),
+    ).toBeNull();
+
+    // isFrameworkGpuAvailable helper falls back to gpuAvailable when gpuFrameworks is omitted.
+    expect(isFrameworkGpuAvailable("torch", { gpuAvailable: true })).toBe(true);
+    expect(isFrameworkGpuAvailable("torch", { gpuAvailable: false })).toBe(false);
+    expect(isFrameworkGpuAvailable(null, { gpuAvailable: true })).toBe(false);
+  });
+
+  it.skipIf(!hasPython)(
+    "probes per-framework CUDA in gpu.py and emits gpuFrameworks in dispatcher.py readiness JSON (issue #2524)",
+    () => {
+      const pyDir = join(process.cwd(), "packages/ai/python");
+      const script = `
+import io, json, os, sys
+os.environ["DISPATCHER_PROFILE"] = "docs"
+sys.path.insert(0, ${JSON.stringify(pyDir)})
+import gpu, dispatcher
+
+os.environ.pop("SNAPOTTER_GPU", None)
+gpu._try_torch_cuda = lambda: False
+gpu._try_onnx_cuda = lambda: True
+gpu.ctranslate2_gpu_available = lambda: False
+gpu.gpu_available.cache_clear()
+
+assert gpu.torch_gpu_available() is False
+assert gpu.onnx_gpu_available() is True
+assert gpu.gpu_frameworks_available() == {"torch": False, "onnx": True, "ctranslate2": False}
+
+os.environ["SNAPOTTER_GPU"] = "0"
+assert gpu.onnx_gpu_available() is False
+os.environ.pop("SNAPOTTER_GPU", None)
+
+buf = io.StringIO()
+orig_stderr = sys.stderr
+orig_stdin = sys.stdin
+try:
+    sys.stderr = buf
+    sys.stdin = io.StringIO("")
+    dispatcher.main()
+finally:
+    sys.stderr = orig_stderr
+    sys.stdin = orig_stdin
+
+lines = [l.strip() for l in buf.getvalue().splitlines() if l.strip()]
+ready = json.loads(lines[0])
+assert ready == {
+    "ready": True,
+    "gpu": True,
+    "gpuFrameworks": {"torch": False, "onnx": True, "ctranslate2": False},
+}, ready
+print("PY_GPU_FRAMEWORKS_OK")
+`;
+      const res = spawnSync(pythonBin as string, ["-c", script], {
+        encoding: "utf8",
+        timeout: 15_000,
+      });
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("PY_GPU_FRAMEWORKS_OK");
+    },
+  );
 });

@@ -27,12 +27,15 @@ export { blurFaces, detectFaces } from "./face-detection.js";
 export { enhanceFaces } from "./face-enhancement.js";
 export type { FaceLandmarkPoint, FaceLandmarks, FaceLandmarksResult } from "./face-landmarks.js";
 export { detectFaceLandmarks } from "./face-landmarks.js";
-export type { SidecarMemoryOptions } from "./feature-gate.js";
+export type { GpuFramework, GpuFrameworks, SidecarMemoryOptions } from "./feature-gate.js";
 export {
   availableSidecarMemoryBytes,
   BUNDLE_CPU_FREE_MEMORY_BYTES,
+  BUNDLE_GPU_FRAMEWORK,
+  isFrameworkGpuAvailable,
   missingBundleForScript,
   SCRIPT_BUNDLE_MAP,
+  SCRIPT_GPU_FRAMEWORK,
   SCRIPT_TOOL_LABEL,
   sidecarMemoryRefusal,
 } from "./feature-gate.js";

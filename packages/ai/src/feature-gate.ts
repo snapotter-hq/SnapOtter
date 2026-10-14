@@ -1,8 +1,17 @@
 import { readFileSync } from "node:fs";
 import { totalmem } from "node:os";
 import { join } from "node:path";
+import { getRequiredBundlesForTool } from "@snapotter/shared";
 
 const GIB = 1024 ** 3;
+
+export type GpuFramework = "torch" | "onnx" | "ctranslate2";
+
+export interface GpuFrameworks {
+  torch?: boolean;
+  onnx?: boolean;
+  ctranslate2?: boolean;
+}
 
 /**
  * Python script name -> required feature bundle.
@@ -74,9 +83,49 @@ export const BUNDLE_CPU_FREE_MEMORY_BYTES: Readonly<Record<string, number>> = {
   "inpaint-hq": 6 * GIB,
 };
 
+/**
+ * GPU inference framework for each feature bundle. MediaPipe (`face-detection`)
+ * and the portable CPU `ocr` runtime always run on CPU even when a CUDA GPU is
+ * present (`null`), so their CPU memory floors are never bypassed by GPU state.
+ */
+export const BUNDLE_GPU_FRAMEWORK: Readonly<Record<string, GpuFramework | null>> = {
+  "background-removal": "onnx",
+  "face-detection": null,
+  "object-eraser-colorize": "onnx",
+  "inpaint-hq": "torch",
+  "upscale-enhance": "torch",
+  "photo-restoration": "torch",
+  ocr: null,
+  transcription: "ctranslate2",
+};
+
+/**
+ * GPU inference framework for each gated sidecar script in SCRIPT_BUNDLE_MAP.
+ */
+export const SCRIPT_GPU_FRAMEWORK: Readonly<Record<string, GpuFramework | null>> = {
+  remove_bg: "onnx",
+  gif_remove_bg: "onnx",
+  detect_faces: null,
+  face_landmarks: null,
+  red_eye_removal: null,
+  inpaint: "onnx",
+  inpaint_hq: "torch",
+  outpaint: "onnx",
+  colorize: "onnx",
+  upscale: "torch",
+  enhance_faces: "torch",
+  noise_removal: "torch",
+  restore: "torch",
+  transcribe: "ctranslate2",
+};
+
 export interface SidecarMemoryOptions {
   /** Whether a usable CUDA GPU is available for inference. */
   gpuAvailable?: boolean;
+  /** Per-framework CUDA availability reported by dispatcher.py at startup. */
+  gpuFrameworks?: GpuFrameworks;
+  /** Caller tool identifier when a script is shared or part of a multi-bundle tool. */
+  toolId?: string;
   /** Direct override for available memory in bytes (test seam). */
   availableMemoryBytes?: number;
   /** Override for host total physical memory in bytes (test seam). */
@@ -85,6 +134,22 @@ export interface SidecarMemoryOptions {
   readTextFile?: (path: string) => string;
   /** Device node existence seam for cold-start NVIDIA device check. */
   deviceExists?: (path: string) => boolean;
+}
+
+/**
+ * True when the given GPU framework can offload inference to VRAM. CPU-only
+ * frameworks (`null`, e.g. MediaPipe) always return false. When `gpuFrameworks`
+ * carries an explicit boolean for `framework`, that per-framework probe wins;
+ * otherwise falls back to the aggregate `gpuAvailable` boolean.
+ */
+export function isFrameworkGpuAvailable(
+  framework: GpuFramework | null | undefined,
+  options: SidecarMemoryOptions = {},
+): boolean {
+  if (!framework) return false;
+  const perFramework = options.gpuFrameworks?.[framework];
+  if (typeof perFramework === "boolean") return perFramework;
+  return Boolean(options.gpuAvailable);
 }
 
 function parseFiniteCgroupBytes(raw: string): number | null {
@@ -225,13 +290,29 @@ export function sidecarMemoryRefusal(
   const bundle = SCRIPT_BUNDLE_MAP[scriptKey];
   if (!bundle) return null;
 
-  const requiredBytes = BUNDLE_CPU_FREE_MEMORY_BYTES[bundle];
-  if (!requiredBytes || options.gpuAvailable) return null;
+  const toolId = options.toolId?.trim();
+  const candidateBundles =
+    toolId && bundle !== "inpaint-hq"
+      ? [...new Set([bundle, ...getRequiredBundlesForTool(toolId)])]
+      : [bundle];
+
+  let requiredBytes = 0;
+  for (const candidateBundle of candidateBundles) {
+    const floor = BUNDLE_CPU_FREE_MEMORY_BYTES[candidateBundle] ?? 0;
+    if (floor <= 0) continue;
+    const framework =
+      candidateBundle in BUNDLE_GPU_FRAMEWORK
+        ? BUNDLE_GPU_FRAMEWORK[candidateBundle]
+        : SCRIPT_GPU_FRAMEWORK[scriptKey];
+    if (isFrameworkGpuAvailable(framework, options)) continue;
+    if (floor > requiredBytes) requiredBytes = floor;
+  }
+  if (!requiredBytes) return null;
 
   const availableBytes = availableSidecarMemoryBytes(options);
   if (availableBytes === null || availableBytes >= requiredBytes) return null;
 
-  const label = SCRIPT_TOOL_LABEL[scriptKey] ?? scriptKey;
+  const label = toolId || SCRIPT_TOOL_LABEL[scriptKey] || scriptKey;
   return (
     `${label} needs about ${formatFloorGb(requiredBytes)} GB free on CPU hosts, ` +
     `this host has ${formatGb(availableBytes)} GB. Free up memory, raise the container memory limit, or use a CUDA GPU.`

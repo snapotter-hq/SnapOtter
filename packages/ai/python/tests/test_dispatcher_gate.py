@@ -94,3 +94,49 @@ def test_docs_profile_allowlist_is_the_docs_script_set():
     # lean document set, not the AI set.
     assert "doc_health" in dispatcher.ALLOWED_SCRIPTS
     assert "remove_bg" not in dispatcher.ALLOWED_SCRIPTS
+
+
+def test_main_emits_gpu_frameworks_in_readiness_payload(monkeypatch, capsys):
+    import io
+    import gpu
+
+    monkeypatch.setattr(gpu, "gpu_available", lambda: True)
+    monkeypatch.setattr(
+        gpu,
+        "gpu_frameworks_available",
+        lambda: {"torch": False, "onnx": True, "ctranslate2": False},
+        raising=False,
+    )
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    dispatcher.main()
+
+    stderr_lines = [line.strip() for line in capsys.readouterr().err.splitlines() if line.strip()]
+    readiness = json.loads(stderr_lines[0])
+    assert readiness == {
+        "ready": True,
+        "gpu": True,
+        "gpuFrameworks": {"torch": False, "onnx": True, "ctranslate2": False},
+    }
+
+
+def test_main_falls_back_to_all_false_gpu_frameworks_when_probe_raises(monkeypatch, capsys):
+    import io
+    import gpu
+
+    def _boom():
+        raise RuntimeError("CUDA driver initialization failed")
+
+    monkeypatch.setattr(gpu, "gpu_available", _boom)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    dispatcher.main()
+
+    stderr_lines = [line.strip() for line in capsys.readouterr().err.splitlines() if line.strip()]
+    # First line is the diagnostic, second is the readiness JSON.
+    readiness = next(json.loads(line) for line in stderr_lines if line.startswith("{"))
+    assert readiness == {
+        "ready": True,
+        "gpu": False,
+        "gpuFrameworks": {"torch": False, "onnx": False, "ctranslate2": False},
+    }
+
+

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import {
+  type GpuFrameworks,
   missingBundleForScript,
   type SidecarMemoryOptions,
   sidecarMemoryRefusal,
@@ -241,7 +242,18 @@ export interface PythonRunOptions {
   onProgress?: ProgressCallback;
   signal?: AbortSignal;
   timeout?: number;
+  toolId?: string;
   memoryOptions?: SidecarMemoryOptions;
+}
+
+function parseGpuFrameworks(raw: unknown): GpuFrameworks | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const obj = raw as Record<string, unknown>;
+  const out: GpuFrameworks = {};
+  if (typeof obj.torch === "boolean") out.torch = obj.torch;
+  if (typeof obj.onnx === "boolean") out.onnx = obj.onnx;
+  if (typeof obj.ctranslate2 === "boolean") out.ctranslate2 = obj.ctranslate2;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export function isNvidiaDevicePresent(
@@ -299,6 +311,7 @@ export class PythonDispatcher {
   private childReady = false;
   private childFailed = false;
   private gpuAvail = false;
+  private gpuFrameworks: GpuFrameworks | undefined = undefined;
   private gpuProbed = false;
   private pending = new Map<string, PendingRequest>();
   private crashes = 0;
@@ -432,6 +445,7 @@ export class PythonDispatcher {
               if (this.child === proc) {
                 this.childReady = true;
                 this.gpuAvail = parsed.gpu === true;
+                this.gpuFrameworks = parseGpuFrameworks(parsed.gpuFrameworks);
                 this.gpuProbed = true;
                 this.crashes = 0;
                 aiLog.info(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
@@ -848,6 +862,11 @@ export class PythonDispatcher {
    * Shut down the persistent dispatcher process.
    */
   shutdown(): void {
+    // Clear per-framework probe state so a shutdown after installing or
+    // resetting AI bundles re-probes on the next spawn instead of refusing
+    // newly installed GPU frameworks against pre-install state.
+    this.gpuProbed = false;
+    this.gpuFrameworks = undefined;
     if (this.child && !this.child.killed) {
       this.stoppedChildren.add(this.child);
       this.child.stdin?.end();
@@ -923,9 +942,17 @@ export class PythonDispatcher {
           (this.gpuProbed
             ? this.gpuAvail
             : isNvidiaDevicePresent(options.memoryOptions?.deviceExists));
+        const gpuFrameworks =
+          options.memoryOptions?.gpuFrameworks ??
+          (options.memoryOptions?.gpuAvailable === undefined && this.gpuProbed
+            ? this.gpuFrameworks
+            : undefined);
+        const toolId = options.toolId ?? options.memoryOptions?.toolId;
         const refusal = sidecarMemoryRefusal(scriptName, {
           ...options.memoryOptions,
+          ...(toolId !== undefined ? { toolId } : {}),
           gpuAvailable,
+          ...(gpuFrameworks !== undefined ? { gpuFrameworks } : {}),
         });
         if (refusal) {
           return Promise.reject(

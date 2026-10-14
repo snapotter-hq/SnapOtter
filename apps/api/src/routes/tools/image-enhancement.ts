@@ -154,6 +154,7 @@ export async function processImageEnhancement(
         strength: 35,
         detailPreservation: 70,
         colorNoise: 20,
+        toolId: "image-enhancement",
       });
       denoised = result.buffer;
     } catch (err) {

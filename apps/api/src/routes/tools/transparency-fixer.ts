@@ -164,7 +164,7 @@ async function processTransparencyFix(
     resultBuffer = await removeBackground(
       workingBuffer,
       outputDir,
-      { model: DEFAULT_MODEL },
+      { model: DEFAULT_MODEL, toolId: TOOL_ID },
       onProgress,
     );
   } catch (err) {
@@ -175,7 +175,7 @@ async function processTransparencyFix(
     resultBuffer = await removeBackground(
       workingBuffer,
       outputDir,
-      { model: FALLBACK_MODEL },
+      { model: FALLBACK_MODEL, toolId: TOOL_ID },
       onProgress,
     );
   }

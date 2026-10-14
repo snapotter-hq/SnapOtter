@@ -66,7 +66,7 @@ registerAiJobHandler("auto-subtitles", async (input, data, ctx) => {
 
   const result = await transcribeAudio(
     wavPath,
-    { language: settings.language, signal: ctx.signal },
+    { language: settings.language, signal: ctx.signal, toolId: "auto-subtitles" },
     (percent, stage) => {
       // Scale transcription progress into 20..95 range
       const scaled = 20 + Math.round(percent * 0.75);

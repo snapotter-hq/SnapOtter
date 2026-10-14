@@ -346,12 +346,18 @@ def _cleanup_after_request():
 def main():
     # Signal readiness with GPU status
     gpu = False
+    gpu_frameworks = {"torch": False, "onnx": False, "ctranslate2": False}
     try:
-        from gpu import gpu_available
+        from gpu import gpu_available, gpu_frameworks_available
         gpu = gpu_available()
-    except ImportError as e:
+        gpu_frameworks = gpu_frameworks_available()
+    except Exception as e:
         print(f"[dispatcher] GPU detection failed: {e}", file=sys.stderr, flush=True)
-    print(json.dumps({"ready": True, "gpu": gpu}), file=sys.stderr, flush=True)
+    print(
+        json.dumps({"ready": True, "gpu": gpu, "gpuFrameworks": gpu_frameworks}),
+        file=sys.stderr,
+        flush=True,
+    )
     print(f"[dispatcher] Ready. GPU: {gpu}. Max requests: {MAX_REQUESTS}. Modules: {list(available_modules.keys())}", file=sys.stderr, flush=True)
 
     _init_tracing()

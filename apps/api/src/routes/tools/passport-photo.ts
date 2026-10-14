@@ -274,7 +274,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
-        const landmarksResult = await detectFaceLandmarks(fileBuffer, landmarkProgress);
+        const landmarksResult = await detectFaceLandmarks(fileBuffer, landmarkProgress, {
+          toolId: "passport-photo",
+        });
 
         if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
           if (clientJobId) {
@@ -304,7 +306,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
           bgRemovedBuffer = await removeBackground(
             fileBuffer,
             scratchDir,
-            { model: "birefnet-portrait" },
+            { model: "birefnet-portrait", toolId: "passport-photo" },
             bgProgress,
           );
         } finally {
@@ -643,7 +645,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
       const orientedBuffer = await autoOrient(inputBuffer);
 
       // Step 1: Detect face landmarks
-      const landmarksResult = await detectFaceLandmarks(orientedBuffer);
+      const landmarksResult = await detectFaceLandmarks(orientedBuffer, undefined, {
+        toolId: "passport-photo",
+      });
       if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
         throw new Error(
           "No face detected. Please upload a clear, front-facing photo with good lighting.",
@@ -663,6 +667,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
       try {
         bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
           model: "birefnet-portrait",
+          toolId: "passport-photo",
         });
       } finally {
         if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});

@@ -17,6 +17,7 @@ export interface RemoveBackgroundOptions {
   edgeRefine?: number;
   decontaminate?: boolean;
   signal?: AbortSignal;
+  toolId?: string;
 }
 
 const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
@@ -45,7 +46,7 @@ export async function removeBackground(
   options: RemoveBackgroundOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<Buffer> {
-  const { signal, ...sidecarOptions } = options;
+  const { signal, toolId, ...sidecarOptions } = options;
   const id = randomUUID();
   const inputPath = join(tmpdir(), `rembg_in_${id}.png`);
   const outputPath = join(outputDir, `rembg_out_${id}.png`);
@@ -85,6 +86,7 @@ export async function removeBackground(
       onProgress,
       timeout,
       signal,
+      toolId,
     );
 
     if (needsDownscale) {
@@ -105,12 +107,19 @@ async function runAndParse(
   onProgress: ProgressCallback | undefined,
   timeout: number,
   signal: AbortSignal | undefined,
+  toolId?: string,
 ): Promise<Buffer> {
+  const runOptions = {
+    onProgress,
+    timeout,
+    signal,
+    ...(toolId ? { toolId } : {}),
+  };
   try {
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(options)],
-      { onProgress, timeout, signal },
+      runOptions,
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {
@@ -128,7 +137,7 @@ async function runAndParse(
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(fallbackOpts)],
-      { onProgress, timeout, signal },
+      runOptions,
     );
     const result = parseStdoutJson(stdout);
     if (!result.success) {
