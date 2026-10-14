@@ -105,6 +105,41 @@ describe("Factory image input: decoder availability (#1428)", () => {
     expect([200, 202]).toContain(res.statusCode);
   });
 
+  it("decodes an AV1 image in a mif1 HEIF container via Sharp when heif-dec lacks AV1 (#1462)", async () => {
+    const shimDir = mkdtempSync(join(tmpdir(), "factory-heif-av1-shims-"));
+    try {
+      const heifNoAv1 = `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "1.23.4"; exit 0; fi
+echo "Could not decode image: No decoding plugin installed for this compression format" >&2
+exit 1
+`;
+      for (const name of ["heif-convert", "heif-dec"]) {
+        writeFileSync(join(shimDir, name), heifNoAv1);
+        chmodSync(join(shimDir, name), 0o755);
+      }
+      process.env.PATH = shimDir;
+
+      const mif1Av1 = Buffer.from(readFixture(fixtures.image.formats("avif")));
+      const ftypSize = mif1Av1.readUInt32BE(0);
+      mif1Av1.write("mif1", 8, 4, "ascii");
+      for (let offset = 16; offset + 4 <= ftypSize && offset + 4 <= mif1Av1.length; offset += 4) {
+        if (mif1Av1.subarray(offset, offset + 4).toString("ascii") === "avif") {
+          mif1Av1.write("mif1", offset, 4, "ascii");
+        }
+      }
+
+      const res = await resizeRequest({
+        filename: "photo.heif",
+        contentType: "image/heif",
+        content: mif1Av1,
+      });
+
+      expect([200, 202], res.body).toContain(res.statusCode);
+    } finally {
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
   it("keeps 422 for a corrupt HEIC when the decoder is installed", async () => {
     const corrupt = Buffer.concat([HEIC.subarray(0, 64), Buffer.alloc(4096, 0x5a)]);
 

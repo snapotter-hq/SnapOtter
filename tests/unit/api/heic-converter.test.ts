@@ -24,6 +24,23 @@ function makeIspeBox(width: number, height: number): Buffer {
   return box;
 }
 
+/**
+ * Rewrite an AVIF fixture's ftyp major and compatible brands from `avif` to
+ * `mif1` so format detection classifies it as generic HEIF while its payload
+ * remains an AV1 bitstream (#1462).
+ */
+function makeMif1Av1Buffer(): Buffer {
+  const buf = Buffer.from(readFixture(fixtures.image.formats("avif")));
+  const ftypSize = buf.readUInt32BE(0);
+  buf.write("mif1", 8, 4, "ascii");
+  for (let offset = 16; offset + 4 <= ftypSize && offset + 4 <= buf.length; offset += 4) {
+    if (buf.subarray(offset, offset + 4).toString("ascii") === "avif") {
+      buf.write("mif1", offset, 4, "ascii");
+    }
+  }
+  return buf;
+}
+
 describe("decodeHeic", () => {
   it("rejects source dimensions over a caller-supplied pixel cap", async () => {
     const heicBuf = readFixture(fixtures.image.formats("heic"));
@@ -116,6 +133,69 @@ describe("decodeHeic", () => {
       .filter((f) => !beforeSet.has(f));
     expect(leftover).toHaveLength(0);
   });
+
+  it("decodes an AV1 image in a mif1 HEIF container via Sharp without shelling out (#1462)", async () => {
+    const mif1Av1 = makeMif1Av1Buffer();
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await decodeHeic(mif1Av1);
+      expect(isPng(result)).toBe(true);
+      const meta = await sharp(result).metadata();
+      expect(meta.width).toBe(740);
+      expect(meta.height).toBe(493);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("preserves EXIF metadata when decoding a mif1 AV1 container via Sharp (#1462)", async () => {
+    const avifWithExif = await sharp({
+      create: { width: 32, height: 16, channels: 3, background: { r: 200, g: 100, b: 50 } },
+    })
+      .withMetadata({ orientation: 6 })
+      .avif()
+      .toBuffer();
+    const mif1WithExif = Buffer.from(avifWithExif);
+    const ftypSize = mif1WithExif.readUInt32BE(0);
+    mif1WithExif.write("mif1", 8, 4, "ascii");
+    for (
+      let offset = 16;
+      offset + 4 <= ftypSize && offset + 4 <= mif1WithExif.length;
+      offset += 4
+    ) {
+      if (mif1WithExif.subarray(offset, offset + 4).toString("ascii") === "avif") {
+        mif1WithExif.write("mif1", offset, 4, "ascii");
+      }
+    }
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await decodeHeic(mif1WithExif);
+      const meta = await sharp(result).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.exif).toBeDefined();
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("enforces maxDimension and maxPixels on a mif1 AV1 buffer without a CLI decoder (#1462)", async () => {
+    const mif1Av1 = makeMif1Av1Buffer();
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      await expect(
+        decodeHeic(mif1Av1, { maxDimension: 500, maxPixels: 40_000_000 }),
+      ).rejects.toThrow(/dimension safety limit.*740x493/i);
+      await expect(decodeHeic(mif1Av1, { maxPixels: 100 })).rejects.toThrow(
+        /pixel safety limit.*740x493/i,
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
 });
 
 describe("ensureSharpCompat", () => {
@@ -123,6 +203,18 @@ describe("ensureSharpCompat", () => {
     const heicBuf = readFixture(fixtures.image.formats("heic"));
     const result = await ensureSharpCompat(heicBuf);
     expect(isPng(result)).toBe(true);
+  });
+
+  it("decodes a mif1 AV1 HEIF buffer to PNG via Sharp without a CLI decoder (#1462)", async () => {
+    const mif1Av1 = makeMif1Av1Buffer();
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await ensureSharpCompat(mif1Av1);
+      expect(isPng(result)).toBe(true);
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 
   it("passes through a PNG buffer unchanged", async () => {

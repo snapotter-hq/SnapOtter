@@ -89,6 +89,53 @@ exit 1`,
     expect(err).toBeInstanceOf(DecoderUnavailableError);
   });
 
+  it("an AV1 image in a mif1 HEIF container decodes via Sharp when heif-convert lacks AV1 (#1462)", async () => {
+    useShims({
+      "heif-convert": `${HEIF_VERSION}
+echo "Could not decode image: No decoding plugin installed for this compression format" >&2
+exit 1`,
+    });
+    const mif1Av1 = Buffer.from(readFixture(fixtures.image.formats("avif")));
+    const ftypSize = mif1Av1.readUInt32BE(0);
+    mif1Av1.write("mif1", 8, 4, "ascii");
+    for (let offset = 16; offset + 4 <= ftypSize && offset + 4 <= mif1Av1.length; offset += 4) {
+      if (mif1Av1.subarray(offset, offset + 4).toString("ascii") === "avif") {
+        mif1Av1.write("mif1", offset, 4, "ascii");
+      }
+    }
+
+    const out = await decodeHeic(mif1Av1);
+
+    expect(out.subarray(1, 4).toString("ascii")).toBe("PNG");
+  });
+
+  it("a corrupt AV1 image in a mif1 HEIF container keeps Sharp's rejection when heif-convert lacks AV1 (#1462)", async () => {
+    useShims({
+      "heif-convert": `${HEIF_VERSION}
+echo "Could not decode image: No decoding plugin installed for this compression format" >&2
+exit 1`,
+    });
+    const corruptMif1Av1 = Buffer.from(readFixture(fixtures.image.formats("avif")));
+    const ftypSize = corruptMif1Av1.readUInt32BE(0);
+    corruptMif1Av1.write("mif1", 8, 4, "ascii");
+    for (
+      let offset = 16;
+      offset + 4 <= ftypSize && offset + 4 <= corruptMif1Av1.length;
+      offset += 4
+    ) {
+      if (corruptMif1Av1.subarray(offset, offset + 4).toString("ascii") === "avif") {
+        corruptMif1Av1.write("mif1", offset, 4, "ascii");
+      }
+    }
+    corruptMif1Av1.fill(0xff, corruptMif1Av1.length - 200);
+
+    const err = await decodeHeic(corruptMif1Av1).catch((e) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toMatch(/Corrupt frame|Invalid input/i);
+  });
+
   it("a decoder that exits 127 (shared libraries won't load) is an unavailable decoder", async () => {
     useShims({ "heif-convert": `${HEIF_VERSION}\nexit 127` });
 

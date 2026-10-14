@@ -6,9 +6,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import sharp from "sharp";
-import { asDecoderOutOfMemory, asDecoderUnavailable, noDecoderFound } from "./format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  asDecoderUnavailable,
+  lacksFormatSupport,
+  noDecoderFound,
+} from "./format-decoders.js";
 
 const execFileAsync = promisify(execFile);
+
+const SHARP_UNSUPPORTED_HEIF_CODEC =
+  /No decoding plugin installed|No decoder for this image format|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
 
 export interface HeicDecodeOptions {
   maxDimension?: number;
@@ -35,6 +43,32 @@ function assertImageLimits(
       `Decoded image exceeds the ${maxPixels.toLocaleString("en-US")} pixel safety limit (${width}x${height})`,
     );
   }
+}
+
+async function verifyDecodedImageLimits(
+  decoded: Buffer,
+  options: HeicDecodeOptions,
+): Promise<Buffer> {
+  if (options.maxPixels !== undefined || options.maxDimension !== undefined) {
+    try {
+      const metadata = await sharp(decoded, {
+        limitInputPixels: options.maxPixels ?? false,
+      }).metadata();
+      assertImageLimits(metadata.width, metadata.height, options.maxPixels, options.maxDimension);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(error.message)
+      ) {
+        throw error;
+      }
+      throw new Error("Decoded image exceeds the configured image safety limits", {
+        cause: error,
+      });
+    }
+  }
+  options.signal?.throwIfAborted();
+  return decoded;
 }
 
 function readIspeDimensions(buffer: Buffer): Array<{ width: number; height: number }> {
@@ -147,6 +181,41 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
     }
   }
 
+  // Generic HEIF containers (`mif1`, `msf1`) can carry an AV1 bitstream rather
+  // than HEVC (#1462). Sharp's bundled libheif decodes AV1 natively, whereas
+  // the container's system libheif is built with libde265 (HEVC) only. Try
+  // Sharp first and fall back to heif-dec/heif-convert for HEVC inputs.
+  let sharpDecoded: Buffer | undefined;
+  let sharpVerdict: unknown;
+  try {
+    sharpDecoded = await sharp(buffer, {
+      limitInputPixels: options.maxPixels ?? false,
+    })
+      .keepMetadata()
+      .png()
+      .toBuffer();
+  } catch (error) {
+    options.signal?.throwIfAborted();
+    if (
+      error instanceof Error &&
+      /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(error.message)
+    ) {
+      throw error;
+    }
+    const outOfMemory = asDecoderOutOfMemory(
+      error instanceof Error && /\bAllocating \d+ bytes failed\b/.test(error.message)
+        ? Object.assign(error, { stderr: error.message })
+        : error,
+    );
+    if (outOfMemory !== error) throw outOfMemory;
+    if (!(error instanceof Error && SHARP_UNSUPPORTED_HEIF_CODEC.test(error.message))) {
+      sharpVerdict = error;
+    }
+  }
+  if (sharpDecoded !== undefined) {
+    return await verifyDecodedImageLimits(sharpDecoded, options);
+  }
+
   const cmd = await findDecodeCmd(options);
   // Include the PID so concurrent processes (and test workers) write to
   // distinct, attributable temp paths in the shared tmpdir.
@@ -161,6 +230,9 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
       timeout: 120_000,
       signal: options.signal,
     }).catch((err: unknown) => {
+      if (sharpVerdict !== undefined && lacksFormatSupport(err)) {
+        throw sharpVerdict;
+      }
       throw asDecoderUnavailable(asDecoderOutOfMemory(err));
     });
     options.signal?.throwIfAborted();
@@ -179,28 +251,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
         throw asDecoderOutOfMemory(suffixedErr);
       });
     }
-    if (options.maxPixels !== undefined || options.maxDimension !== undefined) {
-      try {
-        const metadata = await sharp(decoded, {
-          limitInputPixels: options.maxPixels ?? false,
-        }).metadata();
-        assertImageLimits(metadata.width, metadata.height, options.maxPixels, options.maxDimension);
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(
-            error.message,
-          )
-        ) {
-          throw error;
-        }
-        throw new Error("Decoded image exceeds the configured image safety limits", {
-          cause: error,
-        });
-      }
-    }
-    options.signal?.throwIfAborted();
-    return decoded;
+    return await verifyDecodedImageLimits(decoded, options);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});

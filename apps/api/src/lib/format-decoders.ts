@@ -104,9 +104,9 @@ function cannotStart(err: unknown): boolean {
  * derived from the upload (#1429).
  */
 const MISSING_SUPPORT =
-  /no decode delegate for this image format|delegate library support not built-in|No decoding plugin installed|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
+  /no decode delegate for this image format|delegate library support not built-in|No decoding plugin installed|No decoder for this image format|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
 
-function lacksFormatSupport(err: unknown): boolean {
+export function lacksFormatSupport(err: unknown): boolean {
   const stderr = (err as { stderr?: unknown } | null)?.stderr;
   return stderr !== undefined && MISSING_SUPPORT.test(String(stderr));
 }
