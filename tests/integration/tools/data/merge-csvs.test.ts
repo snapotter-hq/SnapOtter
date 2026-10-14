@@ -191,6 +191,102 @@ describe("merge-csvs (pure JS, no skipIf)", () => {
     expect(dl.payload).toBe("x,__proto__,constructor\r\n1,5,a\r\n2,6,b");
   }, 30_000);
 
+  it("preserves the header row when merging header-only CSVs (#2321)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,x"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("x,a\r\n"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.payload).toBe("a,x");
+  }, 30_000);
+
+  it("preserves the detected delimiter when merging header-only TSVs (#2321)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.tsv",
+        contentType: "text/tab-separated-values",
+        content: Buffer.from("a\tx\r\n"),
+      },
+      {
+        name: "file",
+        filename: "b.tsv",
+        contentType: "text/tab-separated-values",
+        content: Buffer.from("a\tx"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.payload).toBe("a\tx");
+  }, 30_000);
+
+  it("merges a header-only first file with a populated second file in the first file's column order (#2321)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,x\r\n"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("x,a\r\n2,1"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.payload).toBe("a,x\r\n1,2");
+  }, 30_000);
+
   it("answers 400, not a server error, for blank files (#2099)", async () => {
     const bom = Buffer.from("﻿");
     const { body, contentType } = createMultipartPayload([

@@ -58,10 +58,13 @@ export function registerMergeCsvs(app: FastifyInstance) {
       }
 
       // Unparse preserving the first file's field order and delimiter
-      const merged = Papa.unparse(allRows, {
-        columns: fields,
-        delimiter: detectedDelimiter,
-      });
+      const merged =
+        allRows.length === 0
+          ? Papa.unparse([fields], { delimiter: detectedDelimiter })
+          : Papa.unparse(allRows, {
+              columns: fields,
+              delimiter: detectedDelimiter,
+            });
 
       return {
         buffer: Buffer.from(merged, "utf8"),
