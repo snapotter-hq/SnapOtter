@@ -49,19 +49,41 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   },
 }));
 
+const loggerWarn = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: {
+    warn: loggerWarn,
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 // The password policy reads its settings through these helpers; a map stands in
 // for the settings table so the defaults and a changed policy can both be tried.
-const policy = vi.hoisted(() => ({ values: new Map<string, string>() }));
-
-vi.mock("../../../apps/api/src/lib/settings-helpers.js", () => ({
-  getSettingString: async (key: string, fallback = "") => policy.values.get(key) ?? fallback,
-  getSettingNumber: async (key: string, fallback = 0) => {
-    const number = Number(policy.values.get(key));
-    return policy.values.has(key) && !Number.isNaN(number) ? number : fallback;
-  },
-  getSettingStrict: async (key: string) => policy.values.get(key),
-  setSettingIfAbsent: async () => {},
+const policy = vi.hoisted(() => ({
+  values: new Map<string, string>(),
+  failKey: null as string | null,
 }));
+
+vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/settings-helpers.js")>();
+  return {
+    ...actual,
+    getSettingString: async (key: string, fallback = "") => policy.values.get(key) ?? fallback,
+    getSettingNumber: async (key: string, fallback = 0) =>
+      actual.parseNumericSettingValue(key, policy.values.get(key), fallback),
+    getSettingStrict: async (key: string) => {
+      if (policy.failKey === key) {
+        throw new Error(`simulated DB failure reading ${key}`);
+      }
+      return policy.values.get(key);
+    },
+    setSettingIfAbsent: async () => {},
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
   auditLog: vi.fn(),
@@ -80,6 +102,8 @@ import {
 
 beforeEach(() => {
   policy.values.clear();
+  policy.failKey = null;
+  loggerWarn.mockReset();
 });
 
 // ── getAuthUser ─────────────────────────────────────────────────────────
@@ -355,6 +379,39 @@ describe("validatePasswordStrength, a changed policy (#2039)", () => {
     policy.values.set("passwordMinLength", "lots");
 
     expect((await validatePasswordStrength("Ab1"))?.minLength).toBe(8);
+  });
+
+  it.each(["", "   ", "0", "-1", "129", "Infinity", "8.5"])(
+    "falls back to the default minimum of 8 when passwordMinLength is %j (#1713)",
+    async (stored) => {
+      policy.values.set("passwordMinLength", stored);
+
+      const failure = await validatePasswordStrength("Aa1");
+      expect(failure).toMatchObject({
+        rule: "minLength",
+        rules: ["minLength"],
+        minLength: 8,
+      });
+      expect(loggerWarn).toHaveBeenCalledWith(
+        { key: "passwordMinLength", value: stored },
+        "invalid numeric setting, using default",
+      );
+      expect(await validatePasswordStrength("MyPass12")).toBeNull();
+    },
+  );
+
+  it.each([
+    "passwordMinLength",
+    "passwordRequireUppercase",
+    "passwordRequireLowercase",
+    "passwordRequireDigit",
+    "passwordRequireSpecial",
+  ])("propagates a DB error when reading %s instead of failing open (#1713)", async (key) => {
+    policy.failKey = key;
+
+    await expect(validatePasswordStrength("MyPass12!")).rejects.toThrow(
+      `simulated DB failure reading ${key}`,
+    );
   });
 });
 

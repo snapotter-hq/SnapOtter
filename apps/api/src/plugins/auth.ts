@@ -31,7 +31,11 @@ import {
 import { authAttempts } from "../lib/metrics.js";
 import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
 import { setSessionCookie } from "../lib/session-cookie.js";
-import { getSettingNumber, getSettingStrict, getSettingString } from "../lib/settings-helpers.js";
+import {
+  getSettingNumber,
+  getSettingStrict,
+  parseNumericSettingValue,
+} from "../lib/settings-helpers.js";
 import { userLimitReached } from "../lib/user-limit.js";
 import {
   canAssignRole,
@@ -220,11 +224,15 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
     };
   }
 
-  const minLength = await getSettingNumber("passwordMinLength", 8);
-  const requireUpper = await getSettingString("passwordRequireUppercase", "true");
-  const requireLower = await getSettingString("passwordRequireLowercase", "true");
-  const requireDigit = await getSettingString("passwordRequireDigit", "true");
-  const requireSpecial = await getSettingString("passwordRequireSpecial", "false");
+  const minLength = parseNumericSettingValue(
+    "passwordMinLength",
+    await getSettingStrict("passwordMinLength"),
+    8,
+  );
+  const requireUpper = (await getSettingStrict("passwordRequireUppercase")) ?? "true";
+  const requireLower = (await getSettingStrict("passwordRequireLowercase")) ?? "true";
+  const requireDigit = (await getSettingStrict("passwordRequireDigit")) ?? "true";
+  const requireSpecial = (await getSettingStrict("passwordRequireSpecial")) ?? "false";
 
   // The rules mean "has an uppercase letter / a lowercase letter / a digit /
   // punctuation, a symbol or a space" in any script, so a Russian or Arabic

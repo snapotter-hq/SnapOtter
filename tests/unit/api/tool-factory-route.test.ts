@@ -15,7 +15,11 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: vi.fn(() => ({
       from: () => ({
-        where: () => Object.assign(Promise.resolve(jobRows.rows), { get: () => null }),
+        where: () =>
+          Object.assign(Promise.resolve(jobRows.rows), {
+            get: () => null,
+            limit: () => Promise.resolve([]),
+          }),
         all: () => [],
       }),
     })),

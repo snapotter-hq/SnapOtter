@@ -1645,6 +1645,23 @@ describe("Admin user-management guards", () => {
     }
   });
 
+  it("change-password falls back to 8 when stored passwordMinLength is blank or out of range (#1713)", async () => {
+    const user = await loggedInUser();
+    try {
+      for (const bad of ["", "0", "Infinity", "200"]) {
+        await setSetting("passwordMinLength", bad);
+        const res = await sendChangePassword(user, "Aa1");
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body)).toMatchObject({ rule: "minLength", minLength: 8 });
+      }
+      await setSetting("passwordMinLength", "Infinity");
+      const okRes = await sendChangePassword(user, "Abcdef12");
+      expect(okRes.statusCode, okRes.body).toBe(200);
+    } finally {
+      await clearSetting("passwordMinLength");
+    }
+  });
+
   // The minimum counts characters, not UTF-16 code units: an astral character is
   // one character but two units, so counting units let four of them meet a
   // minimum of 8 (#2057). Mathematical bold letters and digits satisfy the
