@@ -1378,11 +1378,174 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
     return removed
 
 
+REMEDIATION_BACKUP_DIRNAME = ".remediation"
+
+
+def _is_remediation_entry(kind: str, name: str) -> bool:
+    if kind == "onnxruntime":
+        return (
+            name in ("onnxruntime", "onnxruntime.libs", "onnxruntime_gpu.libs")
+            or (
+                name.startswith(("onnxruntime-", "onnxruntime_gpu-"))
+                and name.endswith(DIST_INFO_SUFFIX)
+            )
+        )
+    if kind == "opencv":
+        return (
+            name == "cv2"
+            or name in (
+                "opencv_python.libs",
+                "opencv_python_headless.libs",
+                "opencv_contrib_python.libs",
+                "opencv_contrib_python_headless.libs",
+            )
+            or (
+                name.startswith(
+                    (
+                        "opencv_python-",
+                        "opencv_python_headless-",
+                        "opencv_contrib_python-",
+                        "opencv_contrib_python_headless-",
+                    )
+                )
+                and name.endswith(DIST_INFO_SUFFIX)
+            )
+        )
+    return False
+
+
+def _remediation_top_entries(sp_dir: str, kind: str) -> set:
+    if not sp_dir or not os.path.isdir(sp_dir):
+        return set()
+    names = os.listdir(sp_dir)
+    matched = {n for n in names if _is_remediation_entry(kind, n)}
+    dist_infos = {n for n in matched if n.endswith(DIST_INFO_SUFFIX)}
+    if dist_infos:
+        other_claimed = {
+            rel.split("/")[0]
+            for rel in paths_claimed_by_others(sp_dir, dist_infos)
+            if rel
+        }
+        for d in dist_infos:
+            for rel in distribution_files(sp_dir, d):
+                top = rel.split("/")[0]
+                if (
+                    top
+                    and top not in other_claimed
+                    and os.path.exists(os.path.join(sp_dir, top))
+                ):
+                    matched.add(top)
+    return matched
+
+
+def snapshot_remediation_state(sp_dir: str, quarantine_dir: str, kind: str) -> None:
+    """Save the pre-remediation state of kind's packages in sp_dir under
+    quarantine_dir/.remediation/<kind>/ so a failed fallback or a later
+    failed verification can undo pip's writes and .dist-info deletions."""
+    if not sp_dir or not os.path.isdir(sp_dir) or not quarantine_dir:
+        return
+    slot_dir = os.path.join(quarantine_dir, REMEDIATION_BACKUP_DIRNAME, kind)
+    if os.path.exists(slot_dir):
+        return
+    entries_dir = os.path.join(slot_dir, "entries")
+    os.makedirs(entries_dir, exist_ok=True)
+    before_names = sorted(os.listdir(sp_dir))
+    with open(os.path.join(slot_dir, "before.json"), "w") as f:
+        json.dump(before_names, f)
+    for name in sorted(_remediation_top_entries(sp_dir, kind)):
+        src = os.path.join(sp_dir, name)
+        dst = os.path.join(entries_dir, name)
+        if os.path.isdir(src) and not os.path.islink(src):
+            shutil.copytree(src, dst, symlinks=True)
+        else:
+            shutil.copy2(src, dst, follow_symlinks=False)
+
+
+def restore_remediation_state(
+    sp_dir: str,
+    quarantine_dir: str,
+    kind: str = "",
+    remove_backup: bool = True,
+) -> None:
+    """Restore pre-remediation snapshots saved by snapshot_remediation_state."""
+    if not sp_dir or not os.path.isdir(sp_dir) or not quarantine_dir:
+        return
+    rem_root = os.path.join(quarantine_dir, REMEDIATION_BACKUP_DIRNAME)
+    if not os.path.isdir(rem_root):
+        return
+    if kind:
+        kinds = [kind]
+    else:
+        existing = os.listdir(rem_root)
+        # Restore in reverse remediation order (opencv ran after onnxruntime).
+        preferred = ["opencv", "onnxruntime"]
+        kinds = [k for k in preferred if k in existing] + sorted(
+            k for k in existing if k not in preferred
+        )
+    for k in kinds:
+        slot_dir = os.path.join(rem_root, k)
+        if not os.path.isdir(slot_dir):
+            continue
+        before_path = os.path.join(slot_dir, "before.json")
+        before_set = None
+        if os.path.exists(before_path):
+            try:
+                with open(before_path, "r") as f:
+                    before_set = set(json.load(f))
+            except (OSError, ValueError):
+                before_set = None
+        to_remove = set(_remediation_top_entries(sp_dir, k))
+        if before_set is not None:
+            for current_name in os.listdir(sp_dir):
+                if current_name not in before_set:
+                    to_remove.add(current_name)
+        entries_dir = os.path.join(slot_dir, "entries")
+        if os.path.isdir(entries_dir):
+            to_remove.update(os.listdir(entries_dir))
+        for name in sorted(to_remove):
+            target = os.path.join(sp_dir, name)
+            if os.path.isdir(target) and not os.path.islink(target):
+                shutil.rmtree(target)
+            elif os.path.exists(target) or os.path.islink(target):
+                os.unlink(target)
+        if os.path.isdir(entries_dir):
+            for name in sorted(os.listdir(entries_dir)):
+                src = os.path.join(entries_dir, name)
+                dst = os.path.join(sp_dir, name)
+                if remove_backup:
+                    try:
+                        os.replace(src, dst)
+                    except OSError as e:
+                        if getattr(e, "errno", None) != errno.EXDEV:
+                            raise
+                        shutil.move(src, dst)
+                else:
+                    if os.path.isdir(src) and not os.path.islink(src):
+                        shutil.copytree(src, dst, symlinks=True)
+                    else:
+                        shutil.copy2(src, dst, follow_symlinks=False)
+        if remove_backup:
+            shutil.rmtree(slot_dir, ignore_errors=True)
+    if remove_backup and not kind:
+        shutil.rmtree(rem_root, ignore_errors=True)
+
+
+def _format_proc_failure(proc, tool_name: str = "pip") -> str:
+    output = (getattr(proc, "stderr", None) or "").strip() or (
+        getattr(proc, "stdout", None) or ""
+    ).strip()
+    if output:
+        return "\n".join(output.splitlines()[-6:])
+    return f"{tool_name} exited with status {proc.returncode}"
+
+
 def restore_superseded(sp_dir: str, quarantine_dir: str) -> None:
     """Put every quarantined version back where it came from."""
     if not os.path.isdir(quarantine_dir):
         return
     for name in os.listdir(quarantine_dir):
+        if name == REMEDIATION_BACKUP_DIRNAME:
+            continue
         holder = os.path.join(quarantine_dir, name)
         if not os.path.isdir(holder):
             continue
@@ -1423,6 +1586,7 @@ def discard_placed_distributions(sp_dir: str, plan: list) -> None:
 
 def rollback_reconciliation(sp_dir: str, plan: list, quarantine_dir: str) -> None:
     """Undo a merge: drop what this bundle placed, restore what it displaced."""
+    restore_remediation_state(sp_dir, quarantine_dir)
     discard_placed_distributions(sp_dir, plan)
     restore_superseded(sp_dir, quarantine_dir)
 
@@ -1885,6 +2049,63 @@ def _install() -> None:
                 f"at {venv_python} does not exist. Recreate the AI environment and retry."
             )
         import_stmt = "\n".join(f"import {mod}" for mod in smoke_imports)
+        fallback_errors = []
+
+        def _abort_remediation(message: str) -> None:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            had_rollback_work = bool(
+                site_packages_dir
+                and (
+                    reconciliation_plan
+                    or (quarantine_dir and os.path.isdir(quarantine_dir))
+                )
+            )
+            abandon_merge(
+                site_packages_dir, reconciliation_plan, quarantine_dir,
+                venv_writing_marker, bundle_id,
+            )
+            if venv_writing_marker and not had_rollback_work:
+                with contextlib.suppress(OSError):
+                    clear_venv_writing(venv_writing_marker)
+            fail(message)
+
+        def _ensure_remediation_sp() -> str:
+            nonlocal site_packages_dir
+            if not site_packages_dir:
+                if get_site_packages_dir is _default_get_site_packages_dir:
+                    site_packages_dir, sp_err = _probe_site_packages_dir(venv_path)
+                else:
+                    site_packages_dir = get_site_packages_dir(venv_path)
+                    sp_err = ""
+                if not site_packages_dir:
+                    _abort_remediation(
+                        sp_err
+                        or f"The AI environment at {venv_path} has no usable site-packages directory. "
+                        f"Recreate the AI environment and retry."
+                    )
+            return site_packages_dir
+
+        def _cleanup_failed_snapshot_slot(kind: str) -> None:
+            rem_root = os.path.join(quarantine_dir, REMEDIATION_BACKUP_DIRNAME)
+            shutil.rmtree(os.path.join(rem_root, kind), ignore_errors=True)
+            for d in (rem_root, quarantine_dir):
+                with contextlib.suppress(OSError):
+                    os.rmdir(d)
+
+        def _restore_after_failed_fallback(sp_dir: str, kind: str) -> None:
+            try:
+                restore_remediation_state(
+                    sp_dir, quarantine_dir, kind, remove_backup=False
+                )
+            except OSError as restore_err:
+                fallback_errors.append(
+                    f"Failed to restore pre-fallback {kind} state ({restore_err})."
+                )
+                extra = "\n\n" + "\n\n".join(fallback_errors)
+                _abort_remediation(
+                    f"Fallback {kind} installation failed and the AI environment "
+                    f"could not be restored ({restore_err}).{extra}"
+                )
 
         def _run_smoke_import():
             try:
@@ -1901,16 +2122,18 @@ def _install() -> None:
                     site_packages_dir, reconciliation_plan, quarantine_dir,
                     venv_writing_marker, bundle_id,
                 )
-                fail("Installation verification timed out. Please retry the install.")
+                extra = ("\n\n" + "\n\n".join(fallback_errors)) if fallback_errors else ""
+                fail(f"Installation verification timed out. Please retry the install.{extra}")
             except OSError as e:
                 shutil.rmtree(staging_dir, ignore_errors=True)
                 abandon_merge(
                     site_packages_dir, reconciliation_plan, quarantine_dir,
                     venv_writing_marker, bundle_id,
                 )
+                extra = ("\n\n" + "\n\n".join(fallback_errors)) if fallback_errors else ""
                 fail(
                     f"Installation verification failed: the AI environment's Python interpreter "
-                    f"at {venv_python} could not be run ({e}). Recreate the AI environment and retry."
+                    f"at {venv_python} could not be run ({e}). Recreate the AI environment and retry.{extra}"
                 )
 
         proc = _run_smoke_import()
@@ -1922,18 +2145,72 @@ def _install() -> None:
             # resulting in missing attributes or missing libcudart/libcudnn errors.
             if ("AttributeError" in stderr_output and "SessionOptions" in stderr_output) or "libcudart" in stderr_output or "libcudnn" in stderr_output:
                 emit_progress(94, "CUDA libraries missing on host; falling back to CPU onnxruntime...")
+                sp_for_cleanup = _ensure_remediation_sp()
+                try:
+                    mark_venv_writing(venv_writing_marker, bundle_id)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to record venv write marker before onnxruntime fallback: {e}"
+                    )
+                try:
+                    snapshot_remediation_state(sp_for_cleanup, quarantine_dir, "onnxruntime")
+                except OSError as e:
+                    _cleanup_failed_snapshot_slot("onnxruntime")
+                    if getattr(e, "errno", None) == errno.ENOSPC:
+                        _abort_remediation(
+                            "Ran out of disk space while preparing onnxruntime fallback. "
+                            "Free up space and retry."
+                        )
+                    _abort_remediation(f"Failed to prepare onnxruntime fallback: {e}")
+
                 fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "onnxruntime==1.20.1"]
-                fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
-                sp_for_cleanup = site_packages_dir or get_site_packages_dir(venv_path)
-                if fix_proc.returncode == 0 and sp_for_cleanup and os.path.isdir(sp_for_cleanup):
-                    for name in os.listdir(sp_for_cleanup):
-                        if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
-                            shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
-                elif fix_proc.returncode != 0:
+                fix_proc = None
+                try:
+                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
+                except subprocess.TimeoutExpired:
                     emit_progress(94, "Fallback onnxruntime installation failed")
+                    fallback_errors.append(
+                        "Fallback onnxruntime==1.20.1 installation timed out after 120s."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "onnxruntime")
+                except OSError as e:
+                    emit_progress(94, "Fallback onnxruntime installation failed")
+                    fallback_errors.append(
+                        f"Fallback onnxruntime==1.20.1 installation could not be run ({e})."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "onnxruntime")
+
+                if fix_proc is not None:
+                    if fix_proc.returncode == 0:
+                        try:
+                            if sp_for_cleanup and os.path.isdir(sp_for_cleanup):
+                                for name in os.listdir(sp_for_cleanup):
+                                    if name.startswith("onnxruntime_gpu-") and name.endswith(".dist-info"):
+                                        shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
+                        except OSError as e:
+                            _abort_remediation(
+                                f"Failed to clean up onnxruntime metadata after fallback: {e}"
+                            )
+                    else:
+                        emit_progress(94, "Fallback onnxruntime installation failed")
+                        pip_detail = _format_proc_failure(fix_proc, "pip")
+                        fallback_errors.append(
+                            f"Fallback onnxruntime==1.20.1 installation failed:\n{pip_detail}"
+                        )
+                        _restore_after_failed_fallback(sp_for_cleanup, "onnxruntime")
+
+                try:
+                    clear_venv_writing(venv_writing_marker)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to clear venv write marker after onnxruntime fallback: {e}"
+                    )
 
                 # Re-run smoke test after fallback
+                prev_stderr = proc.stderr or ""
                 proc = _run_smoke_import()
+                if proc.returncode != 0 and not (proc.stderr or "").strip():
+                    proc.stderr = prev_stderr
 
         # Auto-remediation for broken cv2 (OpenCV conflict)
         if proc.returncode != 0:
@@ -1941,22 +2218,98 @@ def _install() -> None:
             # The bundle might contain conflicting cv2 binaries due to mediapipe vs rembg requirements
             if "libpng16" in stderr_output or "libGL.so" in stderr_output or "cv2.abi3.so" in stderr_output:
                 emit_progress(94, "OpenCV conflict detected; applying headless fallback...")
-                fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
-                fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
-                if fix_proc.returncode != 0:
-                    emit_progress(94, "Fallback opencv installation failed")
+                sp_for_cleanup = _ensure_remediation_sp()
+                try:
+                    mark_venv_writing(venv_writing_marker, bundle_id)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to record venv write marker before opencv fallback: {e}"
+                    )
+                try:
+                    snapshot_remediation_state(sp_for_cleanup, quarantine_dir, "opencv")
+                except OSError as e:
+                    _cleanup_failed_snapshot_slot("opencv")
+                    if getattr(e, "errno", None) == errno.ENOSPC:
+                        _abort_remediation(
+                            "Ran out of disk space while preparing opencv fallback. "
+                            "Free up space and retry."
+                        )
+                    _abort_remediation(f"Failed to prepare opencv fallback: {e}")
 
-                # Clean up other opencv dist-info to prevent pip from getting confused
-                clean_cmd = [venv_python, "-c",
-                    "import os, shutil, site; "
-                    "bad = [(sp, n) for sp in site.getsitepackages() if os.path.exists(sp) "
-                    "for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and not n.startswith('opencv_contrib_python_headless-') and n.endswith('.dist-info')]; "
-                    "for sp, n in bad: shutil.rmtree(os.path.join(sp, n), ignore_errors=True)"
-                ]
-                subprocess.run(clean_cmd, capture_output=True, text=True, errors="replace", timeout=60)
+                fix_cmd = [venv_python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", "--no-deps", "opencv-contrib-python-headless==4.10.0.84"]
+                fix_proc = None
+                try:
+                    fix_proc = subprocess.run(fix_cmd, capture_output=True, text=True, errors="replace", timeout=120)
+                except subprocess.TimeoutExpired:
+                    emit_progress(94, "Fallback opencv installation failed")
+                    fallback_errors.append(
+                        "Fallback opencv-contrib-python-headless==4.10.0.84 installation timed out after 120s."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "opencv")
+                except OSError as e:
+                    emit_progress(94, "Fallback opencv installation failed")
+                    fallback_errors.append(
+                        f"Fallback opencv-contrib-python-headless==4.10.0.84 installation could not be run ({e})."
+                    )
+                    _restore_after_failed_fallback(sp_for_cleanup, "opencv")
+
+                if fix_proc is not None:
+                    if fix_proc.returncode == 0:
+                        # Clean up other opencv dist-info to prevent pip from getting confused
+                        clean_cmd = [venv_python, "-c",
+                            "import os, shutil, site; "
+                            "bad = [(sp, n) for sp in site.getsitepackages() if os.path.exists(sp) "
+                            "for n in os.listdir(sp) if n.startswith(('opencv_python-', 'opencv_contrib_python-')) and not n.startswith('opencv_contrib_python_headless-') and n.endswith('.dist-info')]; "
+                            "for sp, n in bad: shutil.rmtree(os.path.join(sp, n), ignore_errors=True)"
+                        ]
+                        try:
+                            clean_proc = subprocess.run(clean_cmd, capture_output=True, text=True, errors="replace", timeout=60)
+                            if clean_proc.returncode != 0:
+                                clean_detail = _format_proc_failure(clean_proc, "python3")
+                                fallback_errors.append(
+                                    f"Fallback opencv metadata cleanup failed:\n{clean_detail}"
+                                )
+                        except subprocess.TimeoutExpired:
+                            fallback_errors.append(
+                                "Fallback opencv metadata cleanup timed out after 60s."
+                            )
+                        except OSError as e:
+                            fallback_errors.append(
+                                f"Fallback opencv metadata cleanup could not be run ({e})."
+                            )
+                        try:
+                            if sp_for_cleanup and os.path.isdir(sp_for_cleanup):
+                                for name in os.listdir(sp_for_cleanup):
+                                    if (
+                                        name.startswith(("opencv_python-", "opencv_contrib_python-"))
+                                        and not name.startswith("opencv_contrib_python_headless-")
+                                        and name.endswith(".dist-info")
+                                    ):
+                                        shutil.rmtree(os.path.join(sp_for_cleanup, name), ignore_errors=True)
+                        except OSError as e:
+                            _abort_remediation(
+                                f"Failed to clean up opencv metadata after fallback: {e}"
+                            )
+                    else:
+                        emit_progress(94, "Fallback opencv installation failed")
+                        pip_detail = _format_proc_failure(fix_proc, "pip")
+                        fallback_errors.append(
+                            f"Fallback opencv-contrib-python-headless==4.10.0.84 installation failed:\n{pip_detail}"
+                        )
+                        _restore_after_failed_fallback(sp_for_cleanup, "opencv")
+
+                try:
+                    clear_venv_writing(venv_writing_marker)
+                except OSError as e:
+                    _abort_remediation(
+                        f"Failed to clear venv write marker after opencv fallback: {e}"
+                    )
 
                 # Re-run smoke test after fallback
+                prev_stderr = proc.stderr or ""
                 proc = _run_smoke_import()
+                if proc.returncode != 0 and not (proc.stderr or "").strip():
+                    proc.stderr = prev_stderr
 
         if proc.returncode != 0:
             shutil.rmtree(staging_dir, ignore_errors=True)
@@ -1965,6 +2318,9 @@ def _install() -> None:
                 venv_writing_marker, bundle_id,
             )
             tail = "\n".join((proc.stderr or "").strip().splitlines()[-6:])
+            fallback_note = ""
+            if fallback_errors:
+                fallback_note = "\n\n".join(fallback_errors) + "\n\n"
             bundle_py = str(bundle_meta.get("pythonVersion", "")).strip()
             bundle_py_mm = ".".join(bundle_py.split(".")[:2]) if "." in bundle_py else ""
             venv_py_mm = _venv_python_major_minor(venv_python)
@@ -1990,7 +2346,7 @@ def _install() -> None:
                 "Installation verification failed: the bundle installed but its "
                 "libraries could not be loaded, so the tool would not work.\n"
                 f"{tail}\n\n"
-                f"{mismatch_note}{recovery_hint}"
+                f"{fallback_note}{mismatch_note}{recovery_hint}"
             )
 
     # -- Move models --

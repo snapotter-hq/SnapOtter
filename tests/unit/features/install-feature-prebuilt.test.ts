@@ -1355,4 +1355,396 @@ assert open(os.path.join(${JSON.stringify(sitePackagesDir)}, "testpkg", "__init_
     );
     expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
   });
+
+  it("brackets CUDA/OpenCV fallback pip installs with venv.writing, surfaces fallback pip errors, and rolls back pip writes when verification still fails (#2563)", () => {
+    seedExistingTestPkg();
+    // Seed pre-existing onnxruntime_gpu and opencv_python in the shared venv
+    mkdirSync(join(sitePackagesDir, "onnxruntime"), { recursive: true });
+    mkdirSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "onnxruntime", "__init__.py"), "# gpu-1.20.1");
+    writeFileSync(
+      join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info", "RECORD"),
+      "onnxruntime/__init__.py,,\nonnxruntime_gpu-1.20.1.dist-info/RECORD,,\n",
+    );
+
+    mkdirSync(join(sitePackagesDir, "cv2"), { recursive: true });
+    mkdirSync(join(sitePackagesDir, "opencv_python-4.10.0.84.dist-info"), { recursive: true });
+    writeFileSync(join(sitePackagesDir, "cv2", "__init__.py"), "# gui-4.10.0.84");
+    writeFileSync(
+      join(sitePackagesDir, "opencv_python-4.10.0.84.dist-info", "RECORD"),
+      "cv2/__init__.py,,\nopencv_python-4.10.0.84.dist-info/RECORD,,\n",
+    );
+
+    const buildDir = join(tempDir, "build-remediation-rollback");
+    mkdirSync(join(buildDir, "models", "testmodel"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
+    writeFileSync(join(buildDir, "models", "testmodel", "weights.bin"), "model-weights");
+    writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
+    writeFileSync(
+      join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-1.0.0.dist-info/RECORD,,\n",
+    );
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "face-detection",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: ["testmodel"],
+      }),
+    );
+    const tarPath = join(tempDir, "remediation-rollback.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    rmSync(buildDir, { recursive: true, force: true });
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+
+    writeManifest("face-detection", tarPath, sha256, {
+      smokeImports: ["onnxruntime", "cv2", "testpkg"],
+    });
+
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, json, os, shutil, subprocess, sys
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+ai_dir = ${JSON.stringify(aiDir)}
+venv_dir = ${JSON.stringify(venvDir)}
+sp_dir = ${JSON.stringify(sitePackagesDir)}
+models_dir = ${JSON.stringify(modelsDir)}
+manifest_path = ${JSON.stringify(manifestPath)}
+tar_path = ${JSON.stringify(tarPath)}
+marker = os.path.join(ai_dir, "venv.writing")
+
+os.environ["PYTHON_VENV_PATH"] = venv_dir
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar_path
+sys.argv = ["install_feature.py", "face-detection", manifest_path, models_dir]
+
+real_run = mod.subprocess.run
+errors = []
+def fake_fail(msg):
+    errors.append(msg)
+    raise SystemExit(1)
+mod.fail = fake_fail
+mod.emit_progress = lambda p, s: None
+
+class ProcResult:
+    def __init__(self, returncode, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+def assert_clean_baseline():
+    assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v0.9.0"
+    assert os.path.isdir(os.path.join(sp_dir, "testpkg-0.9.0.dist-info"))
+    assert not os.path.exists(os.path.join(sp_dir, "testpkg-1.0.0.dist-info"))
+    assert open(os.path.join(sp_dir, "onnxruntime", "__init__.py")).read() == "# gpu-1.20.1"
+    assert not os.path.exists(os.path.join(sp_dir, "onnxruntime", "cpu_extra.py"))
+    assert os.path.isdir(os.path.join(sp_dir, "onnxruntime_gpu-1.20.1.dist-info"))
+    assert not os.path.exists(os.path.join(sp_dir, "onnxruntime-1.20.1.dist-info"))
+    assert open(os.path.join(sp_dir, "cv2", "__init__.py")).read() == "# gui-4.10.0.84"
+    assert not os.path.exists(os.path.join(sp_dir, "cv2", "headless_extra.py"))
+    assert os.path.isdir(os.path.join(sp_dir, "opencv_python-4.10.0.84.dist-info"))
+    assert not os.path.exists(os.path.join(sp_dir, "opencv_contrib_python_headless-4.10.0.84.dist-info"))
+    assert not os.path.exists(marker)
+    assert not os.path.exists(os.path.join(venv_dir, ".superseded"))
+    assert not os.path.exists(os.path.join(ai_dir, "staging-face-detection"))
+
+# 1. ONNX fallback pip exits non-zero: venv.writing held during pip, partial writes undone, pip stderr surfaced
+marker_seen_onnx = []
+def onnx_pip_fails(cmd, *a, **kw):
+    joined = " ".join(cmd)
+    if "sysconfig" in joined or "version_info" in joined:
+        return real_run(cmd, *a, **kw)
+    if "-m pip install" in joined and "onnxruntime==1.20.1" in joined:
+        marker_seen_onnx.append(os.path.exists(marker) and json.loads(open(marker).read())["bundleId"])
+        with open(os.path.join(sp_dir, "onnxruntime", "__init__.py"), "w") as f:
+            f.write("# half-broken-cpu")
+        return ProcResult(1, "", "ERROR: Could not connect to pypi.org for onnxruntime==1.20.1\\nNo matching distribution")
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        return ProcResult(1, "", "ImportError: libcudart.so.12: cannot open shared object file")
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = onnx_pip_fails
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+assert marker_seen_onnx == ["face-detection"], f"marker_seen_onnx={marker_seen_onnx}"
+assert "libcudart.so.12" in errors[-1], errors[-1]
+assert "Could not connect to pypi.org for onnxruntime==1.20.1" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+# 2. ONNX fallback pip succeeds (writes CPU files + deletes onnxruntime_gpu dist-info),
+#    OpenCV fallback pip also succeeds (writes headless files + deletes opencv_python dist-info),
+#    then subsequent smoke re-check still fails: both pip writes and dist-info deletions are rolled back!
+markers_seen_both = []
+smoke_calls = [0]
+def both_remediations_then_smoke_fails(cmd, *a, **kw):
+    joined = " ".join(cmd)
+    if "sysconfig" in joined or "version_info" in joined:
+        return real_run(cmd, *a, **kw)
+    if "-m pip install" in joined and "onnxruntime==1.20.1" in joined:
+        markers_seen_both.append(("onnx", os.path.exists(marker)))
+        with open(os.path.join(sp_dir, "onnxruntime", "__init__.py"), "w") as f:
+            f.write("# cpu-1.20.1")
+        with open(os.path.join(sp_dir, "onnxruntime", "cpu_extra.py"), "w") as f:
+            f.write("# extra")
+        os.makedirs(os.path.join(sp_dir, "onnxruntime-1.20.1.dist-info"), exist_ok=True)
+        with open(os.path.join(sp_dir, "onnxruntime-1.20.1.dist-info", "RECORD"), "w") as f:
+            f.write("onnxruntime/__init__.py,,\\nonnxruntime/cpu_extra.py,,\\nonnxruntime-1.20.1.dist-info/RECORD,,\\n")
+        return ProcResult(0, "Successfully installed onnxruntime-1.20.1", "")
+    if "-m pip install" in joined and "opencv-contrib-python-headless==4.10.0.84" in joined:
+        markers_seen_both.append(("opencv-pip", os.path.exists(marker)))
+        with open(os.path.join(sp_dir, "cv2", "__init__.py"), "w") as f:
+            f.write("# headless-4.10.0.84")
+        with open(os.path.join(sp_dir, "cv2", "headless_extra.py"), "w") as f:
+            f.write("# headless-extra")
+        os.makedirs(os.path.join(sp_dir, "opencv_contrib_python_headless-4.10.0.84.dist-info"), exist_ok=True)
+        with open(os.path.join(sp_dir, "opencv_contrib_python_headless-4.10.0.84.dist-info", "RECORD"), "w") as f:
+            f.write("cv2/__init__.py,,\\ncv2/headless_extra.py,,\\nopencv_contrib_python_headless-4.10.0.84.dist-info/RECORD,,\\n")
+        return ProcResult(0, "Successfully installed opencv-contrib-python-headless-4.10.0.84", "")
+    if "opencv_contrib_python_headless-" in joined:
+        markers_seen_both.append(("opencv-clean", os.path.exists(marker)))
+        shutil.rmtree(os.path.join(sp_dir, "opencv_python-4.10.0.84.dist-info"), ignore_errors=True)
+        return ProcResult(0, "", "")
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        smoke_calls[0] += 1
+        if smoke_calls[0] == 1:
+            return ProcResult(1, "", "ImportError: libcudart.so.12: cannot open shared object file")
+        if smoke_calls[0] == 2:
+            # Verify onnxruntime_gpu dist-info was cleaned up after onnx pip succeeded
+            assert not os.path.exists(os.path.join(sp_dir, "onnxruntime_gpu-1.20.1.dist-info"))
+            return ProcResult(1, "", "ImportError: libGL.so.1: cannot open shared object file")
+        # Third smoke check still fails on another module
+        assert not os.path.exists(os.path.join(sp_dir, "opencv_python-4.10.0.84.dist-info"))
+        return ProcResult(1, "", "ImportError: testpkg native symbol mismatch")
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = both_remediations_then_smoke_fails
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+assert markers_seen_both == [("onnx", True), ("opencv-pip", True), ("opencv-clean", True)], markers_seen_both
+assert "testpkg native symbol mismatch" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+# 3. TimeoutExpired and OSError on fix_cmd and clean_cmd do not crash or leak venv.writing, and surface details
+for exc_to_raise, expected_substr in [
+    (subprocess.TimeoutExpired(cmd=["pip"], timeout=120), "timed out"),
+    (OSError("Exec format error"), "Exec format error"),
+]:
+    def onnx_pip_raises(cmd, *a, _exc=exc_to_raise, **kw):
+        joined = " ".join(cmd)
+        if "sysconfig" in joined or "version_info" in joined:
+            return real_run(cmd, *a, **kw)
+        if "-m pip install" in joined and "onnxruntime==1.20.1" in joined:
+            assert os.path.exists(marker)
+            raise _exc
+        if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+            return ProcResult(1, "", "AttributeError: module 'onnxruntime' has no attribute 'SessionOptions'")
+        return real_run(cmd, *a, **kw)
+
+    mod.subprocess.run = onnx_pip_raises
+    try:
+        mod._install()
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    assert expected_substr in errors[-1], errors[-1]
+    assert_clean_baseline()
+
+    def opencv_clean_raises(cmd, *a, _exc=exc_to_raise, **kw):
+        joined = " ".join(cmd)
+        if "sysconfig" in joined or "version_info" in joined:
+            return real_run(cmd, *a, **kw)
+        if "-m pip install" in joined and "opencv-contrib-python-headless==4.10.0.84" in joined:
+            assert os.path.exists(marker)
+            return ProcResult(0, "ok", "")
+        if "opencv_contrib_python_headless-" in joined:
+            assert os.path.exists(marker)
+            raise _exc
+        if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+            return ProcResult(1, "", "ImportError: cv2.abi3.so: undefined symbol")
+        return real_run(cmd, *a, **kw)
+
+    mod.subprocess.run = opencv_clean_raises
+    try:
+        mod._install()
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    assert expected_substr in errors[-1], errors[-1]
+    assert_clean_baseline()
+
+# 4. OpenCV pip fails with empty stderr/stdout (reports exit status), does NOT run clean_cmd,
+#    and preserves prev_stderr when re-check smoke import exits non-zero with empty stderr
+clean_called = []
+empty_smoke_calls = [0]
+def opencv_pip_empty_fails(cmd, *a, **kw):
+    joined = " ".join(cmd)
+    if "sysconfig" in joined or "version_info" in joined:
+        return real_run(cmd, *a, **kw)
+    if "-m pip install" in joined and "opencv-contrib-python-headless==4.10.0.84" in joined:
+        with open(os.path.join(sp_dir, "cv2", "__init__.py"), "w") as f:
+            f.write("# half-broken-cv2")
+        return ProcResult(2, "", "   \\n")
+    if "opencv_contrib_python_headless-" in joined:
+        clean_called.append(True)
+        return ProcResult(0, "", "")
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        empty_smoke_calls[0] += 1
+        if empty_smoke_calls[0] == 1:
+            return ProcResult(1, "", "ImportError: libpng16.so.16: cannot open shared object file")
+        return ProcResult(1, "", "   \\n")
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = opencv_pip_empty_fails
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+assert clean_called == [], "clean_cmd must not run when opencv pip install fails"
+assert "libpng16.so.16" in errors[-1], errors[-1]
+assert "pip exited with status 2" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+# 5. Snapshot ENOSPC, restore_remediation_state OSError, re-check smoke TimeoutExpired, and clear_venv_writing OSError
+def opencv_trigger_fail(cmd, *a, **kw):
+    joined = " ".join(cmd)
+    if "sysconfig" in joined or "version_info" in joined:
+        return real_run(cmd, *a, **kw)
+    if "-m pip install" in joined and "opencv-contrib-python-headless==4.10.0.84" in joined:
+        with open(os.path.join(sp_dir, "cv2", "__init__.py"), "w") as f:
+            f.write("# half-broken-cv2")
+        return ProcResult(2, "", "   \\n")
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        return ProcResult(1, "", "ImportError: libpng16.so.16: cannot open shared object file")
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = opencv_trigger_fail
+real_snapshot = mod.snapshot_remediation_state
+def enospc_snapshot(*a, **kw):
+    import errno
+    raise OSError(errno.ENOSPC, "No space left on device")
+mod.snapshot_remediation_state = enospc_snapshot
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+finally:
+    mod.snapshot_remediation_state = real_snapshot
+assert "Ran out of disk space while preparing opencv fallback" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+real_restore_rem = mod.restore_remediation_state
+def fail_in_place_restore(sp, q, kind="", remove_backup=True):
+    if not remove_backup:
+        raise OSError("EIO restoring pre-fallback state")
+    return real_restore_rem(sp, q, kind, remove_backup)
+mod.restore_remediation_state = fail_in_place_restore
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+finally:
+    mod.restore_remediation_state = real_restore_rem
+assert "could not be restored (EIO restoring pre-fallback state)" in errors[-1], errors[-1]
+assert "pip exited with status 2" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+recheck_timeout_calls = [0]
+def onnx_pip_fails_then_smoke_times_out(cmd, *a, **kw):
+    joined = " ".join(cmd)
+    if "sysconfig" in joined or "version_info" in joined:
+        return real_run(cmd, *a, **kw)
+    if "-m pip install" in joined and "onnxruntime==1.20.1" in joined:
+        return ProcResult(1, "", "ERROR: Offline network unreachable")
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        recheck_timeout_calls[0] += 1
+        if recheck_timeout_calls[0] == 1:
+            return ProcResult(1, "", "ImportError: libcudart.so.12: cannot open shared object file")
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=300)
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = onnx_pip_fails_then_smoke_times_out
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+assert "Installation verification timed out" in errors[-1], errors[-1]
+assert "Offline network unreachable" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+mod.subprocess.run = opencv_trigger_fail
+real_clear = mod.clear_venv_writing
+clear_calls = [0]
+def fail_second_clear(m):
+    clear_calls[0] += 1
+    # First clear is after move_tree; second clear is after opencv fallback
+    if clear_calls[0] == 2:
+        raise OSError("EPERM clearing marker after fallback")
+    real_clear(m)
+mod.clear_venv_writing = fail_second_clear
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+finally:
+    mod.clear_venv_writing = real_clear
+assert "Failed to clear venv write marker after opencv fallback" in errors[-1], errors[-1]
+assert_clean_baseline()
+
+# 6. Successful fallback completes the install, keeps CPU onnxruntime, and deletes .superseded
+ok_calls = [0]
+def onnx_fallback_succeeds(cmd, *a, **kw):
+    joined = " ".join(cmd)
+    if "sysconfig" in joined or "version_info" in joined:
+        return real_run(cmd, *a, **kw)
+    if "-m pip install" in joined and "onnxruntime==1.20.1" in joined:
+        with open(os.path.join(sp_dir, "onnxruntime", "__init__.py"), "w") as f:
+            f.write("# cpu-1.20.1")
+        os.makedirs(os.path.join(sp_dir, "onnxruntime-1.20.1.dist-info"), exist_ok=True)
+        with open(os.path.join(sp_dir, "onnxruntime-1.20.1.dist-info", "RECORD"), "w") as f:
+            f.write("onnxruntime/__init__.py,,\\nonnxruntime-1.20.1.dist-info/RECORD,,\\n")
+        return ProcResult(0, "Successfully installed onnxruntime-1.20.1", "")
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        ok_calls[0] += 1
+        if ok_calls[0] == 1:
+            return ProcResult(1, "", "ImportError: libcudnn.so.9: cannot open shared object file")
+        return ProcResult(0, "", "")
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = onnx_fallback_succeeds
+mod._install()
+assert open(os.path.join(sp_dir, "onnxruntime", "__init__.py")).read() == "# cpu-1.20.1"
+assert os.path.isdir(os.path.join(sp_dir, "onnxruntime-1.20.1.dist-info"))
+assert not os.path.exists(os.path.join(sp_dir, "onnxruntime_gpu-1.20.1.dist-info"))
+assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v1.0.0"
+assert not os.path.exists(marker)
+assert not os.path.exists(os.path.join(venv_dir, ".superseded"))
+
+mod.subprocess.run = real_run
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
 });
