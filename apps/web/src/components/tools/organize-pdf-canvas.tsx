@@ -3,7 +3,7 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -125,8 +125,12 @@ function PageCard({ pageNumber, position, thumb, label }: PageCardProps) {
     <button
       type="button"
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`relative rounded-lg border bg-background p-1.5 cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        WebkitTouchCallout: "none",
+      }}
+      className={`relative rounded-lg border bg-background p-1.5 select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
         isDragging
           ? "border-primary shadow-lg z-10 opacity-90"
           : "border-border hover:border-primary/50"
@@ -141,7 +145,12 @@ function PageCard({ pageNumber, position, thumb, label }: PageCardProps) {
         style={{ width: THUMB_W, height: THUMB_H }}
       >
         {thumb ? (
-          <img src={thumb} alt="" className="max-w-full max-h-full object-contain" />
+          <img
+            src={thumb}
+            alt=""
+            draggable={false}
+            className="max-w-full max-h-full object-contain pointer-events-none select-none"
+          />
         ) : (
           <span className="text-lg font-medium text-muted-foreground">{pageNumber}</span>
         )}
@@ -188,7 +197,7 @@ export function OrganizePdfCanvas() {
   }, [file, setDocument]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );

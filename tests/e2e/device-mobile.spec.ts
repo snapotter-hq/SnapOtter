@@ -298,6 +298,131 @@ test.describe("@mobile Organize PDF on a phone", () => {
       .getByRole("button", { name: "Settings", exact: true })
       .click({ trial: true, timeout: 5_000 });
   });
+
+  test("reorders pages when a card is press-and-held and dragged on touch (#2256)", async ({
+    loggedInPage: page,
+    browserName,
+  }) => {
+    await page.goto("/pdf/organize-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    const page1 = page.getByTestId("organize-page-1");
+    const page2 = page.getByTestId("organize-page-2");
+    const reset = page.getByTestId("organize-reset");
+    await expect(page1).toBeVisible({ timeout: 15_000 });
+    await expect(page2).toBeVisible({ timeout: 15_000 });
+    await expect(reset).toBeDisabled();
+
+    const box1 = await page1.boundingBox();
+    const box2 = await page2.boundingBox();
+    expect(box1).not.toBeNull();
+    expect(box2).not.toBeNull();
+    if (!box1 || !box2) return;
+
+    const startX = Math.round(box1.x + box1.width / 2);
+    const startY = Math.round(box1.y + box1.height / 2);
+    const endX = Math.round(box2.x + box2.width / 2);
+    const endY = Math.round(box2.y + box2.height / 2);
+
+    if (browserName === "chromium") {
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: startX, y: startY, id: 0 }],
+        });
+        await page.waitForTimeout(300);
+        const steps = 8;
+        for (let i = 1; i <= steps; i += 1) {
+          const x = Math.round(startX + ((endX - startX) * i) / steps);
+          const y = Math.round(startY + ((endY - startY) * i) / steps);
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [{ x, y, id: 0 }],
+          });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+      } finally {
+        await cdp.detach().catch(() => {});
+      }
+    } else {
+      // Playwright WebKit has no CDP Input.dispatchTouchEvent equivalent, so replay
+      // the browser's touch-plus-pointercancel event sequence against the live DOM.
+      await page.evaluate(
+        async ({ sx, sy, ex, ey }) => {
+          const target = document.querySelector(
+            '[data-testid="organize-page-1"]',
+          ) as HTMLElement | null;
+          if (!target) throw new Error("organize-page-1 missing");
+          const dispatchTouch = (
+            type: "touchstart" | "touchmove" | "touchend",
+            x: number,
+            y: number,
+          ) => {
+            const point = { identifier: 0, target, clientX: x, clientY: y, pageX: x, pageY: y };
+            const active = type === "touchend" ? [] : [point];
+            const ev = Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+              touches: active,
+              targetTouches: active,
+              changedTouches: [point],
+              clientX: x,
+              clientY: y,
+            });
+            target.dispatchEvent(ev);
+          };
+          target.dispatchEvent(
+            new PointerEvent("pointerdown", {
+              bubbles: true,
+              cancelable: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+              button: 0,
+              clientX: sx,
+              clientY: sy,
+            }),
+          );
+          dispatchTouch("touchstart", sx, sy);
+          await new Promise((r) => setTimeout(r, 300));
+          target.dispatchEvent(
+            new PointerEvent("pointercancel", {
+              bubbles: true,
+              pointerId: 1,
+              pointerType: "touch",
+              isPrimary: true,
+            }),
+          );
+          const steps = 8;
+          for (let i = 1; i <= steps; i += 1) {
+            const x = Math.round(sx + ((ex - sx) * i) / steps);
+            const y = Math.round(sy + ((ey - sy) * i) / steps);
+            dispatchTouch("touchmove", x, y);
+            await new Promise((r) => setTimeout(r, 16));
+          }
+          dispatchTouch("touchend", ex, ey);
+        },
+        { sx: startX, sy: startY, ex: endX, ey: endY },
+      );
+    }
+
+    await expect(reset).toBeEnabled({ timeout: 5_000 });
+    const orderedTestIds = await page
+      .locator('[data-testid^="organize-page-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid")));
+    expect(orderedTestIds.slice(0, 2)).toEqual(["organize-page-2", "organize-page-1"]);
+
+    await page.getByRole("button", { name: "Process", exact: true }).click();
+    await expect(page.locator("#op-order")).toHaveValue("2,1,3-z");
+  });
 });
 
 // ---------------------------------------------------------------------------
