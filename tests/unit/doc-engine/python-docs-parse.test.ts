@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Stub the docs dispatcher so we control exactly what stdout the helpers parse.
@@ -8,10 +10,18 @@ vi.mock("@snapotter/ai", () => ({
 
 import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
 import {
+  htmlToPdfPy,
+  pdfFlattenPy,
+  pdfMetadataGetPy,
+  pdfMetadataSetPy,
   pdfPageCountPy,
   pdfRedactPy,
+  pdfScrubProducerPy,
+  pdfSignPy,
+  pdfTextPy,
   pdfToWordPy,
 } from "../../../packages/doc-engine/src/python-docs.js";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 /** Flatten an error's message, code, and cause-chain messages into one string. */
 function errorText(err: unknown): string {
@@ -191,5 +201,171 @@ describe("python-docs sidecar JSON parsing", () => {
     expect((caught as Error | undefined)?.name).not.toBe("SyntaxError");
     expect(isSafeMessageError(caught)).toBe(true);
     expect(errorText(caught)).toContain("doc_pagecount");
+  });
+
+  it.each(["null", "[]", "123", '"ok"'])(
+    "wraps non-object JSON literal %s in a SafeError instead of throwing a TypeError on 'in'",
+    async (raw) => {
+      runDocsScript.mockResolvedValue(raw);
+
+      let caught: unknown;
+      try {
+        await pdfFlattenPy("/in.pdf", "/out.pdf");
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).name).toBe("SafeError");
+      expect(isSafeMessageError(caught)).toBe(true);
+      expect((caught as Error).message).toBe("Document tool returned non-JSON output");
+      expect(errorText(caught)).toContain("doc_flatten");
+    },
+  );
+
+  it.each([
+    ["pdfPageCountPy", "doc_pagecount", () => pdfPageCountPy("/in.pdf")],
+    ["pdfFlattenPy", "doc_flatten", () => pdfFlattenPy("/in.pdf", "/out.pdf")],
+    ["pdfScrubProducerPy", "doc_scrub_meta", () => pdfScrubProducerPy("/in.pdf", "/out.pdf")],
+    ["pdfRedactPy", "doc_redact", () => pdfRedactPy("/in.pdf", "/out.pdf", ["secret"], false)],
+    ["pdfTextPy", "doc_text", () => pdfTextPy("/in.pdf", "/out.txt")],
+    ["pdfToWordPy", "doc_to_word", () => pdfToWordPy("/in.pdf", "/out.docx")],
+    ["pdfMetadataGetPy", "doc_metadata get", () => pdfMetadataGetPy("/in.pdf")],
+    ["pdfMetadataSetPy", "doc_metadata set", () => pdfMetadataSetPy("/in.pdf", "/out.pdf", {})],
+    ["htmlToPdfPy", "doc_html_pdf", () => htmlToPdfPy("/in.html", "/out.pdf", "html")],
+    [
+      "pdfSignPy",
+      "doc_sign",
+      () =>
+        pdfSignPy(
+          "/in.pdf",
+          "/out.pdf",
+          ["/sig.png"],
+          [{ sig: 0, page: 0, x: 0, y: 0, w: 0.1, h: 0.1 }],
+        ),
+    ],
+  ])(
+    "%s rejects an empty or whitespace-only error message with a non-empty reason and does not classify it as ToolInputError",
+    async (_name, prefix, call) => {
+      for (const payload of ['{"error": ""}', '{"error": "   "}']) {
+        runDocsScript.mockResolvedValue(payload);
+
+        let caught: unknown;
+        try {
+          await call();
+        } catch (e) {
+          caught = e;
+        }
+
+        expect(caught).toBeInstanceOf(Error);
+        expect(isToolInputError(caught)).toBe(false);
+        expect((caught as Error).message).toBe(`${prefix} failed: ${payload}`);
+      }
+    },
+  );
+});
+
+const EMPTY_EXCEPTION_DRIVER = `
+import contextlib, importlib.util, io, json, os, sys, tempfile, types
+
+PYTHON_DIR = sys.argv[1]
+
+pymupdf = types.ModuleType("pymupdf")
+pymupdf.set_messages = lambda **k: None
+sys.modules["pymupdf"] = pymupdf
+
+fitz = types.ModuleType("fitz")
+fitz.TEXTFLAGS_TEXT = 1
+fitz.TEXT_CID_FOR_UNKNOWN_UNICODE = 1
+fitz.TEXT_DEHYPHENATE = 1
+def _raise_mem(*a, **k):
+    raise MemoryError()
+fitz.open = _raise_mem
+sys.modules["fitz"] = fitz
+
+pikepdf = types.ModuleType("pikepdf")
+pikepdf.open = _raise_mem
+sys.modules["pikepdf"] = pikepdf
+
+pdf2docx = types.ModuleType("pdf2docx")
+pdf2docx.Converter = _raise_mem
+sys.modules["pdf2docx"] = pdf2docx
+
+pdf2docx_layout = types.ModuleType("pdf2docx_layout")
+pdf2docx_layout.install_pdf2docx_layout_fixes = lambda: None
+sys.modules["pdf2docx_layout"] = pdf2docx_layout
+
+weasyprint = types.ModuleType("weasyprint")
+weasyprint.HTML = _raise_mem
+weasyprint_urls = types.ModuleType("weasyprint.urls")
+weasyprint_urls.default_url_fetcher = lambda *a, **k: None
+weasyprint.urls = weasyprint_urls
+sys.modules["weasyprint"] = weasyprint
+sys.modules["weasyprint.urls"] = weasyprint_urls
+
+results = []
+with tempfile.TemporaryDirectory() as scratch:
+    dummy_in = os.path.join(scratch, "in.bin")
+    dummy_out = os.path.join(scratch, "out.bin")
+    with open(dummy_in, "wb") as fh:
+        fh.write(b"x")
+
+    CASES = [
+        ("doc_pagecount.py", {"path": dummy_in}),
+        ("doc_flatten.py", {"path": dummy_in, "out": dummy_out}),
+        ("doc_scrub_meta.py", {"path": dummy_in, "out": dummy_out}),
+        ("doc_redact.py", {"path": dummy_in, "out": dummy_out, "terms": ["x"], "caseSensitive": False}),
+        ("doc_text.py", {"path": dummy_in, "out": dummy_out}),
+        ("doc_to_word.py", {"path": dummy_in, "out": dummy_out}),
+        ("doc_metadata.py", {"path": dummy_in, "mode": "get"}),
+        ("doc_metadata.py", {"path": dummy_in, "out": dummy_out, "mode": "set", "metadata": {"Title": "T"}}),
+        ("doc_html_pdf.py", {"path": dummy_in, "out": dummy_out, "mode": "html"}),
+        ("doc_sign.py", {"input": dummy_in, "output": dummy_out, "signatures": [dummy_in], "placements": [{"sig": 0, "page": 0, "x": 0, "y": 0, "w": 0.1, "h": 0.1}]}),
+    ]
+
+    for filename, payload in CASES:
+        script_path = os.path.join(PYTHON_DIR, filename)
+        spec = importlib.util.spec_from_file_location(filename[:-3], script_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        sys.argv = [filename, json.dumps(payload)]
+        buf = io.StringIO()
+        code = 0
+        try:
+            with contextlib.redirect_stdout(buf):
+                mod.main()
+        except SystemExit as exc:
+            code = exc.code if isinstance(exc.code, int) else 1
+        results.append({
+            "script": filename,
+            "mode": payload.get("mode"),
+            "exitCode": code,
+            "stdout": buf.getvalue().strip(),
+        })
+
+print(json.dumps(results))
+`;
+
+describe.skipIf(!hasPython)("doc_*.py empty-message exception handling", () => {
+  it("emits the exception class name and exits 1 when a bare MemoryError() is raised", () => {
+    const pythonDir = join(process.cwd(), "packages", "ai", "python");
+    const res = spawnSync(pythonBin as string, ["-c", EMPTY_EXCEPTION_DRIVER, pythonDir], {
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    expect(res.status, res.stderr).toBe(0);
+    const rows = JSON.parse(res.stdout.trim()) as Array<{
+      script: string;
+      mode?: string;
+      exitCode: number;
+      stdout: string;
+    }>;
+    expect(rows).toHaveLength(10);
+    for (const row of rows) {
+      expect(row.exitCode, `${row.script} (${row.mode ?? "default"}) exitCode`).toBe(1);
+      expect(JSON.parse(row.stdout), `${row.script} (${row.mode ?? "default"}) stdout`).toEqual({
+        error: "MemoryError",
+      });
+    }
   });
 });

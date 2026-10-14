@@ -478,7 +478,7 @@ def main():
             fh.write(text)
         print(json.dumps({"chars": len(text), "hasText": has_text}))
     except Exception as exc:  # noqa: BLE001
-        print(json.dumps({"error": str(exc)}))
+        print(json.dumps({"error": str(exc).strip() or type(exc).__name__}))
         sys.exit(1)
 
 

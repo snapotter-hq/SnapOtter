@@ -68,9 +68,9 @@ def main():
         raise
     except Exception as exc:  # noqa: BLE001
         # str() is empty for an exception built with no args (MemoryError being
-        # the one that matters here), and an empty message reads as success to
-        # the falsy check in htmlToPdfPy. Never emit one.
-        print(json.dumps({"error": str(exc) or type(exc).__name__}))
+        # the one that matters here). Fall back to the exception class name so
+        # the failure reason is never blank (#1157, #1204).
+        print(json.dumps({"error": str(exc).strip() or type(exc).__name__}))
         sys.exit(1)
 
 

@@ -35,6 +35,20 @@ describe("pdfPageCountPy", () => {
     ).rejects.toThrow("doc_pagecount failed: corrupt xref");
   });
 
+  it("throws a non-empty failure reason when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfPageCountPy("/x.pdf")),
+    ).rejects.toThrow('doc_pagecount failed: {"error": ""}');
+  });
+
+  it("throws when error is an empty string even if pages is a number", async () => {
+    runDocsScript.mockResolvedValueOnce('{"pages": 3, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfPageCountPy("/x.pdf")),
+    ).rejects.toThrow('doc_pagecount failed: {"pages": 3, "error": ""}');
+  });
+
   it("throws when pages is not a number", async () => {
     runDocsScript.mockResolvedValueOnce('{"pages": "seven"}');
     await expect(
@@ -105,6 +119,13 @@ describe("parseDocsJson (via pdfFlattenPy non-JSON)", () => {
       import("../src/python-docs.js").then((m) => m.pdfFlattenPy("/in.pdf", "/out.pdf")),
     ).rejects.toThrow("doc_flatten failed: flatten blew up");
   });
+
+  it("rejects when error is an empty string instead of treating it as success", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfFlattenPy("/in.pdf", "/out.pdf")),
+    ).rejects.toThrow('doc_flatten failed: {"error": ""}');
+  });
 });
 
 describe("pdfScrubProducerPy", () => {
@@ -123,6 +144,13 @@ describe("pdfScrubProducerPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfScrubProducerPy("/in.pdf", "/out.pdf")),
     ).rejects.toThrow("doc_scrub_meta failed: scrub failed");
+  });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfScrubProducerPy("/in.pdf", "/out.pdf")),
+    ).rejects.toThrow('doc_scrub_meta failed: {"error": ""}');
   });
 });
 
@@ -164,6 +192,15 @@ describe("pdfRedactPy", () => {
         m.pdfRedactPy("/in.pdf", "/out.pdf", ["x"], true),
       ),
     ).rejects.toThrow("doc_redact failed: redaction verify failed");
+  });
+
+  it("rejects when error is an empty string even if found is present", async () => {
+    runDocsScript.mockResolvedValueOnce('{"found": 0, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) =>
+        m.pdfRedactPy("/in.pdf", "/out.pdf", ["x"], true),
+      ),
+    ).rejects.toThrow('doc_redact failed: {"found": 0, "error": ""}');
   });
 
   it("throws when found is missing but no error field is present", async () => {
@@ -214,6 +251,13 @@ describe("pdfTextPy", () => {
     ).rejects.toThrow("doc_text failed: text extract failed");
   });
 
+  it("rejects when error is an empty string even if chars is present", async () => {
+    runDocsScript.mockResolvedValueOnce('{"chars": 0, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfTextPy("/in.pdf", "/out.txt")),
+    ).rejects.toThrow('doc_text failed: {"chars": 0, "error": ""}');
+  });
+
   it("throws when chars is not a number and no error field is present", async () => {
     runDocsScript.mockResolvedValueOnce('{"hasText": true}');
     await expect(
@@ -239,6 +283,13 @@ describe("pdfToWordPy", () => {
       import("../src/python-docs.js").then((m) => m.pdfToWordPy("/in.pdf", "/out.docx")),
     ).rejects.toThrow("doc_to_word failed: pdf2docx failed");
   });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfToWordPy("/in.pdf", "/out.docx")),
+    ).rejects.toThrow('doc_to_word failed: {"error": ""}');
+  });
 });
 
 describe("pdfMetadataGetPy", () => {
@@ -254,6 +305,13 @@ describe("pdfMetadataGetPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.pdfMetadataGetPy("/in.pdf")),
     ).rejects.toThrow("doc_metadata get failed: docinfo read failed");
+  });
+
+  it("rejects when error is an empty string even if metadata is an object", async () => {
+    runDocsScript.mockResolvedValueOnce('{"metadata": {}, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.pdfMetadataGetPy("/in.pdf")),
+    ).rejects.toThrow('doc_metadata get failed: {"metadata": {}, "error": ""}');
   });
 
   it("throws when metadata is missing/not an object", async () => {
@@ -285,6 +343,15 @@ describe("pdfMetadataSetPy", () => {
       ),
     ).rejects.toThrow("doc_metadata set failed: docinfo write failed");
   });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) =>
+        m.pdfMetadataSetPy("/in.pdf", "/out.pdf", { Title: "X" }),
+      ),
+    ).rejects.toThrow('doc_metadata set failed: {"error": ""}');
+  });
 });
 
 describe("htmlToPdfPy", () => {
@@ -313,6 +380,13 @@ describe("htmlToPdfPy", () => {
     await expect(
       import("../src/python-docs.js").then((m) => m.htmlToPdfPy("/in.html", "/out.pdf", "html")),
     ).rejects.toThrow("doc_html_pdf failed: weasyprint failed");
+  });
+
+  it("rejects when error is an empty string", async () => {
+    runDocsScript.mockResolvedValueOnce('{"error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) => m.htmlToPdfPy("/in.html", "/out.pdf", "html")),
+    ).rejects.toThrow('doc_html_pdf failed: {"error": ""}');
   });
 });
 
@@ -353,6 +427,15 @@ describe("pdfSignPy", () => {
         m.pdfSignPy("/in.pdf", "/out.pdf", ["s.png"], placements),
       ),
     ).rejects.toThrow("doc_sign failed: sign failed");
+  });
+
+  it("rejects when error is an empty string even if placed is present", async () => {
+    runDocsScript.mockResolvedValueOnce('{"placed": 1, "error": ""}');
+    await expect(
+      import("../src/python-docs.js").then((m) =>
+        m.pdfSignPy("/in.pdf", "/out.pdf", ["s.png"], placements),
+      ),
+    ).rejects.toThrow('doc_sign failed: {"placed": 1, "error": ""}');
   });
 
   it("throws when placed is missing but no error field is present", async () => {
