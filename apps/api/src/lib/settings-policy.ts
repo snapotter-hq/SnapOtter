@@ -64,10 +64,11 @@ const disabledToolsSetting = z
   )
   .transform((value) => JSON.stringify(value));
 
-const localeCodes = new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
-const localeSetting = z
-  .string()
-  .refine((value) => localeCodes.has(value), "Must be a supported locale");
+let localeCodes: Set<string> | undefined;
+const localeSetting = z.string().refine((value) => {
+  localeCodes ??= new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
+  return localeCodes.has(value);
+}, "Must be a supported locale");
 
 const breakGlassUsernameSetting = z
   .string()
