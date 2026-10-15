@@ -12,7 +12,6 @@ import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import {
   type ExternalAuthResult,
-  findUniqueUsername,
   resolveExternalUser,
   sanitizeUsername,
   UsernameRaceExhaustedError,
@@ -144,10 +143,10 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
         ? (profile[env.SAML_USERNAME_ATTRIBUTE] as string | undefined)
         : undefined;
 
-      // Derive a username from available claims
+      // Derive a username from available claims. The resolver owns collision
+      // suffixes, and only when it auto-creates, matching the OIDC callback.
       const rawUsername = usernameAttr || email?.split("@")[0] || profile.nameID;
-      let username = sanitizeUsername(rawUsername);
-      username = await findUniqueUsername(username);
+      const username = sanitizeUsername(rawUsername);
 
       // Resolve user via shared external-auth resolver
       let result: ExternalAuthResult;

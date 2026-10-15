@@ -44,14 +44,19 @@ const getMfaPolicyMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 // resolveExternalUser stays REAL by default. The #978 tests swap in a throw for
 // one call each: the retry-exhaustion error the resolver raises after three
 // lost username races (not worth staging against a real DB) and a plain fault
-// that must keep surfacing as a 500.
+// that must keep surfacing as a 500. The wrapper also records the username
+// argument so a callback test can tell a pre-allocated suffix from the base
+// the resolver is supposed to receive.
 const resolverFailure = vi.hoisted(() => ({ next: null as Error | null }));
+const seenResolverUsernames = vi.hoisted(() => ({ list: [] as string[] }));
 vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   const realResolve = actual.resolveExternalUser as (...args: unknown[]) => Promise<unknown>;
   return {
     ...actual,
     resolveExternalUser: async (...args: unknown[]) => {
+      const username = (args[0] as { username?: string } | undefined)?.username;
+      if (typeof username === "string") seenResolverUsernames.list.push(username);
       const err = resolverFailure.next;
       if (err) {
         resolverFailure.next = null;
@@ -144,6 +149,7 @@ afterEach(() => {
   // An armed throw is consumed only if the ACS route reaches the resolver;
   // never let one leak into the next test.
   resolverFailure.next = null;
+  seenResolverUsernames.list.length = 0;
 });
 
 function postCallback() {
@@ -253,6 +259,103 @@ describe("SAML callback", () => {
       expect(user?.username).toContain(uid.toLowerCase());
     } finally {
       (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = undefined;
+    }
+  });
+
+  it("allocates a colliding username once in the resolver", async () => {
+    // 46 characters is sanitizeUsername's cap, so the resolver's single `_2`
+    // still fits in the 50-character limit. A taken base is the same lookup
+    // that used to suffix a reserved name such as "anonymous" before the
+    // resolver allocated again.
+    const token = randomUUID().replace(/-/g, "").slice(0, 8);
+    const base = `${token}${"n".repeat(46 - token.length)}`;
+    await db.insert(schema.users).values({
+      id: randomUUID(),
+      username: base,
+      role: "user",
+      team: "default-team-00000000",
+      mustChangePassword: false,
+      authProvider: "local",
+    });
+
+    (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = "uid";
+    mfaOutcomeMock.mockReturnValue("proceed");
+    try {
+      const nameID = `saml-${token}`;
+      const email = `saml-${token}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID, email, uid: base },
+      });
+      seenResolverUsernames.list.length = 0;
+
+      const created = await postCallback();
+      expect(created.statusCode).toBe(302);
+      expect(created.headers.location).toBe("/");
+      // A callback-level findUniqueUsername would have handed the resolver
+      // `${base}_2` and, when that was taken too, `${base}_2_2`.
+      expect(seenResolverUsernames.list).toEqual([base]);
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, nameID));
+      expect(user?.username).toBe(`${base}_2`);
+      expect(user?.username.length).toBeLessThanOrEqual(50);
+
+      // Existing external-ID match does not look up a username first.
+      seenResolverUsernames.list.length = 0;
+      const matched = await postCallback();
+      expect(matched.statusCode).toBe(302);
+      expect(seenResolverUsernames.list).toEqual([base]);
+      const [still] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, nameID));
+      expect(still?.username).toBe(`${base}_2`);
+
+      // Email link of a local account keeps its username and the base.
+      const linkId = randomUUID();
+      const linkUsername = `local${token}`;
+      const linkEmail = `link-${token}@example.com`;
+      await db.insert(schema.users).values({
+        id: linkId,
+        username: linkUsername,
+        email: linkEmail,
+        role: "user",
+        team: "default-team-00000000",
+        mustChangePassword: false,
+        authProvider: "local",
+      });
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: `link-${token}`, email: linkEmail, uid: base },
+      });
+      seenResolverUsernames.list.length = 0;
+      const linked = await postCallback();
+      expect(linked.statusCode).toBe(302);
+      expect(seenResolverUsernames.list).toEqual([base]);
+      const [linkedUser] = await db.select().from(schema.users).where(eq(schema.users.id, linkId));
+      expect(linkedUser?.authProvider).toBe("saml");
+      expect(linkedUser?.externalId).toBe(`link-${token}`);
+      expect(linkedUser?.username).toBe(linkUsername);
+
+      // Auto-create disabled: the denial is not preceded by a username lookup.
+      (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = false;
+      const deniedId = `denied-${token}`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: deniedId, email: `denied-${token}@example.com`, uid: base },
+      });
+      seenResolverUsernames.list.length = 0;
+      const denied = await postCallback();
+      expect(denied.statusCode).toBe(302);
+      expect(denied.headers.location).toBe("/login?error=saml_user_not_authorized");
+      expect(seenResolverUsernames.list).toEqual([base]);
+      const [deniedUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, deniedId));
+      expect(deniedUser).toBeUndefined();
+    } finally {
+      (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = undefined;
+      (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = true;
     }
   });
 
