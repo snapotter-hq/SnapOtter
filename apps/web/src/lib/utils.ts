@@ -37,17 +37,38 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 /**
- * Copy an image blob to the clipboard. Unlike text, images have no
- * execCommand fallback, so on insecure (plain-http) contexts, where
- * navigator.clipboard and ClipboardItem do not exist, this reports failure
- * instead of throwing (Sentry WEB-G).
+ * Copy an image blob (or a promise of one) to the clipboard. Unlike text,
+ * images have no execCommand fallback, so on insecure (plain-http) contexts,
+ * where navigator.clipboard and ClipboardItem do not exist, this reports
+ * failure instead of throwing (Sentry WEB-G).
+ *
+ * WebKit drops the user gesture across any await before navigator.clipboard.write,
+ * so callers whose export is asynchronous pass a Promise<Blob> directly and let
+ * ClipboardItem receive the promise inside the gesture (#1979).
  */
-export async function copyImageToClipboard(blob: Blob): Promise<boolean> {
-  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
+export async function copyImageToClipboard(
+  blob: Blob | Promise<Blob>,
+  type = "image/png",
+): Promise<boolean> {
+  if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+    Promise.resolve(blob).catch(() => {});
+    return false;
+  }
+  const mimeType = blob instanceof Blob && blob.type ? blob.type : type;
+  const itemBlob = Promise.resolve(blob).then((resolved) => {
+    if (!(resolved instanceof Blob) || resolved.size === 0) {
+      throw new Error("Image clipboard payload is empty");
+    }
+    return resolved;
+  });
+  itemBlob.catch(() => {});
   try {
-    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    const writePromise = navigator.clipboard.write([new ClipboardItem({ [mimeType]: itemBlob })]);
+    Promise.resolve(writePromise).catch(() => {});
+    await Promise.all([itemBlob, writePromise]);
     return true;
-  } catch {
+  } catch (err) {
+    console.error("Failed to copy image to clipboard:", err);
     return false;
   }
 }

@@ -111,37 +111,150 @@ describe("copyImageToClipboard", () => {
   it("returns false without throwing when navigator.clipboard is missing (insecure context)", async () => {
     Object.assign(navigator, { clipboard: undefined });
     (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {};
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(copyImageToClipboard(blob())).resolves.toBe(false);
+    expect(logged).not.toHaveBeenCalled();
   });
 
   it("returns false without throwing when ClipboardItem is missing", async () => {
     Object.assign(navigator, { clipboard: { write: vi.fn() } });
     delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(copyImageToClipboard(blob())).resolves.toBe(false);
+    expect(logged).not.toHaveBeenCalled();
+  });
+
+  it("suppresses unhandled rejection on a rejected blob promise when ClipboardItem is missing", async () => {
+    Object.assign(navigator, { clipboard: { write: vi.fn() } });
+    delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(copyImageToClipboard(Promise.reject(new Error("export failed")))).resolves.toBe(
+      false,
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(logged).not.toHaveBeenCalled();
   });
 
   it("writes the blob and returns true when the API is available", async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { write } });
+    let seenItems: Record<string, unknown> | undefined;
     (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
-      items: unknown;
-      constructor(items: unknown) {
+      items: Record<string, unknown>;
+      constructor(items: Record<string, unknown>) {
         this.items = items;
+        seenItems = items;
       }
     };
 
     await expect(copyImageToClipboard(blob())).resolves.toBe(true);
     expect(write).toHaveBeenCalledTimes(1);
+    expect(seenItems).toBeDefined();
+    await expect(seenItems?.["image/png"]).resolves.toBeInstanceOf(Blob);
   });
 
-  it("returns false when the write itself rejects", async () => {
+  it("tolerates a non-Promise return from navigator.clipboard.write and falls back to type when Blob.type is empty", async () => {
+    const write = vi.fn().mockReturnValue(undefined);
+    Object.assign(navigator, { clipboard: { write } });
+    let seenItems: Record<string, unknown> | undefined;
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      constructor(items: Record<string, unknown>) {
+        seenItems = items;
+      }
+    };
+
+    await expect(copyImageToClipboard(new Blob(["bytes"]), "image/webp")).resolves.toBe(true);
+    expect(seenItems).toBeDefined();
+    await expect(seenItems?.["image/webp"]).resolves.toBeInstanceOf(Blob);
+  });
+
+  it("starts navigator.clipboard.write synchronously before a Promise<Blob> settles (#1979)", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { write } });
+    let seenItems: Record<string, unknown> | undefined;
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      constructor(items: Record<string, unknown>) {
+        seenItems = items;
+      }
+    };
+
+    let resolveBlob!: (b: Blob) => void;
+    const pendingBlob = new Promise<Blob>((resolve) => {
+      resolveBlob = resolve;
+    });
+
+    const resultPromise = copyImageToClipboard(pendingBlob);
+    // WebKit drops the user gesture across any await before clipboard.write, so
+    // both ClipboardItem construction and clipboard.write must happen before
+    // pendingBlob resolves.
+    expect(seenItems).toBeDefined();
+    expect(write).toHaveBeenCalledTimes(1);
+
+    resolveBlob(blob());
+    await expect(resultPromise).resolves.toBe(true);
+    await expect(seenItems?.["image/png"]).resolves.toBeInstanceOf(Blob);
+  });
+
+  it("logs the rejection and returns false when the write itself rejects (#1979)", async () => {
+    const denied = new DOMException("The request is not allowed", "NotAllowedError");
     Object.assign(navigator, {
-      clipboard: { write: vi.fn().mockRejectedValue(new Error("denied")) },
+      clipboard: { write: vi.fn().mockRejectedValue(denied) },
     });
     (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {};
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(copyImageToClipboard(blob())).resolves.toBe(false);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), denied);
+  });
+
+  it("logs the rejection and suppresses unhandled rejections when ClipboardItem throws synchronously while a Promise<Blob> later rejects", async () => {
+    const badMime = new TypeError("Type not supported");
+    Object.assign(navigator, { clipboard: { write: vi.fn() } });
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      constructor() {
+        throw badMime;
+      }
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    let rejectBlob!: (err: unknown) => void;
+    const pendingBlob = new Promise<Blob>((_resolve, reject) => {
+      rejectBlob = reject;
+    });
+
+    await expect(copyImageToClipboard(pendingBlob)).resolves.toBe(false);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), badMime);
+
+    rejectBlob(new Error("late export failure"));
+    await new Promise((r) => setTimeout(r, 0));
+  });
+
+  it("logs the rejection and returns false when a Promise<Blob> rejects or resolves to an empty blob (#1979)", async () => {
+    const write = vi
+      .fn()
+      .mockImplementation(async (items: Array<{ items: Record<string, unknown> }>) => {
+        await items[0].items["image/png"];
+      });
+    Object.assign(navigator, { clipboard: { write } });
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      items: Record<string, unknown>;
+      constructor(items: Record<string, unknown>) {
+        this.items = items;
+      }
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const boom = new Error("export failed");
+    await expect(copyImageToClipboard(Promise.reject(boom))).resolves.toBe(false);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), boom);
+
+    logged.mockClear();
+    await expect(
+      copyImageToClipboard(Promise.resolve(new Blob([], { type: "image/png" }))),
+    ).resolves.toBe(false);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), expect.any(Error));
   });
 });

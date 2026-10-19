@@ -814,18 +814,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    try {
+    const blobPromise = (async () => {
       const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      // Image copy has no fallback on plain-http installs (no ClipboardItem
-      // there), so failure gets surfaced on the button instead of thrown.
-      setCopyStatus((await copyImageToClipboard(blob)) ? "copied" : "failed");
-      later(() => setCopyStatus("idle"), 2000, "copyStatus");
-    } catch (err) {
-      console.error("Copy to clipboard failed:", err);
-      setCopyStatus("failed");
-      later(() => setCopyStatus("idle"), 2000, "copyStatus");
-    }
+      return await res.blob();
+    })();
+    blobPromise.catch(() => {});
+    // Pass the blob promise without awaiting it first so navigator.clipboard.write
+    // starts synchronously inside WebKit's user gesture (#1979). Image copy has no
+    // fallback on plain-http installs (no ClipboardItem there), so failure gets
+    // surfaced on the button instead of thrown.
+    setCopyStatus((await copyImageToClipboard(blobPromise)) ? "copied" : "failed");
+    later(() => setCopyStatus("idle"), 2000, "copyStatus");
   }, [settings, canvasSize, later, guardCapture, reportEmptyExport]);
 
   // Project save (.snapotter file)

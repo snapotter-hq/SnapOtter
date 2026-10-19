@@ -6,6 +6,24 @@ import { captureDocumentCanvas } from "@/components/editor/stage-capture";
 import { copyImageToClipboard } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
 
+function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  let resolveBlob!: (blob: Blob) => void;
+  let rejectBlob!: (err: unknown) => void;
+  const promise = new Promise<Blob>((resolve, reject) => {
+    resolveBlob = resolve;
+    rejectBlob = reject;
+  });
+  promise.catch(() => {});
+  canvas.toBlob((blob) => {
+    if (blob instanceof Blob && blob.size > 0) {
+      resolveBlob(blob);
+    } else {
+      rejectBlob(new Error("Stage export produced no image"));
+    }
+  }, "image/png");
+  return promise;
+}
+
 /**
  * Copy Merged: puts the flattened canvas on the system clipboard as a PNG.
  * The Ctrl/Cmd+Shift+C shortcut and the Edit menu row both run this.
@@ -23,13 +41,11 @@ export async function copyMergedToClipboard(failedMessage: string): Promise<void
     // The Stage carries zoom and pan as its own transform, so exporting it
     // directly copies the viewport (#1978). captureDocumentCanvas draws the
     // document at its own size first, and HTMLCanvasElement.toBlob throws a
-    // tainted canvas's SecurityError onto the toast.
+    // tainted canvas's SecurityError onto the toast. Pass the export promise
+    // straight into copyImageToClipboard so navigator.clipboard.write starts
+    // inside WebKit's user gesture (#1979).
     const canvas = captureDocumentCanvas(stage, canvasSize.width, canvasSize.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    if (!(blob instanceof Blob) || blob.size === 0) {
-      throw new Error("Stage export produced no image");
-    }
-    if (await copyImageToClipboard(blob)) return;
+    if (await copyImageToClipboard(canvasToPngBlob(canvas))) return;
   } catch (err) {
     console.error("Copy merged failed:", err);
   }

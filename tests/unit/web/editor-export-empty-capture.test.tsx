@@ -16,7 +16,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toastError = vi.hoisted(() => vi.fn());
-const copyImageToClipboard = vi.hoisted(() => vi.fn(async () => true));
+const copyImageToClipboard = vi.hoisted(() =>
+  vi.fn<(blob: Blob | Promise<Blob>, type?: string) => Promise<boolean>>(async () => true),
+);
 const capture = vi.hoisted(() => ({
   dataUrl: "data:image/png;base64,AA==",
   blob: new Blob(["x"]) as Blob | null,
@@ -218,11 +220,51 @@ describe("export of a tainted canvas (#2140)", () => {
   });
 });
 
-describe("copy of a canvas that can't be encoded (#2140)", () => {
+describe("copy of a canvas that can't be encoded (#2140, #1979)", () => {
   it("copies a good capture", async () => {
     render(<ExportDialog onClose={() => {}} />);
     clickCopy();
     await waitFor(() => expect(copyImageToClipboard).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("calls copyImageToClipboard synchronously before fetch(dataUrl) resolves so WebKit keeps the user gesture (#1979)", async () => {
+    let resolveFetch!: (res: { ok: boolean; blob: () => Promise<Blob> }) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+    copyImageToClipboard.mockImplementationOnce(async (blob) => {
+      const resolved = await blob;
+      return resolved.size > 0;
+    });
+
+    render(<ExportDialog onClose={() => {}} />);
+    clickCopy();
+    // Must be called synchronously inside the click handler, before fetch resolves.
+    expect(copyImageToClipboard).toHaveBeenCalledTimes(1);
+    expect(copyImageToClipboard.mock.calls[0][0]).toBeInstanceOf(Promise);
+
+    resolveFetch({ ok: true, blob: async () => new Blob(["x"], { type: "image/png" }) });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: en.editor.ui.exportDialog.copied })).toBeTruthy(),
+    );
+  });
+
+  it("shows copyFailed on the button when copyImageToClipboard resolves false (#1979)", async () => {
+    copyImageToClipboard.mockResolvedValueOnce(false);
+    render(<ExportDialog onClose={() => {}} />);
+    clickCopy();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: en.editor.ui.exportDialog.copyFailed }),
+      ).toBeTruthy(),
+    );
     expect(toastError).not.toHaveBeenCalled();
   });
 

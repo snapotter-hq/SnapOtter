@@ -31,11 +31,20 @@ vi.mock("@/components/editor/editor-canvas", () => ({
   editorStageRefHolder: stageHolder,
 }));
 
-const copyImage = vi.hoisted(() => vi.fn<(blob: Blob) => Promise<boolean>>());
-vi.mock("@/lib/utils", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/utils")>()),
-  copyImageToClipboard: copyImage,
+const copyImage = vi.hoisted(() =>
+  vi.fn<(blob: Blob | Promise<Blob>, type?: string) => Promise<boolean>>(),
+);
+const realCopyImage = vi.hoisted(() => ({
+  current: null as ((blob: Blob | Promise<Blob>, type?: string) => Promise<boolean>) | null,
 }));
+vi.mock("@/lib/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/utils")>();
+  realCopyImage.current = actual.copyImageToClipboard;
+  return {
+    ...actual,
+    copyImageToClipboard: copyImage,
+  };
+});
 
 import { de } from "@snapotter/shared/i18n/de.js";
 import { en } from "@snapotter/shared/i18n/en.js";
@@ -50,6 +59,8 @@ import { Toaster } from "../../../apps/web/node_modules/sonner";
 
 const COPY_FAILED = en.editor.ui.exportDialog.copyFailed;
 const INITIAL_STATE = useEditorStore.getState();
+const originalClipboard = navigator.clipboard;
+const originalClipboardItem = globalThis.ClipboardItem;
 
 const PNG = () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });
 
@@ -139,10 +150,16 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  Object.assign(navigator, { clipboard: originalClipboard });
+  if (originalClipboardItem === undefined) {
+    delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+  } else {
+    globalThis.ClipboardItem = originalClipboardItem;
+  }
   vi.restoreAllMocks();
 });
 
-describe("Copy Merged shortcut (#1944)", () => {
+describe("Copy Merged shortcut (#1944, #1979)", () => {
   it("says the copy failed when the clipboard refuses the image", async () => {
     fakeStage();
     copyImage.mockResolvedValue(false);
@@ -152,8 +169,31 @@ describe("Copy Merged shortcut (#1944)", () => {
     await settle();
 
     expect(copyImage).toHaveBeenCalledTimes(1);
-    expect(copyImage.mock.calls[0][0].type).toBe("image/png");
+    const passed = await copyImage.mock.calls[0][0];
+    expect(passed).toBeInstanceOf(Blob);
+    expect(passed.type).toBe("image/png");
     expect(await screen.findByText(COPY_FAILED)).toBeInTheDocument();
+  });
+
+  it("calls copyImageToClipboard synchronously before canvas.toBlob resolves so WebKit keeps the user gesture (#1979)", async () => {
+    let finishBlob!: (b: Blob | null) => void;
+    fakeStage((cb) => {
+      finishBlob = cb;
+    });
+    copyImage.mockImplementation(async (blob) => {
+      const resolved = await blob;
+      return resolved.size > 0;
+    });
+    renderShortcuts();
+
+    pressCopyMerged();
+    // Must be called synchronously inside the keydown handler, before toBlob finishes.
+    expect(copyImage).toHaveBeenCalledTimes(1);
+    expect(copyImage.mock.calls[0][0]).toBeInstanceOf(Promise);
+
+    finishBlob(PNG());
+    await settle();
+    expect(screen.queryByText(COPY_FAILED)).not.toBeInTheDocument();
   });
 
   it("says the copy failed and logs why when the stage can't be exported", async () => {
@@ -209,13 +249,32 @@ describe("Copy Merged shortcut (#1944)", () => {
     ["zero-byte blob", new Blob([], { type: "image/png" })],
   ])("says the copy failed when the export comes back as %s", async (_label, empty) => {
     fakeStage((cb) => cb(empty));
+    Object.assign(navigator, {
+      clipboard: {
+        write: vi
+          .fn()
+          .mockImplementation(async (items: Array<{ items: Record<string, unknown> }>) => {
+            await items[0].items["image/png"];
+          }),
+      },
+    });
+    (globalThis as { ClipboardItem?: unknown }).ClipboardItem = class {
+      items: Record<string, unknown>;
+      constructor(items: Record<string, unknown>) {
+        this.items = items;
+      }
+    };
+    copyImage.mockImplementation((blob, type) => {
+      if (!realCopyImage.current) throw new Error("Expected realCopyImage");
+      return realCopyImage.current(blob, type);
+    });
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     renderShortcuts();
 
     pressCopyMerged();
     await settle();
 
-    expect(copyImage).not.toHaveBeenCalled();
+    expect(copyImage).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(COPY_FAILED)).toBeInTheDocument();
     expect(logged).toHaveBeenCalledTimes(1);
   });

@@ -30,6 +30,8 @@ const backingState = resolvePlaywrightBackingState({
   scope: "editor",
 });
 
+const WEBKIT_SPECS = /(?:^|[/\\])editor-copy-merged\.spec\.ts$/;
+
 export default defineConfig({
   testDir: "./tests/e2e-editor",
   timeout: 60_000,
@@ -49,6 +51,11 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+      testMatch: WEBKIT_SPECS,
     },
   ],
   webServer: [
