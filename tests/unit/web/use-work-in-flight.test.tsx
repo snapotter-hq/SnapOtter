@@ -81,6 +81,7 @@ const OWN_STORES: Array<{ getState: () => { reset: () => void } }> = [
   useDuplicateStore,
   useHtmlToImageStore,
   useMemeStore,
+  usePassportPhotoStore,
   usePdfToImageStore,
   useSplitStore,
 ];
@@ -347,13 +348,6 @@ beforeEach(() => {
   useEditorStore.setState({ isDirty: false });
   useToolResultClaims.getState().reset();
   for (const store of OWN_STORES) store.getState().reset();
-  // No reset action on this one: the panel drives it field by field.
-  usePassportPhotoStore.setState({
-    analyzing: false,
-    generating: false,
-    analyzeResult: null,
-    generateResult: null,
-  });
 });
 
 afterEach(() => {

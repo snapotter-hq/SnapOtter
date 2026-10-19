@@ -66,8 +66,10 @@ import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFeaturesStore } from "@/stores/features-store";
 import { type FileEntry, useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
+import { useMemeStore } from "@/stores/meme-store";
 import { useMultiToolStore } from "@/stores/multi-tool-store";
 import { useOrganizeStore } from "@/stores/organize-store";
+import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { useQrStore } from "@/stores/qr-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -231,7 +233,85 @@ function FileSelectionInfo({
   );
 }
 
+function ToolPageStoreReset({
+  toolId,
+  fromLibrary,
+  resetToolIdRef,
+}: {
+  toolId: string | undefined;
+  fromLibrary: boolean;
+  resetToolIdRef: React.RefObject<string | undefined>;
+}) {
+  const probeRef = useRef<HTMLSpanElement | null>(null);
+  const latestToolIdRef = useRef<string | undefined>(toolId);
+  latestToolIdRef.current = toolId;
+  const setupToolIdRef = useRef<string | undefined>(undefined);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
+  useEffect(() => {
+    resetToolIdRef.current = toolId;
+    if (setupToolIdRef.current !== toolId) {
+      setupToolIdRef.current = toolId;
+      if (!fromLibrary) {
+        useFileStore.getState().reset();
+      }
+      useBase64Store.getState().reset();
+      useCollageStore.getState().reset();
+      useDuplicateStore.getState().reset();
+      useMemeStore.getState().reset();
+      usePassportPhotoStore.getState().reset();
+      usePdfToImageStore.getState().reset();
+      useQrStore.getState().reset();
+      useSplitStore.getState().reset();
+      useHtmlToImageStore.getState().reset();
+      useOrganizeStore.getState().clear();
+    }
+
+    // The editor session belongs to the tool route, not to the settings panel,
+    // which unmounts when the viewport crosses the mobile breakpoint (#1974, #2248).
+    return () => {
+      if (probeRef.current?.isConnected && latestToolIdRef.current === toolId) return;
+      setupToolIdRef.current = undefined;
+      useMemeStore.getState().reset();
+      usePassportPhotoStore.getState().reset();
+      useMultiToolStore.getState().clear();
+      useOrganizeStore.getState().clear();
+    };
+  }, [toolId]);
+
+  return (
+    <span
+      ref={(el) => {
+        if (el) probeRef.current = el;
+      }}
+      hidden
+    />
+  );
+}
+
 export function ToolPage() {
+  const { toolId } = useParams<{ toolId: string }>();
+  const location = useLocation();
+  const fromLibrary = Boolean((location.state as { fromLibrary?: boolean } | null)?.fromLibrary);
+  const resetToolIdRef = useRef<string | undefined>(undefined);
+
+  return (
+    <>
+      <ToolPageStoreReset
+        toolId={toolId}
+        fromLibrary={fromLibrary}
+        resetToolIdRef={resetToolIdRef}
+      />
+      <ToolPageContent resetToolIdRef={resetToolIdRef} />
+    </>
+  );
+}
+
+function ToolPageContent({
+  resetToolIdRef,
+}: {
+  resetToolIdRef: React.RefObject<string | undefined>;
+}) {
   const { t } = useTranslation();
   const { section, toolId } = useParams<{ section: string; toolId: string }>();
   const location = useLocation();
@@ -455,22 +535,10 @@ export function ToolPage() {
   // Every generic multi-file affordance at once.
   const hasBatchUi = hasMultiple && !docCanvas;
 
+  const fromLibrary = Boolean((location.state as { fromLibrary?: boolean } | null)?.fromLibrary);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: toolId triggers intentional reset on tool navigation
   useEffect(() => {
-    const fromLibrary = (location.state as { fromLibrary?: boolean } | null)?.fromLibrary;
-    if (!fromLibrary) {
-      useFileStore.getState().reset();
-    }
-
-    useBase64Store.getState().reset();
-    useCollageStore.getState().reset();
-    useDuplicateStore.getState().reset();
-    usePdfToImageStore.getState().reset();
-    useQrStore.getState().reset();
-    useSplitStore.getState().reset();
-    useHtmlToImageStore.getState().reset();
-    useOrganizeStore.getState().clear();
-
     setPreviewTransform(null);
     setPreviewFilter("");
     setBgPreview(null);
@@ -483,12 +551,6 @@ export function ToolPage() {
     setEraserBrushSize(30);
     setEraserSliderInitPos(null);
     setMobileSettingsOpen(false);
-    // The editor session belongs to the tool route, not to the settings panel,
-    // which unmounts when the viewport crosses the mobile breakpoint (#1974, #2248).
-    return () => {
-      useMultiToolStore.getState().clear();
-      useOrganizeStore.getState().clear();
-    };
   }, [toolId]);
 
   const toolAccept = registryEntry?.accept ?? (tool?.acceptedInputs?.join(",") || undefined);
@@ -719,7 +781,7 @@ export function ToolPage() {
   const IconComponent =
     (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? FileImage;
 
-  const hasFile = files.length > 0;
+  const hasFile = (resetToolIdRef.current === toolId || fromLibrary) && files.length > 0;
   const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
   const isProcessing = currentEntry?.status === "processing";
   const displayMode = registryEntry.displayMode;

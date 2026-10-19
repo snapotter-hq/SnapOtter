@@ -54,7 +54,25 @@ interface PassportPhotoStore {
   setAnalyzing: (a: boolean) => void;
   generating: boolean;
   setGenerating: (g: boolean) => void;
+  reset: () => void;
 }
+
+const INITIAL_STATE = {
+  analyzeResult: null as AnalyzeResult | null,
+  countryCode: "US",
+  documentType: "passport",
+  bgColor: "#FFFFFF",
+  maxFileSizeKb: 0,
+  dpi: 300,
+  customWidthMm: null as number | null,
+  customHeightMm: null as number | null,
+  adjustX: 0,
+  adjustY: 0,
+  zoom: 1,
+  generateResult: null as GenerateResult | null,
+  analyzing: false,
+  generating: false,
+};
 
 /**
  * passport-photo hand-rolls both of its requests, so nothing it does reaches
@@ -67,33 +85,21 @@ interface PassportPhotoStore {
  * lazily loaded chunk into the app's first load.
  */
 export const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
-  analyzeResult: null,
+  ...INITIAL_STATE,
   setAnalyzeResult: (analyzeResult) => set({ analyzeResult, generateResult: null }),
-  countryCode: "US",
   setCountryCode: (countryCode) =>
     set({ countryCode, generateResult: null, customWidthMm: null, customHeightMm: null }),
-  documentType: "passport",
   setDocumentType: (documentType) => set({ documentType, generateResult: null }),
-  bgColor: "#FFFFFF",
   setBgColor: (bgColor) => set({ bgColor, generateResult: null }),
-  maxFileSizeKb: 0,
   setMaxFileSizeKb: (maxFileSizeKb) => set({ maxFileSizeKb }),
-  dpi: 300,
   setDpi: (dpi) => set({ dpi, generateResult: null }),
-  customWidthMm: null,
-  customHeightMm: null,
   setCustomDimensions: (customWidthMm, customHeightMm) =>
     set({ customWidthMm, customHeightMm, countryCode: "CUSTOM", generateResult: null }),
-  adjustX: 0,
-  adjustY: 0,
   setAdjustX: (adjustX) => set({ adjustX, generateResult: null }),
   setAdjustY: (adjustY) => set({ adjustY, generateResult: null }),
-  zoom: 1,
   setZoom: (zoom) => set({ zoom }),
-  generateResult: null,
   setGenerateResult: (generateResult) => set({ generateResult }),
-  analyzing: false,
   setAnalyzing: (analyzing) => set({ analyzing }),
-  generating: false,
   setGenerating: (generating) => set({ generating }),
+  reset: () => set({ ...INITIAL_STATE }),
 }));
