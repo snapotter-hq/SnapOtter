@@ -1059,7 +1059,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   ),
                   signal: ingressAbort.signal,
                 });
-                if (file.size > 0) files.push(file);
+                // Empty parts keep their slot: the client maps results back
+                // onto its own file list by index, so dropping one here
+                // would label a converted file with a different file's name
+                // (issue #2684, mirroring #645). They fail in place in the
+                // loop below.
+                files.push(file);
                 totalStagedBytes += file.size;
                 filePartIndex++;
               } else if (part.fieldname === "pipeline") {
@@ -1290,6 +1295,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const perFileJobId = `${parentId}-f${flowChildIndex}`;
             let uploadKey = `uploads/${perFileJobId}-s0/${processFilename}`;
             let perFileTree: FlowJob | undefined;
+
+            // Reported against the slot it arrived in, so every later result
+            // stays paired with the file it came from.
+            if (file.size === 0) {
+              preFailures.push({
+                originalIndex: fi,
+                filename: file.filename,
+                error: "File is empty",
+              });
+              await rm(file.path, { force: true }).catch(() => {});
+              continue;
+            }
 
             // Insert step + finalize rows before writing the object so a child
             // or step id collision never overwrites or deletes an existing

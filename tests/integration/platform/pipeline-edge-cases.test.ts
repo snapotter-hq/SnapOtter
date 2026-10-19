@@ -1292,6 +1292,37 @@ describe("Pipeline deterministic runtime step failure", () => {
 // BATCH INGRESS PREPROCESSING (per-file validate/decode/sanitize)
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Pipeline batch ingress preprocessing", () => {
+  it("keeps index alignment and records a pre-failure when an upload is empty (#2684)", async () => {
+    const res = await executeBatch(
+      [
+        { filename: "empty.png", content: Buffer.alloc(0) },
+        { filename: "keeper.png", content: PNG_200x150 },
+      ],
+      { steps: [{ toolId: "resize", settings: { width: 50 } }] },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/zip");
+    const fileResults = parseFileResults(res);
+    expect(fileResults["0"]).toBeUndefined();
+    expect(fileResults["1"]).toBe("keeper_resize.png");
+
+    const parentId = res.headers["x-job-id"] as string;
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    expect(parentRow?.progress).toMatchObject({
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 1,
+      result: {
+        fileResults: { "1": "keeper_resize.png" },
+      },
+    });
+    expect(parentRow?.error).toEqual({
+      message: "1 file(s) failed",
+      details: [{ filename: "empty.png", error: "File is empty" }],
+    });
+  }, 30_000);
+
   it("skips invalid images as pre-failures and zips the valid ones", async () => {
     const res = await executeBatch(
       [

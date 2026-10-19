@@ -4,13 +4,23 @@
  * Tests pipeline step validation schemas, tool resolution (content-aware resize),
  * unique filename deduplication, and the pipeline step schema constraints.
  */
+import { Readable } from "node:stream";
 import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
 const insertValuesMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ rowCount: number }>>(async () => ({ rowCount: 1 })),
 );
+const updateSetMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
+const readFileSpy = vi.hoisted(() => vi.fn());
+const rmSpy = vi.hoisted(() => vi.fn());
+const spoolMultipartFileSpy = vi.hoisted(() => vi.fn());
+const recordChildOutcomeMock = vi.hoisted(() => vi.fn(async () => {}));
+const failBatchJobMock = vi.hoisted(() => vi.fn(async () => {}));
+const updateJobProgressMock = vi.hoisted(() => vi.fn());
+const flowAddMock = vi.hoisted(() => vi.fn(async () => {}));
+const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -23,7 +33,12 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     }),
     insert: () => ({ values: (...args: unknown[]) => insertValuesMock(...args) }),
     delete: () => ({ where: () => ({ run: vi.fn() }) }),
-    update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
+    update: () => ({
+      set: (vals: unknown) => {
+        updateSetMock(vals);
+        return { where: () => Promise.resolve({ run: vi.fn() }) };
+      },
+    }),
   },
   pool: {},
   closeDb: async () => {},
@@ -44,10 +59,13 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
     BASE_PATH: "",
     WORKSPACE_PATH: "/tmp/test",
+    SCRATCH_PATH: "",
     MAX_MEGAPIXELS: 100,
     MAX_SVG_SIZE_MB: 10,
     MAX_PIPELINE_STEPS: 20,
+    MAX_PIPELINE_STEP_PIXELS: 0,
     MAX_BATCH_SIZE: 10,
+    MAX_UPLOAD_SIZE_MB: 100,
     CONCURRENT_JOBS: 3,
   },
 }));
@@ -86,6 +104,7 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
   isToolInstalled: vi.fn(() => true),
+  getFirstMissingBundleForTool: vi.fn(() => null),
 }));
 
 vi.mock("../../../apps/api/src/lib/errors.js", async (importOriginal) => {
@@ -103,8 +122,60 @@ vi.mock("../../../apps/api/src/lib/env.js", () => ({
   loadEnv: () => ({}),
 }));
 
-vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      const buf = (await actual.readFile(...args)) as Buffer;
+      readFileSpy(...args);
+      return buf;
+    },
+    rm: (...args: Parameters<typeof actual.rm>) => {
+      rmSpy(...args);
+      return actual.rm(...args);
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/ocr-pdf-ingress.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/ocr-pdf-ingress.js")>();
+  return {
+    ...actual,
+    spoolMultipartFile: async (...args: Parameters<typeof actual.spoolMultipartFile>) => {
+      const res = await actual.spoolMultipartFile(...args);
+      spoolMultipartFileSpy(...args);
+      return res;
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: putObjectMock,
+    deleteObject: vi.fn(async () => {}),
+    getObjectStream: vi.fn(),
+  };
+});
+
+vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
+  getFlowProducer: () => ({ add: flowAddMock }),
+  injectTraceContext: vi.fn(),
+  waitForJob: vi.fn(async () => null),
+}));
+
+vi.mock("../../../apps/api/src/jobs/batch-progress.js", () => ({
+  recordChildOutcome: recordChildOutcomeMock,
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  failBatchJob: failBatchJobMock,
+  updateJobProgress: updateJobProgressMock,
+  updateSingleFileProgress: vi.fn(),
 }));
 
 vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
@@ -366,5 +437,162 @@ describe("POST /api/v1/pipeline/save database error handling (#1988)", () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+// ── POST /api/v1/pipeline/batch empty file handling (#2684) ────────────
+
+describe("POST /api/v1/pipeline/batch empty file handling (#2684)", () => {
+  const batchTestToolId = `pipeline-batch-test-${Math.random().toString(36).slice(2, 8)}`;
+  registerToolProcessFn({
+    toolId: batchTestToolId,
+    settingsSchema: {
+      safeParse: (d: unknown) => ({ success: true, data: d ?? {} }),
+      parse: (d: unknown) => d ?? {},
+    } as never,
+    process: async (buf: Buffer) => ({
+      buffer: buf,
+      filename: "out.png",
+      contentType: "image/png",
+    }),
+  });
+
+  async function invokePipelineBatchRoute(
+    parts: Array<
+      | { type: "file"; filename: string; content: Buffer }
+      | { type: "field"; fieldname: string; value: string }
+    >,
+  ) {
+    let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
+    await registerPipelineRoutes({
+      post: vi.fn((url: string, _opts: unknown, fn: typeof handler) => {
+        if (url === "/api/v1/pipeline/batch") handler = fn;
+      }),
+      get: vi.fn(),
+      delete: vi.fn(),
+      log: { info: vi.fn() },
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        for (const p of parts) {
+          if (p.type === "file") {
+            yield {
+              type: "file" as const,
+              fieldname: "file",
+              filename: p.filename,
+              file: Readable.from([p.content]),
+            };
+          } else {
+            yield p;
+          }
+        }
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await handler?.(request, reply);
+    return reply;
+  }
+
+  it("removes empty spooled files without calling readFile and preserves slot alignment (#2684)", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineBatchRoute([
+      { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+      { type: "file", filename: "real.png", content: Buffer.from("real-png") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+      },
+      { type: "field", fieldname: "clientJobId", value: "pipeline-batch-empty-slot" },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    expect(spoolMultipartFileSpy).toHaveBeenCalledTimes(2);
+    expect(readFileSpy).toHaveBeenCalledTimes(1);
+    expect(String(readFileSpy.mock.calls[0]?.[0])).toMatch(/\/1-real\.png$/);
+    expect(
+      rmSpy.mock.calls.some((call: unknown[]) => String(call[0]).endsWith("/0-empty.png")),
+    ).toBe(true);
+    expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+      "pipeline-batch-empty-slot",
+      2,
+      "empty.png",
+      "File is empty",
+    );
+    expect(updateSetMock).toHaveBeenCalledWith({
+      settings: {
+        flowChildCount: 1,
+        fileIndexMap: [1],
+        stepCount: 1,
+      },
+    });
+    expect(flowAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalFiles: 2,
+          settings: expect.objectContaining({
+            flowChildCount: 1,
+            fileIndexMap: [1],
+            preFailureFaults: [{ error: "File is empty" }],
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("answers 422 when every uploaded file in a pipeline batch is empty (#2684)", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineBatchRoute([
+      { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+      },
+      { type: "field", fieldname: "clientJobId", value: "pipeline-batch-all-empty" },
+    ]);
+
+    expect(reply.statusCode).toBe(422);
+    expect(reply.payload).toEqual({
+      error: "All files failed processing",
+      errors: [{ filename: "empty.png", error: "File is empty" }],
+    });
+    expect(readFileSpy).not.toHaveBeenCalled();
+    expect(
+      rmSpy.mock.calls.some((call: unknown[]) => String(call[0]).endsWith("/0-empty.png")),
+    ).toBe(true);
+    expect(flowAddMock).not.toHaveBeenCalled();
+    expect(failBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "pipeline-batch-all-empty",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        message: "All files failed processing",
+        errors: [{ filename: "empty.png", error: "File is empty" }],
+      }),
+    );
   });
 });
