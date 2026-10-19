@@ -1,9 +1,15 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../../apps/api/src/config.js";
-import { objectExists } from "../../../../apps/api/src/lib/object-storage.js";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
+import {
+  getObjectBuffer,
+  objectExists,
+  putObject,
+} from "../../../../apps/api/src/lib/object-storage.js";
 import { DocumentInputHandler } from "../../../../apps/api/src/modality/document-input.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -328,5 +334,96 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
 
     expect(response.statusCode).toBe(500);
     await expectObjectDeleted(`uploads/${parentId}-f0-s0/scan.pdf`);
+    for (const childId of [`${parentId}-f0-s0`, `${parentId}-f0`]) {
+      const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
+      expect(rows, childId).toHaveLength(0);
+    }
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    expect(parentRow?.status).toBe("failed");
+  });
+
+  it("answers 409 without overwriting existing OCR PDF uploads when a child id collides", async () => {
+    const toolParentId = "ocr-pdf-tool-batch-1724";
+    const toolChildId = `${toolParentId}-f0`;
+    const toolUploadKey = `uploads/${toolChildId}/scan.pdf`;
+    await putObject(toolUploadKey, Buffer.from("existing-ocr-pdf"));
+    await db.insert(schema.jobs).values({
+      id: toolChildId,
+      toolId: "ocr-pdf",
+      pool: "ai",
+      type: "ai-tool",
+      status: "completed",
+      inputRefs: [toolUploadKey],
+      settings: { kept: true },
+    });
+    const [toolChildBefore] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, toolChildId));
+
+    const toolBatch = await postMultipart("/api/v1/tools/pdf/ocr-pdf/batch", [
+      validPdfPart(),
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+      { name: "clientJobId", content: toolParentId },
+    ]);
+    expect(toolBatch.statusCode).toBe(409);
+    expect(toolBatch.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect((await getObjectBuffer(toolUploadKey)).toString()).toBe("existing-ocr-pdf");
+    const [toolChildAfter] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, toolChildId));
+    expect(toolChildAfter).toEqual(toolChildBefore);
+    const [toolParentRow] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, toolParentId));
+    expect(toolParentRow?.status).toBe("failed");
+    expect(toolParentRow?.error).toMatchObject({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+    });
+
+    const pipeParentId = "ocr-pdf-pipeline-batch-1724";
+    const pipeStepId = `${pipeParentId}-f0-s0`;
+    const pipeUploadKey = `uploads/${pipeStepId}/scan.pdf`;
+    await putObject(pipeUploadKey, Buffer.from("existing-pipeline-ocr-pdf"));
+    await db.insert(schema.jobs).values({
+      id: pipeStepId,
+      toolId: "ocr-pdf",
+      pool: "ai",
+      type: "pipeline-step",
+      status: "completed",
+      inputRefs: [pipeUploadKey],
+      settings: { kept: true },
+    });
+    const [pipeStepBefore] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, pipeStepId));
+
+    const pipeBatch = await postMultipart("/api/v1/pipeline/batch", [
+      validPdfPart(),
+      { name: "pipeline", content: OCR_PIPELINE },
+      { name: "clientJobId", content: pipeParentId },
+    ]);
+    expect(pipeBatch.statusCode).toBe(409);
+    expect(pipeBatch.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+    expect((await getObjectBuffer(pipeUploadKey)).toString()).toBe("existing-pipeline-ocr-pdf");
+    const [pipeStepAfter] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, pipeStepId));
+    expect(pipeStepAfter).toEqual(pipeStepBefore);
+    const [pipeParentRow] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, pipeParentId));
+    expect(pipeParentRow?.status).toBe("failed");
+    expect(pipeParentRow?.error).toMatchObject({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+    });
+    expect(mocks.flowAdd).not.toHaveBeenCalled();
   });
 });

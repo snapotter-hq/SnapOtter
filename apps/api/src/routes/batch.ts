@@ -414,13 +414,32 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               continue;
             }
 
+            // Insert the child row before writing the object so a child-id
+            // collision never overwrites or deletes an existing job's upload (#1724).
+            const insertChildRow = async (inputKey: string) => {
+              await db.insert(schema.jobs).values({
+                id: childId,
+                userId,
+                toolId,
+                pool,
+                type: "batch-child",
+                status: "queued",
+                inputRefs: [inputKey],
+                settings: toStorableJson(resolvedSettingsList[i] as Record<string, unknown>),
+              });
+              stagedBatch?.childIds.push(childId);
+            };
+
             if (file.kind === "path") {
               try {
                 await storeValidatedOcrPdf(file, key, {
                   maxBytes: ocrUploadLimits?.fileBytes ?? file.size,
                   signal: ingressAbort.signal,
+                  beforeStore: async () => {
+                    await insertChildRow(key);
+                    uncommittedKeys.add(key);
+                  },
                 });
-                uncommittedKeys.add(key);
               } catch (err) {
                 if (err instanceof InputValidationError) {
                   reportEngineUnavailable(err, toolId, request.log);
@@ -540,24 +559,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               }
 
               key = `uploads/${childId}/${processFilename}`;
+              await insertChildRow(key);
               // Tracked before the write so a store that fails part-way is
               // cleaned up too; deleting a key that was never written is a no-op.
               uncommittedKeys.add(key);
               await putObject(key, processBuffer);
             }
-
-            // Insert child row
-            await db.insert(schema.jobs).values({
-              id: childId,
-              userId,
-              toolId,
-              pool,
-              type: "batch-child",
-              status: "queued",
-              inputRefs: [key],
-              settings: toStorableJson(resolvedSettingsList[i] as Record<string, unknown>),
-            });
-            stagedBatch?.childIds.push(childId);
 
             // Build flow child node
             flowChildren.push({
@@ -826,12 +833,16 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         } catch (err) {
           // Ingress died after the parent row existed but before the flow
           // was enqueued (a store refused by the workspace cap, a decoder
-          // crash). Settle the rows and publish the terminal frame so job
-          // history and a client watching the SSE see the reason instead
-          // of "processing" forever; the finally removes the uploads (#1161).
+          // crash, a child id that collides with an existing job). Settle
+          // the rows and publish the terminal frame so job history and a
+          // client watching the SSE see the reason instead of "processing"
+          // forever; the finally removes the uploads (#1161, #1724).
+          const conflict = isUniqueViolation(err);
           if (stagedBatch) {
             const { parentId, totalFiles, childIds } = stagedBatch;
-            const message = friendlyError(err instanceof Error ? err.message : String(err));
+            const message = conflict
+              ? "Job ID already in use"
+              : friendlyError(err instanceof Error ? err.message : String(err));
             try {
               if (childIds.length > 0) {
                 await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
@@ -843,8 +854,15 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 failedFiles: totalFiles,
                 errors: [{ filename: "", error: message }],
                 message,
-                ...(isSafeMessageError(err) && err.code ? { code: err.code } : {}),
+                ...(conflict
+                  ? { code: "CONFLICT" }
+                  : isSafeMessageError(err) && err.code
+                    ? { code: err.code }
+                    : {}),
               });
+              if (conflict) {
+                return reply.status(409).send({ error: message, code: "CONFLICT" });
+              }
             } catch (settleErr) {
               request.log.error(
                 { err: settleErr, jobId: parentId },

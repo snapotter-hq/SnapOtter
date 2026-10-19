@@ -746,6 +746,77 @@ describe("Pipeline batch execution", () => {
     expect(after).toEqual(before);
   });
 
+  // Same child-id collision on /api/v1/pipeline/batch: the parent insert
+  // succeeds, file 0 stages its rows and upload, and file 1 hits 23505 on
+  // ${parentId}-f1 after inserting ${parentId}-f1-s0. Settle the parent,
+  // clean up the staged rows and upload, leave the existing row and its
+  // upload untouched, and answer 409 (#1724).
+  it("answers 409 when a free clientJobId collides on a child id", async () => {
+    const clientJobId = `pipeline-batch-1724-${randomUUID()}`;
+    const collidingChildId = `${clientJobId}-f1`;
+    const collidingUploadKey = `uploads/${collidingChildId}-s0/b.png`;
+    const { getObjectBuffer, objectExists, putObject } = await import(
+      "../../../apps/api/src/lib/object-storage.js"
+    );
+    await putObject(collidingUploadKey, Buffer.from("existing-step-upload"));
+    await db.insert(schema.jobs).values({
+      id: collidingChildId,
+      toolId: "rotate",
+      pool: "image",
+      type: "tool",
+      status: "completed",
+      inputRefs: [collidingUploadKey],
+      settings: { kept: true },
+    });
+    const [childBefore] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [childAfter] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+    expect(childAfter).toEqual(childBefore);
+    expect((await getObjectBuffer(collidingUploadKey)).toString()).toBe("existing-step-upload");
+
+    for (const stagedId of [
+      `${clientJobId}-f0`,
+      `${clientJobId}-f0-s0`,
+      `${collidingChildId}-s0`,
+    ]) {
+      const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, stagedId));
+      expect(rows, stagedId).toHaveLength(0);
+    }
+    expect(await objectExists(`uploads/${clientJobId}-f0-s0/a.png`)).toBe(false);
+
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(parentRow?.status).toBe("failed");
+    expect(parentRow?.error).toMatchObject({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+    });
+  });
+
   it("pipeline batch with multi-step chain processes correctly", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "multi.png", contentType: "image/png", content: PNG_200x150 },

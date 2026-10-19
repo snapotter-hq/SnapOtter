@@ -9,9 +9,9 @@
  */
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
-import { FEATURE_BUNDLES, MODALITY_POOL, TOOLS } from "@snapotter/shared";
+import { FEATURE_BUNDLES, isSafeMessageError, MODALITY_POOL, TOOLS } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
@@ -34,7 +34,12 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
-import { formatZodErrors, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
+import {
+  formatZodErrors,
+  friendlyError,
+  sharedFailureReason,
+  stripInternalPaths,
+} from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
@@ -1017,6 +1022,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         const ingressAbort = new AbortController();
         const abortIngress = () => ingressAbort.abort();
         const uncommittedOcrKeys = new Set<string>();
+        let stagedBatch: {
+          parentId: string;
+          totalFiles: number;
+          childIds: string[];
+        } | null = null;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -1244,6 +1254,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             }
             throw err;
           }
+          stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
 
           // Emit initial batch progress
           updateJobProgress({
@@ -1282,14 +1293,64 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             let processFilename = file.filename;
             const perFileJobId = `${parentId}-f${flowChildIndex}`;
             let uploadKey = `uploads/${perFileJobId}-s0/${processFilename}`;
+            let perFileTree: FlowJob | undefined;
+
+            // Insert step + finalize rows before writing the object so a child
+            // or step id collision never overwrites or deletes an existing
+            // job's upload (#1724).
+            const insertFileRows = async (finalUploadKey: string, finalFilename: string) => {
+              const built = buildPipelineFlowTree({
+                jobId: perFileJobId,
+                userId,
+                parsedSteps,
+                uploadKey: finalUploadKey,
+                filename: finalFilename,
+                pipelinePool: batchPipelinePool,
+                parentId,
+                totalFiles: files.length,
+                analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+              });
+              perFileTree = built.tree;
+
+              for (let si = 0; si < parsedSteps.length; si++) {
+                await db.insert(schema.jobs).values({
+                  id: built.stepJobIds[si],
+                  userId,
+                  toolId: parsedSteps[si].resolvedToolId,
+                  pool: parsedSteps[si].pool,
+                  type: "pipeline-step",
+                  status: "queued",
+                  inputRefs: si === 0 ? [finalUploadKey] : [],
+                  settings: toStorableJson(
+                    parsedSteps[si].parsedSettings as Record<string, unknown>,
+                  ),
+                });
+                stagedBatch?.childIds.push(built.stepJobIds[si]);
+              }
+
+              await db.insert(schema.jobs).values({
+                id: perFileJobId,
+                userId,
+                toolId: "pipeline",
+                pool: batchPipelinePool,
+                type: "pipeline-finalize",
+                status: "queued",
+                inputRefs: [],
+                settings: {},
+              });
+              stagedBatch?.childIds.push(perFileJobId);
+            };
 
             if (pathBackedOcrPdf) {
               try {
                 await storeValidatedOcrPdf(file, uploadKey, {
                   maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
                   signal: ingressAbort.signal,
+                  beforeStore: async () => {
+                    await insertFileRows(uploadKey, processFilename);
+                    uncommittedOcrKeys.add(uploadKey);
+                  },
                 });
-                uncommittedOcrKeys.add(uploadKey);
               } catch (err) {
                 if (err instanceof InputValidationError) {
                   reportEngineUnavailable(
@@ -1417,47 +1478,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               }
 
               uploadKey = `uploads/${perFileJobId}-s0/${processFilename}`;
+              await insertFileRows(uploadKey, processFilename);
+              uncommittedOcrKeys.add(uploadKey);
               await putObject(uploadKey, processBuffer);
             }
 
-            // Build per-file pipeline chain
-            const { tree: perFileTree, stepJobIds } = buildPipelineFlowTree({
-              jobId: perFileJobId,
-              userId,
-              parsedSteps,
-              uploadKey,
-              filename: processFilename,
-              pipelinePool: batchPipelinePool,
-              parentId,
-              totalFiles: files.length,
-              analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-            });
-
-            // Insert step + finalize rows for this file
-            for (let si = 0; si < parsedSteps.length; si++) {
-              await db.insert(schema.jobs).values({
-                id: stepJobIds[si],
-                userId,
-                toolId: parsedSteps[si].resolvedToolId,
-                pool: parsedSteps[si].pool,
-                type: "pipeline-step",
-                status: "queued",
-                inputRefs: si === 0 ? [uploadKey] : [],
-                settings: toStorableJson(parsedSteps[si].parsedSettings as Record<string, unknown>),
-              });
-            }
-
-            await db.insert(schema.jobs).values({
-              id: perFileJobId,
-              userId,
-              toolId: "pipeline",
-              pool: batchPipelinePool,
-              type: "pipeline-finalize",
-              status: "queued",
-              inputRefs: [],
-              settings: {},
-            });
-
+            if (!perFileTree) throw new Error("Pipeline flow tree was not built");
             perFileChildren.push(perFileTree);
             fileIndexMap.push(fi);
             flowChildIndex++;
@@ -1561,6 +1587,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           await getFlowProducer().add(batchTree);
           uncommittedOcrKeys.clear();
+          stagedBatch = null;
 
           // ── Wait for completion and stream the stored ZIP ────────────────
           let batchResult: ToolJobResult | null;
@@ -1674,6 +1701,41 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             request.log.error({ err, jobId: parentId }, "Failed to open stored pipeline batch ZIP");
             reply.raw.destroy(err instanceof Error ? err : new Error(String(err)));
           }
+        } catch (err) {
+          const conflict = isUniqueViolation(err);
+          if (stagedBatch) {
+            const { parentId, totalFiles, childIds } = stagedBatch;
+            const message = conflict
+              ? "Job ID already in use"
+              : friendlyError(err instanceof Error ? err.message : String(err));
+            try {
+              if (childIds.length > 0) {
+                await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
+              }
+              await failBatchJob({
+                jobId: parentId,
+                totalFiles,
+                completedFiles: totalFiles,
+                failedFiles: totalFiles,
+                errors: [{ filename: "", error: message }],
+                message,
+                ...(conflict
+                  ? { code: "CONFLICT" }
+                  : isSafeMessageError(err) && err.code
+                    ? { code: err.code }
+                    : {}),
+              });
+              if (conflict) {
+                return reply.status(409).send({ error: message, code: "CONFLICT" });
+              }
+            } catch (settleErr) {
+              request.log.error(
+                { err: settleErr, jobId: parentId },
+                "failed to settle a pipeline batch whose ingress died",
+              );
+            }
+          }
+          throw err;
         } finally {
           request.raw.removeListener("aborted", abortIngress);
           await Promise.all(

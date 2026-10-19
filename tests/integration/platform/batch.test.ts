@@ -475,6 +475,71 @@ describe("ClientJobId passthrough", () => {
     const [after] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
     expect(after).toEqual(before);
   });
+
+  // A free clientJobId can still collide when the route inserts its per-file
+  // child rows (${parentId}-f${n}). That is still a client id collision:
+  // settle the staged parent, remove any earlier children and uploads from
+  // this request, leave the pre-existing child row and its upload untouched,
+  // and answer 409 instead of 500 (#1724).
+  it("answers 409 when a free clientJobId collides on a child id", async () => {
+    const clientJobId = `batch-1724-${randomUUID()}`;
+    const collidingChildId = `${clientJobId}-f1`;
+    const collidingUploadKey = `uploads/${collidingChildId}/b.jpg`;
+    const { getObjectBuffer, putObject } = await import(
+      "../../../apps/api/src/lib/object-storage.js"
+    );
+    await putObject(collidingUploadKey, Buffer.from("existing-child-upload"));
+    await db.insert(schema.jobs).values({
+      id: collidingChildId,
+      toolId: "resize",
+      pool: "image",
+      type: "tool",
+      status: "completed",
+      inputRefs: [collidingUploadKey],
+      settings: { kept: true },
+    });
+    const [childBefore] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify({ width: 100 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [childAfter] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, collidingChildId));
+    expect(childAfter).toEqual(childBefore);
+    expect((await getObjectBuffer(collidingUploadKey)).toString()).toBe("existing-child-upload");
+
+    const earlierChildRows = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${clientJobId}-f0`));
+    expect(earlierChildRows).toHaveLength(0);
+    expect(await objectExists(`uploads/${clientJobId}-f0/a.png`)).toBe(false);
+
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(parentRow?.status).toBe("failed");
+    expect(parentRow?.error).toMatchObject({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+    });
+  });
 });
 
 // ── Error handling ──────────────────────────────────────────────

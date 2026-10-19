@@ -33,12 +33,13 @@ export async function spoolMultipartFile(
 export async function storeValidatedOcrPdf(
   file: SpooledMultipartFile,
   key: string,
-  opts: { maxBytes: number; signal?: AbortSignal },
+  opts: { maxBytes: number; signal?: AbortSignal; beforeStore?: () => Promise<void> },
 ): Promise<number> {
   await validatePdfPath(file.path, {
     rejectPasswordProtected: true,
     signal: opts.signal,
   });
+  await opts.beforeStore?.();
   try {
     const written = await putObjectStream(key, createReadStream(file.path), opts);
     if (written !== file.size) {
