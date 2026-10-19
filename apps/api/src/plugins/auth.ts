@@ -1381,22 +1381,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // #928). The locked count and the insert share one transaction so the
     // loser sees the winner's committed row.
     const inserted = await db.transaction(async (tx) => {
+      let roleExists = true;
       if (!validBuiltinRoles.includes(role)) {
         const [lockedRole] = await tx
           .select({ id: schema.roles.id })
           .from(schema.roles)
           .where(eq(schema.roles.name, role))
           .for("share");
-        if (!lockedRole) return "unknown-role" as const;
+        roleExists = Boolean(lockedRole);
       }
+      let teamExists = true;
       if (body.team !== undefined) {
         const [lockedTeam] = await tx
           .select({ id: schema.teams.id, name: schema.teams.name })
           .from(schema.teams)
           .where(eq(schema.teams.id, teamId))
           .for("share");
-        if (!lockedTeam) return "unknown-team" as const;
-        teamName = lockedTeam.name;
+        if (lockedTeam) {
+          teamName = lockedTeam.name;
+        } else {
+          teamExists = false;
+        }
       }
       const [currentAdmin] = await tx
         .select({ role: schema.users.role })
@@ -1405,12 +1410,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!currentAdmin) return "escalation-denied" as const;
 
       const currentActor = { ...admin, role: currentAdmin.role };
-      if (
-        !(await hasEffectivePermission(currentActor, "users:manage")) ||
-        !(await canAssignRole(currentActor, role))
-      ) {
+      if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
         return "escalation-denied" as const;
       }
+      if (!roleExists) return "unknown-role" as const;
+      if (!(await canAssignRole(currentActor, role))) {
+        return "escalation-denied" as const;
+      }
+      if (!teamExists) return "unknown-team" as const;
       if (await userLimitReached(tx)) return "limit" as const;
       return tx
         .insert(schema.users)
@@ -1562,28 +1569,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // One transaction: a role change whose session revoke failed would leave
       // the new role in place while the old sessions keep the old permissions
       // (#2126).
-      const roleChanged = Boolean(updates.role && updates.role !== user.role);
+      let roleChanged = false;
+      let previousRole = user.role;
       try {
         await db.transaction(async (tx) => {
+          let roleExists = true;
           if (updates.role && !validBuiltinRoles.includes(updates.role)) {
             const [lockedRole] = await tx
               .select({ id: schema.roles.id })
               .from(schema.roles)
               .where(eq(schema.roles.name, updates.role))
               .for("share");
-            if (!lockedRole) {
-              throw new Error("UNKNOWN_ROLE");
-            }
+            roleExists = Boolean(lockedRole);
           }
+          let teamExists = true;
           if (updates.team) {
             const [lockedTeam] = await tx
               .select({ id: schema.teams.id })
               .from(schema.teams)
               .where(eq(schema.teams.id, updates.team))
               .for("share");
-            if (!lockedTeam) {
-              throw new Error("UNKNOWN_TEAM");
-            }
+            teamExists = Boolean(lockedTeam);
           }
           // Last admin protection, under the lock every admin removal shares (#2231).
           if (updates.role && updates.role !== "admin") await assertNotLastAdmin(tx, id);
@@ -1597,25 +1603,38 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             .from(schema.users)
             .where(eq(schema.users.id, id));
 
-          if (!currentAdmin || !currentUser) {
-            throw new Error("NOT_FOUND");
+          if (!currentAdmin) {
+            throw new EscalationDeniedError();
           }
 
           const currentActor = { ...admin, role: currentAdmin.role };
 
-          if (
-            !(await hasEffectivePermission(currentActor, "users:manage")) ||
-            !(await canManageTargetRole(currentActor, currentUser.role))
-          ) {
+          if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
             throw new EscalationDeniedError();
           }
 
-          if (
-            updates.role &&
-            !(await canAssignRole({ ...admin, role: currentAdmin.role }, updates.role))
-          ) {
+          if (!currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          if (!(await canManageTargetRole(currentActor, currentUser.role))) {
             throw new EscalationDeniedError();
           }
+
+          if (!roleExists) {
+            throw new Error("UNKNOWN_ROLE");
+          }
+
+          if (updates.role && !(await canAssignRole(currentActor, updates.role))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!teamExists) {
+            throw new Error("UNKNOWN_TEAM");
+          }
+
+          previousRole = currentUser.role;
+          roleChanged = Boolean(updates.role && updates.role !== currentUser.role);
 
           await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
           // Invalidate all sessions when role changes to force re-login with new permissions
@@ -1649,7 +1668,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       }
       if (roleChanged) {
         request.log.info(
-          { targetUserId: id, oldRole: user.role, newRole: updates.role },
+          { targetUserId: id, oldRole: previousRole, newRole: updates.role },
           "Sessions invalidated due to role change",
         );
       }

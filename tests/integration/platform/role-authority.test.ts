@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { canManageTargetRole, hasToolAccess } from "../../../apps/api/src/permissions.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
@@ -496,6 +496,207 @@ describe("role authority containment", () => {
     expect.soft(response.statusCode).toBe(403);
     expect.soft(JSON.parse(response.body).code).toBe("ESCALATION_DENIED");
     expect(persistedRole).toMatchObject({ id: targetId, name: targetName });
+  });
+
+  it("rejects updating a user to an unknown role with 400 UNKNOWN_ROLE while preserving target authority and session invalidation (#2232)", async () => {
+    const userManagerRole = uniqueName("user-mgr");
+    const subordinateRole = uniqueName("sub-role");
+    await createRoleAsAdmin(userManagerRole, ["users:manage", "tools:use"]);
+    await createRoleAsAdmin(subordinateRole, ["tools:use"]);
+    const userManagerToken = await createUserAndLogin(
+      uniqueName("user-mgr-actor"),
+      userManagerRole,
+    );
+
+    const subordinateUsername = uniqueName("sub-target");
+    const subordinateToken = await createUserAndLogin(subordinateUsername, subordinateRole);
+    const [subordinateBefore] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, subordinateUsername));
+
+    const adminTargetUsername = uniqueName("admin-target");
+    await createUserAndLogin(adminTargetUsername, "admin");
+    const [adminTargetBefore] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, adminTargetUsername));
+
+    // Unknown role on a subordinate target returns 400 UNKNOWN_ROLE and leaves the user untouched.
+    const unknownRoleRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${subordinateBefore.id}`,
+      headers: { authorization: `Bearer ${userManagerToken}` },
+      payload: { role: uniqueName("missing-role") },
+    });
+    expect(unknownRoleRes.statusCode).toBe(400);
+    expect(JSON.parse(unknownRoleRes.body)).toEqual({
+      error: "Role not found",
+      code: "UNKNOWN_ROLE",
+    });
+    const [subordinateAfterUnknown] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, subordinateBefore.id));
+    expect(subordinateAfterUnknown.role).toBe(subordinateRole);
+    expect(subordinateAfterUnknown.updatedAt.getTime()).toBe(subordinateBefore.updatedAt.getTime());
+
+    // Out-of-authority target still returns 403 ESCALATION_DENIED even when the requested role is unknown.
+    const outOfScopePrecheckRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${adminTargetBefore.id}`,
+      headers: { authorization: `Bearer ${userManagerToken}` },
+      payload: { role: uniqueName("missing-role") },
+    });
+    expect(outOfScopePrecheckRes.statusCode).toBe(403);
+    expect(JSON.parse(outOfScopePrecheckRes.body).code).toBe("ESCALATION_DENIED");
+
+    // In-transaction race: if the target user is promoted to admin AND the requested custom role
+    // is deleted between the pre-check and the transaction, 403 ESCALATION_DENIED still wins over
+    // 400 UNKNOWN_ROLE (matching pre-check priority).
+    const transientRole = uniqueName("transient-role");
+    await createRoleAsAdmin(transientRole, ["tools:use"]);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, transientRole));
+        await db
+          .update(schema.users)
+          .set({ role: "admin" })
+          .where(eq(schema.users.id, subordinateBefore.id));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const raceRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${subordinateBefore.id}`,
+        headers: { authorization: `Bearer ${userManagerToken}` },
+        payload: { role: transientRole },
+      });
+      expect(raceRes.statusCode).toBe(403);
+      expect(JSON.parse(raceRes.body).code).toBe("ESCALATION_DENIED");
+      expect(txSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      txSpy.mockRestore();
+      await db
+        .update(schema.users)
+        .set({ role: subordinateRole })
+        .where(eq(schema.users.id, subordinateBefore.id));
+    }
+
+    // In-transaction race: if currentUser.role changed between the pre-check and the transaction
+    // (so pre-check user.role === updates.role, but in-transaction currentUser.role !== updates.role),
+    // updating back to updates.role must still invalidate the target user's sessions.
+    const txSessionSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db
+          .update(schema.users)
+          .set({ role: "editor" })
+          .where(eq(schema.users.id, subordinateBefore.id));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const revertRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${subordinateBefore.id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: subordinateRole },
+      });
+      expect(revertRes.statusCode).toBe(200);
+      expect(txSessionSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      txSessionSpy.mockRestore();
+    }
+
+    const sessionRes = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      headers: { authorization: `Bearer ${subordinateToken}` },
+    });
+    expect(sessionRes.statusCode).toBe(401);
+
+    // Opposite in-transaction race: if pre-check user.role !== updates.role ("editor"),
+    // and a concurrent update already moved currentUser.role to subordinateRole before the
+    // transaction runs, a session created on subordinateRole is preserved.
+    await db
+      .update(schema.users)
+      .set({ role: "editor" })
+      .where(eq(schema.users.id, subordinateBefore.id));
+    const reLoginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: subordinateUsername, password: "RoleAuthority1!" },
+    });
+    expect(reLoginRes.statusCode).toBe(200);
+    const freshToken = JSON.parse(reLoginRes.body).token as string;
+    const txNoopSessionSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db
+          .update(schema.users)
+          .set({ role: subordinateRole })
+          .where(eq(schema.users.id, subordinateBefore.id));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const noopRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${subordinateBefore.id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: subordinateRole },
+      });
+      expect(noopRes.statusCode).toBe(200);
+      expect(txNoopSessionSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      txNoopSessionSpy.mockRestore();
+    }
+    const preservedSessionRes = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      headers: { authorization: `Bearer ${freshToken}` },
+    });
+    expect(preservedSessionRes.statusCode).toBe(200);
+
+    // In-transaction race on register: if the actor loses users:manage AND the requested custom
+    // role is deleted during scrypt hashing, 403 ESCALATION_DENIED still wins over 400 UNKNOWN_ROLE.
+    const transientRegRole = uniqueName("transient-reg-role");
+    await createRoleAsAdmin(transientRegRole, ["tools:use"]);
+    const userManagerActorUsername = uniqueName("user-mgr-reg-actor");
+    const userManagerRegToken = await createUserAndLogin(userManagerActorUsername, userManagerRole);
+    const txRegSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, transientRegRole));
+        await db
+          .update(schema.users)
+          .set({ role: "user" })
+          .where(eq(schema.users.username, userManagerActorUsername));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const regRaceRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${userManagerRegToken}` },
+        payload: {
+          username: uniqueName("never-created"),
+          password: "RoleAuthority1!",
+          role: transientRegRole,
+        },
+      });
+      expect(regRaceRes.statusCode).toBe(403);
+      expect(JSON.parse(regRaceRes.body).code).toBe("ESCALATION_DENIED");
+      expect(txRegSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      txRegSpy.mockRestore();
+    }
   });
 });
 
