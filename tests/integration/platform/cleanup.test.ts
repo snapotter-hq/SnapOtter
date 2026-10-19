@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import { getMaxAgeMs, shouldRunStartupCleanup } from "../../../apps/api/src/lib/cleanup.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 
 beforeAll(async () => {
   await runMigrations();
@@ -100,5 +101,24 @@ describe("shouldRunStartupCleanup", () => {
 
     await setSetting("startupCleanup", "1");
     expect(await shouldRunStartupCleanup()).toBe(true);
+  });
+
+  it("logs the error and returns false when a DB error occurs while reading startupCleanup (#2719)", async () => {
+    await setSetting("startupCleanup", "false");
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    try {
+      await expect(shouldRunStartupCleanup()).resolves.toBe(false);
+      expect(errorSpy).toHaveBeenCalledWith(
+        { err: dbError },
+        "Startup cleanup: startupCleanup read failed; skipping startup sweep",
+      );
+    } finally {
+      errorSpy.mockRestore();
+      selectSpy.mockRestore();
+    }
   });
 });

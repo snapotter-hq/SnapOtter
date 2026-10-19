@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
+import { logger } from "./logger.js";
 
 /**
  * Read the temp file max age from DB settings, falling back to env var when no
@@ -22,7 +23,9 @@ export async function getMaxAgeMs(): Promise<number> {
 
 /**
  * Check whether startup cleanup should run.
- * Returns true by default; only returns false when explicitly set to "false".
+ * Returns true by default; returns false when explicitly set to "false" or
+ * when reading the setting fails (so a transient DB error does not run an
+ * unrequested startup sweep; the repeatable storageTtl job still runs).
  */
 export async function shouldRunStartupCleanup(): Promise<boolean> {
   try {
@@ -31,7 +34,8 @@ export async function shouldRunStartupCleanup(): Promise<boolean> {
       .from(schema.settings)
       .where(eq(schema.settings.key, "startupCleanup"));
     return row ? row.value !== "false" : true;
-  } catch {
-    return true;
+  } catch (err) {
+    logger.error({ err }, "Startup cleanup: startupCleanup read failed; skipping startup sweep");
+    return false;
   }
 }
