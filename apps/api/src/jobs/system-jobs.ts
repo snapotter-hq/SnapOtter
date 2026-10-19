@@ -181,15 +181,49 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
       const { gdprExportJob } = await import("./gdpr-export.js");
       const exportData = job.data as unknown as { userId: string; jobId: string };
       const { outputRef } = await gdprExportJob(exportData.userId, exportData.jobId);
-      // Update the job row with the output reference
-      await db
-        .update(schema.jobs)
-        .set({
-          status: "completed",
-          completedAt: new Date(),
-          outputRefs: [outputRef],
-        })
-        .where(eq(schema.jobs.id, exportData.jobId));
+      if (!outputRef) {
+        await db
+          .update(schema.jobs)
+          .set({
+            status: "canceled",
+            completedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.jobs.id, exportData.jobId),
+              inArray(schema.jobs.status, ["queued", "processing"]),
+            ),
+          );
+        return { outputRef: null };
+      }
+      // Update the job row with the output reference, guarded on the row still
+      // being non-terminal (#1496). If a purge or cancel landed between
+      // gdprExportJob's post-write check and this update, or if the update
+      // faults, remove the archive so it cannot outlive a deleted row.
+      let completed: Array<{ id: string }>;
+      try {
+        completed = await db
+          .update(schema.jobs)
+          .set({
+            status: "completed",
+            completedAt: new Date(),
+            outputRefs: [outputRef],
+          })
+          .where(
+            and(
+              eq(schema.jobs.id, exportData.jobId),
+              inArray(schema.jobs.status, ["queued", "processing"]),
+            ),
+          )
+          .returning({ id: schema.jobs.id });
+      } catch (err) {
+        await deletePrefix(`outputs/${exportData.jobId}/`).catch(() => {});
+        throw err;
+      }
+      if (completed.length === 0) {
+        await deletePrefix(`outputs/${exportData.jobId}/`);
+        return { outputRef: null };
+      }
       return { outputRef };
     }
     case SYSTEM_JOBS.alertEvaluator: {

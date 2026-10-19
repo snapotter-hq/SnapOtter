@@ -19,6 +19,8 @@ const deleteMock = vi.hoisted(() => vi.fn());
 const updateMock = vi.hoisted(() => vi.fn());
 const transactionMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn());
+const requestCancelMock = vi.hoisted(() => vi.fn());
+const loggerWarnMock = vi.hoisted(() => vi.fn());
 const queueAddMock = vi.hoisted(() => vi.fn());
 const auditMock = vi.hoisted(() => vi.fn());
 
@@ -56,6 +58,9 @@ async function buildApp(): Promise<FastifyInstance> {
   updateMock.mockReset();
   transactionMock.mockReset();
   deletePrefixMock.mockReset();
+  requestCancelMock.mockReset();
+  requestCancelMock.mockResolvedValue(true);
+  loggerWarnMock.mockReset();
   queueAddMock.mockReset();
   auditMock.mockReset();
   requirePermissionMock.mockReset();
@@ -134,7 +139,15 @@ async function buildApp(): Promise<FastifyInstance> {
   vi.doMock("../../../apps/api/src/jobs/system-jobs.js", () => ({
     SYSTEM_JOBS: { gdprExport: "gdpr-export" },
   }));
-  vi.doMock("../../../apps/api/src/jobs/cancel.js", () => ({ requestCancel: vi.fn() }));
+  vi.doMock("../../../apps/api/src/jobs/cancel.js", () => ({ requestCancel: requestCancelMock }));
+  vi.doMock("../../../apps/api/src/lib/logger.js", () => ({
+    logger: {
+      warn: loggerWarnMock,
+      error: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    },
+  }));
   vi.doMock("../../../apps/api/src/lib/audit.js", () => ({ auditFromRequest: auditMock }));
   vi.doMock("../../../apps/api/src/lib/last-admin.js", () => ({
     assertNotLastAdmin: vi.fn(() => Promise.resolve()),
@@ -459,5 +472,34 @@ describe("GDPR export route authority", () => {
     expect(deletedTables).toEqual([expect.objectContaining({ id: "user_files.id" })]);
     expect(updateMock).not.toHaveBeenCalled();
     expect(auditMock).not.toHaveBeenCalled();
+  });
+
+  it("logs a warning when requestCancel throws and still marks active jobs canceled and sweeps remainingJobRows (#1496)", async () => {
+    app = await buildApp();
+    selectResults = [
+      [{ id: "user-9", role: "user", team: "team-1", legalHold: false }],
+      [{ legalHold: false }],
+      [],
+      [{ id: "job-1" }],
+      [{ id: "job-1" }],
+      [{ id: "job-1" }, { id: "job-2" }],
+    ];
+    canManageTargetRoleMock.mockResolvedValue(true);
+    const cancelErr = new Error("Redis connection lost");
+    requestCancelMock.mockRejectedValueOnce(cancelErr);
+
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/enterprise/users/user-9/purge",
+      payload: { confirm: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: cancelErr, userId: "user-9", jobId: "job-1" },
+      "gdpr purge: failed to cancel active job",
+    );
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/job-2/");
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/job-2/");
   });
 });

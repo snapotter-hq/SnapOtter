@@ -7,10 +7,13 @@ const readStoredFileMock = vi.hoisted(() => vi.fn());
 const isStorageServiceFaultMock = vi.hoisted(() => vi.fn<(_err: unknown) => boolean>(() => false));
 const loggerWarnMock = vi.hoisted(() => vi.fn());
 const putObjectMock = vi.hoisted(() => vi.fn());
+const deletePrefixMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const registerCancelableMock = vi.hoisted(() => vi.fn(() => new AbortController()));
+const unregisterCancelableMock = vi.hoisted(() => vi.fn());
 /** Every archive written through putObjectStream, drained to a buffer. */
 const written = vi.hoisted(() => [] as Array<{ key: string; body: Buffer }>);
 const putObjectStreamMock = vi.hoisted(() =>
-  vi.fn(async (key: string, source: AsyncIterable<Buffer>) => {
+  vi.fn(async (key: string, source: AsyncIterable<Buffer>, _opts?: { signal?: AbortSignal }) => {
     const chunks: Buffer[] = [];
     for await (const chunk of source) chunks.push(chunk);
     const body = Buffer.concat(chunks);
@@ -47,11 +50,17 @@ function queryChain<T>(result: T) {
 async function loadGdprExport() {
   vi.resetModules();
   selectMock.mockReset();
+  selectMock.mockImplementation(() => queryChain([{ id: "export-job", status: "queued" }]));
   readStoredFileMock.mockReset();
   isStorageServiceFaultMock.mockReset();
   isStorageServiceFaultMock.mockReturnValue(false);
   loggerWarnMock.mockReset();
   putObjectMock.mockReset();
+  deletePrefixMock.mockReset();
+  deletePrefixMock.mockResolvedValue(undefined);
+  registerCancelableMock.mockReset();
+  registerCancelableMock.mockImplementation(() => new AbortController());
+  unregisterCancelableMock.mockReset();
   putObjectStreamMock.mockClear();
   written.length = 0;
 
@@ -86,9 +95,14 @@ async function loadGdprExport() {
         recoveryCodesHash: "users.recovery_codes_hash",
       },
       userFiles: { userId: "userFiles.userId" },
-      jobs: { userId: "jobs.userId" },
+      jobs: { id: "jobs.id", userId: "jobs.userId", status: "jobs.status" },
       auditLog: { actorId: "auditLog.actorId" },
     },
+  }));
+
+  vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+    registerCancelable: registerCancelableMock,
+    unregisterCancelable: unregisterCancelableMock,
   }));
 
   vi.doMock("../../../../apps/api/src/lib/file-storage.js", () => ({
@@ -106,6 +120,7 @@ async function loadGdprExport() {
   }));
 
   vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
+    deletePrefix: deletePrefixMock,
     putObject: putObjectMock,
     putObjectStream: putObjectStreamMock,
   }));
@@ -158,6 +173,20 @@ describe("GDPR export job behavior", () => {
 
     expect(putObjectMock).not.toHaveBeenCalled();
     expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("job-1");
+  });
+
+  it("bails out without throwing when the user and export job row were purged before the profile query (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock.mockReturnValueOnce(queryChain([])).mockReturnValueOnce(queryChain([]));
+
+    await expect(gdprExportJob("purged-user", "export-purged-early")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-purged-early/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-purged-early");
   });
 
   // #1441: stranded-job reconciliation adopts a non-empty file in
@@ -168,6 +197,8 @@ describe("GDPR export job behavior", () => {
   // reconciler never lists that subdirectory.
   it("writes the archive through the staged, atomic stream write", async () => {
     const { gdprExportJob } = await loadGdprExport();
+    const ac = new AbortController();
+    registerCancelableMock.mockReturnValueOnce(ac);
     selectMock
       .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
       .mockReturnValueOnce(queryChain([]))
@@ -179,6 +210,7 @@ describe("GDPR export job behavior", () => {
     expect(putObjectMock, "the direct, non-atomic write must not be used").not.toHaveBeenCalled();
     expect(putObjectStreamMock).toHaveBeenCalledTimes(1);
     expect(putObjectStreamMock.mock.calls[0][0]).toBe("outputs/export-atomic/gdpr-export.zip");
+    expect(putObjectStreamMock.mock.calls[0][2]).toEqual({ signal: ac.signal });
     expect(new AdmZip(written[0].body).getEntry("profile.json")).not.toBeNull();
   });
 
@@ -528,12 +560,288 @@ describe("GDPR export job behavior", () => {
     expect(profile).not.toHaveProperty("passwordHash");
   });
 
+  it("bails out before writing when the export job row was deleted by a concurrent purge (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]));
+
+    await expect(gdprExportJob("user-1", "export-purged")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(written).toHaveLength(0);
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-purged/");
+    expect(registerCancelableMock).toHaveBeenCalledWith("export-purged");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-purged");
+  });
+
+  it("bails out before writing when the export job row was canceled (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-canceled", status: "canceled" }]));
+
+    await expect(gdprExportJob("user-1", "export-canceled")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(written).toHaveLength(0);
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-canceled/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-canceled");
+  });
+
+  it("removes the archive if the export job row was deleted while putObjectStream was writing (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-raced", status: "queued" }]))
+      .mockReturnValueOnce(queryChain([]));
+
+    await expect(gdprExportJob("user-1", "export-raced")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(putObjectStreamMock).toHaveBeenCalledTimes(1);
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-raced/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-raced");
+  });
+
+  it("removes the archive if the export job row was marked canceled while putObjectStream was writing (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-raced-cancel", status: "processing" }]))
+      .mockReturnValueOnce(queryChain([{ id: "export-raced-cancel", status: "canceled" }]));
+
+    await expect(gdprExportJob("user-1", "export-raced-cancel")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(putObjectStreamMock).toHaveBeenCalledTimes(1);
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-raced-cancel/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-raced-cancel");
+  });
+
+  it("removes the written archive and rethrows if the post-write liveness query faults (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    const dbFault = new Error("connection terminated unexpectedly");
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-db-fault", status: "processing" }]))
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockRejectedValue(dbFault),
+      });
+
+    await expect(gdprExportJob("user-1", "export-db-fault")).rejects.toBe(dbFault);
+
+    expect(putObjectStreamMock).toHaveBeenCalledTimes(1);
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-db-fault/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-db-fault");
+  });
+
+  it("bails out without logging a missing-blob warning when a concurrent purge deleted library files and canceled the job (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "file-1",
+            userId: "user-1",
+            storedName: "stored/purged",
+            originalName: "purged.txt",
+            createdAt: new Date("2026-06-02T00:00:00.000Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-purged-midloop", status: "canceled" }]));
+
+    readStoredFileMock.mockRejectedValueOnce(
+      Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT", syscall: "open" }),
+    );
+
+    await expect(gdprExportJob("user-1", "export-purged-midloop")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-purged-midloop/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-purged-midloop");
+  });
+
+  it("stops copying library files and skips writing when the cancel signal fires (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    const ac = new AbortController();
+    registerCancelableMock.mockReturnValueOnce(ac);
+
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "file-1",
+            userId: "user-1",
+            storedName: "stored/a",
+            originalName: "a.txt",
+            createdAt: new Date("2026-06-02T00:00:00.000Z"),
+          },
+          {
+            id: "file-2",
+            userId: "user-1",
+            storedName: "stored/b",
+            originalName: "b.txt",
+            createdAt: new Date("2026-06-03T00:00:00.000Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]));
+
+    readStoredFileMock.mockImplementationOnce(async () => {
+      ac.abort();
+      return Buffer.from("first file");
+    });
+
+    await expect(gdprExportJob("user-1", "export-aborted")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(readStoredFileMock).toHaveBeenCalledTimes(1);
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(written).toHaveLength(0);
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-aborted");
+  });
+
+  it("skips reading any library file when the cancel signal fires before the copy loop (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    const ac = new AbortController();
+    ac.abort();
+    registerCancelableMock.mockReturnValueOnce(ac);
+
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            id: "file-1",
+            userId: "user-1",
+            storedName: "stored/a",
+            originalName: "a.txt",
+            createdAt: new Date("2026-06-02T00:00:00.000Z"),
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]));
+
+    await expect(gdprExportJob("user-1", "export-pre-aborted")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(readStoredFileMock).not.toHaveBeenCalled();
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-pre-aborted");
+  });
+
+  it("cleans up outputs and returns null when putObjectStream aborts on the cancel signal (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    const ac = new AbortController();
+    registerCancelableMock.mockReturnValueOnce(ac);
+
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-stream-abort", status: "queued" }]));
+
+    putObjectStreamMock.mockImplementationOnce(async () => {
+      ac.abort();
+      throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    });
+
+    await expect(gdprExportJob("user-1", "export-stream-abort")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-stream-abort/");
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-stream-abort");
+  });
+
+  it("bails out before writing when the cancel signal fires during the pre-write liveness check (#1496)", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    const ac = new AbortController();
+    registerCancelableMock.mockReturnValueOnce(ac);
+
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockImplementationOnce(() => {
+        ac.abort();
+        return queryChain([{ id: "export-signal-during-check", status: "processing" }]);
+      });
+
+    await expect(gdprExportJob("user-1", "export-signal-during-check")).resolves.toEqual({
+      outputRef: null,
+    });
+
+    expect(putObjectStreamMock).not.toHaveBeenCalled();
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-signal-during-check");
+  });
+
+  it("rethrows non-cancel putObjectStream errors", async () => {
+    const { gdprExportJob } = await loadGdprExport();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([]))
+      .mockReturnValueOnce(queryChain([{ id: "export-write-err", status: "queued" }]));
+
+    const writeErr = new Error("ENOSPC: disk full");
+    putObjectStreamMock.mockRejectedValueOnce(writeErr);
+
+    await expect(gdprExportJob("user-1", "export-write-err")).rejects.toBe(writeErr);
+    expect(deletePrefixMock).not.toHaveBeenCalled();
+    expect(unregisterCancelableMock).toHaveBeenCalledWith("export-write-err");
+  });
+
   describe("with real file-storage S3 classification (#975)", () => {
     async function loadGdprExportWithRealFileStorage() {
       vi.resetModules();
       selectMock.mockReset();
+      selectMock.mockImplementation(() => queryChain([{ id: "export-job", status: "queued" }]));
       loggerWarnMock.mockReset();
       putObjectMock.mockReset();
+      deletePrefixMock.mockReset();
+      deletePrefixMock.mockResolvedValue(undefined);
+      registerCancelableMock.mockReset();
+      registerCancelableMock.mockImplementation(() => new AbortController());
+      unregisterCancelableMock.mockReset();
       putObjectStreamMock.mockClear();
       written.length = 0;
 
@@ -562,9 +870,14 @@ describe("GDPR export job behavior", () => {
             updatedAt: "users.updated_at",
           },
           userFiles: { userId: "userFiles.userId" },
-          jobs: { userId: "jobs.userId" },
+          jobs: { id: "jobs.id", userId: "jobs.userId", status: "jobs.status" },
           auditLog: { actorId: "auditLog.actorId" },
         },
+      }));
+
+      vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+        registerCancelable: registerCancelableMock,
+        unregisterCancelable: unregisterCancelableMock,
       }));
 
       vi.doUnmock("../../../../apps/api/src/lib/file-storage.js");
@@ -579,6 +892,7 @@ describe("GDPR export job behavior", () => {
       }));
 
       vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
+        deletePrefix: deletePrefixMock,
         putObject: putObjectMock,
         putObjectStream: putObjectStreamMock,
       }));

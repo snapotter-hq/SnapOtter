@@ -10,6 +10,7 @@ import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
 import { deleteLibraryFileStorage } from "../../lib/library-cleanup.js";
+import { logger } from "../../lib/logger.js";
 import { deletePrefix } from "../../lib/object-storage.js";
 import { canManageTargetRole, requirePermission } from "../../permissions.js";
 
@@ -49,10 +50,14 @@ async function purgeUserData(userId: string): Promise<void> {
     .from(schema.jobs)
     .where(eq(schema.jobs.userId, userId));
 
-  for (const job of jobRows) {
-    await deletePrefix(`uploads/${job.id}/`);
-    await deletePrefix(`outputs/${job.id}/`);
-  }
+  const sweepJobStorage = async (ids: Iterable<string>) => {
+    for (const jobId of ids) {
+      await deletePrefix(`uploads/${jobId}/`);
+      await deletePrefix(`outputs/${jobId}/`);
+    }
+  };
+
+  await sweepJobStorage(jobRows.map((job) => job.id));
 
   // d. Cancel any active BullMQ jobs before deleting DB rows
   const activeJobs = await db
@@ -66,16 +71,30 @@ async function purgeUserData(userId: string): Promise<void> {
     for (const job of activeJobs) {
       try {
         await requestCancel(job.id);
-      } catch {
-        // Best-effort cancellation
+      } catch (err) {
+        logger.warn({ err, userId, jobId: job.id }, "gdpr purge: failed to cancel active job");
       }
     }
+    // Mark non-terminal rows canceled before waiting so an in-flight export
+    // polling its row sees the cancellation even before Redis pub/sub arrives (#1496).
+    await db
+      .update(schema.jobs)
+      .set({ status: "canceled", completedAt: new Date() })
+      .where(
+        and(eq(schema.jobs.userId, userId), inArray(schema.jobs.status, ["queued", "processing"])),
+      );
     // Wait briefly for cancellation to propagate
     await new Promise((r) => setTimeout(r, 500));
   }
 
-  // e. Delete jobs rows
+  // e. Delete jobs rows, then sweep storage again so any output written while
+  // cancellation propagated cannot outlive the deleted rows (#1496).
+  const remainingJobRows = await db
+    .select({ id: schema.jobs.id })
+    .from(schema.jobs)
+    .where(eq(schema.jobs.userId, userId));
   await db.delete(schema.jobs).where(eq(schema.jobs.userId, userId));
+  await sweepJobStorage(new Set([...jobRows, ...remainingJobRows].map((job) => job.id)));
 
   // f. Redact audit log entries (preserve structure, remove PII)
   await db

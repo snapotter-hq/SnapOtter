@@ -5,6 +5,7 @@ const runSiemForwardMock = vi.hoisted(() => vi.fn());
 const runAuditArchiveMock = vi.hoisted(() => vi.fn());
 const dbExecuteMock = vi.hoisted(() => vi.fn());
 const dbUpdateMock = vi.hoisted(() => vi.fn());
+const deletePrefixMock = vi.hoisted(() => vi.fn());
 const storageReconciliationJobMock = vi.hoisted(() => vi.fn());
 const gdprExportJobMock = vi.hoisted(() => vi.fn());
 const evaluateAlertsMock = vi.hoisted(() => vi.fn());
@@ -16,14 +17,16 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   runAuditArchiveMock.mockReset();
   dbExecuteMock.mockReset();
   dbUpdateMock.mockReset();
+  deletePrefixMock.mockReset();
+  deletePrefixMock.mockResolvedValue(undefined);
   storageReconciliationJobMock.mockReset();
   gdprExportJobMock.mockReset();
   evaluateAlertsMock.mockReset();
 
   vi.doMock("drizzle-orm", () => ({
-    and: vi.fn(() => "and"),
-    eq: vi.fn(() => "eq"),
-    inArray: vi.fn(() => "inArray"),
+    and: vi.fn((...conds: unknown[]) => ({ op: "and", conds })),
+    eq: vi.fn((col: unknown, val: unknown) => ({ op: "eq", col, val })),
+    inArray: vi.fn((col: unknown, vals: unknown) => ({ op: "inArray", col, vals })),
     isNotNull: vi.fn(() => "isNotNull"),
     lt: vi.fn(() => "lt"),
     ne: vi.fn(() => "ne"),
@@ -46,6 +49,7 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
     schema: {
       jobs: {
         id: "jobs.id",
+        status: "jobs.status",
       },
     },
   }));
@@ -55,7 +59,7 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   }));
 
   vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
-    deletePrefix: vi.fn(),
+    deletePrefix: deletePrefixMock,
     listJobDirs: vi.fn().mockResolvedValue([]),
   }));
 
@@ -157,7 +161,8 @@ describe("system jobs behavior", () => {
   });
 
   it("dispatches one-shot system jobs and updates GDPR export job rows", async () => {
-    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateReturning = vi.fn().mockResolvedValue([{ id: "export-job" }]);
+    const updateWhere = vi.fn(() => ({ returning: updateReturning }));
     const updateSet = vi.fn(() => ({ where: updateWhere }));
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     dbUpdateMock.mockReturnValue({ set: updateSet });
@@ -189,8 +194,85 @@ describe("system jobs behavior", () => {
         outputRefs: ["outputs/export-job/gdpr-export.zip"],
       }),
     );
+    expect(updateWhere).toHaveBeenCalledWith({
+      op: "and",
+      conds: [
+        { op: "eq", col: "jobs.id", val: "export-job" },
+        { op: "inArray", col: "jobs.status", vals: ["queued", "processing"] },
+      ],
+    });
     await expect(runSystemJob({ name: "system:unknown" } as never)).rejects.toThrow(
       "Unknown system job: system:unknown",
     );
+  });
+
+  it("marks a GDPR export canceled rather than completed when gdprExportJob bails out (#1496)", async () => {
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    dbUpdateMock.mockReturnValue({ set: updateSet });
+    gdprExportJobMock.mockResolvedValue({ outputRef: null });
+
+    await expect(
+      runSystemJob({
+        name: SYSTEM_JOBS.gdprExport,
+        data: { userId: "user-1", jobId: "export-canceled" },
+      } as never),
+    ).resolves.toEqual({ outputRef: null });
+
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "canceled",
+      }),
+    );
+    expect(updateWhere).toHaveBeenCalledWith({
+      op: "and",
+      conds: [
+        { op: "eq", col: "jobs.id", val: "export-canceled" },
+        { op: "inArray", col: "jobs.status", vals: ["queued", "processing"] },
+      ],
+    });
+    expect(updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "completed",
+      }),
+    );
+  });
+
+  it("deletes the export archive when the job row was canceled or deleted before the completed update commits (#1496)", async () => {
+    const updateReturning = vi.fn().mockResolvedValue([]);
+    const updateWhere = vi.fn(() => ({ returning: updateReturning }));
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    dbUpdateMock.mockReturnValue({ set: updateSet });
+    gdprExportJobMock.mockResolvedValue({ outputRef: "outputs/export-raced/gdpr-export.zip" });
+
+    await expect(
+      runSystemJob({
+        name: SYSTEM_JOBS.gdprExport,
+        data: { userId: "user-1", jobId: "export-raced" },
+      } as never),
+    ).resolves.toEqual({ outputRef: null });
+
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-raced/");
+  });
+
+  it("deletes the export archive and rethrows when the completed update faults (#1496)", async () => {
+    const dbFault = new Error("connection reset by peer");
+    const updateReturning = vi.fn().mockRejectedValue(dbFault);
+    const updateWhere = vi.fn(() => ({ returning: updateReturning }));
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    dbUpdateMock.mockReturnValue({ set: updateSet });
+    gdprExportJobMock.mockResolvedValue({ outputRef: "outputs/export-fault/gdpr-export.zip" });
+
+    await expect(
+      runSystemJob({
+        name: SYSTEM_JOBS.gdprExport,
+        data: { userId: "user-1", jobId: "export-fault" },
+      } as never),
+    ).rejects.toBe(dbFault);
+
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-fault/");
   });
 });

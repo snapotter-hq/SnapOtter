@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { deletePrefix, putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { deletePrefix, objectExists, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -566,4 +566,172 @@ describe("GDPR purge role hierarchy", () => {
       }
     },
   );
+
+  it("does not write an export archive after its jobs row has been deleted (#1496)", async () => {
+    const { gdprExportJob } = await import("../../../apps/api/src/jobs/gdpr-export.js");
+    const targetId = await createTarget("user");
+    const exportJobId = randomUUID();
+
+    try {
+      await db.insert(schema.jobs).values({
+        id: exportJobId,
+        userId: targetId,
+        toolId: "gdpr-export",
+        pool: "system",
+        type: "system",
+        status: "queued",
+      });
+
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, exportJobId));
+
+      const result = await gdprExportJob(targetId, exportJobId);
+      expect(result.outputRef).toBeNull();
+      expect(await objectExists(`outputs/${exportJobId}/gdpr-export.zip`)).toBe(false);
+
+      const downloadRes = await licensedApp.app.inject({
+        method: "GET",
+        url: `/api/v1/download/${exportJobId}/gdpr-export.zip`,
+      });
+      expect(downloadRes.statusCode).toBe(404);
+    } finally {
+      await deletePrefix(`outputs/${exportJobId}/`).catch(() => {});
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, exportJobId));
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  });
+
+  it("purging a user while their GDPR export is in progress leaves no archive behind (#1496)", async () => {
+    const cancelMod = await import("../../../apps/api/src/jobs/cancel.js");
+    const fileStorage = await import("../../../apps/api/src/lib/file-storage.js");
+    const { gdprExportJob } = await import("../../../apps/api/src/jobs/gdpr-export.js");
+    const targetId = await createTarget("user");
+    const fileId = randomUUID();
+    const exportJobId = randomUUID();
+    const storedName = await fileStorage.saveFile(
+      Buffer.from("sensitive library contents"),
+      "secret.png",
+    );
+    await db.insert(schema.userFiles).values({
+      id: fileId,
+      userId: targetId,
+      originalName: "secret.png",
+      storedName,
+      mimeType: "image/png",
+      size: 26,
+    });
+    await db.insert(schema.jobs).values({
+      id: exportJobId,
+      userId: targetId,
+      toolId: "gdpr-export",
+      pool: "system",
+      type: "system",
+      status: "processing",
+    });
+
+    let notifyReadingFile!: () => void;
+    const readingFile = new Promise<void>((resolve) => {
+      notifyReadingFile = resolve;
+    });
+    let releaseFileRead!: () => void;
+    const fileReadGate = new Promise<void>((resolve) => {
+      releaseFileRead = resolve;
+    });
+
+    const realReadStoredFile = fileStorage.readStoredFile;
+    const readSpy = vi.spyOn(fileStorage, "readStoredFile").mockImplementationOnce(async (name) => {
+      const buf = await realReadStoredFile(name);
+      notifyReadingFile();
+      await fileReadGate;
+      return buf;
+    });
+
+    const realRequestCancel = cancelMod.requestCancel;
+    const cancelSpy = vi.spyOn(cancelMod, "requestCancel").mockImplementationOnce(async (id) => {
+      const result = await realRequestCancel(id);
+      // Release the export while purgeUserData is still in flight (entering its
+      // 500ms propagation wait) so the export races the purge rather than
+      // resuming after the purge has already returned.
+      setTimeout(() => releaseFileRead(), 50);
+      return result;
+    });
+
+    try {
+      const exportPromise = gdprExportJob(targetId, exportJobId);
+      await readingFile;
+
+      const purgeRes = await licensedApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/enterprise/users/${targetId}/purge`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+        payload: { confirm: true },
+      });
+      expect(purgeRes.statusCode).toBe(200);
+
+      releaseFileRead();
+      const exportResult = await exportPromise;
+      expect(exportResult.outputRef).toBeNull();
+
+      expect(await objectExists(`outputs/${exportJobId}/gdpr-export.zip`)).toBe(false);
+      const statusRes = await licensedApp.app.inject({
+        method: "GET",
+        url: `/api/v1/enterprise/users/${targetId}/export/${exportJobId}`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+      });
+      expect(statusRes.statusCode).toBe(404);
+      expect(JSON.parse(statusRes.body)).toEqual({ error: "Export job not found" });
+      const publicDownloadRes = await licensedApp.app.inject({
+        method: "GET",
+        url: `/api/v1/download/${exportJobId}/gdpr-export.zip`,
+      });
+      expect(publicDownloadRes.statusCode).toBe(404);
+    } finally {
+      cancelSpy.mockRestore();
+      readSpy.mockRestore();
+      releaseFileRead();
+      await deletePrefix(`outputs/${exportJobId}/`).catch(() => {});
+      await fileStorage.deleteStoredFile(storedName).catch(() => {});
+      await db.delete(schema.userFiles).where(eq(schema.userFiles.id, fileId));
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, exportJobId));
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  });
+
+  it("purge sweeps outputs again after canceling active jobs and deleting job rows (#1496)", async () => {
+    const cancelMod = await import("../../../apps/api/src/jobs/cancel.js");
+    const targetId = await createTarget("user");
+    const exportJobId = randomUUID();
+
+    await db.insert(schema.jobs).values({
+      id: exportJobId,
+      userId: targetId,
+      toolId: "gdpr-export",
+      pool: "system",
+      type: "system",
+      status: "processing",
+    });
+
+    const realRequestCancel = cancelMod.requestCancel;
+    const cancelSpy = vi.spyOn(cancelMod, "requestCancel").mockImplementationOnce(async (id) => {
+      const result = await realRequestCancel(id);
+      await putObject(`outputs/${exportJobId}/gdpr-export.zip`, Buffer.from("late-export-bytes"));
+      return result;
+    });
+
+    try {
+      const purgeRes = await licensedApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/enterprise/users/${targetId}/purge`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+        payload: { confirm: true },
+      });
+      expect(purgeRes.statusCode).toBe(200);
+      expect(cancelSpy).toHaveBeenCalledWith(exportJobId);
+      expect(await objectExists(`outputs/${exportJobId}/gdpr-export.zip`)).toBe(false);
+    } finally {
+      cancelSpy.mockRestore();
+      await deletePrefix(`outputs/${exportJobId}/`).catch(() => {});
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, exportJobId));
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  });
 });
