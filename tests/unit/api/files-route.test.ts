@@ -4,9 +4,23 @@
  * Tests the path traversal guard, content type mapping, and download/upload
  * logic helpers from the files route.
  */
-import { describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
+
+const mocks = vi.hoisted(() => ({
+  deletePrefix: vi.fn(() => Promise.resolve()),
+  getObjectSize: vi.fn(),
+  getObjectStream: vi.fn(),
+  isStorageServiceFault: vi.fn(() => false),
+  isValidObjectKey: vi.fn(() => true),
+  putObject: vi.fn(() => Promise.resolve()),
+  reportError: vi.fn(() => Promise.resolve()),
+  requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
+  requirePermission: vi.fn(() => () => Promise.resolve(true)),
+  sanitizeSvg: vi.fn((buf: Buffer) => buf),
+}));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {},
@@ -14,6 +28,34 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   closeDb: async () => {},
   schema: {},
 }));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
+  deletePrefix: mocks.deletePrefix,
+  getObjectSize: mocks.getObjectSize,
+  getObjectStream: mocks.getObjectStream,
+  isStorageServiceFault: mocks.isStorageServiceFault,
+  isValidObjectKey: mocks.isValidObjectKey,
+  putObject: mocks.putObject,
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+  reportError: mocks.reportError,
+}));
+
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  requireFileAccess: mocks.requireFileAccess,
+  requirePermission: mocks.requirePermission,
+}));
+
+vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  return {
+    ...actual,
+    sanitizeSvg: (...args: Parameters<typeof actual.sanitizeSvg>) => mocks.sanitizeSvg(...args),
+  };
+});
+
+import { fileRoutes } from "../../../apps/api/src/routes/files.js";
 
 // ── Reproduce helper functions from files.ts ────────────────────────────
 
@@ -241,6 +283,287 @@ describe("files route logic", () => {
       const parts = filename.split(".");
       const ext = parts.length > 1 ? (parts.pop()?.toLowerCase() ?? "") : "";
       expect(ext).toBe("");
+    });
+  });
+
+  describe("POST /api/v1/upload orphan cleanup on failure (#1210)", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let uploadHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/upload") uploadHandler = handler;
+        }),
+        get: vi.fn(),
+      };
+      await fileRoutes(fakeApp as never);
+    });
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mocks.deletePrefix.mockResolvedValue(undefined);
+      mocks.putObject.mockResolvedValue(undefined);
+      mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
+      mocks.sanitizeSvg.mockImplementation((buf: Buffer) => buf);
+    });
+
+    function makeReply() {
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        code: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        header: vi.fn(() => reply),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
+
+    function filePart(filename: string, content: Buffer | Error) {
+      return {
+        type: "file" as const,
+        fieldname: "file",
+        filename,
+        file:
+          content instanceof Error
+            ? new Readable({
+                read() {
+                  this.destroy(content);
+                },
+              })
+            : Readable.from([content]),
+      };
+    }
+
+    function makeRequest(
+      parts: Array<ReturnType<typeof filePart> | Error>,
+      log = { warn: vi.fn(), error: vi.fn() },
+    ) {
+      return {
+        log,
+        parts: async function* () {
+          for (const part of parts) {
+            if (part instanceof Error) throw part;
+            yield part;
+          }
+        },
+      };
+    }
+
+    it("deletes earlier uploaded parts when a later SVG fails with 400", async () => {
+      const clientErr = Object.assign(new Error("SVG exceeds maximum element count (5000)"), {
+        statusCode: 400,
+      });
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw clientErr;
+      });
+      const req = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart(
+          "second.svg",
+          Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+        ),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(400);
+      expect(reply.payload).toEqual({ error: "SVG exceeds maximum element count (5000)" });
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("deletes earlier uploaded parts when a later SVG sanitizer call fails with 500", async () => {
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw new Error("unexpected parser failure");
+      });
+      const req = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart(
+          "second.svg",
+          Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+        ),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(500);
+      expect(reply.payload).toEqual({ error: "Internal server error" });
+      expect(mocks.reportError).toHaveBeenCalledTimes(1);
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("deletes earlier uploaded parts and rethrows when a later file part stream errors (e.g. 413)", async () => {
+      const tooLarge = Object.assign(new Error("request file too large"), {
+        statusCode: 413,
+        code: "FST_REQ_FILE_TOO_LARGE",
+      });
+      const req = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart("huge.bin", tooLarge),
+      ]);
+      const reply = makeReply();
+
+      await expect(uploadHandler(req, reply)).rejects.toBe(tooLarge);
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("deletes earlier uploaded parts and rethrows when putObject fails on a later part", async () => {
+      const storageFault = Object.assign(new Error("The server's storage is full."), {
+        statusCode: 503,
+      });
+      mocks.putObject.mockResolvedValueOnce(undefined).mockRejectedValueOnce(storageFault);
+      const req = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart("second.txt", Buffer.from("world")),
+      ]);
+      const reply = makeReply();
+
+      await expect(uploadHandler(req, reply)).rejects.toBe(storageFault);
+      expect(mocks.putObject).toHaveBeenCalledTimes(2);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("deletes earlier uploaded parts and rethrows when the multipart iterator throws between parts", async () => {
+      const filesLimitErr = Object.assign(new Error("reached files limit"), {
+        statusCode: 400,
+      });
+      const req = makeRequest([filePart("first.txt", Buffer.from("hello")), filesLimitErr]);
+      const reply = makeReply();
+
+      await expect(uploadHandler(req, reply)).rejects.toBe(filesLimitErr);
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("cleans up the upload prefix and rethrows when putObject fails on the first part", async () => {
+      const storageFault = Object.assign(new Error("The server's storage is full."), {
+        statusCode: 503,
+      });
+      mocks.putObject.mockRejectedValueOnce(storageFault);
+      const req = makeRequest([filePart("first.txt", Buffer.from("hello"))]);
+      const reply = makeReply();
+
+      await expect(uploadHandler(req, reply)).rejects.toBe(storageFault);
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("does not mask a rethrown stream or storage error when deletePrefix fails in the outer catch", async () => {
+      const tooLarge = Object.assign(new Error("request file too large"), {
+        statusCode: 413,
+        code: "FST_REQ_FILE_TOO_LARGE",
+      });
+      mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
+      const log = { warn: vi.fn(), error: vi.fn() };
+      const req = makeRequest(
+        [filePart("first.txt", Buffer.from("hello")), filePart("huge.bin", tooLarge)],
+        log,
+      );
+      const reply = makeReply();
+
+      await expect(uploadHandler(req, reply)).rejects.toBe(tooLarge);
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to discard a rejected request's uploads",
+      );
+    });
+
+    it("does not mask the original 400 when deletePrefix fails during cleanup", async () => {
+      const clientErr = Object.assign(new Error("SVG exceeds maximum element count (5000)"), {
+        statusCode: 400,
+      });
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw clientErr;
+      });
+      mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
+      const log = { warn: vi.fn(), error: vi.fn() };
+      const req = makeRequest(
+        [
+          filePart("first.txt", Buffer.from("hello")),
+          filePart(
+            "second.svg",
+            Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+          ),
+        ],
+        log,
+      );
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(400);
+      expect(reply.payload).toEqual({ error: "SVG exceeds maximum element count (5000)" });
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to discard a rejected request's uploads",
+      );
+    });
+
+    it("does not call deletePrefix when the first part is rejected before putObject", async () => {
+      const clientErr = Object.assign(new Error("SVG exceeds maximum element count (5000)"), {
+        statusCode: 400,
+      });
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw clientErr;
+      });
+      const req = makeRequest([
+        filePart("first.svg", Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>')),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(400);
+      expect(mocks.putObject).not.toHaveBeenCalled();
+      expect(mocks.deletePrefix).not.toHaveBeenCalled();
+    });
+
+    it("keeps uploaded files when all parts succeed", async () => {
+      const req = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart("second.txt", Buffer.from("world")),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(mocks.putObject).toHaveBeenCalledTimes(2);
+      expect(mocks.deletePrefix).not.toHaveBeenCalled();
     });
   });
 });

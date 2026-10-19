@@ -15,6 +15,7 @@ import {
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import {
+  deletePrefix,
   getObjectSize,
   getObjectStream,
   isStorageServiceFault,
@@ -111,91 +112,107 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         size: number;
         format: string;
       }> = [];
+      let wroteUpload = false;
+      const discardUploads = async () => {
+        if (!wroteUpload) return;
+        wroteUpload = false;
+        await deletePrefix(`uploads/${jobId}/`).catch((err) => {
+          request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
+        });
+      };
 
       const parts = request.parts();
 
-      for await (const part of parts) {
-        // Skip non-file fields
-        if (part.type !== "file") continue;
+      try {
+        for await (const part of parts) {
+          // Skip non-file fields
+          if (part.type !== "file") continue;
 
-        // Consume buffer from the stream
-        const chunks: Buffer[] = [];
-        for await (const chunk of part.file) {
-          chunks.push(chunk);
-        }
-        const buffer = Buffer.concat(chunks);
+          // Consume buffer from the stream
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file) {
+            chunks.push(chunk);
+          }
+          const buffer = Buffer.concat(chunks);
 
-        // Skip empty parts (e.g. empty file field)
-        if (buffer.length === 0) continue;
+          // Skip empty parts (e.g. empty file field)
+          if (buffer.length === 0) continue;
 
-        // Try image validation; non-image files are accepted with format from extension
-        const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
-        const isValidImage = validation?.valid === true;
+          // Try image validation; non-image files are accepted with format from extension
+          const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
+          const isValidImage = validation?.valid === true;
 
-        // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
-        // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
-        // an external entity, say) makes Sharp fail validation, and gating the
-        // sanitizer on a successful decode would store the payload untouched.
-        // Throwing out of the multipart loop gets rewritten to a generic 400 by
-        // the stream teardown, so handle it here like the quota check below:
-        // return the sanitizer's reason for a size/element-cap rejection, and
-        // report + 500 for anything unexpected rather than storing the file.
-        let safeBuffer: Buffer = buffer;
-        const uploadExt = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
-        let isDecompressedSvg = false;
-        if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
-          try {
-            if (uploadExt === ".svgz") {
-              safeBuffer = decompressSvgz(buffer);
-            }
-            if (isSvgBuffer(safeBuffer)) {
-              safeBuffer = sanitizeSvg(safeBuffer);
+          // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
+          // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
+          // an external entity, say) makes Sharp fail validation, and gating the
+          // sanitizer on a successful decode would store the payload untouched.
+          // Throwing out of the multipart loop gets rewritten to a generic 400 by
+          // the stream teardown, so handle it here like the quota check below:
+          // return the sanitizer's reason for a size/element-cap rejection, and
+          // report + 500 for anything unexpected rather than storing the file.
+          let safeBuffer: Buffer = buffer;
+          const uploadExt = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+          let isDecompressedSvg = false;
+          if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
+            try {
               if (uploadExt === ".svgz") {
-                isDecompressedSvg = true;
+                safeBuffer = decompressSvgz(buffer);
+              }
+              if (isSvgBuffer(safeBuffer)) {
+                safeBuffer = sanitizeSvg(safeBuffer);
+                if (uploadExt === ".svgz") {
+                  isDecompressedSvg = true;
+                }
+              }
+            } catch (err) {
+              if ((err as Error).message.includes("SVGZ file does not contain")) {
+                request.log.warn(
+                  { err, filename: part.filename },
+                  "Uploaded .svgz file does not contain SVG, storing as opaque file",
+                );
+                safeBuffer = buffer;
+              } else if (
+                (err as { statusCode?: number }).statusCode === 400 ||
+                (err as { code?: string }).code === "Z_DATA_ERROR" ||
+                (err as { code?: string }).code === "Z_BUF_ERROR"
+              ) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
+                await discardUploads();
+                return reply.status(400).send({ error: (err as Error).message });
+              } else {
+                request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+                void reportError(err, {
+                  source: "http",
+                  route: "/api/v1/upload",
+                  method: "POST",
+                  statusCode: 500,
+                });
+                await discardUploads();
+                return reply.status(500).send({ error: "Internal server error" });
               }
             }
-          } catch (err) {
-            if ((err as Error).message.includes("SVGZ file does not contain")) {
-              request.log.warn(
-                { err, filename: part.filename },
-                "Uploaded .svgz file does not contain SVG, storing as opaque file",
-              );
-              safeBuffer = buffer;
-            } else if (
-              (err as { statusCode?: number }).statusCode === 400 ||
-              (err as { code?: string }).code === "Z_DATA_ERROR" ||
-              (err as { code?: string }).code === "Z_BUF_ERROR"
-            ) {
-              request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
-              return reply.status(400).send({ error: (err as Error).message });
-            } else {
-              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
-              void reportError(err, {
-                source: "http",
-                route: "/api/v1/upload",
-                method: "POST",
-                statusCode: 500,
-              });
-              return reply.status(500).send({ error: "Internal server error" });
-            }
           }
+
+          // Sanitize filename (canonical; do NOT re-sanitize downstream)
+          let safeName = sanitizeFilename(part.filename ?? "upload");
+          if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+            safeName = safeName.replace(/\.svgz$/i, ".svg");
+          }
+
+          // Write to object storage uploads prefix
+          wroteUpload = true;
+          await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
+
+          const fileExt = safeName.split(".").pop()?.toLowerCase() ?? "";
+          uploadedFiles.push({
+            name: safeName,
+            size: safeBuffer.length,
+            format: isValidImage ? validation.format : fileExt,
+          });
         }
-
-        // Sanitize filename (canonical; do NOT re-sanitize downstream)
-        let safeName = sanitizeFilename(part.filename ?? "upload");
-        if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
-          safeName = safeName.replace(/\.svgz$/i, ".svg");
-        }
-
-        // Write to object storage uploads prefix
-        await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
-
-        const fileExt = safeName.split(".").pop()?.toLowerCase() ?? "";
-        uploadedFiles.push({
-          name: safeName,
-          size: safeBuffer.length,
-          format: isValidImage ? validation.format : fileExt,
-        });
+      } catch (err) {
+        await discardUploads();
+        throw err;
       }
 
       if (uploadedFiles.length === 0) {
