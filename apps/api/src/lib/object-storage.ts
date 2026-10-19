@@ -494,6 +494,34 @@ function serverFault(error: unknown): Error {
   return Object.assign(err, { statusCode: 500 });
 }
 
+function isS3MissingShape(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
+  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+  if (e.name === "NoSuchBucket") return false;
+  return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
+}
+
+/**
+ * Normalize a local operational write errno (ENOSPC, EDQUOT, EACCES, EPERM,
+ * EROFS) or an S3 service fault into a status-bearing 503 SafeError (#1552).
+ * Errors that already carry a status or belong to the client pass through.
+ */
+export function normalizeOperationalWriteError(error: unknown): unknown {
+  if (alreadyClassified(error)) return error;
+  const { code } = (error ?? {}) as NodeJS.ErrnoException;
+  if (code === "ENOSPC" || code === "EDQUOT") {
+    return storageFault(STORAGE_FULL_MESSAGE, "storage-full", error);
+  }
+  if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+    return storageFault(STORAGE_NOT_WRITABLE_MESSAGE, "storage-not-writable", error);
+  }
+  const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
+  if ((s3Answered && !isS3MissingShape(error)) || connectivityClass(error) === "net-unavailable") {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  return error;
+}
+
 /**
  * What a failed local write means for the request behind it. Without a
  * status, the tool routes answered every one of these as a malformed request
@@ -503,14 +531,9 @@ function serverFault(error: unknown): Error {
  * condition, with the errno as its cause; anything else is a 500.
  */
 function localWriteFault(error: unknown): unknown {
-  if (alreadyClassified(error)) return error;
-  const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
-  if (code === "ENOSPC" || code === "EDQUOT") {
-    return storageFault(STORAGE_FULL_MESSAGE, "storage-full", error);
-  }
-  if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
-    return storageFault(STORAGE_NOT_WRITABLE_MESSAGE, "storage-not-writable", error);
-  }
+  const normalized = normalizeOperationalWriteError(error);
+  if (alreadyClassified(normalized)) return normalized;
+  const { syscall } = (error ?? {}) as NodeJS.ErrnoException;
   if (typeof syscall === "string") {
     return storageFault(STORAGE_WRITE_FAILED_MESSAGE, "storage-write-failed", error);
   }
@@ -523,20 +546,13 @@ function localWriteFault(error: unknown): unknown {
  * faults pass through; anything else is ours.
  */
 function s3WriteFault(error: unknown): unknown {
-  if (alreadyClassified(error)) return error;
+  const normalized = normalizeOperationalWriteError(error);
+  if (alreadyClassified(normalized)) return normalized;
   const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
-  if (s3Answered || connectivityClass(error) === "net-unavailable") {
+  if (s3Answered) {
     return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
   }
   return serverFault(error);
-}
-
-function normalizeOperationalWriteError(error: unknown): unknown {
-  const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
-  if (error instanceof Error && code && ["EACCES", "EDQUOT", "ENOSPC", "EROFS"].includes(code)) {
-    return Object.assign(error, { statusCode: 503 });
-  }
-  return error;
 }
 
 /**

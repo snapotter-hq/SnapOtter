@@ -15,6 +15,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const putObject = vi.fn();
 const getObjectBuffer = vi.fn();
+const getObjectStream = vi.fn();
+const deletePrefix = vi.fn();
+const dbInsertValues = vi.fn();
+const failBatchJob = vi.fn();
+const updateJobProgress = vi.fn();
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
@@ -23,12 +28,28 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     ...actual,
     putObject: (...args: unknown[]) => putObject(...args),
     getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
+    getObjectStream: (...args: unknown[]) => getObjectStream(...args),
+    deletePrefix: (...args: unknown[]) => deletePrefix(...args),
   };
 });
 
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    insert: () => ({
+      values: (...args: unknown[]) => dbInsertValues(...args),
+    }),
+  },
+  schema: { jobs: {} },
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  failBatchJob: (...args: unknown[]) => failBatchJob(...args),
+  updateJobProgress: (...args: unknown[]) => updateJobProgress(...args),
+}));
+
 vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/permissions.js")>();
-  return { ...actual, requireToolAccess: async () => true };
+  return { ...actual, requireToolAccess: async () => ({ id: "user-1" }) };
 });
 
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
@@ -83,7 +104,8 @@ const workspaceCap = () =>
 describe("pdf-to-image single-file route", () => {
   beforeEach(() => {
     putObject.mockReset().mockResolvedValue(undefined);
-    getObjectBuffer.mockReset();
+    getObjectBuffer.mockReset().mockResolvedValue(Buffer.from("page"));
+    deletePrefix.mockReset().mockResolvedValue(undefined);
   });
 
   const send = async (app: Awaited<ReturnType<typeof buildApp>>) =>
@@ -119,6 +141,34 @@ describe("pdf-to-image single-file route", () => {
     const app = await buildApp(registerPdfToImage);
 
     expect((await send(app)).statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("answers 503 storage-unavailable when read-back fails with an S3 service fault", async () => {
+    getObjectBuffer.mockRejectedValue({
+      name: "ServiceUnavailable",
+      $metadata: { httpStatusCode: 503 },
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await send(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    await app.close();
+  });
+
+  it("answers 500 when read-back reports the intermediate page missing (NoSuchKey)", async () => {
+    getObjectBuffer.mockRejectedValue({
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await send(app);
+
+    expect(res.statusCode).toBe(500);
     await app.close();
   });
 
@@ -192,6 +242,182 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
     const app = await buildApp(registerImageToPdf);
 
     expect((await send(app)).statusCode).toBe(503);
+    await app.close();
+  });
+
+  it("answers 503 storage-unavailable when read-back fails with an S3 service fault", async () => {
+    getObjectBuffer.mockRejectedValue({
+      name: "ServiceUnavailable",
+      $metadata: { httpStatusCode: 503 },
+    });
+    const app = await buildApp(registerImageToPdf);
+    const res = await send(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    await app.close();
+  });
+
+  it("answers 503 storage-full when a bare ENOSPC hits putObject", async () => {
+    putObject.mockRejectedValue(
+      Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" }),
+    );
+    const app = await buildApp(registerImageToPdf);
+    const res = await send(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage is full.",
+      code: "storage-full",
+    });
+    await app.close();
+  });
+});
+
+describe("pdf-to-image batch route (#1552)", () => {
+  beforeEach(() => {
+    putObject.mockReset().mockResolvedValue(undefined);
+    getObjectBuffer.mockReset().mockResolvedValue(Buffer.from("page"));
+    getObjectStream
+      .mockReset()
+      .mockImplementation(() =>
+        import("node:stream").then((m) => m.Readable.from([Buffer.from("page")])),
+      );
+    deletePrefix.mockReset().mockResolvedValue(undefined);
+    dbInsertValues.mockReset().mockResolvedValue(undefined);
+    failBatchJob.mockReset().mockResolvedValue(true);
+    updateJobProgress.mockReset().mockResolvedValue(undefined);
+  });
+
+  const sendBatch = async (app: Awaited<ReturnType<typeof buildApp>>) =>
+    app.inject({
+      method: "POST",
+      url: `${apiToolPath("pdf-to-image")}/batch`,
+      ...multipartBody(
+        [
+          { name: "a.pdf", type: "application/pdf", data: PDF },
+          { name: "b.pdf", type: "application/pdf", data: PDF },
+        ],
+        { dpi: 36 },
+      ),
+    });
+
+  it("settles the batch and answers 503 storage-unavailable when an S3 outage hits mid-batch", async () => {
+    putObject.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw { name: "ServiceUnavailable", $metadata: { httpStatusCode: 503 } };
+      }
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(failBatchJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+      }),
+    );
+    expect(logLines.some((line) => line.includes("PDF batch file conversion failed"))).toBe(false);
+    await app.close();
+  });
+
+  it("settles the batch and answers 503 storage-full when a bare ENOSPC hits mid-batch", async () => {
+    putObject.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
+          code: "ENOSPC",
+        });
+      }
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage is full.",
+      code: "storage-full",
+    });
+    expect(failBatchJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        message: "The server's storage is full.",
+        code: "storage-full",
+      }),
+    );
+    expect(logLines.some((line) => line.includes("PDF batch file conversion failed"))).toBe(false);
+    await app.close();
+  });
+
+  it("answers 503 instead of 422 'All files failed processing' when every file hits a storage fault", async () => {
+    putObject.mockRejectedValue(
+      Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" }),
+    );
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage is full.",
+      code: "storage-full",
+    });
+    expect(putObject).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
+  it("settles the batch and answers 503 storage-unavailable when readOwnOutput hits an S3 fault mid-batch", async () => {
+    getObjectBuffer.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw { name: "ServiceUnavailable", $metadata: { httpStatusCode: 503 } };
+      }
+      return Buffer.from("page");
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(failBatchJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+      }),
+    );
+    await app.close();
+  });
+
+  it("settles the batch with storage-unavailable when getObjectStream hits an S3 fault during final ZIP streaming", async () => {
+    getObjectStream.mockRejectedValueOnce({
+      name: "ServiceUnavailable",
+      $metadata: { httpStatusCode: 503 },
+    });
+    const app = await buildApp(registerPdfToImage);
+    await sendBatch(app).then(
+      (res: unknown) => res,
+      () => null,
+    );
+
+    expect(failBatchJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+      }),
+    );
     await app.close();
   });
 });

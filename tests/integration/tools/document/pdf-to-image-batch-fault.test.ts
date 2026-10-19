@@ -25,6 +25,8 @@ import {
 const faults = vi.hoisted(() => ({
   /** Object keys (or key prefixes) whose putObject fails with a 503. */
   poison: new Set<string>(),
+  /** Optional custom error factory for poisoned putObject calls (#1552). */
+  poisonError: null as (() => unknown) | null,
   /** Object keys (or key prefixes) whose getObjectStream fails on read. */
   streamPoison: new Set<string>(),
   /** When set, the route's failBatchJob call rejects. */
@@ -72,6 +74,9 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
               .update(schema.jobs)
               .set({ status: "canceled", completedAt: new Date() })
               .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+          }
+          if (faults.poisonError) {
+            throw faults.poisonError();
           }
           throw new SafeError("Workspace storage limit reached", {
             kind: "operational",
@@ -128,6 +133,7 @@ beforeAll(async () => {
 
 afterEach(() => {
   faults.poison.clear();
+  faults.poisonError = null;
   faults.streamPoison.clear();
   faults.settleFails = false;
   faults.retireRowBeforeFault = null;
@@ -344,5 +350,49 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     expect(outcome === null || outcome.statusCode === 200).toBe(true);
     expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
     expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+  });
+
+  it("settles the progress row as failed and answers 503 on an S3 service fault mid-batch (#1552)", async () => {
+    const clientJobId = "batch-1552-s3-outage";
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
+    faults.poisonError = () => ({
+      name: "ServiceUnavailable",
+      $metadata: { httpStatusCode: 503 },
+    });
+
+    const res = await postBatch(clientJobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
+    expect(res.json()).toMatchObject({ code: "storage-unavailable" });
+
+    const row = await readRow(clientJobId);
+    expect(row?.status).toBe("failed");
+    expect(row?.completedAt).not.toBeNull();
+    expect(row?.error).toMatchObject({
+      message: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+  });
+
+  it("settles the progress row as failed and answers 503 on a bare ENOSPC mid-batch (#1552)", async () => {
+    const clientJobId = "batch-1552-enospc";
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
+    faults.poisonError = () =>
+      Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
+
+    const res = await postBatch(clientJobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
+    expect(res.json()).toMatchObject({ code: "storage-full" });
+
+    const row = await readRow(clientJobId);
+    expect(row?.status).toBe("failed");
+    expect(row?.completedAt).not.toBeNull();
+    expect(row?.error).toMatchObject({
+      message: "The server's storage is full.",
+      code: "storage-full",
+    });
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
   });
 });

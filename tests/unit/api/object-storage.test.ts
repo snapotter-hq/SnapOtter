@@ -18,6 +18,7 @@ import {
   isValidObjectKey,
   listJobDirs,
   listObjects,
+  normalizeOperationalWriteError,
   objectExists,
   putObject,
   putObjectStream,
@@ -640,6 +641,54 @@ describe("object-storage (local backend)", () => {
       vi.resetModules();
       rmSync(stagingPath, { force: true });
     }
+  });
+
+  it("turns local operational write errnos and S3 SDK faults into status-bearing 503 SafeErrors (#1552)", async () => {
+    for (const [errno, expectedCode] of [
+      ["ENOSPC", "storage-full"],
+      ["EDQUOT", "storage-full"],
+      ["EACCES", "storage-not-writable"],
+      ["EPERM", "storage-not-writable"],
+      ["EROFS", "storage-not-writable"],
+    ] as const) {
+      const cause = Object.assign(new Error(`${errno}: simulated`), { code: errno });
+      expect(normalizeOperationalWriteError(cause)).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: expectedCode,
+        statusCode: 503,
+        cause,
+      });
+    }
+
+    for (const s3Outage of [
+      { name: "ServiceUnavailable", $metadata: { httpStatusCode: 503 } },
+      { name: "NoSuchBucket", $metadata: { httpStatusCode: 404 } },
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+    ]) {
+      expect(normalizeOperationalWriteError(s3Outage)).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: s3Outage,
+      });
+    }
+
+    const noSuchKey = { name: "NoSuchKey", $metadata: { httpStatusCode: 404 } };
+    expect(normalizeOperationalWriteError(noSuchKey)).toBe(noSuchKey);
+
+    const unmodeled404 = { name: "NotFound", $metadata: { httpStatusCode: 404 } };
+    expect(normalizeOperationalWriteError(unmodeled404)).toBe(unmodeled404);
+
+    const sdkAbort = Object.assign(new Error("Request aborted"), {
+      name: "AbortError",
+      $metadata: {},
+    });
+    expect(normalizeOperationalWriteError(sdkAbort)).toBe(sdkAbort);
+
+    const plain = new Error("render failed");
+    expect(normalizeOperationalWriteError(plain)).toBe(plain);
   });
 });
 

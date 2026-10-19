@@ -17,7 +17,11 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import { scrubPdfProducer } from "../../lib/pdf-producer.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
@@ -122,9 +126,10 @@ export async function flattenAlpha(buf: Buffer): Promise<Buffer> {
 async function readOwnOutput(key: string): Promise<Buffer> {
   try {
     return await getObjectBuffer(key);
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(rawErr);
     if (hasServerErrorStatus(err)) throw err;
-    throw Object.assign(new Error("Could not read back a stored output", { cause: err }), {
+    throw Object.assign(new Error("Could not read back a stored output", { cause: rawErr }), {
       statusCode: 500,
     });
   }
@@ -378,7 +383,8 @@ export function registerImageToPdfRoute(
         collated: false,
         ...(compression ? { compression } : {}),
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
       request.log.error({ err, toolId: opts.toolId }, "PDF creation failed");

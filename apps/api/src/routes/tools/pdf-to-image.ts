@@ -18,6 +18,7 @@ import {
   deletePrefix,
   getObjectBuffer,
   getObjectStream,
+  normalizeOperationalWriteError,
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
@@ -275,9 +276,10 @@ async function renderPdfPages(
 async function readOwnOutput(key: string): Promise<Buffer> {
   try {
     return await getObjectBuffer(key);
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(rawErr);
     if (hasServerErrorStatus(err)) throw err;
-    throw Object.assign(new Error("Could not read back a stored output", { cause: err }), {
+    throw Object.assign(new Error("Could not read back a stored output", { cause: rawErr }), {
       statusCode: 500,
     });
   }
@@ -593,7 +595,8 @@ export function registerPdfToImageRoute(
           const key = `${prefix}/${zipName}`;
           await putObject(key, await buildPagesZip(childJobId, filenames));
           results[i] = { key, prefix, filename: zipName };
-        } catch (err) {
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
           // A storage or infrastructure fault is not a bad document. Let it
           // reach the error handler (which logs it, reports it, and honors its
           // status) instead of telling the user their PDF is broken.
@@ -708,8 +711,10 @@ export function registerPdfToImageRoute(
       });
       streamDone.catch(() => {});
 
-      const failStream = (err: Error, msg: string) => {
+      const failStream = (rawErr: unknown, msg: string) => {
         if (streamError) return;
+        const normalized = normalizeOperationalWriteError(rawErr);
+        const err = normalized instanceof Error ? normalized : new Error(String(normalized));
         streamError = err;
         request.log.error({ err, jobId }, msg);
         archive.abort();
@@ -763,19 +768,11 @@ export function registerPdfToImageRoute(
         if (!streamError) {
           void archive
             .finalize()
-            .catch((err) =>
-              failStream(
-                err instanceof Error ? err : new Error(String(err)),
-                "Failed to finalize ZIP during PDF batch processing",
-              ),
-            );
+            .catch((err) => failStream(err, "Failed to finalize ZIP during PDF batch processing"));
         }
         await streamDone;
       } catch (err) {
-        failStream(
-          err instanceof Error ? err : new Error(String(err)),
-          "Failed to stream ZIP entries during PDF batch processing",
-        );
+        failStream(err, "Failed to stream ZIP entries during PDF batch processing");
       } finally {
         reply.raw.removeListener("close", onReplyClose);
         reply.raw.removeListener("error", onReplyError);
@@ -896,7 +893,8 @@ export function registerPdfToImageRoute(
         zipUrl,
         zipSize: zipBuffer.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
       // Raised before the first page is written, so there is nothing to clear.
       if (err instanceof PdfInputError) {
         return reply.status(400).send({ error: err.message });
