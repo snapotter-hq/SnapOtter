@@ -254,6 +254,125 @@ describe("GDPR export route authority", () => {
     );
   });
 
+  it("returns a terminal canceled payload without progress when the export job is canceled (#2633)", async () => {
+    app = await buildApp();
+    selectResults = [
+      [
+        {
+          id: "job-canceled-1",
+          status: "canceled",
+          progress: { percent: 45, stage: "archiving" },
+          error: null,
+        },
+      ],
+    ];
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/job-canceled-1",
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "canceled",
+      error: "Export canceled",
+    });
+  });
+
+  it("preserves a custom error message on a canceled export job (#2633)", async () => {
+    app = await buildApp();
+    selectResults = [
+      [
+        {
+          id: "job-canceled-2",
+          status: "canceled",
+          progress: { percent: 80 },
+          error: { message: "Canceled by administrator" },
+        },
+      ],
+    ];
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/job-canceled-2",
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      status: "canceled",
+      error: "Canceled by administrator",
+    });
+  });
+
+  it("returns 404 when the export job does not exist for the target user", async () => {
+    app = await buildApp();
+    selectResults = [[]];
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/missing-job",
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ error: "Export job not found" });
+  });
+
+  it("returns failed status with job error message or default fallback", async () => {
+    app = await buildApp();
+    selectResults = [
+      [{ id: "job-failed-1", status: "failed", error: { message: "Storage unreachable" } }],
+      [{ id: "job-failed-2", status: "failed", error: null }],
+    ];
+
+    const withMessage = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/job-failed-1",
+    });
+    expect(withMessage.statusCode).toBe(200);
+    expect(withMessage.json()).toEqual({
+      status: "failed",
+      error: "Storage unreachable",
+    });
+
+    const fallback = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/job-failed-2",
+    });
+    expect(fallback.statusCode).toBe(200);
+    expect(fallback.json()).toEqual({
+      status: "failed",
+      error: "Export failed",
+    });
+  });
+
+  it("returns progress for queued and processing export jobs", async () => {
+    app = await buildApp();
+    selectResults = [
+      [{ id: "job-queued", status: "queued", progress: null }],
+      [{ id: "job-processing", status: "processing", progress: { percent: 65 } }],
+    ];
+
+    const queuedRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/job-queued",
+    });
+    expect(queuedRes.statusCode).toBe(200);
+    expect(queuedRes.json()).toEqual({
+      status: "queued",
+      progress: 0,
+    });
+
+    const processingRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/enterprise/users/victim-1/export/job-processing",
+    });
+    expect(processingRes.statusCode).toBe(200);
+    expect(processingRes.json()).toEqual({
+      status: "processing",
+      progress: 65,
+    });
+  });
+
   it("excludes the synthetic anonymous row when checking whether a team purge removes every admin (#2459)", async () => {
     app = await buildApp();
     selectResults = [

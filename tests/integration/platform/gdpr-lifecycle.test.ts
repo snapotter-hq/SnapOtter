@@ -463,6 +463,37 @@ describe("GDPR purge role hierarchy", () => {
     }
   });
 
+  it("returns a terminal canceled status without progress when a GDPR export is canceled (#2633)", async () => {
+    const targetId = await createTarget("user");
+    const jobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: jobId,
+      userId: targetId,
+      toolId: "gdpr-export",
+      pool: "system",
+      type: "system",
+      status: "canceled",
+      progress: { percent: 40, stage: "archiving" },
+    });
+
+    try {
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: `/api/v1/enterprise/users/${targetId}/export/${jobId}`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body)).toEqual({
+        status: "canceled",
+        error: "Export canceled",
+      });
+    } finally {
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, jobId));
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  });
+
   const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
   it.skipIf(isRoot)(
     "aborts purge before deleting jobs and users rows when job-storage deletePrefix fails (#2632)",

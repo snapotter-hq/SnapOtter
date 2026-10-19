@@ -215,6 +215,11 @@ export async function registerGdprRoutes(app: FastifyInstance): Promise<void> {
         return reply.send({ status: "failed", error: errorMsg });
       }
 
+      if (job.status === "canceled") {
+        const errorMsg = (job.error as { message?: string } | null)?.message ?? "Export canceled";
+        return reply.send({ status: "canceled", error: errorMsg });
+      }
+
       // queued or processing
       const progress = job.progress as { percent?: number; stage?: string } | null;
       return reply.send({
