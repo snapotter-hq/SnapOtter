@@ -2594,4 +2594,128 @@ describe("useToolProcessor batch entry-identity settle (#944)", () => {
     expect(result.current.progress.phase).toBe("idle");
     unmount();
   });
+
+  it("stops an in-flight batch, cancels the server job, and drops its ZIP when setFiles replaces the file set without reset (#2242)", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].onload?.();
+      useFileStore
+        .getState()
+        .setFiles([new File([new ArrayBuffer(16)], "replacement.png", { type: "image/png" })]);
+    });
+
+    const stateAfterReplace = useFileStore.getState();
+    expect(stateAfterReplace.processing).toBe(false);
+    expect(stateAfterReplace.activeJobId).toBeNull();
+    expect(stateAfterReplace.cancelCurrentJob).toBeNull();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/v1/jobs/${JOB_ID}/cancel`,
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(result.current.progress.phase).toBe("idle");
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await new Promise((r) => setTimeout(r, 20));
+    const state = useFileStore.getState();
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries[0]).toMatchObject({
+      status: "pending",
+      processedUrl: null,
+      error: null,
+    });
+    unmount();
+  });
+
+  it("skips a batch entry whose file was replaced in place on both ZIP completion and batch failure (#2242)", async () => {
+    const { unmount } = startBatchRun();
+    const swappedFile = new File([new ArrayBuffer(16)], "swapped.png", { type: "image/png" });
+
+    act(() => {
+      useFileStore.getState().updateEntry(0, { file: swappedFile, status: "pending" });
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].response = zipBlob();
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results" ? encodedFileResults() : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries[0]).toMatchObject({
+      file: swappedFile,
+      status: "pending",
+      processedUrl: null,
+      error: null,
+    });
+    expect(entries[1]).toMatchObject({
+      status: "completed",
+      processedFilename: "second_resize.jpg",
+    });
+    unmount();
+
+    // Also verify the failure sweep skips an in-place swapped entry.
+    const { unmount: unmountFail } = startBatchRun();
+    act(() => {
+      useFileStore.getState().updateEntry(0, { file: swappedFile, status: "processing" });
+      xhrs[1].onerror?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      file: swappedFile,
+      status: "processing",
+      error: null,
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "Processing was interrupted. Retry when reconnected.",
+    });
+    unmountFail();
+  });
+
+  it("does not start a batch or overwrite replacement files when processAllFiles is called with a stale file array (#2242)", () => {
+    const staleFiles = [
+      new File([new ArrayBuffer(16)], "first.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "second.jpg", { type: "image/jpeg" }),
+    ];
+    const currentFiles = [
+      new File([new ArrayBuffer(16)], "current-a.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "current-b.jpg", { type: "image/jpeg" }),
+    ];
+    useFileStore.getState().setFiles(currentFiles);
+    const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+    act(() => {
+      void result.current.processAllFiles(staleFiles, { width: 50 });
+    });
+
+    expect(xhrs).toHaveLength(0);
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries.map((e) => [e.file, e.status, e.processedUrl])).toEqual([
+      [currentFiles[0], "pending", null],
+      [currentFiles[1], "pending", null],
+    ]);
+    unmount();
+  });
 });

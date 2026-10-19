@@ -252,7 +252,10 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({
       entries,
       selectedIndex: 0,
+      processing: false,
       error: null,
+      activeJobId: null,
+      cancelCurrentJob: null,
       // The previous run's zip describes files that are no longer loaded.
       batchZipBlob: null,
       batchZipFilename: null,
@@ -260,6 +263,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       // A fresh file set is a fresh edit: the save-mode choice made for a
       // previous file must not carry over (#495 defaults to non-destructive).
       librarySaveMode: "new",
+      lastSavedLibraryFileId: null,
       files: deriveFiles(entries),
       ...deriveSelected(entries, 0),
     });

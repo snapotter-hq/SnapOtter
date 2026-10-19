@@ -136,7 +136,9 @@ export function useToolProcessor(toolId: string) {
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
   const activeEntryIdRef = useRef<string | null>(null);
+  const activeFileRef = useRef<File | null>(null);
   const activeEntryIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const activeEntryFilesRef = useRef<ReadonlyMap<string, File> | null>(null);
   const asyncModeRef = useRef(false);
   const reconnectSSERef = useRef<(force?: boolean) => void>(() => {});
   // Save mode captured at run start (#495). Only "overwrite" re-anchors
@@ -208,6 +210,7 @@ export function useToolProcessor(toolId: string) {
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
     activeEntryIdRef.current = null;
+    activeFileRef.current = null;
     uploadedFullyRef.current = false;
     setActiveJob(null, null);
   }, [setActiveJob]);
@@ -226,18 +229,72 @@ export function useToolProcessor(toolId: string) {
     }
   }, []);
 
-  // A store that no longer carries the run (Clear all, a reset, or a newer run
-  // started after an unmounted settling batch) has nothing left to settle, and
-  // an error, cancel handle, or batch ZIP written now would land on whatever
-  // the user does next (#2151, #2622, #2637).
+  const cancelStoppedJob = useCallback(async (jobId: string, stoppedToolId: string) => {
+    try {
+      let res: Response;
+      try {
+        res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
+          method: "POST",
+          headers: formatHeaders(),
+        });
+      } catch (cause) {
+        throw failedCancelRequest(cause, stoppedToolId);
+      }
+      await readCancelAnswer(res, () => false, stoppedToolId);
+    } catch (err) {
+      if (err instanceof CancelRefusedError) return;
+      reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, stoppedToolId);
+    }
+  }, []);
+
+  // A store that no longer carries the run (Clear all, a reset, setFiles/removeFile
+  // replacing or removing its entries, or a newer run started after an unmounted
+  // settling batch) has nothing left to settle, and an error, cancel handle, or
+  // batch ZIP written now would land on whatever the user does next (#2151,
+  // #2242, #2622, #2637).
   const storeWasReset = useCallback(() => {
     const state = useFileStore.getState();
-    const expectedActiveJobId =
-      asyncModeRef.current || batchRunRef.current?.jobId === activeJobIdRef.current
-        ? activeJobIdRef.current
-        : null;
-    if (state.processing && state.activeJobId === expectedActiveJobId) {
+    const isBatch = batchRunRef.current?.jobId === activeJobIdRef.current;
+    const expectedActiveJobId = asyncModeRef.current || isBatch ? activeJobIdRef.current : null;
+    const entryFiles = activeEntryFilesRef.current;
+    const hasRunEntry =
+      entryFiles === null ||
+      entryFiles.size === 0 ||
+      (isBatch
+        ? state.entries.some((entry) => entryFiles.get(entry.id) === entry.file)
+        : [...entryFiles].every(([id, file]) =>
+            state.entries.some((entry) => entry.id === id && entry.file === file),
+          ));
+    if (state.processing && state.activeJobId === expectedActiveJobId && hasRunEntry) {
       return false;
+    }
+    const stillOwnsStoreRun =
+      entryFiles !== null &&
+      entryFiles.size > 0 &&
+      state.processing &&
+      state.activeJobId === expectedActiveJobId;
+    const jobId = activeJobIdRef.current;
+    const accepted = asyncModeRef.current || sawJobEvidenceRef.current;
+    const keepRequest = !accepted && uploadedFullyRef.current;
+    uploadedFullyRef.current = false;
+    if (jobId && !stoppedJobIdsRef.current.has(jobId)) {
+      if (accepted) {
+        stoppedJobIdsRef.current.add(jobId);
+        void cancelStoppedJob(jobId, toolId);
+      } else if (keepRequest) {
+        stoppedJobIdsRef.current.add(jobId);
+        if (!eventSourceRef.current) {
+          reconnectSSERef.current(true);
+        }
+        stoppedRunsRef.current.add({
+          jobId,
+          toolId,
+          xhr: xhrRef.current,
+          es: eventSourceRef.current,
+        });
+        xhrRef.current = null;
+        eventSourceRef.current = null;
+      }
     }
     clearJobEvidenceTimer();
     clearStallTimer();
@@ -257,29 +314,32 @@ export function useToolProcessor(toolId: string) {
     batchRunRef.current = null;
     activeJobIdRef.current = null;
     activeEntryIdRef.current = null;
+    activeFileRef.current = null;
     activeEntryIdsRef.current = null;
-    uploadedFullyRef.current = false;
+    activeEntryFilesRef.current = null;
     setProgress(IDLE_PROGRESS);
-    return true;
-  }, [clearJobEvidenceTimer, clearStallTimer]);
-
-  const cancelStoppedJob = useCallback(async (jobId: string, stoppedToolId: string) => {
-    try {
-      let res: Response;
-      try {
-        res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
-          method: "POST",
-          headers: formatHeaders(),
-        });
-      } catch (cause) {
-        throw failedCancelRequest(cause, stoppedToolId);
+    if (stillOwnsStoreRun) {
+      const teardownError = runEndWrites([
+        ...(state.activeJobId !== null ? [() => setActiveJob(null, null)] : []),
+        () => setProcessing(false),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          toolId,
+        );
       }
-      await readCancelAnswer(res, () => false, stoppedToolId);
-    } catch (err) {
-      if (err instanceof CancelRefusedError) return;
-      reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, stoppedToolId);
     }
-  }, []);
+    return true;
+  }, [
+    cancelStoppedJob,
+    clearJobEvidenceTimer,
+    clearStallTimer,
+    setActiveJob,
+    setProcessing,
+    toolId,
+  ]);
 
   const finishStoppedRun = useCallback(
     (
@@ -367,12 +427,20 @@ export function useToolProcessor(toolId: string) {
       message: string,
       category?: FeedbackErrorCategory,
       entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
+      entryFiles: ReadonlyMap<string, File> | null = activeEntryFilesRef.current,
     ) => {
       if (!entryIds || entryIds.size === 0) return;
       const { entries, updateEntryById } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
       for (const entry of entries) {
-        if (!entry || !entryIds.has(entry.id) || entry.status !== "processing") continue;
+        if (
+          !entry ||
+          !entryIds.has(entry.id) ||
+          (entryFiles && entryFiles.get(entry.id) !== entry.file) ||
+          entry.status !== "processing"
+        ) {
+          continue;
+        }
         try {
           updateEntryById(entry.id, {
             status: "failed",
@@ -577,7 +645,10 @@ export function useToolProcessor(toolId: string) {
   // kickoff's throw, which reaches Sentry through the global handler, so only
   // a teardown that breaks as well is reported here (#1812).
   const endRunAtStart = useCallback(
-    (entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current) => {
+    (
+      entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
+      entryFiles: ReadonlyMap<string, File> | null = activeEntryFilesRef.current,
+    ) => {
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -600,7 +671,7 @@ export function useToolProcessor(toolId: string) {
           toolId,
         );
       }
-      settleProcessingEntries(trackingFailed, undefined, entryIds);
+      settleProcessingEntries(trackingFailed, undefined, entryIds, entryFiles);
     },
     [
       toolId,
@@ -623,14 +694,19 @@ export function useToolProcessor(toolId: string) {
   // alone (a non-null setError also turns processing off). The caller
   // rethrows, so the start's throw is still reported.
   const endStartBeforeClaim = useCallback(
-    (startEntryIds: ReadonlySet<string>) => {
+    (startEntryIds: ReadonlySet<string>, startEntryFiles: ReadonlyMap<string, File>) => {
       if (!activeJobIdRef.current) {
-        endRunAtStart(startEntryIds);
+        endRunAtStart(startEntryIds, startEntryFiles);
         return;
       }
       const liveIds = activeEntryIdsRef.current;
       const orphanedIds = new Set([...startEntryIds].filter((id) => !liveIds?.has(id)));
-      settleProcessingEntries(tRef.current.errors.jobTrackingFailed, undefined, orphanedIds);
+      settleProcessingEntries(
+        tRef.current.errors.jobTrackingFailed,
+        undefined,
+        orphanedIds,
+        startEntryFiles,
+      );
     },
     [endRunAtStart, settleProcessingEntries],
   );
@@ -817,35 +893,45 @@ export function useToolProcessor(toolId: string) {
                 console.debug("Ignored xhr.abort error:", _e);
               }
               const entryId = activeEntryIdRef.current;
+              const entryFile = activeFileRef.current;
               if (
                 entryId &&
-                useFileStore.getState().entries.some((entry) => entry.id === entryId)
+                entryFile &&
+                useFileStore
+                  .getState()
+                  .entries.some((entry) => entry.id === entryId && entry.file === entryFile)
               ) {
                 if (result.savedFileId) {
                   useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
                 }
-                useFileStore.getState().updateEntryById(entryId, {
-                  processedUrl: result.downloadUrl,
-                  processedPreviewUrl: result.previewUrl ?? null,
-                  processedFilename: null,
-                  resultNotes: pickResultNotes(result),
-                  status: "completed",
-                  originalSize: result.originalSize,
-                  processedSize: result.processedSize,
-                  ...(result.savedFileId && saveModeRef.current === "overwrite"
-                    ? { serverFileId: result.savedFileId }
-                    : {}),
-                });
-                // An auto-saved result is already in the library, so it was never at risk.
-                // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
-                if (result.savedFileId) useFileStore.getState().markClaimedById(entryId);
-                // After the store writes, as in landSyncResult: tools that
-                // render straight from the payload (histogram, sprite sheet)
-                // must not show a result beside the error a failed write ends
-                // the run with (#1739). Before the teardown, so a good run
-                // never ends processing with no payload.
-                setWarning(result.warning ?? null);
-                setResultPayload(result as unknown as Record<string, unknown>);
+                if (
+                  useFileStore
+                    .getState()
+                    .entries.some((entry) => entry.id === entryId && entry.file === entryFile)
+                ) {
+                  useFileStore.getState().updateEntryById(entryId, {
+                    processedUrl: result.downloadUrl,
+                    processedPreviewUrl: result.previewUrl ?? null,
+                    processedFilename: null,
+                    resultNotes: pickResultNotes(result),
+                    status: "completed",
+                    originalSize: result.originalSize,
+                    processedSize: result.processedSize,
+                    ...(result.savedFileId && saveModeRef.current === "overwrite"
+                      ? { serverFileId: result.savedFileId }
+                      : {}),
+                  });
+                  // An auto-saved result is already in the library, so it was never at risk.
+                  // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+                  if (result.savedFileId) useFileStore.getState().markClaimedById(entryId);
+                  // After the store writes, as in landSyncResult: tools that
+                  // render straight from the payload (histogram, sprite sheet)
+                  // must not show a result beside the error a failed write ends
+                  // the run with (#1739). Before the teardown, so a good run
+                  // never ends processing with no payload.
+                  setWarning(result.warning ?? null);
+                  setResultPayload(result as unknown as Record<string, unknown>);
+                }
               }
               clearActiveJob();
               setProcessing(false);
@@ -997,6 +1083,29 @@ export function useToolProcessor(toolId: string) {
       }
     };
   });
+  // Stop an in-flight run as soon as setFiles, reset, or removeFile removes
+  // the entry (and file) the run was started on (#2242).
+  useEffect(() => {
+    return useFileStore.subscribe((state) => {
+      if (!activeJobIdRef.current) return;
+      const entryFiles = activeEntryFilesRef.current;
+      if (!entryFiles || entryFiles.size === 0) return;
+      const isBatch = batchRunRef.current?.jobId === activeJobIdRef.current;
+      const hasRunEntry = isBatch
+        ? state.entries.some((entry) => entryFiles.get(entry.id) === entry.file)
+        : [...entryFiles].every(([id, file]) =>
+            state.entries.some((entry) => entry.id === id && entry.file === file),
+          );
+      if (!hasRunEntry) {
+        try {
+          storeWasReset();
+        } catch (err) {
+          reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, toolId);
+        }
+      }
+    });
+  }, [storeWasReset, toolId]);
+
   // Reconnect SSE when tab becomes visible again (mobile tab recovery)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -1057,10 +1166,34 @@ export function useToolProcessor(toolId: string) {
         });
       });
 
-      const capturedIndex = useFileStore.getState().selectedIndex;
-      const capturedEntry = useFileStore.getState().entries[capturedIndex];
+      const stateAtStart = useFileStore.getState();
+      const capturedIndex = stateAtStart.selectedIndex;
+      const uploadedFile = files[capturedIndex] ?? files[0];
+      const selectedEntry = stateAtStart.entries[capturedIndex];
+      const capturedEntry =
+        selectedEntry?.file === uploadedFile
+          ? selectedEntry
+          : stateAtStart.entries.find((entry) => entry.file === uploadedFile);
       const capturedEntryId = capturedEntry?.id ?? null;
+      const capturedFile = capturedEntry?.file ?? null;
       const runEntryIds = new Set(capturedEntryId ? [capturedEntryId] : []);
+      const runEntryFiles = new Map<string, File>();
+      if (MULTI_FILE_TOOLS.has(toolId) && files.length > 1) {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          const atIndex = stateAtStart.entries[i];
+          const matched =
+            atIndex?.file === f ? atIndex : stateAtStart.entries.find((entry) => entry.file === f);
+          if (matched) {
+            runEntryFiles.set(matched.id, f);
+          }
+        }
+      } else if (capturedEntryId && capturedFile) {
+        runEntryFiles.set(capturedEntryId, capturedFile);
+      }
+      if (stateAtStart.entries.length > 0 && (!capturedEntryId || runEntryFiles.size === 0)) {
+        return;
+      }
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
@@ -1072,20 +1205,24 @@ export function useToolProcessor(toolId: string) {
         setWarning(null);
         setResultPayload(null);
         useFileStore.getState().setLastSavedLibraryFileId(null);
-        useFileStore.getState().updateEntry(capturedIndex, {
-          processedUrl: null,
-          processedPreviewUrl: null,
-          processedFilename: null,
-          resultNotes: null,
-          status: "processing",
-          error: null,
-        });
+        if (capturedEntryId) {
+          useFileStore.getState().updateEntryById(capturedEntryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            resultNotes: null,
+            status: "processing",
+            error: null,
+          });
+        }
 
         const clientJobId = generateId();
         activeJobIdRef.current = clientJobId;
         claimed = true;
         activeEntryIdRef.current = capturedEntryId;
+        activeFileRef.current = capturedFile;
         activeEntryIdsRef.current = runEntryIds;
+        activeEntryFilesRef.current = runEntryFiles;
         asyncModeRef.current = false;
         if (useFileStore.getState().activeJobId !== null) {
           setActiveJob(null, null);
@@ -1218,8 +1355,11 @@ export function useToolProcessor(toolId: string) {
           try {
             if (
               capturedEntryId &&
-              useFileStore.getState().entries.find((e) => e.id === capturedEntryId)?.status ===
-                "processing"
+              capturedFile &&
+              useFileStore
+                .getState()
+                .entries.find((e) => e.id === capturedEntryId && e.file === capturedFile)
+                ?.status === "processing"
             ) {
               useFileStore.getState().updateEntryById(capturedEntryId, {
                 status: "failed",
@@ -1259,12 +1399,22 @@ export function useToolProcessor(toolId: string) {
         const landSyncResult = (result: ProcessResult) => {
           if (
             !capturedEntryId ||
-            !useFileStore.getState().entries.some((entry) => entry.id === capturedEntryId)
+            !capturedFile ||
+            !useFileStore
+              .getState()
+              .entries.some((entry) => entry.id === capturedEntryId && entry.file === capturedFile)
           ) {
             return;
           }
           if (result.savedFileId) {
             useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+          }
+          if (
+            !useFileStore
+              .getState()
+              .entries.some((entry) => entry.id === capturedEntryId && entry.file === capturedFile)
+          ) {
+            return;
           }
           useFileStore.getState().updateEntryById(capturedEntryId, {
             processedUrl: result.downloadUrl,
@@ -1451,8 +1601,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        if (claimed) endRunAtStart(runEntryIds);
-        else endStartBeforeClaim(runEntryIds);
+        if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
+        else endStartBeforeClaim(runEntryIds, runEntryFiles);
         throw cause;
       }
     },
@@ -1521,10 +1671,25 @@ export function useToolProcessor(toolId: string) {
       // status; this flag only shapes what this client shows (#767).
       let canceledByUser = false;
 
-      const { updateEntry, updateEntryById, setBatchZip } = useFileStore.getState();
+      const { updateEntryById, setBatchZip } = useFileStore.getState();
       const priorEntries = useFileStore.getState().entries;
-      const capturedEntryIds = priorEntries.map((entry) => entry.id);
-      const runEntryIds = new Set(capturedEntryIds);
+      const capturedEntries = files.map((file, i) => {
+        const atIndex = priorEntries[i];
+        const matched =
+          atIndex?.file === file ? atIndex : priorEntries.find((entry) => entry.file === file);
+        return matched ? { id: matched.id, file } : null;
+      });
+      const runEntryIds = new Set<string>();
+      const runEntryFiles = new Map<string, File>();
+      for (const captured of capturedEntries) {
+        if (captured) {
+          runEntryIds.add(captured.id);
+          runEntryFiles.set(captured.id, captured.file);
+        }
+      }
+      if (priorEntries.length > 0 && runEntryFiles.size === 0) {
+        return;
+      }
 
       // Everything up to the send runs before any XHR handler exists, so a
       // throw here (a store listener, settings JSON.stringify can't encode)
@@ -1545,10 +1710,11 @@ export function useToolProcessor(toolId: string) {
         // before this run uploads, so a failed or absent result can't render a
         // previous run's output under the new run's filename and size (#746).
         // Revoke stale result blob URLs so they don't leak.
-        for (let i = 0; i < priorEntries.length; i++) {
-          const staleUrl = priorEntries[i]?.processedUrl;
+        for (const captured of capturedEntries) {
+          if (!captured) continue;
+          const staleUrl = priorEntries.find((entry) => entry.id === captured.id)?.processedUrl;
           if (staleUrl?.startsWith("blob:")) URL.revokeObjectURL(staleUrl);
-          updateEntry(i, {
+          updateEntryById(captured.id, {
             processedUrl: null,
             processedPreviewUrl: null,
             processedFilename: null,
@@ -1563,7 +1729,9 @@ export function useToolProcessor(toolId: string) {
         activeJobIdRef.current = clientJobId;
         claimed = true;
         activeEntryIdRef.current = null;
+        activeFileRef.current = null;
         activeEntryIdsRef.current = runEntryIds;
+        activeEntryFilesRef.current = runEntryFiles;
         asyncModeRef.current = false;
 
         setProcessing(true);
@@ -1653,7 +1821,13 @@ export function useToolProcessor(toolId: string) {
             const runEntries = useFileStore.getState().entries;
             let settleError: { cause: unknown } | null = null;
             for (const entry of runEntries) {
-              if (!entry || !runEntryIds.has(entry.id) || entry.status !== "processing") continue;
+              if (
+                !entry ||
+                runEntryFiles.get(entry.id) !== entry.file ||
+                entry.status !== "processing"
+              ) {
+                continue;
+              }
               try {
                 updateEntryById(entry.id, {
                   status: "failed",
@@ -1723,12 +1897,27 @@ export function useToolProcessor(toolId: string) {
             if (storeWasReset()) return;
           }
 
-          // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
-          setBatchZip(zipBlob, `batch-${toolId}.zip`);
+          // Only a ZIP that opened (or skipped unpacking) for a batch with at
+          // least one of its entries still in the store is kept as the download.
+          if (
+            useFileStore
+              .getState()
+              .entries.some((entry) => runEntryFiles.get(entry.id) === entry.file)
+          ) {
+            setBatchZip(zipBlob, `batch-${toolId}.zip`);
+          }
 
-          for (let i = 0; i < capturedEntryIds.length; i++) {
-            const entryId = capturedEntryIds[i];
-            if (!useFileStore.getState().entries.some((entry) => entry.id === entryId)) continue;
+          for (let i = 0; i < capturedEntries.length; i++) {
+            const captured = capturedEntries[i];
+            if (
+              !captured ||
+              !useFileStore
+                .getState()
+                .entries.some((entry) => entry.id === captured.id && entry.file === captured.file)
+            ) {
+              continue;
+            }
+            const entryId = captured.id;
             const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
@@ -1798,7 +1987,10 @@ export function useToolProcessor(toolId: string) {
           } catch (cause) {
             const unsettled = useFileStore
               .getState()
-              .entries.some((entry) => runEntryIds.has(entry.id) && entry.status === "processing");
+              .entries.some(
+                (entry) =>
+                  runEntryFiles.get(entry.id) === entry.file && entry.status === "processing",
+              );
             if (activeJobIdRef.current === clientJobId && !storeWasReset() && unsettled) {
               try {
                 failRun(t.errors.batchFailed, settle.reason);
@@ -2127,8 +2319,8 @@ export function useToolProcessor(toolId: string) {
         });
         xhr.send(formData);
       } catch (cause) {
-        if (claimed) endRunAtStart(runEntryIds);
-        else endStartBeforeClaim(runEntryIds);
+        if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
+        else endStartBeforeClaim(runEntryIds, runEntryFiles);
         throw cause;
       }
     },
