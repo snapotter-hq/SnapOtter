@@ -178,6 +178,12 @@ interface FileState {
   librarySaveMode: LibrarySaveMode;
   /** Library file id of the last run's auto-saved result, for the review UI. */
   lastSavedLibraryFileId: string | null;
+  /**
+   * Bumped whenever the tool route leaves (`stopRuns`), so runs that survive a
+   * panel unmount (mobile sheet close or breakpoint swap) still stop when the
+   * user leaves the tool, even if the next route keeps the files (#1994).
+   */
+  stopCount: number;
 
   // Derived from entries (selected entry fields)
   readonly files: File[];
@@ -221,6 +227,7 @@ interface FileState {
   setProcessedUrl: (url: string | null, previewUrl?: string | null) => void;
   setSizes: (original: number, processed: number) => void;
   undoProcessing: () => void;
+  stopRuns: () => void;
   reset: () => void;
 }
 
@@ -236,6 +243,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   cancelCurrentJob: null,
   librarySaveMode: "new",
   lastSavedLibraryFileId: null,
+  stopCount: 0,
 
   // Initial derived values (empty state)
   files: [],
@@ -581,6 +589,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       ...deriveSelected(resetEntries, selectedIndex),
     });
   },
+
+  stopRuns: () => set((state) => ({ stopCount: state.stopCount + 1 })),
 
   reset: () => {
     revokeEntries(get().entries);

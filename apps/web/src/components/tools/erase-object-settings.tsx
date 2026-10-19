@@ -431,14 +431,21 @@ export function EraseObjectSettings({
     const capturedEntryId = capturedEntry.id;
     const runFile = capturedEntry.file;
     const saveMode = useFileStore.getState().librarySaveMode;
+    const startStopCount = useFileStore.getState().stopCount;
     useFileStore.getState().setLastSavedLibraryFileId(null);
 
     const maskBlob = await eraserRef.current.exportMask();
     if (!maskBlob) return;
-    // The store may have been replaced while the mask exported, and the watch
-    // below only sees writes made after it subscribes: starting now would send
-    // a file nobody is looking at and land its answer on the next tool's (#1975).
-    if (!useFileStore.getState().entries.some((e) => e.file === runFile)) return;
+    // The store may have been replaced or the tool route left while the mask
+    // exported, and the watch below only sees writes made after it subscribes:
+    // starting now would send a file nobody is looking at and land its answer on
+    // the next tool's (#1975, #1994).
+    if (
+      useFileStore.getState().stopCount !== startStopCount ||
+      !useFileStore.getState().entries.some((e) => e.file === runFile)
+    ) {
+      return;
+    }
 
     // Record where the user painted so the comparison slider starts at that location
     const maskCenter = eraserRef.current.getMaskCenter();
@@ -575,14 +582,20 @@ export function EraseObjectSettings({
     });
     const stopProgress = subscription.stop;
 
-    // Leaving for another tool resets the file store, and opening library
-    // files replaces it. Either way this run's file is gone and its answer
-    // would land on entries that belong to someone else, so the request is
-    // dropped, as the batch does (#1894). This keys on the store rather than
-    // on unmount because the panel also unmounts when the layout swaps across the
-    // breakpoint, and that must not end the run (#1974, #2304).
+    // Leaving the tool route bumps stopCount (#1994), leaving for another tool
+    // resets the file store, and opening library files replaces it. Either way
+    // this run is over and its answer would land on entries that belong to
+    // someone else, so the request is dropped, as the batch does (#1894). This
+    // keys on the store rather than on unmount because the panel also unmounts
+    // when the layout swaps across the breakpoint, and that must not end the
+    // run (#1974, #2304).
     unwatchFiles = useFileStore.subscribe((state) => {
-      if (abandoned || state.entries.some((e) => e.file === runFile)) return;
+      if (
+        abandoned ||
+        (state.stopCount === startStopCount && state.entries.some((e) => e.file === runFile))
+      ) {
+        return;
+      }
       // This runs inside whoever replaced the files (the tool page's reset,
       // the library's setFiles): a throw here must not break their update, and
       // each step gets its own guard so one that throws can't leave the run at
@@ -728,8 +741,10 @@ export function EraseObjectSettings({
   const handleProcessAll = async () => {
     if (!eraserRef.current) return;
 
+    const startStopCount = useFileStore.getState().stopCount;
     const masks = await eraserRef.current.exportAllMasks();
     if (masks.size === 0) return;
+    if (useFileStore.getState().stopCount !== startStopCount) return;
 
     const { entries: currentEntries } = useFileStore.getState();
 
@@ -745,26 +760,52 @@ export function EraseObjectSettings({
     }
     if (work.length === 0) return;
 
-    // Leaving for another tool resets the file store, and opening library
-    // files replaces it. Either way the batch's files are gone, so it stops
-    // there: the file in flight is dropped, no more are sent, and nothing is
-    // written to entries that now belong to someone else (#1894). This keys
-    // on the store rather than on unmount because the panel also unmounts
-    // whenever the mobile settings sheet closes, and that must not end the run.
+    // Leaving the tool route bumps stopCount (#1994), leaving for another tool
+    // resets the file store, and opening library files replaces it. Either way
+    // the batch stops there: the file in flight is dropped, no more are sent,
+    // and nothing is written to entries that now belong to someone else (#1894).
+    // This keys on the store rather than on unmount because the panel also
+    // unmounts when the layout swaps across the breakpoint, and that must not
+    // end the run.
     const batchFiles = new Set(work.map((w) => w.file));
     let filesGone = false;
     let stopInFlight: (() => void) | null = null;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (filesGone || state.entries.some((e) => batchFiles.has(e.file))) return;
+      if (
+        filesGone ||
+        (state.stopCount === startStopCount && state.entries.some((e) => batchFiles.has(e.file)))
+      ) {
+        return;
+      }
       filesGone = true;
-      // This runs inside whoever replaced the files (the tool page's reset,
-      // the library's setFiles): a throw here must not break their update.
-      try {
-        stopInFlight?.();
-      } catch (err) {
+      // This runs inside whoever replaced the files or left the route: a throw
+      // here must not break their update.
+      let stopError: { cause: unknown } | null = null;
+      for (const step of [
+        () => stopInFlight?.(),
+        () => {
+          if (useFileStore.getState().processing) setProcessing(false);
+        },
+        () => {
+          for (const { entryId } of work) {
+            if (
+              useFileStore.getState().entries.find((e) => e.id === entryId)?.status === "processing"
+            ) {
+              useFileStore.getState().updateEntryById(entryId, { status: "pending" });
+            }
+          }
+        },
+      ]) {
+        try {
+          step();
+        } catch (err) {
+          stopError ??= { cause: err };
+        }
+      }
+      if (stopError) {
         reportRunEndFailure(
           "Stopping an Erase Object batch whose files left failed",
-          err,
+          stopError.cause,
           "erase-object",
         );
       }
@@ -777,7 +818,7 @@ export function EraseObjectSettings({
     let batchError: { cause: unknown } | null = null;
     try {
       setError(null);
-      setProcessing(true);
+      if (!filesGone) setProcessing(true);
       setProgressPhase("uploading");
       setProgressPercent(0);
       setElapsed(0);
@@ -843,9 +884,12 @@ export function EraseObjectSettings({
       () => {
         if (elapsedRef.current) clearInterval(elapsedRef.current);
       },
-      // Still ours to clear when the files are gone: a replacing setFiles
-      // leaves it set, and nothing else can have started a run since.
-      () => setProcessing(false),
+      // A stopped batch's store watch already cleared processing when the stop
+      // fired, so don't write it again after the await where a next run may
+      // have started (#1994).
+      () => {
+        if (!filesGone) setProcessing(false);
+      },
       () => setProgressPhase("idle"),
       () => setProgressStage(null),
       // A batch that stopped early says so, as the single-file run does.

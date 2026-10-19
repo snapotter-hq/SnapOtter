@@ -257,25 +257,46 @@ export function BarcodeReadSettings() {
     const { entries: initialEntries, updateEntryById } = useFileStore.getState();
     const entryIds = initialEntries.map((e) => e.id);
 
-    // Leaving for another tool resets the file store, and opening library
-    // files replaces it. Either way the scan's files are gone, so it stops
-    // there: the request in flight is dropped, no more files are sent, and
-    // nothing is written to entries that now belong to someone else (#1932).
-    // This keys on the store rather than on unmount because the panel also
-    // unmounts whenever the mobile settings sheet closes, and that must not
-    // end the scan.
+    // Leaving the tool route bumps stopCount (#1994), leaving for another tool
+    // resets the file store, and opening library files replaces it. Either way
+    // the scan stops there: the request in flight is dropped, no more files are
+    // sent, and nothing is written to entries that now belong to someone else
+    // (#1932). This keys on the store rather than on unmount because the panel
+    // also unmounts when the layout swaps across the breakpoint, and that must
+    // not end the scan.
     const runFiles = new Set(files);
+    const startStopCount = useFileStore.getState().stopCount;
     let filesGone = false;
     let stopInFlight: (() => void) | null = null;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (filesGone || state.files.some((f) => runFiles.has(f))) return;
+      if (
+        filesGone ||
+        (state.stopCount === startStopCount && state.files.some((f) => runFiles.has(f)))
+      ) {
+        return;
+      }
       filesGone = true;
-      // This runs inside whoever replaced the files (the tool page's reset,
-      // the library's setFiles): a throw here must not break their update.
-      try {
-        stopInFlight?.();
-      } catch (err) {
-        reportRunEndFailure("Stopping a barcode scan whose files left failed", err, "barcode-read");
+      // This runs inside whoever replaced the files or left the route: a throw
+      // here must not break their update.
+      let stopError: { cause: unknown } | null = null;
+      for (const step of [
+        () => stopInFlight?.(),
+        () => {
+          if (useFileStore.getState().processing) setProcessing(false);
+        },
+      ]) {
+        try {
+          step();
+        } catch (err) {
+          stopError ??= { cause: err };
+        }
+      }
+      if (stopError) {
+        reportRunEndFailure(
+          "Stopping a barcode scan whose files left failed",
+          stopError.cause,
+          "barcode-read",
+        );
       }
     });
 
@@ -340,11 +361,10 @@ export function BarcodeReadSettings() {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
     }
 
-    // The results and errors belong to files that are no longer there. The
-    // processing flag is still ours to clear: a replacing setFiles leaves it
-    // set, and nothing else can have started a run since.
+    // The results and errors belong to a scan that was stopped. Its store watch
+    // already cleared processing when the stop fired, so don't write it again
+    // after the await where a next run may have started (#1994).
     if (filesGone) {
-      setProcessing(false);
       setProgressPhase("idle");
       return;
     }

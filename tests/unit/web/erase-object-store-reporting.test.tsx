@@ -2209,6 +2209,111 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
     expect(FakeXhr.instances).toHaveLength(1);
     expect(useFileStore.getState().processing).toBe(false);
   });
+
+  it("stops the batch, preserves completed entries, resets the processing entry, and cancels a 202 job when stopRuns fires without resetting the store (#1994)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+    second.respond(202, { jobId: "queued", async: true });
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).status).toBe("processing");
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+
+    expect(FakeEventSource.instances[1].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).status).toBe("pending");
+    expect(entry(2).status).toBe("pending");
+    const clientJobId = second.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(2);
+  });
+
+  it("still clears processing, resets the processing entry, and reports the first error when abort throws during stopRuns (#1994)", async () => {
+    const { unmount } = renderPanel(3);
+    const first = await submit(1);
+    const abortBoom = new Error("abort blew up on route leave");
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw abortBoom;
+    });
+
+    unmount();
+    expect(() =>
+      act(() => {
+        useFileStore.getState().stopRuns();
+      }),
+    ).not.toThrow();
+    await act(async () => {});
+
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Stopping an Erase Object batch whose files left failed");
+    expect(error.cause).toBe(abortBoom);
+    expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+
+  it("sends nothing when stopRuns fires while batch masks are still exporting (#1994)", async () => {
+    let finishExport: (masks: Map<string, Blob>) => void = () => {};
+    const eraser = fakeEraser();
+    eraser.exportAllMasks = () =>
+      new Promise<Map<string, Blob>>((resolve) => {
+        finishExport = resolve;
+      });
+    render(
+      <EraseObjectSettings
+        eraserRef={{ current: eraser }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={2}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+    await act(async () => {
+      const mask = new Blob(["mask"], { type: "image/png" });
+      finishExport(new Map(useFileStore.getState().entries.map((e) => [e.blobUrl, mask] as const)));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
+  });
+
+  it("does not clobber a new run's processing flag when the stopped batch's microtask drains (#1994)", async () => {
+    const { unmount } = renderPanel(3);
+    await submit(1);
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+      useFileStore.getState().setProcessing(true);
+    });
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(true);
+  });
 });
 
 describe("erase-object single file: leaving the page mid-run (#1975)", () => {
@@ -2475,5 +2580,59 @@ describe("erase-object single file: leaving the page mid-run (#1975)", () => {
     const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
     expect(error.message).toBe("Stopping an Erase Object run whose file left failed");
     expect(tags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+  });
+
+  it("stops a 202 single-file run, closes its stream, and cancels the job when stopRuns fires without resetting the store (#1994)", async () => {
+    const { unmount } = renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).processedUrl).toBeNull();
+    const clientJobId = xhr.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${clientJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
+  it("sends nothing when stopRuns fires while the single-file mask is still exporting (#1994)", async () => {
+    let finishExport: (blob: Blob) => void = () => {};
+    const eraser = fakeEraser();
+    eraser.exportMask = () =>
+      new Promise<Blob | null>((resolve) => {
+        finishExport = resolve;
+      });
+    render(
+      <EraseObjectSettings
+        eraserRef={{ current: eraser }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={1}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("erase-object-submit"));
+
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+    await act(async () => {
+      finishExport(new Blob(["mask"], { type: "image/png" }));
+    });
+
+    expect(FakeXhr.instances).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).status).toBe("pending");
   });
 });

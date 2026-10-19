@@ -29,6 +29,7 @@ import { ToolPage } from "@/pages/tool-page";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
+import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 import { useMemeStore } from "@/stores/meme-store";
@@ -111,6 +112,9 @@ function renderRoutes(
         <Link to="/image/split" data-testid="go-split">
           Split
         </Link>
+        <Link to="/image/rotate" state={{ fromLibrary: true }} data-testid="go-rotate-from-library">
+          Rotate from library
+        </Link>
         <Routes>
           <Route path="/:section/:toolId" element={<ToolPage />} />
           <Route path="/files" element={<div data-testid="files-page">Files Page</div>} />
@@ -140,7 +144,7 @@ beforeEach(() => {
     if (url.endsWith(CANCEL_URL)) {
       return new Response(JSON.stringify({ canceled: true }), { status: 200 });
     }
-    return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
+    return new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 });
   });
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("EventSource", MockEventSource);
@@ -532,4 +536,108 @@ describe("ToolPage resets file and tool stores on unmount (#1122)", () => {
     expect(useFileStore.getState().entries).toEqual([]);
     expect(useFileStore.getState().processing).toBe(false);
   });
+
+  it("stops an active barcode-read scan and clears processing when navigating to a fromLibrary tool route that skips reset (#1994)", async () => {
+    renderRoutes("/image/barcode-read");
+
+    await act(async () => {
+      useFileStore.getState().setFiles([png("code-1.png"), png("code-2.png")]);
+    });
+
+    const submit = await screen.findByTestId("barcode-read-submit");
+    fireEvent.click(submit);
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(xhrs).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId("go-rotate-from-library"));
+    expect(await screen.findByTestId("rotate-right")).toBeInTheDocument();
+
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.entries).toHaveLength(2);
+    expect(xhrs).toHaveLength(1);
+  });
+
+  it("reports a throwing stopRuns in ToolPageStoreReset cleanup with the outgoing toolId without breaking route transitions (#1994)", async () => {
+    renderRoutes("/image/rotate");
+
+    const realStopRuns = useFileStore.getState().stopRuns;
+    const stopBoom = new Error("stop-runs-boom");
+    vi.spyOn(useFileStore.getState(), "stopRuns").mockImplementation(() => {
+      throw stopBoom;
+    });
+
+    try {
+      expect(() => fireEvent.click(screen.getByTestId("go-rotate-from-library"))).not.toThrow();
+      expect(() => fireEvent.click(screen.getByTestId("go-split"))).not.toThrow();
+    } finally {
+      useFileStore.setState({ stopRuns: realStopRuns });
+    }
+
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+      "Ending a tool run after its panel unmounted failed",
+    );
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].cause).toBe(stopBoom);
+    expect(vi.mocked(captureHandledError).mock.calls[0][1]).toEqual({
+      error_class: "bug",
+      tool_id: "rotate",
+    });
+  });
+
+  it.each([
+    ["/files", "go-files", "files-page", 0],
+    ["a fromLibrary tool route", "go-rotate-from-library", "rotate-right", 2],
+  ] as const)(
+    "stops an active 202 OCR scan, closes its progress stream, and cancels the job when leaving ToolPage for %s (#1994)",
+    async (_label, linkTestId, destinationTestId, expectedEntries) => {
+      useFeaturesStore.setState({
+        loaded: true,
+        loadError: false,
+        bundles: [
+          {
+            id: "ocr",
+            name: "OCR",
+            description: "Extract text from images and PDFs",
+            status: "not_installed",
+            installedVersion: null,
+            estimatedSize: "208-234 MiB",
+            availableQualities: ["fast"],
+            enablesTools: ["ocr", "ocr-pdf"],
+            progress: null,
+            error: null,
+          },
+        ],
+      });
+
+      renderRoutes("/image/ocr");
+
+      await act(async () => {
+        useFileStore.getState().setFiles([png("page-1.png"), png("page-2.png")]);
+      });
+
+      const submit = await screen.findByTestId("ocr-submit");
+      fireEvent.click(submit);
+
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(xhrs).toHaveLength(1);
+      act(() => {
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+        xhrs[0].onload?.();
+      });
+
+      fireEvent.click(screen.getByTestId(linkTestId));
+      expect(await screen.findByTestId(destinationTestId)).toBeInTheDocument();
+
+      expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+      expect(cancelPosts()).toHaveLength(1);
+      const state = useFileStore.getState();
+      expect(state.processing).toBe(false);
+      expect(state.entries).toHaveLength(expectedEntries);
+      expect(xhrs).toHaveLength(1);
+    },
+  );
 });

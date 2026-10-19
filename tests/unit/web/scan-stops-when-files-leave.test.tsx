@@ -323,6 +323,66 @@ describe.each(panels)("$name: the scan stops once its files leave the store (#19
     expect(entry(0).status).toBe("pending");
     expect(entry(0).processedUrl).toBeNull();
   });
+
+  it("stops the scan and clears processing when the tool route leaves without resetting the store (#1994)", async () => {
+    const { unmount } = panel.render();
+    const first = await submit(panel);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+
+    expect(first.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    first.respond(200, panel.goodBody);
+    await act(async () => {});
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("still clears processing and reports the first error when abort throws during stopRuns (#1994)", async () => {
+    const { unmount } = panel.render();
+    const first = await submit(panel);
+    const abortBoom = new Error("abort blew up on route leave");
+    vi.spyOn(first, "abort").mockImplementation(() => {
+      throw abortBoom;
+    });
+
+    unmount();
+    expect(() =>
+      act(() => {
+        useFileStore.getState().stopRuns();
+      }),
+    ).not.toThrow();
+    await act(async () => {});
+
+    for (const es of FakeEventSource.instances) expect(es.readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe(panel.stopMessage);
+    expect(error.cause).toBe(abortBoom);
+    expect(tags).toEqual({ error_class: "bug", tool_id: panel.toolId });
+  });
+
+  it("does not clobber a new run's processing flag when the stopped scan's microtask drains (#1994)", async () => {
+    const { unmount } = panel.render();
+    await submit(panel);
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+      useFileStore.getState().setProcessing(true);
+    });
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(true);
+  });
 });
 
 describe("OCR: a file the server took async stops too (#1932)", () => {
@@ -338,6 +398,39 @@ describe("OCR: a file the server took async stops too (#1932)", () => {
 
     expect(FakeEventSource.instances[0].readyState).toBe(2);
     expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("closes the progress stream after a 202 when stopRuns fires without resetting the store (#1994)", async () => {
+    const { unmount } = panels[1].render();
+    const first = await submit(panels[1]);
+    first.respond(202, { jobId: "j", async: true });
+    expect(FakeEventSource.instances[0].readyState).toBe(1);
+
+    unmount();
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+    await act(async () => {});
+
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("does not record savedFileId when stopRuns fires in the same tick a single-file library OCR finishes (#1994)", async () => {
+    useFileStore.getState().setFiles([image("one.png")]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-source-1" });
+    panels[1].render();
+    const first = await submit(panels[1]);
+
+    act(() => {
+      first.answer(200, { text: "hello", savedFileId: "lib-saved-1" });
+      useFileStore.getState().stopRuns();
+    });
+    await act(async () => {});
+
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
     expect(useFileStore.getState().processing).toBe(false);
   });
 });

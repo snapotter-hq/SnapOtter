@@ -285,6 +285,14 @@ function ToolPageStoreReset({
     return () => {
       if (probeRef.current?.isConnected && latestToolIdRef.current === toolId) return;
       setupToolIdRef.current = undefined;
+      const teardownError = runEndWrites([() => useFileStore.getState().stopRuns()]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a tool run after its panel unmounted failed",
+          teardownError.cause,
+          toolId,
+        );
+      }
     };
   }, [toolId]);
 
