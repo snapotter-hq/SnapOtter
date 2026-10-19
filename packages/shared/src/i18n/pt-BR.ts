@@ -5350,6 +5350,7 @@ export const ptBR: TranslationKeys = {
     mfaPolicyUnavailable:
       "Não foi possível verificar a política de MFA. Tente novamente em instantes.",
     accountDisabled: "Esta conta está desativada. Entre em contato com um administrador.",
+    ipNotAllowed: "Seu endereço IP não é permitido. Entre em contato com um administrador.",
     loginThrottled: "Muitas tentativas de login. Tente novamente em {minutes} minuto.",
     loginThrottledPlural: "Muitas tentativas de login. Tente novamente em {minutes} minutos.",
     loginThrottledUnknownWait: "Muitas tentativas de login. Aguarde antes de tentar novamente.",

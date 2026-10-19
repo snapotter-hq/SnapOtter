@@ -219,4 +219,37 @@ describe("IP allowlist with enterprise license", () => {
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
   });
+
+  it("blocks requests from a disallowed IP with 403 IP_NOT_ALLOWED (#2052)", async () => {
+    const putRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/ip-allowlist",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: { cidrs: ["127.0.0.0/8"] },
+    });
+    expect(putRes.statusCode).toBe(200);
+
+    try {
+      await vi.waitFor(async () => {
+        const blocked = await enterpriseApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          remoteAddress: "203.0.113.5",
+          payload: { username: "ipallowlistuser", password: "TestPass1" },
+        });
+        expect(blocked.statusCode).toBe(403);
+        expect(JSON.parse(blocked.body)).toEqual({
+          error: "IP address not allowed",
+          code: "IP_NOT_ALLOWED",
+        });
+      });
+    } finally {
+      await enterpriseApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/ip-allowlist",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+        payload: { cidrs: [] },
+      });
+    }
+  });
 });

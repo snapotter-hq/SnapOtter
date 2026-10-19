@@ -5284,6 +5284,7 @@ export const ar: TranslationKeys = {
     mfaEnrollmentRequired: "تتطلب مؤسستك المصادقة متعددة العوامل. يرجى إعداد MFA في إعدادات حسابك.",
     mfaPolicyUnavailable: "تعذّر التحقق من سياسة MFA. يرجى المحاولة مرة أخرى بعد قليل.",
     accountDisabled: "هذا الحساب معطّل. تواصل مع المسؤول.",
+    ipNotAllowed: "عنوان IP الخاص بك غير مسموح به. تواصل مع المسؤول.",
     loginThrottled: "عدد كبير جدًا من محاولات تسجيل الدخول. حاول مرة أخرى بعد {minutes} دقيقة.",
     loginThrottledPlural:
       "عدد كبير جدًا من محاولات تسجيل الدخول. حاول مرة أخرى بعد {minutes} دقائق.",

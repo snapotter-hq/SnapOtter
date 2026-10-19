@@ -5351,6 +5351,7 @@ export const pl: TranslationKeys = {
       "Twoja organizacja wymaga uwierzytelniania wieloskładnikowego. Skonfiguruj MFA w ustawieniach konta.",
     mfaPolicyUnavailable: "Nie udało się sprawdzić polityki MFA. Spróbuj ponownie za chwilę.",
     accountDisabled: "To konto jest wyłączone. Skontaktuj się z administratorem.",
+    ipNotAllowed: "Twój adres IP nie jest dozwolony. Skontaktuj się z administratorem.",
     loginThrottled: "Zbyt wiele prób logowania. Spróbuj ponownie za {minutes} min.",
     loginThrottledPlural: "Zbyt wiele prób logowania. Spróbuj ponownie za {minutes} min.",
     loginThrottledUnknownWait: "Zbyt wiele prób logowania. Poczekaj przed kolejną próbą.",

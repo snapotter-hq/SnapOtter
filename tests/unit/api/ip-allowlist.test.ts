@@ -1,5 +1,6 @@
 import type { BlockList } from "node:net";
-import { describe, expect, it } from "vitest";
+import Fastify from "fastify";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildBlockList,
   EXEMPT_PATHS,
@@ -188,6 +189,61 @@ describe("IP allowlist", () => {
       expect(EXEMPT_PATHS).toContain("/api/auth/saml/callback");
       expect(EXEMPT_PATHS).toContain("/api/auth/oidc/callback");
       expect(EXEMPT_PATHS).toContain("/api/v1/scim/");
+    });
+  });
+
+  describe("registerIpAllowlist onRequest hook", () => {
+    it("replies 403 with code IP_NOT_ALLOWED when the caller IP is outside the allowlist (#2052)", async () => {
+      vi.resetModules();
+      vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+        isEnterpriseFeatureEnabled: async () => true,
+      }));
+      vi.doMock("../../../apps/api/src/lib/settings-helpers.js", () => ({
+        getSettingString: async () => JSON.stringify(["10.0.0.0/8"]),
+      }));
+      vi.doMock("../../../apps/api/src/jobs/connection.js", () => ({
+        sharedRedis: () => ({
+          set: async () => "OK",
+          duplicate: () => ({
+            subscribe: async () => 1,
+            on: () => {},
+            unsubscribe: async () => {},
+            quit: async () => {},
+          }),
+        }),
+      }));
+
+      const { registerIpAllowlist: registerIsolated } = await import(
+        "../../../apps/api/src/plugins/ip-allowlist.js"
+      );
+      const app = Fastify();
+      try {
+        await registerIsolated(app);
+        app.post("/api/auth/login", async () => ({ ok: true }));
+
+        const blocked = await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          remoteAddress: "203.0.113.5",
+        });
+        expect(blocked.statusCode).toBe(403);
+        expect(blocked.json()).toEqual({
+          error: "IP address not allowed",
+          code: "IP_NOT_ALLOWED",
+        });
+
+        const allowed = await app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          remoteAddress: "10.1.2.3",
+        });
+        expect(allowed.statusCode).toBe(200);
+      } finally {
+        await app.close();
+        vi.doUnmock("../../../apps/api/src/lib/enterprise-feature.js");
+        vi.doUnmock("../../../apps/api/src/lib/settings-helpers.js");
+        vi.doUnmock("../../../apps/api/src/jobs/connection.js");
+      }
     });
   });
 });

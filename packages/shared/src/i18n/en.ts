@@ -5259,6 +5259,7 @@ export const en = {
       "Your organization requires multi-factor authentication. Please set up MFA in your account settings.",
     mfaPolicyUnavailable: "The MFA policy could not be checked. Please try again in a moment.",
     accountDisabled: "This account is disabled. Contact an administrator.",
+    ipNotAllowed: "Your IP address is not allowed. Contact an administrator.",
     loginThrottled: "Too many login attempts. Try again in {minutes} minute.",
     loginThrottledPlural: "Too many login attempts. Try again in {minutes} minutes.",
     loginThrottledUnknownWait: "Too many login attempts. Please wait before trying again.",

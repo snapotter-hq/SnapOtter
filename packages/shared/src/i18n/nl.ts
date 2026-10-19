@@ -5353,6 +5353,7 @@ export const nl: TranslationKeys = {
     mfaPolicyUnavailable:
       "Het MFA-beleid kon niet worden gecontroleerd. Probeer het over enkele ogenblikken opnieuw.",
     accountDisabled: "Dit account is uitgeschakeld. Neem contact op met een beheerder.",
+    ipNotAllowed: "Uw IP-adres is niet toegestaan. Neem contact op met een beheerder.",
     loginThrottled: "Te veel aanmeldpogingen. Probeer het over {minutes} minuut opnieuw.",
     loginThrottledPlural: "Te veel aanmeldpogingen. Probeer het over {minutes} minuten opnieuw.",
     loginThrottledUnknownWait:

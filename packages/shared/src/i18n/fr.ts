@@ -5365,6 +5365,7 @@ export const fr: TranslationKeys = {
     mfaPolicyUnavailable:
       "Impossible de vérifier la politique MFA. Veuillez réessayer dans un instant.",
     accountDisabled: "Ce compte est désactivé. Contactez un administrateur.",
+    ipNotAllowed: "Votre adresse IP n'est pas autorisée. Contactez un administrateur.",
     loginThrottled: "Trop de tentatives de connexion. Réessayez dans {minutes} minute.",
     loginThrottledPlural: "Trop de tentatives de connexion. Réessayez dans {minutes} minutes.",
     loginThrottledUnknownWait:

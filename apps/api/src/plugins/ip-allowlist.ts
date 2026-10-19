@@ -155,7 +155,7 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
     const ip = request.ip;
     if (!isIpAllowed(ip, cachedBlockList)) {
-      return reply.status(403).send({ error: "IP address not allowed" });
+      return reply.status(403).send({ error: "IP address not allowed", code: "IP_NOT_ALLOWED" });
     }
   });
 

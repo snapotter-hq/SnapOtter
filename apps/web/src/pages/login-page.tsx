@@ -100,6 +100,9 @@ function mfaFailureMessage(
   if (code === "MFA_EXPIRED") {
     return { message: t.auth.mfaExpired, clearCode: true, restart: true };
   }
+  if (code === "IP_NOT_ALLOWED") {
+    return { message: t.auth.ipNotAllowed, clearCode: false, restart: false };
+  }
   if (status === 429) {
     const minutes = retryAfterMinutes(bodyRetryAfter, header);
     return {
@@ -111,10 +114,10 @@ function mfaFailureMessage(
       restart: false,
     };
   }
-  if (status >= 500) {
-    return { message: t.auth.connectionError, clearCode: false, restart: false };
+  if (status === 401 || status === 400) {
+    return { message: t.auth.mfaInvalidCode, clearCode: true, restart: false };
   }
-  return { message: t.auth.mfaInvalidCode, clearCode: true, restart: false };
+  return { message: t.auth.connectionError, clearCode: false, restart: false };
 }
 
 /**
@@ -371,6 +374,8 @@ export function LoginPage() {
           // The 403 only goes to a caller who proved the password (#818), so
           // saying so tells the account owner the truth without leaking it.
           setError(t.auth.accountDisabled);
+        } else if (failure?.code === "IP_NOT_ALLOWED") {
+          setError(t.auth.ipNotAllowed);
         } else if (failure?.code === "VALIDATION_ERROR" && failure?.rule === "maxLength") {
           setError(format(t.errors.passwordTooLongAdminReset, { maxLength: failure.maxLength }));
         } else if (res.status === 429) {
@@ -387,13 +392,14 @@ export function LoginPage() {
                   minutes,
                 }),
           );
-        } else if (res.status >= 500) {
-          // A 5xx (a proxy answering with HTML mid-restart, a handler crash)
-          // is not a credentials problem; claiming "invalid credentials"
-          // invites password resets during an outage.
-          setError(t.auth.connectionError);
-        } else {
+        } else if (res.status === 401 || res.status === 400) {
           setError(t.auth.invalidCredentials);
+        } else {
+          // A 5xx (a proxy answering with HTML mid-restart, a handler crash)
+          // or an unrecognized 4xx (a proxy 403, a misrouted 404, auth disabled)
+          // is not a credentials problem; claiming "invalid credentials"
+          // invites password resets during an outage or misconfiguration (#2052).
+          setError(t.auth.connectionError);
         }
         return;
       }

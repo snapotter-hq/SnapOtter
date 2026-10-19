@@ -5372,6 +5372,7 @@ export const de: TranslationKeys = {
     mfaPolicyUnavailable:
       "Die MFA-Richtlinie konnte nicht überprüft werden. Bitte versuchen Sie es gleich erneut.",
     accountDisabled: "Dieses Konto ist deaktiviert. Wenden Sie sich an einen Administrator.",
+    ipNotAllowed: "Ihre IP-Adresse ist nicht zugelassen. Wenden Sie sich an einen Administrator.",
     loginThrottled: "Zu viele Anmeldeversuche. Versuchen Sie es in {minutes} Minute erneut.",
     loginThrottledPlural: "Zu viele Anmeldeversuche. Versuchen Sie es in {minutes} Minuten erneut.",
     loginThrottledUnknownWait:

@@ -5028,6 +5028,7 @@ export const zhCN: TranslationKeys = {
     mfaEnrollmentRequired: "您的组织要求启用多因素认证。请在账户设置中设置 MFA。",
     mfaPolicyUnavailable: "无法检查 MFA 策略。请稍后重试。",
     accountDisabled: "此账户已被禁用。请联系管理员。",
+    ipNotAllowed: "您的 IP 地址不在允许范围内。请联系管理员。",
     loginThrottled: "登录尝试次数过多。请在 {minutes} 分钟后重试。",
     loginThrottledPlural: "登录尝试次数过多。请在 {minutes} 分钟后重试。",
     loginThrottledUnknownWait: "登录尝试次数过多。请稍后重试。",

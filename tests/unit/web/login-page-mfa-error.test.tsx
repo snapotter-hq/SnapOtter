@@ -11,6 +11,8 @@ vi.mock("@/hooks/use-auth", () => ({ useAuth }));
 
 import { LoginPage } from "@/pages/login-page";
 
+const ENROLLMENT_URI = "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&issuer=SnapOtter";
+
 afterEach(() => {
   cleanup();
   useAuth.mockReset();
@@ -142,4 +144,312 @@ describe("LoginPage error messages", () => {
       expect(screen.getByText(/invalid username or password/i)).toBeInTheDocument();
     });
   });
+
+  it("still shows invalid credentials for a 400 without the maxLength rule", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Username and password are required" }),
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid username or password/i)).toBeInTheDocument();
+    });
+  });
+
+  it("says the IP address is not allowed when the API returns IP_NOT_ALLOWED (#2052)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "IP address not allowed", code: "IP_NOT_ALLOWED" }),
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your IP address is not allowed. Contact an administrator."),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      "a proxy or WAF HTML 403",
+      403,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
+    [
+      "an unrecognized 403 JSON response (auth disabled)",
+      403,
+      async () => ({ error: "Authentication is disabled" }),
+    ],
+    [
+      "a plain-text 404 for a misrouted POST",
+      404,
+      async () => {
+        throw new Error("Unexpected token N in JSON");
+      },
+    ],
+  ])(
+    "shows a connection error, not invalid credentials, for %s (#2052)",
+    async (_label, status, json) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status,
+          json,
+        }),
+      );
+
+      renderLoginPage();
+      await submitLogin();
+
+      await waitFor(() => {
+        expect(screen.getByText(/connection error/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/invalid username or password/i)).not.toBeInTheDocument();
+    },
+  );
+
+  it("says the IP address is not allowed and keeps the code on MFA-complete IP_NOT_ALLOWED (#2052)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-1" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          headers: new Headers(),
+          json: async () => ({ error: "IP address not allowed", code: "IP_NOT_ALLOWED" }),
+        }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your IP address is not allowed. Contact an administrator."),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(codeInput.value).toBe("123456");
+  });
+
+  it("leaves Verify enabled for a recovery code when MFA-complete returns IP_NOT_ALLOWED (#2052)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-1" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          headers: new Headers(),
+          json: async () => ({ error: "IP address not allowed", code: "IP_NOT_ALLOWED" }),
+        }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: "a3f9c01b" } });
+    const verifyButton = screen.getByRole("button", { name: /^verify$/i });
+    fireEvent.click(verifyButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your IP address is not allowed. Contact an administrator."),
+      ).toBeInTheDocument();
+    });
+    expect(codeInput.value).toBe("a3f9c01b");
+    expect(verifyButton).toBeEnabled();
+  });
+
+  it("still shows the invalid-code message and clears the field on a 400 MFA validation error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-1" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          json: async () => ({
+            error: "MFA token and code are required",
+            code: "VALIDATION_ERROR",
+          }),
+        }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid code/i)).toBeInTheDocument();
+    });
+    expect(codeInput.value).toBe("");
+  });
+
+  it.each([
+    ["a proxy 403", 403],
+    ["a plain-text 404", 404],
+  ])(
+    "shows a connection error and keeps the code on MFA-complete for %s (#2052)",
+    async (_label, status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-1" }),
+          })
+          .mockResolvedValueOnce({
+            ok: false,
+            status,
+            headers: new Headers(),
+            json: async () => {
+              throw new Error("Unexpected token < in JSON");
+            },
+          }),
+      );
+
+      renderLoginPage();
+      await submitLogin();
+
+      const codeInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
+      fireEvent.change(codeInput, { target: { value: "123456" } });
+      fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/connection error/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+      expect(codeInput.value).toBe("123456");
+    },
+  );
+
+  it("says the IP address is not allowed and keeps the code on MFA-enrollment IP_NOT_ALLOWED (#2052)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            requiresMfaEnrollment: true,
+            enrollmentToken: "enroll-token-1",
+            uri: ENROLLMENT_URI,
+            recoveryCodes: ["AAAA-1111"],
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          headers: new Headers(),
+          json: async () => ({ error: "IP address not allowed", code: "IP_NOT_ALLOWED" }),
+        }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = (await screen.findByLabelText(/6-digit code/i)) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your IP address is not allowed. Contact an administrator."),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(codeInput.value).toBe("123456");
+  });
+
+  it.each([
+    ["a proxy 403", 403],
+    ["a plain-text 404", 404],
+  ])(
+    "shows a connection error and keeps the code on MFA-enrollment for %s (#2052)",
+    async (_label, status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              requiresMfaEnrollment: true,
+              enrollmentToken: "enroll-token-1",
+              uri: ENROLLMENT_URI,
+              recoveryCodes: ["AAAA-1111"],
+            }),
+          })
+          .mockResolvedValueOnce({
+            ok: false,
+            status,
+            headers: new Headers(),
+            json: async () => {
+              throw new Error("Unexpected token < in JSON");
+            },
+          }),
+      );
+
+      renderLoginPage();
+      await submitLogin();
+
+      const codeInput = (await screen.findByLabelText(/6-digit code/i)) as HTMLInputElement;
+      fireEvent.change(codeInput, { target: { value: "123456" } });
+      fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/connection error/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+      expect(codeInput.value).toBe("123456");
+    },
+  );
 });

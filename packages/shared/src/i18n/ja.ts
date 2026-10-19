@@ -5282,6 +5282,8 @@ export const ja: TranslationKeys = {
     mfaPolicyUnavailable:
       "MFA ポリシーを確認できませんでした。しばらくしてからもう一度お試しください。",
     accountDisabled: "このアカウントは無効化されています。管理者にお問い合わせください。",
+    ipNotAllowed:
+      "お使いの IP アドレスからのアクセスは許可されていません。管理者にお問い合わせください。",
     loginThrottled: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledPlural: "ログインの試行が多すぎます。{minutes}分後にもう一度お試しください。",
     loginThrottledUnknownWait:
