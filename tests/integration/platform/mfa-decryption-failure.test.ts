@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
+import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // reportError is mocked so the tests can tell a reported fault from a silent
@@ -46,6 +47,21 @@ async function clearAdminMfa(): Promise<void> {
     .update(schema.users)
     .set({ totpSecret: null, totpEnabled: false, recoveryCodesHash: null, updatedAt: new Date() })
     .where(eq(schema.users.id, adminId));
+  const stepKeys = await sharedRedis().keys(`mfa:totp-step:${adminId}:*`);
+  if (stepKeys.length > 0) {
+    await sharedRedis().del(...stepKeys);
+  }
+}
+
+function generateTotpCode(): string {
+  return new OTPAuth.TOTP({
+    issuer: "SnapOtter",
+    label: "admin",
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(SECRET),
+  }).generate();
 }
 
 beforeAll(async () => {
@@ -127,10 +143,11 @@ describe("MFA routes when the stored TOTP secret can't be decrypted (#2020)", ()
     expectReportedAsOperational("/api/auth/mfa/disable");
   });
 
-  it("POST /api/auth/mfa/complete reports it", async () => {
+  it("POST /api/auth/mfa/complete reports it and preserves the challenge and attempt count (#2790)", async () => {
     await setAdminMfa(true);
     const mfaToken = randomUUID();
     await sharedRedis().set(`mfa:${mfaToken}`, adminId, "EX", 60);
+    await sharedRedis().set(`mfa:attempts:${mfaToken}`, "2", "EX", 60);
     const res = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/complete",
@@ -139,12 +156,29 @@ describe("MFA routes when the stored TOTP secret can't be decrypted (#2020)", ()
     expect(res.statusCode).toBe(500);
     expect(JSON.parse(res.body).code).toBe("DECRYPTION_FAILED");
     expectReportedAsOperational("/api/auth/mfa/complete");
+
+    // The challenge token and prior failed-attempt count must survive so the user
+    // can retry once the server key is restored (#2790).
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBe(adminId);
+    expect(await sharedRedis().pttl(`mfa:${mfaToken}`)).toBeGreaterThan(0);
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("2");
+
+    env.DATA_ENCRYPTION_KEY = KEY_A;
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: generateTotpCode() },
+    });
+    expect(retryRes.statusCode).toBe(200);
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
   });
 
-  it("POST /api/auth/mfa/enroll-complete reports it", async () => {
+  it("POST /api/auth/mfa/enroll-complete reports it and preserves the challenge and attempt count (#2790)", async () => {
     await setAdminMfa(false);
     const enrollmentToken = randomUUID();
     await sharedRedis().set(`mfa:enroll:${enrollmentToken}`, adminId, "EX", 60);
+    await sharedRedis().set(`mfa:enroll:attempts:${enrollmentToken}`, "2", "EX", 60);
     const res = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/mfa/enroll-complete",
@@ -153,6 +187,21 @@ describe("MFA routes when the stored TOTP secret can't be decrypted (#2020)", ()
     expect(res.statusCode).toBe(500);
     expect(JSON.parse(res.body).code).toBe("DECRYPTION_FAILED");
     expectReportedAsOperational("/api/auth/mfa/enroll-complete");
+
+    // The enrollment challenge token and prior failed-attempt count must survive (#2790).
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBe(adminId);
+    expect(await sharedRedis().pttl(`mfa:enroll:${enrollmentToken}`)).toBeGreaterThan(0);
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBe("2");
+
+    env.DATA_ENCRYPTION_KEY = KEY_A;
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: generateTotpCode() },
+    });
+    expect(retryRes.statusCode).toBe(200);
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBeNull();
   });
 
   it("reports it, not a TypeError, when the key was removed after enrollment", async () => {

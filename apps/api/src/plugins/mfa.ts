@@ -811,7 +811,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         // Decrypt the stored secret
         secretBase32 = await decryptSetting(dbUser.totpSecret);
         if (!secretBase32) {
-          await redis.del(attemptsKey);
+          await restoreMfaChallenge(redis, challengeKey, claimed);
           return replyDecryptionFailed(request, reply, userId);
         }
 
@@ -1072,7 +1072,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
         secretBase32 = await decryptSetting(dbUser.totpSecret);
         if (!secretBase32) {
-          await redis.del(attemptsKey);
+          await restoreMfaChallenge(redis, challengeKey, claimed);
           return replyDecryptionFailed(request, reply, userId);
         }
 
