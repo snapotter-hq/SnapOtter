@@ -37,6 +37,7 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
+  useFileStore.getState().updateEntry(0, { processedUrl: RESULT_URL });
   // Save state is per result URL and outlives the panel (#1502); every test
   // here starts on the same URL.
   useSaveToFilesStore.getState().reset();

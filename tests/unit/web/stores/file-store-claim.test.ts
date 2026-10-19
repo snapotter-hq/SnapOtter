@@ -78,6 +78,18 @@ describe("file store claim tracking", () => {
     expect(entries[0].processedUrl).toBeNull();
   });
 
+  it("skips markClaimedById when expectedProcessedUrl no longer matches the entry (#1777)", () => {
+    useFileStore.getState().setFiles([makeFile("a.png")]);
+    const id = useFileStore.getState().entries[0].id;
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:run-2" });
+
+    useFileStore.getState().markClaimedById(id, "blob:run-1");
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+
+    useFileStore.getState().markClaimedById(id, "blob:run-2");
+    expect(useFileStore.getState().entries[0].claimed).toBe(true);
+  });
+
   it("marks every entry claimed when the batch zip is taken", () => {
     useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
     useFileStore.getState().setBatchZip(new Blob(["z"]), "out.zip");

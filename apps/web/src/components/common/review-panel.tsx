@@ -120,13 +120,18 @@ export function ReviewPanel({
   const saveFailure = saveState?.status === "error" ? saveState.failure : "generic";
 
   const handleSaveToFiles = useCallback(async () => {
-    // Capture the entry's stable id before the awaits below: the thumbnail
-    // strip can move the selection or reorder entries while the upload is in
-    // flight, and the claim must land on the entry that was actually saved.
-    const { entries, selectedIndex } = useFileStore.getState();
-    const claimEntryId = entries[selectedIndex]?.id;
     const url = downloadUrl;
     if (!url) return;
+    // Capture the entry's stable id before the awaits below: the thumbnail
+    // strip can move the selection or reorder entries while the upload is in
+    // flight, and a re-run can replace or clear the result on that entry.
+    // The claim must land only on the entry and result that were saved.
+    const { entries, selectedIndex } = useFileStore.getState();
+    const claimEntry =
+      entries[selectedIndex]?.processedUrl === url
+        ? entries[selectedIndex]
+        : entries.find((e) => e.processedUrl === url);
+    const claimEntryId = claimEntry?.id;
     const saves = useSaveToFilesStore.getState();
     saves.saving(url);
     let failure: SaveFailure = "generic";
@@ -162,7 +167,9 @@ export function ReviewPanel({
         });
       }
       saves.saved(url);
-      if (claimEntryId) useFileStore.getState().markClaimedById(claimEntryId);
+      if (claimEntryId) {
+        useFileStore.getState().markClaimedById(claimEntryId, url);
+      }
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
       // fired, so save-rate was unmeasurable.

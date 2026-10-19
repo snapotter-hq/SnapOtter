@@ -206,7 +206,7 @@ interface FileState {
   clearBatchZip: () => void;
   /** Index is required: selectedIndex can change while a job runs. */
   markClaimed: (index: number) => void;
-  markClaimedById: (id: string) => void;
+  markClaimedById: (id: string, expectedProcessedUrl?: string) => void;
   markBatchClaimed: () => void;
   /** Claim the entry the UI is currently showing. Safe only from synchronous
    *  handlers: across an await the selection or order can move, so capture the
@@ -462,9 +462,17 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({ entries: next, files: deriveFiles(next), ...deriveSelected(next, selectedIndex) });
   },
 
-  markClaimedById: (id) => {
-    const index = get().entries.findIndex((e) => e.id === id);
-    if (index !== -1) get().markClaimed(index);
+  markClaimedById: (id, expectedProcessedUrl) => {
+    const { entries } = get();
+    const index = entries.findIndex((e) => e.id === id);
+    if (index === -1) return;
+    if (
+      expectedProcessedUrl !== undefined &&
+      entries[index].processedUrl !== expectedProcessedUrl
+    ) {
+      return;
+    }
+    get().markClaimed(index);
   },
 
   markBatchClaimed: () => {

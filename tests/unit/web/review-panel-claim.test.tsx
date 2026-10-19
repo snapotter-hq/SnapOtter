@@ -39,6 +39,7 @@ beforeEach(() => {
   });
   useFileStore.getState().reset();
   useFileStore.getState().setFiles([new File(["x"], "a.png", { type: "image/png" })]);
+  useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
   // Save state is per result URL and outlives the panel (#1502); every test
   // here renders the same URL.
   useSaveToFilesStore.getState().reset();
@@ -80,6 +81,7 @@ describe("ReviewPanel claim tracking", () => {
         new File(["x"], "a.png", { type: "image/png" }),
         new File(["y"], "b.png", { type: "image/png" }),
       ]);
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
     expect(useFileStore.getState().selectedIndex).toBe(0);
 
     let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
@@ -129,6 +131,7 @@ describe("ReviewPanel claim tracking", () => {
         new File(["y"], "b.png", { type: "image/png" }),
         new File(["z"], "c.png", { type: "image/png" }),
       ]);
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
     const savedId = useFileStore.getState().entries[0].id;
 
     let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
@@ -167,5 +170,267 @@ describe("ReviewPanel claim tracking", () => {
       [false, false],
       [true, true],
     ]);
+  });
+
+  it("claims the entry that was saved when an earlier file is removed mid-save (#1777)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([
+        new File(["x"], "a.png", { type: "image/png" }),
+        new File(["y"], "b.png", { type: "image/png" }),
+        new File(["z"], "c.png", { type: "image/png" }),
+      ]);
+    useFileStore.getState().updateEntry(1, { processedUrl: "blob:result" });
+    useFileStore.getState().setSelectedIndex(1);
+    const savedId = useFileStore.getState().entries[1].id;
+
+    let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
+    const upload = new Promise<{ ok: boolean }>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : upload,
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    // Removing a.png shifts b.png from index 1 to index 0 while the upload is in flight.
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+
+    await act(async () => {
+      resolveUpload?.({ ok: true });
+      await upload;
+    });
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+
+    const { entries } = useFileStore.getState();
+    expect(entries.map((e) => [e.id === savedId, e.claimed])).toEqual([
+      [true, true],
+      [false, false],
+    ]);
+  });
+
+  it("claims the entry that was saved when the file order is reversed mid-save (#1777)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([
+        new File(["x"], "a.png", { type: "image/png" }),
+        new File(["y"], "b.png", { type: "image/png" }),
+        new File(["z"], "c.png", { type: "image/png" }),
+      ]);
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
+    const savedId = useFileStore.getState().entries[0].id;
+
+    let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
+    const upload = new Promise<{ ok: boolean }>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : upload,
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    act(() => {
+      useFileStore.getState().reverseFiles();
+    });
+
+    await act(async () => {
+      resolveUpload?.({ ok: true });
+      await upload;
+    });
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+
+    const { entries } = useFileStore.getState();
+    expect(entries.map((e) => [e.id === savedId, e.claimed])).toEqual([
+      [false, false],
+      [false, false],
+      [true, true],
+    ]);
+  });
+
+  it("does not claim any remaining entry when the saved file itself is removed mid-save (#1777)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([
+        new File(["x"], "a.png", { type: "image/png" }),
+        new File(["y"], "b.png", { type: "image/png" }),
+      ]);
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
+
+    let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
+    const upload = new Promise<{ ok: boolean }>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : upload,
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+
+    await act(async () => {
+      resolveUpload?.({ ok: true });
+      await upload;
+    });
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+
+    const { entries } = useFileStore.getState();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].claimed).toBe(false);
+  });
+
+  it("does not claim a new result when the entry is re-run while the old save is in flight (#1777)", async () => {
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
+
+    let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
+    const upload = new Promise<{ ok: boolean }>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : upload,
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    // A second run lands a new result on the same entry before the first upload finishes.
+    act(() => {
+      useFileStore.getState().updateEntry(0, { processedUrl: "blob:result-second-run" });
+    });
+
+    await act(async () => {
+      resolveUpload?.({ ok: true });
+      await upload;
+    });
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+    expect(useFileStore.getState().entries[0].processedUrl).toBe("blob:result-second-run");
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+  });
+
+  it("does not claim an entry whose result was cleared by undoProcessing mid-save (#1777)", async () => {
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
+
+    let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
+    const upload = new Promise<{ ok: boolean }>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : upload,
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    act(() => {
+      useFileStore.getState().undoProcessing();
+    });
+
+    await act(async () => {
+      resolveUpload?.({ ok: true });
+      await upload;
+    });
+    await act(async () => {});
+
+    expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
+  });
+
+  it("claims the entry matching downloadUrl when selectedIndex already points elsewhere (#1777)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([
+        new File(["x"], "a.png", { type: "image/png" }),
+        new File(["y"], "b.png", { type: "image/png" }),
+      ]);
+    useFileStore.getState().updateEntry(0, { processedUrl: "blob:result" });
+    useFileStore.getState().updateEntry(1, { processedUrl: "blob:other" });
+    useFileStore.getState().setSelectedIndex(1);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : Promise.resolve({ ok: true }),
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+
+    const { entries } = useFileStore.getState();
+    expect(entries[0].claimed).toBe(true);
+    expect(entries[1].claimed).toBe(false);
+  });
+
+  it("does not claim an unprocessed entry when no store entry matches downloadUrl (#1777)", async () => {
+    useFileStore.getState().undoProcessing();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : Promise.resolve({ ok: true }),
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+    expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+    expect(useFileStore.getState().entries[0].claimed).toBe(false);
   });
 });
