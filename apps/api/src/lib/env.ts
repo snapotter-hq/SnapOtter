@@ -15,6 +15,35 @@ export function isHttpsUrl(value: string): boolean {
   }
 }
 
+/**
+ * Canonicalise EXTERNAL_URL to `${url.protocol}//${url.host}${url.pathname}`
+ * with trailing slashes stripped when it is an http(s) URL with no credentials,
+ * query string, or fragment (#1876). Scheme and host are lowercased (IDN hosts
+ * punycoded), default ports (:80, :443) are dropped, and backslashes and dot
+ * segments in the path are resolved, while the path's case is preserved so
+ * BASE_PATH matching does not change. Anything else keeps its trimmed,
+ * slash-stripped form so the SSO boot check still rejects it with its own
+ * message.
+ */
+function normalizeExternalUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    if (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      !url.username &&
+      !url.password &&
+      !/[?#]/.test(trimmed)
+    ) {
+      return `${url.protocol}//${url.host}${url.pathname}`.replace(/\/+$/, "");
+    }
+  } catch {
+    // Keep the trimmed form so the SSO boot check still rejects it.
+  }
+  return trimmed;
+}
+
 const envSchema = z
   .object({
     PORT: z.coerce.number().default(1349),
@@ -165,12 +194,10 @@ const envSchema = z
     SAML_USERNAME_ATTRIBUTE: z.string().default(""),
     SAML_EMAIL_ATTRIBUTE: z.string().default("email"),
     // Callback and logout URLs append a path to this, so a trailing slash
-    // would double up into "//api/auth/..." (#1599). Whitespace goes first: a
-    // newline from an env file or secret mount would otherwise hide the slash.
-    EXTERNAL_URL: z
-      .string()
-      .default("")
-      .transform((v) => v.trim().replace(/\/+$/, "")),
+    // would double up into "//api/auth/..." (#1599), and non-canonical
+    // spellings (uppercase scheme or host, default port, backslash, dot
+    // segments) would give one origin several redirect URIs (#1876).
+    EXTERNAL_URL: z.string().default("").transform(normalizeExternalUrl),
     COOKIE_SECRET: z.string().default(""),
     REDIS_URL: z.string().default("redis://localhost:6379"),
     SYNC_WAIT_MS: z.coerce.number().default(8000),
@@ -347,8 +374,31 @@ const envSchema = z
 
 export type Env = z.infer<typeof envSchema>;
 
-export function loadEnv(): Env {
-  return envSchema.parse(process.env);
+export function loadEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
+  return envSchema.parse(rawEnv);
+}
+
+/**
+ * Log once at boot when SSO is on and EXTERNAL_URL was rewritten to its
+ * canonical form (#1876). Trailing slashes and surrounding whitespace are
+ * stripped either way (#1599), so only a change to the URL itself (uppercase
+ * scheme or host, an explicit :80/:443 default port, a backslash, dot
+ * segments, or an IDN host) warns. An IdP that registered the previous
+ * spelling from SP metadata or an allowlist needs the canonical URL, or
+ * SAML_ENTITY_ID pinned to the previous entity ID.
+ */
+export function warnIfExternalUrlCanonicalized(
+  log: { warn: (obj: Record<string, unknown>, msg: string) => void },
+  rawEnv: NodeJS.ProcessEnv = process.env,
+  parsedEnv: Pick<Env, "OIDC_ENABLED" | "SAML_ENABLED" | "EXTERNAL_URL"> = loadEnv(rawEnv),
+): void {
+  if (!parsedEnv.OIDC_ENABLED && !parsedEnv.SAML_ENABLED) return;
+  const configured = (rawEnv.EXTERNAL_URL ?? "").trim().replace(/\/+$/, "");
+  if (!configured || configured === parsedEnv.EXTERNAL_URL) return;
+  log.warn(
+    { configuredExternalUrl: configured, canonicalExternalUrl: parsedEnv.EXTERNAL_URL },
+    `EXTERNAL_URL "${configured}" was canonicalized to "${parsedEnv.EXTERNAL_URL}". SSO redirect URIs, SAML metadata, and post_logout_redirect_uri now use the canonical URL; update your identity provider or set SAML_ENTITY_ID="${configured}/api/auth/saml/metadata" to keep the previous SAML entity ID.`,
+  );
 }
 
 export function resolveConcurrency(env: Env): number {

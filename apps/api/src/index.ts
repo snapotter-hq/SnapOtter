@@ -29,6 +29,7 @@ import { stripBasePath } from "./lib/base-path.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
+import { warnIfExternalUrlCanonicalized } from "./lib/env.js";
 import { setSentryInstanceTag } from "./lib/error-report.js";
 import {
   acquireInstallLock,
@@ -506,10 +507,9 @@ app.addHook("preHandler", (request, _reply, done) => {
 // Auth routes
 await authRoutes(app);
 
-// OIDC routes
+// SSO routes
+warnIfExternalUrlCanonicalized(app.log, process.env, env);
 await oidcRoutes(app);
-
-// SAML routes
 await registerSaml(app);
 
 // MFA routes (TOTP enrollment, verification, disable)

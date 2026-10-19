@@ -4,7 +4,11 @@ import { join } from "node:path";
 import Fastify from "fastify";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { stripBasePath } from "../../../apps/api/src/lib/base-path.js";
-import { isHttpsUrl, loadEnv } from "../../../apps/api/src/lib/env.js";
+import {
+  isHttpsUrl,
+  loadEnv,
+  warnIfExternalUrlCanonicalized,
+} from "../../../apps/api/src/lib/env.js";
 
 const config = vi.hoisted(() => ({ BASE_PATH: "" }));
 vi.mock("../../../apps/api/src/config.js", () => ({ env: config }));
@@ -164,12 +168,71 @@ describe("BASE_PATH configuration", () => {
         expect(() => loadEnv()).toThrow(/EXTERNAL_URL must not contain a username or password/);
       });
 
-      // The boot check reads the parsed scheme, so an uppercase spelling
-      // boots, and it boots unchanged: every SSO URL keeps the spelling the
-      // IdP has registered (#1775).
-      it("boots an uppercase HTTPS EXTERNAL_URL without rewriting it", () => {
-        configure("/snapotter", "HTTPS://Example.com/snapotter/");
-        expect(loadEnv().EXTERNAL_URL).toBe("HTTPS://Example.com/snapotter");
+      // Every SSO consumer builds its redirect URI, ACS URL, or entity ID from
+      // EXTERNAL_URL, so non-canonical spellings of the same origin are
+      // canonicalised at boot while the path's case is preserved (#1876).
+      it.each([
+        ["", "HTTPS://Photos.Example.com", "https://photos.example.com"],
+        ["/snapotter", "HTTPS://Example.com/snapotter/", "https://example.com/snapotter"],
+        ["", "HTTP://Photos.Example.com/", "http://photos.example.com"],
+        ["", "https://photos.example.com:443", "https://photos.example.com"],
+        ["", "http://photos.example.com:80/", "http://photos.example.com"],
+        ["", "https://photos.example.com:8443/", "https://photos.example.com:8443"],
+        ["", "https://photos.example.com\\", "https://photos.example.com"],
+        ["", "https://photos.example.com/\\", "https://photos.example.com"],
+        ["/snapotter", "https://example.com/snapotter\\", "https://example.com/snapotter"],
+        ["/snapotter", "https://example.com/snapotter/\\", "https://example.com/snapotter"],
+        ["/snapotter", "https://example.com/x/../snapotter", "https://example.com/snapotter"],
+        ["", "https://bücher.example.com/", "https://xn--bcher-kva.example.com"],
+        ["/SnapOtter", "HTTPS://Example.com/SnapOtter/", "https://example.com/SnapOtter"],
+      ])(
+        "canonicalizes BASE_PATH %s with EXTERNAL_URL %s to %s",
+        (basePath, externalUrl, canonical) => {
+          configure(basePath, externalUrl);
+          expect(loadEnv().EXTERNAL_URL).toBe(canonical);
+        },
+      );
+
+      it("preserves path case when matching EXTERNAL_URL against BASE_PATH", () => {
+        configure("/snapotter", "https://example.com/SnapOtter");
+        expect(() => loadEnv()).toThrow(/EXTERNAL_URL path .* must match BASE_PATH/);
+      });
+
+      it.each([
+        ["", "HTTPS://Photos.Example.com/", "https://photos.example.com"],
+        ["", "https://photos.example.com:443", "https://photos.example.com"],
+        ["", "https://photos.example.com\\", "https://photos.example.com"],
+        ["", "https://bücher.example.com", "https://xn--bcher-kva.example.com"],
+        ["/snapotter", "https://example.com/x/../snapotter", "https://example.com/snapotter"],
+      ])(
+        "warns at boot when EXTERNAL_URL %s is canonicalized to %s",
+        (basePath, configured, canonical) => {
+          configure(basePath, configured);
+          const warn = vi.fn();
+          warnIfExternalUrlCanonicalized({ warn }, process.env, loadEnv());
+          expect(warn).toHaveBeenCalledTimes(1);
+          const trimmedConfigured = configured.trim().replace(/\/+$/, "");
+          const [fields, message] = warn.mock.calls[0] as [Record<string, unknown>, string];
+          expect(fields).toEqual({
+            configuredExternalUrl: trimmedConfigured,
+            canonicalExternalUrl: canonical,
+          });
+          expect(message).toContain(trimmedConfigured);
+          expect(message).toContain(canonical);
+          expect(message).toContain(`SAML_ENTITY_ID="${trimmedConfigured}/api/auth/saml/metadata"`);
+        },
+      );
+
+      it.each([
+        ["", "https://photos.example.com"],
+        ["", "https://photos.example.com/"],
+        ["", " https://photos.example.com/\n"],
+        ["/snapotter", "https://example.com/snapotter/"],
+      ])("does not warn when EXTERNAL_URL %j is already canonical", (basePath, configured) => {
+        configure(basePath, configured);
+        const warn = vi.fn();
+        warnIfExternalUrlCanonicalized({ warn });
+        expect(warn).not.toHaveBeenCalled();
       });
     },
   );
@@ -182,9 +245,23 @@ describe("BASE_PATH configuration", () => {
     expect(() => loadEnv()).not.toThrow();
   });
 
+  it("does not warn about EXTERNAL_URL canonicalization when SSO is off", () => {
+    vi.stubEnv("OIDC_ENABLED", "false");
+    vi.stubEnv("SAML_ENABLED", "false");
+    vi.stubEnv("EXTERNAL_URL", "HTTPS://Photos.Example.com");
+    const warn = vi.fn();
+    warnIfExternalUrlCanonicalized({ warn });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("wires the EXTERNAL_URL canonicalization warning at server boot", () => {
+    const source = readFileSync(new URL("../../../apps/api/src/index.ts", import.meta.url), "utf8");
+    expect(source).toContain("warnIfExternalUrlCanonicalized(app.log, process.env, env)");
+  });
+
   // The secure-cookie check reads EXTERNAL_URL with SSO off too, so the slash
-  // is trimmed whatever else is configured, while values SSO would reject
-  // still boot as before (#1599).
+  // is trimmed and clean http(s) URLs are canonicalized whatever else is
+  // configured, while values SSO would reject still boot as before (#1599, #1876).
   it.each([
     ["", ""],
     ["https://example.com", "https://example.com"],
@@ -193,9 +270,11 @@ describe("BASE_PATH configuration", () => {
     ["https://example.com/?x=1", "https://example.com/?x=1"],
     [" https://example.com/\n", "https://example.com"],
     ["https://example.com/snapotter/ ", "https://example.com/snapotter"],
-    // Only the trim and slash strip: the spelling, scheme case included, is
-    // what every SSO URL is built from, so it isn't rewritten (#1775).
-    ["HTTPS://Example.com/", "HTTPS://Example.com"],
+    ["HTTPS://Example.com/", "https://example.com"],
+    ["https://photos.example.com:443", "https://photos.example.com"],
+    ["https://photos.example.com\\", "https://photos.example.com"],
+    ["https://example.com/x/../snapotter", "https://example.com/snapotter"],
+    ["HTTPS://Example.com/SnapOtter/", "https://example.com/SnapOtter"],
     // SSO rejects credentials, but with SSO off the value boots as before.
     ["https://user:pass@example.com/", "https://user:pass@example.com"],
   ])("normalizes EXTERNAL_URL %j without SSO", (input, output) => {
