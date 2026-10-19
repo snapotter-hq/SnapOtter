@@ -39,17 +39,23 @@ export function InfoSettings() {
   const { files, processing, error, setProcessing, setError } = useFileStore();
   const selectedIndex = useFileStore((s) => s.selectedIndex);
   const [info, setInfo] = useState<ImageInfoData | null>(null);
-  const cacheRef = useRef<Map<number, ImageInfoData>>(new Map());
+  const cacheRef = useRef<Map<string, ImageInfoData>>(new Map());
   const autoFetchRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchInfo = useCallback(
     async (index: number) => {
-      const file = useFileStore.getState().entries[index]?.file;
-      if (!file) return;
+      const entry = useFileStore.getState().entries[index];
+      if (!entry) return;
+      const { id: entryId, file } = entry;
 
-      const cached = cacheRef.current.get(index);
+      const cached = cacheRef.current.get(entryId);
       if (cached) {
+        if (abortRef.current) {
+          abortRef.current.abort();
+          abortRef.current = null;
+          setProcessing(false);
+        }
         setError(null);
         setInfo(cached);
         return;
@@ -61,6 +67,7 @@ export function InfoSettings() {
 
       setProcessing(true);
       setError(null);
+      setInfo(null);
 
       try {
         const formData = new FormData();
@@ -79,27 +86,47 @@ export function InfoSettings() {
         }
 
         const data: ImageInfoData = await res.json();
-        cacheRef.current.set(index, data);
-        setInfo(data);
+        const state = useFileStore.getState();
+        if (!autoFetchRef.current || !state.entries.some((e) => e.id === entryId)) return;
+        cacheRef.current.set(entryId, data);
+        if (!controller.signal.aborted && state.entries[state.selectedIndex]?.id === entryId) {
+          setInfo(data);
+        }
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : t.toolSettings.info.failedToRead);
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
+          return;
+        }
+        const state = useFileStore.getState();
+        if (state.entries[state.selectedIndex]?.id === entryId) {
+          setError(err instanceof Error ? err.message : t.toolSettings.info.failedToRead);
+        }
       } finally {
-        if (abortRef.current === controller) abortRef.current = null;
-        if (!controller.signal.aborted) {
-          setProcessing(false);
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          if (!controller.signal.aborted) {
+            setProcessing(false);
+          }
         }
       }
     },
     [setProcessing, setError, t],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: files.length is the reset trigger
+  // biome-ignore lint/correctness/useExhaustiveDependencies: files is the reset trigger
   useEffect(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+      setProcessing(false);
+    }
     cacheRef.current.clear();
     autoFetchRef.current = false;
+    setError(null);
     setInfo(null);
-  }, [files.length]);
+  }, [files]);
 
   useEffect(() => {
     if (!autoFetchRef.current || files.length === 0) return;
