@@ -18,6 +18,7 @@ import {
   SYSTEM_JOBS,
   scheduleSystemJobs,
 } from "../../../apps/api/src/jobs/system-jobs.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import type { ObjectInfo } from "../../../apps/api/src/lib/object-storage.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 
@@ -129,6 +130,60 @@ describe("runSystemJob", () => {
     expect(existsSync(freshDir)).toBe(true);
 
     await rm(freshDir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it("storageTtl skips the global sweep instead of falling back to FILE_MAX_AGE_HOURS when reading tempFileMaxAgeHours fails (#1525)", async () => {
+    const protectedJobId = `protected-${randomUUID().slice(0, 8)}`;
+    const protectedDir = join(env.WORKSPACE_PATH, "uploads", protectedJobId);
+
+    mkdirSync(protectedDir, { recursive: true });
+    writeFileSync(join(protectedDir, "f.txt"), "protected");
+    // Older than FILE_MAX_AGE_HOURS (1h in test env), younger than the admin's 168h setting
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    utimesSync(join(protectedDir, "f.txt"), twoHoursAgo, twoHoursAgo);
+    utimesSync(protectedDir, twoHoursAgo, twoHoursAgo);
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "tempFileMaxAgeHours", value: "168" })
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: "168", updatedAt: new Date() },
+      });
+
+    const readError = new Error("connection terminated unexpectedly");
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      const originalFrom = builder.from.bind(builder);
+      builder.from = (table: unknown) => {
+        if (table === schema.settings) {
+          throw readError;
+        }
+        return originalFrom(table);
+      };
+      return builder;
+    });
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    try {
+      const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+      expect((result as { removed: number }).removed).toBe(0);
+      expect(existsSync(protectedDir)).toBe(true);
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: readError },
+        "Storage TTL: tempFileMaxAgeHours read failed; skipping global sweep",
+      );
+    } finally {
+      selectSpy.mockRestore();
+      errSpy.mockRestore();
+      await rm(protectedDir, { recursive: true, force: true }).catch(() => {});
+      await db
+        .delete(schema.settings)
+        .where(eq(schema.settings.key, "tempFileMaxAgeHours"))
+        .catch(() => {});
+    }
   });
 
   it("sessionPurge deletes expired sessions", async () => {

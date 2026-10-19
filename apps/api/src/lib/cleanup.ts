@@ -3,21 +3,19 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 
 /**
- * Read the temp file max age from DB settings, falling back to env var.
+ * Read the temp file max age from DB settings, falling back to env var when no
+ * valid setting row is stored. Database read errors propagate so the caller can
+ * skip the sweep rather than silently shortening retention (#1525).
  * Called each cleanup cycle so changes take effect without restart.
  */
 export async function getMaxAgeMs(): Promise<number> {
-  try {
-    const [row] = await db
-      .select()
-      .from(schema.settings)
-      .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
-    if (row) {
-      const hours = parseFloat(row.value);
-      if (!Number.isNaN(hours) && hours > 0) return hours * 60 * 60 * 1000;
-    }
-  } catch {
-    /* DB not ready yet, use env */
+  const [row] = await db
+    .select()
+    .from(schema.settings)
+    .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
+  if (row) {
+    const hours = parseFloat(row.value);
+    if (!Number.isNaN(hours) && hours > 0) return hours * 60 * 60 * 1000;
   }
   return env.FILE_MAX_AGE_HOURS * 60 * 60 * 1000;
 }

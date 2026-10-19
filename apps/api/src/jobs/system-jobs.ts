@@ -377,7 +377,15 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   }
 
   // --- Global TTL sweep ---
-  const maxAgeMs = await getMaxAgeMs();
+  let maxAgeMs: number;
+  try {
+    maxAgeMs = await getMaxAgeMs();
+  } catch (err) {
+    // A failed read must not fall back to FILE_MAX_AGE_HOURS, which would
+    // shorten a longer retention the admin configured in Settings (#1525).
+    logger.error({ err }, "Storage TTL: tempFileMaxAgeHours read failed; skipping global sweep");
+    return { removed: deleteAfterCleaned, failed: deleteAfterErrors.length };
+  }
   if (maxAgeMs <= 0) return { removed: deleteAfterCleaned, failed: deleteAfterErrors.length };
 
   const cutoffMs = Date.now() - maxAgeMs;

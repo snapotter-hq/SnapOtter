@@ -410,6 +410,41 @@ describe("storageTtlSweep", () => {
     logSpy.mockRestore();
   });
 
+  it("logs the error and skips the global sweep when reading tempFileMaxAgeHours fails (#1525)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    seedNoLegalHold();
+    queueSelect("jobs", [
+      { id: "da-ok", userId: null },
+      { id: "da-fail", userId: null },
+    ]);
+    deletePrefixMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "uploads/da-fail") throw new Error("S3 down");
+    });
+    const readErr = new Error("connection terminated unexpectedly");
+    getMaxAgeMsMock.mockRejectedValue(readErr);
+
+    const oldMtime = Date.now() - 7_200_000;
+    listJobDirsMock.mockResolvedValue([
+      { key: "uploads/protected-by-admin-ttl", size: 0, mtimeMs: oldMtime },
+    ]);
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 1, failed: 1 });
+    expect(deletePrefixMock).toHaveBeenCalledWith("uploads/da-ok");
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/da-ok");
+    expect(listJobDirsMock).not.toHaveBeenCalled();
+    expect(deletePrefixMock).not.toHaveBeenCalledWith("uploads/protected-by-admin-ttl");
+    expect(errSpy).toHaveBeenCalledWith(
+      { err: readErr },
+      "Storage TTL: tempFileMaxAgeHours read failed; skipping global sweep",
+    );
+    errSpy.mockRestore();
+  });
+
   it("skips deleteAfter jobs belonging to a legal-hold user", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();

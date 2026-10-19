@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { runMigrations } from "../../../apps/api/src/db/migrate.js";
 import { getMaxAgeMs, shouldRunStartupCleanup } from "../../../apps/api/src/lib/cleanup.js";
@@ -62,6 +62,19 @@ describe("getMaxAgeMs", () => {
     await setSetting("tempFileMaxAgeHours", "0.5");
     const result = await getMaxAgeMs();
     expect(result).toBe(0.5 * 60 * 60 * 1000);
+  });
+
+  it("propagates a DB error instead of falling back to FILE_MAX_AGE_HOURS (#1525)", async () => {
+    await setSetting("tempFileMaxAgeHours", "168");
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    try {
+      await expect(getMaxAgeMs()).rejects.toThrow(dbError);
+    } finally {
+      selectSpy.mockRestore();
+    }
   });
 });
 
