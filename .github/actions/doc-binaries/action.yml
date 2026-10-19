@@ -1,21 +1,37 @@
 name: Install doc-engine binaries
 description: >-
   Install the curl-fetched doc-engine binaries (pandoc + pdfcpu) that the
-  document tools need. LibreOffice comes from apt separately. Versions match
-  ci.yml and docker/Dockerfile; keep the three in sync.
+  document tools need. LibreOffice comes from apt separately. Shared by ci.yml
+  and nightly.yml; versions match docker/Dockerfile.
 runs:
   using: composite
   steps:
     - name: Install Pandoc 3.10 (sandboxed DOCX/EPUB)
       shell: bash
       run: |
-        curl -fsSL https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-1-amd64.deb -o /tmp/pandoc.deb
+        curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+          https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-1-amd64.deb \
+          -o /tmp/pandoc.deb
+        printf '%s  %s\n' \
+          "d502599878eb29af3ae5f0cb5d559134df96534125d452c7a0674a5bad2c5ecf" \
+          /tmp/pandoc.deb \
+          | sha256sum --check --strict -
         sudo apt-get install -y --no-install-recommends /tmp/pandoc.deb
+        rm -f /tmp/pandoc.deb
         pandoc --version
     - name: Install pdfcpu (doc-engine PDF layout binary; matches docker/Dockerfile v0.13.0)
       shell: bash
       run: |
-        curl -fsSL https://github.com/pdfcpu/pdfcpu/releases/download/v0.13.0/pdfcpu_0.13.0_Linux_x86_64.tar.xz -o /tmp/pdfcpu.tar.xz
-        tar -xJf /tmp/pdfcpu.tar.xz -C /tmp
-        sudo install "$(find /tmp -type f -name pdfcpu | head -1)" /usr/local/bin/pdfcpu
+        curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+          https://github.com/pdfcpu/pdfcpu/releases/download/v0.13.0/pdfcpu_0.13.0_Linux_x86_64.tar.xz \
+          -o /tmp/pdfcpu.tar.xz
+        printf '%s  %s\n' \
+          "0f03f691c6275fa826e5d99e7aefbc8050180e4bc4a3b919b582137cd7da9bd7" \
+          /tmp/pdfcpu.tar.xz \
+          | sha256sum --check --strict -
+        rm -rf /tmp/pdfcpu-extract
+        mkdir -p /tmp/pdfcpu-extract
+        tar -xJf /tmp/pdfcpu.tar.xz -C /tmp/pdfcpu-extract
+        sudo install "$(find /tmp/pdfcpu-extract -type f -name pdfcpu | head -1)" /usr/local/bin/pdfcpu
+        rm -rf /tmp/pdfcpu.tar.xz /tmp/pdfcpu-extract
         pdfcpu version
