@@ -14,6 +14,8 @@ const stubs = vi.hoisted(() => ({
   publishes: [] as string[],
   removeError: null as Error | null,
   rowUpdates: 0,
+  state: "waiting" as "waiting" | "active",
+  finalizeKeys: new Map<string, string>(),
 }));
 
 vi.mock("../../../../apps/api/src/db/index.js", async (importOriginal) => {
@@ -45,6 +47,12 @@ vi.mock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
 vi.mock("../../../../apps/api/src/jobs/connection.js", () => ({
   createRedisSubscriberConnection: vi.fn(),
   sharedRedis: () => ({
+    set: async (key: string, value: string, _mode?: string, _ttlMs?: number, nx?: string) => {
+      if (nx === "NX" && stubs.finalizeKeys.has(key)) return null;
+      stubs.finalizeKeys.set(key, value);
+      return "OK";
+    },
+    get: async (key: string) => stubs.finalizeKeys.get(key) ?? null,
     publish: async (_channel: string, id: string) => {
       stubs.publishes.push(id);
       return 1;
@@ -57,7 +65,7 @@ vi.mock("../../../../apps/api/src/jobs/queues.js", () => ({
     pool === "image"
       ? {
           getJob: async () => ({
-            getState: async () => "waiting",
+            getState: async () => stubs.state,
             remove: async () => {
               if (stubs.removeError) throw stubs.removeError;
             },
@@ -67,6 +75,7 @@ vi.mock("../../../../apps/api/src/jobs/queues.js", () => ({
 }));
 
 const { requestCancel } = await import("../../../../apps/api/src/jobs/cancel.js");
+const { bullPrefix } = await import("../../../../apps/api/src/jobs/types.js");
 
 describe("requestCancel when remove() races the worker lock (#889)", () => {
   it("falls through to the active signal when the job is locked", async () => {
@@ -96,9 +105,44 @@ describe("requestCancel when remove() races the worker lock (#889)", () => {
 
   it("still propagates removal failures that are not the lock race", async () => {
     stubs.publishes.length = 0;
+    stubs.finalizeKeys.clear();
+    stubs.state = "waiting";
     stubs.removeError = new Error("Connection is closed.");
 
     await expect(requestCancel("j2")).rejects.toThrow("Connection is closed.");
     expect(stubs.publishes).toHaveLength(0);
+  });
+
+  it("refuses to signal an active job when the worker already claimed finalize (#2349)", async () => {
+    stubs.publishes.length = 0;
+    stubs.finalizeKeys.clear();
+    stubs.state = "active";
+    stubs.finalizeKeys.set(`${bullPrefix()}:finalize:j-fin`, "worker");
+
+    await expect(requestCancel("j-fin")).resolves.toBe(false);
+    expect(stubs.publishes).toEqual([]);
+  });
+
+  it("refuses the lock-race fallthrough when the worker already claimed finalize (#2349)", async () => {
+    stubs.publishes.length = 0;
+    stubs.finalizeKeys.clear();
+    stubs.state = "waiting";
+    stubs.removeError = new Error(
+      "Job j-race-fin could not be removed because it is locked by another worker",
+    );
+    stubs.finalizeKeys.set(`${bullPrefix()}:finalize:j-race-fin`, "worker");
+
+    await expect(requestCancel("j-race-fin")).resolves.toBe(false);
+    expect(stubs.publishes).toEqual([]);
+  });
+
+  it("still signals an active job when a prior cancel already holds the finalize key (#2349)", async () => {
+    stubs.publishes.length = 0;
+    stubs.finalizeKeys.clear();
+    stubs.state = "active";
+
+    await expect(requestCancel("j-repeat")).resolves.toBe(true);
+    await expect(requestCancel("j-repeat")).resolves.toBe(true);
+    expect(stubs.publishes).toEqual(["j-repeat", "j-repeat"]);
   });
 });

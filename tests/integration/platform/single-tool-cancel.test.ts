@@ -87,8 +87,12 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 });
 
 // Fails the completion commit once for one job (#2144), so the first attempt's
-// output stays in storage and the retry is what a cancel then reaches.
-const completionFault = vi.hoisted(() => ({ jobId: null as string | null }));
+// output stays in storage and the retry is what a cancel then reaches, or runs
+// a hook right as the commit begins (#2349).
+const completionFault = vi.hoisted(() => ({
+  jobId: null as string | null,
+  before: null as (() => Promise<void>) | null,
+}));
 
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
@@ -105,7 +109,13 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
       commit: Parameters<typeof actual.updateSingleFileProgressAtomically>[1],
     ) => {
       if (frame.jobId === completionFault.jobId) {
+        const before = completionFault.before;
         completionFault.jobId = null;
+        completionFault.before = null;
+        if (before) {
+          await before();
+          return actual.updateSingleFileProgressAtomically(frame, commit);
+        }
         throw new Error("injected completion outage");
       }
       return actual.updateSingleFileProgressAtomically(frame, commit);
@@ -889,8 +899,8 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const afterVersionRow = async () => {
       hook.ran = true;
       try {
-        await requestCancel(clientJobId);
-        await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+        expect(await requestCancel(clientJobId)).toBe(false);
+        expect(wasUserCanceled(jobId)).toBe(false);
       } catch (err) {
         hook.error = err;
       }
@@ -946,6 +956,109 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
     } finally {
       txSpy.mockRestore();
+    }
+  });
+
+  it("refuses the cancel and completes when the cancel lands during the completion commit (#2349)", async () => {
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { ran: false, error: null as unknown };
+    completionFault.jobId = clientJobId;
+    completionFault.before = async () => {
+      hook.ran = true;
+      try {
+        expect(await requestCancel(clientJobId)).toBe(false);
+        expect(wasUserCanceled(jobId)).toBe(false);
+      } catch (err) {
+        hook.error = err;
+      }
+    };
+    try {
+      await enqueueSingleRun({ mode: "fast", tag: "cancel-during-commit", clientJobId, jobId });
+
+      const row = await terminalRow(jobId);
+      expect(hook.ran).toBe(true);
+      expect(hook.error).toBeNull();
+      expect(row.status).toBe("completed");
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
+    } finally {
+      completionFault.jobId = null;
+      completionFault.before = null;
+    }
+  });
+
+  it("settles canceled when the cancel claimed finalize before its pub/sub message reached the worker (#2349)", async () => {
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    outputWriteHook.prefix = `outputs/${jobId}/`;
+    outputWriteHook.after = async () => {
+      await sharedRedis().set(`${bullPrefix()}:finalize:${jobId}`, "cancel", "PX", 60_000, "NX");
+      expect(wasUserCanceled(jobId)).toBe(false);
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({ mode: "fast", tag: "claim-beat-pubsub", clientJobId, jobId });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      expect((await terminalFrame(clientJobId)).error).toBe("Canceled");
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+      const failureLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(failureLogs).toEqual([]);
+    } finally {
+      outputWriteHook.prefix = null;
+      outputWriteHook.after = null;
+      errorLog.mockRestore();
+    }
+  });
+
+  it("settles a library run canceled when the cancel claimed finalize before its pub/sub message reached the save (#2349)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      await sharedRedis().set(`${bullPrefix()}:finalize:${jobId}`, "cancel", "PX", 60_000, "NX");
+      expect(wasUserCanceled(jobId)).toBe(false);
+    };
+    const errorLog = vi.spyOn(logger, "error");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "claim-beat-pubsub-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      if (!hook.storedName) throw new Error("the library save never wrote its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+      const failureLogs = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(failureLogs).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      errorLog.mockRestore();
     }
   });
 

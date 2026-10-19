@@ -23,6 +23,14 @@ const stubs = vi.hoisted(() => ({
   abortDuringProbe: null as AbortController | null,
   abortDuringQuota: null as AbortController | null,
   abortDuringInsert: null as AbortController | null,
+  claimFinalize: true,
+}));
+
+const claimFinalizeMock = vi.hoisted(() => vi.fn(async () => stubs.claimFinalize));
+const releaseFinalizeMock = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("../../../apps/api/src/jobs/cancel.js", () => ({
+  claimFinalize: claimFinalizeMock,
+  releaseFinalize: releaseFinalizeMock,
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => {
@@ -139,6 +147,9 @@ beforeEach(() => {
   stubs.abortDuringProbe = null;
   stubs.abortDuringQuota = null;
   stubs.abortDuringInsert = null;
+  stubs.claimFinalize = true;
+  claimFinalizeMock.mockClear();
+  releaseFinalizeMock.mockClear();
   loggerMock.error.mockReset();
   loggerMock.warn.mockReset();
   reportErrorMock.mockReset();
@@ -159,6 +170,8 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
       toolChain: ["resize", "compress"],
     });
     expect(stubs.deleted).toEqual([]);
+    expect(claimFinalizeMock).toHaveBeenCalledWith("job-1");
+    expect(releaseFinalizeMock).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -272,12 +285,15 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
   it("discards the staged blob cleanly without reporting when quota rejects the save (#2583)", async () => {
     stubs.quotaError = "Storage quota exceeded. Please delete some files.";
 
-    await expect(autoSaveToLibrary(opts())).resolves.toEqual({
+    await expect(
+      autoSaveToLibrary(opts({ userCancel: new AbortController().signal })),
+    ).resolves.toEqual({
       error: "Storage quota exceeded. Please delete some files.",
     });
 
     expect(stubs.inserted).toEqual([]);
     expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(releaseFinalizeMock).toHaveBeenCalledWith("job-1");
     expect(loggerMock.error).not.toHaveBeenCalled();
     expect(loggerMock.warn).not.toHaveBeenCalled();
     expect(reportErrorMock).not.toHaveBeenCalled();
@@ -416,6 +432,7 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
     });
 
     expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(releaseFinalizeMock).toHaveBeenCalledWith("job-1");
     expect(loggerMock.warn).toHaveBeenCalledWith(
       expect.objectContaining({
         err: stubs.insertError,
@@ -511,12 +528,28 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
     });
   });
 
+  it("stops before the insert and takes the blob back when claimFinalize loses to a cancel (#2349)", async () => {
+    stubs.claimFinalize = false;
+    const ac = new AbortController();
+
+    await expect(autoSaveToLibrary(opts({ userCancel: ac.signal }))).rejects.toThrow("Canceled");
+
+    expect(claimFinalizeMock).toHaveBeenCalledWith("job-1");
+    expect(stubs.saved).toEqual(["stored-out.pdf"]);
+    expect(stubs.inserted).toEqual([]);
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
   it("saves as before when no signal is given", async () => {
     // The inline remove-background route has no cancel to pass.
     const res = await autoSaveToLibrary(opts());
 
     expect(res.fileId).toBeDefined();
     expect(stubs.inserted).toHaveLength(1);
+    expect(claimFinalizeMock).not.toHaveBeenCalled();
   });
 
   it("does nothing without a fileId", async () => {

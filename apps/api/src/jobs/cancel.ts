@@ -70,6 +70,53 @@ export function userCancelSignal(jobId: string): AbortSignal {
   return ac.signal;
 }
 
+// ── Finalize claim ──────────────────────────────────────────────
+
+// Bounds a finalize key left behind by a worker that died holding it.
+const FINALIZE_TTL_MS = 10 * 60_000;
+
+const finalizeKey = (jobId: string) => `${bullPrefix()}:finalize:${jobId}`;
+
+/**
+ * Claim the job's finalize key for the worker right before its point of no
+ * return (#2349). When a cancel already holds the key, aborts the job's
+ * user-cancel controller so the worker's catch classifies the throw as a user
+ * cancel even if the pub/sub message has not arrived yet.
+ */
+export async function claimFinalize(jobId: string): Promise<boolean> {
+  const key = finalizeKey(jobId);
+  const r = sharedRedis();
+  const acquired = await r.set(key, "worker", "PX", FINALIZE_TTL_MS, "NX");
+  if (acquired === "OK" || (await r.get(key)) === "worker") {
+    return true;
+  }
+  userCancels.get(jobId)?.abort();
+  return false;
+}
+
+/**
+ * Delete a worker's finalize claim when an attempt fails, so a retry stays
+ * cancelable (#2349). Leaves a cancel claim untouched.
+ */
+export async function releaseFinalize(jobId: string): Promise<void> {
+  const key = finalizeKey(jobId);
+  const r = sharedRedis();
+  if ((await r.get(key)) === "worker") {
+    await r.del(key);
+  }
+}
+
+/**
+ * Claim the job's finalize key for a cancel request before publishing on the
+ * cancel channel (#2349). Returns false once a worker holds the key.
+ */
+async function claimCancel(jobId: string): Promise<boolean> {
+  const key = finalizeKey(jobId);
+  const r = sharedRedis();
+  const acquired = await r.set(key, "cancel", "PX", FINALIZE_TTL_MS, "NX");
+  return acquired === "OK" || (await r.get(key)) === "cancel";
+}
+
 // ── Pub/sub listener ────────────────────────────────────────────
 
 const CANCEL_CHANNEL = () => `${bullPrefix()}:cancel`;
@@ -250,6 +297,7 @@ export async function requestCancel(jobId: string): Promise<boolean> {
         return true;
       }
       if (outcome === "signaled") return true;
+      if (outcome === "refused") return false;
 
       // Nothing in any queue. Three live cases, told apart by the
       // artifact row, which is authoritative:
@@ -331,15 +379,16 @@ export async function requestCancel(jobId: string): Promise<boolean> {
       console.error("reverse alias settle failed", jobId, err);
     }
   }
-  return outcome !== false;
+  return outcome === "removed" || outcome === "signaled";
 }
 
 /**
  * Scan the pools for a queue job under `jobId` and cancel it: remove it
  * when waiting/delayed (marking its DB row canceled), signal the worker
- * when active. Returns false when the job is terminal or in no queue.
+ * when active. Returns "refused" when the job is terminal or already
+ * finalizing, or false when it is in no queue.
  */
-async function cancelQueueJob(jobId: string): Promise<"removed" | "signaled" | false> {
+async function cancelQueueJob(jobId: string): Promise<"removed" | "signaled" | "refused" | false> {
   for (const pool of POOLS) {
     const queue = getQueue(pool);
     const job = await queue.getJob(jobId);
@@ -361,6 +410,7 @@ async function cancelQueueJob(jobId: string): Promise<"removed" | "signaled" | f
         // owns the terminal write for active jobs, so no row update here.
         const message = err instanceof Error ? err.message : String(err);
         if (!/locked by another worker/.test(message)) throw err;
+        if (!(await claimCancel(jobId))) return "refused";
         await sharedRedis().publish(CANCEL_CHANNEL(), jobId);
         return "signaled";
       }
@@ -373,12 +423,13 @@ async function cancelQueueJob(jobId: string): Promise<"removed" | "signaled" | f
 
     // Active: publish cancel signal for the worker
     if (state === "active") {
+      if (!(await claimCancel(jobId))) return "refused";
       await sharedRedis().publish(CANCEL_CHANNEL(), jobId);
       return "signaled";
     }
 
     // Terminal (completed, failed): no-op
-    return false;
+    return "refused";
   }
 
   // Not found in any pool

@@ -22,6 +22,7 @@ import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
+import { claimFinalize, releaseFinalize } from "./cancel.js";
 
 // ── Content-type to extension map ──────────────────────────────
 
@@ -274,6 +275,7 @@ export async function autoSaveToLibrary(
   if (!opts.fileId) return {};
 
   let storedName: string | undefined;
+  let finalizeClaimed = false;
   try {
     const { saveFile } = await import("../lib/file-storage.js");
     const { quotaRefusal } = await import("../lib/quota.js");
@@ -325,9 +327,9 @@ export async function autoSaveToLibrary(
       }
     }
 
-    // The last point a cancel can stop the save (#2143). Past it the version
-    // row goes in, and a cancel is too late.
-    if (opts.userCancel?.aborted) {
+    // The last point a cancel can stop the save (#2143, #2349). Past it the
+    // version row goes in, and a cancel is too late.
+    if (opts.userCancel && (opts.userCancel.aborted || !(await claimFinalize(opts.jobId)))) {
       await discardStagedBlob(
         opts,
         storedName,
@@ -335,6 +337,7 @@ export async function autoSaveToLibrary(
       );
       throw new AutoSaveCanceledError();
     }
+    finalizeClaimed = Boolean(opts.userCancel);
 
     const newId = randomUUID();
     const result = await db.transaction(async (tx) => {
@@ -364,6 +367,10 @@ export async function autoSaveToLibrary(
     });
 
     if (result.error) {
+      if (finalizeClaimed) {
+        await releaseFinalize(opts.jobId).catch(() => {});
+        finalizeClaimed = false;
+      }
       if (storedName) {
         await discardStagedBlob(
           opts,
@@ -381,6 +388,9 @@ export async function autoSaveToLibrary(
     // logged as an orphan). The worker's catch settles the job canceled and
     // removes its outputs (#2143).
     if (err instanceof AutoSaveCanceledError) throw err;
+    if (finalizeClaimed) {
+      await releaseFinalize(opts.jobId).catch(() => {});
+    }
     if (storedName) {
       await discardStagedBlob(
         opts,

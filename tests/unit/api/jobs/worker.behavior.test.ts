@@ -99,6 +99,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     logger: {
       error: vi.fn(),
       info: vi.fn(),
+      warn: vi.fn(),
     },
   }));
 
@@ -131,7 +132,9 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+    claimFinalize: vi.fn(async () => true),
     registerCancelable: vi.fn(() => new AbortController()),
+    releaseFinalize: vi.fn(async () => {}),
     unregisterCancelable: vi.fn(),
     userCancelSignal: vi.fn(() => new AbortController().signal),
     wasUserCanceled: vi.fn(() => false),
@@ -619,6 +622,110 @@ describe("worker result payload behavior", () => {
         }),
       }),
     );
+
+    // 5. Losing the finalize claim before the completion commit settles the job
+    // canceled (without logging "tool job failed" or retrying) and skips the
+    // completion write (#2349). When an attempt fails instead, releaseFinalize
+    // clears the worker's claim so a retry stays cancelable.
+    const cancelMod = await import("../../../../apps/api/src/jobs/cancel.js");
+    const progressMod = await import("../../../../apps/api/src/routes/progress.js");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    const claimFinalizeMock = cancelMod.claimFinalize as ReturnType<typeof vi.fn>;
+    const releaseFinalizeMock = cancelMod.releaseFinalize as ReturnType<typeof vi.fn>;
+    const wasUserCanceledMock = cancelMod.wasUserCanceled as ReturnType<typeof vi.fn>;
+    const atomicCommitMock = progressMod.updateSingleFileProgressAtomically as ReturnType<
+      typeof vi.fn
+    >;
+
+    dbSetMock.mockClear();
+    atomicCommitMock.mockClear();
+    releaseFinalizeMock.mockClear();
+    objectStorageMocks.deletePrefix.mockClear().mockResolvedValue(undefined);
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+    claimFinalizeMock.mockImplementationOnce(async () => {
+      wasUserCanceledMock.mockReturnValue(true);
+      return false;
+    });
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+
+    await expect(
+      processor({
+        ...makeJob("job-finalize-lost"),
+        opts: { attempts: 2 },
+      }),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(claimFinalizeMock).toHaveBeenCalledWith("job-finalize-lost");
+    expect(atomicCommitMock).not.toHaveBeenCalled();
+    expect(objectStorageMocks.deletePrefix).toHaveBeenCalledWith("outputs/job-finalize-lost/");
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "canceled",
+        error: { message: "Canceled" },
+      }),
+    );
+    expect(logger.error).not.toHaveBeenCalledWith(expect.anything(), "tool job failed");
+    expect(releaseFinalizeMock).not.toHaveBeenCalled();
+    wasUserCanceledMock.mockReturnValue(false);
+
+    // 6. A completion-commit fault releases the finalize claim on a retryable
+    // attempt (logging a warning if releaseFinalize rejects), but keeps the
+    // claim on a final attempt or once autoSaveToLibrary committed a version row (#2349).
+    releaseFinalizeMock.mockClear();
+    (logger.warn as ReturnType<typeof vi.fn>).mockClear();
+    const releaseErr = new Error("redis blip");
+    releaseFinalizeMock.mockRejectedValueOnce(releaseErr);
+    atomicCommitMock.mockRejectedValueOnce(new Error("commit failed"));
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    await expect(
+      processor({
+        ...makeJob("job-commit-fault"),
+        opts: { attempts: 2 },
+      }),
+    ).rejects.toThrow("commit failed");
+    expect(releaseFinalizeMock).toHaveBeenCalledWith("job-commit-fault");
+    expect(logger.warn).toHaveBeenCalledWith(
+      { err: releaseErr, jobId: "job-commit-fault", toolId: "compress" },
+      "failed to release finalize claim after attempt error",
+    );
+
+    releaseFinalizeMock.mockClear();
+    atomicCommitMock.mockRejectedValueOnce(new Error("final commit failed"));
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    await expect(processor(makeJob("job-final-fault"))).rejects.toThrow("final commit failed");
+    expect(releaseFinalizeMock).not.toHaveBeenCalled();
+
+    const postprocessMod = await import("../../../../apps/api/src/jobs/postprocess.js");
+    (postprocessMod.autoSaveToLibrary as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      fileId: "saved-v2",
+    });
+    claimFinalizeMock.mockClear();
+    releaseFinalizeMock.mockClear();
+    atomicCommitMock.mockRejectedValueOnce(new Error("commit after save failed"));
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    await expect(
+      processor({
+        ...makeJob("job-saved-commit-fault"),
+        opts: { attempts: 2 },
+      }),
+    ).rejects.toThrow("commit after save failed");
+    expect(claimFinalizeMock).not.toHaveBeenCalled();
+    expect(releaseFinalizeMock).not.toHaveBeenCalled();
   });
 });
 

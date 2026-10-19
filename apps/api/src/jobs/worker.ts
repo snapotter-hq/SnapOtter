@@ -106,7 +106,9 @@ import {
 } from "./ai-handlers.js";
 import { isBatchCanceled, readBatchCounters, recordChildOutcome } from "./batch-progress.js";
 import {
+  claimFinalize,
   registerCancelable,
+  releaseFinalize,
   unregisterCancelable,
   userCancelSignal,
   wasUserCanceled,
@@ -459,6 +461,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     // Read by the catch below (#2144): once the handler has returned, the
     // deadline can't be the cause of a later error.
     let handlerReturned = false;
+    let finalizeClaimed = false;
 
     try {
       await mkdir(scratchDir, { recursive: true });
@@ -743,6 +746,16 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       };
       const legacyResult = buildLegacyResultPayload(jobResult, jobId);
 
+      // A library run that inserted a version row already claimed finalize
+      // before its insert (#2349) and must complete with that version (#2143).
+      // Every other run claims finalize here, right before the completion commit.
+      if (!savedFileId) {
+        if (wasUserCanceled(jobId) || !(await claimFinalize(jobId))) {
+          throw new Error("Canceled");
+        }
+        finalizeClaimed = true;
+      }
+
       // Commit the authoritative artifact row and client replay alias in one
       // transaction before terminal Redis publication. A crash can no longer
       // leave `completed` durable state without the exact result payload.
@@ -990,6 +1003,15 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             ...(!isTimeout && failureStatus(err)),
           });
         }
+      }
+
+      if (willRetry && finalizeClaimed) {
+        await releaseFinalize(jobId).catch((releaseErr) => {
+          logger.warn(
+            { err: releaseErr, jobId, toolId: data.toolId },
+            "failed to release finalize claim after attempt error",
+          );
+        });
       }
 
       // Analytics: emit tool_used on failure
