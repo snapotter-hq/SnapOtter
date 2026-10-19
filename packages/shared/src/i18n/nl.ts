@@ -5341,6 +5341,9 @@ export const nl: TranslationKeys = {
     verify: "Verifieer",
     verifying: "Verifieren...",
     mfaInvalidCode: "Ongeldige code. Probeer het opnieuw.",
+    mfaAttemptsExhausted: "Te veel ongeldige codes. Log opnieuw in.",
+    mfaEnrollmentAttemptsExhausted:
+      "Te veel ongeldige codes. Log opnieuw in voor een nieuwe QR-code en nieuwe herstelcodes; de eerder getoonde codes werken niet meer.",
     mfaExpired: "Uw verificatiesessie is verlopen. Log opnieuw in.",
     mfaEnrollmentExpired:
       "Uw installatiesessie is verlopen. Log opnieuw in voor een nieuwe QR-code en nieuwe herstelcodes; de eerder getoonde codes werken niet meer.",

@@ -5321,6 +5321,9 @@ export const id: TranslationKeys = {
     verify: "Verifikasi",
     verifying: "Memverifikasi...",
     mfaInvalidCode: "Kode tidak valid. Silakan coba lagi.",
+    mfaAttemptsExhausted: "Terlalu banyak kode tidak valid. Silakan masuk lagi.",
+    mfaEnrollmentAttemptsExhausted:
+      "Terlalu banyak kode tidak valid. Masuk lagi untuk mendapatkan kode QR dan kode pemulihan baru; kode yang ditampilkan sebelumnya tidak akan berfungsi.",
     mfaExpired: "Sesi verifikasi Anda telah berakhir. Silakan masuk lagi.",
     mfaEnrollmentExpired:
       "Sesi penyiapan Anda telah berakhir. Masuk lagi untuk mendapatkan kode QR dan kode pemulihan baru; kode yang ditampilkan sebelumnya tidak akan berfungsi.",

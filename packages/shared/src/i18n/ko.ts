@@ -5238,6 +5238,9 @@ export const ko: TranslationKeys = {
     verify: "확인",
     verifying: "확인 중...",
     mfaInvalidCode: "잘못된 코드입니다. 다시 시도해 주세요.",
+    mfaAttemptsExhausted: "잘못된 코드를 너무 많이 입력했습니다. 다시 로그인해 주세요.",
+    mfaEnrollmentAttemptsExhausted:
+      "잘못된 코드를 너무 많이 입력했습니다. 다시 로그인하여 새 QR 코드와 새 복구 코드를 받으세요. 이전에 표시된 코드는 작동하지 않습니다.",
     mfaExpired: "인증 세션이 만료되었습니다. 다시 로그인해 주세요.",
     mfaEnrollmentExpired:
       "설정 세션이 만료되었습니다. 다시 로그인하여 새 QR 코드와 새 복구 코드를 받으세요. 이전에 표시된 코드는 작동하지 않습니다.",

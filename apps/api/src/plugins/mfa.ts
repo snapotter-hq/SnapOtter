@@ -105,23 +105,30 @@ async function restoreMfaChallenge(
   }
 }
 
+type FailedMfaAttemptOutcome = "restored" | "exhausted" | "expired";
+
 async function recordFailedMfaAttempt(
   redis: ReturnType<typeof sharedRedis>,
   challengeKey: string,
   attemptsKey: string,
   claimed: { payload: string; ttlMs: number; claimedAt: number },
-): Promise<void> {
+): Promise<FailedMfaAttemptOutcome> {
   const remainingTtlMs = claimed.ttlMs - (Date.now() - claimed.claimedAt);
-  await redis.eval(
-    FAIL_OR_RESTORE_MFA_CHALLENGE_LUA,
-    2,
-    challengeKey,
-    attemptsKey,
-    claimed.payload,
-    String(remainingTtlMs),
-    String(MFA_MAX_FAILED_ATTEMPTS),
-    String(MFA_CHALLENGE_TTL_SECONDS),
+  const attempts = Number(
+    await redis.eval(
+      FAIL_OR_RESTORE_MFA_CHALLENGE_LUA,
+      2,
+      challengeKey,
+      attemptsKey,
+      claimed.payload,
+      String(remainingTtlMs),
+      String(MFA_MAX_FAILED_ATTEMPTS),
+      String(MFA_CHALLENGE_TTL_SECONDS),
+    ),
   );
+  if (attempts >= MFA_MAX_FAILED_ATTEMPTS) return "exhausted";
+  if (remainingTtlMs <= 0) return "expired";
+  return "restored";
 }
 
 // ── Zod schemas ───────────────────────────────────────────────────
@@ -839,12 +846,29 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         // Burn the challenge after a few wrong codes so an attacker who already
         // holds valid credentials cannot grind TOTP guesses within the challenge
         // window, or put the challenge back if attempts remain.
-        await recordFailedMfaAttempt(redis, challengeKey, attemptsKey, claimed);
+        const attemptOutcome = await recordFailedMfaAttempt(
+          redis,
+          challengeKey,
+          attemptsKey,
+          claimed,
+        );
         await audit("MFA_VERIFY_FAILED", {
           userId,
           username: dbUser.username,
           ...(recoveryRace && { reason: "recovery_code_spent_concurrently" }),
         });
+        if (attemptOutcome === "exhausted") {
+          return reply.status(401).send({
+            error: "Too many invalid codes; MFA challenge expired",
+            code: "MFA_ATTEMPTS_EXHAUSTED",
+          });
+        }
+        if (attemptOutcome === "expired") {
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
         return reply.status(401).send({
           error: "Invalid TOTP or recovery code",
           code: "INVALID_CODE",
@@ -1067,8 +1091,25 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         // Burn the enrollment after a few wrong codes so an attacker who already
         // holds valid credentials cannot grind TOTP guesses within the window,
         // or put the challenge back if attempts remain.
-        await recordFailedMfaAttempt(redis, challengeKey, attemptsKey, claimed);
+        const attemptOutcome = await recordFailedMfaAttempt(
+          redis,
+          challengeKey,
+          attemptsKey,
+          claimed,
+        );
         await audit("MFA_VERIFY_FAILED", { userId, username: dbUser.username });
+        if (attemptOutcome === "exhausted") {
+          return reply.status(401).send({
+            error: "Too many invalid codes; enrollment challenge expired",
+            code: "MFA_ATTEMPTS_EXHAUSTED",
+          });
+        }
+        if (attemptOutcome === "expired") {
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
         return reply.status(401).send({
           error: "Invalid TOTP code",
           code: "INVALID_CODE",

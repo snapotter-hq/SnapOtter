@@ -5339,6 +5339,9 @@ export const it: TranslationKeys = {
     verify: "Verifica",
     verifying: "Verifica in corso...",
     mfaInvalidCode: "Codice non valido. Riprova.",
+    mfaAttemptsExhausted: "Troppi codici non validi. Accedi di nuovo.",
+    mfaEnrollmentAttemptsExhausted:
+      "Troppi codici non validi. Accedi di nuovo per ottenere un nuovo codice QR e nuovi codici di ripristino; quelli mostrati prima non funzioneranno.",
     mfaExpired: "La sessione di verifica è scaduta. Accedi di nuovo.",
     mfaEnrollmentExpired:
       "La sessione di configurazione è scaduta. Accedi di nuovo per ottenere un nuovo codice QR e nuovi codici di ripristino; quelli mostrati prima non funzioneranno.",

@@ -5340,6 +5340,9 @@ export const pl: TranslationKeys = {
     verify: "Zweryfikuj",
     verifying: "Weryfikowanie...",
     mfaInvalidCode: "Nieprawidłowy kod. Spróbuj ponownie.",
+    mfaAttemptsExhausted: "Zbyt wiele nieprawidłowych kodów. Zaloguj się ponownie.",
+    mfaEnrollmentAttemptsExhausted:
+      "Zbyt wiele nieprawidłowych kodów. Zaloguj się ponownie, aby otrzymać nowy kod QR i nowe kody odzyskiwania; wcześniej wyświetlone nie będą działać.",
     mfaExpired: "Sesja weryfikacji wygasła. Zaloguj się ponownie.",
     mfaEnrollmentExpired:
       "Sesja konfiguracji wygasła. Zaloguj się ponownie, aby otrzymać nowy kod QR i nowe kody odzyskiwania; wcześniej wyświetlone nie będą działać.",

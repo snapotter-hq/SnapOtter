@@ -812,15 +812,25 @@ describe("MFA login flow", () => {
     });
     const { mfaToken } = JSON.parse(loginRes.body);
 
-    // Exhaust the wrong-code budget. Each wrong attempt is a 401.
-    for (let i = 0; i < 5; i++) {
+    // First four wrong attempts return 401 INVALID_CODE; the 5th exhausts the
+    // budget and returns 401 MFA_ATTEMPTS_EXHAUSTED (#2019).
+    for (let i = 0; i < 4; i++) {
       const bad = await testApp.app.inject({
         method: "POST",
         url: "/api/auth/mfa/complete",
         payload: { mfaToken, code: "000000" },
       });
       expect(bad.statusCode).toBe(401);
+      expect(JSON.parse(bad.body).code).toBe("INVALID_CODE");
     }
+
+    const fifth = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: "000000" },
+    });
+    expect(fifth.statusCode).toBe(401);
+    expect(JSON.parse(fifth.body).code).toBe("MFA_ATTEMPTS_EXHAUSTED");
 
     // The challenge is now burned: even the correct TOTP is rejected as expired,
     // forcing the attacker back through the login (and its rate limit).

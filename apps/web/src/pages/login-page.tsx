@@ -86,9 +86,10 @@ function retryAfterMinutes(bodyRetryAfter: unknown, header: string | null): numb
  * is also wrong here: this user is past the password and one code away, not
  * guessing credentials.
  *
- * MFA_EXPIRED (#1234) is a 401 like a wrong code, but the challenge token is
- * gone (5 minute TTL, or burned by 5 wrong codes) so no later code can work.
- * `restart` tells the caller to drop back to the password form.
+ * MFA_EXPIRED (#1234) and MFA_ATTEMPTS_EXHAUSTED (#2019) are 401s like a wrong
+ * code, but the challenge token is gone (5 minute TTL, or burned by 5 wrong
+ * codes) so no later code can work. `restart` tells the caller to drop back to
+ * the password form.
  */
 function mfaFailureMessage(
   status: number,
@@ -103,6 +104,13 @@ function mfaFailureMessage(
   }
   if (code === "MFA_ALREADY_ENABLED") {
     return { message: t.auth.mfaAlreadyEnabled, clearCode: true, restart: true };
+  }
+  if (code === "MFA_ATTEMPTS_EXHAUSTED") {
+    return {
+      message: enrolling ? t.auth.mfaEnrollmentAttemptsExhausted : t.auth.mfaAttemptsExhausted,
+      clearCode: true,
+      restart: true,
+    };
   }
   if (code === "IP_NOT_ALLOWED") {
     return { message: t.auth.ipNotAllowed, clearCode: false, restart: false };

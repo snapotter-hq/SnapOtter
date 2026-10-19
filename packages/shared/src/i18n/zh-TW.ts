@@ -5021,6 +5021,9 @@ export const zhTW: TranslationKeys = {
     verify: "驗證",
     verifying: "驗證中...",
     mfaInvalidCode: "驗證碼無效，請再試一次。",
+    mfaAttemptsExhausted: "無效驗證碼次數過多，請重新登入。",
+    mfaEnrollmentAttemptsExhausted:
+      "無效驗證碼次數過多。請重新登入以取得新的 QR 碼與新的復原碼，先前顯示的將無法使用。",
     mfaExpired: "驗證工作階段已過期，請重新登入。",
     mfaEnrollmentExpired:
       "設定工作階段已過期。請重新登入以取得新的 QR 碼與新的復原碼，先前顯示的將無法使用。",

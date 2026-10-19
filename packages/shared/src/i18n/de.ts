@@ -5360,6 +5360,9 @@ export const de: TranslationKeys = {
     verify: "Bestätigen",
     verifying: "Wird überprüft...",
     mfaInvalidCode: "Ungültiger Code. Bitte versuchen Sie es erneut.",
+    mfaAttemptsExhausted: "Zu viele ungültige Codes. Bitte melden Sie sich erneut an.",
+    mfaEnrollmentAttemptsExhausted:
+      "Zu viele ungültige Codes. Melden Sie sich erneut an, um einen neuen QR-Code und neue Wiederherstellungscodes zu erhalten; die zuvor angezeigten funktionieren nicht mehr.",
     mfaExpired: "Ihre Verifizierungssitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     mfaEnrollmentExpired:
       "Ihre Einrichtungssitzung ist abgelaufen. Melden Sie sich erneut an, um einen neuen QR-Code und neue Wiederherstellungscodes zu erhalten; die zuvor angezeigten funktionieren nicht mehr.",

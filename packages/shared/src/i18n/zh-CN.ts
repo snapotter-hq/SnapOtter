@@ -5021,6 +5021,9 @@ export const zhCN: TranslationKeys = {
     verify: "验证",
     verifying: "验证中...",
     mfaInvalidCode: "验证码无效，请重试。",
+    mfaAttemptsExhausted: "无效验证码次数过多，请重新登录。",
+    mfaEnrollmentAttemptsExhausted:
+      "无效验证码次数过多。请重新登录以获取新的二维码和新的恢复码，之前显示的将无法使用。",
     mfaExpired: "验证会话已过期，请重新登录。",
     mfaEnrollmentExpired:
       "设置会话已过期。请重新登录以获取新的二维码和新的恢复码，之前显示的将无法使用。",

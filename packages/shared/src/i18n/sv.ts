@@ -5320,6 +5320,9 @@ export const sv: TranslationKeys = {
     verify: "Verifiera",
     verifying: "Verifierar...",
     mfaInvalidCode: "Ogiltig kod. Försök igen.",
+    mfaAttemptsExhausted: "För många ogiltiga koder. Logga in igen.",
+    mfaEnrollmentAttemptsExhausted:
+      "För många ogiltiga koder. Logga in igen för att få en ny QR-kod och nya återställningskoder; de som visades tidigare fungerar inte.",
     mfaExpired: "Din verifieringssession har gått ut. Logga in igen.",
     mfaEnrollmentExpired:
       "Din installationssession har gått ut. Logga in igen för att få en ny QR-kod och nya återställningskoder; de som visades tidigare fungerar inte.",

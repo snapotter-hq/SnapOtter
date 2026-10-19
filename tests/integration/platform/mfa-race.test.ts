@@ -213,12 +213,12 @@ describe("MFA Race Condition #2328", () => {
     }
 
     const codes = responses.map((res: { body: string }) => JSON.parse(res.body).code as string);
-    const invalidCodeCount = codes.filter((c: string) => c === "INVALID_CODE").length;
+    const exhaustedCount = codes.filter((c: string) => c === "MFA_ATTEMPTS_EXHAUSTED").length;
     const expiredCount = codes.filter((c: string) => c === "MFA_EXPIRED").length;
 
-    // Only 1 of the 5 racing guesses may be checked (bringing the total to 5);
-    // the other 4 must be rejected without being checked.
-    expect(invalidCodeCount).toBe(1);
+    // Only 1 of the 5 racing guesses may be checked (bringing the total to 5
+    // and exhausting the challenge); the other 4 must be rejected without being checked.
+    expect(exhaustedCount).toBe(1);
     expect(expiredCount).toBe(4);
     expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
 
@@ -466,7 +466,7 @@ describe("MFA Race Condition #2328", () => {
     const badCodes = badResponses.map(
       (res: { body: string }) => JSON.parse(res.body).code as string,
     );
-    expect(badCodes.filter((c: string) => c === "INVALID_CODE").length).toBe(1);
+    expect(badCodes.filter((c: string) => c === "MFA_ATTEMPTS_EXHAUSTED").length).toBe(1);
     expect(badCodes.filter((c: string) => c === "MFA_EXPIRED").length).toBe(4);
 
     // 2. Concurrent valid TOTP codes on enroll-complete mint only one session.

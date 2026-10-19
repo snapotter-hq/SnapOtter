@@ -5353,6 +5353,9 @@ export const fr: TranslationKeys = {
     verify: "Vérifier",
     verifying: "Vérification...",
     mfaInvalidCode: "Code invalide. Veuillez réessayer.",
+    mfaAttemptsExhausted: "Trop de codes invalides. Veuillez vous reconnecter.",
+    mfaEnrollmentAttemptsExhausted:
+      "Trop de codes invalides. Reconnectez-vous pour obtenir un nouveau code QR et de nouveaux codes de récupération ; ceux affichés précédemment ne fonctionneront plus.",
     mfaExpired: "Votre session de vérification a expiré. Veuillez vous reconnecter.",
     mfaEnrollmentExpired:
       "Votre session de configuration a expiré. Reconnectez-vous pour obtenir un nouveau code QR et de nouveaux codes de récupération ; ceux affichés précédemment ne fonctionneront plus.",

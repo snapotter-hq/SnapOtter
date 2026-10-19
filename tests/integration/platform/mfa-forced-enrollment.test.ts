@@ -149,15 +149,16 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
     expect(nextBody.requiresMfaEnrollment).toBeUndefined();
   });
 
-  it("enroll-complete rejects an invalid code with 401 INVALID_CODE and burns the token after 5 wrong attempts", async () => {
+  it("enroll-complete rejects an invalid code with 401 INVALID_CODE and burns the token with MFA_ATTEMPTS_EXHAUSTED on the 5th wrong attempt (#2019)", async () => {
     const { username, password } = await createUnenrolledUser();
     await setMfaPolicy("required");
 
     const loginRes = await login(username, password);
     const { enrollmentToken } = JSON.parse(loginRes.body);
 
-    // Five wrong codes, each a 401 INVALID_CODE.
-    for (let i = 0; i < 5; i++) {
+    // First four wrong codes return 401 INVALID_CODE; the 5th burns the token
+    // and answers 401 MFA_ATTEMPTS_EXHAUSTED.
+    for (let i = 0; i < 4; i++) {
       const bad = await testApp.app.inject({
         method: "POST",
         url: "/api/auth/mfa/enroll-complete",
@@ -168,6 +169,16 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
       expect(badBody.code).toBe("INVALID_CODE");
       expect(badBody.token).toBeUndefined();
     }
+
+    const fifth = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: "000000" },
+    });
+    const fifthBody = JSON.parse(fifth.body);
+    expect(fifth.statusCode).toBe(401);
+    expect(fifthBody.code).toBe("MFA_ATTEMPTS_EXHAUSTED");
+    expect(fifthBody.token).toBeUndefined();
 
     // The 6th attempt finds a burned token: it now reads as expired.
     const res = await testApp.app.inject({

@@ -5330,6 +5330,9 @@ export const tr: TranslationKeys = {
     verify: "Doğrula",
     verifying: "Doğrulanıyor...",
     mfaInvalidCode: "Geçersiz kod. Lütfen tekrar deneyin.",
+    mfaAttemptsExhausted: "Çok fazla geçersiz kod. Lütfen tekrar giriş yapın.",
+    mfaEnrollmentAttemptsExhausted:
+      "Çok fazla geçersiz kod. Yeni bir QR kodu ve yeni kurtarma kodları almak için tekrar giriş yapın; daha önce gösterilenler çalışmayacak.",
     mfaExpired: "Doğrulama oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
     mfaEnrollmentExpired:
       "Kurulum oturumunuzun süresi doldu. Yeni bir QR kodu ve yeni kurtarma kodları almak için tekrar giriş yapın; daha önce gösterilenler çalışmayacak.",

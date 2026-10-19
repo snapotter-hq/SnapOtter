@@ -22,6 +22,9 @@ const ENROLLMENT_URI = "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&i
 const EXPIRED_MESSAGE = "Your verification session expired. Please log in again.";
 const ENROLLMENT_EXPIRED_MESSAGE =
   "Your setup session expired. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.";
+const ATTEMPTS_EXHAUSTED_MESSAGE = "Too many invalid codes. Please log in again.";
+const ENROLLMENT_ATTEMPTS_EXHAUSTED_MESSAGE =
+  "Too many invalid codes. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.";
 const NOT_CONFIGURED_MESSAGE = "Two-factor authentication is not set up. Please log in again.";
 const ALREADY_ENABLED_MESSAGE =
   "Two-factor authentication is already enabled. Please log in again.";
@@ -285,6 +288,55 @@ describe("LoginPage MFA challenge expiry (#1234)", () => {
       expect(screen.getByText(ENROLLMENT_EXPIRED_MESSAGE)).toBeInTheDocument();
     });
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("says too many invalid codes and returns to the password form on MFA_ATTEMPTS_EXHAUSTED (#2019)", async () => {
+    stubTotpFlow(
+      failedResponse(401, {
+        error: "Too many invalid codes; MFA challenge expired",
+        code: "MFA_ATTEMPTS_EXHAUSTED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ATTEMPTS_EXHAUSTED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText("Invalid code. Please try again.")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("000000")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("says too many invalid codes and warns that the shown QR and recovery codes won't work on enroll-complete MFA_ATTEMPTS_EXHAUSTED (#2019)", async () => {
+    stubEnrollFlow(
+      failedResponse(401, {
+        error: "Too many invalid codes; enrollment challenge expired",
+        code: "MFA_ATTEMPTS_EXHAUSTED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByLabelText(/6-digit code/i);
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ENROLLMENT_ATTEMPTS_EXHAUSTED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(ATTEMPTS_EXHAUSTED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(ENROLLMENT_EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText("Invalid code. Please try again.")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
   });

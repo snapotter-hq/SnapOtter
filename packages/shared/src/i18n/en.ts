@@ -5250,6 +5250,9 @@ export const en = {
     verify: "Verify",
     verifying: "Verifying...",
     mfaInvalidCode: "Invalid code. Please try again.",
+    mfaAttemptsExhausted: "Too many invalid codes. Please log in again.",
+    mfaEnrollmentAttemptsExhausted:
+      "Too many invalid codes. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.",
     mfaExpired: "Your verification session expired. Please log in again.",
     mfaEnrollmentExpired:
       "Your setup session expired. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.",

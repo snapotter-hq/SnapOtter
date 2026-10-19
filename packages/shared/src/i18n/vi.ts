@@ -5309,6 +5309,9 @@ export const vi: TranslationKeys = {
     verify: "Xác minh",
     verifying: "Đang xác minh...",
     mfaInvalidCode: "Mã không hợp lệ. Vui lòng thử lại.",
+    mfaAttemptsExhausted: "Nhập sai mã quá nhiều lần. Vui lòng đăng nhập lại.",
+    mfaEnrollmentAttemptsExhausted:
+      "Nhập sai mã quá nhiều lần. Hãy đăng nhập lại để nhận mã QR mới và mã khôi phục mới; các mã hiển thị trước đó sẽ không dùng được.",
     mfaExpired: "Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.",
     mfaEnrollmentExpired:
       "Phiên thiết lập đã hết hạn. Hãy đăng nhập lại để nhận mã QR mới và mã khôi phục mới; các mã hiển thị trước đó sẽ không dùng được.",

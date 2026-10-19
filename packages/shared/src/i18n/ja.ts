@@ -5271,6 +5271,10 @@ export const ja: TranslationKeys = {
     verify: "確認",
     verifying: "確認中...",
     mfaInvalidCode: "無効なコードです。もう一度お試しください。",
+    mfaAttemptsExhausted:
+      "無効なコードの入力回数が上限に達しました。もう一度ログインしてください。",
+    mfaEnrollmentAttemptsExhausted:
+      "無効なコードの入力回数が上限に達しました。もう一度ログインして新しいQRコードと新しいリカバリーコードを取得してください。以前に表示されたコードは使用できません。",
     mfaExpired: "認証セッションの有効期限が切れました。もう一度ログインしてください。",
     mfaEnrollmentExpired:
       "セットアップセッションの有効期限が切れました。もう一度ログインして新しいQRコードと新しいリカバリーコードを取得してください。以前に表示されたコードは使用できません。",
