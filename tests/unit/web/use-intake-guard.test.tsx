@@ -147,6 +147,12 @@ describe("ToolPage Clear all intake guard (#2622)", () => {
       createObjectURL: () => "blob:original-input",
       revokeObjectURL: () => {},
     });
+    class MockResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", MockResizeObserver);
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
