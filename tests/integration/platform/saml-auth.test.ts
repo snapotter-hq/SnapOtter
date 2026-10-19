@@ -47,7 +47,10 @@ const getMfaPolicyMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 // that must keep surfacing as a 500. The wrapper also records the username
 // argument so a callback test can tell a pre-allocated suffix from the base
 // the resolver is supposed to receive.
-const resolverFailure = vi.hoisted(() => ({ next: null as Error | null }));
+const resolverFailure = vi.hoisted(() => ({
+  next: null as Error | null,
+  beforeResolve: null as (() => Promise<void>) | null,
+}));
 const seenResolverUsernames = vi.hoisted(() => ({ list: [] as string[] }));
 vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -57,6 +60,11 @@ vi.mock("../../../apps/api/src/lib/external-auth-resolver.js", async (importOrig
     resolveExternalUser: async (...args: unknown[]) => {
       const username = (args[0] as { username?: string } | undefined)?.username;
       if (typeof username === "string") seenResolverUsernames.list.push(username);
+      const beforeResolve = resolverFailure.beforeResolve;
+      if (beforeResolve) {
+        resolverFailure.beforeResolve = null;
+        await beforeResolve();
+      }
       const err = resolverFailure.next;
       if (err) {
         resolverFailure.next = null;
@@ -149,6 +157,7 @@ afterEach(() => {
   // An armed throw is consumed only if the ACS route reaches the resolver;
   // never let one leak into the next test.
   resolverFailure.next = null;
+  resolverFailure.beforeResolve = null;
   seenResolverUsernames.list.length = 0;
 });
 
@@ -263,19 +272,35 @@ describe("SAML callback", () => {
   });
 
   it("allocates a colliding username once in the resolver", async () => {
-    // 46 characters is sanitizeUsername's cap, so the resolver's single `_2`
-    // still fits in the 50-character limit. A taken base is the same lookup
-    // that used to suffix a reserved name such as "anonymous" before the
-    // resolver allocated again.
+    // 46 characters is sanitizeUsername's cap. Seed `base` through `${base}_9`
+    // so the next free suffix when the request arrives is `${base}_10` (49
+    // chars), then claim `${base}_10` right as resolveExternalUser starts. A
+    // callback-level findUniqueUsername used to hand `${base}_10` to the
+    // resolver, which then suffixed a second time into `${base}_10_2` (51
+    // chars, exceeding the 50-character username limit).
     const token = randomUUID().replace(/-/g, "").slice(0, 8);
     const base = `${token}${"n".repeat(46 - token.length)}`;
-    await db.insert(schema.users).values({
-      id: randomUUID(),
-      username: base,
-      role: "user",
-      team: "default-team-00000000",
-      mustChangePassword: false,
-      authProvider: "local",
+    const seededNames = [base, ...Array.from({ length: 8 }, (_, idx) => `${base}_${idx + 2}`)];
+    await db.insert(schema.users).values(
+      seededNames.map((username) => ({
+        id: randomUUID(),
+        username,
+        role: "user",
+        team: "default-team-00000000",
+        mustChangePassword: false,
+        authProvider: "local",
+      })),
+    );
+
+    let usernameReads = 0;
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      if (selection && Object.keys(selection).join() === "username") {
+        usernameReads++;
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      return (originalSelect as any)(...args);
     });
 
     (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = "uid";
@@ -286,33 +311,45 @@ describe("SAML callback", () => {
       samlMock.validatePostResponseAsync.mockResolvedValue({
         profile: { nameID, email, uid: base },
       });
+      resolverFailure.beforeResolve = async () => {
+        await db.insert(schema.users).values({
+          id: randomUUID(),
+          username: `${base}_10`,
+          role: "user",
+          team: "default-team-00000000",
+          mustChangePassword: false,
+          authProvider: "local",
+        });
+      };
       seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
 
       const created = await postCallback();
       expect(created.statusCode).toBe(302);
       expect(created.headers.location).toBe("/");
-      // A callback-level findUniqueUsername would have handed the resolver
-      // `${base}_2` and, when that was taken too, `${base}_2_2`.
-      expect(seenResolverUsernames.list).toEqual([base]);
       const [user] = await db
         .select()
         .from(schema.users)
         .where(eq(schema.users.externalId, nameID));
-      expect(user?.username).toBe(`${base}_2`);
       expect(user?.username.length).toBeLessThanOrEqual(50);
+      expect(user?.username).toBe(`${base}_11`);
+      expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBeGreaterThan(0);
 
       // Existing external-ID match does not look up a username first.
       seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
       const matched = await postCallback();
       expect(matched.statusCode).toBe(302);
       expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBe(0);
       const [still] = await db
         .select()
         .from(schema.users)
         .where(eq(schema.users.externalId, nameID));
-      expect(still?.username).toBe(`${base}_2`);
+      expect(still?.username).toBe(`${base}_11`);
 
-      // Email link of a local account keeps its username and the base.
+      // Email link of a local account keeps its username and runs no username lookup.
       const linkId = randomUUID();
       const linkUsername = `local${token}`;
       const linkEmail = `link-${token}@example.com`;
@@ -329,9 +366,11 @@ describe("SAML callback", () => {
         profile: { nameID: `link-${token}`, email: linkEmail, uid: base },
       });
       seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
       const linked = await postCallback();
       expect(linked.statusCode).toBe(302);
       expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBe(0);
       const [linkedUser] = await db.select().from(schema.users).where(eq(schema.users.id, linkId));
       expect(linkedUser?.authProvider).toBe("saml");
       expect(linkedUser?.externalId).toBe(`link-${token}`);
@@ -344,16 +383,19 @@ describe("SAML callback", () => {
         profile: { nameID: deniedId, email: `denied-${token}@example.com`, uid: base },
       });
       seenResolverUsernames.list.length = 0;
+      usernameReads = 0;
       const denied = await postCallback();
       expect(denied.statusCode).toBe(302);
       expect(denied.headers.location).toBe("/login?error=saml_user_not_authorized");
       expect(seenResolverUsernames.list).toEqual([base]);
+      expect(usernameReads).toBe(0);
       const [deniedUser] = await db
         .select()
         .from(schema.users)
         .where(eq(schema.users.externalId, deniedId));
       expect(deniedUser).toBeUndefined();
     } finally {
+      selectSpy.mockRestore();
       (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = undefined;
       (env as Record<string, unknown>).SAML_AUTO_CREATE_USERS = true;
     }
@@ -436,6 +478,17 @@ describe("SAML callback", () => {
 
   it("redirects to saml_auth_failed instead of a raw 500 when auto-create exhausts its username-race retries (#978)", async () => {
     const email = `raced-${randomUUID().slice(0, 8)}@example.com`;
+    const attemptedUsername = email.split("@")[0];
+    // Seed the base username so a pre-resolver findUniqueUsername in saml.ts
+    // would suffix attemptedUsername to `${attemptedUsername}_2` in the audit row.
+    await db.insert(schema.users).values({
+      id: randomUUID(),
+      username: attemptedUsername,
+      role: "user",
+      team: "default-team-00000000",
+      mustChangePassword: false,
+      authProvider: "local",
+    });
     samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
     const raceErr = new UsernameRaceExhaustedError();
     resolverFailure.next = raceErr;
@@ -447,7 +500,8 @@ describe("SAML callback", () => {
     const setCookie = res.headers["set-cookie"];
     expect(String(setCookie ?? "")).not.toContain("snapotter-session=");
 
-    // Exhaustion gets the same audit trail as every other terminal denial.
+    // Exhaustion gets the same audit trail as every other terminal denial,
+    // with the unsuffixed sanitized base recorded as attemptedUsername.
     const auditRows = await db
       .select()
       .from(schema.auditLog)
@@ -455,7 +509,6 @@ describe("SAML callback", () => {
         sql`${schema.auditLog.action} = 'SAML_LOGIN_FAILED' AND ${schema.auditLog.details}->>'reason' = 'auto_create_race_exhausted' AND ${schema.auditLog.details}->>'externalId' = ${email}`,
       );
     expect(auditRows).toHaveLength(1);
-    const attemptedUsername = email.split("@")[0];
     expect(auditRows[0].details).toMatchObject({ attemptedUsername });
 
     // Reported once, the error passed through untouched, with route-level
