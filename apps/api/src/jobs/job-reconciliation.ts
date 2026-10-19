@@ -429,15 +429,28 @@ export async function reconcileStrandedJobs(
       continue;
     }
 
-    const objects = await listObjects(`outputs/${row.id}/`);
-    const artifacts = orderArtifacts(objects);
-    const outcome =
-      artifacts.length > 0
-        ? await recoverFromOutputs(row, artifacts, objects)
-        : await failWithoutOutput(row);
+    try {
+      const objects = await listObjects(`outputs/${row.id}/`);
+      const artifacts = orderArtifacts(objects);
+      const outcome =
+        artifacts.length > 0
+          ? await recoverFromOutputs(row, artifacts, objects)
+          : await failWithoutOutput(row);
 
-    summary[outcome.resolution] += 1;
-    summary.outcomes.push(outcome);
+      summary[outcome.resolution] += 1;
+      summary.outcomes.push(outcome);
+    } catch (err) {
+      logger.error(
+        { err, jobId: row.id, toolId: row.toolId },
+        "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+      );
+      void reportError(err, {
+        source: "worker",
+        pool: "system",
+        toolId: row.toolId ?? undefined,
+        jobId: row.id,
+      });
+    }
   }
 
   if (summary.recovered > 0 || summary.failed > 0) {

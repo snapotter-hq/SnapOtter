@@ -20,6 +20,8 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { chmod } from "node:fs/promises";
+import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -677,7 +679,7 @@ describe("stranded-job reconciliation", () => {
       }
     });
 
-    it("propagates a storage read fault on the sidecar rather than completing the row without its payload", async () => {
+    it("leaves the row non-terminal on a sidecar storage read fault rather than completing it without its payload", async () => {
       const id = await seedJob({ status: "processing" });
       await seedOutput(id, "out.jpg", Buffer.from("jpg-bytes"));
       await seedOutput(
@@ -693,14 +695,24 @@ describe("stranded-job reconciliation", () => {
         }
         return origGetBuffer(key);
       });
+      const errorSpy = vi.spyOn(logger, "error");
       try {
-        await expect(reconcileStrandedJobs({ graceMs: 0 })).rejects.toThrow("EIO: i/o error, read");
+        const firstSweep = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(firstSweep.outcomes.find((o) => o.jobId === id)).toBeUndefined();
         expect(
           (await readJob(id)).status,
           "row must stay non-terminal so the next sweep retries",
         ).toBe("processing");
+        expect(
+          errorSpy.mock.calls.some(
+            ([ctx, msg]) =>
+              (ctx as { jobId?: string } | undefined)?.jobId === id &&
+              msg === "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+          ),
+        ).toBe(true);
       } finally {
         readSpy.mockRestore();
+        errorSpy.mockRestore();
       }
 
       const summary = await reconcileStrandedJobs({ graceMs: 0 });
@@ -1395,6 +1407,94 @@ describe("stranded-job reconciliation", () => {
       expect(badCountsProgress?.totalFiles).toBeUndefined();
       expect(badCountsProgress?.completedFiles).toBeUndefined();
       expect(badCountsProgress?.failedFiles).toBe(1);
+    });
+  });
+
+  describe("storage fault resilience (#1498)", () => {
+    const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+
+    it.skipIf(isRoot)(
+      "leaves a stranded row with an unreadable output dir non-terminal while still reconciling sibling rows, then recovers it once permissions are restored",
+      async () => {
+        const lockedId = await seedJob({ status: "processing" });
+        await seedOutput(lockedId, "finished.avif", Buffer.from("avif-bytes-on-disk"));
+        const siblingRecoveredId = await seedJob({ status: "processing" });
+        await seedOutput(siblingRecoveredId, "sibling.avif", Buffer.from("sibling-bytes"));
+        const siblingFailedId = await seedJob({ status: "queued" });
+
+        const lockedDir = join(env.WORKSPACE_PATH, "outputs", lockedId);
+        await chmod(lockedDir, 0o000);
+        const errorSpy = vi.spyOn(logger, "error");
+        try {
+          const first = await reconcileStrandedJobs({ graceMs: 0 });
+          expect(first.outcomes.find((o) => o.jobId === lockedId)).toBeUndefined();
+          expect(first.outcomes.find((o) => o.jobId === siblingRecoveredId)?.resolution).toBe(
+            "recovered",
+          );
+          expect(first.outcomes.find((o) => o.jobId === siblingFailedId)?.resolution).toBe(
+            "failed",
+          );
+          expect(
+            (await readJob(lockedId)).status,
+            "an unreadable output dir must not permanently fail a job whose output is on disk",
+          ).toBe("processing");
+          expect(
+            errorSpy.mock.calls.some(
+              ([ctx, msg]) =>
+                (ctx as { jobId?: string } | undefined)?.jobId === lockedId &&
+                msg === "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+            ),
+          ).toBe(true);
+        } finally {
+          errorSpy.mockRestore();
+          await chmod(lockedDir, 0o755);
+        }
+
+        const second = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(second.outcomes.find((o) => o.jobId === lockedId)?.resolution).toBe("recovered");
+        const recoveredRow = await readJob(lockedId);
+        expect(recoveredRow.status).toBe("completed");
+        expect(recoveredRow.outputRefs).toEqual([`outputs/${lockedId}/finished.avif`]);
+      },
+    );
+
+    it("leaves a stranded row non-terminal on a simulated EIO from listObjects regardless of UID", async () => {
+      const eioId = await seedJob({ status: "processing" });
+      await seedOutput(eioId, "finished.avif", Buffer.from("avif-bytes-on-disk"));
+      const siblingId = await seedJob({ status: "processing" });
+      await seedOutput(siblingId, "sibling.avif", Buffer.from("sibling-bytes"));
+
+      const origList = objectStorage.listObjects;
+      const listSpy = vi.spyOn(objectStorage, "listObjects").mockImplementation(async (prefix) => {
+        if (prefix === `outputs/${eioId}/`) {
+          throw Object.assign(new Error("EIO: i/o error, scandir"), {
+            code: "EIO",
+            syscall: "scandir",
+          });
+        }
+        return origList(prefix);
+      });
+      const errorSpy = vi.spyOn(logger, "error");
+      try {
+        const first = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(first.outcomes.find((o) => o.jobId === eioId)).toBeUndefined();
+        expect(first.outcomes.find((o) => o.jobId === siblingId)?.resolution).toBe("recovered");
+        expect((await readJob(eioId)).status).toBe("processing");
+        expect(
+          errorSpy.mock.calls.some(
+            ([ctx, msg]) =>
+              (ctx as { jobId?: string } | undefined)?.jobId === eioId &&
+              msg === "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+          ),
+        ).toBe(true);
+      } finally {
+        listSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+
+      const second = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(second.outcomes.find((o) => o.jobId === eioId)?.resolution).toBe("recovered");
+      expect((await readJob(eioId)).status).toBe("completed");
     });
   });
 });

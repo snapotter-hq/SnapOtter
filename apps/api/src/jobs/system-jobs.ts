@@ -389,10 +389,24 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
   if (maxAgeMs <= 0) return { removed: deleteAfterCleaned, failed: deleteAfterErrors.length };
 
   const cutoffMs = Date.now() - maxAgeMs;
-  const uploadDirs = await listJobDirs("uploads");
-  const outputDirs = await listJobDirs("outputs");
-  const allDirs = [...uploadDirs, ...outputDirs];
-  if (allDirs.length === 0) return { removed: 0, failed: deleteAfterErrors.length };
+  const errors: string[] = [];
+  const allDirs: ObjectInfo[] = [];
+  for (const prefix of ["uploads", "outputs"] as const) {
+    try {
+      allDirs.push(...(await listJobDirs(prefix)));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`${prefix}: ${message}`);
+    }
+  }
+  if (allDirs.length === 0) {
+    if (errors.length > 0) {
+      logger.error(
+        `Storage TTL: ${errors.length} dir(s) failed to delete:\n${listSweepErrors(errors)}`,
+      );
+    }
+    return { removed: 0, failed: errors.length + deleteAfterErrors.length };
+  }
 
   // Batch-lookup job rows for dirs with unknown mtime (S3 backend)
   const unknownIds = [
@@ -445,7 +459,6 @@ async function storageTtlSweep(): Promise<{ removed: number; failed: number }> {
 
   let removed = 0;
   let kept = 0;
-  const errors: string[] = [];
   for (const dir of expiredDirs) {
     const jobId = dir.key.split("/")[1];
     if (owningJobIds(jobId).some((id) => inFlightIds.has(id))) {

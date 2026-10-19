@@ -669,21 +669,27 @@ export async function listObjects(prefix: string): Promise<ObjectInfo[]> {
     return s3.listGenericObjects(prefix);
   }
   const dir = join(env.WORKSPACE_PATH, prefix);
+  let names: string[];
   try {
-    const out: ObjectInfo[] = [];
-    for (const name of await readdir(dir)) {
-      const s = await stat(join(dir, name)).catch(() => null);
-      if (s?.isFile())
-        out.push({
-          key: `${prefix.replace(/\/?$/, "/")}${name}`,
-          size: s.size,
-          mtimeMs: s.mtimeMs,
-        });
-    }
-    return out;
-  } catch {
-    return [];
+    names = await readdir(dir);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return [];
+    throw err;
   }
+  const out: ObjectInfo[] = [];
+  for (const name of names) {
+    const s = await stat(join(dir, name)).catch((err: unknown) => {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+      throw err;
+    });
+    if (s?.isFile())
+      out.push({
+        key: `${prefix.replace(/\/?$/, "/")}${name}`,
+        size: s.size,
+        mtimeMs: s.mtimeMs,
+      });
+  }
+  return out;
 }
 
 // Lists the top-level job directories under a prefix with their mtime so the
@@ -694,14 +700,20 @@ export async function listJobDirs(prefix: "uploads" | "outputs"): Promise<Object
     return s3.listGenericJobDirs(prefix);
   }
   const root = join(env.WORKSPACE_PATH, prefix);
+  let names: string[];
   try {
-    const out: ObjectInfo[] = [];
-    for (const name of await readdir(root)) {
-      const s = await stat(join(root, name)).catch(() => null);
-      if (s?.isDirectory()) out.push({ key: `${prefix}/${name}`, size: 0, mtimeMs: s.mtimeMs });
-    }
-    return out;
-  } catch {
-    return [];
+    names = await readdir(root);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return [];
+    throw err;
   }
+  const out: ObjectInfo[] = [];
+  for (const name of names) {
+    const s = await stat(join(root, name)).catch((err: unknown) => {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+      throw err;
+    });
+    if (s?.isDirectory()) out.push({ key: `${prefix}/${name}`, size: 0, mtimeMs: s.mtimeMs });
+  }
+  return out;
 }

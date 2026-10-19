@@ -675,6 +675,94 @@ describe("object-storage local prefix + listing operations", () => {
     expect(await listObjects(`outputs/missing-${process.pid}`)).toEqual([]);
   });
 
+  const isRootForList = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRootForList)(
+    "propagates a permission fault from listObjects when the prefix directory is unreadable (#1498)",
+    async () => {
+      const unreadableJobId = `unreadable-list-${process.pid}`;
+      const unreadableDir = join(env.WORKSPACE_PATH, "outputs", unreadableJobId);
+      await mkdir(unreadableDir, { recursive: true });
+      await writeFile(join(unreadableDir, "result.bin"), Buffer.from("done"));
+      await chmod(unreadableDir, 0o000);
+      try {
+        await expect(listObjects(`outputs/${unreadableJobId}/`)).rejects.toMatchObject({
+          code: expect.stringMatching(/^(EACCES|EPERM)$/),
+        });
+      } finally {
+        await chmod(unreadableDir, 0o755).catch(() => {});
+        await deletePrefix(`outputs/${unreadableJobId}`).catch(() => {});
+      }
+    },
+  );
+
+  it("propagates a non-ENOENT readdir or stat error in listObjects and ignores ENOENT mid-walk (#1498)", async () => {
+    const eio = Object.assign(new Error("EIO: i/o error, scandir"), {
+      code: "EIO",
+      syscall: "scandir",
+    });
+    const statFault = Object.assign(new Error("EIO: i/o error, stat"), {
+      code: "EIO",
+      syscall: "stat",
+    });
+    const vanished = Object.assign(new Error("ENOENT: no such file or directory, stat"), {
+      code: "ENOENT",
+      syscall: "stat",
+    });
+    let readdirShouldFail = true;
+    let readdirThrowNull = false;
+    let statShouldFail = false;
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        readdir: async (...args: Parameters<typeof actual.readdir>) => {
+          if (readdirThrowNull) throw null;
+          if (readdirShouldFail) throw eio;
+          return actual.readdir(...args);
+        },
+        stat: async (p: Parameters<typeof actual.stat>[0]) => {
+          const pathStr = String(p);
+          if (pathStr.endsWith("vanished.bin")) throw vanished;
+          if (statShouldFail && pathStr.endsWith("fault.bin")) throw statFault;
+          return actual.stat(p);
+        },
+      };
+    });
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(isolatedStorage.listObjects(`outputs/${jobId}`)).rejects.toBe(eio);
+
+      readdirThrowNull = true;
+      await expect(isolatedStorage.listObjects(`outputs/${jobId}`)).rejects.toBeNull();
+      readdirThrowNull = false;
+
+      readdirShouldFail = false;
+      const raceJobId = `race-list-${process.pid}`;
+      const raceDir = join(env.WORKSPACE_PATH, "outputs", raceJobId);
+      await mkdir(raceDir, { recursive: true });
+      await writeFile(join(raceDir, "kept.bin"), Buffer.from("ok"));
+      await writeFile(join(raceDir, "vanished.bin"), Buffer.from("gone"));
+      await writeFile(join(raceDir, "fault.bin"), Buffer.from("bad"));
+      try {
+        const listed = await isolatedStorage.listObjects(`outputs/${raceJobId}`);
+        expect(listed.map((o) => o.key).sort()).toEqual([
+          `outputs/${raceJobId}/fault.bin`,
+          `outputs/${raceJobId}/kept.bin`,
+        ]);
+
+        statShouldFail = true;
+        await expect(isolatedStorage.listObjects(`outputs/${raceJobId}`)).rejects.toBe(statFault);
+      } finally {
+        await deletePrefix(`outputs/${raceJobId}`).catch(() => {});
+      }
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+  });
+
   it("rejects listObjects for a prefix outside the allowed roots", async () => {
     await expect(listObjects("secrets/job-1")).rejects.toThrow(/invalid prefix/i);
   });
@@ -715,6 +803,90 @@ describe("object-storage local prefix + listing operations", () => {
     } finally {
       (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = originalWorkspace;
       rmSync(emptyRoot, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(isRootForList)(
+    "propagates a permission fault from listJobDirs when the prefix root is unreadable (#1498)",
+    async () => {
+      const originalWorkspace = env.WORKSPACE_PATH;
+      const lockedWorkspace = mkdtempSync(join(tmpdir(), "snapotter-locked-ws-"));
+      const lockedUploads = join(lockedWorkspace, "uploads");
+      await mkdir(join(lockedUploads, "job-1"), { recursive: true });
+      await chmod(lockedUploads, 0o000);
+      (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = lockedWorkspace;
+      try {
+        await expect(listJobDirs("uploads")).rejects.toMatchObject({
+          code: expect.stringMatching(/^(EACCES|EPERM)$/),
+        });
+      } finally {
+        (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = originalWorkspace;
+        await chmod(lockedUploads, 0o755).catch(() => {});
+        rmSync(lockedWorkspace, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("propagates a non-ENOENT readdir or stat error in listJobDirs and ignores ENOENT mid-walk (#1498)", async () => {
+    const eio = Object.assign(new Error("EIO: i/o error, scandir"), {
+      code: "EIO",
+      syscall: "scandir",
+    });
+    const statFault = Object.assign(new Error("EIO: i/o error, stat"), {
+      code: "EIO",
+      syscall: "stat",
+    });
+    const vanished = Object.assign(new Error("ENOENT: no such file or directory, stat"), {
+      code: "ENOENT",
+      syscall: "stat",
+    });
+    let readdirShouldFail = true;
+    let statShouldFail = false;
+
+    const tempWorkspace = mkdtempSync(join(tmpdir(), "snapotter-jobdirs-ws-"));
+    await mkdir(join(tempWorkspace, "outputs", "kept-job"), { recursive: true });
+    await mkdir(join(tempWorkspace, "outputs", "vanished-job"), { recursive: true });
+    await mkdir(join(tempWorkspace, "outputs", "fault-job"), { recursive: true });
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        readdir: async (...args: Parameters<typeof actual.readdir>) => {
+          if (readdirShouldFail) throw eio;
+          return actual.readdir(...args);
+        },
+        stat: async (p: Parameters<typeof actual.stat>[0]) => {
+          const pathStr = String(p);
+          if (pathStr.endsWith("vanished-job")) throw vanished;
+          if (statShouldFail && pathStr.endsWith("fault-job")) throw statFault;
+          return actual.stat(p);
+        },
+      };
+    });
+    try {
+      const isolatedConfig = await import("../../../apps/api/src/config.js");
+      const originalIsolatedWorkspace = isolatedConfig.env.WORKSPACE_PATH;
+      (isolatedConfig.env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = tempWorkspace;
+      try {
+        const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        await expect(isolatedStorage.listJobDirs("outputs")).rejects.toBe(eio);
+
+        readdirShouldFail = false;
+        const dirs = await isolatedStorage.listJobDirs("outputs");
+        expect(dirs.map((d) => d.key).sort()).toEqual(["outputs/fault-job", "outputs/kept-job"]);
+
+        statShouldFail = true;
+        await expect(isolatedStorage.listJobDirs("outputs")).rejects.toBe(statFault);
+      } finally {
+        (isolatedConfig.env as { WORKSPACE_PATH: string }).WORKSPACE_PATH =
+          originalIsolatedWorkspace;
+      }
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+      rmSync(tempWorkspace, { recursive: true, force: true });
     }
   });
 

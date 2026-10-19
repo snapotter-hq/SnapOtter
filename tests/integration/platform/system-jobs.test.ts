@@ -431,6 +431,40 @@ describe("runSystemJob", () => {
     }
   });
 
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "counts and logs a permission fault on uploads/ while still sweeping expired dirs under outputs/ (#1498)",
+    async () => {
+      const staleOutId = `stale-out-${randomUUID().slice(0, 8)}`;
+      const staleOutDir = join(env.WORKSPACE_PATH, "outputs", staleOutId);
+      const uploadsRoot = join(env.WORKSPACE_PATH, "uploads");
+
+      mkdirSync(uploadsRoot, { recursive: true });
+      mkdirSync(staleOutDir, { recursive: true });
+      writeFileSync(join(staleOutDir, "out.txt"), "stale");
+      const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      utimesSync(join(staleOutDir, "out.txt"), past, past);
+      utimesSync(staleOutDir, past, past);
+
+      const { chmod } = await import("node:fs/promises");
+      await chmod(uploadsRoot, 0o000);
+      const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      try {
+        const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as unknown as Job);
+        const typed = result as { removed: number; failed: number };
+        expect(typed.removed).toBeGreaterThanOrEqual(1);
+        expect(typed.failed).toBe(1);
+        expect(existsSync(staleOutDir)).toBe(false);
+        const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(logged).toMatch(/uploads: EACCES|uploads: EPERM/);
+      } finally {
+        errSpy.mockRestore();
+        await chmod(uploadsRoot, 0o755).catch(() => {});
+        await rm(staleOutDir, { recursive: true, force: true }).catch(() => {});
+      }
+    },
+  );
+
   // #1412: the sweep expired dirs by age alone, so a job that waited in the
   // queue past FILE_MAX_AGE_HOURS lost its input before the worker ran it.
   describe("in-flight jobs (#1412)", () => {

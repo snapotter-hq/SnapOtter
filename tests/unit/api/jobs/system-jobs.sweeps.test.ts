@@ -833,6 +833,66 @@ describe("storageTtlSweep", () => {
     errSpy.mockRestore();
   });
 
+  it("sweeps outputs/ and records the failure when listJobDirs('uploads') throws (#1498)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", []);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+
+    const oldMtime = Date.now() - 7_200_000;
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") => {
+      if (prefix === "uploads") {
+        throw Object.assign(new Error("EACCES: permission denied, scandir 'uploads'"), {
+          code: "EACCES",
+          syscall: "scandir",
+        });
+      }
+      return [{ key: "outputs/stale-out", size: 0, mtimeMs: oldMtime }];
+    });
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 1, failed: 1 });
+    expect(deletePrefixMock).toHaveBeenCalledWith("outputs/stale-out");
+    const errCalls = errSpy.mock.calls.map((c) => String(c[0]));
+    expect(
+      errCalls.some((m) => m.includes("uploads: EACCES: permission denied, scandir 'uploads'")),
+    ).toBe(true);
+    errSpy.mockRestore();
+  });
+
+  it("reports listJobDirs failures and adds deleteAfter failures when both prefix roots are unreadable (#1498)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    queueSelect("users", []);
+    queueSelect("teams", []);
+    queueSelect("jobs", [{ id: "da-job", userId: null }]);
+    getMaxAgeMsMock.mockResolvedValue(3_600_000);
+    deletePrefixMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "uploads/da-job") throw new Error("deleteAfter perm denied");
+    });
+
+    listJobDirsMock.mockImplementation(async (prefix: "uploads" | "outputs") => {
+      if (prefix === "uploads") throw new Error("EACCES: uploads denied");
+      throw "outputs string fault";
+    });
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.storageTtl } as never);
+
+    expect(result).toEqual({ removed: 0, failed: 3 });
+    const logged = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("Storage TTL: 2 dir(s) failed to delete:");
+    expect(logged).toContain("uploads: EACCES: uploads denied");
+    expect(logged).toContain("outputs: outputs string fault");
+    errSpy.mockRestore();
+  });
+
   it("skips deleting expired dirs whose job belongs to a legal-hold user", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();

@@ -521,6 +521,7 @@ describe("storageTtlSweep return arithmetic and empty-set handling", () => {
     // deleteAfterCleaned=2, maxAgeMs>0, but no dirs -> the allDirs.length===0
     // early return intentionally reports removed:0 (NOT removed:2).
     delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     queueSelect("users", []);
     queueSelect("teams", []);
@@ -536,8 +537,10 @@ describe("storageTtlSweep return arithmetic and empty-set handling", () => {
     // Kills ConditionalExpression `false` on line 285 (fall-through would give
     // removed:2 because deleteAfterCleaned would be added at line 343).
     expect(result).toEqual({ removed: 0, failed: 0 });
+    expect(errSpy).not.toHaveBeenCalled();
     // The two deleteAfter jobs were still cleaned (4 deletePrefix calls).
     expect(deletePrefixMock).toHaveBeenCalledTimes(4);
+    errSpy.mockRestore();
   });
 
   it("returns removed = global-sweep removals + deleteAfterCleaned (sum, not diff)", async () => {
