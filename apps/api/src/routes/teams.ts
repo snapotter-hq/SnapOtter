@@ -26,17 +26,19 @@ const teamNameField = z
       .max(TEAM_NAME_MAX_LENGTH, "Team name must be 50 characters or fewer"),
   );
 
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
+
 const createTeamSchema = z.object({
   name: teamNameField,
-  storageQuota: z.number().int().positive().nullable().optional(),
-  retentionHours: z.number().int().positive().nullable().optional(),
+  storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+  retentionHours: z.number().int().positive().max(POSTGRES_INTEGER_MAX).nullable().optional(),
 });
 
 const updateTeamSchema = z
   .object({
     name: teamNameField.optional(),
-    storageQuota: z.number().int().positive().nullable().optional(),
-    retentionHours: z.number().int().positive().nullable().optional(),
+    storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+    retentionHours: z.number().int().positive().max(POSTGRES_INTEGER_MAX).nullable().optional(),
   })
   // Strict because Zod strips unknown keys before any refine runs: without it a
   // body misspelling storagequota alongside a valid name would parse, rename the

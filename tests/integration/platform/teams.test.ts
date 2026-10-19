@@ -280,6 +280,48 @@ describe("POST /api/v1/teams", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it.each([
+    { field: "retentionHours", value: 2_147_483_648 },
+    { field: "storageQuota", value: Number.MAX_SAFE_INTEGER + 1 },
+    { field: "storageQuota", value: 1e19 },
+  ])("rejects out-of-range $field ($value) with 400", async ({ field, value }) => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: "OutOfRangeTeam", [field]: value },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+
+    const [team] = await db
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.name, "OutOfRangeTeam"));
+    expect(team).toBeUndefined();
+  });
+
+  it("accepts maximum valid storageQuota and retentionHours on create", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        name: "MaxQuotaTeam",
+        storageQuota: Number.MAX_SAFE_INTEGER,
+        retentionHours: 2_147_483_647,
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body);
+    expect(body.storageQuota).toBe(Number.MAX_SAFE_INTEGER);
+    expect(body.retentionHours).toBe(2_147_483_647);
+
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, body.id));
+    expect(team?.storageQuota).toBe(Number.MAX_SAFE_INTEGER);
+    expect(team?.retentionHours).toBe(2_147_483_647);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -506,6 +548,42 @@ describe("PUT /api/v1/teams/:id", () => {
     const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
     expect(team?.storageQuota).toBeNull();
     expect(team?.retentionHours).toBeNull();
+  });
+
+  it.each([
+    { field: "retentionHours", value: 2_147_483_648 },
+    { field: "storageQuota", value: Number.MAX_SAFE_INTEGER + 1 },
+    { field: "storageQuota", value: 1e19 },
+  ])("rejects out-of-range $field ($value) with 400", async ({ field, value }) => {
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { [field]: value },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(team?.storageQuota).toBeNull();
+    expect(team?.retentionHours).toBeNull();
+  });
+
+  it("accepts maximum valid storageQuota and retentionHours on update", async () => {
+    const res = await app.inject({
+      method: "PUT",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        storageQuota: Number.MAX_SAFE_INTEGER,
+        retentionHours: 2_147_483_647,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+    expect(team?.storageQuota).toBe(Number.MAX_SAFE_INTEGER);
+    expect(team?.retentionHours).toBe(2_147_483_647);
   });
 });
 

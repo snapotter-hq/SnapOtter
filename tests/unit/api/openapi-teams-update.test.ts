@@ -49,9 +49,16 @@ describe("PUT /api/v1/teams/{id} in the API reference (#2011)", () => {
     const properties = bodySchema.properties as Record<string, unknown>;
     expect(Object.keys(properties).sort()).toEqual(["name", "retentionHours", "storageQuota"]);
     expect(properties.name).toEqual({ type: "string" });
-    for (const key of ["storageQuota", "retentionHours"]) {
-      expect(properties[key]).toMatchObject({ type: ["integer", "null"], minimum: 1 });
-    }
+    expect(properties.storageQuota).toMatchObject({
+      type: ["integer", "null"],
+      minimum: 1,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+    expect(properties.retentionHours).toMatchObject({
+      type: ["integer", "null"],
+      minimum: 1,
+      maximum: 2_147_483_647,
+    });
   });
 
   // storageQuota is bytes (compared against summed storageUsed), not the MB the

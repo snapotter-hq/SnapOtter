@@ -6950,12 +6950,14 @@ paths:
                     - integer
                     - 'null'
                   minimum: 1
+                  maximum: 9007199254740991
                   description: Team-wide limit on library storage, in bytes, counted across all members. null removes the limit.
                 retentionHours:
                   type:
                     - integer
                     - 'null'
                   minimum: 1
+                  maximum: 2147483647
                   description: Hours to keep the team's job results before they are deleted. null uses the instance default (FILE_MAX_AGE_HOURS). Only applies when the team_retention_overrides enterprise feature is on.
       responses:
         '200':
