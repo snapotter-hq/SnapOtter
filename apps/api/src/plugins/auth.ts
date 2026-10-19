@@ -891,54 +891,83 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
       // Wrap the session insert in a transaction that takes FOR SHARE on the user row
-      // and refuses if the hash differs from the one verified. This conflicts with
-      // the FOR NO KEY UPDATE in the password change route, closing the race condition.
-      const inserted = await db.transaction(async (tx) => {
-        const [lockedUser] = await tx
-          .select({ passwordHash: schema.users.passwordHash })
-          .from(schema.users)
-          .where(eq(schema.users.id, user.id))
-          .for("share");
+      // and refuses if the hash or role differs from the one verified. This conflicts
+      // with the FOR NO KEY UPDATE / FOR UPDATE in the password and role change routes,
+      // closing the race condition (#2235, #2823).
+      const inserted = await db.transaction(
+        async (tx): Promise<"ok" | "password_changed" | "user_disabled" | "role_changed"> => {
+          const [lockedUser] = await tx
+            .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, user.id))
+            .for("share");
 
-        if (lockedUser?.passwordHash !== user.passwordHash) {
-          return false;
-        }
+          if (!lockedUser) {
+            return "password_changed";
+          }
+          if (lockedUser.passwordHash !== user.passwordHash) {
+            return lockedUser.passwordHash === null && isDisabledRole(lockedUser.role)
+              ? "user_disabled"
+              : "password_changed";
+          }
+          if (isDisabledRole(lockedUser.role)) {
+            return "user_disabled";
+          }
+          if (lockedUser.role !== user.role) {
+            return "role_changed";
+          }
 
-        await tx.insert(schema.sessions).values({
-          id: token,
-          userId: user.id,
-          expiresAt,
-        });
+          await tx.insert(schema.sessions).values({
+            id: token,
+            userId: user.id,
+            expiresAt,
+          });
 
-        // ── Concurrent session limit (FIFO eviction) ──────────────
-        if (maxSessions > 0) {
-          const sessions = await tx
-            .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
-            .from(schema.sessions)
-            .where(eq(schema.sessions.userId, user.id))
-            .orderBy(asc(schema.sessions.createdAt));
+          // ── Concurrent session limit (FIFO eviction) ──────────────
+          if (maxSessions > 0) {
+            const sessions = await tx
+              .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
+              .from(schema.sessions)
+              .where(eq(schema.sessions.userId, user.id))
+              .orderBy(asc(schema.sessions.createdAt));
 
-          if (sessions.length > maxSessions) {
-            const toDelete = sessions.slice(0, sessions.length - maxSessions);
-            for (const s of toDelete) {
-              await tx.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
+            if (sessions.length > maxSessions) {
+              const toDelete = sessions.slice(0, sessions.length - maxSessions);
+              for (const s of toDelete) {
+                await tx.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
+              }
             }
           }
-        }
 
-        return true;
-      });
+          return "ok";
+        },
+      );
 
-      if (!inserted) {
+      if (inserted === "user_disabled") {
+        authAttempts.inc({ method: "password", result: "failure" });
+        await audit("LOGIN_FAILED", {
+          username: sanitizeAuditInput(body.username),
+          reason: "disabled_user",
+        });
+        return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
+      }
+
+      if (inserted !== "ok") {
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
-          reason: "password_changed_concurrently",
+          reason:
+            inserted === "role_changed"
+              ? "role_changed_concurrently"
+              : "password_changed_concurrently",
         });
 
-        // Use a generic delay so this is not a timing oracle
-        await recordThrottleFailure();
+        // Only count a concurrent password rotation against the brute-force throttle;
+        // a concurrent role update on a user who proved their password should not lock them out.
+        if (inserted === "password_changed") {
+          await recordThrottleFailure();
+        }
         return reply.status(401).send({ error: "Invalid credentials" });
       }
 

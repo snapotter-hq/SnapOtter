@@ -892,25 +892,41 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
       const verifiedUser = dbUser;
 
-      let inserted: "success" | "password_changed" | "password_removed";
+      let inserted:
+        | { status: "success"; role: string }
+        | { status: "password_changed" | "password_removed" | "user_disabled" | "user_deleted" };
       try {
         inserted = await db.transaction(async (tx) => {
           const [lockedUser] = await tx
-            .select({ passwordHash: schema.users.passwordHash })
+            .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
             .from(schema.users)
             .where(eq(schema.users.id, verifiedUser.id))
             .for("share");
 
-          if (hashFingerprint) {
-            const { createHash } = await import("node:crypto");
-            const freshFingerprint = lockedUser?.passwordHash
-              ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
-              : null;
-            if (freshFingerprint !== hashFingerprint) {
-              return lockedUser?.passwordHash ? "password_changed" : "password_removed";
-            }
-          } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
-            return lockedUser?.passwordHash ? "password_changed" : "password_removed";
+          if (!lockedUser) {
+            return { status: "user_deleted" as const };
+          }
+
+          const passwordMismatch = hashFingerprint
+            ? (lockedUser.passwordHash
+                ? createHash("sha256")
+                    .update(lockedUser.passwordHash)
+                    .digest("hex")
+                    .substring(0, 16)
+                : null) !== hashFingerprint
+            : lockedUser.passwordHash !== verifiedUser.passwordHash;
+          if (passwordMismatch) {
+            return {
+              status: lockedUser.passwordHash
+                ? ("password_changed" as const)
+                : isDisabledRole(lockedUser.role)
+                  ? ("user_disabled" as const)
+                  : ("password_removed" as const),
+            };
+          }
+
+          if (isDisabledRole(lockedUser.role)) {
+            return { status: "user_disabled" as const };
           }
 
           await tx.insert(schema.sessions).values({
@@ -919,7 +935,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
-          return "success";
+          return { status: "success" as const, role: lockedUser.role };
         });
       } catch (err) {
         if (claimedStep) {
@@ -933,14 +949,25 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       // challenge key was deleted on claim).
       await redis.del(attemptsKey);
 
-      if (inserted !== "success") {
+      if (inserted.status !== "success") {
         if (claimedStep) {
           await restoreTotpStep(redis, claimedStep);
+        }
+        if (inserted.status === "user_disabled") {
+          await audit("MFA_VERIFY_FAILED", {
+            userId: verifiedUser.id,
+            username: verifiedUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
         }
         await audit("MFA_VERIFY_FAILED", {
           userId: verifiedUser.id,
           username: verifiedUser.username,
-          reason: inserted,
+          reason: inserted.status,
         });
         return reply.status(401).send({
           error: "MFA challenge expired or invalid",
@@ -965,11 +992,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         user: {
           id: verifiedUser.id,
           username: verifiedUser.username,
-          role: verifiedUser.role,
+          role: inserted.role,
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD
             ? false
             : verifiedUser.mustChangePassword,
-          permissions: await getPermissions(verifiedUser.role),
+          permissions: await getPermissions(inserted.role),
           teamName: teamRow?.name ?? verifiedUser.team,
         },
         expiresAt: expiresAt.toISOString(),
@@ -1145,25 +1172,41 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
       const verifiedUser = dbUser;
 
-      let inserted: "success" | "password_changed" | "password_removed";
+      let inserted:
+        | { status: "success"; role: string }
+        | { status: "password_changed" | "password_removed" | "user_disabled" | "user_deleted" };
       try {
         inserted = await db.transaction(async (tx) => {
           const [lockedUser] = await tx
-            .select({ passwordHash: schema.users.passwordHash })
+            .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
             .from(schema.users)
             .where(eq(schema.users.id, verifiedUser.id))
             .for("share");
 
-          if (hashFingerprint) {
-            const { createHash } = await import("node:crypto");
-            const freshFingerprint = lockedUser?.passwordHash
-              ? createHash("sha256").update(lockedUser.passwordHash).digest("hex").substring(0, 16)
-              : null;
-            if (freshFingerprint !== hashFingerprint) {
-              return lockedUser?.passwordHash ? "password_changed" : "password_removed";
-            }
-          } else if (lockedUser?.passwordHash !== verifiedUser.passwordHash) {
-            return lockedUser?.passwordHash ? "password_changed" : "password_removed";
+          if (!lockedUser) {
+            return { status: "user_deleted" as const };
+          }
+
+          const passwordMismatch = hashFingerprint
+            ? (lockedUser.passwordHash
+                ? createHash("sha256")
+                    .update(lockedUser.passwordHash)
+                    .digest("hex")
+                    .substring(0, 16)
+                : null) !== hashFingerprint
+            : lockedUser.passwordHash !== verifiedUser.passwordHash;
+          if (passwordMismatch) {
+            return {
+              status: lockedUser.passwordHash
+                ? ("password_changed" as const)
+                : isDisabledRole(lockedUser.role)
+                  ? ("user_disabled" as const)
+                  : ("password_removed" as const),
+            };
+          }
+
+          if (isDisabledRole(lockedUser.role)) {
+            return { status: "user_disabled" as const };
           }
 
           await tx
@@ -1177,7 +1220,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
-          return "success";
+          return { status: "success" as const, role: lockedUser.role };
         });
       } catch (err) {
         await restoreTotpStep(redis, claimedStep);
@@ -1189,12 +1232,23 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       // challenge key was deleted on claim).
       await redis.del(attemptsKey);
 
-      if (inserted !== "success") {
+      if (inserted.status !== "success") {
         await restoreTotpStep(redis, claimedStep);
+        if (inserted.status === "user_disabled") {
+          await audit("MFA_VERIFY_FAILED", {
+            userId: verifiedUser.id,
+            username: verifiedUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
         await audit("MFA_VERIFY_FAILED", {
           userId: verifiedUser.id,
           username: verifiedUser.username,
-          reason: inserted,
+          reason: inserted.status,
         });
         return reply.status(401).send({
           error: "Enrollment challenge expired or invalid",
@@ -1217,11 +1271,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         user: {
           id: verifiedUser.id,
           username: verifiedUser.username,
-          role: verifiedUser.role,
+          role: inserted.role,
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD
             ? false
             : verifiedUser.mustChangePassword,
-          permissions: await getPermissions(verifiedUser.role),
+          permissions: await getPermissions(inserted.role),
           teamName: teamRow?.name ?? verifiedUser.team,
         },
         expiresAt: expiresAt.toISOString(),
