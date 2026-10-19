@@ -167,4 +167,72 @@ describe("LoginPage TOTP prompt accepts recovery codes", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     await waitFor(() => expect(input.value).toBe(""));
   });
+
+  it("clears the rejected recovery code when leaving the MFA prompt via Back (#2750)", async () => {
+    const { input, fetchMock } = await reachTotpPrompt();
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: async () => ({ error: "Invalid TOTP or recovery code", code: "INVALID_CODE" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-2" }),
+      });
+
+    fireEvent.change(input, { target: { value: "a3f9c01b" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await screen.findByText(/invalid code/i);
+    expect(screen.getByRole("button", { name: /^verify$/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    const nextInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(nextInput, { target: { value: "a3f9c01b" } });
+    expect(screen.getByRole("button", { name: /^verify$/i })).toBeEnabled();
+  });
+
+  it("clears the rejected recovery code when restartLogin returns to the password form (#2750)", async () => {
+    const { input, fetchMock } = await reachTotpPrompt();
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: async () => ({ error: "Invalid TOTP or recovery code", code: "INVALID_CODE" }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: async () => ({ error: "MFA session expired", code: "MFA_EXPIRED" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-2" }),
+      });
+
+    fireEvent.change(input, { target: { value: "a3f9c01b" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await screen.findByText(/invalid code/i);
+    expect(screen.getByRole("button", { name: /^verify$/i })).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await screen.findByText(/verification session expired/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    const nextInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(nextInput, { target: { value: "a3f9c01b" } });
+    expect(screen.getByRole("button", { name: /^verify$/i })).toBeEnabled();
+  });
 });

@@ -455,6 +455,7 @@ export function LoginPage() {
     setShowMfaPrompt(false);
     setMfaToken("");
     setMfaCode("");
+    setRejectedMfaCode("");
     setShowMfaEnrollment(false);
     setEnrollmentToken("");
     setEnrollmentUri("");
@@ -777,6 +778,7 @@ export function LoginPage() {
                   setShowMfaPrompt(false);
                   setMfaToken("");
                   setMfaCode("");
+                  setRejectedMfaCode("");
                   setError("");
                 }}
                 className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
