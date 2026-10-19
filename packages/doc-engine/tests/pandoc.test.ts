@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { isToolInputError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeSpawnHelpers } from "./helpers/spawn-capture.js";
 
@@ -243,5 +244,101 @@ describe("runPandoc", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("kills the child with SIGKILL and rejects with Canceled when signal aborts mid-run", async () => {
+    const mod = await import("../src/pandoc.js");
+    const child = h.nextManual();
+    const ac = new AbortController();
+    const p = mod.runPandoc("/in.epub", "/out.html", { signal: ac.signal });
+    ac.abort();
+    await expect(p).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+  });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/pandoc.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(mod.runPandoc("/in.epub", "/out.html", { signal: ac.signal })).rejects.toThrow(
+      "Canceled",
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("removes the abort listener on normal close and on spawn error", async () => {
+    const mod = await import("../src/pandoc.js");
+    const ac1 = new AbortController();
+    const removeSpy1 = vi.spyOn(ac1.signal, "removeEventListener");
+    h.nextClose({ code: 0 });
+    await mod.runPandoc("/in.epub", "/out.html", { signal: ac1.signal });
+    expect(removeSpy1).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const ac2 = new AbortController();
+    const removeSpy2 = vi.spyOn(ac2.signal, "removeEventListener");
+    h.nextError(new Error("spawn failed"));
+    await expect(mod.runPandoc("/in.epub", "/out.html", { signal: ac2.signal })).rejects.toThrow(
+      "spawn failed",
+    );
+    expect(removeSpy2).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+
+  it("marks corrupt/invalid container and parse exits (63, 64, 91) as ToolInputError", async () => {
+    const mod = await import("../src/pandoc.js");
+    h.nextClose({ stderr: "No entry on path: META-INF/container.xml\n", code: 64 });
+    const err64 = await mod.runPandoc("/bad.epub", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err64)).toBe(true);
+
+    h.nextClose({ stderr: "couldn't parse docx file: DocxError\n", code: 63 });
+    const err63 = await mod.runPandoc("/bad.docx", "/out.epub").catch((e: unknown) => e);
+    expect(isToolInputError(err63)).toBe(true);
+
+    h.nextClose({ stderr: "UTF-8 decoding error", code: 91 });
+    const err91 = await mod.runPandoc("/bad.txt", "/out.epub").catch((e: unknown) => e);
+    expect(isToolInputError(err91)).toBe(true);
+  });
+
+  it("markIfPandocInputError matches each stderr pattern even when exit code is not 63/64/91", async () => {
+    const { markIfPandocInputError } = await import("../src/pandoc.js");
+    const samples = [
+      "No entry on path: META-INF/container.xml",
+      "Couldn't extract ePub file: Unknown compression method",
+      "couldn't parse docx file: DocxError",
+      "UTF-8 decoding error at byte 42",
+      "Error parsing YAML metadata at line 4",
+    ];
+    for (const stderr of samples) {
+      expect(isToolInputError(markIfPandocInputError(new Error("fail"), 1, stderr))).toBe(true);
+      expect(isToolInputError(markIfPandocInputError(new Error("fail"), null, stderr))).toBe(true);
+    }
+    expect(
+      isToolInputError(markIfPandocInputError(new Error("fail"), 1, "pandoc: Out of memory")),
+    ).toBe(false);
+  });
+
+  it("marks DRM/invalid-UTF-8 exception on exit 1 as ToolInputError and strips GHC HasCallStack backtrace", async () => {
+    const mod = await import("../src/pandoc.js");
+    const ghcStderr = [
+      "pandoc: Uncaught exception text-2.1.3:Data.Text.Encoding.Error.UnicodeException:",
+      "",
+      "Cannot decode byte '\\x89': Data.Text.Internal.Encoding: Invalid UTF-8 stream",
+      "",
+      "HasCallStack backtrace:",
+      "  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37",
+      "  throw, called at libraries/text/src/Data/Text/Encoding/Error.hs:101:23",
+    ].join("\n");
+    h.nextClose({ stderr: ghcStderr, code: 1 });
+    const err = (await mod.runPandoc("/drm.epub", "/out.html").catch((e: unknown) => e)) as Error;
+    expect(isToolInputError(err)).toBe(true);
+    expect(err.message).toContain("Invalid UTF-8 stream");
+    expect(err.message).not.toContain("HasCallStack backtrace");
+    expect(err.message.split("\n").length).toBeLessThanOrEqual(3);
+  });
+
+  it("leaves non-input pandoc failures unmarked so genuine bugs still report", async () => {
+    const mod = await import("../src/pandoc.js");
+    h.nextClose({ stderr: "pandoc: unknown reader", code: 43 });
+    const err = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err)).toBe(false);
   });
 });

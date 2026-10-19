@@ -200,16 +200,20 @@ export async function pdfMetadataSetPy(
   }
 }
 
-/** HTML or Markdown to PDF (WeasyPrint, SSRF-hardened). 2 min timeout. */
+/** HTML or Markdown to PDF (WeasyPrint, SSRF-hardened). 2 min default timeout. */
 export async function htmlToPdfPy(
   inPath: string,
   outPath: string,
   mode: "html" | "markdown",
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<void> {
   const stdout = await runDocsScript(
     "doc_html_pdf",
     { path: inPath, out: outPath, mode },
-    { timeoutMs: 120_000 },
+    {
+      timeoutMs: opts?.timeoutMs ?? 120_000,
+      ...(opts?.signal ? { signal: opts.signal } : {}),
+    },
   );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_html_pdf", stdout);
   if ("error" in parsed) {

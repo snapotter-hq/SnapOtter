@@ -34,15 +34,19 @@ export function registerEpubConvert(app: FastifyInstance) {
       ctx.report(10, "Converting");
 
       if (format === "pdf") {
-        // Two-step chain: epub -> standalone HTML -> PDF via WeasyPrint.
-        // Resource embedding MUST stay OFF: pandoc --self-contained / --embed-resources
-        // would fetch remote refs server-side (SSRF). WeasyPrint's url_fetcher then
-        // refuses every non-data: URL, so a book that links to or embeds remote
-        // content converts with that content omitted rather than fetched (#1157).
+        // Two-step chain: epub -> self-contained HTML -> PDF via WeasyPrint.
+        // runPandoc always runs with --sandbox (PandocPure: no network or
+        // filesystem IO beyond the input file), so selfContained inlines the
+        // EPUB's own MediaBag assets (cover, images, CSS) as data: URIs while
+        // refusing any remote refs. WeasyPrint's url_fetcher then serves only
+        // data: URIs and omits any remaining non-data: URL (#1157).
         const intermediateHtml = join(ctx.scratchDir, "book.html");
-        await runPandoc(inPath, intermediateHtml, { extraArgs: ["--standalone"] });
+        await runPandoc(inPath, intermediateHtml, {
+          selfContained: true,
+          signal: ctx.signal,
+        });
         const outPath = join(ctx.scratchDir, `${base}.pdf`);
-        await htmlToPdfPy(intermediateHtml, outPath, "html");
+        await htmlToPdfPy(intermediateHtml, outPath, "html", { signal: ctx.signal });
         ctx.report(90, "Done");
         return {
           scratchPath: outPath,
@@ -53,7 +57,11 @@ export function registerEpubConvert(app: FastifyInstance) {
 
       // Direct pandoc conversion for docx, html, md
       const outPath = join(ctx.scratchDir, `${base}.${format}`);
-      await runPandoc(inPath, outPath, format === "html" ? { extraArgs: ["--standalone"] } : {});
+      await runPandoc(
+        inPath,
+        outPath,
+        format === "html" ? { selfContained: true, signal: ctx.signal } : { signal: ctx.signal },
+      );
       ctx.report(90, "Done");
 
       return {

@@ -388,6 +388,31 @@ describe("htmlToPdfPy", () => {
       import("../src/python-docs.js").then((m) => m.htmlToPdfPy("/in.html", "/out.pdf", "html")),
     ).rejects.toThrow('doc_html_pdf failed: {"error": ""}');
   });
+
+  it("forwards signal and custom timeoutMs to runDocsScript when provided", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    const ac = new AbortController();
+    await import("../src/python-docs.js").then((m) =>
+      m.htmlToPdfPy("/in.html", "/out.pdf", "html", { signal: ac.signal, timeoutMs: 300_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_html_pdf",
+      { path: "/in.html", out: "/out.pdf", mode: "html" },
+      { timeoutMs: 300_000, signal: ac.signal },
+    ]);
+  });
+
+  it("omits the signal key when opts has only timeoutMs", async () => {
+    runDocsScript.mockResolvedValueOnce('{"ok": true}');
+    await import("../src/python-docs.js").then((m) =>
+      m.htmlToPdfPy("/in.html", "/out.pdf", "html", { timeoutMs: 300_000 }),
+    );
+    expect(firstCall()).toEqual([
+      "doc_html_pdf",
+      { path: "/in.html", out: "/out.pdf", mode: "html" },
+      { timeoutMs: 300_000 },
+    ]);
+  });
 });
 
 describe("pdfSignPy", () => {

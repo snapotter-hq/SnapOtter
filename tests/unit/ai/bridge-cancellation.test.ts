@@ -130,4 +130,52 @@ describe("Python bridge cancellation", () => {
     expect(fallbackPython.process.kill).toHaveBeenCalledWith("SIGTERM");
     expect(missingVenvPython.process.kill).not.toHaveBeenCalled();
   });
+
+  it("forwards signal from runDocsScript to the docs dispatcher run", async () => {
+    const dispatcher = createMockProcess();
+    const request = createMockProcess();
+    vi.mocked(spawn).mockReturnValueOnce(dispatcher.process).mockReturnValueOnce(request.process);
+
+    const bridge = await import("../../../packages/ai/src/bridge.js");
+    const controller = new AbortController();
+    const result = bridge.runDocsScript(
+      "doc_html_pdf",
+      { path: "/in.html", out: "/out.pdf", mode: "html" },
+      { signal: controller.signal, timeoutMs: 120_000 },
+    );
+
+    controller.abort("job canceled");
+    request.stdout.emit("data", Buffer.from('{"ok":true}\n'));
+    request.emit("close", 0, null);
+
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    expect(request.process.kill).toHaveBeenCalledWith("SIGTERM");
+    await bridge.shutdownDocsDispatcher();
+  });
+
+  it("runDocsScript passes undefined options when opts is omitted or empty, and maps timeoutMs/signal individually", async () => {
+    const bridge = await import("../../../packages/ai/src/bridge.js");
+    const runSpy = vi
+      .spyOn(bridge.getDocsDispatcher(), "run")
+      .mockResolvedValue({ stdout: '{"ok":true}', stderr: "" });
+
+    await bridge.runDocsScript("doc_pagecount", { path: "/a.pdf" });
+    expect(runSpy).toHaveBeenLastCalledWith("doc_pagecount.py", ['{"path":"/a.pdf"}'], undefined);
+
+    await bridge.runDocsScript("doc_pagecount", { path: "/a.pdf" }, {});
+    expect(runSpy).toHaveBeenLastCalledWith("doc_pagecount.py", ['{"path":"/a.pdf"}'], undefined);
+
+    await bridge.runDocsScript("doc_pagecount", { path: "/a.pdf" }, { timeoutMs: 45_000 });
+    expect(runSpy).toHaveBeenLastCalledWith("doc_pagecount.py", ['{"path":"/a.pdf"}'], {
+      timeout: 45_000,
+    });
+
+    const ac = new AbortController();
+    await bridge.runDocsScript("doc_pagecount", { path: "/a.pdf" }, { signal: ac.signal });
+    expect(runSpy).toHaveBeenLastCalledWith("doc_pagecount.py", ['{"path":"/a.pdf"}'], {
+      signal: ac.signal,
+    });
+
+    await bridge.shutdownDocsDispatcher();
+  });
 });

@@ -1097,16 +1097,19 @@ export function getDocsDispatcher(): PythonDispatcher {
 export async function runDocsScript(
   script: string,
   args: Record<string, unknown>,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<string> {
   // Ensure .py extension: the dispatcher protocol strips it for the
   // in-process path, while the per-request fallback needs it for the
   // file path on disk.
   const scriptFile = script.endsWith(".py") ? script : `${script}.py`;
+  const runOpts: PythonRunOptions = {};
+  if (opts?.timeoutMs !== undefined) runOpts.timeout = opts.timeoutMs;
+  if (opts?.signal !== undefined) runOpts.signal = opts.signal;
   const result = await getDocsDispatcher().run(
     scriptFile,
     [JSON.stringify(args)],
-    opts?.timeoutMs ? { timeout: opts.timeoutMs } : undefined,
+    Object.keys(runOpts).length > 0 ? runOpts : undefined,
   );
   return result.stdout;
 }

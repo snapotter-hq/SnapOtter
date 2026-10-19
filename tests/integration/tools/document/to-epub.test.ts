@@ -72,6 +72,49 @@ describe.skipIf(!pandocAvailable())("to-epub (requires pandoc)", () => {
     // EPUB is a ZIP archive (PK magic bytes)
     expect(dl.rawPayload.subarray(0, 2).toString()).toBe("PK");
   }, 90_000);
+
+  it("converts a .txt file with --- dividers and colons without YAML parse failure", async () => {
+    const txt = Buffer.from(
+      [
+        "Title: The Time Machine: An Invention",
+        "Author: H. G. Wells",
+        "",
+        "---",
+        "Chapter I: Introduction: The Time Traveller",
+        "---",
+        "",
+        "The Time Traveller was expounding a recondite matter to us.",
+      ].join("\n"),
+    );
+    const res = await runTool("GUTENBERG.TXT", txt);
+    expect(res.statusCode).toBe(202);
+    const { jobId } = JSON.parse(res.body);
+    const { db, schema } = await import("../../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    let row: { status: string; outputRefs: unknown; error: { message: string } | null } | undefined;
+    for (let i = 0; i < 120; i++) {
+      [row] = await db
+        .select({
+          status: schema.jobs.status,
+          outputRefs: schema.jobs.outputRefs,
+          error: schema.jobs.error,
+        })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (row?.status !== "completed") {
+      throw new Error(`to-epub job ${jobId} ${row?.status}: ${row?.error?.message ?? "unknown"}`);
+    }
+    const outName = (row.outputRefs as string[])[0].split("/").pop() as string;
+    const dl = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/download/${jobId}/${encodeURIComponent(outName)}`,
+    });
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.subarray(0, 2).toString()).toBe("PK");
+  }, 90_000);
 });
 
 // Ungated: runs locally without pandoc

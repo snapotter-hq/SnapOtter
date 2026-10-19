@@ -21,9 +21,15 @@ export function registerToEpub(app: FastifyInstance) {
       await writeFile(inPath, input.buffer);
 
       const outPath = join(ctx.scratchDir, `${base}.epub`);
+      const isPlainText = input.filename.toLowerCase().endsWith(".txt");
       ctx.report(10, "Converting");
       await runPandoc(inPath, outPath, {
-        extraArgs: ["--metadata", `title=${base}`],
+        signal: ctx.signal,
+        extraArgs: [
+          ...(isPlainText ? ["-f", "markdown-yaml_metadata_block"] : []),
+          "--metadata",
+          `title=${base}`,
+        ],
       });
       ctx.report(90, "Done");
 
