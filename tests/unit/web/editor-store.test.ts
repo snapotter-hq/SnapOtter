@@ -1223,10 +1223,10 @@ describe("Canvas Transforms", () => {
     expect(obj.type === "rect" && obj.attrs.y).toBe(350);
   });
 
-  it("trimCanvas trims to object bounds", () => {
+  it("trimCanvas trims to object bounds", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     act((s) => s.addObject(makeRect({ id: "r1", x: 100, y: 200 })));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     expect(state().isDirty).toBe(true);
     // Trim now includes strokeWidth (1px / 2 = 0.5px per side -> 1px extra per axis)
     expect(state().canvasSize).toEqual({ width: 102, height: 52 });
@@ -1237,9 +1237,9 @@ describe("Canvas Transforms", () => {
     expect(obj.type === "rect" && obj.attrs.y).toBe(1);
   });
 
-  it("trimCanvas no-ops when no objects exist", () => {
+  it("trimCanvas no-ops when no objects exist", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     expect(state().isDirty).toBe(false);
     expect(state().canvasSize).toEqual({ width: 800, height: 600 });
   });
@@ -1533,7 +1533,7 @@ describe("transform with center-based objects", () => {
 // ===========================================================================
 
 describe("trimCanvas with line objects", () => {
-  it("computes correct bounds from line points", () => {
+  it("computes correct bounds from line points", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     // Line with points [50, 100, 250, 300], strokeWidth = 2
     const lineObj: CanvasObject = {
@@ -1552,13 +1552,13 @@ describe("trimCanvas with line objects", () => {
       },
     };
     act((s) => s.addObject(lineObj));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     // Bounds: minX = 50-1=49, minY = 100-1=99, maxX = 250+1=251, maxY = 300+1=301
     // Trimmed size = ceil(251) - floor(49) = 251-49 = 202, ceil(301) - floor(99) = 301-99 = 202
     expect(state().canvasSize).toEqual({ width: 202, height: 202 });
   });
 
-  it("offsets line points after trim", () => {
+  it("offsets line points after trim", async () => {
     act((s) => s.loadImage("blob:test", 800, 600));
     const lineObj: CanvasObject = {
       id: "l1",
@@ -1576,7 +1576,7 @@ describe("trimCanvas with line objects", () => {
       },
     };
     act((s) => s.addObject(lineObj));
-    act((s) => s.trimCanvas());
+    await act((s) => s.trimCanvas());
     const obj = state().objects[0];
     if (obj.type === "line") {
       // minX = floor(49) = 49, minY = floor(99) = 99

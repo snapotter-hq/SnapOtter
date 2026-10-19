@@ -13,6 +13,7 @@ const analytics = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/analytics", () => analytics);
 
+import { runEditorAction } from "@/lib/editor-action";
 import { useEditorStore } from "@/stores/editor-store";
 import type { CanvasObject } from "@/types/editor";
 
@@ -82,8 +83,7 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
   it("trim crops the bitmap to the content bounds instead of squashing it", async () => {
     const draws = stubRaster();
     useEditorStore.getState().addObject(rect(100, 50));
-    useEditorStore.getState().trimCanvas();
-    await flush();
+    await expect(useEditorStore.getState().trimCanvas()).resolves.toBe(true);
     expect(useEditorStore.getState().canvasSize).toEqual({ width: 200, height: 100 });
     expect(draws).toHaveLength(1);
     expect(draws[0].canvas).toMatchObject({ width: 200, height: 100 });
@@ -91,10 +91,9 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
     expect(useEditorStore.getState().sourceImageUrl).toBe("data:image/png;base64,REBAKED");
   });
 
-  // Crop no longer takes this path: it builds the bitmap first and rejects on failure
-  // (editor-rebake-transforms.test.ts). Trim still commits first, so its failure has to be
-  // reported here.
-  it("reports a failed trim rebake instead of swallowing it", async () => {
+  // Trim and crop both build the bitmap first and reject on failure (#2070, #2116);
+  // the menu bar wraps Trim in runEditorAction so the failure is logged and reported.
+  it("reports a failed trim rebake and leaves the canvas untouched", async () => {
     stubRaster();
     vi.stubGlobal(
       "Image",
@@ -108,31 +107,28 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
     );
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     useEditorStore.getState().addObject(rect(100, 50));
-    useEditorStore.getState().trimCanvas();
+    runEditorAction(useEditorStore.getState().trimCanvas(), "Something went wrong");
     await flush();
-    expect(logged).toHaveBeenCalledWith(
-      "Trim could not update the source image",
-      expect.any(Error),
-    );
+    expect(logged).toHaveBeenCalledWith("Editor action failed", expect.any(Error));
     // The console alone never reaches Sentry; the report must carry the root cause.
     await vi.waitFor(() =>
       expect(analytics.captureHandledError).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: "Could not update the source image after a trim",
+          message: "Editor could not rebuild the source image",
           isSafeMessage: true,
           cause: expect.any(Error),
         }),
-        { error_class: "bug", tool_id: "editor-trim" },
+        { error_class: "operational" },
       ),
     );
-    // The canvas change already committed, so the original bitmap stays as is.
-    expect(useEditorStore.getState().canvasSize).toEqual({ width: 200, height: 100 });
+    // The bitmap failed to build, so the canvas and bitmap stay untouched.
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 800, height: 600 });
     expect(useEditorStore.getState().sourceImageUrl).toBe("blob:test");
   });
 
   it("crop draws the bitmap at the canvas size, so it works after Image Size", async () => {
     const draws = stubRaster();
-    useEditorStore.getState().resizeImage(400, 300);
+    await expect(useEditorStore.getState().resizeImage(400, 300)).resolves.toBe(true);
     useEditorStore.getState().setCropState({
       x: 100,
       y: 50,
@@ -140,8 +136,7 @@ describe("trim and crop move the source bitmap with the canvas (#2069)", () => {
       height: 100,
       aspectRatio: null,
     });
-    useEditorStore.getState().applyCrop();
-    await flush();
+    await expect(useEditorStore.getState().applyCrop()).resolves.toBe(true);
     expect(draws).toHaveLength(1);
     expect(draws[0].canvas).toMatchObject({ width: 200, height: 100 });
     // The bitmap is drawn 400x300 after the resize, not at its natural 800x600.

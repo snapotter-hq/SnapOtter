@@ -48,7 +48,7 @@ function setup(zoom = 1) {
   return { result, click, dblclick, drawTriangle };
 }
 
-function setupCropOnEnter(applyImpl: () => Promise<void> = () => Promise.resolve()) {
+function setupCropOnEnter(applyImpl: () => Promise<boolean> = () => Promise.resolve(true)) {
   // The store's applyCrop returns a promise (#2070); the shortcut handles its failure.
   const applyCrop = vi.fn(applyImpl);
   const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };

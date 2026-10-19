@@ -461,20 +461,23 @@ export interface EditorState {
   setPanOffset: (offset: { x: number; y: number }) => void;
   loadImage: (url: string, width: number, height: number) => void;
   // `fill` is a #rrggbb color painted into the added room when the canvas grows;
-  // omitted, the room stays transparent. Anything else is refused.
+  // omitted, the room stays transparent. Anything else is refused. Resolves with
+  // `true` when committed and `false` when dropped because the document changed
+  // underneath while the bitmap was being built (#2116).
   resizeCanvas: (
     width: number,
     height: number,
     anchor: AnchorPosition,
     fill?: string,
-  ) => Promise<void>;
-  resizeImage: (width: number, height: number, resample?: string) => void;
+  ) => Promise<boolean>;
+  resizeImage: (width: number, height: number, resample?: string) => Promise<boolean>;
   // These rebuild the source bitmap, so like resizeCanvas they resolve once the change
-  // is committed and reject (leaving the editor untouched) if the bitmap can't be built.
-  rotateCanvas: (degrees: 90 | 180 | 270) => Promise<void>;
-  flipCanvasHorizontal: () => Promise<void>;
-  flipCanvasVertical: () => Promise<void>;
-  trimCanvas: () => void;
+  // is committed (`true`) or dropped (`false`), and reject (leaving the editor
+  // untouched) if the bitmap can't be built.
+  rotateCanvas: (degrees: 90 | 180 | 270) => Promise<boolean>;
+  flipCanvasHorizontal: () => Promise<boolean>;
+  flipCanvasVertical: () => Promise<boolean>;
+  trimCanvas: () => Promise<boolean>;
 
   // Colors
   setForegroundColor: (color: string) => void;
@@ -518,7 +521,7 @@ export interface EditorState {
 
   // Crop
   setCropState: (state: CropState | null) => void;
-  applyCrop: () => Promise<void>;
+  applyCrop: () => Promise<boolean>;
 
   // Eyedropper
   setEyedropperSampleSize: (size: EyedropperSampleSize) => void;

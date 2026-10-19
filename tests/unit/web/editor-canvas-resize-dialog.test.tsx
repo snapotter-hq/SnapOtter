@@ -35,11 +35,13 @@ vi.stubGlobal("localStorage", {
 });
 
 import { CanvasResizeDialog } from "@/components/editor/common/canvas-resize-dialog";
+import { ImageResizeDialog } from "@/components/editor/common/image-resize-dialog";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { captureHandledError } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
 
-const resizeCanvas = vi.fn<(...args: unknown[]) => Promise<void>>();
+const resizeCanvas = vi.fn<(...args: unknown[]) => Promise<boolean>>();
+const resizeImage = vi.fn<(...args: unknown[]) => Promise<boolean>>();
 
 function renderDialog() {
   const onClose = vi.fn();
@@ -63,8 +65,10 @@ const apply = () => fireEvent.click(screen.getByRole("button", { name: "Apply" }
 beforeEach(() => {
   storage.clear();
   resizeCanvas.mockReset();
-  resizeCanvas.mockResolvedValue(undefined);
-  useEditorStore.setState({ resizeCanvas, canvasSize: { width: 800, height: 600 } });
+  resizeCanvas.mockResolvedValue(true);
+  resizeImage.mockReset();
+  resizeImage.mockResolvedValue(true);
+  useEditorStore.setState({ resizeCanvas, resizeImage, canvasSize: { width: 800, height: 600 } });
 });
 
 afterEach(() => {
@@ -141,5 +145,36 @@ describe("Canvas Size dialog background color (#2068)", () => {
     expect(reported.cause).toBe(cause);
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+  });
+
+  it("stays open without an error toast when a resize is dropped (#2116)", async () => {
+    resizeCanvas.mockResolvedValue(false);
+    const { onClose } = renderDialog();
+    apply();
+    await waitFor(() => expect(resizeCanvas).toHaveBeenCalledWith(800, 600, "center", "#ffffff"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled());
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+  });
+
+  it("Image Size dialog closes when applied and stays open when a queued resize is dropped (#2116)", async () => {
+    const onClose = vi.fn();
+    resizeImage.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    render(
+      <I18nProvider>
+        <ImageResizeDialog open={true} onClose={onClose} />
+      </I18nProvider>,
+    );
+
+    apply();
+    await waitFor(() => expect(resizeImage).toHaveBeenCalledWith(800, 600));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+
+    apply();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });

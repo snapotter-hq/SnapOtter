@@ -1,6 +1,6 @@
 // apps/web/src/stores/editor-store.ts
 
-import { ANALYTICS_EVENTS, SafeError } from "@snapotter/shared";
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { temporal } from "zundo";
 import { create } from "zustand";
 import {
@@ -77,6 +77,27 @@ let decodesStarted = 0;
 // Counts rebakes that committed, so an undo queued behind one can tell whether the
 // step it was meant to undo ever landed.
 let rebakesCommitted = 0;
+
+// Counts document replacements or out-of-queue canvas/source changes (loadImage,
+// File > Close, project load, autosave restore, direct setState), so a job queued
+// behind an in-flight rebake is dropped too if the document changed before it ran.
+let externalDocumentVersion = 0;
+let committingRebake = false;
+
+function runInRebakeCommit(apply: () => void): void {
+  committingRebake = true;
+  try {
+    apply();
+  } finally {
+    committingRebake = false;
+  }
+}
+
+function commitRebake(apply: () => void): boolean {
+  rebakesCommitted++;
+  runInRebakeCommit(apply);
+  return true;
+}
 
 // Draw the source image onto a fresh `width` x `height` canvas and resolve with its
 // PNG data URL. Rejects on any failure (the image won't reload, no 2D context, a
@@ -232,9 +253,10 @@ function rebakeSourceCrop(
 // the queue's own, so a caller that ignores a rejection still gets an
 // unhandled-rejection report.
 let rebakeTail: Promise<void> | null = null;
-function enqueueRebake(job: () => Promise<void>): Promise<void> {
+function enqueueRebake<T>(job: (versionAtCall: number) => Promise<T>): Promise<T> {
+  const versionAtCall = externalDocumentVersion;
   const decodesBefore = decodesStarted;
-  const run = rebakeTail ? rebakeTail.then(job) : job();
+  const run = rebakeTail ? rebakeTail.then(() => job(versionAtCall)) : job(versionAtCall);
   if (!rebakeTail && decodesStarted === decodesBefore) return run;
   const tail = run.then(
     () => undefined,
@@ -245,31 +267,6 @@ function enqueueRebake(job: () => Promise<void>): Promise<void> {
     if (rebakeTail === tail) rebakeTail = null;
   });
   return run.finally(() => undefined);
-}
-
-// Rebake for actions that commit the new canvas first and swap the bitmap in when it
-// is ready (trim, which runs outside the rebake queue: #2116). A failure can't undo
-// the canvas change, so say so loudly: the console alone never reaches Sentry.
-function rebakeThenSetSource(
-  label: string,
-  rebake: Promise<string>,
-  set: (partial: { sourceImageUrl: string }) => void,
-): void {
-  rebake.then(
-    (newUrl) => set({ sourceImageUrl: newUrl }),
-    (err) => {
-      console.error(`${label} could not update the source image`, err);
-      void import("@/lib/analytics").then(({ captureHandledError }) =>
-        captureHandledError(
-          new SafeError("Could not update the source image after a trim", {
-            kind: "bug",
-            cause: err,
-          }),
-          { error_class: "bug", tool_id: `editor-${label.toLowerCase()}` },
-        ),
-      );
-    },
-  );
 }
 
 // Extended store state with additional fields/methods not yet in the shared interface
@@ -634,7 +631,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         if (fill !== undefined && !isHexColor(fill)) {
           return Promise.reject(new Error(INVALID_FILL_MESSAGE));
         }
-        return enqueueRebake(async () => {
+        return enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
           const { canvasSize, sourceImageUrl } = get();
           const dw = width - canvasSize.width;
           const dh = height - canvasSize.height;
@@ -673,85 +671,98 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
               fill,
             );
             // The user loaded, rotated or resized something else while this decoded.
-            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+            if (
+              externalDocumentVersion !== versionAtCall ||
+              get().sourceImageUrl !== sourceImageUrl ||
+              get().canvasSize !== canvasSize
+            ) {
+              return false;
+            }
           }
           const { objects } = get();
-          rebakesCommitted++;
-          set({
-            canvasSize: { width, height },
-            sourceImageSize: { width, height },
-            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-            objects:
-              offsetX !== 0 || offsetY !== 0
-                ? objects.map((obj) => {
-                    const attrs = { ...obj.attrs };
-                    if (hasPointsArray(obj)) {
-                      const pts = [...(attrs as { points: number[] }).points];
-                      for (let i = 0; i < pts.length; i += 2) {
-                        pts[i] += offsetX;
-                        pts[i + 1] += offsetY;
+          return commitRebake(() =>
+            set({
+              canvasSize: { width, height },
+              sourceImageSize: { width, height },
+              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+              objects:
+                offsetX !== 0 || offsetY !== 0
+                  ? objects.map((obj) => {
+                      const attrs = { ...obj.attrs };
+                      if (hasPointsArray(obj)) {
+                        const pts = [...(attrs as { points: number[] }).points];
+                        for (let i = 0; i < pts.length; i += 2) {
+                          pts[i] += offsetX;
+                          pts[i + 1] += offsetY;
+                        }
+                        (attrs as { points: number[] }).points = pts;
+                      } else {
+                        if ("x" in attrs) {
+                          (attrs as { x: number }).x += offsetX;
+                        }
+                        if ("y" in attrs) {
+                          (attrs as { y: number }).y += offsetY;
+                        }
                       }
-                      (attrs as { points: number[] }).points = pts;
-                    } else {
-                      if ("x" in attrs) {
-                        (attrs as { x: number }).x += offsetX;
-                      }
-                      if ("y" in attrs) {
-                        (attrs as { y: number }).y += offsetY;
-                      }
-                    }
-                    return { ...obj, attrs } as CanvasObject;
-                  })
-                : objects,
-            isDirty: true,
-            lastAction: { id: "resizeCanvas" },
-            _historyVersion: get()._historyVersion + 1,
-          });
+                      return { ...obj, attrs } as CanvasObject;
+                    })
+                  : objects,
+              isDirty: true,
+              lastAction: { id: "resizeCanvas" },
+              _historyVersion: get()._historyVersion + 1,
+            }),
+          );
         });
       },
 
       resizeImage: (width, height, resample) => {
         void resample; // accepted for future server-side resize; client-side scales objects only
-        const { canvasSize, objects } = get();
-        const scaleX = width / canvasSize.width;
-        const scaleY = height / canvasSize.height;
-        set({
-          canvasSize: { width, height },
-          sourceImageSize: { width, height },
-          objects: objects.map((obj) => {
-            const attrs = { ...obj.attrs };
-            const a = attrs as unknown as Record<string, number>;
-            if (hasPointsArray(obj)) {
-              const pts = [...(attrs as { points: number[] }).points];
-              for (let i = 0; i < pts.length; i += 2) {
-                pts[i] *= scaleX;
-                pts[i + 1] *= scaleY;
-              }
-              (attrs as { points: number[] }).points = pts;
-              if ("strokeWidth" in attrs) a.strokeWidth *= Math.min(scaleX, scaleY);
-            } else {
-              if ("x" in attrs) a.x *= scaleX;
-              if ("y" in attrs) a.y *= scaleY;
-              if ("width" in attrs) a.width *= scaleX;
-              if ("height" in attrs) a.height *= scaleY;
-              if ("radius" in attrs) a.radius *= Math.min(scaleX, scaleY);
-              if ("radiusX" in attrs) a.radiusX *= scaleX;
-              if ("radiusY" in attrs) a.radiusY *= scaleY;
-              if ("innerRadius" in attrs) a.innerRadius *= Math.min(scaleX, scaleY);
-              if ("outerRadius" in attrs) a.outerRadius *= Math.min(scaleX, scaleY);
-              if ("fontSize" in attrs) a.fontSize *= Math.min(scaleX, scaleY);
-              if ("strokeWidth" in attrs) a.strokeWidth *= Math.min(scaleX, scaleY);
-            }
-            return { ...obj, attrs } as CanvasObject;
-          }),
-          isDirty: true,
-          lastAction: { id: "resizeImage" },
-          _historyVersion: get()._historyVersion + 1,
+        return enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
+          const { canvasSize, objects } = get();
+          const scaleX = width / canvasSize.width;
+          const scaleY = height / canvasSize.height;
+          return commitRebake(() =>
+            set({
+              canvasSize: { width, height },
+              sourceImageSize: { width, height },
+              objects: objects.map((obj) => {
+                const attrs = { ...obj.attrs };
+                const a = attrs as unknown as Record<string, number>;
+                if (hasPointsArray(obj)) {
+                  const pts = [...(attrs as { points: number[] }).points];
+                  for (let i = 0; i < pts.length; i += 2) {
+                    pts[i] *= scaleX;
+                    pts[i + 1] *= scaleY;
+                  }
+                  (attrs as { points: number[] }).points = pts;
+                  if ("strokeWidth" in attrs) a.strokeWidth *= Math.min(scaleX, scaleY);
+                } else {
+                  if ("x" in attrs) a.x *= scaleX;
+                  if ("y" in attrs) a.y *= scaleY;
+                  if ("width" in attrs) a.width *= scaleX;
+                  if ("height" in attrs) a.height *= scaleY;
+                  if ("radius" in attrs) a.radius *= Math.min(scaleX, scaleY);
+                  if ("radiusX" in attrs) a.radiusX *= scaleX;
+                  if ("radiusY" in attrs) a.radiusY *= scaleY;
+                  if ("innerRadius" in attrs) a.innerRadius *= Math.min(scaleX, scaleY);
+                  if ("outerRadius" in attrs) a.outerRadius *= Math.min(scaleX, scaleY);
+                  if ("fontSize" in attrs) a.fontSize *= Math.min(scaleX, scaleY);
+                  if ("strokeWidth" in attrs) a.strokeWidth *= Math.min(scaleX, scaleY);
+                }
+                return { ...obj, attrs } as CanvasObject;
+              }),
+              isDirty: true,
+              lastAction: { id: "resizeImage" },
+              _historyVersion: get()._historyVersion + 1,
+            }),
+          );
         });
       },
 
       rotateCanvas: (degrees) =>
-        enqueueRebake(async () => {
+        enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
           const { canvasSize, sourceImageUrl } = get();
           const newSize =
             degrees === 180 ? canvasSize : { width: canvasSize.height, height: canvasSize.width };
@@ -769,83 +780,92 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
               transform,
             );
             // The user loaded or undid to a different image while this decoded.
-            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+            if (
+              externalDocumentVersion !== versionAtCall ||
+              get().sourceImageUrl !== sourceImageUrl ||
+              get().canvasSize !== canvasSize
+            ) {
+              return false;
+            }
           }
           // Read objects only now: anything added during the decode rotates with the rest.
           const { objects } = get();
-          rebakesCommitted++;
-          set({
-            canvasSize: newSize,
-            sourceImageSize: newSize,
-            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-            objects: objects.map((obj) => {
-              const attrs = { ...obj.attrs };
-              const a = attrs as unknown as Record<string, number>;
+          return commitRebake(() =>
+            set({
+              canvasSize: newSize,
+              sourceImageSize: newSize,
+              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+              objects: objects.map((obj) => {
+                const attrs = { ...obj.attrs };
+                const a = attrs as unknown as Record<string, number>;
 
-              // Handle points-based objects (line, arrow)
-              if (hasPointsArray(obj)) {
-                const pts = [...(attrs as { points: number[] }).points];
-                for (let i = 0; i < pts.length; i += 2) {
-                  const px = pts[i];
-                  const py = pts[i + 1];
-                  if (degrees === 90) {
-                    pts[i] = canvasSize.height - py;
-                    pts[i + 1] = px;
-                  } else if (degrees === 270) {
-                    pts[i] = py;
-                    pts[i + 1] = canvasSize.width - px;
-                  } else {
-                    pts[i] = canvasSize.width - px;
-                    pts[i + 1] = canvasSize.height - py;
+                // Handle points-based objects (line, arrow)
+                if (hasPointsArray(obj)) {
+                  const pts = [...(attrs as { points: number[] }).points];
+                  for (let i = 0; i < pts.length; i += 2) {
+                    const px = pts[i];
+                    const py = pts[i + 1];
+                    if (degrees === 90) {
+                      pts[i] = canvasSize.height - py;
+                      pts[i + 1] = px;
+                    } else if (degrees === 270) {
+                      pts[i] = py;
+                      pts[i + 1] = canvasSize.width - px;
+                    } else {
+                      pts[i] = canvasSize.width - px;
+                      pts[i + 1] = canvasSize.height - py;
+                    }
+                  }
+                  (attrs as { points: number[] }).points = pts;
+                } else {
+                  const centerBased = isCenterBased(obj);
+                  const hasPos = "x" in attrs && "y" in attrs;
+                  const hasSize = "width" in attrs && "height" in attrs;
+
+                  if (hasPos) {
+                    if (degrees === 90) {
+                      const newX =
+                        canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
+                      const newY = a.x;
+                      a.x = newX;
+                      a.y = newY;
+                    } else if (degrees === 270) {
+                      const newX = a.y;
+                      const newY =
+                        canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
+                      a.x = newX;
+                      a.y = newY;
+                    } else {
+                      a.x = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
+                      a.y = canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
+                    }
+                  }
+                  if (hasSize && degrees !== 180) {
+                    const oldW = a.width;
+                    a.width = a.height;
+                    a.height = oldW;
+                  }
+                  if ("radiusX" in attrs && "radiusY" in attrs && degrees !== 180) {
+                    const oldRx = a.radiusX;
+                    a.radiusX = a.radiusY;
+                    a.radiusY = oldRx;
                   }
                 }
-                (attrs as { points: number[] }).points = pts;
-              } else {
-                const centerBased = isCenterBased(obj);
-                const hasPos = "x" in attrs && "y" in attrs;
-                const hasSize = "width" in attrs && "height" in attrs;
-
-                if (hasPos) {
-                  if (degrees === 90) {
-                    const newX =
-                      canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
-                    const newY = a.x;
-                    a.x = newX;
-                    a.y = newY;
-                  } else if (degrees === 270) {
-                    const newX = a.y;
-                    const newY = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
-                    a.x = newX;
-                    a.y = newY;
-                  } else {
-                    a.x = canvasSize.width - a.x - (centerBased ? 0 : hasSize ? a.width : 0);
-                    a.y = canvasSize.height - a.y - (centerBased ? 0 : hasSize ? a.height : 0);
-                  }
+                if ("rotation" in attrs) {
+                  a.rotation = ((a.rotation || 0) + degrees) % 360;
                 }
-                if (hasSize && degrees !== 180) {
-                  const oldW = a.width;
-                  a.width = a.height;
-                  a.height = oldW;
-                }
-                if ("radiusX" in attrs && "radiusY" in attrs && degrees !== 180) {
-                  const oldRx = a.radiusX;
-                  a.radiusX = a.radiusY;
-                  a.radiusY = oldRx;
-                }
-              }
-              if ("rotation" in attrs) {
-                a.rotation = ((a.rotation || 0) + degrees) % 360;
-              }
-              return { ...obj, attrs } as CanvasObject;
+                return { ...obj, attrs } as CanvasObject;
+              }),
+              isDirty: true,
+              lastAction: { id: "rotateCanvas", degrees },
+              _historyVersion: get()._historyVersion + 1,
             }),
-            isDirty: true,
-            lastAction: { id: "rotateCanvas", degrees },
-            _historyVersion: get()._historyVersion + 1,
-          });
+          );
         }),
 
       flipCanvasHorizontal: () =>
-        enqueueRebake(async () => {
+        enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
           const { canvasSize, sourceImageUrl } = get();
           let newSourceUrl: string | null = null;
           if (sourceImageUrl) {
@@ -855,39 +875,47 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
               canvasSize.height,
               "flipH",
             );
-            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+            if (
+              externalDocumentVersion !== versionAtCall ||
+              get().sourceImageUrl !== sourceImageUrl ||
+              get().canvasSize !== canvasSize
+            ) {
+              return false;
+            }
           }
           const { objects } = get();
-          rebakesCommitted++;
-          set({
-            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-            objects: objects.map((obj) => {
-              const attrs = { ...obj.attrs };
-              const a = attrs as unknown as Record<string, number>;
-              if (hasPointsArray(obj)) {
-                const pts = [...(attrs as { points: number[] }).points];
-                for (let i = 0; i < pts.length; i += 2) {
-                  pts[i] = canvasSize.width - pts[i];
+          return commitRebake(() =>
+            set({
+              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+              objects: objects.map((obj) => {
+                const attrs = { ...obj.attrs };
+                const a = attrs as unknown as Record<string, number>;
+                if (hasPointsArray(obj)) {
+                  const pts = [...(attrs as { points: number[] }).points];
+                  for (let i = 0; i < pts.length; i += 2) {
+                    pts[i] = canvasSize.width - pts[i];
+                  }
+                  (attrs as { points: number[] }).points = pts;
+                } else if ("x" in attrs) {
+                  const centerBased = isCenterBased(obj);
+                  const w = centerBased ? 0 : "width" in attrs ? a.width : 0;
+                  a.x = canvasSize.width - a.x - w;
                 }
-                (attrs as { points: number[] }).points = pts;
-              } else if ("x" in attrs) {
-                const centerBased = isCenterBased(obj);
-                const w = centerBased ? 0 : "width" in attrs ? a.width : 0;
-                a.x = canvasSize.width - a.x - w;
-              }
-              if ("rotation" in attrs) {
-                a.rotation = (360 - (a.rotation || 0)) % 360;
-              }
-              return { ...obj, attrs } as CanvasObject;
+                if ("rotation" in attrs) {
+                  a.rotation = (360 - (a.rotation || 0)) % 360;
+                }
+                return { ...obj, attrs } as CanvasObject;
+              }),
+              isDirty: true,
+              lastAction: { id: "flipHorizontal" },
+              _historyVersion: get()._historyVersion + 1,
             }),
-            isDirty: true,
-            lastAction: { id: "flipHorizontal" },
-            _historyVersion: get()._historyVersion + 1,
-          });
+          );
         }),
 
       flipCanvasVertical: () =>
-        enqueueRebake(async () => {
+        enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
           const { canvasSize, sourceImageUrl } = get();
           let newSourceUrl: string | null = null;
           if (sourceImageUrl) {
@@ -897,109 +925,119 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
               canvasSize.height,
               "flipV",
             );
-            if (get().sourceImageUrl !== sourceImageUrl || get().canvasSize !== canvasSize) return;
+            if (
+              externalDocumentVersion !== versionAtCall ||
+              get().sourceImageUrl !== sourceImageUrl ||
+              get().canvasSize !== canvasSize
+            ) {
+              return false;
+            }
           }
           const { objects } = get();
-          rebakesCommitted++;
-          set({
-            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-            objects: objects.map((obj) => {
-              const attrs = { ...obj.attrs };
-              const a = attrs as unknown as Record<string, number>;
-              if (hasPointsArray(obj)) {
-                const pts = [...(attrs as { points: number[] }).points];
-                for (let i = 1; i < pts.length; i += 2) {
-                  pts[i] = canvasSize.height - pts[i];
+          return commitRebake(() =>
+            set({
+              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+              objects: objects.map((obj) => {
+                const attrs = { ...obj.attrs };
+                const a = attrs as unknown as Record<string, number>;
+                if (hasPointsArray(obj)) {
+                  const pts = [...(attrs as { points: number[] }).points];
+                  for (let i = 1; i < pts.length; i += 2) {
+                    pts[i] = canvasSize.height - pts[i];
+                  }
+                  (attrs as { points: number[] }).points = pts;
+                } else if ("y" in attrs) {
+                  const centerBased = isCenterBased(obj);
+                  const h = centerBased ? 0 : "height" in attrs ? a.height : 0;
+                  a.y = canvasSize.height - a.y - h;
                 }
-                (attrs as { points: number[] }).points = pts;
-              } else if ("y" in attrs) {
-                const centerBased = isCenterBased(obj);
-                const h = centerBased ? 0 : "height" in attrs ? a.height : 0;
-                a.y = canvasSize.height - a.y - h;
-              }
-              if ("rotation" in attrs) {
-                a.rotation = (360 - (a.rotation || 0)) % 360;
-              }
-              return { ...obj, attrs } as CanvasObject;
+                if ("rotation" in attrs) {
+                  a.rotation = (360 - (a.rotation || 0)) % 360;
+                }
+                return { ...obj, attrs } as CanvasObject;
+              }),
+              isDirty: true,
+              lastAction: { id: "flipVertical" },
+              _historyVersion: get()._historyVersion + 1,
             }),
-            isDirty: true,
-            lastAction: { id: "flipVertical" },
-            _historyVersion: get()._historyVersion + 1,
-          });
+          );
         }),
 
-      trimCanvas: () => {
-        const { objects, canvasSize, sourceImageUrl } = get();
-        if (objects.length === 0) return;
-        let minX = canvasSize.width;
-        let minY = canvasSize.height;
-        let maxX = 0;
-        let maxY = 0;
-        for (const obj of objects) {
-          const a = obj.attrs as unknown as Record<string, number>;
-          const sw = "strokeWidth" in obj.attrs ? a.strokeWidth / 2 : 0;
-          if (hasPointsArray(obj)) {
-            const pts = (obj.attrs as { points: number[] }).points;
-            for (let i = 0; i < pts.length; i += 2) {
-              minX = Math.min(minX, pts[i] - sw);
-              minY = Math.min(minY, pts[i + 1] - sw);
-              maxX = Math.max(maxX, pts[i] + sw);
-              maxY = Math.max(maxY, pts[i + 1] + sw);
+      trimCanvas: () =>
+        enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
+          const { objects, canvasSize, sourceImageUrl } = get();
+          if (objects.length === 0) return false;
+          let minX = canvasSize.width;
+          let minY = canvasSize.height;
+          let maxX = 0;
+          let maxY = 0;
+          for (const obj of objects) {
+            const a = obj.attrs as unknown as Record<string, number>;
+            const sw = "strokeWidth" in obj.attrs ? a.strokeWidth / 2 : 0;
+            if (hasPointsArray(obj)) {
+              const pts = (obj.attrs as { points: number[] }).points;
+              for (let i = 0; i < pts.length; i += 2) {
+                minX = Math.min(minX, pts[i] - sw);
+                minY = Math.min(minY, pts[i + 1] - sw);
+                maxX = Math.max(maxX, pts[i] + sw);
+                maxY = Math.max(maxY, pts[i + 1] + sw);
+              }
+            } else if (isCenterBased(obj)) {
+              const cx = "x" in obj.attrs ? a.x : 0;
+              const cy = "y" in obj.attrs ? a.y : 0;
+              const rx =
+                "radiusX" in obj.attrs
+                  ? a.radiusX
+                  : "radius" in obj.attrs
+                    ? a.radius
+                    : "outerRadius" in obj.attrs
+                      ? a.outerRadius
+                      : 0;
+              const ry =
+                "radiusY" in obj.attrs
+                  ? a.radiusY
+                  : "radius" in obj.attrs
+                    ? a.radius
+                    : "outerRadius" in obj.attrs
+                      ? a.outerRadius
+                      : 0;
+              minX = Math.min(minX, cx - rx - sw);
+              minY = Math.min(minY, cy - ry - sw);
+              maxX = Math.max(maxX, cx + rx + sw);
+              maxY = Math.max(maxY, cy + ry + sw);
+            } else {
+              const x = "x" in obj.attrs ? a.x : 0;
+              const y = "y" in obj.attrs ? a.y : 0;
+              const w = "width" in obj.attrs ? a.width : 0;
+              const h = "height" in obj.attrs ? a.height : 0;
+              minX = Math.min(minX, x - sw);
+              minY = Math.min(minY, y - sw);
+              maxX = Math.max(maxX, x + w + sw);
+              maxY = Math.max(maxY, y + h + sw);
             }
-          } else if (isCenterBased(obj)) {
-            const cx = "x" in obj.attrs ? a.x : 0;
-            const cy = "y" in obj.attrs ? a.y : 0;
-            const rx =
-              "radiusX" in obj.attrs
-                ? a.radiusX
-                : "radius" in obj.attrs
-                  ? a.radius
-                  : "outerRadius" in obj.attrs
-                    ? a.outerRadius
-                    : 0;
-            const ry =
-              "radiusY" in obj.attrs
-                ? a.radiusY
-                : "radius" in obj.attrs
-                  ? a.radius
-                  : "outerRadius" in obj.attrs
-                    ? a.outerRadius
-                    : 0;
-            minX = Math.min(minX, cx - rx - sw);
-            minY = Math.min(minY, cy - ry - sw);
-            maxX = Math.max(maxX, cx + rx + sw);
-            maxY = Math.max(maxY, cy + ry + sw);
-          } else {
-            const x = "x" in obj.attrs ? a.x : 0;
-            const y = "y" in obj.attrs ? a.y : 0;
-            const w = "width" in obj.attrs ? a.width : 0;
-            const h = "height" in obj.attrs ? a.height : 0;
-            minX = Math.min(minX, x - sw);
-            minY = Math.min(minY, y - sw);
-            maxX = Math.max(maxX, x + w + sw);
-            maxY = Math.max(maxY, y + h + sw);
           }
-        }
-        minX = Math.max(0, Math.floor(minX));
-        minY = Math.max(0, Math.floor(minY));
-        maxX = Math.min(canvasSize.width, Math.ceil(maxX));
-        maxY = Math.min(canvasSize.height, Math.ceil(maxY));
-        const newWidth = maxX - minX;
-        const newHeight = maxY - minY;
-        if (newWidth <= 0 || newHeight <= 0) return;
-        if (
-          newWidth === canvasSize.width &&
-          newHeight === canvasSize.height &&
-          minX === 0 &&
-          minY === 0
-        )
-          return;
-        // The bitmap is drawn at canvas size, so it has to be cropped to the trimmed
-        // bounds too or it would squash into them (#2069).
-        if (sourceImageUrl) {
-          rebakeThenSetSource(
-            "Trim",
-            rebakeSourceIntoCanvas(
+          minX = Math.max(0, Math.floor(minX));
+          minY = Math.max(0, Math.floor(minY));
+          maxX = Math.min(canvasSize.width, Math.ceil(maxX));
+          maxY = Math.min(canvasSize.height, Math.ceil(maxY));
+          const newWidth = maxX - minX;
+          const newHeight = maxY - minY;
+          if (newWidth <= 0 || newHeight <= 0) return false;
+          if (
+            newWidth === canvasSize.width &&
+            newHeight === canvasSize.height &&
+            minX === 0 &&
+            minY === 0
+          ) {
+            return false;
+          }
+          // The bitmap is drawn at canvas size, so it has to be cropped to the trimmed
+          // bounds too or it would squash into them (#2069). Build it first and commit
+          // size, bitmap and objects together, like rotateCanvas (#2070, #2116).
+          let newSourceUrl: string | null = null;
+          if (sourceImageUrl) {
+            newSourceUrl = await rebakeSourceIntoCanvas(
               sourceImageUrl,
               canvasSize.width,
               canvasSize.height,
@@ -1007,37 +1045,46 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
               newHeight,
               -minX,
               -minY,
-            ),
-            set,
-          );
-        }
-        set({
-          canvasSize: { width: newWidth, height: newHeight },
-          sourceImageSize: { width: newWidth, height: newHeight },
-          objects: objects.map((obj) => {
-            const attrs = { ...obj.attrs };
-            if (hasPointsArray(obj)) {
-              const pts = [...(attrs as { points: number[] }).points];
-              for (let i = 0; i < pts.length; i += 2) {
-                pts[i] -= minX;
-                pts[i + 1] -= minY;
-              }
-              (attrs as { points: number[] }).points = pts;
-            } else {
-              if ("x" in attrs) {
-                (attrs as unknown as Record<string, number>).x -= minX;
-              }
-              if ("y" in attrs) {
-                (attrs as unknown as Record<string, number>).y -= minY;
-              }
+            );
+            if (
+              externalDocumentVersion !== versionAtCall ||
+              get().sourceImageUrl !== sourceImageUrl ||
+              get().canvasSize !== canvasSize
+            ) {
+              return false;
             }
-            return { ...obj, attrs } as CanvasObject;
-          }),
-          isDirty: true,
-          lastAction: { id: "trimCanvas" },
-          _historyVersion: get()._historyVersion + 1,
-        });
-      },
+          }
+          const { objects: currentObjects } = get();
+          return commitRebake(() =>
+            set({
+              canvasSize: { width: newWidth, height: newHeight },
+              sourceImageSize: { width: newWidth, height: newHeight },
+              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+              objects: currentObjects.map((obj) => {
+                const attrs = { ...obj.attrs };
+                if (hasPointsArray(obj)) {
+                  const pts = [...(attrs as { points: number[] }).points];
+                  for (let i = 0; i < pts.length; i += 2) {
+                    pts[i] -= minX;
+                    pts[i + 1] -= minY;
+                  }
+                  (attrs as { points: number[] }).points = pts;
+                } else {
+                  if ("x" in attrs) {
+                    (attrs as unknown as Record<string, number>).x -= minX;
+                  }
+                  if ("y" in attrs) {
+                    (attrs as unknown as Record<string, number>).y -= minY;
+                  }
+                }
+                return { ...obj, attrs } as CanvasObject;
+              }),
+              isDirty: true,
+              lastAction: { id: "trimCanvas" },
+              _historyVersion: get()._historyVersion + 1,
+            }),
+          );
+        }),
 
       // Eyedropper
       setEyedropperSampleSize: (size) => set({ eyedropperSampleSize: size }),
@@ -1520,11 +1567,16 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         // flip or resize ahead of this crop in the queue changes the canvas or the
         // bitmap first, the box no longer means what it did: drop the crop and leave
         // the box up for the user to redraw, rather than cut a region they never framed.
-        const { canvasSize: canvasAtCall, sourceImageUrl: sourceAtCall } = get();
-        return enqueueRebake(async () => {
+        const {
+          cropState: cropAtCall,
+          canvasSize: canvasAtCall,
+          sourceImageUrl: sourceAtCall,
+        } = get();
+        return enqueueRebake(async (versionAtCall) => {
+          if (externalDocumentVersion !== versionAtCall) return false;
           const { cropState, canvasSize, sourceImageUrl } = get();
-          if (!cropState) return;
-          if (canvasSize !== canvasAtCall || sourceImageUrl !== sourceAtCall) return;
+          if (!cropState || cropState !== cropAtCall) return false;
+          if (canvasSize !== canvasAtCall || sourceImageUrl !== sourceAtCall) return false;
 
           // Crop the source image first, then commit size, bitmap and objects together
           // (see rotateCanvas). The crop box stays up until then, so a failed crop can be
@@ -1535,44 +1587,46 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             // Dropped when the image changed underneath, or when the crop box it was
             // built from is gone or replaced (cancelled, redrawn, or the tool switched).
             if (
+              externalDocumentVersion !== versionAtCall ||
               get().sourceImageUrl !== sourceImageUrl ||
               get().canvasSize !== canvasSize ||
               get().cropState !== cropState
             ) {
-              return;
+              return false;
             }
           }
           const { objects } = get();
-          rebakesCommitted++;
-          set({
-            canvasSize: { width: cropState.width, height: cropState.height },
-            sourceImageSize: { width: cropState.width, height: cropState.height },
-            ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-            objects: objects.map((obj) => {
-              const attrs = { ...obj.attrs };
-              if (hasPointsArray(obj)) {
-                const pts = [...(attrs as { points: number[] }).points];
-                for (let i = 0; i < pts.length; i += 2) {
-                  pts[i] -= cropState.x;
-                  pts[i + 1] -= cropState.y;
+          return commitRebake(() =>
+            set({
+              canvasSize: { width: cropState.width, height: cropState.height },
+              sourceImageSize: { width: cropState.width, height: cropState.height },
+              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+              objects: objects.map((obj) => {
+                const attrs = { ...obj.attrs };
+                if (hasPointsArray(obj)) {
+                  const pts = [...(attrs as { points: number[] }).points];
+                  for (let i = 0; i < pts.length; i += 2) {
+                    pts[i] -= cropState.x;
+                    pts[i + 1] -= cropState.y;
+                  }
+                  (attrs as { points: number[] }).points = pts;
+                } else {
+                  if ("x" in attrs) {
+                    (attrs as { x: number }).x -= cropState.x;
+                  }
+                  if ("y" in attrs) {
+                    (attrs as { y: number }).y -= cropState.y;
+                  }
                 }
-                (attrs as { points: number[] }).points = pts;
-              } else {
-                if ("x" in attrs) {
-                  (attrs as { x: number }).x -= cropState.x;
-                }
-                if ("y" in attrs) {
-                  (attrs as { y: number }).y -= cropState.y;
-                }
-              }
-              return { ...obj, attrs } as CanvasObject;
+                return { ...obj, attrs } as CanvasObject;
+              }),
+              cropState: null,
+              isCropping: false,
+              isDirty: true,
+              lastAction: { id: "crop" },
+              _historyVersion: get()._historyVersion + 1,
             }),
-            cropState: null,
-            isCropping: false,
-            isDirty: true,
-            lastAction: { id: "crop" },
-            _historyVersion: get()._historyVersion + 1,
-          });
+          );
         });
       },
 
@@ -1803,6 +1857,21 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
   ),
 );
 
+useEditorStore.subscribe((state, prev) => {
+  if (
+    !committingRebake &&
+    (state.sourceImageUrl !== prev.sourceImageUrl ||
+      state.canvasSize !== prev.canvasSize ||
+      (state.lastAction !== prev.lastAction &&
+        (state.lastAction.id === "loadImage" ||
+          state.lastAction.id === "loadProject" ||
+          state.lastAction.id === "restoreAutosave")))
+  ) {
+    externalDocumentVersion++;
+    rebakeTail = null;
+  }
+});
+
 // Undo and redo wait for any rebake in flight. zundo restores a stored state through
 // the raw set, with the same canvasSize object and the same URL string the rebake
 // started from, so its stale check can't see the undo. Without the wait, Ctrl+Z
@@ -1818,9 +1887,10 @@ type EditorTemporal = ReturnType<typeof useEditorStore.temporal.getState>;
 function enqueueRelativeStep(step: (temporal: EditorTemporal) => void): Promise<void> {
   const waited = rebakeTail !== null;
   const committedBefore = rebakesCommitted;
-  return enqueueRebake(async () => {
+  return enqueueRebake(async (versionAtCall) => {
+    if (externalDocumentVersion !== versionAtCall) return;
     if (waited && rebakesCommitted === committedBefore) return;
-    step(useEditorStore.temporal.getState());
+    runInRebakeCommit(() => step(useEditorStore.temporal.getState()));
   });
 }
 
@@ -1844,16 +1914,17 @@ export function redoEditor(steps = 1): Promise<void> {
 // off. It's absolute, so unlike undo it still runs after a rebake ahead of it fails.
 // Rejects when the step is gone (a rebake that committed first cleared the redo stack).
 export function jumpEditorToHistoryState(target: unknown): Promise<void> {
-  return enqueueRebake(async () => {
+  return enqueueRebake(async (versionAtCall) => {
+    if (externalDocumentVersion !== versionAtCall) return;
     const temporal = useEditorStore.temporal.getState();
     const past = temporal.pastStates.indexOf(target as never);
     if (past >= 0) {
-      temporal.undo(temporal.pastStates.length - past);
+      runInRebakeCommit(() => temporal.undo(temporal.pastStates.length - past));
       return;
     }
     const future = temporal.futureStates.indexOf(target as never);
     if (future >= 0) {
-      temporal.redo(temporal.futureStates.length - future);
+      runInRebakeCommit(() => temporal.redo(temporal.futureStates.length - future));
       return;
     }
     throw new Error("That history step no longer exists");

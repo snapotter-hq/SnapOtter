@@ -72,13 +72,14 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const rotateAction = useEditorStore((s) => s.rotateCanvas);
   const flipHorizontalAction = useEditorStore((s) => s.flipCanvasHorizontal);
   const flipVerticalAction = useEditorStore((s) => s.flipCanvasVertical);
+  const trimAction = useEditorStore((s) => s.trimCanvas);
   // These rebuild the bitmap and can fail, leaving the editor as it was; say so.
   const transformFailed = t.common.somethingWentWrong;
   const rotateCanvas = (degrees: 90 | 180 | 270) =>
     runEditorAction(rotateAction(degrees), transformFailed);
   const flipCanvasHorizontal = () => runEditorAction(flipHorizontalAction(), transformFailed);
   const flipCanvasVertical = () => runEditorAction(flipVerticalAction(), transformFailed);
-  const trimCanvas = useEditorStore((s) => s.trimCanvas);
+  const trimCanvas = () => runEditorAction(trimAction(), transformFailed);
   const toggleFilter = useEditorStore((s) => s.toggleFilter);
   const toggleRulers = useEditorStore((s) => s.toggleRulers);
   const toggleGrid = useEditorStore((s) => s.toggleGrid);

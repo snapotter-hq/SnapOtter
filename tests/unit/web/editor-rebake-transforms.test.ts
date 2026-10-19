@@ -12,6 +12,7 @@ vi.mock("zustand/middleware", async (importOriginal) => {
   return { ...actual, persist: (config: unknown) => config };
 });
 
+import { restoreAutosave } from "@/components/editor/common/export-dialog";
 import {
   jumpEditorToHistoryState,
   redoEditor,
@@ -44,7 +45,7 @@ const rect = (): CanvasObject => ({
 
 const CROP = { x: 100, y: 50, width: 300, height: 200, aspectRatio: null };
 
-const ACTIONS: Array<[string, () => Promise<void>]> = [
+const ACTIONS: Array<[string, () => Promise<boolean>]> = [
   ["rotate 90", () => s().rotateCanvas(90)],
   ["rotate 180", () => s().rotateCanvas(180)],
   ["flip horizontal", () => s().flipCanvasHorizontal()],
@@ -56,6 +57,7 @@ const ACTIONS: Array<[string, () => Promise<void>]> = [
       return s().applyCrop();
     },
   ],
+  ["trim", () => s().trimCanvas()],
 ];
 
 beforeEach(() => {
@@ -102,8 +104,23 @@ describe("size, objects and bitmap commit together", () => {
     expect(s().sourceImageUrl).toBe("blob:test");
 
     raster.release();
-    await pending;
+    await expect(pending).resolves.toBe(true);
     expect(s().canvasSize).toEqual({ width: 600, height: 800 });
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED1");
+    expect(s()._historyVersion).toBe(before + 1);
+  });
+
+  it("trim changes nothing until the bitmap is ready, then everything at once", async () => {
+    const raster = stubRaster({ manual: true });
+    const before = s()._historyVersion;
+    const pending = s().trimCanvas();
+    await flush();
+    expect(s().canvasSize).toEqual({ width: 800, height: 600 });
+    expect(s().sourceImageUrl).toBe("blob:test");
+
+    raster.release();
+    await expect(pending).resolves.toBe(true);
+    expect(s().canvasSize).toEqual({ width: 102, height: 52 });
     expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED1");
     expect(s()._historyVersion).toBe(before + 1);
   });
@@ -164,16 +181,37 @@ describe("size, objects and bitmap commit together", () => {
     const late = s().objects.find((o) => o.id === "late");
     expect(late?.attrs).toMatchObject({ x: 690 });
   });
+
+  it("trim offsets objects added while the bitmap was still being built", async () => {
+    const raster = stubRaster({ manual: true });
+    const pending = s().trimCanvas();
+    await flush();
+    s().addObject({ ...rect(), id: "late" });
+    raster.release();
+    await expect(pending).resolves.toBe(true);
+    const late = s().objects.find((o) => o.id === "late");
+    expect(late?.attrs).toMatchObject({ x: 1, y: 1 });
+  });
 });
 
 describe("a result built from an image that has since changed is dropped", () => {
+  it("canvas resize: another image was loaded while it decoded", async () => {
+    const raster = stubRaster({ manual: true });
+    const pending = s().resizeCanvas(1000, 800, "center");
+    await flush();
+    s().loadImage("blob:other", 640, 480);
+    raster.release();
+    await expect(pending).resolves.toBe(false);
+    expect(s().sourceImageUrl).toBe("blob:other");
+    expect(s().canvasSize).toEqual({ width: 640, height: 480 });
+  });
   it("rotate: another image was loaded while it decoded", async () => {
     const raster = stubRaster({ manual: true });
     const pending = s().rotateCanvas(90);
     await flush();
     s().loadImage("blob:other", 640, 480);
     raster.release();
-    await pending;
+    await expect(pending).resolves.toBe(false);
     expect(s().sourceImageUrl).toBe("blob:other");
     expect(s().canvasSize).toEqual({ width: 640, height: 480 });
   });
@@ -184,7 +222,18 @@ describe("a result built from an image that has since changed is dropped", () =>
     await flush();
     s().loadImage("blob:other", 640, 480);
     raster.release();
-    await pending;
+    await expect(pending).resolves.toBe(false);
+    expect(s().sourceImageUrl).toBe("blob:other");
+    expect(s().canvasSize).toEqual({ width: 640, height: 480 });
+  });
+
+  it("trim: another image was loaded while it decoded", async () => {
+    const raster = stubRaster({ manual: true });
+    const pending = s().trimCanvas();
+    await flush();
+    s().loadImage("blob:other", 640, 480);
+    raster.release();
+    await expect(pending).resolves.toBe(false);
     expect(s().sourceImageUrl).toBe("blob:other");
     expect(s().canvasSize).toEqual({ width: 640, height: 480 });
   });
@@ -196,7 +245,7 @@ describe("a result built from an image that has since changed is dropped", () =>
     await flush();
     s().setCropState(null);
     raster.release();
-    await pending;
+    await expect(pending).resolves.toBe(false);
     expect(s().canvasSize).toEqual({ width: 800, height: 600 });
     expect(s().sourceImageUrl).toBe("blob:test");
   });
@@ -209,20 +258,62 @@ describe("a result built from an image that has since changed is dropped", () =>
     const redrawn = { ...CROP, width: 200 };
     s().setCropState(redrawn);
     raster.release();
-    await pending;
+    await expect(pending).resolves.toBe(false);
     expect(s().canvasSize).toEqual({ width: 800, height: 600 });
     // The user's new box is still up, for them to apply or adjust.
     expect(s().cropState).toEqual(redrawn);
   });
 
-  it("flip: the canvas was resized while it decoded, though the image is the same", async () => {
+  it("rotate: File > Close cleared the image while it decoded, and drops rebakes queued behind it", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotating = s().rotateCanvas(90);
+    const flipping = s().flipCanvasHorizontal();
+    const resizing = s().resizeImage(400, 300);
+    await flush();
+    useEditorStore.setState({
+      sourceImageUrl: null,
+      sourceImageSize: null,
+      objects: [],
+      selectedObjectIds: [],
+    });
+    raster.release();
+    await expect(rotating).resolves.toBe(false);
+    await expect(flipping).resolves.toBe(false);
+    await expect(resizing).resolves.toBe(false);
+    // The queued flip never even started a second decode.
+    expect(raster.sources).toEqual(["blob:test"]);
+    expect(s().sourceImageUrl).toBeNull();
+    expect(s().canvasSize).toEqual({ width: 800, height: 600 });
+  });
+
+  it("flip: a project or autosave was restored while it decoded, even with the same source URL and canvasSize reference", async () => {
     const raster = stubRaster({ manual: true });
     const pending = s().flipCanvasHorizontal();
+    const queued = s().rotateCanvas(90);
     await flush();
-    s().resizeImage(400, 300);
+    restoreAutosave({
+      version: 1,
+      timestamp: 1,
+      state: {
+        canvasSize: s().canvasSize,
+        layers: s().layers,
+        objects: [],
+        adjustments: s().adjustments,
+        filters: s().filters,
+        levels: s().levels,
+        curves: s().curves,
+        guides: [],
+        sourceImageUrl: "blob:test",
+        sourceImageSize: s().canvasSize,
+        foregroundColor: "#000000",
+        backgroundColor: "#ffffff",
+      },
+    });
     raster.release();
-    await pending;
-    expect(s().canvasSize).toEqual({ width: 400, height: 300 });
+    await expect(pending).resolves.toBe(false);
+    await expect(queued).resolves.toBe(false);
+    expect(raster.sources).toEqual(["blob:test"]);
+    expect(s().canvasSize).toEqual({ width: 800, height: 600 });
     expect(s().sourceImageUrl).toBe("blob:test");
   });
 });
@@ -299,6 +390,31 @@ describe("undo and redo wait for a rebake in flight", () => {
     expect(s().sourceImageUrl).toBe("blob:other");
   });
 
+  it("an undo in a newly loaded document works immediately even while the old document's rotate is still decoding", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotating = s().rotateCanvas(90);
+    await flush();
+    s().loadImage("blob:other", 640, 480);
+    s().addObject({ ...rect(), id: "on-new" });
+    await undoEditor();
+    expect(s().sourceImageUrl).toBe("blob:other");
+    expect(s().objects).toEqual([]);
+    raster.release();
+    await expect(rotating).resolves.toBe(false);
+  });
+
+  it("a redo or rebake queued after a queued undo still runs (#2116)", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotating = s().rotateCanvas(90);
+    await flush();
+    const undone = undoEditor();
+    const redone = redoEditor();
+    raster.release();
+    await Promise.all([rotating, undone, redone]);
+    expect(s().canvasSize).toEqual({ width: 600, height: 800 });
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED1");
+  });
+
   // zundo's undo(0), and a negative or fractional count, replace the whole store with
   // undefined.
   it.each([0, -1, 1.5, Number.NaN])("ignores an undo or redo of %s steps", async (steps) => {
@@ -343,6 +459,18 @@ describe("a history-panel jump", () => {
   it("rejects when the step no longer exists", async () => {
     await expect(jumpEditorToHistoryState({})).rejects.toThrow(/no longer exists/);
   });
+
+  it("is dropped if another image was loaded before the queued jump ran", async () => {
+    const raster = stubRaster({ manual: true });
+    const target = useEditorStore.temporal.getState().pastStates.at(-1);
+    const rotating = s().rotateCanvas(90);
+    await flush();
+    const jumped = jumpEditorToHistoryState(target);
+    s().loadImage("blob:other", 640, 480);
+    raster.release();
+    await Promise.all([rotating, jumped]);
+    expect(s().sourceImageUrl).toBe("blob:other");
+  });
 });
 
 describe("a crop queued behind another rebake", () => {
@@ -358,6 +486,21 @@ describe("a crop queued behind another rebake", () => {
     expect(s().canvasSize).toEqual({ width: 600, height: 800 });
     // The box stays up for the user to redraw.
     expect(s().cropState).toEqual(CROP);
+  });
+
+  it("is dropped if the box was redrawn while waiting for an earlier rebake that failed", async () => {
+    const raster = stubRaster({ manual: true, loadFails: true });
+    const rotating = s().rotateCanvas(90);
+    s().setCropState(CROP);
+    const cropping = s().applyCrop();
+    await flush();
+    const redrawn = { ...CROP, width: 200 };
+    s().setCropState(redrawn);
+    raster.release();
+    await expect(rotating).rejects.toThrow();
+    await expect(cropping).resolves.toBe(false);
+    expect(s().canvasSize).toEqual({ width: 800, height: 600 });
+    expect(s().cropState).toEqual(redrawn);
   });
 });
 
@@ -390,6 +533,64 @@ describe("rebakes run one at a time", () => {
     const rotate = s().rotateCanvas(90);
     await Promise.all([resize, rotate]);
     expect(s().canvasSize).toEqual({ width: 800, height: 1000 });
+  });
+
+  it("Image Size while a rotate is decoding waits for the rotate instead of cancelling it (#2116)", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotate = s().rotateCanvas(90);
+    await flush();
+    const resize = s().resizeImage(300, 400);
+    raster.release();
+    await expect(Promise.all([rotate, resize])).resolves.toEqual([true, true]);
+
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED1");
+    expect(s().canvasSize).toEqual({ width: 300, height: 400 });
+    // After 90 CW (800x600 -> 600x800), rect at (10,20,100x50) is at (530,10,50x100);
+    // scaling 600x800 -> 300x400 halves it to (265,5,25x50).
+    expect(s().objects[0].attrs).toMatchObject({ x: 265, y: 5, width: 25, height: 50 });
+  });
+
+  it("Image Size with unchanged dimensions while a rotate is decoding still lets the rotate land (#2116)", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotate = s().rotateCanvas(90);
+    await flush();
+    const resize = s().resizeImage(800, 600);
+    raster.release();
+    await expect(Promise.all([rotate, resize])).resolves.toEqual([true, true]);
+
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED1");
+    expect(s().canvasSize).toEqual({ width: 800, height: 600 });
+  });
+
+  it("Trim while a rotate is decoding waits for the rotate and trims the rotated canvas (#2116)", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotate = s().rotateCanvas(90);
+    await flush();
+    const trim = s().trimCanvas();
+    raster.release();
+    await flush();
+    raster.release();
+    await expect(Promise.all([rotate, trim])).resolves.toEqual([true, true]);
+
+    expect(raster.sources).toEqual(["blob:test", "data:image/png;base64,REBAKED1"]);
+    // After 90 CW, rect (10,20,100x50, sw=1) sits at (530,10,50x100) on 600x800;
+    // trim bounds are x=529..581 (width 52), y=9..111 (height 102).
+    expect(s().canvasSize).toEqual({ width: 52, height: 102 });
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED2");
+    expect(raster.draws[1].args).toEqual([-529, -9, 600, 800]);
+  });
+
+  it("a rotate queued behind a trim rotates the trimmed canvas and bitmap (#2116)", async () => {
+    const raster = stubRaster();
+    const trim = s().trimCanvas();
+    const rotate = s().rotateCanvas(90);
+    await expect(Promise.all([trim, rotate])).resolves.toEqual([true, true]);
+
+    expect(raster.sources).toEqual(["blob:test", "data:image/png;base64,REBAKED1"]);
+    // Trim produces 102x52; rotating 90 CW swaps to 52x102.
+    expect(s().canvasSize).toEqual({ width: 52, height: 102 });
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED2");
+    expect(raster.draws[1].args).toEqual([0, 0, 102, 52]);
   });
 
   it("gives up on an image that never loads, so it can't block every later rebake", async () => {
@@ -432,5 +633,37 @@ describe("with no source image there is no bitmap to rebuild", () => {
     expect(s().canvasSize).toEqual({ width: 600, height: 800 });
     expect(raster.draws).toHaveLength(0);
     return pending;
+  });
+
+  it("trim commits straight away without touching a canvas", async () => {
+    const raster = stubRaster();
+    useEditorStore.setState({ sourceImageUrl: null });
+    const pending = s().trimCanvas();
+    expect(s().canvasSize).toEqual({ width: 102, height: 52 });
+    expect(raster.draws).toHaveLength(0);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it("trim resolves to false without decoding when there is nothing to trim", async () => {
+    const raster = stubRaster();
+    useEditorStore.setState({ objects: [] });
+    await expect(s().trimCanvas()).resolves.toBe(false);
+
+    s().addObject({
+      ...rect(),
+      attrs: { ...rect().attrs, x: 0, y: 0, width: 800, height: 600, strokeWidth: 0 },
+    } as CanvasObject);
+    await expect(s().trimCanvas()).resolves.toBe(false);
+
+    useEditorStore.setState({
+      objects: [
+        {
+          ...rect(),
+          attrs: { ...rect().attrs, x: 900, y: 700, width: 10, height: 10, strokeWidth: 0 },
+        } as CanvasObject,
+      ],
+    });
+    await expect(s().trimCanvas()).resolves.toBe(false);
+    expect(raster.draws).toHaveLength(0);
   });
 });

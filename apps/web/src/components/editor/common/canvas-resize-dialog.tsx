@@ -72,8 +72,8 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   const handleApply = useCallback(async () => {
     setApplying(true);
     try {
-      await resizeCanvas(width, height, anchor, fill);
-      onClose();
+      const applied = await resizeCanvas(width, height, anchor, fill);
+      if (applied !== false) onClose();
     } catch (err) {
       // A refused color or a rebake that failed. A toast alone leaves nothing to debug
       // from, so log and report it the way runEditorAction does for rotate and flip.
