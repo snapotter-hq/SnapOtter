@@ -465,19 +465,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         );
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (decodeErr) {
-                        if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
-                        try {
-                          await sharp(processBuffer).metadata();
-                        } catch (err) {
-                          if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-                          return reply.status(422).send({
-                            error: `Failed to decode ${validation.format} file`,
-                            details: stripInternalPaths(
-                              err instanceof Error ? err.message : String(err),
-                            ),
-                          });
-                        }
+                      } catch (err) {
+                        if (isDecoderUnavailable(err)) throw err;
+                        return reply.status(422).send({
+                          error: `Failed to decode ${validation.format} file`,
+                          details: stripInternalPaths(
+                            err instanceof Error ? err.message : String(err),
+                          ),
+                        });
                       }
                     }
 

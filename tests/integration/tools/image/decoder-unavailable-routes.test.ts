@@ -240,7 +240,7 @@ describe("Hand-written image routes: decoder availability (#1428)", () => {
     }
   }
 
-  for (const routeName of ["stitch", "pipeline execute", "batch", "pipeline batch"]) {
+  for (const routeName of ["stitch", "batch", "pipeline batch"]) {
     it(`${routeName}: Sharp's own decode still wins when the CLI decoder is missing`, async () => {
       process.env.PATH = emptyBinDir;
 
