@@ -237,8 +237,8 @@ export async function assertLocalCapacity(): Promise<void> {
 export async function putObject(key: string, data: Buffer): Promise<void> {
   assertValidKey(key);
   if (isS3Enabled()) {
-    const s3 = await getS3();
     try {
+      const s3 = await getS3();
       await s3.putGenericObject(key, data);
     } catch (err) {
       throw s3WriteFault(err);
@@ -314,16 +314,25 @@ export async function putObjectStream(
     }
   };
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    opts.signal?.throwIfAborted();
     opts.signal?.addEventListener("abort", abortSource, { once: true });
+    let s3: S3StorageModule | undefined;
+    let streamStarted = false;
     try {
       try {
+        s3 = await getS3();
+        opts.signal?.throwIfAborted();
+        streamStarted = true;
         await s3.putGenericObjectStream(key, counter(source), opts.signal);
         opts.signal?.throwIfAborted();
         return written;
       } catch (error) {
-        await s3.deleteGenericObject(key).catch(() => {});
+        if (!source.destroyed) {
+          if (source.listenerCount("error") === 0) source.once("error", () => {});
+          source.destroy();
+        }
+        if (streamStarted) {
+          await s3?.deleteGenericObject(key).catch(() => {});
+        }
         throw sourceError !== undefined ? localWriteFault(sourceError) : s3WriteFault(error);
       }
     } finally {
@@ -672,8 +681,8 @@ export async function deletePrefix(prefix: string): Promise<void> {
     throw new Error(`Invalid prefix: ${prefix}`);
   }
   if (isS3Enabled()) {
-    const s3 = await getS3();
     try {
+      const s3 = await getS3();
       await s3.deleteGenericPrefix(prefix);
     } catch (err) {
       throw s3WriteFault(err);

@@ -9,6 +9,8 @@ import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const s3 = vi.hoisted(() => ({
+  defaultMod: null as unknown,
+  load: vi.fn<() => Promise<unknown>>(),
   configure: vi.fn(),
   putObject: vi.fn(),
   putStream: vi.fn(),
@@ -43,19 +45,21 @@ vi.mock("@snapotter/enterprise", async () => {
   const { isMissingObjectError } = await vi.importActual<
     typeof import("../../../packages/enterprise/src/storage-s3.js")
   >("../../../packages/enterprise/src/storage-s3.js");
+  s3.defaultMod = {
+    isMissingObjectError,
+    configureS3: s3.configure,
+    putGenericObject: s3.putObject,
+    putGenericObjectStream: s3.putStream,
+    getGenericObjectStream: s3.getStream,
+    getGenericObjectSize: s3.getSize,
+    deleteGenericObject: s3.deleteObject,
+    deleteGenericPrefix: s3.deletePrefix,
+    listGenericObjects: s3.listObjects,
+    listGenericJobDirs: s3.listJobDirs,
+  };
+  s3.load.mockResolvedValue(s3.defaultMod);
   return {
-    loadS3Storage: vi.fn(async () => ({
-      isMissingObjectError,
-      configureS3: s3.configure,
-      putGenericObject: s3.putObject,
-      putGenericObjectStream: s3.putStream,
-      getGenericObjectStream: s3.getStream,
-      getGenericObjectSize: s3.getSize,
-      deleteGenericObject: s3.deleteObject,
-      deleteGenericPrefix: s3.deletePrefix,
-      listGenericObjects: s3.listObjects,
-      listGenericJobDirs: s3.listJobDirs,
-    })),
+    loadS3Storage: () => s3.load(),
   };
 });
 
@@ -73,6 +77,7 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  s3.load.mockResolvedValue(s3.defaultMod);
   s3.putObject.mockResolvedValue(undefined);
   s3.deleteObject.mockResolvedValue(undefined);
   s3.deletePrefix.mockResolvedValue(undefined);
@@ -98,6 +103,169 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
     await putObject("uploads/job-put/file.bin", data);
     expect(s3.putObject).toHaveBeenCalledTimes(1);
     expect(s3.putObject).toHaveBeenCalledWith("uploads/job-put/file.bin", data);
+  });
+
+  describe("a failed S3 buffer write", () => {
+    it.each([
+      [
+        "S3 refusing access",
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+      ],
+      [
+        "S3 throttling the write",
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+      ],
+      [
+        "the endpoint unreachable",
+        Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+      ],
+    ])("answers 503 storage-unavailable for %s", async (_case, cause) => {
+      s3.putObject.mockRejectedValueOnce(cause);
+      await expect(putObject("uploads/job-put/file.bin", Buffer.from("x"))).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+    });
+
+    it("stamps 500 on an unexpected non-S3 error during putObject", async () => {
+      const bug = new TypeError("unexpected failure");
+      s3.putObject.mockRejectedValueOnce(bug);
+      await expect(putObject("uploads/job-put/file.bin", Buffer.from("x"))).rejects.toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
+  });
+
+  describe("a failed S3 initialization in getS3 (#2787)", () => {
+    it("stamps 500 on putObject, putObjectStream, and deletePrefix when loadS3Storage or configureS3 throws an unexpected error", async () => {
+      vi.resetModules();
+      const fresh = await import("../../../apps/api/src/lib/object-storage.js");
+
+      const loadBug = new Error("Failed to load S3 storage module");
+      s3.load.mockRejectedValueOnce(loadBug);
+      await expect(fresh.putObject("uploads/job-init/file.bin", Buffer.from("x"))).rejects.toBe(
+        loadBug,
+      );
+      expect((loadBug as Error & { statusCode?: number }).statusCode).toBe(500);
+
+      const streamController = new AbortController();
+      const removeListenerSpy = vi.spyOn(streamController.signal, "removeEventListener");
+      const streamSource = Readable.from([Buffer.from("x")]);
+      const streamBug = new Error("Failed to load S3 storage for stream");
+      s3.load.mockRejectedValueOnce(streamBug);
+      await expect(
+        fresh.putObjectStream("uploads/job-init/stream.bin", streamSource, {
+          signal: streamController.signal,
+        }),
+      ).rejects.toBe(streamBug);
+      expect((streamBug as Error & { statusCode?: number }).statusCode).toBe(500);
+      expect(streamSource.destroyed).toBe(true);
+      expect(removeListenerSpy).toHaveBeenCalledWith("abort", expect.any(Function));
+      expect(s3.deleteObject).not.toHaveBeenCalled();
+
+      const configBug = new TypeError("Invalid S3 configuration");
+      s3.configure.mockImplementationOnce(() => {
+        throw configBug;
+      });
+      await expect(fresh.deletePrefix("outputs/job-init")).rejects.toBe(configBug);
+      expect((configBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
+
+    it("answers 503 storage-unavailable when getS3 fails with a connectivity or S3 error", async () => {
+      vi.resetModules();
+      const fresh = await import("../../../apps/api/src/lib/object-storage.js");
+
+      const netCause = Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+        code: "ECONNREFUSED",
+      });
+      s3.load.mockRejectedValueOnce(netCause);
+      await expect(
+        fresh.putObject("uploads/job-init/file.bin", Buffer.from("x")),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: netCause,
+      });
+
+      const s3Cause = Object.assign(new Error("Service Unavailable"), {
+        name: "ServiceUnavailable",
+        $metadata: { httpStatusCode: 503 },
+      });
+      s3.load.mockRejectedValueOnce(s3Cause);
+      const streamSource = Readable.from([Buffer.from("x")]);
+      await expect(
+        fresh.putObjectStream("uploads/job-init/stream.bin", streamSource),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: s3Cause,
+      });
+      expect(streamSource.destroyed).toBe(true);
+      expect(s3.deleteObject).not.toHaveBeenCalled();
+
+      s3.load.mockRejectedValueOnce(netCause);
+      await expect(fresh.deletePrefix("outputs/job-init")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: netCause,
+      });
+    });
+
+    it("destroys the source and rejects with AbortError if aborted while getS3 is pending", async () => {
+      vi.resetModules();
+      const fresh = await import("../../../apps/api/src/lib/object-storage.js");
+
+      const controller = new AbortController();
+      const streamSource = Readable.from(
+        (async function* () {
+          yield Buffer.from("x");
+        })(),
+      );
+      let markLoading!: () => void;
+      const loading = new Promise<void>((resolve) => {
+        markLoading = resolve;
+      });
+      let resolveLoad!: (mod: unknown) => void;
+      s3.load.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveLoad = resolve;
+            markLoading();
+          }),
+      );
+
+      const pending = fresh.putObjectStream("uploads/job-init/abort.bin", streamSource, {
+        signal: controller.signal,
+      });
+      await loading;
+      controller.abort();
+      const abortedWhileLoading = streamSource.destroyed;
+      resolveLoad(s3.defaultMod);
+
+      const caught = await pending.then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(caught).toMatchObject({ name: "AbortError" });
+      expect((caught as { statusCode?: unknown }).statusCode).toBeUndefined();
+      expect(abortedWhileLoading).toBe(true);
+      expect(s3.putStream).not.toHaveBeenCalled();
+      expect(s3.deleteObject).not.toHaveBeenCalled();
+    });
   });
 
   it("routes getObjectSize to the S3 backend and returns its exact number", async () => {
@@ -214,10 +382,13 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
   describe("a failed S3 streaming upload", () => {
     async function streamFailure(error: unknown): Promise<unknown> {
       s3.putStream.mockRejectedValueOnce(error);
-      return putObjectStream("uploads/job-s3fault/a.bin", Readable.from([Buffer.from("x")])).then(
+      const source = Readable.from([Buffer.from("x")]);
+      const err = await putObjectStream("uploads/job-s3fault/a.bin", source).then(
         () => null,
         (e: unknown) => e,
       );
+      expect(source.destroyed).toBe(true);
+      return err;
     }
 
     it.each([
