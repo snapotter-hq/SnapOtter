@@ -5258,6 +5258,8 @@ export const en = {
       "Your setup session expired. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.",
     mfaNotConfigured: "Two-factor authentication is not set up. Please log in again.",
     mfaAlreadyEnabled: "Two-factor authentication is already enabled. Please log in again.",
+    mfaUnreadable:
+      "Your two-factor authentication data can't be read on the server. Contact an administrator.",
     mfaEnrollmentHeading: "Set up two-factor authentication to continue",
     mfaEnrollmentRequired:
       "Your organization requires multi-factor authentication. Please set up MFA in your account settings.",

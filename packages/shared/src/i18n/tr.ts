@@ -5338,6 +5338,8 @@ export const tr: TranslationKeys = {
       "Kurulum oturumunuzun süresi doldu. Yeni bir QR kodu ve yeni kurtarma kodları almak için tekrar giriş yapın; daha önce gösterilenler çalışmayacak.",
     mfaNotConfigured: "İki faktörlü kimlik doğrulama ayarlanmamış. Lütfen tekrar giriş yapın.",
     mfaAlreadyEnabled: "İki faktörlü kimlik doğrulama zaten etkin. Lütfen tekrar giriş yapın.",
+    mfaUnreadable:
+      "Sunucu iki faktörlü kimlik doğrulama verilerinizi okuyamıyor. Bir yönetici ile iletişime geçin.",
     mfaEnrollmentHeading: "Devam etmek için iki faktörlü kimlik doğrulamayı ayarlayın",
     mfaEnrollmentRequired:
       "Kuruluşunuz çok faktörlü kimlik doğrulama gerektiriyor. Lütfen hesap ayarlarınızdan MFA kurulumunu yapın.",

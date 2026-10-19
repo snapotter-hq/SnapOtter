@@ -5370,6 +5370,8 @@ export const de: TranslationKeys = {
       "Die Zwei-Faktor-Authentifizierung ist nicht eingerichtet. Bitte melden Sie sich erneut an.",
     mfaAlreadyEnabled:
       "Die Zwei-Faktor-Authentifizierung ist bereits aktiviert. Bitte melden Sie sich erneut an.",
+    mfaUnreadable:
+      "Ihre Daten für die Zwei-Faktor-Authentifizierung können auf dem Server nicht gelesen werden. Wenden Sie sich an einen Administrator.",
     mfaEnrollmentHeading: "Richten Sie die Zwei-Faktor-Authentifizierung ein, um fortzufahren",
     mfaEnrollmentRequired:
       "Ihre Organisation erfordert Multi-Faktor-Authentifizierung. Bitte richten Sie MFA in Ihren Kontoeinstellungen ein.",

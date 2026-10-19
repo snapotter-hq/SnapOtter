@@ -5029,6 +5029,7 @@ export const zhCN: TranslationKeys = {
       "设置会话已过期。请重新登录以获取新的二维码和新的恢复码，之前显示的将无法使用。",
     mfaNotConfigured: "尚未设置双重身份验证，请重新登录。",
     mfaAlreadyEnabled: "双重身份验证已启用，请重新登录。",
+    mfaUnreadable: "服务器无法读取您的双重身份验证数据。请联系管理员。",
     mfaEnrollmentHeading: "请设置双重身份验证以继续",
     mfaEnrollmentRequired: "您的组织要求启用多因素认证。请在账户设置中设置 MFA。",
     mfaPolicyUnavailable: "无法检查 MFA 策略。请稍后重试。",

@@ -5346,6 +5346,8 @@ export const ptBR: TranslationKeys = {
       "Sua sessão de configuração expirou. Faça login novamente para obter um novo QR code e novos códigos de recuperação; os exibidos antes não vão funcionar.",
     mfaNotConfigured: "A autenticação de dois fatores não está configurada. Faça login novamente.",
     mfaAlreadyEnabled: "A autenticação de dois fatores já está ativada. Faça login novamente.",
+    mfaUnreadable:
+      "O servidor não consegue ler seus dados de autenticação de dois fatores. Entre em contato com um administrador.",
     mfaEnrollmentHeading: "Configure a autenticação de dois fatores para continuar",
     mfaEnrollmentRequired:
       "Sua organização exige autenticação multifator. Configure o MFA nas configurações da sua conta.",

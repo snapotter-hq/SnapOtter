@@ -5029,6 +5029,7 @@ export const zhTW: TranslationKeys = {
       "設定工作階段已過期。請重新登入以取得新的 QR 碼與新的復原碼，先前顯示的將無法使用。",
     mfaNotConfigured: "尚未設定兩步驟驗證，請重新登入。",
     mfaAlreadyEnabled: "兩步驟驗證已啟用，請重新登入。",
+    mfaUnreadable: "伺服器無法讀取您的兩步驟驗證資料。請聯絡管理員。",
     mfaEnrollmentHeading: "請設定兩步驟驗證以繼續",
     mfaEnrollmentRequired: "您的組織要求啟用多因素驗證。請在帳戶設定中設定 MFA。",
     mfaPolicyUnavailable: "無法檢查 MFA 政策。請稍後再試。",

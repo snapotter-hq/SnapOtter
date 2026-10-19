@@ -5349,6 +5349,8 @@ export const pl: TranslationKeys = {
     mfaNotConfigured:
       "Uwierzytelnianie dwuskładnikowe nie jest skonfigurowane. Zaloguj się ponownie.",
     mfaAlreadyEnabled: "Uwierzytelnianie dwuskładnikowe jest już włączone. Zaloguj się ponownie.",
+    mfaUnreadable:
+      "Serwer nie może odczytać danych uwierzytelniania dwuskładnikowego. Skontaktuj się z administratorem.",
     mfaEnrollmentHeading: "Skonfiguruj uwierzytelnianie dwuskładnikowe, aby kontynuować",
     mfaEnrollmentRequired:
       "Twoja organizacja wymaga uwierzytelniania wieloskładnikowego. Skonfiguruj MFA w ustawieniach konta.",

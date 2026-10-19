@@ -115,6 +115,9 @@ function mfaFailureMessage(
   if (code === "IP_NOT_ALLOWED") {
     return { message: t.auth.ipNotAllowed, clearCode: false, restart: false };
   }
+  if (code === "DECRYPTION_FAILED") {
+    return { message: t.auth.mfaUnreadable, clearCode: false, restart: false };
+  }
   if (status === 429) {
     const minutes = retryAfterMinutes(bodyRetryAfter, header);
     return {

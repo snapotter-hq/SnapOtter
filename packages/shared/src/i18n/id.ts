@@ -5329,6 +5329,8 @@ export const id: TranslationKeys = {
       "Sesi penyiapan Anda telah berakhir. Masuk lagi untuk mendapatkan kode QR dan kode pemulihan baru; kode yang ditampilkan sebelumnya tidak akan berfungsi.",
     mfaNotConfigured: "Autentikasi dua faktor belum disiapkan. Silakan masuk lagi.",
     mfaAlreadyEnabled: "Autentikasi dua faktor sudah aktif. Silakan masuk lagi.",
+    mfaUnreadable:
+      "Server tidak dapat membaca data autentikasi dua faktor Anda. Hubungi administrator.",
     mfaEnrollmentHeading: "Siapkan autentikasi dua faktor untuk melanjutkan",
     mfaEnrollmentRequired:
       "Organisasi Anda mewajibkan autentikasi multi-faktor. Silakan atur MFA di pengaturan akun Anda.",

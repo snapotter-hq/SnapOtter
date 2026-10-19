@@ -5363,6 +5363,8 @@ export const fr: TranslationKeys = {
       "L'authentification à deux facteurs n'est pas configurée. Veuillez vous reconnecter.",
     mfaAlreadyEnabled:
       "L'authentification à deux facteurs est déjà activée. Veuillez vous reconnecter.",
+    mfaUnreadable:
+      "Le serveur ne parvient pas à lire vos données d'authentification à deux facteurs. Contactez un administrateur.",
     mfaEnrollmentHeading: "Configurez l'authentification à deux facteurs pour continuer",
     mfaEnrollmentRequired:
       "Votre organisation exige l'authentification multifacteur. Veuillez configurer le MFA dans les paramètres de votre compte.",

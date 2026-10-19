@@ -5338,6 +5338,8 @@ export const es: TranslationKeys = {
       "Tu sesión de configuración ha caducado. Inicia sesión de nuevo para obtener un código QR y códigos de recuperación nuevos; los anteriores ya no funcionarán.",
     mfaNotConfigured: "La autenticación en dos pasos no está configurada. Inicia sesión de nuevo.",
     mfaAlreadyEnabled: "La autenticación en dos pasos ya está activada. Inicia sesión de nuevo.",
+    mfaUnreadable:
+      "El servidor no puede leer tus datos de autenticación en dos pasos. Ponte en contacto con un administrador.",
     mfaEnrollmentHeading: "Configura la autenticación en dos pasos para continuar",
     mfaEnrollmentRequired:
       "Tu organización requiere autenticación multifactor. Configura MFA en los ajustes de tu cuenta.",
