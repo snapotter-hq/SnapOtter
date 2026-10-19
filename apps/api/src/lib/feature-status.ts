@@ -1764,30 +1764,62 @@ export async function importBundleArchive(
     const sitePackagesDir = touchesVenv ? resolveVenvSitePackages(venvPath) : "";
     const venvPython = join(venvPath, "bin", "python3");
 
-    const rollbackActions: Array<() => void> = [];
+    const venvRollbackActions: Array<() => void> = [];
+    const modelsRollbackActions: Array<() => void> = [];
     const installedFixupPackages: string[] = [];
+    let venvTornDuringMove = false;
     try {
       // Move site-packages/* into venv site-packages
       if (hasSitePackages && sitePackagesDir) {
-        const spRollback = moveTreeWithRollback(
-          stagingSitePackages,
-          sitePackagesDir,
-          join(stagingDir, ".rollback-site-packages"),
-        );
-        rollbackActions.push(spRollback);
+        markVenvWriting(descriptor.bundleId);
+        try {
+          const spRollback = moveTreeWithRollback(
+            stagingSitePackages,
+            sitePackagesDir,
+            join(stagingDir, ".rollback-site-packages"),
+          );
+          venvRollbackActions.push(spRollback);
+        } catch (moveErr) {
+          if ((moveErr as { rollbackError?: Error })?.rollbackError) {
+            venvTornDuringMove = true;
+          }
+          throw moveErr;
+        }
+        clearVenvWriting();
       }
 
       // Apply fixups (NCCL wheel) if present
       if (hasFixups) {
         for (const wheel of fixupWheels) {
           const pkgName = wheel.split("-")[0];
+          if (!pkgName || !/^[A-Za-z0-9][A-Za-z0-9._]*$/.test(pkgName)) {
+            throw new ImportValidationError(
+              `Invalid fixup wheel filename "${wheel}": package name is malformed.`,
+            );
+          }
+        }
+        markVenvWriting(descriptor.bundleId);
+        for (const wheel of fixupWheels) {
+          const pkgName = wheel.split("-")[0];
           const wasPresent =
             Boolean(sitePackagesDir) && isDistributionInstalled(sitePackagesDir, pkgName);
-          if (!wasPresent) {
-            installedFixupPackages.push(pkgName);
+          try {
+            installFixupWheel(venvPython, stagingFixups, wheel, pkgName, installLockFd);
+            if (!wasPresent) {
+              installedFixupPackages.push(pkgName);
+            }
+          } catch (fixupErr) {
+            if (
+              !wasPresent &&
+              sitePackagesDir &&
+              isDistributionInstalled(sitePackagesDir, pkgName)
+            ) {
+              installedFixupPackages.push(pkgName);
+            }
+            throw fixupErr;
           }
-          installFixupWheel(venvPython, stagingFixups, wheel, pkgName, installLockFd);
         }
+        clearVenvWriting();
       }
 
       // Verify the bundle's Python modules actually import in the venv before
@@ -1808,10 +1840,31 @@ export async function importBundleArchive(
           MODELS_DIR,
           join(stagingDir, ".rollback-models"),
         );
-        rollbackActions.push(modelsRollback);
+        modelsRollbackActions.push(modelsRollback);
       }
     } catch (err) {
       const rollbackErrors: string[] = [];
+      const partialRollbackErr = (err as { rollbackError?: Error })?.rollbackError;
+      if (partialRollbackErr) {
+        rollbackErrors.push(partialRollbackErr.message);
+      }
+      let venvRollbackFailed = venvTornDuringMove;
+      const hasVenvRollbackWork =
+        installedFixupPackages.length > 0 || venvRollbackActions.length > 0;
+      if (hasVenvRollbackWork) {
+        try {
+          markVenvWriting(descriptor.bundleId);
+        } catch (markErr) {
+          venvRollbackFailed = true;
+          logger.error(
+            { err: markErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to record venv.writing before offline import rollback",
+          );
+          rollbackErrors.push(
+            `could not record venv.writing (${markErr instanceof Error ? markErr.message : String(markErr)})`,
+          );
+        }
+      }
       if (installedFixupPackages.length > 0) {
         try {
           const uninst = spawnSync(
@@ -1824,6 +1877,7 @@ export async function importBundleArchive(
             },
           );
           if (uninst.error || uninst.status !== 0) {
+            venvRollbackFailed = true;
             const detail =
               uninst.stderr?.trim() ||
               uninst.stdout?.trim() ||
@@ -1841,6 +1895,7 @@ export async function importBundleArchive(
             rollbackErrors.push(`fixup wheel rollback failed (${detail})`);
           }
         } catch (uninstErr) {
+          venvRollbackFailed = true;
           logger.error(
             {
               err: uninstErr,
@@ -1854,9 +1909,34 @@ export async function importBundleArchive(
           );
         }
       }
-      for (let i = rollbackActions.length - 1; i >= 0; i--) {
+      for (let i = venvRollbackActions.length - 1; i >= 0; i--) {
         try {
-          rollbackActions[i]();
+          venvRollbackActions[i]();
+        } catch (rbErr) {
+          venvRollbackFailed = true;
+          logger.error(
+            { err: rbErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to roll back files after failed offline import",
+          );
+          rollbackErrors.push(rbErr instanceof Error ? rbErr.message : String(rbErr));
+        }
+      }
+      if (touchesVenv && !venvRollbackFailed) {
+        try {
+          clearVenvWriting();
+        } catch (clearErr) {
+          logger.error(
+            { err: clearErr, bundleId: descriptor.bundleId },
+            "[feature-status] Failed to clear venv.writing after offline import rollback",
+          );
+          rollbackErrors.push(
+            `could not clear venv.writing (${clearErr instanceof Error ? clearErr.message : String(clearErr)})`,
+          );
+        }
+      }
+      for (let i = modelsRollbackActions.length - 1; i >= 0; i--) {
+        try {
+          modelsRollbackActions[i]();
         } catch (rbErr) {
           logger.error(
             { err: rbErr, bundleId: descriptor.bundleId },
@@ -2097,6 +2177,22 @@ function lstatOrNull(path: string): ReturnType<typeof lstatSync> | null {
   }
 }
 
+function markVenvWriting(bundleId: string): void {
+  writeFileSync(
+    VENV_WRITING_MARKER,
+    JSON.stringify({ bundleId, startedAt: new Date().toISOString() }),
+    "utf-8",
+  );
+}
+
+function clearVenvWriting(): void {
+  try {
+    unlinkSync(VENV_WRITING_MARKER);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+}
+
 /**
  * Recursively move entries from src into dest, merging directories while
  * backing up any overwritten entries into backupDir so the caller can undo the
@@ -2214,6 +2310,10 @@ function moveTreeWithRollback(src: string, dest: string, backupDir: string): () 
         { err: rbErr, src, dest },
         "[feature-status] Rollback after partial tree move failed",
       );
+      if (err instanceof Error) {
+        (err as Error & { rollbackError?: Error }).rollbackError =
+          rbErr instanceof Error ? rbErr : new Error(String(rbErr));
+      }
     }
     throw err;
   }

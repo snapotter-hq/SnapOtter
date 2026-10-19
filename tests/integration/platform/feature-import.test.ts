@@ -457,6 +457,7 @@ describe("site-packages import", () => {
     // The venv is validated before either move now, so a rejected import
     // leaves no half-applied bundle (models included) behind (#1139).
     expect(existsSync(join(modelsDir, "mediapipe", "face.tflite"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
   }
 
   it("extracts site-packages into venv site-packages directory", async () => {
@@ -473,6 +474,7 @@ describe("site-packages import", () => {
     invalidateCache();
     const result = await importBundleArchive(createReadStream(tarPath));
     expect(result.bundleId).toBe(testBundleId);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
 
     // Assert the contract that matters: the venv's own interpreter can now
     // import what was moved, not just that some directory matched a guess.

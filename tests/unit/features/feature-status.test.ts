@@ -30,6 +30,11 @@ const fsFaults = vi.hoisted(() => ({
   denyOwnerOnlyMutationPath: null as string | null,
   denyRecursiveRemovePath: null as string | null,
   denyReaddirPath: null as string | null,
+  denyUnlinkPath: null as string | null,
+  onRenameDestMatch: null as {
+    match: string;
+    callback: (src: string, dest: string) => void;
+  } | null,
   existsSequencePath: null as string | null,
   existsSequence: [] as boolean[],
   forceNonDocker: false,
@@ -139,6 +144,19 @@ vi.mock("node:fs", async (importOriginal) => {
       if (args[0] === fsFaults.denyRecursiveRemovePath) throw permissionError();
       return actual.rmSync(...args);
     },
+    renameSync: (...args: Parameters<typeof actual.renameSync>) => {
+      if (
+        fsFaults.onRenameDestMatch &&
+        String(args[1]).includes(fsFaults.onRenameDestMatch.match)
+      ) {
+        fsFaults.onRenameDestMatch.callback(String(args[0]), String(args[1]));
+      }
+      return actual.renameSync(...args);
+    },
+    unlinkSync: (...args: Parameters<typeof actual.unlinkSync>) => {
+      if (args[0] === fsFaults.denyUnlinkPath) throw permissionError();
+      return actual.unlinkSync(...args);
+    },
     readdirSync: ((...args: Parameters<typeof actual.readdirSync>) => {
       if (args[0] === fsFaults.denyReaddirPath) throw permissionError();
       return actual.readdirSync(...args);
@@ -165,6 +183,9 @@ beforeEach(async () => {
   vi.resetModules();
   fsFaults.denyOwnerOnlyMutationPath = null;
   fsFaults.denyRecursiveRemovePath = null;
+  fsFaults.denyReaddirPath = null;
+  fsFaults.denyUnlinkPath = null;
+  fsFaults.onRenameDestMatch = null;
   fsFaults.existsSequencePath = null;
   fsFaults.existsSequence.length = 0;
   fsFaults.forceNonDocker = false;
@@ -2348,6 +2369,7 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
     expect(readFileSync(join(sitePackagesDir, "mediapipe", "__init__.py"), "utf-8")).toBe(
       "# existing v1",
     );
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
   });
 
   it("fails with ImportValidationError naming the module and stderr and rolls back when a smokeImports module fails", async () => {
@@ -2582,6 +2604,7 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
     await expect(mod.importBundleArchive(createReadStream(badWheelTar))).rejects.toThrow(
       /Invalid fixup wheel filename/i,
     );
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
 
     writeFileSync(
       process.env.FEATURE_MANIFEST_PATH ?? "",
@@ -2718,6 +2741,7 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
     expect(err).toBeInstanceOf(mod.ImportValidationError);
     expect((err as Error).message).toMatch(/rollback warnings:.*uninstall lock failure/i);
     expect(errorSpy).toHaveBeenCalled();
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(true);
   });
 
   it("rejects archives where fixups, site-packages, or models is a regular file with ImportValidationError", async () => {
@@ -2755,5 +2779,242 @@ describe("importBundleArchive fixups and smoke verification (#1237)", () => {
     const err = await mod.importBundleArchive(createReadStream(tarPath)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(mod.ImportValidationError);
     expect((err as Error).message).toMatch(/Archive entry "fixups" must be a directory/i);
+  });
+
+  it("brackets site-packages move and fixups pip install with venv.writing and clears it after import (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath, sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    const markerPath = join(aiDir, "venv.writing");
+    const markerDuringPipPath = join(tempDir, "marker-during-pip.json");
+
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      "  *-m\\ pip\\ install*)\n",
+      `  *-m\\ pip\\ install*)\n    if [ -f ${JSON.stringify(markerPath)} ]; then cp ${JSON.stringify(markerPath)} ${JSON.stringify(markerDuringPipPath)}; fi\n`,
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    const markersSeenDuringMove: Array<{ bundleId: string; startedAt: string }> = [];
+    fsFaults.onRenameDestMatch = {
+      match: sitePackagesDir,
+      callback: () => {
+        if (existsSync(markerPath)) {
+          markersSeenDuringMove.push(JSON.parse(readFileSync(markerPath, "utf-8")));
+        }
+      },
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe", "nccl_fixup"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "mediapipe/__init__.py": "# ok",
+      },
+      fixups: {
+        "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "valid-wheel",
+      },
+    });
+
+    const result = await mod.importBundleArchive(createReadStream(tarPath));
+    expect(result.bundleId).toBe("face-detection");
+    expect(markersSeenDuringMove.length).toBeGreaterThan(0);
+    expect(markersSeenDuringMove[0]).toMatchObject({
+      bundleId: "face-detection",
+      startedAt: expect.any(String),
+    });
+    expect(existsSync(markerDuringPipPath)).toBe(true);
+    expect(JSON.parse(readFileSync(markerDuringPipPath, "utf-8"))).toMatchObject({
+      bundleId: "face-detection",
+      startedAt: expect.any(String),
+    });
+    expect(existsSync(markerPath)).toBe(false);
+  });
+
+  it("clears venv.writing when moving site-packages throws partway through and rollback succeeds (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    const markerPath = join(aiDir, "venv.writing");
+
+    let moveCount = 0;
+    let markerSeenBeforeThrow = false;
+    fsFaults.onRenameDestMatch = {
+      match: sitePackagesDir,
+      callback: () => {
+        moveCount += 1;
+        if (moveCount === 2) {
+          markerSeenBeforeThrow = existsSync(markerPath);
+          throw Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
+        }
+      },
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: {
+        "first_pkg/__init__.py": "# 1",
+        "second_pkg/__init__.py": "# 2",
+      },
+    });
+
+    await expect(mod.importBundleArchive(createReadStream(tarPath))).rejects.toThrow(/ENOSPC/);
+    expect(markerSeenBeforeThrow).toBe(true);
+    expect(existsSync(markerPath)).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "first_pkg"))).toBe(false);
+    expect(existsSync(join(sitePackagesDir, "second_pkg"))).toBe(false);
+  });
+
+  it("brackets venv rollback with venv.writing, clears it when rollback succeeds, and retains it when venv rollback fails (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { venvPath, sitePackagesDir } = setupFakeVenv({
+      pipBehavior: "ok",
+      failImport: "mediapipe",
+    });
+    const markerPath = join(aiDir, "venv.writing");
+    const markerDuringUninstallPath = join(tempDir, "marker-during-uninstall.json");
+
+    const binPy = join(venvPath, "bin", "python3");
+    const script = readFileSync(binPy, "utf-8").replace(
+      "  *-m\\ pip\\ uninstall*)\n",
+      `  *-m\\ pip\\ uninstall*)\n    if [ -f ${JSON.stringify(markerPath)} ]; then cp ${JSON.stringify(markerPath)} ${JSON.stringify(markerDuringUninstallPath)}; fi\n`,
+    );
+    writeFileSync(binPy, script);
+    chmodSync(binPy, 0o755);
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPath = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# fail" },
+      fixups: { "fake_nccl-1.0.0-cp312-linux_x86_64.whl": "wheel-bytes" },
+    });
+
+    await expect(mod.importBundleArchive(createReadStream(tarPath))).rejects.toThrow(
+      mod.ImportValidationError,
+    );
+    expect(existsSync(markerDuringUninstallPath)).toBe(true);
+    expect(JSON.parse(readFileSync(markerDuringUninstallPath, "utf-8"))).toMatchObject({
+      bundleId: "face-detection",
+    });
+    expect(existsSync(markerPath)).toBe(false);
+
+    // Now simulate a failed venv rollback (e.g. rmSync on the placed site-packages
+    // file fails with EPERM): venv.writing must stay on disk so next boot reseeds.
+    fsFaults.denyRecursiveRemovePath = join(sitePackagesDir, "mediapipe", "__init__.py");
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
+
+    const tarPath2 = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# fail" },
+    });
+    const err2 = await mod.importBundleArchive(createReadStream(tarPath2)).catch((e: unknown) => e);
+    expect(err2).toBeInstanceOf(mod.ImportValidationError);
+    expect((err2 as Error).message).toMatch(/rollback warnings/i);
+    expect(existsSync(markerPath)).toBe(true);
+
+    // And recoverInterruptedInstalls() on next boot heals the torn venv.
+    fsFaults.denyRecursiveRemovePath = null;
+    markOfficialImage();
+    childProcessFaults.reseedOutcomes.push("success");
+    expect(mod.recoverInterruptedInstalls()).toBe(true);
+    expect(childProcessFaults.reseedCalls).toHaveLength(1);
+    expect(existsSync(markerPath)).toBe(false);
+  });
+
+  it("retains venv.writing when a partial site-packages move fails its own rollback or when venv.writing cannot be unlinked (#1238)", async () => {
+    const { createReadStream } = await import("node:fs");
+    const { sitePackagesDir } = setupFakeVenv({ pipBehavior: "ok" });
+    const markerPath = join(aiDir, "venv.writing");
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
+
+    // 1. Partial move throws on the 2nd file AND rollback fails to remove the 1st file
+    let moveCount = 0;
+    fsFaults.onRenameDestMatch = {
+      match: sitePackagesDir,
+      callback: () => {
+        moveCount += 1;
+        if (moveCount === 2) {
+          fsFaults.denyRecursiveRemovePath = join(sitePackagesDir, "first_pkg", "__init__.py");
+          throw Object.assign(new Error("ENOSPC mid-move"), { code: "ENOSPC" });
+        }
+      },
+    };
+
+    writeFileSync(
+      process.env.FEATURE_MANIFEST_PATH ?? "",
+      JSON.stringify({
+        bundles: {
+          "face-detection": {
+            models: [{ id: "face", path: "mediapipe/face.tflite" }],
+            smokeImports: ["mediapipe"],
+          },
+        },
+      }),
+    );
+
+    const tarPartial = await createTestArchive({
+      sitePackages: {
+        "first_pkg/__init__.py": "# 1",
+        "second_pkg/__init__.py": "# 2",
+      },
+    });
+
+    const err1 = await mod
+      .importBundleArchive(createReadStream(tarPartial))
+      .catch((e: unknown) => e);
+    expect((err1 as Error).message).toMatch(/ENOSPC mid-move.*rollback warnings/i);
+    expect(existsSync(markerPath)).toBe(true);
+
+    // Clean up and test 2: unlinkSync on venv.writing fails with EPERM after move
+    fsFaults.onRenameDestMatch = null;
+    fsFaults.denyRecursiveRemovePath = null;
+    unlinkSync(markerPath);
+    rmSync(join(sitePackagesDir, "first_pkg"), { recursive: true, force: true });
+
+    fsFaults.denyUnlinkPath = markerPath;
+    const tarUnlinkFail = await createTestArchive({
+      sitePackages: { "mediapipe/__init__.py": "# ok" },
+    });
+
+    const err2 = await mod
+      .importBundleArchive(createReadStream(tarUnlinkFail))
+      .catch((e: unknown) => e);
+    expect((err2 as Error).message).toMatch(/could not clear venv\.writing/i);
+    expect(existsSync(join(sitePackagesDir, "mediapipe"))).toBe(false);
+    expect(existsSync(markerPath)).toBe(true);
+    fsFaults.denyUnlinkPath = null;
   });
 });
