@@ -811,8 +811,10 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         span.addEvent("job.failed");
       }
 
+      const isInputMissing = isSafeMessageError(err) && err.code === "INPUT_MISSING";
+      const isUnrecoverable = isCanceled || isValidationError || isInputMissing;
       const maxAttempts = job.opts.attempts ?? 1;
-      const willRetry = !isCanceled && job.attemptsMade + 1 < maxAttempts;
+      const willRetry = !isUnrecoverable && job.attemptsMade + 1 < maxAttempts;
 
       // A canceled job may have written its output already, in this attempt or
       // in an earlier one that lost its completion commit (output keys are per
@@ -964,6 +966,11 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
 
       if (isCanceled) throw new UnrecoverableError("Canceled");
       if (isTimeout) throw new Error(finalError);
+      if (isUnrecoverable) {
+        const unrecoverable = new UnrecoverableError(errorMessage);
+        if (err instanceof Error && err.stack) unrecoverable.stack = err.stack;
+        throw Object.assign(unrecoverable, { cause: err });
+      }
       throw err;
     } finally {
       if (span) span.end();
@@ -2102,11 +2109,13 @@ export function startWorkers(): void {
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
       }
-      const pf = (err as { pythonFrames?: unknown }).pythonFrames;
+      const failedErr =
+        err.name === "UnrecoverableError" && err.cause instanceof Error ? err.cause : err;
+      const pf = (failedErr as { pythonFrames?: unknown }).pythonFrames;
       if (Array.isArray(pf) && pf.length) {
         logger.error({ pool, jobId: job.id, pythonFrames: pf }, "sidecar failure");
       }
-      void reportError(err, {
+      void reportError(failedErr, {
         source: "worker",
         pool,
         toolId: data?.toolId,

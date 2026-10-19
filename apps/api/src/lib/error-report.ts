@@ -75,7 +75,20 @@ export function jobAgeBucket(ms: number | undefined): string | undefined {
   return "gte_24h";
 }
 
-export function classifyError(err: unknown, source?: ReportContext["source"]): ErrorClass {
+/**
+ * The worker wraps non-retryable failures (validation errors, ToolInputError,
+ * INPUT_MISSING) in an UnrecoverableError with the real Error on `cause` so
+ * BullMQ skips the pool's second attempt (#1176). BullMQ's own lock-loss
+ * UnrecoverableError carries no `cause`, so unwrapping only when `cause` is an
+ * Error preserves both paths.
+ */
+function unwrapUnrecoverable(err: unknown): unknown {
+  const e = err as { name?: unknown; cause?: unknown } | null;
+  return e?.name === "UnrecoverableError" && e.cause instanceof Error ? e.cause : err;
+}
+
+export function classifyError(rawErr: unknown, source?: ReportContext["source"]): ErrorClass {
+  const err = unwrapUnrecoverable(rawErr);
   if (isToolInputError(err)) return "expected";
   const e = err as { name?: string; message?: string; code?: string } | null;
   // InputValidationError (apps/api/src/modality/contract.ts) is a 400 the user
@@ -141,7 +154,8 @@ export function resetThrottleForTests(): void {
   seen.clear();
 }
 
-export function errorSignature(err: unknown): string {
+export function errorSignature(rawErr: unknown): string {
+  const err = unwrapUnrecoverable(rawErr);
   const e = err as { name?: string; code?: string; stack?: string; cause?: unknown } | null;
   const name = e?.name ?? "Unknown";
   const code = e?.code ?? "-";
@@ -199,9 +213,10 @@ export function vetSettings(
 }
 
 /** Fire-and-forget; never throws, never blocks. */
-export async function reportError(err: unknown, ctx: ReportContext): Promise<void> {
+export async function reportError(rawErr: unknown, ctx: ReportContext): Promise<void> {
   try {
     if (!analyticsEnabled()) return;
+    const err = unwrapUnrecoverable(rawErr);
     const cls = classifyError(err, ctx.source);
     if (cls === "expected") return;
     if (!sentryDiagnostic() && !shouldReport(cls, errorSignature(err))) return;

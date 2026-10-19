@@ -21,7 +21,12 @@ import { mkdirSync } from "node:fs";
 import { truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { ANALYTICS_EVENTS, ONBOARDING_FIRST_PROCESSED_KEY, TOOLS } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  ONBOARDING_FIRST_PROCESSED_KEY,
+  TOOLS,
+  ToolInputError,
+} from "@snapotter/shared";
 import AdmZip from "adm-zip";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -140,6 +145,7 @@ const { __resetGateForTests, __setReaderForTests, refreshAnalyticsGate } = await
 const { getObjectBuffer, getObjectSize, putObject } = await import(
   "../../../apps/api/src/lib/object-storage.js"
 );
+const { logger } = await import("../../../apps/api/src/lib/logger.js");
 const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
 const { MAX_BUFFERED_OUTPUT_BYTES } = await import("../../../apps/api/src/jobs/output-resolve.js");
 const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
@@ -235,6 +241,17 @@ registerToolProcessFn({
   process: unusedLegacyProcess,
   processV2: async () => {
     throw new InputValidationError("That file looks wrong", 422);
+  },
+});
+
+let toolInputRuns = 0;
+registerToolProcessFn({
+  toolId: "wt-tool-input",
+  settingsSchema: passthroughSchema,
+  process: unusedLegacyProcess,
+  processV2: async () => {
+    toolInputRuns++;
+    throw new ToolInputError("remote resources are disabled: http://127.0.0.1:9/x.png");
   },
 });
 
@@ -586,29 +603,158 @@ describe("tool job failure paths", () => {
     expect(row.error?.message).toBe('Extra output "bad.bin" has neither buffer nor scratchPath');
   });
 
-  it("classifies a worker-side InputValidationError as user input, not a bug", async () => {
+  it("classifies a worker-side InputValidationError as user input, not a bug, and does not retry it (#1176)", async () => {
     const jobId = randomUUID();
     const inputRef = await seedInput(jobId, "in.png", Buffer.from("x"));
+    const errorSpy = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "wt-invalid",
+          // Image pool enqueues with attempts: 2; validation errors must settle on attempt 1.
+          pool: "image",
+          inputRefs: [inputRef],
+          filename: "in.png",
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("failed");
+      expect(row.attempts).toBe(1);
+      expect(row.error).toMatchObject({ message: "That file looks wrong", httpStatus: 422 });
+
+      const failedQueueJob = await waitFor(async () => {
+        const queueJob = await getQueue("image").getJob(jobId);
+        if (!queueJob) return undefined;
+        return (await queueJob.getState()) === "failed" ? queueJob : undefined;
+      }, 10_000);
+      expect(failedQueueJob.attemptsMade).toBe(1);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
+      expect(events).toHaveLength(1);
+      const props = events[0];
+      expect(props.status).toBe("failed");
+      expect(props.error_kind).toBe("input");
+      expect(props.error_code).toBe("processing");
+
+      expect(
+        errorSpy.mock.calls.some(
+          ([ctx, msg]) =>
+            msg === "tool job failed" && (ctx as { jobId?: string } | undefined)?.jobId === jobId,
+        ),
+      ).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("does not retry a worker-side ToolInputError or log it as a server fault (#1176)", async () => {
+    const jobId = randomUUID();
+    const inputRef = await seedInput(
+      jobId,
+      "in.html",
+      Buffer.from("<img src='http://127.0.0.1:9/x.png'>"),
+    );
+    const errorSpy = vi.spyOn(logger, "error");
+    toolInputRuns = 0;
+    reported.errors.length = 0;
+
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId,
+          toolId: "wt-tool-input",
+          // Docs pool enqueues with attempts: 2.
+          pool: "docs",
+          inputRefs: [inputRef],
+          filename: "in.html",
+        }),
+      );
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("failed");
+      expect(row.attempts).toBe(1);
+      expect(toolInputRuns).toBe(1);
+      expect(row.error).toMatchObject({
+        message: "remote resources are disabled: http://127.0.0.1:9/x.png",
+        httpStatus: 400,
+      });
+
+      const failedQueueJob = await waitFor(async () => {
+        const queueJob = await getQueue("docs").getJob(jobId);
+        if (!queueJob) return undefined;
+        return (await queueJob.getState()) === "failed" ? queueJob : undefined;
+      }, 10_000);
+      expect(failedQueueJob.attemptsMade).toBe(1);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        status: "failed",
+        error_kind: "input",
+        error_code: "processing",
+      });
+
+      expect(
+        errorSpy.mock.calls.some(
+          ([ctx, msg]) =>
+            msg === "tool job failed" && (ctx as { jobId?: string } | undefined)?.jobId === jobId,
+        ),
+      ).toBe(false);
+      expect(
+        reported.errors.some(
+          (e) =>
+            (e as { isToolInputError?: boolean; message?: string } | null)?.isToolInputError ===
+              true &&
+            (e as Error).message === "remote resources are disabled: http://127.0.0.1:9/x.png",
+        ),
+      ).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("does not retry INPUT_MISSING when a queued input has vanished (#1176)", async () => {
+    const jobId = randomUUID();
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
         jobId,
-        toolId: "wt-invalid",
-        pool: "ai",
-        inputRefs: [inputRef],
-        filename: "in.png",
+        toolId: "wt-echo",
+        // Image pool enqueues with attempts: 2; a missing input stays missing.
+        pool: "image",
+        inputRefs: [`uploads/${jobId}/vanished.png`],
+        filename: "vanished.png",
       }),
     );
 
     const row = await terminalRow(jobId);
     expect(row.status).toBe("failed");
-    expect(row.error?.message).toBe("That file looks wrong");
+    expect(row.attempts).toBe(1);
+    expect(row.error?.message).toBe("Input file is no longer available. Upload it again.");
 
     const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
-    const props = events[0];
-    expect(props.status).toBe("failed");
-    expect(props.error_kind).toBe("input");
-    expect(props.error_code).toBe("processing");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      status: "failed",
+      error_code: "INPUT_MISSING",
+      error_kind: "operational",
+    });
+
+    const failedQueueJob = await waitFor(async () => {
+      const queueJob = await getQueue("image").getJob(jobId);
+      if (!queueJob) return undefined;
+      return (await queueJob.getState()) === "failed" ? queueJob : undefined;
+    }, 10_000);
+    expect(failedQueueJob.attemptsMade).toBe(1);
+
+    const missingReports = reported.errors.filter(
+      (e) => (e as { code?: string } | null)?.code === "INPUT_MISSING",
+    );
+    expect(missingReports).toHaveLength(1);
   });
 
   it("cancels an active job: canceled row, ephemeral terminal frame, cancelled analytics", async () => {

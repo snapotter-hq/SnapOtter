@@ -7,7 +7,7 @@
  * call yields exactly one captureException with the ORIGINAL error object,
  * and the throttle allows one capture per distinct signature.
  */
-import { SafeError } from "@snapotter/shared";
+import { SafeError, ToolInputError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   reportError,
@@ -149,6 +149,38 @@ describe("capture path", () => {
     resetThrottleForTests();
     await reportError(make(s3), { source: "worker", pool: "image" });
     expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
+  });
+
+  it("unwraps an UnrecoverableError with a cause before classifying, fingerprinting, and capturing (#1176)", async () => {
+    const enoent = Object.assign(new Error("ENOENT: no such file or directory, open '/x'"), {
+      code: "ENOENT",
+      syscall: "open",
+    });
+    const inputMissing = new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: enoent,
+    });
+    const wrappedMissing = Object.assign(new Error(inputMissing.message), {
+      name: "UnrecoverableError",
+      cause: inputMissing,
+    });
+
+    await reportError(wrappedMissing, { source: "worker", pool: "image", jobId: "job-1" });
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    expect(h.captureException).toHaveBeenCalledWith(inputMissing);
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_code", "INPUT_MISSING");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["operational", "INPUT_MISSING"]);
+
+    // Wrapped expected errors (ToolInputError) are still dropped before capture.
+    vi.clearAllMocks();
+    const wrappedInputErr = Object.assign(new Error("remote resources are disabled: http://x"), {
+      name: "UnrecoverableError",
+      cause: new ToolInputError("remote resources are disabled: http://x"),
+    });
+    await reportError(wrappedInputErr, { source: "worker", pool: "docs", jobId: "job-2" });
+    expect(h.captureException).not.toHaveBeenCalled();
   });
 
   it("groups a coded SafeError wrapping a network failure by its own code, not the shared connectivity issue (#1907)", async () => {

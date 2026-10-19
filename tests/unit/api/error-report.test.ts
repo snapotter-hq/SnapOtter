@@ -147,6 +147,41 @@ describe("classifyError", () => {
     expect(classifyError(stalled, "worker")).toBe("operational");
     expect(classifyError(stalled)).toBe("operational");
   });
+  it("looks through an UnrecoverableError with a cause so non-retryable worker errors keep their class (#1176)", () => {
+    const wrap = (cause: Error) =>
+      Object.assign(new Error(cause.message), { name: "UnrecoverableError", cause });
+
+    expect(
+      classifyError(wrap(new ToolInputError("remote resources are disabled: x")), "worker"),
+    ).toBe("expected");
+    expect(
+      classifyError(
+        wrap(
+          Object.assign(new Error("bad png"), { name: "InputValidationError", statusCode: 422 }),
+        ),
+        "worker",
+      ),
+    ).toBe("expected");
+    expect(
+      classifyError(
+        wrap(
+          Object.assign(new Error("engine down"), {
+            name: "InputValidationError",
+            statusCode: 503,
+          }),
+        ),
+        "worker",
+      ),
+    ).toBe("operational");
+    const inputMissing = new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+    });
+    expect(classifyError(wrap(inputMissing), "worker")).toBe("operational");
+    expect(classifyError(wrap(new Error("unexpected crash")), "worker")).toBe("bug");
+  });
 });
 
 describe("classifyError undici", () => {
@@ -219,6 +254,21 @@ describe("errorSignature", () => {
     expect(errorSignature(wrap("DecoderUnavailableError"))).not.toBe(
       errorSignature(wrap("DecoderOutOfMemoryError")),
     );
+  });
+  it("unwraps an UnrecoverableError with a cause so the signature matches the underlying error (#1176)", () => {
+    const inner = new SafeError("Input file is no longer available. Upload it again.", {
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      cause: Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+    });
+    inner.stack =
+      "SafeError: Input file is no longer available.\n  at loadToolInputs (/app/apps/api/src/jobs/worker.ts:207:11)";
+    const wrapped = Object.assign(new Error(inner.message), {
+      name: "UnrecoverableError",
+      cause: inner,
+    });
+    expect(errorSignature(wrapped)).toBe(errorSignature(inner));
   });
 });
 

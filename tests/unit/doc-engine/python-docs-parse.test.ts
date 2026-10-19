@@ -188,6 +188,43 @@ describe("python-docs sidecar JSON parsing", () => {
     expect(isSafeMessageError(caught)).toBe(true);
   });
 
+  it("classifies a doc_html_pdf remote-resource rejection as ToolInputError (#1176)", async () => {
+    runDocsScript.mockResolvedValue(
+      JSON.stringify({ error: "remote resources are disabled: http://127.0.0.1:9/x.png" }),
+    );
+
+    let caught: unknown;
+    try {
+      await htmlToPdfPy("/in.html", "/out.pdf", "html");
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(isToolInputError(caught)).toBe(true);
+    expect((caught as Error).message).toBe(
+      "remote resources are disabled: http://127.0.0.1:9/x.png",
+    );
+  });
+
+  it("keeps other doc_html_pdf errors as non-input errors (#1176)", async () => {
+    runDocsScript.mockResolvedValue(
+      JSON.stringify({ error: "weasyprint not usable: No module named 'weasyprint'" }),
+    );
+
+    let caught: unknown;
+    try {
+      await htmlToPdfPy("/in.html", "/out.pdf", "html");
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(isToolInputError(caught)).toBe(false);
+    expect((caught as Error).message).toBe(
+      "doc_html_pdf failed: weasyprint not usable: No module named 'weasyprint'",
+    );
+  });
+
   it("guards every helper, not only redact", async () => {
     runDocsScript.mockResolvedValue("<html>500 Internal Server Error</html>");
 

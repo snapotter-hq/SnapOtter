@@ -213,7 +213,11 @@ export async function htmlToPdfPy(
   );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_html_pdf", stdout);
   if ("error" in parsed) {
-    throw new Error(`doc_html_pdf failed: ${formatDocsError(parsed.error, stdout)}`);
+    const detail = formatDocsError(parsed.error, stdout);
+    if (detail.startsWith("remote resources are disabled")) {
+      throw new ToolInputError(detail);
+    }
+    throw new Error(`doc_html_pdf failed: ${detail}`);
   }
 }
 

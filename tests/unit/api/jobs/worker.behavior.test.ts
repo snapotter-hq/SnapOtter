@@ -593,4 +593,44 @@ describe("worker failure reports carry the job age (#1414)", () => {
     const ctx = reportErrorMock.mock.calls[0][1] as { jobAgeMs?: number };
     expect(ctx.jobAgeMs).toBeUndefined();
   });
+
+  it("unwraps an UnrecoverableError with a cause before handing the error to reportError (#1176)", async () => {
+    const listeners = await failedListeners();
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    const job = {
+      id: "job-3",
+      data: { toolId: "image-enhancement", filename: "photo.jpg", settings: {} },
+      timestamp: 1_000,
+      processedOn: 2_000,
+    };
+    const inner = Object.assign(new Error("Input file is no longer available. Upload it again."), {
+      pythonFrames: [{ file: "doc_html_pdf.py", line: 30, func: "fetch" }],
+    });
+    const wrapped = Object.assign(new Error(inner.message), {
+      name: "UnrecoverableError",
+      cause: inner,
+    });
+
+    listenerFor(listeners, "image")(job, wrapped);
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      inner,
+      expect.objectContaining({ source: "worker", jobId: "job-3", jobAgeMs: 1_000 }),
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "job-3", pythonFrames: inner.pythonFrames }),
+      "sidecar failure",
+    );
+
+    // A bare BullMQ lock-loss UnrecoverableError (no cause) passes through unchanged.
+    reportErrorMock.mockClear();
+    const stalled = Object.assign(new Error("Missing lock for job 42. moveToFinished"), {
+      name: "UnrecoverableError",
+    });
+    listenerFor(listeners, "image")(job, stalled);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      stalled,
+      expect.objectContaining({ source: "worker", jobId: "job-3", jobAgeMs: 1_000 }),
+    );
+  });
 });
