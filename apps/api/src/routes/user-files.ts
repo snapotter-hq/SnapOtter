@@ -649,6 +649,15 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           .send(cached);
       }
 
+      const cacheThumbnail = (buffer: Buffer) => {
+        saveThumbnail(file.storedName, buffer).catch((err) => {
+          request.log.warn(
+            { err, fileId: id, storedName: file.storedName },
+            "Failed to cache thumbnail",
+          );
+        });
+      };
+
       try {
         const rawBuffer = await readStoredFile(file.storedName);
 
@@ -658,7 +667,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           if (!poster) {
             return reply.status(422).send({ error: "Could not generate thumbnail" });
           }
-          saveThumbnail(file.storedName, poster).catch(() => {});
+          cacheThumbnail(poster);
           return reply
             .header("Content-Type", "image/webp")
             .header("Cache-Control", "public, max-age=86400, immutable")
@@ -671,7 +680,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           if (!page) {
             return reply.status(422).send({ error: "Could not generate thumbnail" });
           }
-          saveThumbnail(file.storedName, page).catch(() => {});
+          cacheThumbnail(page);
           return reply
             .header("Content-Type", "image/png")
             .header("Cache-Control", "public, max-age=86400, immutable")
@@ -711,7 +720,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           .toBuffer();
 
         // Cache to disk (non-blocking, don't fail the request)
-        saveThumbnail(file.storedName, thumbnail).catch(() => {});
+        cacheThumbnail(thumbnail);
 
         return reply
           .header("Content-Type", "image/jpeg")

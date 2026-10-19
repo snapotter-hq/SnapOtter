@@ -39,6 +39,7 @@ const diskState = vi.hoisted(() => ({
   lowDisk: false,
   failOpenWith: "",
   failWriteMidway: false,
+  failRenameWith: "",
   failUnlink: false,
   partialPath: "",
 }));
@@ -67,6 +68,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       }
       return handle;
     },
+    rename: async (...args: Parameters<typeof actual.rename>) => {
+      if (diskState.failRenameWith) throw errno(diskState.failRenameWith);
+      return actual.rename(...args);
+    },
     unlink: (path: Parameters<typeof actual.unlink>[0]) =>
       diskState.failUnlink ? Promise.reject(errno("EBUSY")) : actual.unlink(path),
   };
@@ -94,6 +99,7 @@ afterEach(async () => {
   diskState.lowDisk = false;
   diskState.failOpenWith = "";
   diskState.failWriteMidway = false;
+  diskState.failRenameWith = "";
   diskState.failUnlink = false;
   diskState.partialPath = "";
   vi.restoreAllMocks();
@@ -318,6 +324,11 @@ describe("path traversal containment", () => {
   it.each(TRAVERSAL_NAMES)("deleteThumbnail rejects %j", async (name) => {
     const { deleteThumbnail } = await importModule();
     await expect(deleteThumbnail(name)).rejects.toThrow();
+  });
+
+  it.each(TRAVERSAL_NAMES)("saveThumbnail rejects %j", async (name) => {
+    const { saveThumbnail } = await importModule();
+    await expect(saveThumbnail(name, Buffer.from("t"))).rejects.toThrow();
   });
 
   it("still serves and deletes a normally-stored file", async () => {
@@ -553,6 +564,33 @@ describe("storage not writable (EACCES)", () => {
       }
     },
   );
+
+  it.skipIf(isRoot)(
+    "saveThumbnail throws a SafeError when .thumbs becomes read-only after initialization",
+    async () => {
+      const { logger } = await import("../../../apps/api/src/lib/logger.js");
+      const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const { saveThumbnail } = await importModule();
+      await saveThumbnail("first.png", Buffer.from("t"));
+      const thumbDir = join(testDir, ".thumbs");
+      try {
+        await chmod(thumbDir, 0o555);
+        const err = (await saveThumbnail("second.png", Buffer.from("t")).then(
+          () => null,
+          (e: unknown) => e,
+        )) as StorageError | null;
+        expect(err).toBeInstanceOf(Error);
+        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.isSafeMessage).toBe(true);
+        expect(err?.kind).toBe("operational");
+        expect(err?.code).toBe("EACCES");
+        expect(err?.statusCode).toBe(503);
+        expect(logError).not.toHaveBeenCalled();
+      } finally {
+        await chmod(thumbDir, 0o755).catch(() => {});
+      }
+    },
+  );
 });
 
 describe("disk space floor", () => {
@@ -634,6 +672,118 @@ describe("saveFile after a failed write", () => {
     expect(logError).toHaveBeenCalledWith(
       expect.objectContaining({
         storedName: leftover,
+        err: expect.objectContaining({ code: "EBUSY" }),
+        writeErr: expect.objectContaining({ code: "ENOSPC" }),
+      }),
+      expect.any(String),
+    );
+  });
+});
+
+// #1633: a thumbnail write must stage to a temporary file in .thumbs and
+// rename into place, removing the temp file on failure so a partial write is
+// never cached or served by getCachedThumbnail.
+describe("saveThumbnail after a failed write (#1633)", () => {
+  async function thumbFiles(): Promise<string[]> {
+    const dir = join(testDir, ".thumbs");
+    return existsSync(dir) ? readdir(dir) : [];
+  }
+
+  it("removes the partly written temp file, leaves getCachedThumbnail null, and rethrows", async () => {
+    const { saveThumbnail, getCachedThumbnail } = await importModule();
+    diskState.failWriteMidway = true;
+
+    const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("ENOSPC");
+    expect(dirname(diskState.partialPath)).toBe(join(testDir, ".thumbs"));
+    expect(diskState.partialPath).not.toBe(join(testDir, ".thumbs", "photo.png.thumb.jpg"));
+    expect(existsSync(diskState.partialPath)).toBe(false);
+    expect(await thumbFiles()).toEqual([]);
+    expect(await getCachedThumbnail("photo.png")).toBeNull();
+  });
+
+  it("replaces an existing cached thumbnail without leaving temp files behind", async () => {
+    const { saveThumbnail, getCachedThumbnail } = await importModule();
+    await saveThumbnail("photo.png", Buffer.from("first-thumb"));
+    await saveThumbnail("photo.png", Buffer.from("second-thumb"));
+
+    expect(await thumbFiles()).toEqual(["photo.png.thumb.jpg"]);
+    expect((await getCachedThumbnail("photo.png"))?.toString()).toBe("second-thumb");
+  });
+
+  it("preserves an existing cached thumbnail when a later write fails partway", async () => {
+    const { saveThumbnail, getCachedThumbnail } = await importModule();
+    await saveThumbnail("photo.png", Buffer.from("intact-thumb"));
+    diskState.failWriteMidway = true;
+
+    const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("ENOSPC");
+    expect(await thumbFiles()).toEqual(["photo.png.thumb.jpg"]);
+    expect((await getCachedThumbnail("photo.png"))?.toString()).toBe("intact-thumb");
+  });
+
+  it("removes the temp file and leaves the cache empty when rename fails", async () => {
+    const { saveThumbnail, getCachedThumbnail } = await importModule();
+    diskState.failRenameWith = "EIO";
+
+    const err = (await saveThumbnail("photo.png", Buffer.from("thumb-bytes")).then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("EIO");
+    expect(await thumbFiles()).toEqual([]);
+    expect(await getCachedThumbnail("photo.png")).toBeNull();
+  });
+
+  it("cleans up nothing, and logs nothing, when the temp file was never created", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const { saveThumbnail, getCachedThumbnail } = await importModule();
+    diskState.failOpenWith = "EROFS";
+    diskState.failUnlink = true;
+
+    const err = (await saveThumbnail("photo.png", Buffer.alloc(16)).then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("EROFS");
+    expect(logError).not.toHaveBeenCalled();
+    expect(await thumbFiles()).toEqual([]);
+    expect(await getCachedThumbnail("photo.png")).toBeNull();
+  });
+
+  it("logs the temp file it couldn't remove, and still leaves getCachedThumbnail null", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const { saveThumbnail, getCachedThumbnail } = await importModule();
+    diskState.failWriteMidway = true;
+    diskState.failUnlink = true;
+
+    const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("ENOSPC");
+    expect(await getCachedThumbnail("photo.png")).toBeNull();
+    const [leftover, ...rest] = await thumbFiles();
+    expect(rest).toEqual([]);
+    expect(leftover).not.toBe("photo.png.thumb.jpg");
+    expect(diskState.partialPath).toBe(join(testDir, ".thumbs", leftover));
+    expect((await readFile(join(testDir, ".thumbs", leftover))).length).toBe(2048);
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storedName: join(".thumbs", leftover),
         err: expect.objectContaining({ code: "EBUSY" }),
         writeErr: expect.objectContaining({ code: "ENOSPC" }),
       }),

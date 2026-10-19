@@ -1,13 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-  type FileHandle,
-  mkdir,
-  open,
-  readFile,
-  statfs,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
+import { type FileHandle, mkdir, open, readFile, rename, statfs, unlink } from "node:fs/promises";
 import { basename, extname, isAbsolute, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
@@ -359,7 +351,27 @@ export async function saveThumbnail(storedName: string, buffer: Buffer): Promise
     return;
   }
   await ensureThumbDir();
-  await writeFile(thumbPath(storedName), buffer);
+  const finalPath = thumbPath(storedName);
+  const tempPath = `${finalPath}.${randomUUID()}.tmp`;
+  // Write to a sibling temp file and rename into place so getCachedThumbnail
+  // never observes a half-written file (#1633).
+  let handle: FileHandle;
+  try {
+    handle = await open(tempPath, "wx");
+  } catch (e) {
+    throw storageWriteError(e);
+  }
+  let closed = false;
+  try {
+    await handle.writeFile(buffer);
+    await handle.close();
+    closed = true;
+    await rename(tempPath, finalPath);
+  } catch (e) {
+    if (!closed) await handle.close().catch(() => {});
+    await removePartialWrite(tempPath, join(THUMB_DIR, basename(tempPath)), e);
+    throw storageWriteError(e);
+  }
 }
 
 export async function deleteThumbnail(storedName: string): Promise<void> {

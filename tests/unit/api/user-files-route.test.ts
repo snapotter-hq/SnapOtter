@@ -6,6 +6,7 @@
  * and POST /api/v1/files/save-result handlers from user-files.ts.
  */
 import { Readable } from "node:stream";
+import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
@@ -17,6 +18,14 @@ const mocks = vi.hoisted(() => ({
   parentRows: [] as unknown[],
   insertedValues: undefined as Record<string, unknown> | undefined,
   saveFile: vi.fn(() => Promise.resolve("stored-result.png")),
+  saveThumbnail: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  readStoredFile: vi.fn<() => Promise<Buffer>>(() => Promise.resolve(Buffer.alloc(0))),
+  videoPosterPreview: vi.fn<() => Promise<Buffer | null>>(() =>
+    Promise.resolve(Buffer.from("webp-poster")),
+  ),
+  pdfFirstPagePreview: vi.fn<() => Promise<Buffer | null>>(() =>
+    Promise.resolve(Buffer.from("png-page")),
+  ),
   quotaRefusal: vi.fn(() => Promise.resolve(null)),
   requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
   hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
@@ -109,10 +118,15 @@ vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
   deleteStoredFile: vi.fn(() => Promise.resolve()),
   getCachedThumbnail: vi.fn(() => Promise.resolve(null)),
   isStorageServiceFault: vi.fn(() => false),
-  readStoredFile: vi.fn(),
+  readStoredFile: mocks.readStoredFile,
   saveFile: mocks.saveFile,
-  saveThumbnail: vi.fn(() => Promise.resolve()),
+  saveThumbnail: mocks.saveThumbnail,
   streamStoredFile: vi.fn(),
+}));
+
+vi.mock("../../../apps/api/src/modality/preview.js", () => ({
+  videoPosterPreview: mocks.videoPosterPreview,
+  pdfFirstPagePreview: mocks.pdfFirstPagePreview,
 }));
 
 vi.mock("../../../apps/api/src/lib/quota.js", () => ({
@@ -407,12 +421,14 @@ describe("user files route logic", () => {
     let listHandler: RouteHandler;
     let deleteHandler: RouteHandler;
     let saveResultHandler: RouteHandler;
+    let thumbnailHandler: RouteHandler;
 
     beforeAll(async () => {
       const fakeApp = {
         get: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
           const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
           if (path === "/api/v1/files") listHandler = handler;
+          if (path === "/api/v1/files/:id/thumbnail") thumbnailHandler = handler;
         }),
         post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
           const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
@@ -435,6 +451,9 @@ describe("user files route logic", () => {
       mocks.hasEffectivePermission.mockResolvedValue(true);
       mocks.quotaRefusal.mockResolvedValue(null);
       mocks.saveFile.mockResolvedValue("stored-result.png");
+      mocks.saveThumbnail.mockResolvedValue();
+      mocks.videoPosterPreview.mockResolvedValue(Buffer.from("webp-poster"));
+      mocks.pdfFirstPagePreview.mockResolvedValue(Buffer.from("png-page"));
       mocks.validateImageBuffer.mockResolvedValue({
         valid: true,
         format: "png",
@@ -446,9 +465,14 @@ describe("user files route logic", () => {
     function makeReply() {
       const reply = {
         statusCode: 200,
+        headers: {} as Record<string, string>,
         payload: undefined as unknown,
         status: vi.fn((code: number) => {
           reply.statusCode = code;
+          return reply;
+        }),
+        header: vi.fn((name: string, value: string) => {
+          reply.headers[name.toLowerCase()] = value;
           return reply;
         }),
         send: vi.fn((body: unknown) => {
@@ -667,6 +691,100 @@ describe("user files route logic", () => {
           reply3,
         );
         expect(mocks.insertedValues?.originalName).toBe("vacation-photo.jpg");
+      });
+    });
+
+    describe("GET /api/v1/files/:id/thumbnail cache write failure logging (#1633)", () => {
+      function makeFileRow(overrides: Partial<UserFileRow> = {}): UserFileRow {
+        return {
+          id: "file-thumb-1",
+          userId: "user-1",
+          originalName: "photo.png",
+          storedName: "stored-thumb.png",
+          mimeType: "image/png",
+          size: 512,
+          width: 10,
+          height: 10,
+          version: 1,
+          parentId: null,
+          toolChain: null,
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+          ...overrides,
+        };
+      }
+
+      it("still sends the generated thumbnail and logs a warning when saveThumbnail rejects", async () => {
+        const tinyPng = await sharp({
+          create: { width: 4, height: 4, channels: 3, background: { r: 20, g: 40, b: 60 } },
+        })
+          .png()
+          .toBuffer();
+
+        const cases = [
+          {
+            label: "image",
+            row: makeFileRow({
+              id: "file-img",
+              storedName: "stored-img.png",
+              mimeType: "image/png",
+            }),
+            raw: tinyPng,
+            expectedType: "image/jpeg",
+          },
+          {
+            label: "video",
+            row: makeFileRow({
+              id: "file-vid",
+              storedName: "stored-vid.mp4",
+              mimeType: "video/mp4",
+            }),
+            raw: Buffer.from("video-bytes"),
+            expectedType: "image/webp",
+          },
+          {
+            label: "pdf",
+            row: makeFileRow({
+              id: "file-pdf",
+              storedName: "stored-pdf.pdf",
+              mimeType: "application/pdf",
+            }),
+            raw: Buffer.from("pdf-bytes"),
+            expectedType: "image/png",
+          },
+        ];
+
+        for (const c of cases) {
+          mocks.parentRows = [c.row];
+          mocks.readStoredFile.mockResolvedValueOnce(c.raw);
+          const diskFull = Object.assign(new Error("ENOSPC: no space left on device"), {
+            code: "ENOSPC",
+          });
+          mocks.saveThumbnail.mockRejectedValueOnce(diskFull);
+
+          const warn = vi.fn();
+          const reply = makeReply();
+          await thumbnailHandler(
+            { params: { id: c.row.id }, log: { warn, error: vi.fn() } },
+            reply,
+          );
+          await new Promise((resolve) => setImmediate(resolve));
+
+          expect(reply.statusCode, c.label).toBe(200);
+          expect(reply.headers["content-type"], c.label).toBe(c.expectedType);
+          expect(Buffer.isBuffer(reply.payload), c.label).toBe(true);
+          expect(mocks.saveThumbnail, c.label).toHaveBeenCalledWith(
+            c.row.storedName,
+            reply.payload,
+          );
+          expect(warn, c.label).toHaveBeenCalledWith(
+            expect.objectContaining({
+              err: diskFull,
+              fileId: c.row.id,
+              storedName: c.row.storedName,
+            }),
+            expect.any(String),
+          );
+        }
       });
     });
   });
