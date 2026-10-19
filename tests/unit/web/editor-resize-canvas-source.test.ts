@@ -6,14 +6,14 @@ vi.mock("zustand/middleware", async (importOriginal) => {
   return { ...actual, persist: (config: unknown) => config };
 });
 
-import { useEditorStore } from "@/stores/editor-store";
+import { redoEditor, undoEditor, useEditorStore } from "@/stores/editor-store";
 
 type DrawCall = { canvas: { width: number; height: number }; args: number[] };
 
 // jsdom has no canvas or image decoding, so stand both in and record where the
 // source bitmap lands on the rebaked canvas. `ops` logs every 2D call in order, so a
 // test can check that a background fill lands under the image and not over it.
-function stubRaster(opts: { loadFails?: boolean; dataUrl?: string } = {}) {
+function stubRaster(opts: { loadFails?: boolean; dataUrl?: string; noContext?: boolean } = {}) {
   const draws: DrawCall[] = [];
   const ops: string[] = [];
   let decodes = 0;
@@ -24,8 +24,11 @@ function stubRaster(opts: { loadFails?: boolean; dataUrl?: string } = {}) {
       width: 0,
       height: 0,
       getContext: () => {
+        if (opts.noContext) return null;
         const ctx = {
           fillStyle: "#000000",
+          translate: (...args: number[]) => ops.push(`translate(${args.join(",")})`),
+          rotate: (angle: number) => ops.push(`rotate(${angle})`),
           fillRect: (...args: number[]) => ops.push(`fillRect(${args.join(",")}) ${ctx.fillStyle}`),
           clearRect: (...args: number[]) => ops.push(`clearRect(${args.join(",")})`),
           drawImage: (_img: unknown, ...args: number[]) => {
@@ -208,6 +211,125 @@ describe("resizeCanvas paints the background fill into the added room (#2068)", 
     expect(ops).toEqual(["drawImage(100,100,800,600)"]);
   });
 
+  it("paints a solid bitmap without decoding and shifts objects when there is no source image (#2273)", async () => {
+    const { ops, decodes } = stubRaster();
+    useEditorStore.setState({
+      sourceImageUrl: null,
+      sourceImageSize: null,
+      canvasSize: { width: 800, height: 600 },
+      _historyVersion: useEditorStore.getState()._historyVersion + 1,
+    });
+    useEditorStore.getState().addObject({
+      id: "r1",
+      type: "rect",
+      layerId: useEditorStore.getState().activeLayerId,
+      attrs: {
+        x: 10,
+        y: 20,
+        width: 50,
+        height: 40,
+        fill: "#ff0000",
+        stroke: "#000000",
+        strokeWidth: 1,
+        cornerRadius: 0,
+        rotation: 0,
+        opacity: 1,
+      },
+    });
+    const before = useEditorStore.getState()._historyVersion;
+
+    await expect(
+      useEditorStore.getState().resizeCanvas(1000, 800, "bottom-right", "#112233"),
+    ).resolves.toBe(true);
+
+    expect(decodes()).toBe(0);
+    expect(ops).toEqual(["fillRect(0,0,1000,800) #112233"]);
+    const after = useEditorStore.getState();
+    expect(after.canvasSize).toEqual({ width: 1000, height: 800 });
+    expect(after.sourceImageSize).toEqual({ width: 1000, height: 800 });
+    expect(after.sourceImageUrl).toBe("data:image/png;base64,REBAKED");
+    expect(after.objects[0].attrs).toMatchObject({ x: 210, y: 220 });
+    expect(after._historyVersion).toBe(before + 1);
+
+    await undoEditor();
+    expect(useEditorStore.getState().sourceImageUrl).toBeNull();
+    expect(useEditorStore.getState().sourceImageSize).toBeNull();
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 800, height: 600 });
+    expect(useEditorStore.getState().objects[0].attrs).toMatchObject({ x: 10, y: 20 });
+
+    await redoEditor();
+    expect(useEditorStore.getState().sourceImageUrl).toBe("data:image/png;base64,REBAKED");
+    expect(useEditorStore.getState().sourceImageSize).toEqual({ width: 1000, height: 800 });
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 1000, height: 800 });
+    expect(useEditorStore.getState().objects[0].attrs).toMatchObject({ x: 210, y: 220 });
+  });
+
+  it("rejects and leaves a blank document untouched when the solid canvas is too large (#2273)", async () => {
+    stubRaster({ dataUrl: "data:," });
+    useEditorStore.setState({ sourceImageUrl: null, sourceImageSize: null });
+    const before = useEditorStore.getState();
+
+    await expect(before.resizeCanvas(20000, 20000, "center", "#112233")).rejects.toThrow(
+      /larger than this browser can draw/,
+    );
+
+    const after = useEditorStore.getState();
+    expect(after.canvasSize).toEqual({ width: 800, height: 600 });
+    expect(after.sourceImageUrl).toBeNull();
+    expect(after._historyVersion).toBe(before._historyVersion);
+  });
+
+  it("rejects and leaves a blank document untouched when 2D canvas is unavailable (#2273)", async () => {
+    stubRaster({ noContext: true });
+    useEditorStore.setState({ sourceImageUrl: null, sourceImageSize: null });
+    const before = useEditorStore.getState();
+
+    await expect(before.resizeCanvas(1000, 800, "center", "#112233")).rejects.toThrow(
+      /2D canvas is unavailable/,
+    );
+
+    const after = useEditorStore.getState();
+    expect(after.canvasSize).toEqual({ width: 800, height: 600 });
+    expect(after.sourceImageUrl).toBeNull();
+    expect(after._historyVersion).toBe(before._historyVersion);
+  });
+
+  it.each([
+    [0, 800],
+    [800, 0],
+    [Number.NaN, 800],
+  ])(
+    "rejects (%s x %s) and leaves a blank document untouched when the canvas has no pixels (#2273)",
+    async (w, h) => {
+      stubRaster();
+      useEditorStore.setState({ sourceImageUrl: null, sourceImageSize: null });
+      const before = useEditorStore.getState();
+
+      await expect(before.resizeCanvas(w, h, "center", "#112233")).rejects.toThrow(/no pixels/);
+
+      const after = useEditorStore.getState();
+      expect(after.canvasSize).toEqual({ width: 800, height: 600 });
+      expect(after.sourceImageUrl).toBeNull();
+      expect(after._historyVersion).toBe(before._historyVersion);
+    },
+  );
+
+  it("composes a later rebake on top of the painted blank document (#2273)", async () => {
+    const { draws, ops, decodes } = stubRaster();
+    useEditorStore.setState({ sourceImageUrl: null, sourceImageSize: null });
+
+    const resize = useEditorStore.getState().resizeCanvas(1000, 800, "center", "#112233");
+    const rotate = useEditorStore.getState().rotateCanvas(90);
+    await expect(Promise.all([resize, rotate])).resolves.toEqual([true, true]);
+
+    expect(decodes()).toBe(1);
+    expect(ops[0]).toBe("fillRect(0,0,1000,800) #112233");
+    expect(draws).toHaveLength(1);
+    expect(draws[0].canvas).toMatchObject({ width: 800, height: 1000 });
+    expect(draws[0].args).toEqual([0, 0, 1000, 800]);
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 800, height: 1000 });
+  });
+
   // Only #rrggbb is accepted (what the dialog's picker can hold); anything else from
   // the free-text field is refused before anything is decoded, since an unparseable
   // fillStyle would paint the room black with no error.
@@ -228,10 +350,11 @@ describe("resizeCanvas paints the background fill into the added room (#2068)", 
 
   it("refuses a bad colour even when there is no image to paint", async () => {
     stubRaster();
-    useEditorStore.setState({ sourceImageUrl: null });
+    useEditorStore.setState({ sourceImageUrl: null, sourceImageSize: null });
     const before = useEditorStore.getState();
     await expect(before.resizeCanvas(1000, 800, "center", "red")).rejects.toThrow(/background/i);
     expect(useEditorStore.getState().canvasSize).toEqual({ width: 800, height: 600 });
+    expect(useEditorStore.getState().sourceImageUrl).toBeNull();
     expect(useEditorStore.getState()._historyVersion).toBe(before._historyVersion);
   });
 });

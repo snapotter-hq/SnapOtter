@@ -72,6 +72,27 @@ test.describe("Canvas Size background color in a real browser (#2068)", () => {
     expect(await readSourcePixel(page, 150, 75)).toEqual([255, 100, 50, 255]);
     expect(await readSourcePixel(page, 299, 75)).toEqual([255, 100, 50, 255]);
   });
+
+  test("paints a solid bitmap when resizing a blank document with no source image (#2273)", async ({
+    editorPage: page,
+  }) => {
+    await page.click('[data-testid="menu-image"]');
+    await page.click('[data-testid="menu-item-canvas-size"]');
+    await expect(page.locator("#canvas-w")).toBeVisible();
+
+    await page.getByTestId("canvas-fill-hex").fill("112233");
+    await page.locator("#canvas-w").fill("300");
+    await page.locator("#canvas-h").fill("200");
+    await page.locator("button").filter({ hasText: "Apply" }).click();
+
+    await expect(page.locator('[data-testid="status-dimensions"]')).toHaveText(/^300 x 200 px$/);
+    await expect(page.locator("#canvas-w")).toHaveCount(0);
+    await expect
+      .poll(() => readSourcePixel(page, 150, 100), { timeout: 15_000 })
+      .toEqual([17, 34, 51, 255]);
+    expect(await readSourcePixel(page, 0, 0)).toEqual([17, 34, 51, 255]);
+    expect(await readSourcePixel(page, 299, 199)).toEqual([17, 34, 51, 255]);
+  });
 });
 
 test.describe("Editor Transform and Resize", () => {

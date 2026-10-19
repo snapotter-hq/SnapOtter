@@ -98,11 +98,11 @@ describe("editor store branch helpers", () => {
     expect(state().isCropping).toBe(false);
   });
 
-  it("resizes canvas from a bottom-right anchor by offsetting objects", () => {
+  it("resizes canvas from a bottom-right anchor by offsetting objects", async () => {
     state().addObject(makeRect("rect"));
     state().addObject(makeLine("line"));
 
-    state().resizeCanvas(2000, 1100, "bottom-right", "#abcdef");
+    await state().resizeCanvas(2000, 1100, "bottom-right");
 
     expect(state().objects[0].attrs).toMatchObject({ x: 90, y: 40 });
     expect((state().objects[1].attrs as { points: number[] }).points).toEqual([80, 20, 90, 30]);

@@ -105,6 +105,42 @@ function commitRebake(apply: () => void): boolean {
   return true;
 }
 
+function drawToCanvasDataUrl(
+  width: number,
+  height: number,
+  draw: (ctx: CanvasRenderingContext2D) => void,
+): string {
+  // A canvas with no pixels also comes back from toDataURL as "data:,", which would
+  // read as "too large" below. Say what's actually wrong.
+  if (!(width >= 1) || !(height >= 1)) {
+    throw new Error("Nothing to draw: the canvas would have no pixels");
+  }
+  const off = document.createElement("canvas");
+  off.width = width;
+  off.height = height;
+  const ctx = off.getContext("2d");
+  if (!ctx) throw new Error("2D canvas is unavailable");
+  draw(ctx);
+  const out = off.toDataURL("image/png");
+  // Past the browser's canvas size limit Chromium/WebKit hand back an empty URL
+  // instead of throwing, which would blank the image.
+  if (out === "data:,") throw new Error("Canvas is larger than this browser can draw");
+  return out;
+}
+
+// Paint a solid `width` x `height` bitmap when a blank document (`sourceImageUrl: null`)
+// is resized with a background fill (#2273). Runs synchronously without bumping
+// `decodesStarted`, so `enqueueRebake` does not think a decode is in flight.
+function renderSolidBitmap(width: number, height: number, fill: string): string {
+  if (!isHexColor(fill)) {
+    throw new Error(INVALID_FILL_MESSAGE);
+  }
+  return drawToCanvasDataUrl(width, height, (ctx) => {
+    ctx.fillStyle = fill;
+    ctx.fillRect(0, 0, width, height);
+  });
+}
+
 // Draw the source image onto a fresh `width` x `height` canvas and resolve with its
 // PNG data URL. Rejects on any failure (the image won't reload, no 2D context, a
 // cross-origin image tainting the canvas, a canvas past the browser's size limit) so
@@ -118,8 +154,6 @@ function renderSourceBitmap(
   draw: (ctx: CanvasRenderingContext2D, img: HTMLImageElement) => void,
 ): Promise<string> {
   decodesStarted++;
-  // A canvas with no pixels also comes back from toDataURL as "data:,", which would
-  // read as "too large" below. Say what's actually wrong.
   if (!(width >= 1) || !(height >= 1)) {
     return Promise.reject(new Error("Nothing to draw: the canvas would have no pixels"));
   }
@@ -145,17 +179,7 @@ function renderSourceBitmap(
     img.onload = () => {
       clearTimeout(timer);
       try {
-        const off = document.createElement("canvas");
-        off.width = width;
-        off.height = height;
-        const ctx = off.getContext("2d");
-        if (!ctx) throw new Error("2D canvas is unavailable");
-        draw(ctx, img);
-        const out = off.toDataURL("image/png");
-        // Past the browser's canvas size limit Chromium/WebKit hand back an empty URL
-        // instead of throwing, which would blank the image.
-        if (out === "data:,") throw new Error("Canvas is larger than this browser can draw");
-        resolve(out);
+        resolve(drawToCanvasDataUrl(width, height, (ctx) => draw(ctx, img)));
       } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)));
       }
@@ -684,6 +708,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             ) {
               return false;
             }
+          } else if (fill) {
+            newSourceUrl = renderSolidBitmap(width, height, fill);
           }
           const { objects } = get();
           return commitRebake(() =>
