@@ -224,6 +224,15 @@ function validPartsFor(toolId: string): Array<Record<string, unknown>> {
   return [{ type: "file", fieldname: "file", filename: "photo.png", file: {} }];
 }
 
+function twoFilePartsFor(toolId: string): Array<Record<string, unknown>> {
+  const parts = [...validPartsFor(toolId)];
+  const fileCount = parts.filter((p) => p.type === "file").length;
+  if (fileCount < 2) {
+    parts.push({ type: "file", fieldname: "file", filename: "second.png", file: {} });
+  }
+  return parts;
+}
+
 function setupValidBuffersFor(toolId: string) {
   if (toolId === "sign-pdf") {
     mocks.getObjectBuffer.mockImplementation((key: string) =>
@@ -448,11 +457,8 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    ["erase-object", "/api/v1/tools/image/erase-object"],
-    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf"],
-  ] as const)(
-    "%s deletes earlier uploaded parts before answering when the second file part fails with 413 (#1644)",
+  it.each(ROUTES)(
+    "%s deletes earlier uploaded parts before answering when the second file part fails with 413 (#1644, #2783)",
     async (toolId, path) => {
       const tooLarge = Object.assign(new Error("Object exceeds the maximum allowed size"), {
         statusCode: 413,
@@ -468,7 +474,7 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
         )
         .mockRejectedValueOnce(tooLarge);
 
-      const req = makeRequest(validPartsFor(toolId));
+      const req = makeRequest(twoFilePartsFor(toolId));
       const reply = makeReply();
       const sendSpy = vi.spyOn(reply, "send");
 
@@ -484,11 +490,8 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     },
   );
 
-  it.each([
-    ["erase-object", "/api/v1/tools/image/erase-object"],
-    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf"],
-  ] as const)(
-    "%s deletes earlier uploaded parts before rethrowing when the second file part fails with 503 (#1644)",
+  it.each(ROUTES)(
+    "%s deletes earlier uploaded parts before rethrowing when the second file part fails with 503 (#1644, #2783)",
     async (toolId, path) => {
       const capFault = Object.assign(new Error("The server's workspace is full."), {
         statusCode: 503,
@@ -504,7 +507,7 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
         )
         .mockRejectedValueOnce(capFault);
 
-      const req = makeRequest(validPartsFor(toolId));
+      const req = makeRequest(twoFilePartsFor(toolId));
       const reply = makeReply();
 
       await expect(handlers[path](req, reply)).rejects.toBe(capFault);
@@ -515,11 +518,8 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     },
   );
 
-  it.each([
-    ["erase-object", "/api/v1/tools/image/erase-object"],
-    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf"],
-  ] as const)(
-    "%s deletes earlier uploaded parts and logs a warning without masking a mid-loop 400 or 503 when deletePrefix fails (#1644)",
+  it.each(ROUTES)(
+    "%s deletes earlier uploaded parts and logs a warning without masking a mid-loop 400 or 503 when deletePrefix fails (#1644, #2783)",
     async (toolId, path) => {
       const parseErr = new Error("Unexpected end of form");
       mocks.receiveUpload
@@ -533,7 +533,7 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
         .mockRejectedValueOnce(parseErr);
       mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
 
-      const req = makeRequest(validPartsFor(toolId));
+      const req = makeRequest(twoFilePartsFor(toolId));
       const reply = makeReply();
 
       await handlers[path](req, reply);
@@ -561,7 +561,7 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
         .mockRejectedValueOnce(capFault);
       mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
 
-      const req503 = makeRequest(validPartsFor(toolId));
+      const req503 = makeRequest(twoFilePartsFor(toolId));
       const reply503 = makeReply();
 
       await expect(handlers[path](req503, reply503)).rejects.toBe(capFault);
@@ -573,4 +573,38 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
       );
     },
   );
+
+  it("remove-gif-background deletes the uploaded GIF when the backgroundImage stream fails with 413 (#2783)", async () => {
+    const tooLarge = Object.assign(new Error("request file too large"), {
+      statusCode: 413,
+      code: "FST_REQ_FILE_TOO_LARGE",
+      limitBytes: 1024 * 1024,
+    });
+    const req = makeRequest([
+      { type: "file", fieldname: "file", filename: "anim.gif", file: {} },
+      {
+        type: "file",
+        fieldname: "backgroundImage",
+        filename: "bg.png",
+        file: {
+          async *[Symbol.asyncIterator]() {
+            yield Buffer.from("partial");
+            throw tooLarge;
+          },
+        },
+      },
+    ]);
+    const reply = makeReply();
+    const sendSpy = vi.spyOn(reply, "send");
+
+    await handlers["/api/v1/tools/image/remove-gif-background"](req, reply);
+
+    const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+    expect(reply.statusCode).toBe(413);
+    expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+    expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+    expect(mocks.deletePrefix.mock.invocationCallOrder[0]).toBeLessThan(
+      sendSpy.mock.invocationCallOrder[0],
+    );
+  });
 });

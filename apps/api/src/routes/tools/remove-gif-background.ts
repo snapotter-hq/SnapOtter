@@ -179,6 +179,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           }
         }
       } catch (err) {
+        await discardUnenqueuedUploads(jobId, request.log);
         const failure = multipartFailure(err);
         return reply.status(failure.status).send(failure.body);
       }
