@@ -27,6 +27,7 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -106,7 +107,11 @@ export async function processBeautify(
     buf = sanitizeSvg(buf);
   }
   buf = await autoOrient(buf);
-  buf = await sharp(buf).ensureAlpha().png().toBuffer();
+  try {
+    buf = await sharp(buf).ensureAlpha().png().toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(buf, err);
+  }
 
   // 2. Apply Border Radius (skip for device frames that have their own bezels)
   const hasDeviceFrame = settings.frame !== "none" && DEVICE_FRAMES.has(settings.frame);
@@ -164,7 +169,15 @@ export async function processBeautify(
     bgOpts = { type: "transparent", width: canvasW, height: canvasH };
   }
 
-  const background = await generateBackground(bgOpts);
+  let background: Buffer;
+  try {
+    background = await generateBackground(bgOpts);
+  } catch (err) {
+    if (bgOpts.type === "image") {
+      throw await asInputErrorIfUndecodable(bgOpts.imageBuffer, err);
+    }
+    throw err;
+  }
 
   // 7. Composite onto Background
   buf = await sharp(background)
@@ -339,15 +352,19 @@ export function registerBeautify(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "beautify",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const s = settings as BeautifySettings;
-      const buffer = await processBeautify(inputBuffer, s, filename);
-      const outFilename = resolveOutputFilename(filename, s);
-      const forcedPng = needsAlphaOutput(s) && !ALPHA_FORMATS.has(s.outputFormat);
-      const ext = forcedPng ? "png" : s.outputFormat;
-      const contentType =
-        ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
-      return { buffer, filename: outFilename, contentType };
-    },
+    process: withImageEncodeContext<unknown>(
+      "Image beautify failed",
+      (s) => (s as BeautifySettings)?.outputFormat ?? "png",
+      async (inputBuffer, settings, filename) => {
+        const s = settings as BeautifySettings;
+        const buffer = await processBeautify(inputBuffer, s, filename);
+        const outFilename = resolveOutputFilename(filename, s);
+        const forcedPng = needsAlphaOutput(s) && !ALPHA_FORMATS.has(s.outputFormat);
+        const ext = forcedPng ? "png" : s.outputFormat;
+        const contentType =
+          ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
+        return { buffer, filename: outFilename, contentType };
+      },
+    ),
   });
 }

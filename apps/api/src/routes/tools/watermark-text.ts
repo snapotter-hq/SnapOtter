@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -39,83 +40,93 @@ export function registerWatermarkText(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "watermark-text",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      // The watermark is composited, and a composite lands on the first frame
-      // only, so animation is handled a frame at a time (#1083).
-      const core = async (source: Buffer): Promise<Buffer> => {
-        const image = sharp(source);
-        const metadata = await image.metadata();
-        const width = metadata.width ?? 800;
-        const height = metadata.height ?? 600;
-        const rgba = hexToRgba(settings.color, settings.opacity);
-        const escapedText = escapeXml(settings.text);
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "Text watermark failed",
+      (s) => s?.position ?? "center",
+      async (inputBuffer, settings, filename) => {
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        // The watermark is composited, and a composite lands on the first frame
+        // only, so animation is handled a frame at a time (#1083).
+        const core = async (source: Buffer): Promise<Buffer> => {
+          const image = sharp(source);
+          const metadata = await image.metadata();
+          const width = metadata.width ?? 800;
+          const height = metadata.height ?? 600;
+          const rgba = hexToRgba(settings.color, settings.opacity);
+          const escapedText = escapeXml(settings.text);
 
-        let svgOverlay: string;
+          let svgOverlay: string;
 
-        if (settings.position === "tiled") {
-          // Create tiled watermark
-          const spacingX = settings.fontSize * 6;
-          const spacingY = settings.fontSize * 4;
-          let textElements = "";
-          const maxElements = 500;
-          let count = 0;
-          outer: for (let y = 0; y < height + spacingY; y += spacingY) {
-            for (let x = 0; x < width + spacingX; x += spacingX) {
-              if (count >= maxElements) break outer;
-              textElements += `<text x="${x}" y="${y}" font-size="${settings.fontSize}" fill="${rgba}" font-family="sans-serif" transform="rotate(${settings.rotation},${x},${y})">${escapedText}</text>`;
-              count++;
+          if (settings.position === "tiled") {
+            // Create tiled watermark
+            const spacingX = settings.fontSize * 6;
+            const spacingY = settings.fontSize * 4;
+            let textElements = "";
+            const maxElements = 500;
+            let count = 0;
+            outer: for (let y = 0; y < height + spacingY; y += spacingY) {
+              for (let x = 0; x < width + spacingX; x += spacingX) {
+                if (count >= maxElements) break outer;
+                textElements += `<text x="${x}" y="${y}" font-size="${settings.fontSize}" fill="${rgba}" font-family="sans-serif" transform="rotate(${settings.rotation},${x},${y})">${escapedText}</text>`;
+                count++;
+              }
             }
-          }
-          svgOverlay = `<svg width="${width}" height="${height}">${textElements}</svg>`;
-        } else {
-          // Single watermark at specified position
-          let x: number, y: number;
-          let anchor = "middle";
-          const pad = settings.fontSize;
+            svgOverlay = `<svg width="${width}" height="${height}">${textElements}</svg>`;
+          } else {
+            // Single watermark at specified position
+            let x: number, y: number;
+            let anchor = "middle";
+            const pad = settings.fontSize;
 
-          switch (settings.position) {
-            case "top-left":
-              x = pad;
-              y = pad + settings.fontSize;
-              anchor = "start";
-              break;
-            case "top-right":
-              x = width - pad;
-              y = pad + settings.fontSize;
-              anchor = "end";
-              break;
-            case "bottom-left":
-              x = pad;
-              y = height - pad;
-              anchor = "start";
-              break;
-            case "bottom-right":
-              x = width - pad;
-              y = height - pad;
-              anchor = "end";
-              break;
-            default:
-              x = width / 2;
-              y = height / 2;
-              anchor = "middle";
-              break;
-          }
+            switch (settings.position) {
+              case "top-left":
+                x = pad;
+                y = pad + settings.fontSize;
+                anchor = "start";
+                break;
+              case "top-right":
+                x = width - pad;
+                y = pad + settings.fontSize;
+                anchor = "end";
+                break;
+              case "bottom-left":
+                x = pad;
+                y = height - pad;
+                anchor = "start";
+                break;
+              case "bottom-right":
+                x = width - pad;
+                y = height - pad;
+                anchor = "end";
+                break;
+              default:
+                x = width / 2;
+                y = height / 2;
+                anchor = "middle";
+                break;
+            }
 
-          svgOverlay = `<svg width="${width}" height="${height}">
+            svgOverlay = `<svg width="${width}" height="${height}">
           <text x="${x}" y="${y}" font-size="${settings.fontSize}" fill="${rgba}" font-family="sans-serif" text-anchor="${anchor}" transform="rotate(${settings.rotation},${x},${y})">${escapedText}</text>
         </svg>`;
+          }
+
+          const svgBuffer = Buffer.from(svgOverlay);
+          const result = image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
+          return await result.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+        };
+
+        let buffer: Buffer;
+        try {
+          buffer =
+            (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
+            (await core(inputBuffer));
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
 
-        const svgBuffer = Buffer.from(svgOverlay);
-        const result = await image.composite([{ input: svgBuffer, top: 0, left: 0 }]);
-        return await result.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
-      };
-
-      const buffer =
-        (await runPerFrame(inputBuffer, outputFormat.format, core)) ?? (await core(inputBuffer));
-
-      return { buffer, filename, contentType: outputFormat.contentType };
-    },
+        return { buffer, filename, contentType: outputFormat.contentType };
+      },
+    ),
   });
 }

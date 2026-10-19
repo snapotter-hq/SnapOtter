@@ -27,6 +27,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -47,50 +52,62 @@ const settingsSchema = z.object({
 });
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("restore-photo", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "restore-photo",
+  withAiImageEncodeContext(
+    "Photo restoration failed",
+    () => "restore-photo",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
 
-  const result = await restorePhoto(
-    input,
-    ctx.scratchDir,
-    {
-      scratchRemoval: settings.scratchRemoval,
-      faceEnhancement: settings.faceEnhancement,
-      fidelity: settings.fidelity,
-      denoise: settings.denoise,
-      denoiseStrength: settings.denoiseStrength,
-      colorize: settings.colorize,
-      colorizeStrength: settings.colorizeStrength,
+      let result: Awaited<ReturnType<typeof restorePhoto>>;
+      try {
+        result = await restorePhoto(
+          input,
+          ctx.scratchDir,
+          {
+            scratchRemoval: settings.scratchRemoval,
+            faceEnhancement: settings.faceEnhancement,
+            fidelity: settings.fidelity,
+            denoise: settings.denoise,
+            denoiseStrength: settings.denoiseStrength,
+            colorize: settings.colorize,
+            colorizeStrength: settings.colorizeStrength,
+          },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(input, err);
+      }
+
+      const outputFormat = await resolveOutputFormat(input, data.filename);
+      let outputBuffer = result.buffer;
+      if (outputFormat.format !== "png") {
+        outputBuffer = await sharp(result.buffer)
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
+          .toBuffer();
+      }
+
+      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
+
+      return {
+        buffer: outputBuffer,
+        filename: outputFilename,
+        contentType: outputFormat.contentType,
+        resultPayload: {
+          width: result.width,
+          height: result.height,
+          steps: result.steps,
+          scratchCoverage: result.scratchCoverage,
+          facesEnhanced: result.facesEnhanced,
+          isGrayscale: result.isGrayscale,
+          colorized: result.colorized,
+        },
+      };
     },
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  const outputFormat = await resolveOutputFormat(input, data.filename);
-  let outputBuffer = result.buffer;
-  if (outputFormat.format !== "png") {
-    outputBuffer = await sharp(result.buffer)
-      .toFormat(outputFormat.format, outputFormat.encoderOptions)
-      .toBuffer();
-  }
-
-  const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
-
-  return {
-    buffer: outputBuffer,
-    filename: outputFilename,
-    contentType: outputFormat.contentType,
-    resultPayload: {
-      width: result.width,
-      height: result.height,
-      steps: result.steps,
-      scratchCoverage: result.scratchCoverage,
-      facesEnhanced: result.facesEnhanced,
-      isGrayscale: result.isGrayscale,
-      colorized: result.colorized,
-    },
-  };
-});
+  ),
+);
 
 /**
  * AI photo restoration route.
@@ -264,53 +281,62 @@ export function registerRestorePhoto(app: FastifyInstance) {
       colorize: z.boolean().default(false),
       colorizeStrength: z.number().min(0).max(100).default(85),
     }),
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as z.infer<typeof settingsSchema>;
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await restorePhoto(
-          orientedBuffer,
-          scratchDir,
-          {
-            scratchRemoval: s.scratchRemoval,
-            faceEnhancement: s.faceEnhancement,
-            fidelity: s.fidelity,
-            denoise: s.denoise,
-            denoiseStrength: s.denoiseStrength,
-            colorize: s.colorize,
-            colorizeStrength: s.colorizeStrength,
-          },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
-        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-        let outputBuffer = result.buffer;
-        if (outputFormat.format !== "png") {
-          outputBuffer = await sharp(result.buffer)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+    process: withImageEncodeContext(
+      "Photo restoration failed",
+      () => "restore-photo",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as z.infer<typeof settingsSchema>;
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let result: Awaited<ReturnType<typeof restorePhoto>>;
+          try {
+            result = await restorePhoto(
+              orientedBuffer,
+              scratchDir,
+              {
+                scratchRemoval: s.scratchRemoval,
+                faceEnhancement: s.faceEnhancement,
+                fidelity: s.fidelity,
+                denoise: s.denoise,
+                denoiseStrength: s.denoiseStrength,
+                colorize: s.colorize,
+                colorizeStrength: s.colorizeStrength,
+              },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+          const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+          let outputBuffer = result.buffer;
+          if (outputFormat.format !== "png") {
+            outputBuffer = await sharp(result.buffer)
+              .toFormat(outputFormat.format, outputFormat.encoderOptions)
+              .toBuffer();
+          }
+          const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
+          return {
+            buffer: outputBuffer,
+            filename: outputFilename,
+            contentType: outputFormat.contentType,
+            resultPayload: {
+              width: result.width,
+              height: result.height,
+              steps: result.steps,
+              scratchCoverage: result.scratchCoverage,
+              facesEnhanced: result.facesEnhanced,
+              isGrayscale: result.isGrayscale,
+              colorized: result.colorized,
+            },
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
-        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_restored.${ext}`;
-        return {
-          buffer: outputBuffer,
-          filename: outputFilename,
-          contentType: outputFormat.contentType,
-          resultPayload: {
-            width: result.width,
-            height: result.height,
-            steps: result.steps,
-            scratchCoverage: result.scratchCoverage,
-            facesEnhanced: result.facesEnhanced,
-            isGrayscale: result.isGrayscale,
-            colorized: result.colorized,
-          },
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+      },
+    ),
   });
 }

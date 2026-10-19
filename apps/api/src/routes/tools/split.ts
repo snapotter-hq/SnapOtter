@@ -18,6 +18,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
@@ -158,7 +159,11 @@ export function registerSplit(app: FastifyInstance) {
       // lets truncated files through, and a decode failure after
       // reply.hijack() cannot become an error response anymore.
       if (validation.format !== "svg") {
-        await sharp(fileBuffer).stats();
+        try {
+          await sharp(fileBuffer).stats();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(fileBuffer, err);
+        }
       }
 
       let cols = settings.columns;
@@ -260,96 +265,111 @@ export function registerSplit(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "split",
     settingsSchema,
-    process: async (inputBuffer, _settings, filename) => {
-      const settings = _settings as z.infer<typeof settingsSchema>;
-      const metadata = await sharp(inputBuffer).metadata();
-      const fullW = metadata.width ?? 0;
-      const fullH = metadata.height ?? 0;
-
-      let cols = settings.columns;
-      let rows = settings.rows;
-      if (settings.tileWidth && settings.tileHeight) {
-        cols = Math.max(1, Math.ceil(fullW / settings.tileWidth));
-        rows = Math.max(1, Math.ceil(fullH / settings.tileHeight));
-      }
-      cols = Math.min(cols, 100);
-      rows = Math.min(rows, 100);
-
-      if (cols * rows > MAX_OUTPUT_TILES) {
-        throw new InputValidationError(
-          `Too many tiles: ${cols}x${rows} exceeds the ${MAX_OUTPUT_TILES}-tile limit. Use a coarser grid.`,
-        );
-      }
-
-      const cellW = Math.floor(fullW / cols);
-      const cellH = Math.floor(fullH / rows);
-      const originalExt = extname(filename) || ".png";
-      const baseName = filename.replace(/\.[^.]+$/, "");
-      const { sharpFormat, ext: outputExt } = resolveOutputFormat(
-        settings.outputFormat,
-        originalExt,
-      );
-
-      const archive = archiver("zip", { zlib: { level: 5 } });
-      const chunks: Buffer[] = [];
-      archive.on("data", (chunk: Buffer) => chunks.push(chunk));
-      const done = new Promise<void>((resolve, reject) => {
-        archive.on("end", resolve);
-        archive.on("error", reject);
-      });
-
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          let left: number;
-          let top: number;
-          let w: number;
-          let h: number;
-
-          if (settings.tileWidth && settings.tileHeight) {
-            left = col * settings.tileWidth;
-            top = row * settings.tileHeight;
-            w = col === cols - 1 ? fullW - left : Math.min(settings.tileWidth, fullW - left);
-            h = row === rows - 1 ? fullH - top : Math.min(settings.tileHeight, fullH - top);
-          } else {
-            left = col * cellW;
-            top = row * cellH;
-            w = col === cols - 1 ? fullW - left : cellW;
-            h = row === rows - 1 ? fullH - top : cellH;
-          }
-
-          if (left >= fullW || top >= fullH || w <= 0 || h <= 0) continue;
-
-          let pipeline = sharp(inputBuffer).extract({ left, top, width: w, height: h });
-          if (sharpFormat) {
-            const formatOpts: Record<string, unknown> = {};
-            if (sharpFormat === "jpeg" || sharpFormat === "webp" || sharpFormat === "avif") {
-              formatOpts.quality = settings.quality;
-            }
-            if (sharpFormat === "avif") {
-              formatOpts.effort = 4;
-            }
-            pipeline = pipeline.toFormat(sharpFormat, formatOpts);
-          }
-
-          const partBuffer = await pipeline.toBuffer();
-          const finalBuffer =
-            settings.outputFormat === "jxl"
-              ? await encodeJxl(partBuffer, settings.quality)
-              : partBuffer;
-          archive.append(finalBuffer, {
-            name: `${baseName}_r${row + 1}_c${col + 1}${outputExt}`,
-          });
+    process: withImageEncodeContext<unknown>(
+      "Image split failed",
+      (s) => (s as z.infer<typeof settingsSchema>)?.outputFormat ?? "original",
+      async (inputBuffer, _settings, filename) => {
+        const settings = _settings as z.infer<typeof settingsSchema>;
+        let fullW: number;
+        let fullH: number;
+        try {
+          const metadata = await sharp(inputBuffer).metadata();
+          fullW = metadata.width ?? 0;
+          fullH = metadata.height ?? 0;
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
-      }
 
-      await archive.finalize();
-      await done;
+        let cols = settings.columns;
+        let rows = settings.rows;
+        if (settings.tileWidth && settings.tileHeight) {
+          cols = Math.max(1, Math.ceil(fullW / settings.tileWidth));
+          rows = Math.max(1, Math.ceil(fullH / settings.tileHeight));
+        }
+        cols = Math.min(cols, 100);
+        rows = Math.min(rows, 100);
 
-      return {
-        buffer: Buffer.concat(chunks),
-        filename: `${baseName}_split.zip`,
-        contentType: "application/zip",
-      };
-    },
+        if (cols * rows > MAX_OUTPUT_TILES) {
+          throw new InputValidationError(
+            `Too many tiles: ${cols}x${rows} exceeds the ${MAX_OUTPUT_TILES}-tile limit. Use a coarser grid.`,
+          );
+        }
+
+        const cellW = Math.floor(fullW / cols);
+        const cellH = Math.floor(fullH / rows);
+        const originalExt = extname(filename) || ".png";
+        const baseName = filename.replace(/\.[^.]+$/, "");
+        const { sharpFormat, ext: outputExt } = resolveOutputFormat(
+          settings.outputFormat,
+          originalExt,
+        );
+
+        const archive = archiver("zip", { zlib: { level: 5 } });
+        const chunks: Buffer[] = [];
+        archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+        const done = new Promise<void>((resolve, reject) => {
+          archive.on("end", resolve);
+          archive.on("error", reject);
+        });
+
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            let left: number;
+            let top: number;
+            let w: number;
+            let h: number;
+
+            if (settings.tileWidth && settings.tileHeight) {
+              left = col * settings.tileWidth;
+              top = row * settings.tileHeight;
+              w = col === cols - 1 ? fullW - left : Math.min(settings.tileWidth, fullW - left);
+              h = row === rows - 1 ? fullH - top : Math.min(settings.tileHeight, fullH - top);
+            } else {
+              left = col * cellW;
+              top = row * cellH;
+              w = col === cols - 1 ? fullW - left : cellW;
+              h = row === rows - 1 ? fullH - top : cellH;
+            }
+
+            if (left >= fullW || top >= fullH || w <= 0 || h <= 0) continue;
+
+            let pipeline = sharp(inputBuffer).extract({ left, top, width: w, height: h });
+            if (sharpFormat) {
+              const formatOpts: Record<string, unknown> = {};
+              if (sharpFormat === "jpeg" || sharpFormat === "webp" || sharpFormat === "avif") {
+                formatOpts.quality = settings.quality;
+              }
+              if (sharpFormat === "avif") {
+                formatOpts.effort = 4;
+              }
+              pipeline = pipeline.toFormat(sharpFormat, formatOpts);
+            }
+
+            let partBuffer: Buffer;
+            try {
+              partBuffer = await pipeline.toBuffer();
+            } catch (err) {
+              throw await asInputErrorIfUndecodable(inputBuffer, err);
+            }
+            const finalBuffer =
+              settings.outputFormat === "jxl"
+                ? await encodeJxl(partBuffer, settings.quality)
+                : partBuffer;
+            archive.append(finalBuffer, {
+              name: `${baseName}_r${row + 1}_c${col + 1}${outputExt}`,
+            });
+          }
+        }
+
+        await archive.finalize();
+        await done;
+
+        return {
+          buffer: Buffer.concat(chunks),
+          filename: `${baseName}_split.zip`,
+          contentType: "application/zip",
+        };
+      },
+    ),
   });
 }

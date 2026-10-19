@@ -2,6 +2,7 @@ import { crop } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -17,17 +18,26 @@ export function registerCrop(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "crop",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      const image = openAnimated(
-        inputBuffer,
-        await readAnimationFor(inputBuffer, outputFormat.format),
-      );
-      const result = await crop(image, settings);
-      const buffer = await result
-        .toFormat(outputFormat.format, outputFormat.encoderOptions)
-        .toBuffer();
-      return { buffer, filename, contentType: outputFormat.contentType };
-    },
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "Image crop failed",
+      (s) => s?.unit ?? "px",
+      async (inputBuffer, settings, filename) => {
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        const image = openAnimated(
+          inputBuffer,
+          await readAnimationFor(inputBuffer, outputFormat.format),
+        );
+        const result = await crop(image, settings);
+        let buffer: Buffer;
+        try {
+          buffer = await result
+            .toFormat(outputFormat.format, outputFormat.encoderOptions)
+            .toBuffer();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
+        }
+        return { buffer, filename, contentType: outputFormat.contentType };
+      },
+    ),
   });
 }

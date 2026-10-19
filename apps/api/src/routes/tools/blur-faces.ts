@@ -27,6 +27,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -42,41 +47,53 @@ const settingsSchema = z.object({
 });
 
 // ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("blur-faces", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
-  const { blurRadius, sensitivity } = settings;
+registerAiJobHandler(
+  "blur-faces",
+  withAiImageEncodeContext(
+    "Face blur failed",
+    () => "blur-faces",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
+      const { blurRadius, sensitivity } = settings;
 
-  const result = await blurFaces(
-    input,
-    ctx.scratchDir,
-    { blurRadius, sensitivity },
-    (percent, stage) => ctx.report(percent, stage),
-  );
+      let result: Awaited<ReturnType<typeof blurFaces>>;
+      try {
+        result = await blurFaces(
+          input,
+          ctx.scratchDir,
+          { blurRadius, sensitivity },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(input, err);
+      }
 
-  const outputFormat = await resolveOutputFormat(input, data.filename);
-  let outputBuffer = result.buffer;
-  if (outputFormat.format !== "png") {
-    outputBuffer = await sharp(result.buffer)
-      .toFormat(outputFormat.format, outputFormat.encoderOptions)
-      .toBuffer();
-  }
+      const outputFormat = await resolveOutputFormat(input, data.filename);
+      let outputBuffer = result.buffer;
+      if (outputFormat.format !== "png") {
+        outputBuffer = await sharp(result.buffer)
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
+          .toBuffer();
+      }
 
-  const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_blurred.${ext}`;
+      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_blurred.${ext}`;
 
-  return {
-    buffer: outputBuffer,
-    filename: outputFilename,
-    contentType: outputFormat.contentType,
-    resultPayload: {
-      facesDetected: result.facesDetected,
-      faces: result.faces,
-      ...(result.facesDetected === 0 && {
-        warning: "No faces detected in this image. Try increasing detection sensitivity.",
-      }),
+      return {
+        buffer: outputBuffer,
+        filename: outputFilename,
+        contentType: outputFormat.contentType,
+        resultPayload: {
+          facesDetected: result.facesDetected,
+          faces: result.faces,
+          ...(result.facesDetected === 0 && {
+            warning: "No faces detected in this image. Try increasing detection sensitivity.",
+          }),
+        },
+      };
     },
-  };
-});
+  ),
+);
 
 /** Face detection and blurring route. */
 export function registerBlurFaces(app: FastifyInstance) {
@@ -235,64 +252,73 @@ export function registerBlurFaces(app: FastifyInstance) {
       blurRadius: z.number().min(1).max(100).default(30),
       sensitivity: z.number().min(0).max(1).default(0.5),
     }),
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as { blurRadius?: number; sensitivity?: number };
-      let decoded = inputBuffer;
-      const validation = await validateImageBuffer(decoded, filename);
-      if (validation.valid && validation.format === "heif") {
-        decoded = await decodeHeic(decoded);
-      }
-      if (validation.valid && needsCliDecode(validation.format)) {
-        try {
-          decoded = await decodeToSharpCompat(decoded, validation.format);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+    process: withImageEncodeContext(
+      "Face blur failed",
+      () => "blur-faces",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as { blurRadius?: number; sensitivity?: number };
+        let decoded = inputBuffer;
+        const validation = await validateImageBuffer(decoded, filename);
+        if (validation.valid && validation.format === "heif") {
+          decoded = await decodeHeic(decoded);
+        }
+        if (validation.valid && needsCliDecode(validation.format)) {
           try {
-            await sharp(decoded).metadata();
-          } catch (err) {
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-            throw err;
+            decoded = await decodeToSharpCompat(decoded, validation.format);
+          } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            try {
+              await sharp(decoded).metadata();
+            } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              throw err;
+            }
           }
         }
-      }
-      const orientedBuffer = await autoOrient(decoded);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await blurFaces(
-          orientedBuffer,
-          scratchDir,
-          {
-            blurRadius: s.blurRadius ?? 30,
-            sensitivity: s.sensitivity ?? 0.5,
-          },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
-        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-        let outputBuffer = result.buffer;
-        if (outputFormat.format !== "png") {
-          outputBuffer = await sharp(result.buffer)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+        const orientedBuffer = await autoOrient(decoded);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let result: Awaited<ReturnType<typeof blurFaces>>;
+          try {
+            result = await blurFaces(
+              orientedBuffer,
+              scratchDir,
+              {
+                blurRadius: s.blurRadius ?? 30,
+                sensitivity: s.sensitivity ?? 0.5,
+              },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+          const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+          let outputBuffer = result.buffer;
+          if (outputFormat.format !== "png") {
+            outputBuffer = await sharp(result.buffer)
+              .toFormat(outputFormat.format, outputFormat.encoderOptions)
+              .toBuffer();
+          }
+          const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_blurred.${ext}`;
+          return {
+            buffer: outputBuffer,
+            filename: outputFilename,
+            contentType: outputFormat.contentType,
+            resultPayload: {
+              facesDetected: result.facesDetected,
+              faces: result.faces,
+              ...(result.facesDetected === 0 && {
+                warning: "No faces detected in this image. Try increasing detection sensitivity.",
+              }),
+            },
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
-        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_blurred.${ext}`;
-        return {
-          buffer: outputBuffer,
-          filename: outputFilename,
-          contentType: outputFormat.contentType,
-          resultPayload: {
-            facesDetected: result.facesDetected,
-            faces: result.faces,
-            ...(result.facesDetected === 0 && {
-              warning: "No faces detected in this image. Try increasing detection sensitivity.",
-            }),
-          },
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+      },
+    ),
   });
 }

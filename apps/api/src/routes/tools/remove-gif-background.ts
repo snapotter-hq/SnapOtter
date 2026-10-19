@@ -4,7 +4,13 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { removeBackgroundAnimated } from "@snapotter/ai";
-import { BG_REMOVAL_MODELS, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  BG_REMOVAL_MODELS,
+  getBundleForTool,
+  isSafeMessageError,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
@@ -22,6 +28,11 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
@@ -91,36 +102,62 @@ function writeCancelSentinel(scratchDir: string, signal?: AbortSignal): string {
 }
 
 // ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("remove-gif-background", async (input, data, ctx) => {
-  const settings = jobSettingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "remove-gif-background",
+  withAiImageEncodeContext<Settings>(
+    "Animated background removal failed",
+    (s) => s?.outputFormat ?? "webp",
+    async (input, data, ctx) => {
+      const settings = jobSettingsSchema.parse(data.settings);
 
-  const cancelFile = writeCancelSentinel(ctx.scratchDir, ctx.signal);
+      const cancelFile = writeCancelSentinel(ctx.scratchDir, ctx.signal);
 
-  let bgImagePath: string | undefined;
-  if (settings.bgImageKey) {
-    const bg = await getObjectBuffer(settings.bgImageKey);
-    if (bg && bg.length > 0) {
-      bgImagePath = join(ctx.scratchDir, "bg-input");
-      await writeFile(bgImagePath, bg);
-    }
-  }
+      let bgImagePath: string | undefined;
+      let bgBuffer: Buffer | undefined;
+      if (settings.bgImageKey) {
+        const bg = await getObjectBuffer(settings.bgImageKey);
+        if (bg && bg.length > 0) {
+          bgBuffer = bg;
+          bgImagePath = join(ctx.scratchDir, "bg-input");
+          await writeFile(bgImagePath, bg);
+        }
+      }
 
-  const { frames } = await detectAnimation(input, data.filename);
+      let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
+      try {
+        const { frames } = await detectAnimation(input, data.filename);
+        result = await removeBackgroundAnimated(
+          input,
+          ctx.scratchDir,
+          { ...toWrapperOptions(settings, frames, data.filename), cancelFile, bgImagePath },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        // removeBackgroundAnimated hands the raw file to Pillow and wraps any
+        // Python failure as a bug-kind SafeError via toSidecarError, so probe
+        // the underlying Error before letting a corrupt GIF report as a bug.
+        const probeCandidate =
+          isSafeMessageError(err) && err.kind === "bug"
+            ? (err.cause ?? new Error(err.message))
+            : err;
+        const classified = await asInputErrorIfUndecodable(input, probeCandidate);
+        if (isToolInputError(classified)) throw classified;
+        if (bgBuffer) {
+          const bgClassified = await asInputErrorIfUndecodable(bgBuffer, probeCandidate);
+          if (isToolInputError(bgClassified)) throw bgClassified;
+        }
+        throw err;
+      }
 
-  const result = await removeBackgroundAnimated(
-    input,
-    ctx.scratchDir,
-    { ...toWrapperOptions(settings, frames, data.filename), cancelFile, bgImagePath },
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  const base = data.filename.replace(/\.[^.]+$/, "");
-  return {
-    buffer: result.buffer,
-    filename: `${base}-nobg.${result.ext}`,
-    contentType: result.contentType,
-  };
-});
+      const base = data.filename.replace(/\.[^.]+$/, "");
+      return {
+        buffer: result.buffer,
+        filename: `${base}-nobg.${result.ext}`,
+        contentType: result.contentType,
+      };
+    },
+  ),
+);
 
 /**
  * AI background removal for animated images (GIF, animated WebP, APNG). Unlike
@@ -309,34 +346,49 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "remove-gif-background",
     settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as Settings;
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const cancelFile = writeCancelSentinel(scratchDir, ctx?.signal);
+    process: withImageEncodeContext<unknown>(
+      "Animated background removal failed",
+      (s) => (s as Settings)?.outputFormat ?? "webp",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as Settings;
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          const cancelFile = writeCancelSentinel(scratchDir, ctx?.signal);
 
-        // A still frame is an animation with one frame, which the sidecar
-        // handles; the tool page has always accepted one (#2076).
-        const animation = await detectAnimation(inputBuffer, filename);
-        // Batch/pipeline has no per-request background image; "image" degrades
-        // to transparent in the pipeline (the Python side handles a null bg).
-        const result = await removeBackgroundAnimated(
-          inputBuffer,
-          scratchDir,
-          { ...toWrapperOptions(s, animation.frames, filename), cancelFile },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
-        const base = filename.replace(/\.[^.]+$/, "");
-        return {
-          buffer: result.buffer,
-          filename: `${base}-nobg.${result.ext}`,
-          contentType: result.contentType,
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+          // A still frame is an animation with one frame, which the sidecar
+          // handles; the tool page has always accepted one (#2076).
+          let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
+          try {
+            const animation = await detectAnimation(inputBuffer, filename);
+            // Batch/pipeline has no per-request background image; "image" degrades
+            // to transparent in the pipeline (the Python side handles a null bg).
+            result = await removeBackgroundAnimated(
+              inputBuffer,
+              scratchDir,
+              { ...toWrapperOptions(s, animation.frames, filename), cancelFile },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            const probeCandidate =
+              isSafeMessageError(err) && err.kind === "bug"
+                ? (err.cause ?? new Error(err.message))
+                : err;
+            const classified = await asInputErrorIfUndecodable(inputBuffer, probeCandidate);
+            if (isToolInputError(classified)) throw classified;
+            throw err;
+          }
+          const base = filename.replace(/\.[^.]+$/, "");
+          return {
+            buffer: result.buffer,
+            filename: `${base}-nobg.${result.ext}`,
+            contentType: result.contentType,
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

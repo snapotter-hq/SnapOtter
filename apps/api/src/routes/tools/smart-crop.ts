@@ -7,6 +7,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -239,25 +240,33 @@ export function registerSmartCrop(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "smart-crop",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename, settings.quality);
-      let result: Buffer;
+    process: withImageEncodeContext<z.output<typeof settingsSchema>>(
+      "Smart crop failed",
+      (s) => s?.mode ?? "subject",
+      async (inputBuffer, settings, filename) => {
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename, settings.quality);
+        let result: Buffer;
 
-      if (settings.mode === "face") {
-        result = await processFace(inputBuffer, settings);
-      } else if (settings.mode === "trim") {
-        result = await processTrim(inputBuffer, settings);
-      } else {
-        result = await processSubject(inputBuffer, settings);
-      }
+        try {
+          if (settings.mode === "face") {
+            result = await processFace(inputBuffer, settings);
+          } else if (settings.mode === "trim") {
+            result = await processTrim(inputBuffer, settings);
+          } else {
+            result = await processSubject(inputBuffer, settings);
+          }
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
+        }
 
-      result = await sharp(result)
-        .toFormat(outputFormat.format, outputFormat.encoderOptions)
-        .toBuffer();
+        result = await sharp(result)
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
+          .toBuffer();
 
-      const stem = filename.replace(/\.[^.]+$/, "");
-      const outputFilename = `${stem}_smartcrop.${outputFormat.extension}`;
-      return { buffer: result, filename: outputFilename, contentType: outputFormat.contentType };
-    },
+        const stem = filename.replace(/\.[^.]+$/, "");
+        const outputFilename = `${stem}_smartcrop.${outputFormat.extension}`;
+        return { buffer: result, filename: outputFilename, contentType: outputFormat.contentType };
+      },
+    ),
   });
 }

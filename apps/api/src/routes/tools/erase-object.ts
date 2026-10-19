@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { inpaint, isGpuAvailable } from "@snapotter/ai";
-import { FEATURE_BUNDLES, getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  getBundleForTool,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -25,6 +30,7 @@ import {
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { containerMemoryLimitBytes, hqCpuMemoryRefusal } from "../../lib/hq-memory-gate.js";
+import { asInputErrorIfUndecodable, withAiImageEncodeContext } from "../../lib/image-error.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
@@ -324,86 +330,100 @@ export function registerEraseObject(app: FastifyInstance) {
 // ── AI job handler (separate import for the worker) ───────────────
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 
-registerAiJobHandler("erase-object", async (input, data, ctx) => {
-  // Second inputRef is the mask
-  const maskBuffer = await getObjectBuffer(data.inputRefs[1]);
-  const settings = settingsSchema.parse(data.settings);
-  const format = settings.format;
-  const quality = settings.quality;
+registerAiJobHandler(
+  "erase-object",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Object erasing failed",
+    (s) => s?.format ?? "auto",
+    async (input, data, ctx) => {
+      // Second inputRef is the mask
+      const maskBuffer = await getObjectBuffer(data.inputRefs[1]);
+      const settings = settingsSchema.parse(data.settings);
+      const format = settings.format;
+      const quality = settings.quality;
 
-  const resultBuffer = await inpaint(
-    input,
-    maskBuffer,
-    ctx.scratchDir,
-    (percent, stage) => ctx.report(percent, stage),
-    settings.qualityMode,
-    { signal: ctx.signal },
-  );
+      let resultBuffer: Buffer;
+      try {
+        resultBuffer = await inpaint(
+          input,
+          maskBuffer,
+          ctx.scratchDir,
+          (percent, stage) => ctx.report(percent, stage),
+          settings.qualityMode,
+          { signal: ctx.signal },
+        );
+      } catch (err) {
+        const classifiedInput = await asInputErrorIfUndecodable(input, err);
+        if (isToolInputError(classifiedInput)) throw classifiedInput;
+        throw await asInputErrorIfUndecodable(maskBuffer, err);
+      }
 
-  // Convert to requested output format
-  const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
-  let outputBuffer: Buffer;
-  let finalFormat = format;
+      // Convert to requested output format
+      const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
+      let outputBuffer: Buffer;
+      let finalFormat = format;
 
-  if (needsNodeConversion) {
-    if (format === "heic" || format === "heif") {
-      outputBuffer = await encodeHeic(resultBuffer, quality);
-      finalFormat = format;
-    } else if (format === "jxl") {
-      outputBuffer = await encodeJxl(resultBuffer, quality);
-      finalFormat = "jxl";
-    } else {
-      outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
-      finalFormat = "avif";
-    }
-  } else if (format === "jpg" || format === "jpeg") {
-    outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
-    finalFormat = "jpg";
-  } else if (format === "webp") {
-    outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
-    finalFormat = "webp";
-  } else if (format === "tiff") {
-    outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
-    finalFormat = "tiff";
-  } else if (format === "gif") {
-    outputBuffer = await sharp(resultBuffer).gif().toBuffer();
-    finalFormat = "gif";
-  } else {
-    outputBuffer = resultBuffer;
-    finalFormat = "png";
-  }
+      if (needsNodeConversion) {
+        if (format === "heic" || format === "heif") {
+          outputBuffer = await encodeHeic(resultBuffer, quality);
+          finalFormat = format;
+        } else if (format === "jxl") {
+          outputBuffer = await encodeJxl(resultBuffer, quality);
+          finalFormat = "jxl";
+        } else {
+          outputBuffer = await sharp(resultBuffer).avif({ quality }).toBuffer();
+          finalFormat = "avif";
+        }
+      } else if (format === "jpg" || format === "jpeg") {
+        outputBuffer = await sharp(resultBuffer).jpeg({ quality }).toBuffer();
+        finalFormat = "jpg";
+      } else if (format === "webp") {
+        outputBuffer = await sharp(resultBuffer).webp({ quality }).toBuffer();
+        finalFormat = "webp";
+      } else if (format === "tiff") {
+        outputBuffer = await sharp(resultBuffer).tiff({ quality }).toBuffer();
+        finalFormat = "tiff";
+      } else if (format === "gif") {
+        outputBuffer = await sharp(resultBuffer).gif().toBuffer();
+        finalFormat = "gif";
+      } else {
+        outputBuffer = resultBuffer;
+        finalFormat = "png";
+      }
 
-  const EXT_MAP: Record<string, string> = {
-    jpeg: "jpg",
-    jpg: "jpg",
-    png: "png",
-    webp: "webp",
-    tiff: "tiff",
-    gif: "gif",
-    avif: "avif",
-    heic: "heic",
-    heif: "heif",
-    jxl: "jxl",
-  };
-  const ext = EXT_MAP[finalFormat] || "png";
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_erased.${ext}`;
+      const EXT_MAP: Record<string, string> = {
+        jpeg: "jpg",
+        jpg: "jpg",
+        png: "png",
+        webp: "webp",
+        tiff: "tiff",
+        gif: "gif",
+        avif: "avif",
+        heic: "heic",
+        heif: "heif",
+        jxl: "jxl",
+      };
+      const ext = EXT_MAP[finalFormat] || "png";
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_erased.${ext}`;
 
-  const CONTENT_TYPES: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    tiff: "image/tiff",
-    gif: "image/gif",
-    avif: "image/avif",
-    heic: "image/heic",
-    heif: "image/heif",
-    jxl: "image/jxl",
-  };
+      const CONTENT_TYPES: Record<string, string> = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        tiff: "image/tiff",
+        gif: "image/gif",
+        avif: "image/avif",
+        heic: "image/heic",
+        heif: "image/heif",
+        jxl: "image/jxl",
+      };
 
-  return {
-    buffer: outputBuffer,
-    filename: outputFilename,
-    contentType: CONTENT_TYPES[finalFormat] || "image/png",
-  };
-});
+      return {
+        buffer: outputBuffer,
+        filename: outputFilename,
+        contentType: CONTENT_TYPES[finalFormat] || "image/png",
+      };
+    },
+  ),
+);

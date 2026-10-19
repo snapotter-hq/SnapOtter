@@ -27,6 +27,11 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -140,24 +145,36 @@ async function encodeExtended(
 }
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("ai-canvas-expand", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "ai-canvas-expand",
+  withAiImageEncodeContext<Settings>(
+    "AI canvas expand failed",
+    (s) => s?.format ?? "auto",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
 
-  const resultBuffer = await outpaint(
-    input,
-    {
-      extendTop: settings.extendTop,
-      extendRight: settings.extendRight,
-      extendBottom: settings.extendBottom,
-      extendLeft: settings.extendLeft,
-      tier: settings.tier,
+      let resultBuffer: Buffer;
+      try {
+        resultBuffer = await outpaint(
+          input,
+          {
+            extendTop: settings.extendTop,
+            extendRight: settings.extendRight,
+            extendBottom: settings.extendBottom,
+            extendLeft: settings.extendLeft,
+            tier: settings.tier,
+          },
+          ctx.scratchDir,
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(input, err);
+      }
+
+      return encodeExtended(resultBuffer, settings.format, settings.quality, input, data.filename);
     },
-    ctx.scratchDir,
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  return encodeExtended(resultBuffer, settings.format, settings.quality, input, data.filename);
-});
+  ),
+);
 
 export function registerAiCanvasExpand(app: FastifyInstance) {
   app.post(
@@ -325,46 +342,55 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "ai-canvas-expand",
     settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as Settings;
+    process: withImageEncodeContext<unknown>(
+      "AI canvas expand failed",
+      (s) => (s as Settings)?.format ?? "auto",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as Settings;
 
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-      let buf = inputBuffer;
-      if (["heic", "heif", "hif"].includes(ext)) {
-        buf = await decodeHeic(buf);
-      }
-      const cliCheck = await validateImageBuffer(inputBuffer, filename);
-      if (cliCheck.valid && needsCliDecode(cliCheck.format)) {
-        buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
-      }
+        const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+        let buf = inputBuffer;
+        if (["heic", "heif", "hif"].includes(ext)) {
+          buf = await decodeHeic(buf);
+        }
+        const cliCheck = await validateImageBuffer(inputBuffer, filename);
+        if (cliCheck.valid && needsCliDecode(cliCheck.format)) {
+          buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
+        }
 
-      const orientedBuffer = await autoOrient(buf);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const resultBuffer = await outpaint(
-          orientedBuffer,
-          {
-            extendTop: s.extendTop,
-            extendRight: s.extendRight,
-            extendBottom: s.extendBottom,
-            extendLeft: s.extendLeft,
-            tier: s.tier,
-          },
-          scratchDir,
-        );
+        const orientedBuffer = await autoOrient(buf);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let resultBuffer: Buffer;
+          try {
+            resultBuffer = await outpaint(
+              orientedBuffer,
+              {
+                extendTop: s.extendTop,
+                extendRight: s.extendRight,
+                extendBottom: s.extendBottom,
+                extendLeft: s.extendLeft,
+                tier: s.tier,
+              },
+              scratchDir,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
 
-        return await encodeExtended(
-          resultBuffer,
-          s.format ?? "auto",
-          s.quality ?? 95,
-          orientedBuffer,
-          filename,
-        );
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+          return await encodeExtended(
+            resultBuffer,
+            s.format ?? "auto",
+            s.quality ?? 95,
+            orientedBuffer,
+            filename,
+          );
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

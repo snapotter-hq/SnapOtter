@@ -10,6 +10,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
+import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import {
   asInputErrorIfUndecodable,
@@ -17,10 +18,63 @@ import {
   DISK_ENVIRONMENT_MESSAGE,
   PIXEL_LIMIT_IMAGE_MESSAGE,
   UNDECODABLE_IMAGE_MESSAGE,
+  withAiImageEncodeContext,
   withImageEncodeContext,
+  withImageEncodeContextV2,
 } from "../../../apps/api/src/lib/image-error.js";
+import { putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
+import { registerAiCanvasExpand } from "../../../apps/api/src/routes/tools/ai-canvas-expand.js";
+import { registerBackgroundReplace } from "../../../apps/api/src/routes/tools/background-replace.js";
+import { processBeautify, registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
+import { registerBlurBackground } from "../../../apps/api/src/routes/tools/blur-background.js";
+import { registerBlurFaces } from "../../../apps/api/src/routes/tools/blur-faces.js";
+import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
+import { registerChartMaker } from "../../../apps/api/src/routes/tools/chart-maker.js";
+import { registerCircleCrop } from "../../../apps/api/src/routes/tools/circle-crop.js";
+import { registerColorBlindness } from "../../../apps/api/src/routes/tools/color-blindness.js";
+import { registerColorize } from "../../../apps/api/src/routes/tools/colorize.js";
+import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
+import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
+import { registerCrop } from "../../../apps/api/src/routes/tools/crop.js";
+import { registerDuotone } from "../../../apps/api/src/routes/tools/duotone.js";
+import { registerEnhanceFaces } from "../../../apps/api/src/routes/tools/enhance-faces.js";
+import { registerEraseObject } from "../../../apps/api/src/routes/tools/erase-object.js";
+import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
+import { registerGifWebp } from "../../../apps/api/src/routes/tools/gif-webp.js";
+import { registerHistogram } from "../../../apps/api/src/routes/tools/histogram.js";
+import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
+import { registerImagePad } from "../../../apps/api/src/routes/tools/image-pad.js";
+import { registerImagesToVideo } from "../../../apps/api/src/routes/tools/images-to-video.js";
+import { registerLqipPlaceholder } from "../../../apps/api/src/routes/tools/lqip-placeholder.js";
+import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
+import { registerNoiseRemoval } from "../../../apps/api/src/routes/tools/noise-removal.js";
+import { registerOcr } from "../../../apps/api/src/routes/tools/ocr.js";
+import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
+import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
+import { registerPixelate } from "../../../apps/api/src/routes/tools/pixelate.js";
+import { registerRedEyeRemoval } from "../../../apps/api/src/routes/tools/red-eye-removal.js";
+import { registerRemoveBackground } from "../../../apps/api/src/routes/tools/remove-background.js";
+import { registerRemoveGifBackground } from "../../../apps/api/src/routes/tools/remove-gif-background.js";
+import { registerReplaceColor } from "../../../apps/api/src/routes/tools/replace-color.js";
+import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
+import { registerRestorePhoto } from "../../../apps/api/src/routes/tools/restore-photo.js";
+import { registerRotate } from "../../../apps/api/src/routes/tools/rotate.js";
+import { registerRoundedCrop } from "../../../apps/api/src/routes/tools/rounded-crop.js";
+import { registerSharpening } from "../../../apps/api/src/routes/tools/sharpening.js";
+import { registerSmartCrop } from "../../../apps/api/src/routes/tools/smart-crop.js";
+import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { registerSpriteSheet } from "../../../apps/api/src/routes/tools/sprite-sheet.js";
+import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
+import { registerTextOverlay } from "../../../apps/api/src/routes/tools/text-overlay.js";
+import { registerTransparencyFixer } from "../../../apps/api/src/routes/tools/transparency-fixer.js";
+import { registerUpscale } from "../../../apps/api/src/routes/tools/upscale.js";
+import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
+import { registerVignette } from "../../../apps/api/src/routes/tools/vignette.js";
+import { registerWatermarkText } from "../../../apps/api/src/routes/tools/watermark-text.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 interface Settings {
@@ -89,6 +143,121 @@ describe("withImageEncodeContext", () => {
       },
     );
     await expect(wrapped(input, settings, "in.png")).rejects.toBe(inputErr);
+  });
+
+  it("passes an InputValidationError through unchanged", async () => {
+    const valErr = new InputValidationError("Only GIF and WebP inputs are supported");
+    const wrapped = withImageEncodeContext(
+      "GIF/WebP conversion failed",
+      () => "webp",
+      async () => {
+        throw valErr;
+      },
+    );
+    await expect(wrapped(input, settings, "in.png")).rejects.toBe(valErr);
+  });
+});
+
+describe("withImageEncodeContextV2", () => {
+  const ctx = {
+    inputs: [{ buffer: input, filename: "in.png", ref: "r" }],
+    settings,
+    scratchDir: "/tmp",
+    signal: new AbortController().signal,
+    report: () => undefined,
+  };
+
+  it("wraps an opaque encode failure in a SafeError with the code from ctx.settings", async () => {
+    const sharpErr = new Error("");
+    const wrapped = withImageEncodeContextV2<Settings>(
+      "Histogram generation failed",
+      (s) => s.format,
+      async () => {
+        throw sharpErr;
+      },
+    );
+    const caught = await wrapped(ctx).catch((e: unknown) => e);
+    expect(caught).toMatchObject({
+      name: "SafeError",
+      message: "Histogram generation failed",
+      kind: "bug",
+      code: "webp",
+      cause: sharpErr,
+    });
+  });
+
+  it("passes SafeError, ToolInputError, and InputValidationError through unchanged", async () => {
+    const safe = new SafeError("Process killed", { kind: "operational" });
+    const inputErr = markToolInputError(new Error("Bad input"));
+    const valErr = new InputValidationError("Provide at least two images");
+    for (const err of [safe, inputErr, valErr]) {
+      const wrapped = withImageEncodeContextV2(
+        "Failed",
+        () => "v2",
+        async () => {
+          throw err;
+        },
+      );
+      await expect(wrapped(ctx)).rejects.toBe(err);
+    }
+  });
+});
+
+describe("withAiImageEncodeContext", () => {
+  const jobData = {
+    jobId: "j1",
+    toolId: "upscale",
+    userId: null,
+    pool: "ai" as const,
+    inputRefs: ["r1"],
+    filename: "in.png",
+    settings,
+    kind: "ai-tool" as const,
+  };
+  const aiCtx = {
+    scratchDir: "/tmp",
+    signal: new AbortController().signal,
+    report: () => undefined,
+  };
+
+  it("wraps an opaque encode failure in a SafeError with the code from data.settings", async () => {
+    const sharpErr = new Error("");
+    const wrapped = withAiImageEncodeContext<Settings>(
+      "Image upscaling failed",
+      (s) => s.format,
+      async () => {
+        throw sharpErr;
+      },
+    );
+    const caught = await wrapped(input, jobData, aiCtx).catch((e: unknown) => e);
+    expect(caught).toMatchObject({
+      name: "SafeError",
+      message: "Image upscaling failed",
+      kind: "bug",
+      code: "webp",
+      cause: sharpErr,
+    });
+  });
+
+  it("passes AbortError, AnimatedRemovalCanceledError, Canceled, and 400 status errors through unchanged", async () => {
+    const abortErr = Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    const animCanceled = Object.assign(new Error("canceled"), {
+      name: "AnimatedRemovalCanceledError",
+    });
+    const canceledErr = new Error("Canceled");
+    const timeoutErr = new Error("Timed out after 10s");
+    const status400Err = Object.assign(new Error("SVG exceeds limit"), { statusCode: 400 });
+
+    for (const err of [abortErr, animCanceled, canceledErr, timeoutErr, status400Err, "timeout"]) {
+      const wrapped = withAiImageEncodeContext(
+        "Failed",
+        () => "ai",
+        async () => {
+          throw err;
+        },
+      );
+      await expect(wrapped(input, jobData, aiCtx)).rejects.toBe(err);
+    }
   });
 });
 
@@ -200,6 +369,30 @@ describe("asInputErrorIfUndecodable", () => {
     const err = await asInputErrorIfUndecodable(truncatedJpg, sharpErr);
     expect(isToolInputError(err)).toBe(true);
     expect(err.message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    expect(err.cause).toBe(sharpErr);
+  });
+
+  it("classifies a multi-frame GIF with corrupt frame 2 data as ToolInputError", async () => {
+    const raw1 = Buffer.alloc(32 * 32 * 3, 100);
+    const raw2 = Buffer.alloc(32 * 32 * 3);
+    for (let i = 0; i < raw2.length; i++) raw2[i] = (i * 37) % 256;
+    const f1 = await sharp(raw1, { raw: { width: 32, height: 32, channels: 3 } })
+      .png()
+      .toBuffer();
+    const f2 = await sharp(raw2, { raw: { width: 32, height: 32, channels: 3 } })
+      .png()
+      .toBuffer();
+    const gif = await sharp([f1, f2], { join: { across: 1, animated: true } })
+      .gif({ delay: [100, 100] })
+      .toBuffer();
+    const corruptGif = Buffer.from(gif);
+    for (let i = corruptGif.length - 100; i < corruptGif.length - 2; i++) corruptGif[i] = 0xff;
+
+    const sharpErr = new Error("gifload_buffer: Invalid frame data");
+    const err = await asInputErrorIfUndecodable(corruptGif, sharpErr);
+    expect(isToolInputError(err)).toBe(true);
+    expect(err.message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    expect(err.cause).toBe(sharpErr);
   });
 
   it("returns the original error when the input decodes fine (downstream bugs stay bugs)", async () => {
@@ -222,13 +415,512 @@ describe("asInputErrorIfUndecodable", () => {
     const err = await asInputErrorIfUndecodable(bombPng, sharpErr);
     expect(isToolInputError(err)).toBe(true);
     expect(err.message).toBe(PIXEL_LIMIT_IMAGE_MESSAGE);
+    expect(err.cause).toBe(sharpErr);
   });
 
-  it("passes through already-classified errors without reclassifying", async () => {
+  it("passes through already-classified errors and operational errnos without reclassifying", async () => {
     const safe = new SafeError("Process killed (out of memory)", { kind: "operational" });
     expect(await asInputErrorIfUndecodable(truncatedJpg, safe)).toBe(safe);
 
     const inputErr = markToolInputError(new Error("Unsupported input"));
     expect(await asInputErrorIfUndecodable(truncatedJpg, inputErr)).toBe(inputErr);
+
+    const enospc = Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
+    expect(await asInputErrorIfUndecodable(truncatedJpg, enospc)).toBe(enospc);
+  });
+});
+
+describe("Image tool registry undecodable input & encode context guards (#949)", () => {
+  const truncatedJpg = readFixture(fixtures.image.hostile.truncated);
+  const truncatedGifHeader = Buffer.from("GIF89a\x10\x00\x10\x00");
+  const validPng = readFixture(fixtures.image.base.png200);
+  const stubApp = {
+    post: () => undefined,
+    get: () => undefined,
+  } as unknown as FastifyInstance;
+
+  for (const reg of [
+    registerResize,
+    registerCompress,
+    registerCrop,
+    registerRotate,
+    registerColorAdjustments,
+    registerSharpening,
+    registerColorBlindness,
+    registerGifWebp,
+    registerOptimizeForWeb,
+    registerPixelate,
+    registerSmartCrop,
+    registerReplaceColor,
+    registerCircleCrop,
+    registerRoundedCrop,
+    registerBorder,
+    registerDuotone,
+    registerImagePad,
+    registerVignette,
+    registerTextOverlay,
+    registerWatermarkText,
+    registerLqipPlaceholder,
+    registerHistogram,
+    registerSpriteSheet,
+    registerSplit,
+    registerMemeGenerator,
+    registerBeautify,
+    registerVectorize,
+    registerImagesToVideo,
+    registerChartMaker,
+    registerConvert,
+    registerGifTools,
+    registerImageEnhancement,
+    registerStripMetadata,
+    registerTransparencyFixer,
+    registerUpscale,
+    registerRestorePhoto,
+    registerBlurFaces,
+    registerColorize,
+    registerAiCanvasExpand,
+    registerPassportPhoto,
+    registerContentAwareResize,
+    registerRemoveBackground,
+    registerRemoveGifBackground,
+    registerEnhanceFaces,
+    registerNoiseRemoval,
+    registerRedEyeRemoval,
+    registerOcr,
+  ]) {
+    reg(stubApp);
+  }
+  void registerBackgroundReplace;
+  void registerBlurBackground;
+  void registerEraseObject;
+
+  const TRUNCATED_CASES: Array<{
+    toolId: string;
+    settings?: Record<string, unknown>;
+    filename?: string;
+    inputBuffer?: Buffer;
+    extraInputs?: Array<{ buffer: Buffer; filename: string; ref: string }>;
+  }> = [
+    { toolId: "resize", settings: { width: 64 } },
+    { toolId: "compress", settings: { mode: "quality", quality: 80 } },
+    { toolId: "crop", settings: { left: 0, top: 0, width: 10, height: 10 } },
+    { toolId: "rotate", settings: { angle: 90 } },
+    { toolId: "rotate", settings: { angle: 0 } },
+    { toolId: "adjust-colors", settings: { brightness: 10 } },
+    { toolId: "brightness-contrast", settings: { brightness: 10 } },
+    { toolId: "saturation", settings: { saturation: 10 } },
+    { toolId: "color-channels", settings: { red: 120 } },
+    { toolId: "color-effects", settings: { effect: "grayscale" } },
+    { toolId: "sharpening", settings: {} },
+    { toolId: "color-blindness", settings: {} },
+    { toolId: "gif-webp", settings: {}, filename: "truncated.webp" },
+    { toolId: "optimize-for-web", settings: {} },
+    { toolId: "pixelate", settings: {} },
+    { toolId: "smart-crop", settings: { mode: "subject" } },
+    { toolId: "smart-crop", settings: { mode: "trim" } },
+    { toolId: "smart-crop", settings: { mode: "face" } },
+    { toolId: "replace-color", settings: {} },
+    { toolId: "circle-crop", settings: {} },
+    { toolId: "rounded-crop", settings: {} },
+    { toolId: "border", settings: {} },
+    { toolId: "duotone", settings: {} },
+    { toolId: "image-pad", settings: {} },
+    { toolId: "vignette", settings: {} },
+    { toolId: "text-overlay", settings: { text: "Hello" } },
+    { toolId: "watermark-text", settings: { text: "Watermark" } },
+    { toolId: "lqip-placeholder", settings: { strategy: "blur" } },
+    { toolId: "lqip-placeholder", settings: { strategy: "solid" } },
+    { toolId: "histogram", settings: {} },
+    {
+      toolId: "sprite-sheet",
+      settings: {},
+      extraInputs: [{ buffer: validPng, filename: "b.png", ref: "r2" }],
+    },
+    { toolId: "split", settings: { columns: 2, rows: 2 } },
+    { toolId: "meme-generator", settings: { textBoxes: [{ id: "top", text: "HI" }] } },
+    { toolId: "beautify", settings: {} },
+    { toolId: "vectorize", settings: {} },
+    {
+      toolId: "images-to-video",
+      settings: {},
+      extraInputs: [{ buffer: validPng, filename: "b.png", ref: "r2" }],
+    },
+    { toolId: "convert", settings: { format: "png" } },
+    { toolId: "convert", settings: { format: "bmp" } },
+    { toolId: "convert", settings: { format: "psd" } },
+    { toolId: "convert", settings: { format: "heic" } },
+    { toolId: "gif-tools", settings: { mode: "resize", width: 32 }, filename: "truncated.gif" },
+    { toolId: "image-enhancement", settings: {} },
+    { toolId: "strip-metadata", settings: { stripAll: true } },
+    { toolId: "transparency-fixer", settings: { removeWatermark: true } },
+    { toolId: "transparency-fixer", settings: { removeWatermark: false } },
+    { toolId: "upscale", settings: { scale: 2 } },
+    { toolId: "restore-photo", settings: {} },
+    { toolId: "blur-faces", settings: {} },
+    { toolId: "colorize", settings: {} },
+    { toolId: "ai-canvas-expand", settings: { extendRight: 16 } },
+    { toolId: "passport-photo", settings: { countryCode: "US" } },
+    { toolId: "content-aware-resize", settings: { width: 50 } },
+    { toolId: "remove-background", settings: {} },
+    {
+      toolId: "remove-gif-background",
+      settings: {},
+      filename: "truncated.gif",
+      inputBuffer: truncatedGifHeader,
+    },
+    { toolId: "enhance-faces", settings: {} },
+    { toolId: "noise-removal", settings: {} },
+    { toolId: "red-eye-removal", settings: {} },
+    { toolId: "ocr", settings: { quality: "fast" } },
+  ];
+
+  it.each(TRUNCATED_CASES)(
+    "$toolId classifies truncated input as ToolInputError ($settings)",
+    async ({
+      toolId,
+      settings: rawSettings = {},
+      filename = "truncated.jpg",
+      inputBuffer = truncatedJpg,
+      extraInputs = [],
+    }) => {
+      const config = getToolConfig(toolId);
+      if (!config?.processV2) throw new Error(`${toolId} missing from toolRegistry`);
+      const parsedSettings = config.settingsSchema.parse(rawSettings);
+      const err = await config
+        .processV2({
+          inputs: [{ buffer: inputBuffer, filename, ref: "r1" }, ...extraInputs],
+          settings: parsedSettings,
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        })
+        .then(
+          () => null,
+          (e: unknown) => e,
+        );
+
+      expect(isToolInputError(err)).toBe(true);
+      expect((err as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    },
+  );
+
+  it.each(["sprite-sheet", "images-to-video"])(
+    "%s classifies a truncated second input as ToolInputError (not only input[0])",
+    async (toolId) => {
+      const config = getToolConfig(toolId);
+      if (!config?.processV2) throw new Error(`${toolId} missing from toolRegistry`);
+      const parsedSettings = config.settingsSchema.parse({});
+      const err = await config
+        .processV2({
+          inputs: [
+            { buffer: validPng, filename: "a.png", ref: "r1" },
+            { buffer: truncatedJpg, filename: "truncated.jpg", ref: "r2" },
+          ],
+          settings: parsedSettings,
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        })
+        .then(
+          () => null,
+          (e: unknown) => e,
+        );
+
+      expect(isToolInputError(err)).toBe(true);
+      expect((err as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    },
+  );
+
+  it.each([
+    { toolId: "transparency-fixer", settings: { removeWatermark: true } },
+    { toolId: "transparency-fixer", settings: { removeWatermark: false } },
+    { toolId: "upscale", settings: { scale: 2 } },
+    { toolId: "restore-photo", settings: {} },
+    { toolId: "blur-faces", settings: {} },
+    { toolId: "colorize", settings: {} },
+    { toolId: "ai-canvas-expand", settings: { extendRight: 16 } },
+    { toolId: "background-replace", settings: {} },
+    { toolId: "blur-background", settings: {} },
+    { toolId: "remove-background", settings: {} },
+    {
+      toolId: "remove-gif-background",
+      settings: {},
+      filename: "truncated.gif",
+      inputBuffer: truncatedGifHeader,
+    },
+    { toolId: "enhance-faces", settings: {} },
+    { toolId: "noise-removal", settings: {} },
+    { toolId: "red-eye-removal", settings: {} },
+    { toolId: "ocr", settings: { quality: "fast" } },
+  ])(
+    "AI job handler $toolId classifies truncated input as ToolInputError",
+    async ({
+      toolId,
+      settings: rawSettings,
+      filename = "truncated.jpg",
+      inputBuffer = truncatedJpg,
+    }: {
+      toolId: string;
+      settings: Record<string, unknown>;
+      filename?: string;
+      inputBuffer?: Buffer;
+    }) => {
+      const err = await runAiToolJob(
+        {
+          jobId: "test-job",
+          toolId,
+          userId: null,
+          pool: "ai",
+          inputRefs: [`uploads/test-job/${filename}`],
+          filename,
+          settings: rawSettings,
+          kind: "ai-tool",
+        },
+        inputBuffer,
+        {
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        },
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+
+      expect(isToolInputError(err)).toBe(true);
+      expect((err as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    },
+  );
+
+  it("erase-object AI job handler classifies both a truncated main image and a truncated mask as ToolInputError", async () => {
+    const maskKeyValid = "uploads/test-erase-job/mask-valid.png";
+    const maskKeyTrunc = "uploads/test-erase-job/mask-trunc.jpg";
+    await putObject(maskKeyValid, validPng);
+    await putObject(maskKeyTrunc, truncatedJpg);
+
+    // 1. Truncated main image + valid mask
+    const errMain = await runAiToolJob(
+      {
+        jobId: "test-erase-1",
+        toolId: "erase-object",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/test-erase-job/in.jpg", maskKeyValid],
+        filename: "truncated.jpg",
+        settings: {},
+        kind: "ai-tool",
+      },
+      truncatedJpg,
+      {
+        scratchDir: tmpdir(),
+        signal: new AbortController().signal,
+        report: () => undefined,
+      },
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(isToolInputError(errMain)).toBe(true);
+    expect((errMain as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+
+    // 2. Valid main image + truncated mask
+    const errMask = await runAiToolJob(
+      {
+        jobId: "test-erase-2",
+        toolId: "erase-object",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/test-erase-job/in.png", maskKeyTrunc],
+        filename: "valid.png",
+        settings: {},
+        kind: "ai-tool",
+      },
+      validPng,
+      {
+        scratchDir: tmpdir(),
+        signal: new AbortController().signal,
+        report: () => undefined,
+      },
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(isToolInputError(errMask)).toBe(true);
+    expect((errMask as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+  });
+
+  it("beautify classifies a truncated backgroundImage as ToolInputError when main image is valid", async () => {
+    const config = getToolConfig("beautify");
+    if (!config) throw new Error("beautify missing from toolRegistry");
+    const settings = config.settingsSchema.parse({ backgroundType: "image" });
+    const err = await processBeautify(
+      validPng,
+      settings as Parameters<typeof processBeautify>[1],
+      "valid.png",
+      truncatedJpg,
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(isToolInputError(err)).toBe(true);
+    expect((err as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+  });
+
+  it("adjust-colors (with sharpness > 0) and image-enhancement classify a multi-frame GIF with corrupt frame 2 as ToolInputError", async () => {
+    const raw1 = Buffer.alloc(32 * 32 * 3, 100);
+    const raw2 = Buffer.alloc(32 * 32 * 3);
+    for (let i = 0; i < raw2.length; i++) raw2[i] = (i * 37) % 256;
+    const f1 = await sharp(raw1, { raw: { width: 32, height: 32, channels: 3 } })
+      .png()
+      .toBuffer();
+    const f2 = await sharp(raw2, { raw: { width: 32, height: 32, channels: 3 } })
+      .png()
+      .toBuffer();
+    const gif = await sharp([f1, f2], { join: { across: 1, animated: true } })
+      .gif({ delay: [100, 100] })
+      .toBuffer();
+    const corruptGif = Buffer.from(gif);
+    for (let i = corruptGif.length - 100; i < corruptGif.length - 2; i++) corruptGif[i] = 0xff;
+
+    for (const [toolId, rawSettings] of [
+      ["adjust-colors", { sharpness: 20 }],
+      ["image-enhancement", {}],
+    ] as const) {
+      const config = getToolConfig(toolId);
+      if (!config?.processV2) throw new Error(`${toolId} missing from toolRegistry`);
+      const parsed = config.settingsSchema.parse(rawSettings);
+      const err = await config
+        .processV2({
+          inputs: [{ buffer: corruptGif, filename: "corrupt.gif", ref: "r1" }],
+          settings: parsed,
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        })
+        .then(
+          () => null,
+          (e: unknown) => e,
+        );
+      expect(isToolInputError(err), `${toolId} did not classify corruptGif`).toBe(true);
+      expect((err as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    }
+  });
+
+  it("content-aware-resize classifies bomb PNG as PIXEL_LIMIT_IMAGE_MESSAGE and wraps caire failures as SafeError", async () => {
+    const bombPng = readFixture(fixtures.image.hostile.bomb);
+    const config = getToolConfig("content-aware-resize");
+    if (!config) throw new Error("content-aware-resize missing from toolRegistry");
+    const bombErr = await config.process(bombPng, { width: 100 }, "bomb.png").then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(isToolInputError(bombErr)).toBe(true);
+    expect((bombErr as Error).message).toBe(PIXEL_LIMIT_IMAGE_MESSAGE);
+
+    const prevPath = process.env.PATH;
+    const prevCaire = process.env.CAIRE_PATH;
+    process.env.PATH = "";
+    process.env.CAIRE_PATH = "/nonexistent-caire-binary";
+    try {
+      const caireErr = await config.process(validPng, { width: 100 }, "valid.png").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isSafeMessageError(caireErr)).toBe(true);
+      expect((caireErr as SafeError).message).toBe("Content-aware resize failed");
+      expect((caireErr as SafeError).kind).toBe("bug");
+    } finally {
+      process.env.PATH = prevPath;
+      if (prevCaire === undefined) delete process.env.CAIRE_PATH;
+      else process.env.CAIRE_PATH = prevCaire;
+    }
+  });
+
+  it("passport-photo registry process rejects unknown countryCode or documentType as ToolInputError", async () => {
+    const config = getToolConfig("passport-photo");
+    if (!config) throw new Error("passport-photo missing from toolRegistry");
+    const badCountry = await config
+      .process(validPng, { countryCode: "ZZ", documentType: "passport" }, "valid.png")
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(isToolInputError(badCountry)).toBe(true);
+    expect((badCountry as Error).message).toBe("Unknown country code: ZZ");
+
+    const badDoc = await config
+      .process(validPng, { countryCode: "US", documentType: "nonexistent" }, "valid.png")
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(isToolInputError(badDoc)).toBe(true);
+    expect((badDoc as Error).message).toBe("No nonexistent spec for US");
+  });
+
+  it("surfaces non-input process failures as titled SafeError bugs across wrapped tools", async () => {
+    // Calling process/processV2 with invalid settings or non-image bytes that
+    // fail outside the input-decode guard verifies withImageEncodeContext is wired.
+    for (const [toolId, badSettings, expectedTitle] of [
+      ["optimize-for-web", { format: "invalid" }, "Web optimization failed"],
+      ["sharpening", { method: "invalid" }, "Image sharpening failed"],
+      ["convert", { format: "invalid" }, "Image conversion failed"],
+    ] as const) {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} missing from toolRegistry`);
+      const err = await config.process(validPng, badSettings, "valid.png").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isSafeMessageError(err), `${toolId} did not wrap in SafeError`).toBe(true);
+      expect((err as SafeError).message).toBe(expectedTitle);
+      expect((err as SafeError).kind).toBe("bug");
+    }
+
+    // Tools whose leading metadata() sits before the pixel-decode try/catch
+    // surface non-image bytes as titled SafeErrors when intake is bypassed.
+    const garbage = Buffer.from("not an image");
+    for (const [toolId, rawSettings, expectedTitle] of [
+      ["resize", { width: 64 }, "Image resize failed"],
+      ["crop", { left: 0, top: 0, width: 10, height: 10 }, "Image crop failed"],
+      ["circle-crop", {}, "Circle crop failed"],
+      ["rounded-crop", {}, "Rounded crop failed"],
+      ["duotone", {}, "Duotone failed"],
+      ["gif-tools", { mode: "resize", width: 32 }, "GIF processing failed"],
+      ["strip-metadata", { stripAll: true }, "Metadata strip failed"],
+    ] as const) {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} missing from toolRegistry`);
+      const parsed = config.settingsSchema.parse(rawSettings);
+      const err = await config.process(garbage, parsed, "garbage.bin").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isSafeMessageError(err), `${toolId} did not wrap in SafeError`).toBe(true);
+      expect((err as SafeError).message).toBe(expectedTitle);
+      expect((err as SafeError).kind).toBe("bug");
+    }
+
+    // chart-maker wraps processV2 in withImageEncodeContextV2: an unparseable
+    // settings payload (e.g. width: -1) thrown inside processV2 is wrapped as
+    // SafeError("Chart rendering failed", { kind: "bug" }).
+    const chartConfig = getToolConfig("chart-maker");
+    if (!chartConfig?.processV2) throw new Error("chart-maker missing from toolRegistry");
+    const chartErr = await chartConfig
+      .processV2({
+        inputs: [{ buffer: Buffer.from("label,value\nA,10\n"), filename: "data.csv", ref: "r1" }],
+        settings: { kind: "bar", width: -1 },
+        scratchDir: tmpdir(),
+        signal: new AbortController().signal,
+        report: () => undefined,
+      })
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect(isSafeMessageError(chartErr)).toBe(true);
+    expect((chartErr as SafeError).message).toBe("Chart rendering failed");
+    expect((chartErr as SafeError).kind).toBe("bug");
   });
 });

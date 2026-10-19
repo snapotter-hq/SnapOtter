@@ -1,5 +1,6 @@
 import { extname } from "node:path";
 import { MAX_RESIZE_OUTPUT_DIMENSION, optimizeForWeb } from "@snapotter/image-engine";
+import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
@@ -15,6 +16,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
@@ -58,7 +60,12 @@ async function processImage(inputBuffer: Buffer, settings: Settings, filename: s
     await readAnimationFor(inputBuffer, engineSettings.format),
   );
   const result = await optimizeForWeb(image, engineSettings);
-  let buffer: Buffer = await result.toBuffer();
+  let buffer: Buffer;
+  try {
+    buffer = await result.toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
+  }
 
   if (isJxl) {
     buffer = await encodeJxl(buffer, settings.quality);
@@ -199,7 +206,9 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
         const message = stripInternalPaths(
           err instanceof Error ? err.message : "Preview processing failed",
         );
-        request.log.error({ err }, "Optimize preview failed");
+        if (!isToolInputError(err)) {
+          request.log.error({ err }, "Optimize preview failed");
+        }
         return reply.status(422).send({ error: "Preview failed", details: message });
       }
     },
@@ -209,6 +218,10 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "optimize-for-web",
     settingsSchema,
-    process: processImage,
+    process: withImageEncodeContext<Settings>(
+      "Web optimization failed",
+      (s) => s?.format ?? "webp",
+      processImage,
+    ),
   });
 }

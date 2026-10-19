@@ -26,6 +26,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
@@ -155,31 +160,35 @@ async function processTransparencyFix(
 ): Promise<Buffer> {
   let workingBuffer = inputBuffer;
 
-  if (settings.removeWatermark) {
-    onProgress?.(2, "Removing watermark...");
-    workingBuffer = await removeWatermarkMedian(workingBuffer);
-  }
-
   let resultBuffer: Buffer;
 
   try {
-    resultBuffer = await removeBackground(
-      workingBuffer,
-      outputDir,
-      { model: DEFAULT_MODEL, toolId: TOOL_ID },
-      onProgress,
-    );
-  } catch (err) {
-    const isOom = isMemoryAllocError(err);
-    if (!isOom) throw err;
+    if (settings.removeWatermark) {
+      onProgress?.(2, "Removing watermark...");
+      workingBuffer = await removeWatermarkMedian(workingBuffer);
+    }
 
-    onProgress?.(5, `Retrying with fallback model (${FALLBACK_MODEL})`);
-    resultBuffer = await removeBackground(
-      workingBuffer,
-      outputDir,
-      { model: FALLBACK_MODEL, toolId: TOOL_ID },
-      onProgress,
-    );
+    try {
+      resultBuffer = await removeBackground(
+        workingBuffer,
+        outputDir,
+        { model: DEFAULT_MODEL, toolId: TOOL_ID },
+        onProgress,
+      );
+    } catch (err) {
+      const isOom = isMemoryAllocError(err);
+      if (!isOom) throw err;
+
+      onProgress?.(5, `Retrying with fallback model (${FALLBACK_MODEL})`);
+      resultBuffer = await removeBackground(
+        workingBuffer,
+        outputDir,
+        { model: FALLBACK_MODEL, toolId: TOOL_ID },
+        onProgress,
+      );
+    }
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
   }
 
   resultBuffer = await applyDefringe(resultBuffer, settings.defringe);
@@ -192,29 +201,36 @@ async function processTransparencyFix(
 }
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("transparency-fixer", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "transparency-fixer",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Transparency fix failed",
+    (s) => s?.outputFormat ?? "png",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
 
-  const resultBuffer = await processTransparencyFix(
-    input,
-    settings,
-    ctx.scratchDir,
-    (percent, stage) => ctx.report(Math.min(percent, 95), stage),
-  );
+      const resultBuffer = await processTransparencyFix(
+        input,
+        settings,
+        ctx.scratchDir,
+        (percent, stage) => ctx.report(Math.min(percent, 95), stage),
+      );
 
-  const outputExt = settings.outputFormat === "webp" ? "webp" : "png";
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
-  const contentType = outputExt === "webp" ? "image/webp" : "image/png";
+      const outputExt = settings.outputFormat === "webp" ? "webp" : "png";
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
+      const contentType = outputExt === "webp" ? "image/webp" : "image/png";
 
-  return {
-    buffer: resultBuffer,
-    filename: outputFilename,
-    contentType,
-    resultPayload: {
-      filename: data.filename,
+      return {
+        buffer: resultBuffer,
+        filename: outputFilename,
+        contentType,
+        resultPayload: {
+          filename: data.filename,
+        },
+      };
     },
-  };
-});
+  ),
+);
 
 export function registerTransparencyFixer(app: FastifyInstance) {
   app.post(
@@ -372,34 +388,38 @@ export function registerTransparencyFixer(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: TOOL_ID,
     settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as z.infer<typeof settingsSchema>;
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const resultBuffer = await processTransparencyFix(
-          orientedBuffer,
-          s,
-          scratchDir,
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
+    process: withImageEncodeContext<unknown>(
+      "Transparency fix failed",
+      (s) => (s as z.infer<typeof settingsSchema>)?.outputFormat ?? "png",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as z.infer<typeof settingsSchema>;
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          const resultBuffer = await processTransparencyFix(
+            orientedBuffer,
+            s,
+            scratchDir,
+            ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+          );
 
-        const outputExt = s.outputFormat === "webp" ? "webp" : "png";
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
-        const contentType = outputExt === "webp" ? "image/webp" : "image/png";
-        return {
-          buffer: resultBuffer,
-          filename: outputFilename,
-          contentType,
-          resultPayload: {
-            filename,
-          },
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+          const outputExt = s.outputFormat === "webp" ? "webp" : "png";
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_fixed.${outputExt}`;
+          const contentType = outputExt === "webp" ? "image/webp" : "image/png";
+          return {
+            buffer: resultBuffer,
+            filename: outputFilename,
+            contentType,
+            resultPayload: {
+              filename,
+            },
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

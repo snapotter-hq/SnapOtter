@@ -9,6 +9,7 @@ import { z } from "zod";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
@@ -58,16 +59,25 @@ async function vectorizeBuffer(
 ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
   let buf = inputBuffer;
 
-  if (settings.invert) {
-    // PNG: negating a GIF through its own palette traced inverted magenta as
-    // 76,105,113 instead of green (#1190).
-    buf = await sharp(buf).negate({ alpha: false }).png().toBuffer();
+  let pngBuffer: Buffer;
+  try {
+    if (settings.invert) {
+      // PNG: negating a GIF through its own palette traced inverted magenta as
+      // 76,105,113 instead of green (#1190).
+      buf = await sharp(buf).negate({ alpha: false }).png().toBuffer();
+    }
+
+    pngBuffer =
+      settings.colorMode === "color"
+        ? await sharp(buf).png().toBuffer()
+        : await sharp(buf).grayscale().png().toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
   }
 
   let svg: string;
 
   if (settings.colorMode === "color") {
-    const pngBuffer = await sharp(buf).png().toBuffer();
     svg = await vtrace(pngBuffer, {
       colorMode: 0,
       colorPrecision: settings.colorPrecision,
@@ -82,7 +92,6 @@ async function vectorizeBuffer(
       pathPrecision: 5,
     });
   } else {
-    const pngBuffer = await sharp(buf).grayscale().png().toBuffer();
     svg = await traceImage(pngBuffer, {
       threshold: settings.threshold,
       turdSize: settings.filterSpeckle,
@@ -176,10 +185,14 @@ export function registerVectorize(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "vectorize",
     settingsSchema: settingsSchema as z.ZodType<unknown, z.ZodTypeDef, unknown>,
-    process: vectorizeBuffer as (
-      inputBuffer: Buffer,
-      settings: unknown,
-      filename: string,
-    ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>,
+    process: withImageEncodeContext<unknown>(
+      "Image vectorization failed",
+      (s) => (s as z.infer<typeof settingsSchema>)?.colorMode ?? "bw",
+      vectorizeBuffer as (
+        inputBuffer: Buffer,
+        settings: unknown,
+        filename: string,
+      ) => Promise<{ buffer: Buffer; filename: string; contentType: string }>,
+    ),
   });
 }

@@ -7,9 +7,11 @@ import {
   FEATURE_BUNDLES,
   formatTargetKb,
   hasServerErrorStatus,
+  isToolInputError,
   kbToBytes,
   PASSPORT_SPECS,
   PRINT_LAYOUTS,
+  ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
@@ -27,6 +29,7 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
@@ -274,9 +277,14 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
-        const landmarksResult = await detectFaceLandmarks(fileBuffer, landmarkProgress, {
-          toolId: "passport-photo",
-        });
+        let landmarksResult: Awaited<ReturnType<typeof detectFaceLandmarks>>;
+        try {
+          landmarksResult = await detectFaceLandmarks(fileBuffer, landmarkProgress, {
+            toolId: "passport-photo",
+          });
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(fileBuffer, err);
+        }
 
         if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
           if (clientJobId) {
@@ -303,12 +311,16 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         let bgRemovedBuffer: Buffer;
         try {
-          bgRemovedBuffer = await removeBackground(
-            fileBuffer,
-            scratchDir,
-            { model: "birefnet-portrait", toolId: "passport-photo" },
-            bgProgress,
-          );
+          try {
+            bgRemovedBuffer = await removeBackground(
+              fileBuffer,
+              scratchDir,
+              { model: "birefnet-portrait", toolId: "passport-photo" },
+              bgProgress,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(fileBuffer, err);
+          }
         } finally {
           await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
@@ -349,7 +361,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
       } catch (err) {
         if (isDecoderUnavailable(err)) throw err;
         if (hasServerErrorStatus(err)) throw err;
-        request.log.error({ err, toolId: "passport-photo" }, "Passport photo analysis failed");
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "passport-photo" }, "Passport photo analysis failed");
+        }
         return reply.status(422).send({
           error: "Passport photo analysis failed",
           details: err instanceof Error ? err.message : "Unknown error",
@@ -571,7 +585,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
           // The spec fixes the pixel dimensions, so there is nothing left to
           // trade: say so instead of returning a photo over the cap (#1288).
           if (cropped.length > targetBytes) {
-            throw new Error(
+            throw new ToolInputError(
               `Couldn't get this photo under ${formatTargetKb(targetBytes)} at the required dimensions. Try a larger size limit.`,
             );
           }
@@ -618,7 +632,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
         return reply.send(response);
       } catch (err) {
         if (hasServerErrorStatus(err)) throw err;
-        request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "passport-photo" }, "Passport photo generation failed");
+        }
         return reply.status(422).send({
           error: "Passport photo generation failed",
           details: err instanceof Error ? err.message : "Unknown error",
@@ -640,128 +656,140 @@ export function registerPassportPhoto(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "passport-photo",
     settingsSchema: pipelineSettingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as z.infer<typeof pipelineSettingsSchema>;
-      const orientedBuffer = await autoOrient(inputBuffer);
+    process: withImageEncodeContext<unknown>(
+      "Passport photo generation failed",
+      (s) => (s as z.infer<typeof pipelineSettingsSchema>)?.countryCode ?? "passport",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as z.infer<typeof pipelineSettingsSchema>;
+        const countrySpec = PASSPORT_SPECS.find((sp) => sp.code === s.countryCode);
+        if (!countrySpec) throw new ToolInputError(`Unknown country code: ${s.countryCode}`);
 
-      // Step 1: Detect face landmarks
-      const landmarksResult = await detectFaceLandmarks(orientedBuffer, undefined, {
-        toolId: "passport-photo",
-      });
-      if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
-        throw new Error(
-          "No face detected. Please upload a clear, front-facing photo with good lighting.",
-        );
-      }
+        const docSpec = countrySpec.documents.find((d) => d.type === s.documentType);
+        if (!docSpec) throw new ToolInputError(`No ${s.documentType} spec for ${s.countryCode}`);
 
-      const landmarks = landmarksResult.landmarks;
-      const imgW = landmarksResult.imageWidth;
-      const imgH = landmarksResult.imageHeight;
+        const orientedBuffer = await autoOrient(inputBuffer);
 
-      // Step 2: Remove background
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        // Step 1: Detect face landmarks
+        let landmarksResult: Awaited<ReturnType<typeof detectFaceLandmarks>>;
+        try {
+          landmarksResult = await detectFaceLandmarks(orientedBuffer, undefined, {
+            toolId: "passport-photo",
+          });
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(orientedBuffer, err);
+        }
+        if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
+          throw new ToolInputError(
+            "No face detected. Please upload a clear, front-facing photo with good lighting.",
+          );
+        }
 
-      let bgRemovedBuffer: Buffer;
-      try {
-        bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
-          model: "birefnet-portrait",
-          toolId: "passport-photo",
-        });
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
+        const landmarks = landmarksResult.landmarks;
+        const imgW = landmarksResult.imageWidth;
+        const imgH = landmarksResult.imageHeight;
 
-      // Step 3: Look up spec and compute crop
-      const countrySpec = PASSPORT_SPECS.find((sp) => sp.code === s.countryCode);
-      if (!countrySpec) throw new Error(`Unknown country code: ${s.countryCode}`);
+        // Step 2: Remove background
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
 
-      const docSpec = countrySpec.documents.find((d) => d.type === s.documentType);
-      if (!docSpec) throw new Error(`No ${s.documentType} spec for ${s.countryCode}`);
+        let bgRemovedBuffer: Buffer;
+        try {
+          try {
+            bgRemovedBuffer = await removeBackground(orientedBuffer, scratchDir, {
+              model: "birefnet-portrait",
+              toolId: "passport-photo",
+            });
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
 
-      // Use actual bg-removed image dimensions (may differ from original)
-      const bgRemovedMeta = await sharp(bgRemovedBuffer).metadata();
-      const actualW = bgRemovedMeta.width ?? imgW;
-      const actualH = bgRemovedMeta.height ?? imgH;
-      const scaleX = actualW / imgW;
-      const scaleY = actualH / imgH;
+        // Step 3: Compute crop using actual bg-removed image dimensions (may differ from original)
+        const bgRemovedMeta = await sharp(bgRemovedBuffer).metadata();
+        const actualW = bgRemovedMeta.width ?? imgW;
+        const actualH = bgRemovedMeta.height ?? imgH;
+        const scaleX = actualW / imgW;
+        const scaleY = actualH / imgH;
 
-      // Convert normalized landmarks (0-1) to pixel coordinates in bg-removed space
-      const crownYPx = (landmarks.crown.y + s.adjustY) * imgH * scaleY;
-      const chinYPx = (landmarks.chin.y + s.adjustY) * imgH * scaleY;
-      const eyeYPx = (landmarks.eyeCenter.y + s.adjustY) * imgH * scaleY;
-      const faceCenterXPx = (landmarks.faceCenterX + s.adjustX) * imgW * scaleX;
+        // Convert normalized landmarks (0-1) to pixel coordinates in bg-removed space
+        const crownYPx = (landmarks.crown.y + s.adjustY) * imgH * scaleY;
+        const chinYPx = (landmarks.chin.y + s.adjustY) * imgH * scaleY;
+        const eyeYPx = (landmarks.eyeCenter.y + s.adjustY) * imgH * scaleY;
+        const faceCenterXPx = (landmarks.faceCenterX + s.adjustX) * imgW * scaleX;
 
-      const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
-      const headHeightPx = chinYPx - crownYPx;
-      const photoHeightPx = headHeightPx / targetHeadRatio;
-      const aspectRatio = docSpec.width / docSpec.height;
-      const photoWidthPx = photoHeightPx * aspectRatio;
+        const targetHeadRatio = (docSpec.headHeightMin + docSpec.headHeightMax) / 2;
+        const headHeightPx = chinYPx - crownYPx;
+        const photoHeightPx = headHeightPx / targetHeadRatio;
+        const aspectRatio = docSpec.width / docSpec.height;
+        const photoWidthPx = photoHeightPx * aspectRatio;
 
-      const topY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
-      const leftX = faceCenterXPx - photoWidthPx / 2;
+        const topY = eyeYPx - photoHeightPx * (1 - docSpec.eyeLineFromBottom);
+        const leftX = faceCenterXPx - photoWidthPx / 2;
 
-      // Composite onto background
-      const hex = s.bgColor.replace("#", "");
-      const bgR = Number.parseInt(hex.slice(0, 2), 16);
-      const bgG = Number.parseInt(hex.slice(2, 4), 16);
-      const bgB = Number.parseInt(hex.slice(4, 6), 16);
-      const bgRgb = { r: bgR, g: bgG, b: bgB, alpha: 1 };
+        // Composite onto background
+        const hex = s.bgColor.replace("#", "");
+        const bgR = Number.parseInt(hex.slice(0, 2), 16);
+        const bgG = Number.parseInt(hex.slice(2, 4), 16);
+        const bgB = Number.parseInt(hex.slice(4, 6), 16);
+        const bgRgb = { r: bgR, g: bgG, b: bgB, alpha: 1 };
 
-      const bgLayer = await sharp({
-        create: {
-          width: actualW,
-          height: actualH,
-          channels: 4,
-          background: bgRgb,
-        },
-      })
-        .composite([{ input: bgRemovedBuffer, blend: "over" }])
-        .png()
-        .toBuffer();
-
-      // Pad instead of clamp so the crop region can extend beyond the image
-      const rawLeft = Math.round(leftX);
-      const rawTop = Math.round(topY);
-      const rawW = Math.round(photoWidthPx);
-      const rawH = Math.round(photoHeightPx);
-
-      const padLeft = Math.max(0, -rawLeft);
-      const padTop = Math.max(0, -rawTop);
-      const padRight = Math.max(0, rawLeft + rawW - actualW);
-      const padBottom = Math.max(0, rawTop + rawH - actualH);
-
-      let sourceForCrop = bgLayer;
-      if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
-        // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
-        sourceForCrop = await sharp(bgLayer)
-          .extend({
-            top: padTop,
-            bottom: padBottom,
-            left: padLeft,
-            right: padRight,
+        const bgLayer = await sharp({
+          create: {
+            width: actualW,
+            height: actualH,
+            channels: 4,
             background: bgRgb,
-          })
+          },
+        })
+          .composite([{ input: bgRemovedBuffer, blend: "over" }])
           .png()
           .toBuffer();
-      }
 
-      const cropLeft = rawLeft + padLeft;
-      const cropTop = rawTop + padTop;
+        // Pad instead of clamp so the crop region can extend beyond the image
+        const rawLeft = Math.round(leftX);
+        const rawTop = Math.round(topY);
+        const rawW = Math.round(photoWidthPx);
+        const rawH = Math.round(photoHeightPx);
 
-      const MM_PER_INCH = 25.4;
-      const targetWidthPx = Math.round((docSpec.width / MM_PER_INCH) * docSpec.dpi);
-      const targetHeightPx = Math.round((docSpec.height / MM_PER_INCH) * docSpec.dpi);
+        const padLeft = Math.max(0, -rawLeft);
+        const padTop = Math.max(0, -rawTop);
+        const padRight = Math.max(0, rawLeft + rawW - actualW);
+        const padBottom = Math.max(0, rawTop + rawH - actualH);
 
-      const result = await sharp(sourceForCrop)
-        .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
-        .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
-        .jpeg({ quality: 95 })
-        .toBuffer();
+        let sourceForCrop = bgLayer;
+        if (padLeft > 0 || padTop > 0 || padRight > 0 || padBottom > 0) {
+          // PNG: the extend paints a backdrop colour the source palette need not hold (#1190).
+          sourceForCrop = await sharp(bgLayer)
+            .extend({
+              top: padTop,
+              bottom: padBottom,
+              left: padLeft,
+              right: padRight,
+              background: bgRgb,
+            })
+            .png()
+            .toBuffer();
+        }
 
-      const stem = filename.replace(/\.[^.]+$/, "");
-      return { buffer: result, filename: `${stem}_passport.jpg`, contentType: "image/jpeg" };
-    },
+        const cropLeft = rawLeft + padLeft;
+        const cropTop = rawTop + padTop;
+
+        const MM_PER_INCH = 25.4;
+        const targetWidthPx = Math.round((docSpec.width / MM_PER_INCH) * docSpec.dpi);
+        const targetHeightPx = Math.round((docSpec.height / MM_PER_INCH) * docSpec.dpi);
+
+        const result = await sharp(sourceForCrop)
+          .extract({ left: cropLeft, top: cropTop, width: rawW, height: rawH })
+          .resize(targetWidthPx, targetHeightPx, { fit: "fill" })
+          .jpeg({ quality: 95 })
+          .toBuffer();
+
+        const stem = filename.replace(/\.[^.]+$/, "");
+        return { buffer: result, filename: `${stem}_passport.jpg`, contentType: "image/jpeg" };
+      },
+    ),
   });
 }

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -32,139 +33,147 @@ export function registerBorder(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "border",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      let buf = inputBuffer;
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "Image border failed",
+      (s) => (s?.shadow ? "shadow" : "border"),
+      async (inputBuffer, settings, filename) => {
+        let buf = inputBuffer;
 
-      // Both steps below name PNG so the colour they paint is not re-encoded in
-      // the input's own container: a green border came back as 76,105,113 out
-      // of a GIF, whose palette has no green in it (#1190).
+        try {
+          // Both steps below name PNG so the colour they paint is not re-encoded in
+          // the input's own container: a green border came back as 76,105,113 out
+          // of a GIF, whose palette has no green in it (#1190).
 
-      // 1. Add padding
-      if (settings.padding > 0) {
-        const c = parseHex(settings.paddingColor);
-        buf = await sharp(buf)
-          .extend({
-            top: settings.padding,
-            bottom: settings.padding,
-            left: settings.padding,
-            right: settings.padding,
-            background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
-          })
-          .png()
-          .toBuffer();
-      }
+          // 1. Add padding
+          if (settings.padding > 0) {
+            const c = parseHex(settings.paddingColor);
+            buf = await sharp(buf)
+              .extend({
+                top: settings.padding,
+                bottom: settings.padding,
+                left: settings.padding,
+                right: settings.padding,
+                background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
+              })
+              .png()
+              .toBuffer();
+          }
 
-      // 2. Add border
-      if (settings.borderWidth > 0) {
-        const c = parseHex(settings.borderColor);
-        buf = await sharp(buf)
-          .extend({
-            top: settings.borderWidth,
-            bottom: settings.borderWidth,
-            left: settings.borderWidth,
-            right: settings.borderWidth,
-            background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
-          })
-          .png()
-          .toBuffer();
-      }
+          // 2. Add border
+          if (settings.borderWidth > 0) {
+            const c = parseHex(settings.borderColor);
+            buf = await sharp(buf)
+              .extend({
+                top: settings.borderWidth,
+                bottom: settings.borderWidth,
+                left: settings.borderWidth,
+                right: settings.borderWidth,
+                background: { r: c.r, g: c.g, b: c.b, alpha: 1 },
+              })
+              .png()
+              .toBuffer();
+          }
 
-      // 3. Apply corner radius
-      if (settings.cornerRadius > 0) {
-        buf = await sharp(buf).ensureAlpha().png().toBuffer();
-        const meta = await sharp(buf).metadata();
-        const w = meta.width ?? 100;
-        const h = meta.height ?? 100;
-        const r = Math.min(settings.cornerRadius, w / 2, h / 2);
+          // 3. Apply corner radius
+          if (settings.cornerRadius > 0) {
+            buf = await sharp(buf).ensureAlpha().png().toBuffer();
+            const meta = await sharp(buf).metadata();
+            const w = meta.width ?? 100;
+            const h = meta.height ?? 100;
+            const r = Math.min(settings.cornerRadius, w / 2, h / 2);
 
-        const mask = Buffer.from(
-          `<svg width="${w}" height="${h}"><rect x="0" y="0" width="${w}" height="${h}" rx="${r}" ry="${r}" fill="white"/></svg>`,
-        );
-        buf = await sharp(buf)
-          .composite([{ input: await sharp(mask).resize(w, h).toBuffer(), blend: "dest-in" }])
-          .png()
-          .toBuffer();
-      }
+            const mask = Buffer.from(
+              `<svg width="${w}" height="${h}"><rect x="0" y="0" width="${w}" height="${h}" rx="${r}" ry="${r}" fill="white"/></svg>`,
+            );
+            buf = await sharp(buf)
+              .composite([{ input: await sharp(mask).resize(w, h).toBuffer(), blend: "dest-in" }])
+              .png()
+              .toBuffer();
+          }
 
-      // 4. Apply shadow
-      if (settings.shadow) {
-        buf = await sharp(buf).ensureAlpha().png().toBuffer();
-        const meta = await sharp(buf).metadata();
-        const bW = meta.width ?? 100;
-        const bH = meta.height ?? 100;
+          // 4. Apply shadow
+          if (settings.shadow) {
+            buf = await sharp(buf).ensureAlpha().png().toBuffer();
+            const meta = await sharp(buf).metadata();
+            const bW = meta.width ?? 100;
+            const bH = meta.height ?? 100;
 
-        const sc = parseHex(settings.shadowColor);
-        const alpha = settings.shadowOpacity / 100;
-        const blur = settings.shadowBlur;
-        const spread = Math.ceil(blur * 2);
-        const ox = settings.shadowOffsetX;
-        const oy = settings.shadowOffsetY;
+            const sc = parseHex(settings.shadowColor);
+            const alpha = settings.shadowOpacity / 100;
+            const blur = settings.shadowBlur;
+            const spread = Math.ceil(blur * 2);
+            const ox = settings.shadowOffsetX;
+            const oy = settings.shadowOffsetY;
 
-        // Create shadow silhouette matching image shape (respects rounded corners)
-        const shadowSilhouette = await sharp({
-          create: {
-            width: bW,
-            height: bH,
-            channels: 4,
-            background: { r: sc.r, g: sc.g, b: sc.b, alpha },
-          },
-        })
-          .composite([{ input: buf, blend: "dest-in" }])
-          .extend({
-            top: spread,
-            bottom: spread,
-            left: spread,
-            right: spread,
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
-          })
-          .blur(Math.max(blur, 0.3))
-          .png()
-          .toBuffer();
+            // Create shadow silhouette matching image shape (respects rounded corners)
+            const shadowSilhouette = await sharp({
+              create: {
+                width: bW,
+                height: bH,
+                channels: 4,
+                background: { r: sc.r, g: sc.g, b: sc.b, alpha },
+              },
+            })
+              .composite([{ input: buf, blend: "dest-in" }])
+              .extend({
+                top: spread,
+                bottom: spread,
+                left: spread,
+                right: spread,
+                background: { r: 0, g: 0, b: 0, alpha: 0 },
+              })
+              .blur(Math.max(blur, 0.3))
+              .png()
+              .toBuffer();
 
-        // Calculate canvas padding for shadow spread + offset
-        const padL = Math.max(0, spread - ox);
-        const padR = Math.max(0, spread + ox);
-        const padT = Math.max(0, spread - oy);
-        const padB = Math.max(0, spread + oy);
+            // Calculate canvas padding for shadow spread + offset
+            const padL = Math.max(0, spread - ox);
+            const padR = Math.max(0, spread + ox);
+            const padT = Math.max(0, spread - oy);
+            const padB = Math.max(0, spread + oy);
 
-        const canvasW = bW + padL + padR;
-        const canvasH = bH + padT + padB;
+            const canvasW = bW + padL + padR;
+            const canvasH = bH + padT + padB;
 
-        const imgX = padL;
-        const imgY = padT;
-        const shadX = Math.max(0, imgX + ox - spread);
-        const shadY = Math.max(0, imgY + oy - spread);
+            const imgX = padL;
+            const imgY = padT;
+            const shadX = Math.max(0, imgX + ox - spread);
+            const shadY = Math.max(0, imgY + oy - spread);
 
-        buf = await sharp({
-          create: {
-            width: canvasW,
-            height: canvasH,
-            channels: 4,
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
-          },
-        })
-          .composite([
-            { input: shadowSilhouette, left: shadX, top: shadY },
-            { input: buf, left: imgX, top: imgY },
-          ])
-          .png()
-          .toBuffer();
-      }
+            buf = await sharp({
+              create: {
+                width: canvasW,
+                height: canvasH,
+                channels: 4,
+                background: { r: 0, g: 0, b: 0, alpha: 0 },
+              },
+            })
+              .composite([
+                { input: shadowSilhouette, left: shadX, top: shadY },
+                { input: buf, left: imgX, top: imgY },
+              ])
+              .png()
+              .toBuffer();
+          }
 
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-      const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
-      const needsAlpha = settings.cornerRadius > 0 || settings.shadow;
+          const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+          const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
+          const needsAlpha = settings.cornerRadius > 0 || settings.shadow;
 
-      if (needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)) {
-        const buffer = await sharp(buf).png().toBuffer();
-        const outName = filename.replace(/\.[^.]+$/, ".png");
-        return { buffer, filename: outName, contentType: "image/png" };
-      }
+          if (needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)) {
+            const buffer = await sharp(buf).png().toBuffer();
+            const outName = filename.replace(/\.[^.]+$/, ".png");
+            return { buffer, filename: outName, contentType: "image/png" };
+          }
 
-      const buffer = await sharp(buf)
-        .toFormat(outputFormat.format, outputFormat.encoderOptions)
-        .toBuffer();
-      return { buffer, filename, contentType: outputFormat.contentType };
-    },
+          const buffer = await sharp(buf)
+            .toFormat(outputFormat.format, outputFormat.encoderOptions)
+            .toBuffer();
+          return { buffer, filename, contentType: outputFormat.contentType };
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
+        }
+      },
+    ),
   });
 }

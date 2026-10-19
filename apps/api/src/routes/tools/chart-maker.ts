@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import Papa from "papaparse";
 import sharp from "sharp";
 import { z } from "zod";
+import { withImageEncodeContextV2 } from "../../lib/image-error.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -521,68 +522,72 @@ export function registerChartMaker(app: FastifyInstance) {
     process: async () => {
       throw new Error("chart-maker is v2-only");
     },
-    processV2: async (ctx) => {
-      const settings = settingsSchema.parse(ctx.settings);
-      const input = ctx.inputs[0];
-      const base = input.filename.replace(/\.[^.]+$/, "");
+    processV2: withImageEncodeContextV2<z.infer<typeof settingsSchema>>(
+      "Chart rendering failed",
+      (s) => s?.kind ?? "bar",
+      async (ctx) => {
+        const settings = settingsSchema.parse(ctx.settings);
+        const input = ctx.inputs[0];
+        const base = input.filename.replace(/\.[^.]+$/, "");
 
-      let data: DataPoint[];
-      const skipped: SkippedRows = { unreadable: 0 };
-      try {
-        data = parseInput(input.buffer, skipped);
-      } catch (err) {
-        // Every throw inside parseInput is already a ToolInputError. Blanket
-        // rewrapping anything else as one told the user their file was at
-        // fault and, because worker.ts skips logger.error for input errors,
-        // kept our own bugs out of Sentry entirely.
-        if (isToolInputError(err)) throw err;
-        if (err instanceof RangeError) {
-          throw new ToolInputError("This file is too large for Chart Maker to read as text.");
+        let data: DataPoint[];
+        const skipped: SkippedRows = { unreadable: 0 };
+        try {
+          data = parseInput(input.buffer, skipped);
+        } catch (err) {
+          // Every throw inside parseInput is already a ToolInputError. Blanket
+          // rewrapping anything else as one told the user their file was at
+          // fault and, because worker.ts skips logger.error for input errors,
+          // kept our own bugs out of Sentry entirely.
+          if (isToolInputError(err)) throw err;
+          if (err instanceof RangeError) {
+            throw new ToolInputError("This file is too large for Chart Maker to read as text.");
+          }
+          throw err;
         }
-        throw err;
-      }
 
-      if (data.length === 0) {
-        throw new ToolInputError("No data points found in input");
-      }
-      if (data.length > 100) {
-        throw new ToolInputError("Too many data points (max 100)");
-      }
+        if (data.length === 0) {
+          throw new ToolInputError("No data points found in input");
+        }
+        if (data.length > 100) {
+          throw new ToolInputError("Too many data points (max 100)");
+        }
 
-      // Every parse path above returns finite numbers or throws, so there is
-      // no NaN left to screen for here.
-      // Negative values render as invalid/degenerate SVG (negative bar heights,
-      // backward pie arcs that Sharp silently drops); reject with a clear message.
-      if (data.some((point) => point.value < 0)) {
-        throw new ToolInputError("Chart values must be zero or greater");
-      }
+        // Every parse path above returns finite numbers or throws, so there is
+        // no NaN left to screen for here.
+        // Negative values render as invalid/degenerate SVG (negative bar heights,
+        // backward pie arcs that Sharp silently drops); reject with a clear message.
+        if (data.some((point) => point.value < 0)) {
+          throw new ToolInputError("Chart values must be zero or greater");
+        }
 
-      let svg: string;
-      switch (settings.kind) {
-        case "bar":
-          svg = renderBarSvg(data, settings.width, settings.height, settings.title);
-          break;
-        case "line":
-          svg = renderLineSvg(data, settings.width, settings.height, settings.title);
-          break;
-        case "pie":
-          svg = renderPieSvg(data, settings.width, settings.height, settings.title);
-          break;
-      }
+        let svg: string;
+        switch (settings.kind) {
+          case "bar":
+            svg = renderBarSvg(data, settings.width, settings.height, settings.title);
+            break;
+          case "line":
+            svg = renderLineSvg(data, settings.width, settings.height, settings.title);
+            break;
+          case "pie":
+            svg = renderPieSvg(data, settings.width, settings.height, settings.title);
+            break;
+        }
 
-      const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+        const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
 
-      return {
-        buffer: pngBuffer,
-        filename: `${base}_chart.png`,
-        contentType: "image/png",
-        // Say how many rows were left out, so a chart missing rows doesn't
-        // look complete (#2060).
-        resultPayload:
-          skipped.unreadable > 0
-            ? { chartRows: { charted: data.length, skipped: skipped.unreadable } }
-            : undefined,
-      };
-    },
+        return {
+          buffer: pngBuffer,
+          filename: `${base}_chart.png`,
+          contentType: "image/png",
+          // Say how many rows were left out, so a chart missing rows doesn't
+          // look complete (#2060).
+          resultPayload:
+            skipped.unreadable > 0
+              ? { chartRows: { charted: data.length, skipped: skipped.unreadable } }
+              : undefined,
+        };
+      },
+    ),
   });
 }

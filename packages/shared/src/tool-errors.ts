@@ -47,8 +47,8 @@ export class ToolInputError extends Error {
   readonly isToolInputError = true;
   readonly statusCode = 400;
 
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, opts?: { cause?: unknown }) {
+    super(message, opts?.cause !== undefined ? { cause: opts.cause } : undefined);
     this.name = "ToolInputError";
   }
 }

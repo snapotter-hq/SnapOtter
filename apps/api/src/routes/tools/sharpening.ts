@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -30,45 +31,55 @@ export function registerSharpening(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "sharpening",
     settingsSchema,
-    process: async (inputBuffer, settings, filename) => {
-      const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+    process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
+      "Image sharpening failed",
+      (s) => s?.method ?? "adaptive",
+      async (inputBuffer, settings, filename) => {
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
 
-      // sharpen, median and convolve sample neighbouring rows. Run over Sharp's
-      // stacked frame strip they reach into the next frame and leave a halo
-      // along every frame edge, so animation goes a frame at a time (#1083).
-      const core = async (source: Buffer): Promise<Buffer> => {
-        let image = sharp(source);
+        // sharpen, median and convolve sample neighbouring rows. Run over Sharp's
+        // stacked frame strip they reach into the next frame and leave a halo
+        // along every frame edge, so animation goes a frame at a time (#1083).
+        const core = async (source: Buffer): Promise<Buffer> => {
+          let image = sharp(source);
 
-        image = await sharpenAdvanced(image, {
-          method: settings.method,
-          sigma: settings.sigma,
-          m1: settings.m1,
-          m2: settings.m2,
-          x1: settings.x1,
-          y2: settings.y2,
-          y3: settings.y3,
-          amount: settings.amount,
-          radius: settings.radius,
-          threshold: settings.threshold,
-          strength: settings.strength,
-          kernelSize: settings.kernelSize,
-          denoise: settings.denoise,
-        });
+          image = await sharpenAdvanced(image, {
+            method: settings.method,
+            sigma: settings.sigma,
+            m1: settings.m1,
+            m2: settings.m2,
+            x1: settings.x1,
+            y2: settings.y2,
+            y3: settings.y3,
+            amount: settings.amount,
+            radius: settings.radius,
+            threshold: settings.threshold,
+            strength: settings.strength,
+            kernelSize: settings.kernelSize,
+            denoise: settings.denoise,
+          });
 
-        // vips_convolve (high-pass) on a 3-channel image outputs 32-bit float
-        // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
-        // values >= 1.0 clamp to white. Materialising through PNG casts back to
-        // 8-bit uchar first (#2586).
-        const finalImage =
-          outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
-        return await finalImage
-          .toFormat(outputFormat.format, outputFormat.encoderOptions)
-          .toBuffer();
-      };
+          // vips_convolve (high-pass) on a 3-channel image outputs 32-bit float
+          // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
+          // values >= 1.0 clamp to white. Materialising through PNG casts back to
+          // 8-bit uchar first (#2586).
+          const finalImage =
+            outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
+          return await finalImage
+            .toFormat(outputFormat.format, outputFormat.encoderOptions)
+            .toBuffer();
+        };
 
-      const buffer =
-        (await runPerFrame(inputBuffer, outputFormat.format, core)) ?? (await core(inputBuffer));
-      return { buffer, filename, contentType: outputFormat.contentType };
-    },
+        let buffer: Buffer;
+        try {
+          buffer =
+            (await runPerFrame(inputBuffer, outputFormat.format, core)) ??
+            (await core(inputBuffer));
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(inputBuffer, err);
+        }
+        return { buffer, filename, contentType: outputFormat.contentType };
+      },
+    ),
   });
 }

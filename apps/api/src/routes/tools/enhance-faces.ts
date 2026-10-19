@@ -25,6 +25,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
@@ -41,34 +46,46 @@ const settingsSchema = z.object({
 });
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("enhance-faces", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "enhance-faces",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Face enhancement failed",
+    (s) => s?.model ?? "auto",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
 
-  const result = await enhanceFaces(
-    input,
-    ctx.scratchDir,
-    {
-      model: settings.model,
-      strength: settings.strength,
-      onlyCenterFace: settings.onlyCenterFace,
-      sensitivity: settings.sensitivity,
+      let result: Awaited<ReturnType<typeof enhanceFaces>>;
+      try {
+        result = await enhanceFaces(
+          input,
+          ctx.scratchDir,
+          {
+            model: settings.model,
+            strength: settings.strength,
+            onlyCenterFace: settings.onlyCenterFace,
+            sensitivity: settings.sensitivity,
+          },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(input, err);
+      }
+
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
+
+      return {
+        buffer: result.buffer,
+        filename: outputFilename,
+        contentType: "image/png",
+        resultPayload: {
+          facesDetected: result.facesDetected,
+          faces: result.faces,
+          model: result.model,
+        },
+      };
     },
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
-
-  return {
-    buffer: result.buffer,
-    filename: outputFilename,
-    contentType: "image/png",
-    resultPayload: {
-      facesDetected: result.facesDetected,
-      faces: result.faces,
-      model: result.model,
-    },
-  };
-});
+  ),
+);
 
 /** Face enhancement route using GFPGAN/CodeFormer. */
 export function registerEnhanceFaces(app: FastifyInstance) {
@@ -230,43 +247,52 @@ export function registerEnhanceFaces(app: FastifyInstance) {
       onlyCenterFace: z.boolean().default(false),
       sensitivity: z.number().min(0).max(1).default(0.5),
     }),
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as {
-        model?: "auto" | "gfpgan" | "codeformer";
-        strength?: number;
-        onlyCenterFace?: boolean;
-        sensitivity?: number;
-      };
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await enhanceFaces(
-          orientedBuffer,
-          scratchDir,
-          {
-            model: s.model ?? "auto",
-            strength: s.strength ?? 0.8,
-            onlyCenterFace: s.onlyCenterFace ?? false,
-            sensitivity: s.sensitivity ?? 0.5,
-          },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
-        return {
-          buffer: result.buffer,
-          filename: outputFilename,
-          contentType: "image/png",
-          resultPayload: {
-            facesDetected: result.facesDetected,
-            faces: result.faces,
-            model: result.model,
-          },
+    process: withImageEncodeContext(
+      "Face enhancement failed",
+      (s) => (s as { model?: string })?.model ?? "auto",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as {
+          model?: "auto" | "gfpgan" | "codeformer";
+          strength?: number;
+          onlyCenterFace?: boolean;
+          sensitivity?: number;
         };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let result: Awaited<ReturnType<typeof enhanceFaces>>;
+          try {
+            result = await enhanceFaces(
+              orientedBuffer,
+              scratchDir,
+              {
+                model: s.model ?? "auto",
+                strength: s.strength ?? 0.8,
+                onlyCenterFace: s.onlyCenterFace ?? false,
+                sensitivity: s.sensitivity ?? 0.5,
+              },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_enhanced.png`;
+          return {
+            buffer: result.buffer,
+            filename: outputFilename,
+            contentType: "image/png",
+            resultPayload: {
+              facesDetected: result.facesDetected,
+              faces: result.faces,
+              model: result.model,
+            },
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

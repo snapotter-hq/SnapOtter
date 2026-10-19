@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -15,6 +15,7 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -124,7 +125,12 @@ async function processMeme(
   filename: string,
   templateTextBoxes?: TemplateTextBox[],
 ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
-  const meta = await sharp(imageBuffer).metadata();
+  let meta: Metadata;
+  try {
+    meta = await sharp(imageBuffer).metadata();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(imageBuffer, err);
+  }
   const imageWidth = meta.width ?? 800;
   const imageHeight = meta.height ?? 600;
 
@@ -148,24 +154,28 @@ async function processMeme(
 
   let result: Buffer;
 
-  if (textBoxes.length > 0) {
-    const svgBuffer = renderMemeTextSvg({
-      imageWidth,
-      imageHeight,
-      textBoxes,
-      fontFamily: settings.fontFamily,
-      fontSize: settings.fontSize,
-      textColor: settings.textColor,
-      strokeColor: settings.strokeColor,
-      textAlign: settings.textAlign,
-      allCaps: settings.allCaps,
-    });
+  try {
+    if (textBoxes.length > 0) {
+      const svgBuffer = renderMemeTextSvg({
+        imageWidth,
+        imageHeight,
+        textBoxes,
+        fontFamily: settings.fontFamily,
+        fontSize: settings.fontSize,
+        textColor: settings.textColor,
+        strokeColor: settings.strokeColor,
+        textAlign: settings.textAlign,
+        allCaps: settings.allCaps,
+      });
 
-    result = await sharp(imageBuffer)
-      .composite([{ input: svgBuffer }])
-      .toBuffer();
-  } else {
-    result = await sharp(imageBuffer).toBuffer();
+      result = await sharp(imageBuffer)
+        .composite([{ input: svgBuffer }])
+        .toBuffer();
+    } else {
+      result = await sharp(imageBuffer).toBuffer();
+    }
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(imageBuffer, err);
   }
 
   const outputMeta = await sharp(result).metadata();
@@ -204,30 +214,34 @@ export function registerMemeGenerator(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "meme-generator",
     settingsSchema: settingsSchema as z.ZodType<unknown, z.ZodTypeDef, unknown>,
-    process: async (inputBuffer: Buffer, settings: unknown, filename: string) => {
-      const parsed = settingsSchema.parse(settings);
-      let buf = inputBuffer;
-      const validation = await validateImageBuffer(buf, filename);
-      if (validation.valid && validation.format === "heif") {
-        buf = await decodeHeic(buf);
-      }
-      if (validation.valid && needsCliDecode(validation.format)) {
-        try {
-          const fileExt = filename.split(".").pop()?.toLowerCase();
-          buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+    process: withImageEncodeContext<unknown>(
+      "Meme generation failed",
+      (s) => (s as Settings)?.textLayout ?? "top-bottom",
+      async (inputBuffer: Buffer, settings: unknown, filename: string) => {
+        const parsed = settingsSchema.parse(settings);
+        let buf = inputBuffer;
+        const validation = await validateImageBuffer(buf, filename);
+        if (validation.valid && validation.format === "heif") {
+          buf = await decodeHeic(buf);
+        }
+        if (validation.valid && needsCliDecode(validation.format)) {
           try {
-            await sharp(buf).metadata();
-          } catch (err) {
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-            throw err;
+            const fileExt = filename.split(".").pop()?.toLowerCase();
+            buf = await decodeToSharpCompat(buf, validation.format, fileExt);
+          } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            try {
+              await sharp(buf).metadata();
+            } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              throw err;
+            }
           }
         }
-      }
-      buf = await autoOrient(buf);
-      return processMeme(buf, parsed, filename);
-    },
+        buf = await autoOrient(buf);
+        return processMeme(buf, parsed, filename);
+      },
+    ),
   });
 
   app.post("/api/v1/tools/image/meme-generator", async (request, reply) => {

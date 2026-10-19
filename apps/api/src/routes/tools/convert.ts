@@ -20,7 +20,7 @@ import {
   encodeTga,
 } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
-import { withImageEncodeContext } from "../../lib/image-error.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { isSvgBuffer } from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -113,7 +113,12 @@ export function registerConvert(app: FastifyInstance) {
         // CLI-encoded formats bypass Sharp entirely
         const cliEncoder = CLI_ENCODERS[settings.format];
         if (cliEncoder) {
-          const outputBuffer = await cliEncoder(inputBuffer, settings.quality);
+          let outputBuffer: Buffer;
+          try {
+            outputBuffer = await cliEncoder(inputBuffer, settings.quality);
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(inputBuffer, err);
+          }
           const ext = extname(filename);
           const baseName = ext ? filename.slice(0, -ext.length) : filename;
           const contentType = FORMAT_CONTENT_TYPES[settings.format] || "application/octet-stream";
@@ -133,7 +138,12 @@ export function registerConvert(app: FastifyInstance) {
 
         let buffer: Buffer;
         if (settings.format === "psd") {
-          const pngBuffer = await image.png().toBuffer();
+          let pngBuffer: Buffer;
+          try {
+            pngBuffer = await image.png().toBuffer();
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(inputBuffer, err);
+          }
           const id = randomUUID();
           const inputPath = join(tmpdir(), `psd-enc-in-${id}.png`);
           const outputPath = join(tmpdir(), `psd-enc-out-${id}.psd`);
@@ -149,11 +159,20 @@ export function registerConvert(app: FastifyInstance) {
             await rm(outputPath, { force: true }).catch(() => {});
           }
         } else if (settings.format === "heic" || settings.format === "heif") {
-          const pngBuffer = await image.png().toBuffer();
+          let pngBuffer: Buffer;
+          try {
+            pngBuffer = await image.png().toBuffer();
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(inputBuffer, err);
+          }
           buffer = await encodeHeic(pngBuffer, settings.quality);
         } else {
           const result = await convert(image, settings as Parameters<typeof convert>[1]);
-          buffer = await result.toBuffer();
+          try {
+            buffer = await result.toBuffer();
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(inputBuffer, err);
+          }
         }
 
         // Change filename extension to match the output format

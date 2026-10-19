@@ -187,9 +187,16 @@ export async function processImageEnhancement(
   // to 500 sidecar round trips for one job, and denoising each frame on its
   // own plays back as flicker. Animations get the standard pass on every frame
   // and a reason the client can show.
-  const perFrame = await runPerFrame(rawBuffer, outputFormat.format, (frame) => core(frame, false));
-  if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
-  const finalBuffer = perFrame ?? (await core(rawBuffer, true));
+  let finalBuffer: Buffer;
+  try {
+    const perFrame = await runPerFrame(rawBuffer, outputFormat.format, (frame) =>
+      core(frame, false),
+    );
+    if (perFrame && settings.deepEnhance) deepEnhanceSkipped = "animated";
+    finalBuffer = perFrame ?? (await core(rawBuffer, true));
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(rawBuffer, err);
+  }
 
   return {
     buffer: finalBuffer,

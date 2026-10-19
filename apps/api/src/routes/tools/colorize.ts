@@ -26,6 +26,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -41,38 +46,50 @@ const settingsSchema = z.object({
 });
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("colorize", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "colorize",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Photo colorization failed",
+    (s) => s?.model ?? "auto",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
 
-  const result = await colorize(
-    input,
-    ctx.scratchDir,
-    { intensity: settings.intensity, model: settings.model },
-    (percent, stage) => ctx.report(percent, stage),
-  );
+      let result: Awaited<ReturnType<typeof colorize>>;
+      try {
+        result = await colorize(
+          input,
+          ctx.scratchDir,
+          { intensity: settings.intensity, model: settings.model },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(input, err);
+      }
 
-  const outputFormat = await resolveOutputFormat(input, data.filename);
-  let outputBuffer = result.buffer;
-  if (outputFormat.format !== "png") {
-    outputBuffer = await sharp(result.buffer)
-      .toFormat(outputFormat.format, outputFormat.encoderOptions)
-      .toBuffer();
-  }
+      const outputFormat = await resolveOutputFormat(input, data.filename);
+      let outputBuffer = result.buffer;
+      if (outputFormat.format !== "png") {
+        outputBuffer = await sharp(result.buffer)
+          .toFormat(outputFormat.format, outputFormat.encoderOptions)
+          .toBuffer();
+      }
 
-  const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_colorized.${ext}`;
+      const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_colorized.${ext}`;
 
-  return {
-    buffer: outputBuffer,
-    filename: outputFilename,
-    contentType: outputFormat.contentType,
-    resultPayload: {
-      width: result.width,
-      height: result.height,
-      method: result.method,
+      return {
+        buffer: outputBuffer,
+        filename: outputFilename,
+        contentType: outputFormat.contentType,
+        resultPayload: {
+          width: result.width,
+          height: result.height,
+          method: result.method,
+        },
+      };
     },
-  };
-});
+  ),
+);
 
 /**
  * AI photo colorization route.
@@ -232,45 +249,54 @@ export function registerColorize(app: FastifyInstance) {
       intensity: z.number().min(0).max(1).default(1.0),
       model: z.enum(["auto", "ddcolor", "opencv"]).default("auto"),
     }),
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await colorize(
-          orientedBuffer,
-          scratchDir,
-          {
-            intensity: (settings as { intensity?: number }).intensity ?? 1.0,
-            model: (settings as { model?: string }).model ?? "auto",
-          },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
+    process: withImageEncodeContext(
+      "Photo colorization failed",
+      (s) => (s as { model?: string })?.model ?? "auto",
+      async (inputBuffer, settings, filename, ctx) => {
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let result: Awaited<ReturnType<typeof colorize>>;
+          try {
+            result = await colorize(
+              orientedBuffer,
+              scratchDir,
+              {
+                intensity: (settings as { intensity?: number }).intensity ?? 1.0,
+                model: (settings as { model?: string }).model ?? "auto",
+              },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
 
-        // Match the input's own format, the way the tool page does; a pipeline
-        // step that fed a JPEG used to get a PNG here (#2076).
-        const outputFormat = await resolveOutputFormat(orientedBuffer, filename);
-        let outputBuffer = result.buffer;
-        if (outputFormat.format !== "png") {
-          outputBuffer = await sharp(result.buffer)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
+          // Match the input's own format, the way the tool page does; a pipeline
+          // step that fed a JPEG used to get a PNG here (#2076).
+          const outputFormat = await resolveOutputFormat(orientedBuffer, filename);
+          let outputBuffer = result.buffer;
+          if (outputFormat.format !== "png") {
+            outputBuffer = await sharp(result.buffer)
+              .toFormat(outputFormat.format, outputFormat.encoderOptions)
+              .toBuffer();
+          }
+          const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
+          return {
+            buffer: outputBuffer,
+            filename: `${filename.replace(/\.[^.]+$/, "")}_colorized.${ext}`,
+            contentType: outputFormat.contentType,
+            resultPayload: {
+              width: result.width,
+              height: result.height,
+              method: result.method,
+            },
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
-        const ext = outputFormat.format === "jpeg" ? "jpg" : outputFormat.format;
-        return {
-          buffer: outputBuffer,
-          filename: `${filename.replace(/\.[^.]+$/, "")}_colorized.${ext}`,
-          contentType: outputFormat.contentType,
-          resultPayload: {
-            width: result.width,
-            height: result.height,
-            method: result.method,
-          },
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+      },
+    ),
   });
 }

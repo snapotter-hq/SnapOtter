@@ -1,7 +1,12 @@
 import { isSafeMessageError, isToolInputError, SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
+import type { AiJobHandler } from "../jobs/ai-handlers.js";
 import { isPixelSafetyError } from "../modality/image-input.js";
-import type { LegacyToolProcessResult, ToolProcessCtx } from "../routes/tool-factory.js";
+import type {
+  LegacyToolProcessResult,
+  ToolProcessCtx,
+  ToolProcessV2,
+} from "../routes/tool-factory.js";
 import { isOperationalErrno } from "./error-report.js";
 import { logger } from "./logger.js";
 
@@ -49,6 +54,39 @@ type ImageProcess<T> = (
  * the message is a sentence written for the user rather than Node's text,
  * which can carry temp paths.
  */
+function isPassthroughError(err: unknown): boolean {
+  if (err === "timeout") return true;
+  if (isSafeMessageError(err) || isToolInputError(err)) return true;
+  if (!(err instanceof Error)) return false;
+  return (
+    err.name === "InputValidationError" ||
+    err.name === "AbortError" ||
+    err.name === "AnimatedRemovalCanceledError" ||
+    (err as { statusCode?: unknown }).statusCode === 400 ||
+    /^(Canceled$|Timed out after )/i.test(err.message)
+  );
+}
+
+function wrapEncodeFailure<T>(
+  err: unknown,
+  message: string,
+  codeOf: (settings: T) => string,
+  settings: T,
+): never {
+  if (isPassthroughError(err)) {
+    throw err;
+  }
+  if (err instanceof Error && isOperationalErrno(err)) {
+    const code = String((err as NodeJS.ErrnoException).code);
+    throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });
+  }
+  throw new SafeError(message, {
+    kind: "bug",
+    code: codeOf(settings),
+    cause: err instanceof Error ? err : new Error(String(err)),
+  });
+}
+
 export function withImageEncodeContext<T>(
   message: string,
   codeOf: (settings: T) => string,
@@ -58,16 +96,35 @@ export function withImageEncodeContext<T>(
     try {
       return await process(inputBuffer, settings, filename, ctx);
     } catch (err) {
-      if (isSafeMessageError(err) || isToolInputError(err)) throw err;
-      if (err instanceof Error && isOperationalErrno(err)) {
-        const code = String((err as NodeJS.ErrnoException).code);
-        throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });
-      }
-      throw new SafeError(message, {
-        kind: "bug",
-        code: codeOf(settings),
-        cause: err instanceof Error ? err : new Error(String(err)),
-      });
+      wrapEncodeFailure(err, message, codeOf, settings);
+    }
+  };
+}
+
+export function withImageEncodeContextV2<T = unknown>(
+  message: string,
+  codeOf: (settings: T) => string,
+  processV2: ToolProcessV2,
+): ToolProcessV2 {
+  return async (ctx) => {
+    try {
+      return await processV2(ctx);
+    } catch (err) {
+      wrapEncodeFailure(err, message, codeOf, ctx.settings as T);
+    }
+  };
+}
+
+export function withAiImageEncodeContext<T = unknown>(
+  message: string,
+  codeOf: (settings: T) => string,
+  handler: AiJobHandler,
+): AiJobHandler {
+  return async (input, data, ctx) => {
+    try {
+      return await handler(input, data, ctx);
+    } catch (err) {
+      wrapEncodeFailure(err, message, codeOf, data.settings as T);
     }
   };
 }
@@ -95,17 +152,25 @@ export function withImageEncodeContext<T>(
  */
 export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknown): Promise<Error> {
   const alreadyClassified =
-    isSafeMessageError(err) ||
-    isToolInputError(err) ||
-    (err instanceof Error && err.name === "InputValidationError");
+    isPassthroughError(err) || (err instanceof Error && isOperationalErrno(err));
   if (alreadyClassified) return err as Error;
 
   try {
-    await sharp(inputBuffer).resize(1).raw().toBuffer();
+    const meta = await sharp(inputBuffer).metadata();
+    const animated = meta.format === "gif" || meta.format === "webp";
+    await sharp(inputBuffer, animated ? { animated: true } : undefined)
+      .resize(1)
+      .raw()
+      .toBuffer();
   } catch (probeErr) {
+    if (probeErr instanceof Error && isOperationalErrno(probeErr)) {
+      return err instanceof Error ? err : new Error(String(err));
+    }
     logger.info({ err, probeErr }, "undecodable image input rejected");
-    if (isPixelSafetyError(probeErr)) return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE);
-    return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE);
+    if (isPixelSafetyError(probeErr)) {
+      return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
+    }
+    return new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: err });
   }
   return err instanceof Error ? err : new Error(String(err));
 }

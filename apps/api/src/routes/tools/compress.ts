@@ -3,6 +3,7 @@ import { kbToBytes, SafeError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -32,8 +33,15 @@ async function runCompress(inputBuffer: Buffer, settings: CompressSettings, file
     compressOptions.quality = settings.quality ?? 80;
   }
 
-  const result = await compressDetailed(image, compressOptions);
-  const buffer = result.buffer ?? (await result.image.toBuffer());
+  let buffer: Buffer;
+  let resizedTo: { width: number; height: number } | undefined;
+  try {
+    const result = await compressDetailed(image, compressOptions);
+    buffer = result.buffer ?? (await result.image.toBuffer());
+    resizedTo = result.resizedTo;
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
+  }
   if (
     compressOptions.targetSizeBytes !== undefined &&
     buffer.length > compressOptions.targetSizeBytes
@@ -47,22 +55,28 @@ async function runCompress(inputBuffer: Buffer, settings: CompressSettings, file
     buffer,
     filename,
     contentType: outputFormat.contentType,
-    resultPayload: targetKb ? { targetKb, resizedTo: result.resizedTo } : undefined,
+    resultPayload: targetKb ? { targetKb, resizedTo } : undefined,
   };
 }
+
+const guardedCompress = withImageEncodeContext<CompressSettings>(
+  "Image compression failed",
+  (s) => s?.mode ?? "quality",
+  runCompress,
+);
 
 export function registerCompress(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "compress",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const { buffer, contentType } = await runCompress(inputBuffer, settings, filename);
+      const { buffer, contentType } = await guardedCompress(inputBuffer, settings, filename);
       return { buffer, filename, contentType };
     },
     // v2 so target-size runs can tell the client whether the image was shrunk to fit.
     processV2: async (ctx) => {
       const input = ctx.inputs[0];
-      return runCompress(input.buffer, settingsSchema.parse(ctx.settings), input.filename);
+      return guardedCompress(input.buffer, settingsSchema.parse(ctx.settings), input.filename);
     },
   });
 }

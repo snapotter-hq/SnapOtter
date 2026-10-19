@@ -27,6 +27,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
@@ -43,33 +48,45 @@ const settingsSchema = z.object({
 });
 
 // ── AI job handler ────────────────────────────────────────────────
-registerAiJobHandler("red-eye-removal", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
+registerAiJobHandler(
+  "red-eye-removal",
+  withAiImageEncodeContext(
+    "Red-eye removal failed",
+    () => "red-eye-removal",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
 
-  const result = await removeRedEye(
-    input,
-    ctx.scratchDir,
-    {
-      sensitivity: settings.sensitivity,
-      strength: settings.strength,
-      format: settings.format,
-      quality: settings.quality,
+      let result: Awaited<ReturnType<typeof removeRedEye>>;
+      try {
+        result = await removeRedEye(
+          input,
+          ctx.scratchDir,
+          {
+            sensitivity: settings.sensitivity,
+            strength: settings.strength,
+            format: settings.format,
+            quality: settings.quality,
+          },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(input, err);
+      }
+
+      const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
+
+      return {
+        buffer: result.buffer,
+        filename: outputFilename,
+        contentType: "image/png",
+        resultPayload: {
+          facesDetected: result.facesDetected,
+          eyesCorrected: result.eyesCorrected,
+        },
+      };
     },
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  const outputFilename = `${data.filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
-
-  return {
-    buffer: result.buffer,
-    filename: outputFilename,
-    contentType: "image/png",
-    resultPayload: {
-      facesDetected: result.facesDetected,
-      eyesCorrected: result.eyesCorrected,
-    },
-  };
-});
+  ),
+);
 
 /** Red eye detection and removal route. */
 export function registerRedEyeRemoval(app: FastifyInstance) {
@@ -230,60 +247,69 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
       format: z.string().optional(),
       quality: z.number().min(1).max(100).default(90),
     }),
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as {
-        sensitivity?: number;
-        strength?: number;
-        format?: string;
-        quality?: number;
-      };
-      let decoded = inputBuffer;
-      const validation = await validateImageBuffer(decoded, filename);
-      if (validation.valid && validation.format === "heif") {
-        decoded = await decodeHeic(decoded);
-      }
-      if (validation.valid && needsCliDecode(validation.format)) {
-        try {
-          decoded = await decodeToSharpCompat(decoded, validation.format);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+    process: withImageEncodeContext(
+      "Red-eye removal failed",
+      () => "red-eye-removal",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as {
+          sensitivity?: number;
+          strength?: number;
+          format?: string;
+          quality?: number;
+        };
+        let decoded = inputBuffer;
+        const validation = await validateImageBuffer(decoded, filename);
+        if (validation.valid && validation.format === "heif") {
+          decoded = await decodeHeic(decoded);
+        }
+        if (validation.valid && needsCliDecode(validation.format)) {
           try {
-            await sharp(decoded).metadata();
-          } catch (err) {
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-            throw err;
+            decoded = await decodeToSharpCompat(decoded, validation.format);
+          } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            try {
+              await sharp(decoded).metadata();
+            } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              throw err;
+            }
           }
         }
-      }
-      const orientedBuffer = await autoOrient(decoded);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const result = await removeRedEye(
-          orientedBuffer,
-          scratchDir,
-          {
-            sensitivity: s.sensitivity ?? 50,
-            strength: s.strength ?? 70,
-            format: s.format,
-            quality: s.quality ?? 90,
-          },
-          ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-        );
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
-        return {
-          buffer: result.buffer,
-          filename: outputFilename,
-          contentType: "image/png",
-          resultPayload: {
-            facesDetected: result.facesDetected,
-            eyesCorrected: result.eyesCorrected,
-          },
-        };
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+        const orientedBuffer = await autoOrient(decoded);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let result: Awaited<ReturnType<typeof removeRedEye>>;
+          try {
+            result = await removeRedEye(
+              orientedBuffer,
+              scratchDir,
+              {
+                sensitivity: s.sensitivity ?? 50,
+                strength: s.strength ?? 70,
+                format: s.format,
+                quality: s.quality ?? 90,
+              },
+              ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+            );
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
+          const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_redeye_fixed.png`;
+          return {
+            buffer: result.buffer,
+            filename: outputFilename,
+            contentType: "image/png",
+            resultPayload: {
+              facesDetected: result.facesDetected,
+              eyesCorrected: result.eyesCorrected,
+            },
+          };
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

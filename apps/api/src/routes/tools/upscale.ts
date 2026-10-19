@@ -27,6 +27,11 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
@@ -95,20 +100,25 @@ async function runUpscale(
   const needsNodeConversion = ["heic", "heif", "avif", "jxl"].includes(format);
   const pythonFormat = needsNodeConversion ? "png" : format;
 
-  const result = await upscale(
-    input,
-    scratchDir,
-    {
-      scale,
-      model,
-      faceEnhance,
-      denoise,
-      format: pythonFormat,
-      quality: outputQuality,
-      signal: ctx?.signal,
-    },
-    ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
-  );
+  let result: Awaited<ReturnType<typeof upscale>>;
+  try {
+    result = await upscale(
+      input,
+      scratchDir,
+      {
+        scale,
+        model,
+        faceEnhance,
+        denoise,
+        format: pythonFormat,
+        quality: outputQuality,
+        signal: ctx?.signal,
+      },
+      ctx ? (percent, stage) => ctx.report(percent, stage) : undefined,
+    );
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(input, err);
+  }
 
   let outputBuffer = result.buffer;
   let finalFormat = result.format;
@@ -141,9 +151,16 @@ async function runUpscale(
 }
 
 // ── AI job handler (runs inside the BullMQ worker) ────────────────
-registerAiJobHandler("upscale", async (input, data, ctx) => {
-  return runUpscale(input, data.settings, data.filename, ctx.scratchDir, ctx);
-});
+registerAiJobHandler(
+  "upscale",
+  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+    "Image upscaling failed",
+    (s) => String(s?.format ?? "auto"),
+    async (input, data, ctx) => {
+      return runUpscale(input, data.settings, data.filename, ctx.scratchDir, ctx);
+    },
+  ),
+);
 
 /**
  * AI image upscaling route.
@@ -301,20 +318,24 @@ export function registerUpscale(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "upscale",
     settingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        return await runUpscale(orientedBuffer, settings, filename, scratchDir, ctx);
-      } finally {
-        if (needsCleanup) {
-          await rm(scratchDir, { recursive: true, force: true }).catch((err) => {
-            logger.error({ err, scratchDir }, "Failed to clean up upscale scratch directory");
-          });
+    process: withImageEncodeContext<unknown>(
+      "Image upscaling failed",
+      (s) => String((s as z.infer<typeof settingsSchema>)?.format ?? "auto"),
+      async (inputBuffer, settings, filename, ctx) => {
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          return await runUpscale(orientedBuffer, settings, filename, scratchDir, ctx);
+        } finally {
+          if (needsCleanup) {
+            await rm(scratchDir, { recursive: true, force: true }).catch((err) => {
+              logger.error({ err, scratchDir }, "Failed to clean up upscale scratch directory");
+            });
+          }
         }
-      }
-    },
+      },
+    ),
   });
 }

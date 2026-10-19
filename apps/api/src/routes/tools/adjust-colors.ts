@@ -11,6 +11,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor, runPerFrame } from "../../lib/animated-image.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -70,12 +71,16 @@ async function processColorAdjustments(
   // strip. That one setting goes frame by frame; the rest keep the cheaper
   // single pass over the whole animation (#1083).
   if (settings.sharpness > 0) {
-    const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
-      const result = await processColorAdjustments(frame, settings, filename);
-      return result.buffer;
-    });
-    if (perFrame) {
-      return { buffer: perFrame, filename, contentType: outputFormat.contentType };
+    try {
+      const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
+        const result = await processColorAdjustments(frame, settings, filename);
+        return result.buffer;
+      });
+      if (perFrame) {
+        return { buffer: perFrame, filename, contentType: outputFormat.contentType };
+      }
+    } catch (err) {
+      throw await asInputErrorIfUndecodable(inputBuffer, err);
     }
   }
 
@@ -146,18 +151,27 @@ async function processColorAdjustments(
   // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
   // values >= 1.0 clamp to white. Materialising through PNG casts back to
   // 8-bit uchar first (#2586).
-  const finalImage = outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
-  const buffer = await finalImage
-    .toFormat(outputFormat.format, outputFormat.encoderOptions)
-    .toBuffer();
+  let buffer: Buffer;
+  try {
+    const finalImage = outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
+    buffer = await finalImage.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(inputBuffer, err);
+  }
   return { buffer, filename, contentType: outputFormat.contentType };
 }
+
+const guardedProcessColorAdjustments = withImageEncodeContext<z.infer<typeof settingsSchema>>(
+  "Color adjustment failed",
+  (s) => s?.effect ?? "none",
+  processColorAdjustments,
+);
 
 export function registerColorAdjustments(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "adjust-colors",
     settingsSchema,
-    process: processColorAdjustments,
+    process: guardedProcessColorAdjustments,
   });
   // Backwards-compatible alias routes consolidated into adjust-colors. These
   // ids are not catalog TOOLS, so pass the section explicitly (all image).
@@ -167,7 +181,7 @@ export function registerColorAdjustments(app: FastifyInstance) {
       toolId,
       section: "image",
       settingsSchema,
-      process: processColorAdjustments,
+      process: guardedProcessColorAdjustments,
     });
   }
 }

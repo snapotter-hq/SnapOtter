@@ -8,6 +8,7 @@ import {
   getBundleForTool,
   HEX_COLOR_PATTERN,
   hasServerErrorStatus,
+  isToolInputError,
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -38,6 +39,11 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
@@ -153,46 +159,58 @@ async function compositeCutout(
 // fn's braces: since #2076 that fn owns pipeline steps and batch children, and
 // the only kind reaching here is "ai-tool", but both paths call the same
 // compositeCutout so neither can drift from the other.
-registerAiJobHandler("remove-background", async (input, data, ctx) => {
-  const settings = settingsSchema.parse(data.settings);
-  const standalone = data.kind === "ai-tool";
-  const source = standalone ? input : await autoOrient(input);
+registerAiJobHandler(
+  "remove-background",
+  withAiImageEncodeContext<RemoveBgSettings>(
+    "Background removal failed",
+    (s) => s?.outputFormat ?? "png",
+    async (input, data, ctx) => {
+      const settings = settingsSchema.parse(data.settings);
+      const standalone = data.kind === "ai-tool";
+      const source = standalone ? input : await autoOrient(input);
 
-  // Phase 1: AI background removal -> transparent PNG
-  const transparentResult = await removeBackground(
-    source,
-    ctx.scratchDir,
-    {
-      model: settings.model,
-      edgeRefine: settings.edgeRefine,
-      decontaminate: settings.decontaminate,
-      signal: ctx.signal,
+      // Phase 1: AI background removal -> transparent PNG
+      let transparentResult: Buffer;
+      try {
+        transparentResult = await removeBackground(
+          source,
+          ctx.scratchDir,
+          {
+            model: settings.model,
+            edgeRefine: settings.edgeRefine,
+            decontaminate: settings.decontaminate,
+            signal: ctx.signal,
+          },
+          (percent, stage) => ctx.report(percent, stage),
+        );
+      } catch (err) {
+        throw await asInputErrorIfUndecodable(source, err);
+      }
+
+      if (!standalone) return compositeCutout(transparentResult, source, settings, data.filename);
+
+      // The mask IS the transparent result; cache original for effects re-apply
+      const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
+      const originalFilename = `${data.filename.replace(/\.[^.]+$/, "")}_original.png`;
+
+      const maskUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
+      const originalUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(originalFilename)}`;
+
+      return {
+        buffer: transparentResult,
+        filename: maskFilename,
+        contentType: "image/png",
+        resultPayload: {
+          maskUrl,
+          originalUrl,
+          filename: data.filename,
+          model: settings.model,
+        },
+        extraOutputs: [{ name: originalFilename, buffer: input, contentType: "image/png" }],
+      };
     },
-    (percent, stage) => ctx.report(percent, stage),
-  );
-
-  if (!standalone) return compositeCutout(transparentResult, source, settings, data.filename);
-
-  // The mask IS the transparent result; cache original for effects re-apply
-  const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
-  const originalFilename = `${data.filename.replace(/\.[^.]+$/, "")}_original.png`;
-
-  const maskUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
-  const originalUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(originalFilename)}`;
-
-  return {
-    buffer: transparentResult,
-    filename: maskFilename,
-    contentType: "image/png",
-    resultPayload: {
-      maskUrl,
-      originalUrl,
-      filename: data.filename,
-      model: settings.model,
-    },
-    extraOutputs: [{ name: originalFilename, buffer: input, contentType: "image/png" }],
-  };
-});
+  ),
+);
 
 /**
  * AI background removal with two-phase flow:
@@ -508,19 +526,27 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
         // Apply effects using cached mask + original
         const fmt = (settings.outputFormat ?? "png") as BgOutputFormat;
-        const resultBuffer = await applyEffects(maskBuffer, originalBuffer, {
-          backgroundType: settings.backgroundType,
-          backgroundColor: settings.backgroundColor,
-          gradientColor1: settings.gradientColor1,
-          gradientColor2: settings.gradientColor2,
-          gradientAngle: settings.gradientAngle,
-          backgroundImageBuffer: bgImageBuffer ?? undefined,
-          blurEnabled: settings.blurEnabled,
-          blurIntensity: settings.blurIntensity,
-          shadowEnabled: settings.shadowEnabled,
-          shadowOpacity: settings.shadowOpacity,
-          outputFormat: fmt,
-        });
+        let resultBuffer: Buffer;
+        try {
+          resultBuffer = await applyEffects(maskBuffer, originalBuffer, {
+            backgroundType: settings.backgroundType,
+            backgroundColor: settings.backgroundColor,
+            gradientColor1: settings.gradientColor1,
+            gradientColor2: settings.gradientColor2,
+            gradientAngle: settings.gradientAngle,
+            backgroundImageBuffer: bgImageBuffer ?? undefined,
+            blurEnabled: settings.blurEnabled,
+            blurIntensity: settings.blurIntensity,
+            shadowEnabled: settings.shadowEnabled,
+            shadowOpacity: settings.shadowOpacity,
+            outputFormat: fmt,
+          });
+        } catch (err) {
+          if (bgImageBuffer) {
+            throw await asInputErrorIfUndecodable(bgImageBuffer, err);
+          }
+          throw err;
+        }
 
         // Save the final output
         const outputFilename = `${baseName}_nobg.${fmt}`;
@@ -550,7 +576,9 @@ export function registerRemoveBackground(app: FastifyInstance) {
       } catch (err) {
         if (isDecoderUnavailable(err)) throw err;
         if (hasServerErrorStatus(err)) throw err;
-        request.log.error({ err }, "Effects processing failed");
+        if (!isToolInputError(err)) {
+          request.log.error({ err }, "Effects processing failed");
+        }
         return reply.status(422).send({
           error: "Effects processing failed",
           details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
@@ -563,24 +591,33 @@ export function registerRemoveBackground(app: FastifyInstance) {
   registerToolProcessFn({
     toolId: "remove-background",
     settingsSchema: pipelineSettingsSchema,
-    process: async (inputBuffer, settings, filename, ctx) => {
-      const s = settings as z.infer<typeof settingsSchema>;
-      const orientedBuffer = await autoOrient(inputBuffer);
-      const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
-      const needsCleanup = !ctx?.scratchDir;
-      if (needsCleanup) await mkdir(scratchDir, { recursive: true });
-      try {
-        const transparentResult = await removeBackground(orientedBuffer, scratchDir, {
-          model: s.model,
-          edgeRefine: s.edgeRefine,
-          decontaminate: s.decontaminate,
-          signal: ctx?.signal,
-        });
+    process: withImageEncodeContext<unknown>(
+      "Background removal failed",
+      (s) => (s as RemoveBgSettings)?.outputFormat ?? "png",
+      async (inputBuffer, settings, filename, ctx) => {
+        const s = settings as z.infer<typeof settingsSchema>;
+        const orientedBuffer = await autoOrient(inputBuffer);
+        const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
+        const needsCleanup = !ctx?.scratchDir;
+        if (needsCleanup) await mkdir(scratchDir, { recursive: true });
+        try {
+          let transparentResult: Buffer;
+          try {
+            transparentResult = await removeBackground(orientedBuffer, scratchDir, {
+              model: s.model,
+              edgeRefine: s.edgeRefine,
+              decontaminate: s.decontaminate,
+              signal: ctx?.signal,
+            });
+          } catch (err) {
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
+          }
 
-        return await compositeCutout(transparentResult, orientedBuffer, s, filename);
-      } finally {
-        if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+          return await compositeCutout(transparentResult, orientedBuffer, s, filename);
+        } finally {
+          if (needsCleanup) await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+        }
+      },
+    ),
   });
 }

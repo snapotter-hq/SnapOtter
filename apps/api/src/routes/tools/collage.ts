@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { COLLAGE_PAN_LIMIT } from "@snapotter/shared";
+import { COLLAGE_PAN_LIMIT, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
@@ -15,6 +15,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
+import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
@@ -589,122 +590,128 @@ export function registerCollage(app: FastifyInstance) {
         const cellH = Math.max(1, Math.round(rect.h));
         const cellSetting = cellSettings[i] ?? { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
 
-        // Get image metadata for proper crop calculation
-        const meta = await sharp(files[i].buffer).metadata();
-        if (!meta.width || !meta.height) {
-          // Falling back to the cell's own size would fill-stretch the image
-          // to the cell aspect: silent distortion instead of an error (#718).
-          throw new InputValidationError(
-            `Could not read image dimensions for "${files[i].filename}"`,
-          );
-        }
-        const imgW = meta.width;
-        const imgH = meta.height;
-
         const zoom = Math.max(1, cellSetting.zoom);
         const fitMode = cellSetting.objectFit ?? "cover";
 
         let cellBuffer: Buffer;
 
-        if (fitMode === "contain") {
-          // Contain: fit entire image inside the cell, fill rest with background
-          const bgColor =
-            settings.backgroundColor === "transparent"
-              ? { r: 0, g: 0, b: 0, alpha: 0 }
-              : (() => {
-                  const hex = settings.backgroundColor.replace("#", "");
-                  return {
-                    r: Number.parseInt(hex.substring(0, 2), 16),
-                    g: Number.parseInt(hex.substring(2, 4), 16),
-                    b: Number.parseInt(hex.substring(4, 6), 16),
-                    alpha: 1,
-                  };
-                })();
+        try {
+          // Get image metadata for proper crop calculation
+          const meta = await sharp(files[i].buffer).metadata();
+          if (!meta.width || !meta.height) {
+            // Falling back to the cell's own size would fill-stretch the image
+            // to the cell aspect: silent distortion instead of an error (#718).
+            throw new InputValidationError(
+              `Could not read image dimensions for "${files[i].filename}"`,
+            );
+          }
+          const imgW = meta.width;
+          const imgH = meta.height;
 
-          // The preview renders contain cells as object-contain plus
-          // `translate(panX%, panY%) scale(zoom)` clipped at the cell (#711).
-          // Pan is a fraction of the cell, and neither offset scales with zoom.
-          const panXPx = Math.round((cellSetting.panX / 100) * cellW);
-          const panYPx = Math.round((cellSetting.panY / 100) * cellH);
+          if (fitMode === "contain") {
+            // Contain: fit entire image inside the cell, fill rest with background
+            const bgColor =
+              settings.backgroundColor === "transparent"
+                ? { r: 0, g: 0, b: 0, alpha: 0 }
+                : (() => {
+                    const hex = settings.backgroundColor.replace("#", "");
+                    return {
+                      r: Number.parseInt(hex.substring(0, 2), 16),
+                      g: Number.parseInt(hex.substring(2, 4), 16),
+                      b: Number.parseInt(hex.substring(4, 6), 16),
+                      alpha: 1,
+                    };
+                  })();
 
-          if (zoom === 1 && panXPx === 0 && panYPx === 0) {
+            // The preview renders contain cells as object-contain plus
+            // `translate(panX%, panY%) scale(zoom)` clipped at the cell (#711).
+            // Pan is a fraction of the cell, and neither offset scales with zoom.
+            const panXPx = Math.round((cellSetting.panX / 100) * cellW);
+            const panYPx = Math.round((cellSetting.panY / 100) * cellH);
+
+            if (zoom === 1 && panXPx === 0 && panYPx === 0) {
+              // PNG, not the input format: a JPEG cell buffer cannot carry the
+              // alpha the cornerRadius mask cuts, so corners flatten to black.
+              cellBuffer = await sharp(files[i].buffer)
+                .resize(cellW, cellH, { fit: "contain", background: bgColor })
+                .png()
+                .toBuffer();
+            } else {
+              // Chaining a zoom resize into the contain resize does not work:
+              // Sharp keeps one set of resize options per pipeline, and even as
+              // two pipelines the contain step would scale the zoom right back
+              // out. Scale the contain-fitted image, place it about the cell
+              // centre, clip to the cell and composite over the background.
+              const fitScale = Math.min(cellW / imgW, cellH / imgH);
+              const contentW = Math.max(1, Math.round(imgW * fitScale * zoom));
+              const contentH = Math.max(1, Math.round(imgH * fitScale * zoom));
+              // floor, not round: sharp's own contain places content at
+              // floor((cell - content) / 2), and matching it keeps the two
+              // paths from drifting a pixel apart when the difference is odd.
+              const x0 = Math.floor((cellW - contentW) / 2) + panXPx;
+              const y0 = Math.floor((cellH - contentH) / 2) + panYPx;
+
+              const visLeft = Math.max(0, x0);
+              const visTop = Math.max(0, y0);
+              const visRight = Math.min(cellW, x0 + contentW);
+              const visBottom = Math.min(cellH, y0 + contentH);
+
+              const canvas = sharp({
+                create: { width: cellW, height: cellH, channels: 4, background: bgColor },
+              });
+
+              if (visRight <= visLeft || visBottom <= visTop) {
+                // Panned entirely out of the cell: background only.
+                cellBuffer = await canvas.png().toBuffer();
+              } else {
+                // PNG, so the cell is not re-encoded in its own input's container
+                // on the way to the canvas (#1190).
+                const visible = await sharp(files[i].buffer)
+                  .resize(contentW, contentH, { fit: "fill" })
+                  .extract({
+                    left: visLeft - x0,
+                    top: visTop - y0,
+                    width: visRight - visLeft,
+                    height: visBottom - visTop,
+                  })
+                  .png()
+                  .toBuffer();
+                cellBuffer = await canvas
+                  .composite([{ input: visible, left: visLeft, top: visTop }])
+                  .png()
+                  .toBuffer();
+              }
+            }
+          } else {
+            // Cover: resize to fully fill the cell, then crop with pan offset
+            const scaleToFit = Math.max(cellW / imgW, cellH / imgH);
+            const resizedW = Math.round(imgW * scaleToFit * zoom);
+            const resizedH = Math.round(imgH * scaleToFit * zoom);
+
+            const overflowX = Math.max(0, resizedW - cellW);
+            const overflowY = Math.max(0, resizedH - cellH);
+            const extractLeft = Math.round(
+              overflowX / 2 - (cellSetting.panX / 100) * (overflowX / 2),
+            );
+            const extractTop = Math.round(
+              overflowY / 2 - (cellSetting.panY / 100) * (overflowY / 2),
+            );
+
             // PNG, not the input format: a JPEG cell buffer cannot carry the
             // alpha the cornerRadius mask cuts, so corners flatten to black.
             cellBuffer = await sharp(files[i].buffer)
-              .resize(cellW, cellH, { fit: "contain", background: bgColor })
+              .resize(resizedW, resizedH, { fit: "fill" })
+              .extract({
+                left: Math.max(0, Math.min(extractLeft, resizedW - cellW)),
+                top: Math.max(0, Math.min(extractTop, resizedH - cellH)),
+                width: cellW,
+                height: cellH,
+              })
               .png()
               .toBuffer();
-          } else {
-            // Chaining a zoom resize into the contain resize does not work:
-            // Sharp keeps one set of resize options per pipeline, and even as
-            // two pipelines the contain step would scale the zoom right back
-            // out. Scale the contain-fitted image, place it about the cell
-            // centre, clip to the cell and composite over the background.
-            const fitScale = Math.min(cellW / imgW, cellH / imgH);
-            const contentW = Math.max(1, Math.round(imgW * fitScale * zoom));
-            const contentH = Math.max(1, Math.round(imgH * fitScale * zoom));
-            // floor, not round: sharp's own contain places content at
-            // floor((cell - content) / 2), and matching it keeps the two
-            // paths from drifting a pixel apart when the difference is odd.
-            const x0 = Math.floor((cellW - contentW) / 2) + panXPx;
-            const y0 = Math.floor((cellH - contentH) / 2) + panYPx;
-
-            const visLeft = Math.max(0, x0);
-            const visTop = Math.max(0, y0);
-            const visRight = Math.min(cellW, x0 + contentW);
-            const visBottom = Math.min(cellH, y0 + contentH);
-
-            const canvas = sharp({
-              create: { width: cellW, height: cellH, channels: 4, background: bgColor },
-            });
-
-            if (visRight <= visLeft || visBottom <= visTop) {
-              // Panned entirely out of the cell: background only.
-              cellBuffer = await canvas.png().toBuffer();
-            } else {
-              // PNG, so the cell is not re-encoded in its own input's container
-              // on the way to the canvas (#1190).
-              const visible = await sharp(files[i].buffer)
-                .resize(contentW, contentH, { fit: "fill" })
-                .extract({
-                  left: visLeft - x0,
-                  top: visTop - y0,
-                  width: visRight - visLeft,
-                  height: visBottom - visTop,
-                })
-                .png()
-                .toBuffer();
-              cellBuffer = await canvas
-                .composite([{ input: visible, left: visLeft, top: visTop }])
-                .png()
-                .toBuffer();
-            }
           }
-        } else {
-          // Cover: resize to fully fill the cell, then crop with pan offset
-          const scaleToFit = Math.max(cellW / imgW, cellH / imgH);
-          const resizedW = Math.round(imgW * scaleToFit * zoom);
-          const resizedH = Math.round(imgH * scaleToFit * zoom);
-
-          const overflowX = Math.max(0, resizedW - cellW);
-          const overflowY = Math.max(0, resizedH - cellH);
-          const extractLeft = Math.round(
-            overflowX / 2 - (cellSetting.panX / 100) * (overflowX / 2),
-          );
-          const extractTop = Math.round(overflowY / 2 - (cellSetting.panY / 100) * (overflowY / 2));
-
-          // PNG, not the input format: a JPEG cell buffer cannot carry the
-          // alpha the cornerRadius mask cuts, so corners flatten to black.
-          cellBuffer = await sharp(files[i].buffer)
-            .resize(resizedW, resizedH, { fit: "fill" })
-            .extract({
-              left: Math.max(0, Math.min(extractLeft, resizedW - cellW)),
-              top: Math.max(0, Math.min(extractTop, resizedH - cellH)),
-              width: cellW,
-              height: cellH,
-            })
-            .png()
-            .toBuffer();
+        } catch (err) {
+          throw await asInputErrorIfUndecodable(files[i].buffer, err);
         }
 
         // Apply corner radius via SVG mask if needed
@@ -784,10 +791,10 @@ export function registerCollage(app: FastifyInstance) {
         processedSize: finalBuffer.length,
       });
     } catch (err) {
-      if (err instanceof InputValidationError) {
-        // Genuine bad input (e.g. an image whose dimensions won't decode). The
-        // 422 here is the documented worker-error convention, not the factory's
-        // 400 (see #718); keep it.
+      if (err instanceof InputValidationError || isToolInputError(err)) {
+        // Genuine bad input (e.g. an image whose dimensions or pixels won't
+        // decode). The 422 here is the documented worker-error convention, not
+        // the factory's 400 (see #718); keep it.
         return reply.status(422).send({
           error: "Collage creation failed",
           details: err.message,

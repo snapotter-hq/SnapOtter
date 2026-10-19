@@ -19,6 +19,11 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import {
+  asInputErrorIfUndecodable,
+  withAiImageEncodeContext,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { deleteObject } from "../../lib/object-storage.js";
@@ -83,17 +88,22 @@ async function processOcrJob(
   ctx.signal.throwIfAborted();
   ctx.report(10, "Preparing OCR");
 
-  const result = await extractText(
-    prepared.buffer,
-    ctx.scratchDir,
-    {
-      quality,
-      language: settings.language,
-      enhance: settings.enhance ?? quality === "best",
-      signal: ctx.signal,
-    },
-    (percent, stage) => ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
-  );
+  let result: Awaited<ReturnType<typeof extractText>>;
+  try {
+    result = await extractText(
+      prepared.buffer,
+      ctx.scratchDir,
+      {
+        quality,
+        language: settings.language,
+        enhance: settings.enhance ?? quality === "best",
+        signal: ctx.signal,
+      },
+      (percent, stage) => ctx.report(10 + Math.max(0, Math.min(100, percent)) * 0.9, stage),
+    );
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(prepared.buffer, err);
+  }
   const base = prepared.filename.replace(/\.[^.]+$/, "");
   return {
     buffer: Buffer.from(result.text, "utf-8"),
@@ -103,23 +113,32 @@ async function processOcrJob(
   };
 }
 
-registerAiJobHandler("ocr", async (input, data, ctx) =>
-  processOcrJob(input, data.settings, data.filename, ctx),
+registerAiJobHandler(
+  "ocr",
+  withAiImageEncodeContext<OcrSettings>(
+    "OCR processing failed",
+    (s) => s?.quality ?? "fast",
+    async (input, data, ctx) => processOcrJob(input, data.settings, data.filename, ctx),
+  ),
 );
 
 registerToolProcessFn({
   toolId: "ocr",
   settingsSchema,
-  process: async (input, settings, filename, ctx) => {
-    if (!ctx) throw new Error("OCR processing context is required");
-    const result = await processOcrJob(input, settings, filename, ctx);
-    return {
-      buffer: result.buffer,
-      filename: result.filename,
-      contentType: result.contentType,
-      resultPayload: result.resultPayload,
-    };
-  },
+  process: withImageEncodeContext<unknown>(
+    "OCR processing failed",
+    (s) => (s as OcrSettings)?.quality ?? "fast",
+    async (input, settings, filename, ctx) => {
+      if (!ctx) throw new Error("OCR processing context is required");
+      const result = await processOcrJob(input, settings, filename, ctx);
+      return {
+        buffer: result.buffer,
+        filename: result.filename,
+        contentType: result.contentType,
+        resultPayload: result.resultPayload,
+      };
+    },
+  ),
 });
 
 /**
