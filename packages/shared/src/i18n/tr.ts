@@ -1998,10 +1998,8 @@ export const tr: TranslationKeys = {
       submit: "Nesneyi Sil",
       submitBatch: "Tümünü Sil ({count})",
       progressLabel: "Nesne siliniyor",
-      stall:
-        "İşlem ilerleme olmadan zaman aşımına uğradı. Sonuç dosyalarınıza kaydedilmiş olabilir; aksi halde tekrar deneyin.",
-      stallBatch:
-        "İşlem zaman aşımına uğradı. Sonuç kaydedilmiş olabilir, dosyalarınızı kontrol edin.",
+      stall: "İşlem ilerleme olmadan zaman aşımına uğradı. Tekrar deneyin.",
+      stallBatch: "İşlem zaman aşımına uğradı. Tekrar deneyin.",
       timeoutOverloaded: "İstek zaman aşımına uğradı, sunucu aşırı yüklü olabilir. Tekrar deneyin.",
       erasingProgress: "Siliniyor {current}/{total}",
     },

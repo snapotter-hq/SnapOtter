@@ -189,11 +189,8 @@ export function subscribeEraseObjectJobProgress(
 
 /**
  * Cancels the job when the stream failed because handling a frame threw. A
- * failed frame, a completed frame with no result and a stall don't cancel: the
- * first two arrive with the server done with the job, and a stall's copy tells
- * the user the result may have saved. (A failed frame whose display throws is
- * relabelled trackingFailed by the stream and cancels too; the server answers
- * `canceled: false`.)
+ * failed frame and a completed frame with no result don't cancel, since both
+ * arrive with the server already done with the job.
  */
 function cancelIfHandlingFailed(failure: JobFailure, clientJobId: string) {
   if ("reason" in failure && failure.reason === "trackingFailed") {
@@ -317,11 +314,16 @@ export function EraseObjectSettings({
         },
         onFailed: (failure) => {
           if (abandoned) return;
+          abandoned = true;
           cancelIfHandlingFailed(failure, clientJobId);
           abandon(new Error(jobFailureMessage(failure, t.errors)));
         },
-        onStall: () =>
-          abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout")),
+        onStall: () => {
+          if (abandoned) return;
+          abandoned = true;
+          abandonedJob.cancelOnStall();
+          abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout"));
+        },
       });
       const stopProgress = subscription.stop;
       // Drops this file where it stands. The error only settles the promise:
@@ -566,6 +568,8 @@ export function EraseObjectSettings({
       },
       onStall: () => {
         endWatch();
+        if (runEndedWithError) return;
+        abandonedJob.cancelOnStall();
         endRunWithError(t.toolSettings["erase-object"].stall, abandonRequest);
       },
     });

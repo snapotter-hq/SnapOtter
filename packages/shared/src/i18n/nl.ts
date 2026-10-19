@@ -2001,10 +2001,8 @@ export const nl: TranslationKeys = {
       submit: "Object verwijderen",
       submitBatch: "Alles verwijderen ({count})",
       progressLabel: "Object verwijderen",
-      stall:
-        "Verwerking duurde te lang zonder voortgang. Het resultaat is mogelijk in je bestanden opgeslagen, probeer het anders opnieuw.",
-      stallBatch:
-        "Verwerking duurde te lang. Het resultaat is mogelijk opgeslagen, controleer je bestanden.",
+      stall: "Verwerking duurde te lang zonder voortgang. Probeer het opnieuw.",
+      stallBatch: "Verwerking duurde te lang. Probeer het opnieuw.",
       timeoutOverloaded:
         "Time-out van verzoek: de server is mogelijk overbelast. Probeer het opnieuw.",
       erasingProgress: "Wissen {current}/{total}",

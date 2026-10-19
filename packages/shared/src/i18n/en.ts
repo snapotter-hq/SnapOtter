@@ -1938,9 +1938,8 @@ export const en = {
       submit: "Erase Object",
       submitBatch: "Erase All ({count})",
       progressLabel: "Erasing object",
-      stall:
-        "Processing timed out with no progress. The result may have saved to your files; otherwise, try again.",
-      stallBatch: "Processing timed out. The result may have saved; check your files.",
+      stall: "Processing timed out with no progress. Try again.",
+      stallBatch: "Processing timed out. Try again.",
       timeoutOverloaded: "Request timed out - the server may be overloaded. Try again.",
       erasingProgress: "Erasing {current}/{total}",
     },

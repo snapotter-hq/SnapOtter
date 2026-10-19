@@ -1998,10 +1998,8 @@ export const ptBR: TranslationKeys = {
       submit: "Apagar objeto",
       submitBatch: "Apagar todos ({count})",
       progressLabel: "Apagando objeto",
-      stall:
-        "O processamento expirou sem progresso. O resultado pode ter sido salvo nos seus arquivos; caso contrário, tente novamente.",
-      stallBatch:
-        "O processamento expirou. O resultado pode ter sido salvo, verifique seus arquivos.",
+      stall: "O processamento expirou sem progresso. Tente novamente.",
+      stallBatch: "O processamento expirou. Tente novamente.",
       timeoutOverloaded:
         "A requisição expirou, o servidor pode estar sobrecarregado. Tente novamente.",
       erasingProgress: "Apagando {current}/{total}",

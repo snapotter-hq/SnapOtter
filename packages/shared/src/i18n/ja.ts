@@ -1950,10 +1950,8 @@ export const ja: TranslationKeys = {
       submit: "消去",
       submitBatch: "すべて消去（{count}）",
       progressLabel: "オブジェクトを消去中",
-      stall:
-        "処理が進まないままタイムアウトしました。結果はファイルに保存されている可能性があります。保存されていない場合は、もう一度お試しください。",
-      stallBatch:
-        "処理がタイムアウトしました。結果が保存されている可能性があるため、ファイルを確認してください。",
+      stall: "処理が進まないままタイムアウトしました。もう一度お試しください。",
+      stallBatch: "処理がタイムアウトしました。もう一度お試しください。",
       timeoutOverloaded:
         "リクエストがタイムアウトしました。サーバーが過負荷の可能性があります。もう一度お試しください。",
       erasingProgress: "消去中 {current}/{total}",

@@ -44,6 +44,12 @@ export interface AbandonedJobTracker {
    * aborting it (#2093, #2136, #2239).
    */
   keepRequestOnStop: () => boolean;
+  /**
+   * Cancel the job when the progress stream gives up after a stall (#1960).
+   * Cancels immediately if the server already accepted the job; otherwise arms
+   * a cancel in case a 202 arrives before the caller's abort takes effect.
+   */
+  cancelOnStall: () => void;
 }
 
 /**
@@ -88,6 +94,15 @@ export function trackAbandonedJob(
         return true;
       }
       return false;
+    },
+    cancelOnStall() {
+      if (stopped) return;
+      stopped = true;
+      if (accepted) {
+        void cancelAbandonedJob(clientJobId, toolId);
+        return;
+      }
+      cancelOnAnswer = true;
     },
   };
 }

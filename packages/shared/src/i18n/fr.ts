@@ -2007,10 +2007,8 @@ export const fr: TranslationKeys = {
       submit: "Effacer l'objet",
       submitBatch: "Tout effacer ({count})",
       progressLabel: "Effacement de l'objet",
-      stall:
-        "Délai de traitement dépassé sans progression. Le résultat a peut-être été enregistré dans vos fichiers ; sinon, veuillez réessayer.",
-      stallBatch:
-        "Délai de traitement dépassé. Le résultat a peut-être été enregistré : vérifiez vos fichiers.",
+      stall: "Délai de traitement dépassé sans progression. Veuillez réessayer.",
+      stallBatch: "Délai de traitement dépassé. Veuillez réessayer.",
       timeoutOverloaded:
         "Délai d'attente dépassé. Le serveur est peut-être surchargé. Veuillez réessayer.",
       erasingProgress: "Effacement {current}/{total}",

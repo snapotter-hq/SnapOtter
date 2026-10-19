@@ -1998,10 +1998,8 @@ export const it: TranslationKeys = {
       submit: "Cancella oggetto",
       submitBatch: "Cancella tutti ({count})",
       progressLabel: "Cancellazione oggetto",
-      stall:
-        "Tempo di elaborazione scaduto senza progressi. Il risultato potrebbe essere stato salvato nei tuoi file; altrimenti, riprova.",
-      stallBatch:
-        "Tempo di elaborazione scaduto. Il risultato potrebbe essere stato salvato: controlla i tuoi file.",
+      stall: "Tempo di elaborazione scaduto senza progressi. Riprova.",
+      stallBatch: "Tempo di elaborazione scaduto. Riprova.",
       timeoutOverloaded: "Richiesta scaduta. Il server potrebbe essere sovraccarico. Riprova.",
       erasingProgress: "Cancellazione {current}/{total}",
     },

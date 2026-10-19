@@ -2005,10 +2005,8 @@ export const de: TranslationKeys = {
       submit: "Objekt entfernen",
       submitBatch: "Alle entfernen ({count})",
       progressLabel: "Objekt wird entfernt",
-      stall:
-        "Zeitüberschreitung bei der Verarbeitung ohne Fortschritt. Das Ergebnis wurde möglicherweise in Ihren Dateien gespeichert, andernfalls versuchen Sie es erneut.",
-      stallBatch:
-        "Zeitüberschreitung bei der Verarbeitung. Das Ergebnis wurde möglicherweise gespeichert, prüfen Sie Ihre Dateien.",
+      stall: "Zeitüberschreitung bei der Verarbeitung ohne Fortschritt. Versuchen Sie es erneut.",
+      stallBatch: "Zeitüberschreitung bei der Verarbeitung. Versuchen Sie es erneut.",
       timeoutOverloaded:
         "Zeitüberschreitung der Anfrage: Der Server ist möglicherweise überlastet. Versuchen Sie es erneut.",
       erasingProgress: "Wird entfernt {current}/{total}",

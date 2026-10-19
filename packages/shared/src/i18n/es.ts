@@ -1985,10 +1985,8 @@ export const es: TranslationKeys = {
       submit: "Borrar objeto",
       submitBatch: "Borrar todos ({count})",
       progressLabel: "Borrando objeto",
-      stall:
-        "Se agotó el tiempo de procesamiento sin avances. Es posible que el resultado se haya guardado en tus archivos; si no, intenta de nuevo.",
-      stallBatch:
-        "Se agotó el tiempo de procesamiento. Es posible que el resultado se haya guardado: revisa tus archivos.",
+      stall: "Se agotó el tiempo de procesamiento sin avances. Intenta de nuevo.",
+      stallBatch: "Se agotó el tiempo de procesamiento. Intenta de nuevo.",
       timeoutOverloaded:
         "La solicitud agotó el tiempo de espera. El servidor puede estar sobrecargado. Intenta de nuevo.",
       erasingProgress: "Borrando {current}/{total}",

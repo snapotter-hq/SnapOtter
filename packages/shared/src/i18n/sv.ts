@@ -1990,10 +1990,8 @@ export const sv: TranslationKeys = {
       submit: "Radera objekt",
       submitBatch: "Radera alla ({count})",
       progressLabel: "Raderar objekt",
-      stall:
-        "Bearbetningen tog för lång tid utan framsteg. Resultatet kan ha sparats i dina filer, annars försök igen.",
-      stallBatch:
-        "Bearbetningen tog för lång tid. Resultatet kan ha sparats, kontrollera dina filer.",
+      stall: "Bearbetningen tog för lång tid utan framsteg. Försök igen.",
+      stallBatch: "Bearbetningen tog för lång tid. Försök igen.",
       timeoutOverloaded:
         "Tidsgränsen för begäran överskreds: servern kan vara överbelastad. Försök igen.",
       erasingProgress: "Raderar {current}/{total}",

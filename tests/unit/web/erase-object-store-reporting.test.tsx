@@ -13,6 +13,7 @@ vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ hasPermission: () => true
 import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import { captureHandledError } from "@/lib/analytics";
+import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { useFileStore } from "@/stores/file-store";
 
 /**
@@ -1549,9 +1550,9 @@ describe("erase-object counts upload progress as a sign of life (#1959)", () => 
 });
 
 /**
- * #1960: when the client gives up on a run because its own handling broke, the
- * job still runs on the server and can still save. Those failures cancel it.
- * A stall doesn't: its copy promises the result may have saved.
+ * #1960: when the client gives up on a run (handling a frame broke, or the
+ * five-minute stall fired), the job still runs on the server and can still
+ * save. Both paths cancel the server job once it has been accepted.
  */
 describe("erase-object cancels a job the client gave up on (#1960)", () => {
   const cancelUrl = (xhr: FakeXhr) =>
@@ -1658,18 +1659,218 @@ describe("erase-object cancels a job the client gave up on (#1960)", () => {
     expect(entry(1).status).toBe("completed");
   });
 
-  it("does not cancel on a stall, whose copy says the result may have saved", async () => {
+  it("single file: posts a cancel when the progress stream stalls after 202", async () => {
     const stalls = captureStallTimers();
     try {
       renderPanel();
-      await submit();
+      const xhr = await submit();
+      xhr.respond(202, { jobId: "job-1", async: true });
+
       stalls.fireLatest();
 
-      expect(fetchMock).not.toHaveBeenCalled();
       expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      expect(en.toolSettings["erase-object"].stall).toBe(
+        "Processing timed out with no progress. Try again.",
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe(cancelUrl(xhr));
+      expect(init.method).toBe("POST");
     } finally {
       stalls.restore();
     }
+  });
+
+  it("single file: posts a cancel on stall even when aborting the request throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.respond(202, { jobId: "job-1", async: true });
+      vi.spyOn(xhr, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: posts a cancel for the file whose progress stream stalled after 202", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(202, { jobId: "job-1", async: true });
+
+      stalls.fireLatest();
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.toolSettings["erase-object"].stallBatch);
+      expect(en.toolSettings["erase-object"].stallBatch).toBe("Processing timed out. Try again.");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: posts a cancel on stall even when aborting the request throws", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(202, { jobId: "job-1", async: true });
+      vi.spyOn(first, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() => stalls.fireLatest()).toThrow("abort broke");
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+      expect(entry(0).status).toBe("failed");
+      expect(entry(1).status).toBe("completed");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not send a cancel when the stall fires while the file is still uploading, unless a 202 slips past the abort", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+
+      expect(xhr.aborted).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(useFileStore.getState().error).toBe(en.toolSettings["erase-object"].stall);
+
+      // A 202 response already queued behind the abort still triggers a cancel,
+      // while a non-202 response does not.
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not send a cancel when a non-202 response slips past a pre-202 stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      stalls.fireLatest();
+
+      xhr.respond(200, GOOD_BODY);
+      xhr.respond(422, { error: "Object erasing failed" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("cancels once when a stall follows a progress frame and the 202 arrives later", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 30 }),
+        });
+      });
+
+      stalls.fireLatest();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("batch: cancels once when a stall follows a progress frame and the 202 arrives later", async () => {
+    const stalls = captureStallTimers();
+    try {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      renderPanel(2);
+      const first = await submit(1);
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 30 }),
+        });
+      });
+
+      stalls.fireLatest();
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      first.respond(202, { jobId: "job-1", async: true });
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(first));
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("single file: posts a cancel on stall after 202 even when showing the stall message throws", async () => {
+    const stalls = captureStallTimers();
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || state.error === previous.error) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("store broke");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      unsubscribe();
+      stalls.restore();
+    }
+  });
+
+  it("trackAbandonedJob sends at most one cancel across cancelOnStall and keepRequestOnStop", () => {
+    const stalledFirst = trackAbandonedJob("job-stall-first", "erase-object");
+    stalledFirst.onAccepted();
+    stalledFirst.cancelOnStall();
+    stalledFirst.cancelOnStall();
+    expect(stalledFirst.keepRequestOnStop()).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const stoppedFirst = trackAbandonedJob("job-stop-first", "erase-object");
+    stoppedFirst.onAccepted();
+    expect(stoppedFirst.keepRequestOnStop()).toBe(false);
+    stoppedFirst.cancelOnStall();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("leaves the failure alone, and reports it, when the cancel never reaches the server", async () => {

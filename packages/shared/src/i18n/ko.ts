@@ -1929,9 +1929,8 @@ export const ko: TranslationKeys = {
       submit: "객체 지우기",
       submitBatch: "모두 지우기 ({count})",
       progressLabel: "객체 지우는 중",
-      stall:
-        "진행 없이 처리 시간이 초과되었습니다. 결과가 파일에 저장되었을 수 있습니다. 저장되지 않았다면 다시 시도해 주세요.",
-      stallBatch: "처리 시간이 초과되었습니다. 결과가 저장되었을 수 있으니 파일을 확인하세요.",
+      stall: "진행 없이 처리 시간이 초과되었습니다. 다시 시도해 주세요.",
+      stallBatch: "처리 시간이 초과되었습니다. 다시 시도해 주세요.",
       timeoutOverloaded:
         "요청 시간이 초과되었습니다. 서버가 과부하일 수 있습니다. 다시 시도해 주세요.",
       erasingProgress: "지우는 중 {current}/{total}",

@@ -1992,9 +1992,8 @@ export const id: TranslationKeys = {
       submit: "Hapus Objek",
       submitBatch: "Hapus Semua ({count})",
       progressLabel: "Menghapus objek",
-      stall:
-        "Pemrosesan habis waktu tanpa kemajuan. Hasilnya mungkin sudah tersimpan di file Anda; jika tidak, coba lagi.",
-      stallBatch: "Pemrosesan habis waktu. Hasilnya mungkin sudah tersimpan, periksa file Anda.",
+      stall: "Pemrosesan habis waktu tanpa kemajuan. Coba lagi.",
+      stallBatch: "Pemrosesan habis waktu. Coba lagi.",
       timeoutOverloaded: "Permintaan habis waktu, server mungkin kelebihan beban. Coba lagi.",
       erasingProgress: "Menghapus {current}/{total}",
     },

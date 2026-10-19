@@ -1998,10 +1998,8 @@ export const pl: TranslationKeys = {
       submit: "Usuń obiekt",
       submitBatch: "Usuń wszystko ({count})",
       progressLabel: "Usuwanie obiektu",
-      stall:
-        "Upłynął limit czasu przetwarzania bez postępu. Wynik mógł zostać zapisany w Twoich plikach; jeśli nie, spróbuj ponownie.",
-      stallBatch:
-        "Upłynął limit czasu przetwarzania. Wynik mógł zostać zapisany, sprawdź swoje pliki.",
+      stall: "Upłynął limit czasu przetwarzania bez postępu. Spróbuj ponownie.",
+      stallBatch: "Upłynął limit czasu przetwarzania. Spróbuj ponownie.",
       timeoutOverloaded:
         "Upłynął limit czasu żądania, serwer może być przeciążony. Spróbuj ponownie.",
       erasingProgress: "Usuwanie {current}/{total}",

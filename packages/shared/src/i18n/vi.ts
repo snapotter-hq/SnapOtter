@@ -1992,9 +1992,8 @@ export const vi: TranslationKeys = {
       submit: "Xóa đối tượng",
       submitBatch: "Xóa tất cả ({count})",
       progressLabel: "Đang xóa đối tượng",
-      stall:
-        "Xử lý đã hết thời gian mà không có tiến triển. Kết quả có thể đã được lưu vào tệp của bạn; nếu chưa, vui lòng thử lại.",
-      stallBatch: "Xử lý đã hết thời gian. Kết quả có thể đã được lưu, hãy kiểm tra tệp của bạn.",
+      stall: "Xử lý đã hết thời gian mà không có tiến triển. Vui lòng thử lại.",
+      stallBatch: "Xử lý đã hết thời gian. Vui lòng thử lại.",
       timeoutOverloaded: "Yêu cầu đã hết thời gian, máy chủ có thể đang quá tải. Vui lòng thử lại.",
       erasingProgress: "Đang xóa {current}/{total}",
     },
