@@ -76,9 +76,28 @@ describe("assertLocalCapacity free-space floor (statfs)", () => {
     expect(statfsMock).toHaveBeenCalledWith(root);
   });
 
-  it("allows the write when statfs itself rejects (unavailable on the platform)", async () => {
+  it("logs a warning once and allows the write when statfs itself rejects (#1634)", async () => {
+    vi.resetModules();
+    const { logger: freshLogger } = await import("../../../apps/api/src/lib/logger.js");
+    const { env: freshEnv } = await import("../../../apps/api/src/config.js");
+    (freshEnv as { WORKSPACE_PATH: string }).WORKSPACE_PATH = root;
+    (freshEnv as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0;
+    const { assertLocalCapacity: freshAssertLocalCapacity } = await import(
+      "../../../apps/api/src/lib/object-storage.js"
+    );
+    const warnSpy = vi.spyOn(freshLogger, "warn").mockImplementation(() => {});
     statfsMock.mockRejectedValue(Object.assign(new Error("ENOSYS"), { code: "ENOSYS" }));
 
-    await expect(assertLocalCapacity()).resolves.toBeUndefined();
+    await expect(freshAssertLocalCapacity()).resolves.toBeUndefined();
+    await expect(freshAssertLocalCapacity()).resolves.toBeUndefined();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        root,
+        err: expect.objectContaining({ code: "ENOSYS" }),
+      }),
+      expect.any(String),
+    );
   });
 });

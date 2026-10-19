@@ -16,6 +16,7 @@ import { basename, dirname, join, normalize, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { env } from "../config.js";
+import { logger } from "./logger.js";
 
 // Processing object store: keys are "<prefix>/<jobId>/<filename>" under the
 // prefixes uploads/ and outputs/. Local backend roots at WORKSPACE_PATH
@@ -208,6 +209,8 @@ async function assertWorkspaceSizeCap(root: string): Promise<void> {
   }
 }
 
+let statfsFailureLogged = false;
+
 /**
  * Asserts that the local storage volume has enough free space.
  * Called by putObject / putObjectStream for the local backend only.
@@ -221,7 +224,14 @@ export async function assertLocalCapacity(): Promise<void> {
   let fsStats: Awaited<ReturnType<typeof statfs>>;
   try {
     fsStats = await statfs(root);
-  } catch {
+  } catch (err) {
+    if (!statfsFailureLogged) {
+      statfsFailureLogged = true;
+      logger.warn(
+        { err, root },
+        "Failed to check free disk space for workspace; skipping floor check",
+      );
+    }
     return; // statfs unavailable (e.g. some CI envs) -- allow the write
   }
   const freeBytes = fsStats.bavail * fsStats.bsize;
