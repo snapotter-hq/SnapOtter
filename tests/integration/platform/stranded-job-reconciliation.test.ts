@@ -22,6 +22,7 @@
 import { randomUUID } from "node:crypto";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
+import type { Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -33,7 +34,7 @@ import {
   UNRECOVERABLE_STRANDED_JOB_ERROR,
 } from "../../../apps/api/src/jobs/job-reconciliation.js";
 import { getQueue } from "../../../apps/api/src/jobs/queues.js";
-import { SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
+import { runSystemJob, SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
@@ -41,7 +42,12 @@ import {
   buildBatchReplayEvent,
   buildSingleFileReplayEvent,
 } from "../../../apps/api/src/routes/progress.js";
-import { buildTestApp, type TestApp } from "../test-server.js";
+import {
+  buildTestApp,
+  createMultipartPayload,
+  createUserAndLogin,
+  type TestApp,
+} from "../test-server.js";
 
 let testApp: TestApp;
 const seededPrefixes: string[] = [];
@@ -60,6 +66,7 @@ type Seed = {
   toolId?: string | null;
   type?: string;
   pool?: string | null;
+  userId?: string | null;
   ageMs?: number;
 };
 
@@ -67,6 +74,7 @@ async function seedJob(seed: Seed = {}): Promise<string> {
   const id = randomUUID();
   await db.insert(schema.jobs).values({
     id,
+    userId: seed.userId ?? null,
     toolId: seed.toolId === undefined ? "convert" : seed.toolId,
     pool: seed.pool === undefined ? "image" : seed.pool,
     type: seed.type ?? "tool",
@@ -1504,6 +1512,197 @@ describe("stranded-job reconciliation", () => {
       const second = await reconcileStrandedJobs({ graceMs: 0 });
       expect(second.outcomes.find((o) => o.jobId === eioId)?.resolution).toBe("recovered");
       expect((await readJob(eioId)).status).toBe("completed");
+    });
+  });
+
+  describe("periodic orphaned-job reconciliation (#1726)", () => {
+    it("fails old tool_id-less processing/queued rows and leaves fresh, terminal, or tool_id-bearing rows untouched", async () => {
+      const user = await createUserAndLogin(testApp.app, `orphan-reconcile-${Date.now()}`);
+      const oldOwnedBatchId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "batch",
+        status: "processing",
+        ageMs: 61 * 60_000,
+      });
+      const oldEmptyToolQueuedId = await seedJob({
+        userId: null,
+        toolId: "",
+        pool: null,
+        type: "batch",
+        status: "queued",
+        ageMs: 65 * 60_000,
+      });
+      const freshOwnedBatchId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "batch",
+        status: "processing",
+        ageMs: 59 * 60_000,
+      });
+      const freshEmptyToolQueuedId = await seedJob({
+        userId: null,
+        toolId: "",
+        pool: null,
+        type: "batch",
+        status: "queued",
+        ageMs: 59 * 60_000,
+      });
+      const oldLiveToolId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        ageMs: 65 * 60_000,
+      });
+      const oldCompletedId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "batch",
+        status: "completed",
+        ageMs: 120 * 60_000,
+      });
+      const oldFailedId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "batch",
+        status: "failed",
+        ageMs: 120 * 60_000,
+      });
+      await db
+        .update(schema.jobs)
+        .set({ error: { message: "1 file(s) failed" } })
+        .where(eq(schema.jobs.id, oldFailedId));
+      const oldFailedBefore = await readJob(oldFailedId);
+      const oldCanceledId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "batch",
+        status: "canceled",
+        ageMs: 120 * 60_000,
+      });
+
+      const queue = getQueue("image");
+      await queue.add("convert", { jobId: oldLiveToolId } as never, {
+        jobId: oldLiveToolId,
+        delay: 10 * 60_000,
+      });
+      const infoSpy = vi.spyOn(logger, "info");
+      try {
+        const result = (await runSystemJob({
+          name: SYSTEM_JOBS.jobReconciliation,
+        } as unknown as Job)) as { orphaned?: number; live?: number };
+        expect(result.orphaned).toBe(2);
+        expect(result.live).toBeGreaterThanOrEqual(1);
+        expect(infoSpy).toHaveBeenCalledWith({ count: 2 }, "Reconciled orphaned job rows");
+
+        const oldBatchRow = await readJob(oldOwnedBatchId);
+        expect(oldBatchRow.status).toBe("failed");
+        expect(oldBatchRow.error).toEqual({ message: "Orphaned job reconciled" });
+        expect(oldBatchRow.completedAt).not.toBeNull();
+
+        const oldEmptyToolRow = await readJob(oldEmptyToolQueuedId);
+        expect(oldEmptyToolRow.status).toBe("failed");
+        expect(oldEmptyToolRow.error).toEqual({ message: "Orphaned job reconciled" });
+        expect(oldEmptyToolRow.completedAt).not.toBeNull();
+
+        const freshBatchRow = await readJob(freshOwnedBatchId);
+        expect(freshBatchRow.status).toBe("processing");
+        expect(freshBatchRow.error).toBeNull();
+        expect(freshBatchRow.completedAt).toBeNull();
+
+        const freshEmptyToolRow = await readJob(freshEmptyToolQueuedId);
+        expect(freshEmptyToolRow.status).toBe("queued");
+        expect(freshEmptyToolRow.error).toBeNull();
+        expect(freshEmptyToolRow.completedAt).toBeNull();
+
+        const oldLiveToolRow = await readJob(oldLiveToolId);
+        expect(oldLiveToolRow.status).toBe("processing");
+        expect(oldLiveToolRow.error).toBeNull();
+
+        expect((await readJob(oldCompletedId)).status).toBe("completed");
+        expect((await readJob(oldCanceledId)).status).toBe("canceled");
+        const oldFailedAfter = await readJob(oldFailedId);
+        expect(oldFailedAfter.status).toBe("failed");
+        expect(oldFailedAfter.error).toEqual({ message: "1 file(s) failed" });
+        expect(oldFailedAfter.completedAt?.getTime()).toBe(oldFailedBefore.completedAt?.getTime());
+
+        infoSpy.mockClear();
+        const secondResult = (await runSystemJob({
+          name: SYSTEM_JOBS.jobReconciliation,
+        } as unknown as Job)) as { orphaned?: number };
+        expect(secondResult.orphaned).toBe(0);
+        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), "Reconciled orphaned job rows");
+      } finally {
+        infoSpy.mockRestore();
+        await queue.remove(oldLiveToolId).catch(() => {});
+      }
+    });
+
+    it("unblocks a user locked out by maxConcurrentJobsPerUser after an inline batch's terminal write was lost", async () => {
+      const user = await createUserAndLogin(testApp.app, `orphan-slot-${Date.now()}`);
+      const stuckBatchId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "batch",
+        status: "processing",
+        ageMs: 61 * 60_000,
+      });
+
+      await db
+        .insert(schema.settings)
+        .values({ key: "maxConcurrentJobsPerUser", value: "1" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+      try {
+        const png = await noiseJpeg(32, 32);
+        const makePayload = () =>
+          createMultipartPayload([
+            { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: png },
+            { name: "settings", content: JSON.stringify({ width: 16 }) },
+          ]);
+
+        // Precondition: the stuck tool_id-less batch row blocks the user with 429.
+        const blockedPayload = makePayload();
+        const blocked = await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize",
+          headers: {
+            "content-type": blockedPayload.contentType,
+            authorization: `Bearer ${user.token}`,
+          },
+          body: blockedPayload.body,
+        });
+        expect(blocked.statusCode).toBe(429);
+
+        await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as unknown as Job);
+        expect((await readJob(stuckBatchId)).status).toBe("failed");
+
+        // Slot is now free: the user can run tools again without a server restart.
+        const unblockedPayload = makePayload();
+        const unblocked = await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize",
+          headers: {
+            "content-type": unblockedPayload.contentType,
+            authorization: `Bearer ${user.token}`,
+          },
+          body: unblockedPayload.body,
+        });
+        expect([200, 202]).toContain(unblocked.statusCode);
+      } finally {
+        await db
+          .update(schema.settings)
+          .set({ value: "0" })
+          .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
+      }
     });
   });
 });

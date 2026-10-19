@@ -43,6 +43,7 @@ function loggerCalls(level: "info" | "warn" | "error") {
 const getQueueMock = vi.hoisted(() => vi.fn());
 const runSiemForwardMock = vi.hoisted(() => vi.fn());
 const runAuditArchiveMock = vi.hoisted(() => vi.fn());
+const reconcileStrandedJobsMock = vi.hoisted(() => vi.fn());
 const getMaxAgeMsMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn());
 const listJobDirsMock = vi.hoisted(() => vi.fn());
@@ -152,6 +153,7 @@ async function loadSystemJobs(
   getQueueMock.mockReset();
   runSiemForwardMock.mockReset();
   runAuditArchiveMock.mockReset();
+  reconcileStrandedJobsMock.mockReset();
   getMaxAgeMsMock.mockReset();
   deletePrefixMock.mockReset();
   listJobDirsMock.mockReset();
@@ -233,6 +235,11 @@ async function loadSystemJobs(
     runAuditArchive: runAuditArchiveMock,
   }));
 
+  vi.doMock("../../../../apps/api/src/jobs/job-reconciliation.js", () => ({
+    reconcilableJobRows: () => "reconcilableJobRows",
+    reconcileStrandedJobs: reconcileStrandedJobsMock,
+  }));
+
   vi.doMock("../../../../apps/api/src/jobs/queues.js", () => ({
     getQueue: getQueueMock,
   }));
@@ -308,6 +315,10 @@ describe("scheduleSystemJobs value pinning", () => {
     });
     // alertEvaluator: 60_000.
     expect(queue.upsertJobScheduler).toHaveBeenCalledWith(SYSTEM_JOBS.alertEvaluator, {
+      every: 60_000,
+    });
+    // jobReconciliation: 60_000.
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(SYSTEM_JOBS.jobReconciliation, {
       every: 60_000,
     });
   });
@@ -483,6 +494,88 @@ describe("dispatchSystemJob sessionPurge SQL", () => {
     const text = allSqlText();
     expect(text).toContain("DELETE FROM sessions");
     expect(text).toContain("expires_at < now()");
+  });
+});
+
+// -- dispatchSystemJob: jobReconciliation (#1726) -----------------------------
+
+describe("dispatchSystemJob jobReconciliation (#1726)", () => {
+  it("runs reconcileStrandedJobs, fails orphaned tool_id-less rows older than 1 hour, and logs the count when positive", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const logSpy = loggerCalls("info");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    reconcileStrandedJobsMock.mockResolvedValue({
+      scanned: 1,
+      recovered: 1,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      outcomes: [
+        { jobId: "j-1", toolId: "resize", previousStatus: "processing", resolution: "recovered" },
+      ],
+    });
+    dbExecuteMock.mockResolvedValue({ rowCount: 2 });
+
+    const result = await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+
+    expect(reconcileStrandedJobsMock).toHaveBeenCalledTimes(1);
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    const text = allSqlText();
+    expect(text).toContain("UPDATE jobs");
+    expect(text).toContain("status = 'failed'");
+    expect(text).toContain('\'{"message":"Orphaned job reconciled"}\'::jsonb');
+    expect(text).toContain("completed_at = now()");
+    expect(text).toContain("status IN ('processing', 'queued')");
+    expect(text).toContain("(tool_id IS NULL OR tool_id = '')");
+    expect(text).toContain("created_at < now() - interval '1 hour'");
+    expect(logSpy).toHaveBeenCalledWith({ count: 2 }, "Reconciled orphaned job rows");
+    expect(result).toEqual({
+      scanned: 1,
+      recovered: 1,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      orphaned: 2,
+    });
+  });
+
+  it("does NOT log when zero orphaned rows were reconciled and defaults missing rowCount to 0", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const logSpy = loggerCalls("info");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    reconcileStrandedJobsMock.mockResolvedValue({
+      scanned: 0,
+      recovered: 0,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      outcomes: [],
+    });
+    dbExecuteMock.mockResolvedValueOnce({ rowCount: 0 }).mockResolvedValueOnce({});
+
+    const zeroResult = await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+    expect(zeroResult).toEqual({
+      scanned: 0,
+      recovered: 0,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      orphaned: 0,
+    });
+    expect(logSpy).not.toHaveBeenCalled();
+
+    const missingCountResult = await runSystemJob({
+      name: SYSTEM_JOBS.jobReconciliation,
+    } as never);
+    expect(missingCountResult).toEqual({
+      scanned: 0,
+      recovered: 0,
+      failed: 0,
+      live: 0,
+      raced: 0,
+      orphaned: 0,
+    });
+    expect(logSpy).not.toHaveBeenCalled();
   });
 });
 

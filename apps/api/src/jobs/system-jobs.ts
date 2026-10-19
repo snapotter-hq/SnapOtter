@@ -175,7 +175,25 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
     case SYSTEM_JOBS.jobReconciliation: {
       const { reconcileStrandedJobs } = await import("./job-reconciliation.js");
       const { outcomes, ...counts } = await reconcileStrandedJobs();
-      return counts;
+      // Inline batch routes (pdf-to-image, svg-to-raster) and SSE progress
+      // placeholders reserve rows with no tool_id, so reconcileStrandedJobs
+      // leaves them alone. Settle any that are still non-terminal after an hour
+      // so a lost terminal write cannot hold a user's concurrency slot until
+      // the next restart (#1726).
+      const orphanResult = await db.execute(
+        sql`UPDATE jobs
+          SET status = 'failed',
+              error = '{"message":"Orphaned job reconciled"}'::jsonb,
+              completed_at = now()
+          WHERE status IN ('processing', 'queued')
+            AND (tool_id IS NULL OR tool_id = '')
+            AND created_at < now() - interval '1 hour'`,
+      );
+      const orphaned = (orphanResult as { rowCount?: number }).rowCount ?? 0;
+      if (orphaned > 0) {
+        logger.info({ count: orphaned }, "Reconciled orphaned job rows");
+      }
+      return { ...counts, orphaned };
     }
     case SYSTEM_JOBS.gdprExport: {
       const { gdprExportJob } = await import("./gdpr-export.js");

@@ -51,9 +51,11 @@ const NON_TERMINAL = ["queued", "processing"] as const;
 
 /**
  * The rows this reconciler settles, before the grace window: non-terminal and
- * actually enqueued. A row with no tool_id is an SSE-progress placeholder that
- * was never enqueued; those are reconciled at startup by their own narrow path
- * in apps/api/src/index.ts, and the two sets are deliberately disjoint.
+ * actually enqueued. A row with no tool_id (an inline batch row or SSE-progress
+ * placeholder) was never enqueued; those are reconciled at startup in
+ * apps/api/src/index.ts and after an hour by SYSTEM_JOBS.jobReconciliation in
+ * apps/api/src/jobs/system-jobs.ts (#1726), and the two sets are deliberately
+ * disjoint.
  *
  * The storage TTL sweep uses this same predicate to decide which in-flight
  * jobs keep their files (#1412), so a row can only hold a dir while something

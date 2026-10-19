@@ -7,8 +7,10 @@ const dbExecuteMock = vi.hoisted(() => vi.fn());
 const dbUpdateMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn());
 const storageReconciliationJobMock = vi.hoisted(() => vi.fn());
+const reconcileStrandedJobsMock = vi.hoisted(() => vi.fn());
 const gdprExportJobMock = vi.hoisted(() => vi.fn());
 const evaluateAlertsMock = vi.hoisted(() => vi.fn());
+const loggerInfoMock = vi.hoisted(() => vi.fn());
 
 async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   vi.resetModules();
@@ -20,8 +22,10 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   deletePrefixMock.mockReset();
   deletePrefixMock.mockResolvedValue(undefined);
   storageReconciliationJobMock.mockReset();
+  reconcileStrandedJobsMock.mockReset();
   gdprExportJobMock.mockReset();
   evaluateAlertsMock.mockReset();
+  loggerInfoMock.mockReset();
 
   vi.doMock("drizzle-orm", () => ({
     and: vi.fn((...conds: unknown[]) => ({ op: "and", conds })),
@@ -84,12 +88,26 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
     storageReconciliationJob: storageReconciliationJobMock,
   }));
 
+  vi.doMock("../../../../apps/api/src/jobs/job-reconciliation.js", () => ({
+    reconcilableJobRows: vi.fn(),
+    reconcileStrandedJobs: reconcileStrandedJobsMock,
+  }));
+
   vi.doMock("../../../../apps/api/src/jobs/gdpr-export.js", () => ({
     gdprExportJob: gdprExportJobMock,
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/alert-evaluator.js", () => ({
     evaluateAlerts: evaluateAlertsMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({
+    logger: {
+      info: loggerInfoMock,
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
   }));
 
   return import("../../../../apps/api/src/jobs/system-jobs.js");
@@ -275,5 +293,31 @@ describe("system jobs behavior", () => {
     ).rejects.toBe(dbFault);
 
     expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-fault/");
+  });
+
+  it("reconciles stranded BullMQ jobs and fails orphaned tool_id-less rows older than 1 hour (#1726)", async () => {
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    reconcileStrandedJobsMock.mockResolvedValue({
+      scanned: 2,
+      recovered: 1,
+      failed: 1,
+      live: 0,
+      raced: 0,
+      outcomes: [],
+    });
+    dbExecuteMock.mockResolvedValue({ rowCount: 3 });
+
+    await expect(runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never)).resolves.toEqual({
+      scanned: 2,
+      recovered: 1,
+      failed: 1,
+      live: 0,
+      raced: 0,
+      orphaned: 3,
+    });
+
+    expect(reconcileStrandedJobsMock).toHaveBeenCalledTimes(1);
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(loggerInfoMock).toHaveBeenCalledWith({ count: 3 }, "Reconciled orphaned job rows");
   });
 });
