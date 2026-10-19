@@ -1883,16 +1883,21 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             .from(schema.users)
             .where(eq(schema.users.id, id));
 
-          if (!currentAdmin || !currentUser) {
-            throw new Error("NOT_FOUND");
+          if (!currentAdmin) {
+            throw new EscalationDeniedError();
           }
 
           const currentActor = { ...admin, role: currentAdmin.role };
 
-          if (
-            !(await hasEffectivePermission(currentActor, "users:manage")) ||
-            !(await canManageTargetRole(currentActor, currentUser.role))
-          ) {
+          if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          if (!(await canManageTargetRole(currentActor, currentUser.role))) {
             throw new EscalationDeniedError();
           }
 

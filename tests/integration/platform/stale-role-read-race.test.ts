@@ -795,4 +795,290 @@ describe("Stale role reads during concurrent operations", () => {
     expect(targetAfter.passwordHash).toBe(originalHash);
     expect(targetAfter.mustChangePassword).toBe(false);
   });
+
+  it("actor deleted or demoted during DELETE /api/auth/users/:id loses authority with 403 ESCALATION_DENIED (#2723)", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const [team] = await db.select().from(schema.teams).limit(1);
+
+    const delAdminId = randomUUID();
+    const targetUserId = randomUUID();
+    await db.insert(schema.users).values([
+      {
+        id: delAdminId,
+        username: `admin-delactor-${suffix}`,
+        passwordHash: await hashPassword("Password123!"),
+        role: "admin",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+      {
+        id: targetUserId,
+        username: `target-delactor-${suffix}`,
+        passwordHash: await hashPassword("OriginalPass123!"),
+        role: "user",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+    ]);
+
+    const targetSessionId = randomUUID();
+    await db.insert(schema.sessions).values({
+      id: targetSessionId,
+      userId: targetUserId,
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+
+    const delLogin = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: `admin-delactor-${suffix}`, password: "Password123!" },
+    });
+    const delAdminToken = delLogin.cookies?.find(
+      (c: { name: string; value: string }) => c.name === "snapotter-session",
+    )?.value;
+
+    let txCount = 0;
+    interceptFn = async (_tx, id) => {
+      if (id === targetUserId) {
+        txCount += 1;
+        // DELETE /api/auth/users/:id runs assertNotLastAdmin in two transactions:
+        // a pre-check before deleteLibraryFileStorage and the final delete transaction.
+        // Delete the acting admin right as the final transaction starts.
+        if (txCount === 2) {
+          await db.delete(schema.users).where(eq(schema.users.id, delAdminId));
+        }
+      }
+    };
+
+    const delRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${targetUserId}`,
+      headers: { cookie: `snapotter-session=${delAdminToken}` },
+    });
+    expect(delRes.statusCode).toBe(403);
+    expect(JSON.parse(delRes.body)).toEqual({
+      error: "Cannot manage a user beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [targetAfter] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, targetUserId));
+    expect(targetAfter).toBeDefined();
+    expect(targetAfter.role).toBe("user");
+    const remainingTargetSessions = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, targetUserId));
+    expect(remainingTargetSessions).toHaveLength(1);
+
+    // Also verify that when the acting admin loses users:manage AND the target user
+    // is deleted before the final transaction, 403 ESCALATION_DENIED wins over 404 NOT_FOUND.
+    const demotedAdminId = randomUUID();
+    const secondTargetId = randomUUID();
+    await db.insert(schema.users).values([
+      {
+        id: demotedAdminId,
+        username: `admin-demoted-del-${suffix}`,
+        passwordHash: await hashPassword("Password123!"),
+        role: "admin",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+      {
+        id: secondTargetId,
+        username: `target-demoted-del-${suffix}`,
+        passwordHash: await hashPassword("OriginalPass123!"),
+        role: "user",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+    ]);
+
+    const demotedLogin = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: `admin-demoted-del-${suffix}`, password: "Password123!" },
+    });
+    const demotedAdminToken = demotedLogin.cookies?.find(
+      (c: { name: string; value: string }) => c.name === "snapotter-session",
+    )?.value;
+
+    let secondTxCount = 0;
+    interceptFn = async (_tx, id) => {
+      if (id === secondTargetId) {
+        secondTxCount += 1;
+        if (secondTxCount === 2) {
+          await db
+            .update(schema.users)
+            .set({ role: "user" })
+            .where(eq(schema.users.id, demotedAdminId));
+          await db.delete(schema.users).where(eq(schema.users.id, secondTargetId));
+        }
+      }
+    };
+
+    const demotedRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${secondTargetId}`,
+      headers: { cookie: `snapotter-session=${demotedAdminToken}` },
+    });
+    expect(demotedRes.statusCode).toBe(403);
+    expect(JSON.parse(demotedRes.body)).toEqual({
+      error: "Cannot manage a user beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    // When a custom user-manager retains users:manage, the target still exists,
+    // and the target is promoted to admin before the final transaction,
+    // canManageTargetRole rejects with 403 ESCALATION_DENIED and preserves the target.
+    const managerRoleName = `mgr-del-${suffix}`;
+    const subordinateRoleName = `sub-del-${suffix}`;
+    await db.insert(schema.roles).values([
+      {
+        id: randomUUID(),
+        name: managerRoleName,
+        description: "User manager for delete race",
+        permissions: ["tools:use", "users:manage"],
+        isBuiltin: false,
+      },
+      {
+        id: randomUUID(),
+        name: subordinateRoleName,
+        description: "Subordinate user for delete race",
+        permissions: ["tools:use"],
+        isBuiltin: false,
+      },
+    ]);
+    const managerActorId = randomUUID();
+    const promotedTargetId = randomUUID();
+    await db.insert(schema.users).values([
+      {
+        id: managerActorId,
+        username: `mgr-del-actor-${suffix}`,
+        passwordHash: await hashPassword("Password123!"),
+        role: managerRoleName,
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+      {
+        id: promotedTargetId,
+        username: `target-promoted-del-${suffix}`,
+        passwordHash: await hashPassword("OriginalPass123!"),
+        role: subordinateRoleName,
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+    ]);
+
+    const managerLogin = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: `mgr-del-actor-${suffix}`, password: "Password123!" },
+    });
+    const managerToken = managerLogin.cookies?.find(
+      (c: { name: string; value: string }) => c.name === "snapotter-session",
+    )?.value;
+
+    let promotedTxCount = 0;
+    interceptFn = async (_tx, id) => {
+      if (id === promotedTargetId) {
+        promotedTxCount += 1;
+        if (promotedTxCount === 2) {
+          await db
+            .update(schema.users)
+            .set({ role: "admin" })
+            .where(eq(schema.users.id, promotedTargetId));
+        }
+      }
+    };
+
+    const promotedRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${promotedTargetId}`,
+      headers: { cookie: `snapotter-session=${managerToken}` },
+    });
+    expect(promotedRes.statusCode).toBe(403);
+    expect(JSON.parse(promotedRes.body)).toEqual({
+      error: "Cannot manage a user beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+    expect(promotedTxCount).toBe(2);
+    const [promotedTargetAfter] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, promotedTargetId));
+    expect(promotedTargetAfter).toBeDefined();
+    expect(promotedTargetAfter.role).toBe("admin");
+
+    // When the acting admin still has authority and only the target user was
+    // deleted before the final transaction, 404 NOT_FOUND is returned.
+    const validAdminId = randomUUID();
+    const doomedTargetId = randomUUID();
+    await db.insert(schema.users).values([
+      {
+        id: validAdminId,
+        username: `admin-validdel-${suffix}`,
+        passwordHash: await hashPassword("Password123!"),
+        role: "admin",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+      {
+        id: doomedTargetId,
+        username: `target-doomed-${suffix}`,
+        passwordHash: await hashPassword("OriginalPass123!"),
+        role: "user",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      },
+    ]);
+
+    const validAdminLogin = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: `admin-validdel-${suffix}`, password: "Password123!" },
+    });
+    const validAdminToken = validAdminLogin.cookies?.find(
+      (c: { name: string; value: string }) => c.name === "snapotter-session",
+    )?.value;
+
+    let thirdTxCount = 0;
+    interceptFn = async (_tx, id) => {
+      if (id === doomedTargetId) {
+        thirdTxCount += 1;
+        if (thirdTxCount === 2) {
+          await db.delete(schema.users).where(eq(schema.users.id, doomedTargetId));
+        }
+      }
+    };
+
+    const missingTargetRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${doomedTargetId}`,
+      headers: { cookie: `snapotter-session=${validAdminToken}` },
+    });
+    expect(missingTargetRes.statusCode).toBe(404);
+    expect(JSON.parse(missingTargetRes.body)).toEqual({
+      error: "User not found",
+      code: "NOT_FOUND",
+    });
+  });
 });
