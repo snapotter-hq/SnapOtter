@@ -698,6 +698,115 @@ describe("role authority containment", () => {
       txRegSpy.mockRestore();
     }
   });
+
+  it("allows a custom users:manage actor to update their own team when keeping their current role while still blocking self-demotion (#2724)", async () => {
+    const teamLeadRole = uniqueName("team-lead");
+    const subordinateRole = uniqueName("team-member");
+    await createRoleAsAdmin(teamLeadRole, ["tools:use", "users:manage"]);
+    await createRoleAsAdmin(subordinateRole, ["tools:use"]);
+
+    const teamName = uniqueName("Design");
+    const createTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: teamName },
+    });
+    expect(createTeamRes.statusCode, createTeamRes.body).toBe(201);
+    const teamId = JSON.parse(createTeamRes.body).id as string;
+
+    const leadUsername = uniqueName("alice-lead");
+    const leadToken = await createUserAndLogin(leadUsername, teamLeadRole);
+    const [leadBefore] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, leadUsername));
+
+    // Keeping the same custom role while changing team succeeds and preserves the active session.
+    const selfTeamUpdateRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${leadBefore.id}`,
+      headers: { authorization: `Bearer ${leadToken}` },
+      payload: { role: teamLeadRole, team: teamName },
+    });
+    expect(selfTeamUpdateRes.statusCode, selfTeamUpdateRes.body).toBe(200);
+    expect(JSON.parse(selfTeamUpdateRes.body)).toEqual({ ok: true });
+
+    const [leadAfterTeamUpdate] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, leadBefore.id));
+    expect(leadAfterTeamUpdate.role).toBe(teamLeadRole);
+    expect(leadAfterTeamUpdate.team).toBe(teamId);
+
+    const sessionRes = await testApp.app.inject({
+      method: "GET",
+      url: "/api/auth/session",
+      headers: { authorization: `Bearer ${leadToken}` },
+    });
+    expect(sessionRes.statusCode).toBe(200);
+
+    // Changing own role to a subordinate role is still rejected with 400 SELF_DEMOTE.
+    const selfDemoteRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${leadBefore.id}`,
+      headers: { authorization: `Bearer ${leadToken}` },
+      payload: { role: subordinateRole, team: teamName },
+    });
+    expect(selfDemoteRes.statusCode).toBe(400);
+    expect(JSON.parse(selfDemoteRes.body)).toEqual({
+      error: "Cannot remove your own admin role",
+      code: "SELF_DEMOTE",
+    });
+
+    // Changing own role beyond authority still fails with 403 ESCALATION_DENIED.
+    const selfEscalateRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${leadBefore.id}`,
+      headers: { authorization: `Bearer ${leadToken}` },
+      payload: { role: "admin" },
+    });
+    expect(selfEscalateRes.statusCode).toBe(403);
+    expect(JSON.parse(selfEscalateRes.body).code).toBe("ESCALATION_DENIED");
+
+    // In-transaction race: if the actor is promoted to admin between the pre-check
+    // and the transaction, keeping the stale pre-check role in updates.role must not
+    // self-demote the newly promoted admin back to teamLeadRole.
+    const origTx = db.transaction.bind(db);
+    const txRaceSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db
+          .update(schema.users)
+          .set({ role: "admin" })
+          .where(eq(schema.users.id, leadBefore.id));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const raceSelfDemoteRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${leadBefore.id}`,
+        headers: { authorization: `Bearer ${leadToken}` },
+        payload: { role: teamLeadRole, team: "Default" },
+      });
+      expect(raceSelfDemoteRes.statusCode).toBe(400);
+      expect(JSON.parse(raceSelfDemoteRes.body)).toEqual({
+        error: "Cannot remove your own admin role",
+        code: "SELF_DEMOTE",
+      });
+      expect(txRaceSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      txRaceSpy.mockRestore();
+    }
+
+    const [leadAfterRace] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, leadBefore.id));
+    expect(leadAfterRace.role).toBe("admin");
+    expect(leadAfterRace.team).toBe(teamId);
+  });
 });
 
 describe("API-key-scoped role authority", () => {

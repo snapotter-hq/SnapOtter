@@ -1536,7 +1536,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
 
         // Prevent removing your own admin role
-        if (id === admin.id && body.role !== "admin") {
+        if (id === admin.id && body.role !== user.role) {
           return reply.status(400).send({
             error: "Cannot remove your own admin role",
             code: "SELF_DEMOTE",
@@ -1592,16 +1592,22 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             teamExists = Boolean(lockedTeam);
           }
           // Last admin protection, under the lock every admin removal shares (#2231).
-          if (updates.role && updates.role !== "admin") await assertNotLastAdmin(tx, id);
+          if (id !== admin.id && updates.role && updates.role !== "admin") {
+            await assertNotLastAdmin(tx, id);
+          }
 
-          const [currentAdmin] = await tx
-            .select({ role: schema.users.role })
-            .from(schema.users)
-            .where(eq(schema.users.id, admin.id));
           const [currentUser] = await tx
             .select({ role: schema.users.role })
             .from(schema.users)
-            .where(eq(schema.users.id, id));
+            .where(eq(schema.users.id, id))
+            .for("no key update");
+          const [currentAdmin] =
+            id === admin.id
+              ? [currentUser]
+              : await tx
+                  .select({ role: schema.users.role })
+                  .from(schema.users)
+                  .where(eq(schema.users.id, admin.id));
 
           if (!currentAdmin) {
             throw new EscalationDeniedError();
@@ -1629,6 +1635,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             throw new EscalationDeniedError();
           }
 
+          if (id === admin.id && updates.role && updates.role !== currentUser.role) {
+            throw new Error("SELF_DEMOTE");
+          }
+
           if (!teamExists) {
             throw new Error("UNKNOWN_TEAM");
           }
@@ -1651,6 +1661,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
         if (err instanceof Error && err.message === "UNKNOWN_ROLE") {
           return reply.status(400).send({ error: "Role not found", code: "UNKNOWN_ROLE" });
+        }
+        if (err instanceof Error && err.message === "SELF_DEMOTE") {
+          return reply.status(400).send({
+            error: "Cannot remove your own admin role",
+            code: "SELF_DEMOTE",
+          });
         }
         if (err instanceof Error && err.message === "UNKNOWN_TEAM") {
           return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
