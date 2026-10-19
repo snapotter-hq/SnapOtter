@@ -3,6 +3,10 @@
 import { de } from "@snapotter/shared/i18n/de.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   formatHeaders: () => [],
@@ -13,6 +17,7 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 import { ocrOneFile } from "@/components/tools/ocr-settings";
+import { captureHandledError } from "@/lib/analytics";
 
 interface MockXhr {
   status: number;
@@ -46,7 +51,12 @@ let xhrs: MockXhr[];
 beforeEach(() => {
   xhrs = [];
   MockEventSource.instances = [];
+  vi.mocked(captureHandledError).mockClear();
   vi.stubGlobal("EventSource", MockEventSource);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
   vi.stubGlobal(
     "XMLHttpRequest",
     vi.fn(() => {
@@ -455,5 +465,243 @@ describe("OCR stopping a file (#2093)", () => {
     stop();
 
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
+describe("OCR canceling a job the client gave up on (#2721)", () => {
+  const CANCEL_URL = "/api/v1/jobs/11111111-1111-4111-8111-111111111111/cancel";
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+    );
+  });
+
+  it("posts a cancel when the five-minute stall timer fires after 202", async () => {
+    vi.useFakeTimers();
+    const promise = runOcr();
+    const assertion = expect(promise).rejects.toThrow(
+      "OCR timed out with no progress. Try again or use a smaller image.",
+    );
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    xhr.status = 202;
+    xhr.responseText = JSON.stringify({ jobId: "job-1", status: "queued" });
+    xhr.onload?.();
+
+    await vi.advanceTimersByTimeAsync(300_000);
+
+    await assertion;
+    expect(events.close).toHaveBeenCalledTimes(1);
+    expect(xhr.abort).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      CANCEL_URL,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("posts a cancel once and aborts the request when a stall follows a progress frame and the 202 arrives later", async () => {
+    vi.useFakeTimers();
+    const promise = runOcr();
+    const assertion = expect(promise).rejects.toThrow(
+      "OCR timed out with no progress. Try again or use a smaller image.",
+    );
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    events.emit({ type: "single", phase: "processing", percent: 30, stage: "Recognizing" });
+    await vi.advanceTimersByTimeAsync(300_000);
+
+    await assertion;
+    expect(xhr.abort).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      CANCEL_URL,
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    xhr.status = 202;
+    xhr.onload?.();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+
+    xhr.status = 200;
+    xhr.responseText = JSON.stringify({ text: "late sync" });
+    xhr.onload?.();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("posts a cancel when a single frame without a numeric percent stalls", async () => {
+    vi.useFakeTimers();
+    const promise = runOcr();
+    const assertion = expect(promise).rejects.toThrow(
+      "OCR timed out with no progress. Try again or use a smaller image.",
+    );
+    const events = MockEventSource.instances[0];
+
+    events.emit({ type: "single", phase: "processing", stage: "Queued" });
+    await vi.advanceTimersByTimeAsync(300_000);
+
+    await assertion;
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      CANCEL_URL,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("posts a cancel on stall even when aborting the request throws", async () => {
+    vi.useFakeTimers();
+    const promise = runOcr();
+    promise.catch(() => {});
+    const xhr = xhrs[0];
+    xhr.status = 202;
+    xhr.onload?.();
+    xhr.abort.mockImplementation(() => {
+      throw new Error("abort broke");
+    });
+
+    expect(() => vi.advanceTimersByTime(300_000)).toThrow("abort broke");
+    await expect(promise).rejects.toThrow(
+      "OCR timed out with no progress. Try again or use a smaller image.",
+    );
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      CANCEL_URL,
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("posts a cancel and aborts the request when handling a progress frame throws", async () => {
+    let stop: () => void = () => {};
+    const promise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      {
+        onUploadProgress: vi.fn(),
+        onProcessingProgress: () => {
+          throw new Error("boom");
+        },
+        onStoppable: (s) => {
+          stop = s;
+        },
+      },
+    );
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    expect(() => events.emit({ type: "single", phase: "processing", percent: 40 })).toThrow("boom");
+    await expect(promise).rejects.toThrow(
+      "Something went wrong while tracking this job. Try again.",
+    );
+    expect(events.close).toHaveBeenCalledTimes(1);
+    expect(xhr.abort).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      CANCEL_URL,
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    // Neither a late 202 nor a subsequent stop() sends a duplicate cancel.
+    xhr.status = 202;
+    xhr.onload?.();
+    stop();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cancel a job the server itself reported as failed, even when closing the stream throws", async () => {
+    const promise = runOcr();
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    xhr.status = 202;
+    xhr.onload?.();
+    events.close.mockImplementationOnce(() => {
+      throw new Error("close broke");
+    });
+
+    expect(() =>
+      events.emit({ type: "single", phase: "failed", error: "runtime crashed" }),
+    ).toThrow("close broke");
+    await expect(promise).rejects.toThrow("runtime crashed");
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("still resolves and does not cancel when closing the stream throws on a completed frame", async () => {
+    const promise = runOcr();
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    xhr.status = 202;
+    xhr.onload?.();
+    events.close.mockImplementationOnce(() => {
+      throw new Error("close broke");
+    });
+
+    expect(() =>
+      events.emit({ type: "single", phase: "complete", result: { text: "extracted text" } }),
+    ).toThrow("close broke");
+    await expect(promise).resolves.toMatchObject({ text: "extracted text" });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("sends at most one cancel when stop() is called after a stall", async () => {
+    vi.useFakeTimers();
+    let stop: () => void = () => {};
+    const promise = runOcr((s) => {
+      stop = s;
+    });
+    const assertion = expect(promise).rejects.toThrow(
+      "OCR timed out with no progress. Try again or use a smaller image.",
+    );
+    const xhr = xhrs[0];
+    xhr.status = 202;
+    xhr.onload?.();
+
+    await vi.advanceTimersByTimeAsync(300_000);
+    await assertion;
+    stop();
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a cancel for an abandoned OCR job that finds no job", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      vi.mocked(fetch).mockResolvedValueOnce(new Response("{}", { status: 404 }));
+      const promise = ocrOneFile(
+        new File(["image"], "scan.png", { type: "image/png" }),
+        { quality: "fast", language: "en", enhance: false },
+        {
+          onUploadProgress: vi.fn(),
+          onProcessingProgress: () => {
+            throw new Error("boom");
+          },
+        },
+      );
+      xhrs[0].status = 202;
+      xhrs[0].onload?.();
+
+      expect(() =>
+        MockEventSource.instances[0].emit({ type: "single", phase: "processing", percent: 40 }),
+      ).toThrow("boom");
+      await expect(promise).rejects.toThrow(
+        "Something went wrong while tracking this job. Try again.",
+      );
+      await vi.waitFor(() => expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1));
+
+      expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+        "Cancel for an abandoned OCR job found no job",
+      );
+      expect(vi.mocked(captureHandledError).mock.calls[0][1]).toEqual({
+        error_class: "operational",
+        tool_id: "ocr",
+        status_code: "404",
+      });
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 });

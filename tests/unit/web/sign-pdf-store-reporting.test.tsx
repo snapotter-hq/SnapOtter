@@ -1876,3 +1876,264 @@ describe("sign-pdf says so, and stops the job, when the panel unmounts mid-run (
     }
   });
 });
+
+/**
+ * #2721: when the client gives up on a Sign PDF run (handling a frame broke, or
+ * the five-minute stall fired), the job still runs on the server and can still
+ * auto-save. Both paths cancel the server job once it has been accepted.
+ */
+describe("sign-pdf cancels a job the client gave up on (#2721)", () => {
+  const cancelUrl = (xhr: FakeXhr) =>
+    `/api/v1/jobs/${xhr.body?.get("clientJobId") as string}/cancel`;
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const realUpdateEntryById = useFileStore.getState().updateEntryById;
+
+  beforeEach(() => {
+    fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    useFileStore.setState({ updateEntryById: realUpdateEntryById });
+  });
+
+  function breakNextEntryWrite() {
+    vi.spyOn(useFileStore.getState(), "updateEntryById")
+      .mockImplementationOnce(() => {
+        throw new Error("boom");
+      })
+      .mockImplementation(realUpdateEntryById);
+  }
+
+  async function breakLandingStreamResult(xhr: FakeXhr) {
+    xhr.respond(202, { jobId: "job-1", async: true });
+    breakNextEntryWrite();
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: DOWNLOAD_URL },
+          }),
+        });
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+  }
+
+  it("posts a cancel when handling the stream breaks", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    await breakLandingStreamResult(xhr);
+
+    expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.jobTrackingFailed);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(cancelUrl(xhr));
+    expect(init.method).toBe("POST");
+  });
+
+  it("does not cancel a job the server itself reported as failed", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not cancel a failed frame's job when showing its error throws", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (previous.processing && !state.processing) {
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({ data: JSON.stringify(FAILED_FRAME) });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("sends at most one cancel when handling a frame breaks before 202 and the panel then unmounts", async () => {
+    renderPanel();
+    const xhr = await apply();
+    breakNextEntryWrite();
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: DOWNLOAD_URL },
+          }),
+        });
+      }),
+    ).toThrow("boom");
+    await act(async () => {});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+
+    // Neither a late 202 nor unmounting sends a second cancel.
+    act(() => {
+      xhr.status = 202;
+      xhr.responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhr.onload?.();
+    });
+    cleanup();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cancel when a streamed complete frame has no download URL", async () => {
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("posts a cancel when the progress stream stalls after 202", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      xhr.respond(202, { jobId: "job-1", async: true });
+
+      stalls.fireLatest();
+
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+      expect(en.toolSettings["sign-pdf"].stall).toBe("Processing timed out. Try again.");
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.toolSettings["sign-pdf"].stall);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe(cancelUrl(xhr));
+      expect(init.method).toBe("POST");
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not send a cancel when the stall fires while the file is still uploading, unless a 202 slips past the abort", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      stalls.fireLatest();
+
+      expect(xhr.aborted).toBe(true);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(screen.getByText(en.toolSettings["sign-pdf"].stall)).toBeInTheDocument();
+
+      // A 202 response already queued behind the abort still triggers a cancel.
+      act(() => {
+        xhr.status = 202;
+        xhr.responseText = JSON.stringify({ jobId: "job-1", async: true });
+        xhr.onload?.();
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("does not send a cancel when a non-202 response slips past a pre-202 stall", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      stalls.fireLatest();
+
+      act(() => {
+        xhr.status = 200;
+        xhr.responseText = JSON.stringify({ downloadUrl: DOWNLOAD_URL });
+        xhr.onload?.();
+      });
+      act(() => {
+        xhr.status = 422;
+        xhr.responseText = JSON.stringify({ error: "Processing failed" });
+        xhr.onload?.();
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("cancels once when a stall follows a progress frame and the 202 arrives later", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 30 }),
+        });
+      });
+
+      stalls.fireLatest();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+
+      act(() => {
+        xhr.status = 202;
+        xhr.responseText = JSON.stringify({ jobId: "job-1", async: true });
+        xhr.onload?.();
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it("posts a cancel on stall after 202 even when showing the stall message throws", async () => {
+    const stalls = captureStallTimers();
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    let threw = false;
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (threw || !previous.processing || state.processing) return;
+      threw = true;
+      throw new Error("store broke");
+    });
+
+    try {
+      expect(() => stalls.fireLatest()).toThrow("store broke");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe(cancelUrl(xhr));
+      expect(useFileStore.getState().processing).toBe(false);
+    } finally {
+      unsubscribe();
+      stalls.restore();
+    }
+  });
+});

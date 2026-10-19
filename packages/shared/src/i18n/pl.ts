@@ -3960,8 +3960,7 @@ export const pl: TranslationKeys = {
           "Upuść plik PNG / JPG lub kliknij, aby wybrać. Przezroczysty PNG działa najlepiej.",
       },
       exportFailed: "Nie udało się odczytać umieszczonych podpisów. Spróbuj ponownie.",
-      stall:
-        "Upłynął limit czasu przetwarzania. Wynik mógł zostać zapisany w Twoich plikach; jeśli nie, spróbuj ponownie.",
+      stall: "Upłynął limit czasu przetwarzania. Spróbuj ponownie.",
       timeout: "Upłynął limit czasu żądania. Spróbuj ponownie.",
     },
     "redact-pdf": {

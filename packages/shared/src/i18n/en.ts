@@ -3891,7 +3891,7 @@ export const en = {
         uploadHint: "Drop a PNG / JPG, or click to choose. Transparent PNG works best.",
       },
       exportFailed: "Could not read the placed signatures. Try again.",
-      stall: "Processing timed out. The result may have saved to your files; otherwise, try again.",
+      stall: "Processing timed out. Try again.",
       timeout: "Request timed out. Try again.",
     },
     "redact-pdf": {

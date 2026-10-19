@@ -3683,7 +3683,7 @@ export const zhCN: TranslationKeys = {
         uploadHint: "拖入 PNG / JPG，或点击选择。透明 PNG 效果最佳。",
       },
       exportFailed: "无法读取已放置的签名。请重试。",
-      stall: "处理超时。结果可能已保存到您的文件中；如果没有，请重试。",
+      stall: "处理超时。请重试。",
       timeout: "请求超时。请重试。",
     },
     "redact-pdf": {

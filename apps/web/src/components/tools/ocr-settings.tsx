@@ -74,8 +74,11 @@ export function ocrOneFile(
     const resolveOnce = (result: { text: string; savedFileId?: string }) => {
       if (settled) return;
       settled = true;
-      cleanup();
-      resolve(result);
+      try {
+        cleanup();
+      } finally {
+        resolve(result);
+      }
     };
 
     const rejectOnce = (error: Error) => {
@@ -94,11 +97,18 @@ export function ocrOneFile(
       if (settled) return;
       if (stallTimer) clearTimeout(stallTimer);
       stallTimer = setTimeout(() => {
-        rejectOnce(
-          new Error(
-            messages.timeout ?? "OCR timed out with no progress. Try again or use a smaller image.",
-          ),
-        );
+        if (settled) return;
+        abandonedJob.cancelOnStall();
+        try {
+          rejectOnce(
+            new Error(
+              messages.timeout ??
+                "OCR timed out with no progress. Try again or use a smaller image.",
+            ),
+          );
+        } finally {
+          xhr.abort();
+        }
       }, OCR_ASYNC_STALL_TIMEOUT_MS);
     };
 
@@ -143,18 +153,25 @@ export function ocrOneFile(
           );
           return;
         }
+        abandonedJob.onAccepted();
         if (typeof data.percent === "number") {
-          abandonedJob.onAccepted();
           callbacks.onProcessingProgress(data.percent, data.stage ?? "");
         }
       } catch (err) {
-        rejectOnce(
-          new Error(
-            messages.t
-              ? messages.t.errors.jobTrackingFailed
-              : (messages.processingFailed ?? en.errors.jobTrackingFailed),
-          ),
-        );
+        if (!settled) {
+          abandonedJob.cancelOnStall();
+          try {
+            rejectOnce(
+              new Error(
+                messages.t
+                  ? messages.t.errors.jobTrackingFailed
+                  : (messages.processingFailed ?? en.errors.jobTrackingFailed),
+              ),
+            );
+          } finally {
+            xhr.abort();
+          }
+        }
         throw err;
       }
     };

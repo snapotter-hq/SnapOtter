@@ -3961,8 +3961,7 @@ export const ptBR: TranslationKeys = {
         uploadHint: "Solte um PNG / JPG ou clique para escolher. PNG transparente funciona melhor.",
       },
       exportFailed: "Não foi possível ler as assinaturas posicionadas. Tente novamente.",
-      stall:
-        "O processamento expirou. O resultado pode ter sido salvo nos seus arquivos; caso contrário, tente novamente.",
+      stall: "O processamento expirou. Tente novamente.",
       timeout: "A requisição expirou. Tente novamente.",
     },
     "redact-pdf": {

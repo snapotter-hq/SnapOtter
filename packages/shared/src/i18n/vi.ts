@@ -3948,8 +3948,7 @@ export const vi: TranslationKeys = {
         uploadHint: "Thả PNG / JPG, hoặc nhấp để chọn. PNG trong suốt hoạt động tốt nhất.",
       },
       exportFailed: "Không thể đọc các chữ ký đã đặt. Vui lòng thử lại.",
-      stall:
-        "Xử lý đã hết thời gian. Kết quả có thể đã được lưu vào tệp của bạn; nếu chưa, vui lòng thử lại.",
+      stall: "Xử lý đã hết thời gian. Vui lòng thử lại.",
       timeout: "Yêu cầu đã hết thời gian. Vui lòng thử lại.",
     },
     "redact-pdf": {

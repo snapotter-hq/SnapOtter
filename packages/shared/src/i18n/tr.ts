@@ -3957,8 +3957,7 @@ export const tr: TranslationKeys = {
           "Bir PNG / JPG bırakın veya seçmek için tıklayın. Şeffaf PNG en iyi sonucu verir.",
       },
       exportFailed: "Yerleştirilen imzalar okunamadı. Tekrar deneyin.",
-      stall:
-        "İşlem zaman aşımına uğradı. Sonuç dosyalarınıza kaydedilmiş olabilir; aksi halde tekrar deneyin.",
+      stall: "İşlem zaman aşımına uğradı. Tekrar deneyin.",
       timeout: "İstek zaman aşımına uğradı. Tekrar deneyin.",
     },
     "redact-pdf": {

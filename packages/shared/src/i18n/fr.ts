@@ -3973,8 +3973,7 @@ export const fr: TranslationKeys = {
           "Déposez un PNG / JPG ou cliquez pour choisir. Un PNG transparent fonctionne le mieux.",
       },
       exportFailed: "Impossible de lire les signatures placées. Veuillez réessayer.",
-      stall:
-        "Délai de traitement dépassé. Le résultat a peut-être été enregistré dans vos fichiers ; sinon, veuillez réessayer.",
+      stall: "Délai de traitement dépassé. Veuillez réessayer.",
       timeout: "Délai d'attente dépassé. Veuillez réessayer.",
     },
     "redact-pdf": {

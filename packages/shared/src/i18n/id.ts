@@ -3953,8 +3953,7 @@ export const id: TranslationKeys = {
           "Letakkan PNG / JPG, atau klik untuk memilih. PNG transparan bekerja paling baik.",
       },
       exportFailed: "Tidak dapat membaca tanda tangan yang ditempatkan. Coba lagi.",
-      stall:
-        "Pemrosesan habis waktu. Hasilnya mungkin sudah tersimpan di file Anda; jika tidak, coba lagi.",
+      stall: "Pemrosesan habis waktu. Coba lagi.",
       timeout: "Permintaan habis waktu. Coba lagi.",
     },
     "redact-pdf": {

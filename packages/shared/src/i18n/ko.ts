@@ -3883,8 +3883,7 @@ export const ko: TranslationKeys = {
         uploadHint: "PNG / JPG를 끌어다 놓거나 클릭하여 선택하세요. 투명한 PNG가 가장 좋습니다.",
       },
       exportFailed: "배치한 서명을 읽을 수 없습니다. 다시 시도해 주세요.",
-      stall:
-        "처리 시간이 초과되었습니다. 결과가 파일에 저장되었을 수 있습니다. 저장되지 않았다면 다시 시도해 주세요.",
+      stall: "처리 시간이 초과되었습니다. 다시 시도해 주세요.",
       timeout: "요청 시간이 초과되었습니다. 다시 시도해 주세요.",
     },
     "redact-pdf": {

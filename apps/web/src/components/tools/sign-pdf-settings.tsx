@@ -7,7 +7,7 @@ import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { captureHandledError } from "@/lib/analytics";
 import { formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
-import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
+import { type AbandonedJobTracker, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
 import {
   checkToolResult,
@@ -173,6 +173,18 @@ export function subscribeSignPdfJobProgress(
   open();
   resetStall();
   return { stop: cleanup, touch: resetStall };
+}
+
+/**
+ * Cancels the job when the stream failed because handling a frame threw. A
+ * failed frame and a completed frame with no result don't cancel, since both
+ * arrive with the server already done with the job.
+ */
+function cancelIfHandlingFailed(failure: JobFailure, abandonedJob: AbandonedJobTracker) {
+  if ("reason" in failure && failure.reason === "trackingFailed") {
+    abandonedJob.onAccepted();
+    abandonedJob.cancelOnStall();
+  }
 }
 
 /**
@@ -467,6 +479,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           abandonRequest();
           return;
         }
+        cancelIfHandlingFailed(failure, abandonedJob);
         abandonRequest();
         // A failure with a reason shows one of our translated messages; a
         // server message is English and classifies from its text.
@@ -480,6 +493,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           abandonRequest();
           return;
         }
+        abandonedJob.cancelOnStall();
         abandonRequest();
         failRun(sp.stall, "timeout");
       },

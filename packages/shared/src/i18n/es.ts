@@ -3949,8 +3949,7 @@ export const es: TranslationKeys = {
           "Suelta un PNG / JPG o haz clic para elegir. Un PNG transparente funciona mejor.",
       },
       exportFailed: "No se pudieron leer las firmas colocadas. Intenta de nuevo.",
-      stall:
-        "Se agotó el tiempo de procesamiento. Es posible que el resultado se haya guardado en tus archivos; si no, intenta de nuevo.",
+      stall: "Se agotó el tiempo de procesamiento. Intenta de nuevo.",
       timeout: "La solicitud agotó el tiempo de espera. Intenta de nuevo.",
     },
     "redact-pdf": {

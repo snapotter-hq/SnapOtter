@@ -3950,8 +3950,7 @@ export const sv: TranslationKeys = {
           "Släpp en PNG / JPG eller klicka för att välja. En transparent PNG fungerar bäst.",
       },
       exportFailed: "Kunde inte läsa de placerade signaturerna. Försök igen.",
-      stall:
-        "Bearbetningen tog för lång tid. Resultatet kan ha sparats i dina filer; annars försök igen.",
+      stall: "Bearbetningen tog för lång tid. Försök igen.",
       timeout: "Tidsgränsen för begäran överskreds. Försök igen.",
     },
     "redact-pdf": {

@@ -3968,8 +3968,7 @@ export const nl: TranslationKeys = {
           "Zet een PNG / JPG neer of klik om te kiezen. Een transparante PNG werkt het best.",
       },
       exportFailed: "Kan de geplaatste handtekeningen niet lezen. Probeer het opnieuw.",
-      stall:
-        "Verwerking duurde te lang. Het resultaat is mogelijk in je bestanden opgeslagen; probeer het anders opnieuw.",
+      stall: "Verwerking duurde te lang. Probeer het opnieuw.",
       timeout: "Time-out van verzoek. Probeer het opnieuw.",
     },
     "redact-pdf": {

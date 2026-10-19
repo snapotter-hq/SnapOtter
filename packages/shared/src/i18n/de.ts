@@ -3975,8 +3975,7 @@ export const de: TranslationKeys = {
       },
       exportFailed:
         "Die platzierten Unterschriften konnten nicht gelesen werden. Versuchen Sie es erneut.",
-      stall:
-        "Zeitüberschreitung bei der Verarbeitung. Das Ergebnis wurde möglicherweise in Ihren Dateien gespeichert; andernfalls versuchen Sie es erneut.",
+      stall: "Zeitüberschreitung bei der Verarbeitung. Versuchen Sie es erneut.",
       timeout: "Zeitüberschreitung der Anfrage. Versuchen Sie es erneut.",
     },
     "redact-pdf": {

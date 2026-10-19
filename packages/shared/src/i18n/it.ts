@@ -3960,8 +3960,7 @@ export const it: TranslationKeys = {
           "Trascina un PNG / JPG o fai clic per scegliere. Un PNG trasparente è l'ideale.",
       },
       exportFailed: "Impossibile leggere le firme posizionate. Riprova.",
-      stall:
-        "Tempo di elaborazione scaduto. Il risultato potrebbe essere stato salvato nei tuoi file; altrimenti, riprova.",
+      stall: "Tempo di elaborazione scaduto. Riprova.",
       timeout: "Richiesta scaduta. Riprova.",
     },
     "redact-pdf": {

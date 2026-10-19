@@ -3682,7 +3682,7 @@ export const zhTW: TranslationKeys = {
         uploadHint: "拖入 PNG / JPG，或點擊選擇。透明 PNG 效果最佳。",
       },
       exportFailed: "無法讀取已放置的簽名，請再試一次。",
-      stall: "處理逾時。結果可能已儲存到您的檔案中；若沒有，請再試一次。",
+      stall: "處理逾時。請再試一次。",
       timeout: "要求逾時，請再試一次。",
     },
     "redact-pdf": {
