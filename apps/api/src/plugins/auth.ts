@@ -1398,6 +1398,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         if (!lockedTeam) return "unknown-team" as const;
         teamName = lockedTeam.name;
       }
+      const [currentAdmin] = await tx
+        .select({ role: schema.users.role })
+        .from(schema.users)
+        .where(eq(schema.users.id, admin.id));
+      if (!currentAdmin) return "escalation-denied" as const;
+
+      const currentActor = { ...admin, role: currentAdmin.role };
+      if (
+        !(await hasEffectivePermission(currentActor, "users:manage")) ||
+        !(await canAssignRole(currentActor, role))
+      ) {
+        return "escalation-denied" as const;
+      }
       if (await userLimitReached(tx)) return "limit" as const;
       return tx
         .insert(schema.users)
@@ -1423,6 +1436,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({
         error: "Team not found",
         code: "UNKNOWN_TEAM",
+      });
+    }
+
+    if (inserted === "escalation-denied") {
+      return reply.status(403).send({
+        error: "Cannot create a user beyond your role authority",
+        code: "ESCALATION_DENIED",
       });
     }
 
@@ -1689,18 +1709,69 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const newHash = await hashPassword(normalizePassword(body.newPassword));
 
       // One transaction, for the same reason as change-password (#2089).
-      await db.transaction(async (tx) => {
-        await tx
-          .update(schema.users)
-          .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
-          .where(eq(schema.users.id, id));
+      try {
+        await db.transaction(async (tx) => {
+          const [currentUser] = await tx
+            .select({ role: schema.users.role, passwordHash: schema.users.passwordHash })
+            .from(schema.users)
+            .where(eq(schema.users.id, id))
+            .for("no key update");
+          const [currentAdmin] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, admin.id));
 
-        // Invalidate all sessions for this user
-        await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+          if (!currentAdmin) {
+            throw new EscalationDeniedError();
+          }
 
-        // Revoke all API keys
-        await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
-      });
+          const currentActor = { ...admin, role: currentAdmin.role };
+
+          if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!currentUser) {
+            throw new Error("NOT_FOUND");
+          }
+
+          if (!(await canManageTargetRole(currentActor, currentUser.role))) {
+            throw new EscalationDeniedError();
+          }
+
+          if (!currentUser.passwordHash) {
+            throw new Error("OIDC_NO_PASSWORD");
+          }
+
+          await tx
+            .update(schema.users)
+            .set({ passwordHash: newHash, mustChangePassword: true, updatedAt: new Date() })
+            .where(eq(schema.users.id, id));
+
+          // Invalidate all sessions for this user
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
+
+          // Revoke all API keys
+          await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+        });
+      } catch (err) {
+        if (err instanceof EscalationDeniedError) {
+          return reply.status(403).send({
+            error: "Cannot manage a user beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });
+        }
+        if (err instanceof Error && err.message === "OIDC_NO_PASSWORD") {
+          return reply.status(400).send({
+            error: "Cannot reset password for OIDC user.",
+            code: "OIDC_NO_PASSWORD",
+          });
+        }
+        throw err;
+      }
 
       await auditFromRequest(request)("PASSWORD_RESET", {
         adminId: admin.id,
