@@ -37,7 +37,7 @@ test.describe("Editor Autosave", () => {
           ],
           objects: [],
           adjustments: {},
-          filters: {},
+          filters: [],
           guides: [],
           sourceImageUrl: null,
           sourceImageSize: null,
@@ -69,6 +69,7 @@ test.describe("Editor Autosave", () => {
     expect(parsed.state.canvasSize.height).toBeGreaterThan(0);
     expect(parsed.state.layers).toBeDefined();
     expect(Array.isArray(parsed.state.layers)).toBe(true);
+    expect(Array.isArray(parsed.state.filters)).toBe(true);
   });
 
   test("modified content persists across page reload", async ({ editorPage: page }) => {
@@ -99,7 +100,7 @@ test.describe("Editor Autosave", () => {
         ],
         objects: [],
         adjustments: {},
-        filters: {},
+        filters: [],
         guides: [],
         sourceImageUrl: null,
         sourceImageSize: null,
@@ -121,7 +122,9 @@ test.describe("Editor Autosave", () => {
 
     // Reload the page
     await page.reload();
-    await page.waitForTimeout(3000);
+    await expect(page.getByRole("button", { name: "Restore", exact: true })).toBeVisible({
+      timeout: 10000,
+    });
 
     // After reload, localStorage should still have the autosave data
     const dataAfter = await page.evaluate(() => {

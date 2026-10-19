@@ -1072,7 +1072,7 @@ test.describe("Editor Autosave", () => {
         ],
         objects: [],
         adjustments: {},
-        filters: {},
+        filters: [],
         guides: [],
         sourceImageUrl: null,
         sourceImageSize: null,
@@ -1093,5 +1093,6 @@ test.describe("Editor Autosave", () => {
     const parsed = JSON.parse(autosaveData!);
     expect(parsed.version).toBe(1);
     expect(parsed.state.canvasSize.width).toBeGreaterThan(0);
+    expect(Array.isArray(parsed.state.filters)).toBe(true);
   });
 });
