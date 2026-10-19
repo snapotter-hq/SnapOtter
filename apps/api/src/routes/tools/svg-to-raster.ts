@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { apiToolPath, hasServerErrorStatus } from "@snapotter/shared";
+import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import PQueue from "p-queue";
@@ -10,7 +10,7 @@ import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { resolveConcurrency } from "../../lib/env.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
@@ -19,7 +19,7 @@ import { putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { requireToolAccess } from "../../permissions.js";
-import { updateJobProgress } from "../progress.js";
+import { failBatchJob, updateJobProgress } from "../progress.js";
 
 const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
 
@@ -337,22 +337,21 @@ export function registerSvgToRasterRoute(
 
     await Promise.all(tasks);
 
-    // Awaited: this route owns the row, and until it is terminal it counts
-    // against the user's concurrent-job limit (#1688). A failed write still
-    // sends the result, but is logged; nothing else will settle the row
-    // before the next restart.
-    await updateJobProgress({
-      jobId,
-      status: errors.length === files.length ? "failed" : "completed",
-      totalFiles: files.length,
-      completedFiles,
-      failedFiles: errors.length,
-      errors,
-    }).catch((err) =>
-      request.log.error({ err, jobId }, "failed to persist an SVG batch's terminal progress"),
-    );
-
     if (errors.length === files.length) {
+      // Awaited: this route owns the row, and until it is terminal it counts
+      // against the user's concurrent-job limit (#1688). A failed write still
+      // sends the result, but is logged; nothing else will settle the row
+      // before the next restart.
+      await updateJobProgress({
+        jobId,
+        status: "failed",
+        totalFiles: files.length,
+        completedFiles,
+        failedFiles: errors.length,
+        errors,
+      }).catch((err) =>
+        request.log.error({ err, jobId }, "failed to persist an SVG batch's terminal progress"),
+      );
       return reply.status(422).send({ error: "All files failed processing", errors });
     }
 
@@ -388,34 +387,121 @@ export function registerSvgToRasterRoute(
     // directory. Entries here are in-memory buffers, so unlike the other batch
     // routes there is no storage read to fail, but an archiver fault still has
     // to reach the client.
-    let streamFailed = false;
+    let streamError = null as Error | null;
+    let rejectStream: ((err: Error) => void) | null = null;
+    const streamDone = new Promise<void>((resolve, reject) => {
+      rejectStream = reject;
+      archive.on("end", resolve);
+    });
+    streamDone.catch(() => {});
+
     const failStream = (err: Error, msg: string) => {
-      if (streamFailed) return;
-      streamFailed = true;
+      if (streamError) return;
+      streamError = err;
       request.log.error({ err, jobId }, msg);
       archive.abort();
-      reply.raw.destroy(err);
+      rejectStream?.(err);
     };
 
     archive.on("error", (err) => failStream(err, "Archiver error during SVG batch processing"));
-
-    archive.pipe(reply.raw);
+    const onReplyClose = () => {
+      if (!archive.readableEnded) {
+        failStream(
+          new Error("Response stream closed before SVG batch ZIP finished"),
+          "Response stream closed during SVG batch processing",
+        );
+      }
+    };
+    const onReplyError = (err: Error) =>
+      failStream(err, "Response stream error during SVG batch processing");
+    reply.raw.on("close", onReplyClose);
+    reply.raw.on("error", onReplyError);
+    // Keep reply.raw open until the terminal progress write settles (#1688,
+    // #2751): ending the socket is what resolves the client's request, so
+    // settling after pipe's default auto-end would race the next request's
+    // concurrency check, and settling before the stream finishes would leave
+    // the row completed when the ZIP stream fails.
+    archive.pipe(reply.raw, { end: false });
+    if (reply.raw.destroyed) {
+      onReplyClose();
+    }
 
     // A throw past this point cannot be answered: the reply is hijacked, so
     // Fastify logs and walks away, leaving the socket neither ended nor
     // destroyed and the client waiting forever.
     try {
-      for (const result of results) {
-        if (result) {
+      try {
+        for (const result of results) {
+          if (!result) continue;
+          if (streamError) break;
           archive.append(result.buffer, { name: result.filename });
         }
+        if (!streamError) {
+          void archive
+            .finalize()
+            .catch((err) =>
+              failStream(
+                err instanceof Error ? err : new Error(String(err)),
+                "Failed to finalize ZIP during SVG batch processing",
+              ),
+            );
+        }
+        await streamDone;
+      } catch (err) {
+        failStream(
+          err instanceof Error ? err : new Error(String(err)),
+          "Failed to finalize ZIP during SVG batch processing",
+        );
       }
-      await archive.finalize();
-    } catch (err) {
-      failStream(
-        err instanceof Error ? err : new Error(String(err)),
-        "Failed to finalize ZIP during SVG batch processing",
-      );
+
+      if (streamError) {
+        const message = isSafeMessageError(streamError)
+          ? friendlyError(streamError.message)
+          : "Failed to package batch results";
+        const applied = await failBatchJob({
+          jobId,
+          totalFiles: files.length,
+          completedFiles,
+          failedFiles: errors.length,
+          errors: [...errors, { filename: "", error: message }],
+          message,
+          ...(isSafeMessageError(streamError) && streamError.code
+            ? { code: streamError.code }
+            : {}),
+        }).catch((settleErr) => {
+          request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
+          return null;
+        });
+        if (applied === false) {
+          request.log.warn(
+            { jobId },
+            "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
+          );
+        }
+      } else {
+        await updateJobProgress({
+          jobId,
+          status: "completed",
+          totalFiles: files.length,
+          completedFiles,
+          failedFiles: errors.length,
+          errors,
+        }).catch((err) =>
+          request.log.error({ err, jobId }, "failed to persist an SVG batch's terminal progress"),
+        );
+      }
+    } finally {
+      reply.raw.removeListener("close", onReplyClose);
+      reply.raw.removeListener("error", onReplyError);
+    }
+
+    if (streamError) {
+      if (!reply.raw.destroyed) {
+        reply.raw.once("error", () => {});
+      }
+      reply.raw.destroy(streamError);
+    } else {
+      reply.raw.end();
     }
   });
 
