@@ -5333,6 +5333,8 @@ export const es: TranslationKeys = {
     mfaExpired: "Tu sesión de verificación ha caducado. Inicia sesión de nuevo.",
     mfaEnrollmentExpired:
       "Tu sesión de configuración ha caducado. Inicia sesión de nuevo para obtener un código QR y códigos de recuperación nuevos; los anteriores ya no funcionarán.",
+    mfaNotConfigured: "La autenticación en dos pasos no está configurada. Inicia sesión de nuevo.",
+    mfaAlreadyEnabled: "La autenticación en dos pasos ya está activada. Inicia sesión de nuevo.",
     mfaEnrollmentHeading: "Configura la autenticación en dos pasos para continuar",
     mfaEnrollmentRequired:
       "Tu organización requiere autenticación multifactor. Configura MFA en los ajustes de tu cuenta.",

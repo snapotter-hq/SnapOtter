@@ -5343,6 +5343,9 @@ export const pl: TranslationKeys = {
     mfaExpired: "Sesja weryfikacji wygasła. Zaloguj się ponownie.",
     mfaEnrollmentExpired:
       "Sesja konfiguracji wygasła. Zaloguj się ponownie, aby otrzymać nowy kod QR i nowe kody odzyskiwania; wcześniej wyświetlone nie będą działać.",
+    mfaNotConfigured:
+      "Uwierzytelnianie dwuskładnikowe nie jest skonfigurowane. Zaloguj się ponownie.",
+    mfaAlreadyEnabled: "Uwierzytelnianie dwuskładnikowe jest już włączone. Zaloguj się ponownie.",
     mfaEnrollmentHeading: "Skonfiguruj uwierzytelnianie dwuskładnikowe, aby kontynuować",
     mfaEnrollmentRequired:
       "Twoja organizacja wymaga uwierzytelniania wieloskładnikowego. Skonfiguruj MFA w ustawieniach konta.",

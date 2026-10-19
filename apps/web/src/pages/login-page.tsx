@@ -96,9 +96,13 @@ function mfaFailureMessage(
   bodyRetryAfter: unknown,
   header: string | null,
   t: TranslationKeys,
+  enrolling = false,
 ): { message: string; clearCode: boolean; restart: boolean } {
-  if (code === "MFA_EXPIRED") {
-    return { message: t.auth.mfaExpired, clearCode: true, restart: true };
+  if (code === "MFA_NOT_CONFIGURED") {
+    return { message: t.auth.mfaNotConfigured, clearCode: true, restart: true };
+  }
+  if (code === "MFA_ALREADY_ENABLED") {
+    return { message: t.auth.mfaAlreadyEnabled, clearCode: true, restart: true };
   }
   if (code === "IP_NOT_ALLOWED") {
     return { message: t.auth.ipNotAllowed, clearCode: false, restart: false };
@@ -114,8 +118,18 @@ function mfaFailureMessage(
       restart: false,
     };
   }
-  if (status === 401 || status === 400) {
+  if (code === "INVALID_CODE") {
     return { message: t.auth.mfaInvalidCode, clearCode: true, restart: false };
+  }
+  if (
+    code === "MFA_EXPIRED" ||
+    (status >= 400 && status < 500 && typeof code === "string" && code.length > 0)
+  ) {
+    return {
+      message: enrolling ? t.auth.mfaEnrollmentExpired : t.auth.mfaExpired,
+      clearCode: true,
+      restart: true,
+    };
   }
   return { message: t.auth.connectionError, clearCode: false, restart: false };
 }
@@ -514,11 +528,10 @@ export function LoginPage() {
           failure?.retryAfter,
           res.headers.get("Retry-After"),
           t,
+          true,
         );
         if (restart) {
-          // A fresh login mints a new secret and new recovery codes, so the QR
-          // the user may already have scanned and the codes they saved are dead.
-          restartLogin(t.auth.mfaEnrollmentExpired);
+          restartLogin(message);
           return;
         }
         setError(message);

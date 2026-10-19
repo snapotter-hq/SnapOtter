@@ -5274,6 +5274,8 @@ export const ja: TranslationKeys = {
     mfaExpired: "認証セッションの有効期限が切れました。もう一度ログインしてください。",
     mfaEnrollmentExpired:
       "セットアップセッションの有効期限が切れました。もう一度ログインして新しいQRコードと新しいリカバリーコードを取得してください。以前に表示されたコードは使用できません。",
+    mfaNotConfigured: "2 要素認証が設定されていません。もう一度ログインしてください。",
+    mfaAlreadyEnabled: "2 要素認証はすでに有効になっています。もう一度ログインしてください。",
     mfaEnrollmentHeading: "続行するには 2 要素認証を設定してください",
     mfaEnrollmentRequired: "組織で多要素認証が必須です。アカウント設定で MFA を設定してください。",
     mfaPolicyUnavailable:

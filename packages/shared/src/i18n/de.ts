@@ -5363,6 +5363,10 @@ export const de: TranslationKeys = {
     mfaExpired: "Ihre Verifizierungssitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     mfaEnrollmentExpired:
       "Ihre Einrichtungssitzung ist abgelaufen. Melden Sie sich erneut an, um einen neuen QR-Code und neue Wiederherstellungscodes zu erhalten; die zuvor angezeigten funktionieren nicht mehr.",
+    mfaNotConfigured:
+      "Die Zwei-Faktor-Authentifizierung ist nicht eingerichtet. Bitte melden Sie sich erneut an.",
+    mfaAlreadyEnabled:
+      "Die Zwei-Faktor-Authentifizierung ist bereits aktiviert. Bitte melden Sie sich erneut an.",
     mfaEnrollmentHeading: "Richten Sie die Zwei-Faktor-Authentifizierung ein, um fortzufahren",
     mfaEnrollmentRequired:
       "Ihre Organisation erfordert Multi-Faktor-Authentifizierung. Bitte richten Sie MFA in Ihren Kontoeinstellungen ein.",

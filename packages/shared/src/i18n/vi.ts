@@ -5312,6 +5312,8 @@ export const vi: TranslationKeys = {
     mfaExpired: "Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.",
     mfaEnrollmentExpired:
       "Phiên thiết lập đã hết hạn. Hãy đăng nhập lại để nhận mã QR mới và mã khôi phục mới; các mã hiển thị trước đó sẽ không dùng được.",
+    mfaNotConfigured: "Xác thực hai yếu tố chưa được thiết lập. Vui lòng đăng nhập lại.",
+    mfaAlreadyEnabled: "Xác thực hai yếu tố đã được bật. Vui lòng đăng nhập lại.",
     mfaEnrollmentHeading: "Thiết lập xác thực hai yếu tố để tiếp tục",
     mfaEnrollmentRequired:
       "Tổ chức của bạn yêu cầu xác thực đa yếu tố. Vui lòng thiết lập MFA trong cài đặt tài khoản.",

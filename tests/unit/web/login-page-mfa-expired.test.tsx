@@ -22,8 +22,11 @@ const ENROLLMENT_URI = "otpauth://totp/SnapOtter:admin?secret=JBSWY3DPEHPK3PXP&i
 const EXPIRED_MESSAGE = "Your verification session expired. Please log in again.";
 const ENROLLMENT_EXPIRED_MESSAGE =
   "Your setup session expired. Log in again to get a new QR code and new recovery codes; the ones shown before won't work.";
+const NOT_CONFIGURED_MESSAGE = "Two-factor authentication is not set up. Please log in again.";
+const ALREADY_ENABLED_MESSAGE =
+  "Two-factor authentication is already enabled. Please log in again.";
 
-function renderLoginPage() {
+function renderLoginPage(initialEntry = "/login") {
   useAuth.mockReturnValue({
     oidcEnabled: false,
     oidcProviderName: null,
@@ -32,7 +35,7 @@ function renderLoginPage() {
     ssoEnforced: false,
   });
   return render(
-    <MemoryRouter initialEntries={["/login"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <LoginPage />
     </MemoryRouter>,
   );
@@ -164,5 +167,125 @@ describe("LoginPage MFA challenge expiry (#1234)", () => {
     const secondInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
     expect(secondInput.value).toBe("");
     expect(screen.queryByText(EXPIRED_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it("says MFA is not set up and returns to the password form on MFA_NOT_CONFIGURED (#2018)", async () => {
+    stubTotpFlow(
+      failedResponse(401, {
+        error: "User not found or MFA not configured",
+        code: "MFA_NOT_CONFIGURED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(NOT_CONFIGURED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("000000")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("says MFA is not set up and returns to the password form on enroll-complete MFA_NOT_CONFIGURED (#2018)", async () => {
+    stubEnrollFlow(
+      failedResponse(401, {
+        error: "User not found or MFA not configured",
+        code: "MFA_NOT_CONFIGURED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByLabelText(/6-digit code/i);
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(NOT_CONFIGURED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(ENROLLMENT_EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("says MFA is already enabled and returns to the password form on enroll-complete MFA_ALREADY_ENABLED (#2018)", async () => {
+    stubEnrollFlow(
+      failedResponse(409, {
+        error: "MFA is already verified and active",
+        code: "MFA_ALREADY_ENABLED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByLabelText(/6-digit code/i);
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ALREADY_ENABLED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(ENROLLMENT_EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/connection error/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("returns to the password form when a garbled redirected mfaToken fails with 400 VALIDATION_ERROR (#2018)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        failedResponse(400, {
+          error: "MFA token and code are required",
+          code: "VALIDATION_ERROR",
+        }),
+      ),
+    );
+
+    renderLoginPage("/login?mfaToken=not-a-uuid");
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(EXPIRED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("000000")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("returns to the password form on enroll-complete 400 VALIDATION_ERROR (#2018)", async () => {
+    stubEnrollFlow(
+      failedResponse(400, {
+        error: "Enrollment token and code are required",
+        code: "VALIDATION_ERROR",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByLabelText(/6-digit code/i);
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ENROLLMENT_EXPIRED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
   });
 });

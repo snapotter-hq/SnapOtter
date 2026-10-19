@@ -295,46 +295,37 @@ describe("LoginPage error messages", () => {
     expect(verifyButton).toBeEnabled();
   });
 
-  it("still shows the invalid-code message and clears the field on a 400 MFA validation error", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-1" }),
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 400,
-          headers: new Headers(),
-          json: async () => ({
-            error: "MFA token and code are required",
-            code: "VALIDATION_ERROR",
-          }),
-        }),
-    );
-
-    renderLoginPage();
-    await submitLogin();
-
-    const codeInput = (await screen.findByPlaceholderText("000000")) as HTMLInputElement;
-    fireEvent.change(codeInput, { target: { value: "123456" } });
-    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/invalid code/i)).toBeInTheDocument();
-    });
-    expect(codeInput.value).toBe("");
-  });
-
   it.each([
-    ["a proxy 403", 403],
-    ["a plain-text 404", 404],
+    [
+      "a proxy 400",
+      400,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
+    ["an uncoded 401 JSON response", 401, async () => ({ error: "Unauthorized" })],
+    [
+      "a 400 JSON response with an empty code",
+      400,
+      async () => ({ error: "Bad request", code: "" }),
+    ],
+    [
+      "a proxy 403",
+      403,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
+    [
+      "a plain-text 404",
+      404,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
   ])(
-    "shows a connection error and keeps the code on MFA-complete for %s (#2052)",
-    async (_label, status) => {
+    "shows a connection error and keeps the code on MFA-complete for %s (#2052, #2018)",
+    async (_label, status, json) => {
       vi.stubGlobal(
         "fetch",
         vi
@@ -348,9 +339,7 @@ describe("LoginPage error messages", () => {
             ok: false,
             status,
             headers: new Headers(),
-            json: async () => {
-              throw new Error("Unexpected token < in JSON");
-            },
+            json,
           }),
       );
 
@@ -409,11 +398,31 @@ describe("LoginPage error messages", () => {
   });
 
   it.each([
-    ["a proxy 403", 403],
-    ["a plain-text 404", 404],
+    [
+      "a proxy 400",
+      400,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
+    ["an uncoded 401 JSON response", 401, async () => ({ error: "Unauthorized" })],
+    [
+      "a proxy 403",
+      403,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
+    [
+      "a plain-text 404",
+      404,
+      async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    ],
   ])(
-    "shows a connection error and keeps the code on MFA-enrollment for %s (#2052)",
-    async (_label, status) => {
+    "shows a connection error and keeps the code on MFA-enrollment for %s (#2052, #2018)",
+    async (_label, status, json) => {
       vi.stubGlobal(
         "fetch",
         vi
@@ -432,9 +441,7 @@ describe("LoginPage error messages", () => {
             ok: false,
             status,
             headers: new Headers(),
-            json: async () => {
-              throw new Error("Unexpected token < in JSON");
-            },
+            json,
           }),
       );
 

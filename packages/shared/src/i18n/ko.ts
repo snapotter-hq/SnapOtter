@@ -5241,6 +5241,8 @@ export const ko: TranslationKeys = {
     mfaExpired: "인증 세션이 만료되었습니다. 다시 로그인해 주세요.",
     mfaEnrollmentExpired:
       "설정 세션이 만료되었습니다. 다시 로그인하여 새 QR 코드와 새 복구 코드를 받으세요. 이전에 표시된 코드는 작동하지 않습니다.",
+    mfaNotConfigured: "2단계 인증이 설정되어 있지 않습니다. 다시 로그인해 주세요.",
+    mfaAlreadyEnabled: "2단계 인증이 이미 활성화되어 있습니다. 다시 로그인해 주세요.",
     mfaEnrollmentHeading: "계속하려면 2단계 인증을 설정하세요",
     mfaEnrollmentRequired: "조직에서 다단계 인증을 요구합니다. 계정 설정에서 MFA를 설정해 주세요.",
     mfaPolicyUnavailable: "MFA 정책을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",

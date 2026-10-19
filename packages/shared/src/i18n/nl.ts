@@ -5344,6 +5344,8 @@ export const nl: TranslationKeys = {
     mfaExpired: "Uw verificatiesessie is verlopen. Log opnieuw in.",
     mfaEnrollmentExpired:
       "Uw installatiesessie is verlopen. Log opnieuw in voor een nieuwe QR-code en nieuwe herstelcodes; de eerder getoonde codes werken niet meer.",
+    mfaNotConfigured: "Tweefactorauthenticatie is niet ingesteld. Log opnieuw in.",
+    mfaAlreadyEnabled: "Tweefactorauthenticatie is al ingeschakeld. Log opnieuw in.",
     mfaEnrollmentHeading: "Stel tweefactorauthenticatie in om door te gaan",
     mfaEnrollmentRequired:
       "Uw organisatie vereist meerfactorauthenticatie. Stel MFA in via uw accountinstellingen.",

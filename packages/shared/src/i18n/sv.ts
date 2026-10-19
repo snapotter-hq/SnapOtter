@@ -5323,6 +5323,8 @@ export const sv: TranslationKeys = {
     mfaExpired: "Din verifieringssession har gått ut. Logga in igen.",
     mfaEnrollmentExpired:
       "Din installationssession har gått ut. Logga in igen för att få en ny QR-kod och nya återställningskoder; de som visades tidigare fungerar inte.",
+    mfaNotConfigured: "Tvåfaktorsautentisering är inte konfigurerad. Logga in igen.",
+    mfaAlreadyEnabled: "Tvåfaktorsautentisering är redan aktiverad. Logga in igen.",
     mfaEnrollmentHeading: "Konfigurera tvåfaktorsautentisering för att fortsätta",
     mfaEnrollmentRequired:
       "Din organisation kräver multifaktorautentisering. Konfigurera MFA i dina kontoinställningar.",
