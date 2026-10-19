@@ -226,10 +226,16 @@ type StrandedRow = {
   id: string;
   toolId: string | null;
   pool: string | null;
+  type: string;
   status: string;
   bytesIn: number | null;
   inputRefs: string[] | null;
+  progress: unknown;
 };
+
+function isBatchCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
 
 /**
  * Non-terminal clientJobId alias rows still pointing at this artifact job
@@ -274,7 +280,30 @@ async function recoverFromOutputs(
   }
 
   const completedAt = new Date();
-  const progress = { percent: 100, stage: "complete", result };
+  const existingProgress =
+    row.type === "batch" && typeof row.progress === "object" && row.progress !== null
+      ? (row.progress as Record<string, unknown>)
+      : undefined;
+  const pickBatchCounter = (key: "totalFiles" | "completedFiles" | "failedFiles") => {
+    const fromSidecar = row.type === "batch" ? toolPayload?.[key] : undefined;
+    if (isBatchCount(fromSidecar)) return fromSidecar;
+    const fromProgress = existingProgress?.[key];
+    return isBatchCount(fromProgress) ? fromProgress : undefined;
+  };
+  if (row.type === "batch") {
+    delete result.totalFiles;
+    delete result.completedFiles;
+    delete result.failedFiles;
+  }
+  const totalFiles = pickBatchCounter("totalFiles");
+  const completedFiles = pickBatchCounter("completedFiles");
+  const failedFiles = pickBatchCounter("failedFiles");
+  const batchCounts = {
+    ...(totalFiles !== undefined && { totalFiles }),
+    ...(completedFiles !== undefined && { completedFiles }),
+    ...(failedFiles !== undefined && { failedFiles }),
+  };
+  const progress = { percent: 100, stage: "complete", ...batchCounts, result };
   const updated = await db.transaction(async (tx) => {
     const settled = await tx
       .update(schema.jobs)
@@ -368,9 +397,11 @@ export async function reconcileStrandedJobs(
       id: schema.jobs.id,
       toolId: schema.jobs.toolId,
       pool: schema.jobs.pool,
+      type: schema.jobs.type,
       status: schema.jobs.status,
       bytesIn: schema.jobs.bytesIn,
       inputRefs: schema.jobs.inputRefs,
+      progress: schema.jobs.progress,
     })
     .from(schema.jobs)
     .where(and(reconcilableJobRows(), lt(schema.jobs.createdAt, new Date(Date.now() - graceMs))))

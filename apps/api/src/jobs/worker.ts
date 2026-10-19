@@ -1443,6 +1443,10 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   const lastOutputBuffer = await getObjectBuffer(lastOutputRef);
   const outFilename = lastOutputRef.split("/").pop() ?? "output";
   const parentKey = `outputs/${data.jobId}/${outFilename}`;
+  await putObject(
+    resultPayloadKey(data.jobId),
+    Buffer.from(JSON.stringify({ stepsCompleted: totalSteps, steps }), "utf8"),
+  );
   await putObject(parentKey, lastOutputBuffer);
 
   // Modality-aware preview of the final output (video poster / pdf first page /
@@ -1904,6 +1908,20 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
   let zipSize: number;
   try {
+    await putObject(
+      resultPayloadKey(data.jobId),
+      Buffer.from(
+        JSON.stringify({
+          zipFilename,
+          fileResults,
+          fileNotes,
+          totalFiles,
+          completedFiles: totalFiles,
+          failedFiles,
+        }),
+        "utf8",
+      ),
+    );
     zipSize = await buildBatchZip(zipKey, successEntries);
   } catch (err) {
     // A SafeError's message names what to do (the workspace cap is the one

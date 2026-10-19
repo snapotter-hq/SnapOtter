@@ -35,7 +35,10 @@ import { SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
-import { buildSingleFileReplayEvent } from "../../../apps/api/src/routes/progress.js";
+import {
+  buildBatchReplayEvent,
+  buildSingleFileReplayEvent,
+} from "../../../apps/api/src/routes/progress.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -347,19 +350,31 @@ describe("stranded-job reconciliation", () => {
    * `db.update` setting a terminal status), so a worker that finishes writing
    * `outputs/<jobId>/` leaves its row stranded in `processing`.
    */
-  async function withTerminalWriteOutage<T>(fn: () => Promise<T>): Promise<T> {
+  async function withTerminalWriteOutage<T>(
+    fn: (outage: { terminalWriteFailures: () => number }) => Promise<T>,
+  ): Promise<T> {
+    let failures = 0;
     const origUpdate = db.update.bind(db);
-    const txSpy = vi
-      .spyOn(db, "transaction")
-      .mockRejectedValue(new Error("simulated Postgres outage on terminal transaction"));
+    const txSpy = vi.spyOn(db, "transaction").mockImplementation(async () => {
+      failures += 1;
+      throw new Error("simulated Postgres outage on terminal transaction");
+    });
     const updateSpy = vi.spyOn(db, "update").mockImplementation(((table: unknown) => {
       const builder = origUpdate(table as never);
       const origSet = builder.set.bind(builder);
       builder.set = ((values: Record<string, unknown>) => {
-        if (values.status === "completed" || values.status === "failed") {
+        if (
+          values.status === "completed" ||
+          values.status === "failed" ||
+          values.status === "canceled"
+        ) {
           return {
-            where: () =>
-              Promise.reject(new Error("simulated Postgres outage on terminal status update")),
+            where: () => {
+              failures += 1;
+              return Promise.reject(
+                new Error("simulated Postgres outage on terminal status update"),
+              );
+            },
           } as never;
         }
         return origSet(values as never);
@@ -367,7 +382,7 @@ describe("stranded-job reconciliation", () => {
       return builder;
     }) as typeof db.update);
     try {
-      return await fn();
+      return await fn({ terminalWriteFailures: () => failures });
     } finally {
       txSpy.mockRestore();
       updateSpy.mockRestore();
@@ -889,6 +904,497 @@ describe("stranded-job reconciliation", () => {
       const canceledRow = await readJob(canceledAlias);
       expect(canceledRow.status).toBe("canceled");
       expect(canceledRow.error?.message).toBe("Canceled");
+    });
+  });
+
+  describe("pipeline and batch finalize resultPayload preservation (#2683)", () => {
+    it("restores a pipeline parent row's stepsCompleted and per-step notes when pipeline-finalize's terminal DB write fails", async () => {
+      const pipelineId = await seedJob({
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+      });
+      const step0Id = `${pipelineId}-s0`;
+      const step1Id = `${pipelineId}-s1`;
+      const step1Bytes = await noiseJpeg(60, 40);
+      seededPrefixes.push(`outputs/${step1Id}/`, `outputs/${pipelineId}/`);
+      await seedOutput(step1Id, "photo_rotated.jpg", step1Bytes);
+
+      await db.insert(schema.jobs).values([
+        {
+          id: step0Id,
+          toolId: "compress",
+          pool: "image",
+          type: "pipeline-step",
+          status: "completed",
+          bytesIn: 24_000,
+          bytesOut: 1_800,
+          inputRefs: [`uploads/${pipelineId}/photo.jpg`],
+          outputRefs: [`outputs/${step0Id}/photo_compress.jpg`],
+          progress: {
+            percent: 100,
+            stage: "complete",
+            result: {
+              jobId: step0Id,
+              targetKb: 2,
+              resizedTo: { width: 600, height: 450 },
+            },
+          },
+          completedAt: new Date(),
+        },
+        {
+          id: step1Id,
+          toolId: "rotate",
+          pool: "image",
+          type: "pipeline-step",
+          status: "completed",
+          bytesIn: 1_800,
+          bytesOut: step1Bytes.length,
+          inputRefs: [`outputs/${step0Id}/photo_compress.jpg`],
+          outputRefs: [`outputs/${step1Id}/photo_rotated.jpg`],
+          progress: {
+            percent: 100,
+            stage: "complete",
+            result: { jobId: step1Id },
+          },
+          completedAt: new Date(),
+        },
+      ]);
+
+      const imageQueue = getQueue("image");
+      await withTerminalWriteOutage(async ({ terminalWriteFailures }) => {
+        const finalizeJob = await imageQueue.add(
+          "pipeline-finalize",
+          {
+            jobId: pipelineId,
+            toolId: "pipeline",
+            userId: null,
+            pool: "image",
+            inputRefs: [],
+            filename: "photo.jpg",
+            settings: {},
+            kind: "pipeline-finalize",
+            totalSteps: 2,
+          } as never,
+          { jobId: pipelineId, attempts: 1 },
+        );
+        await vi.waitFor(
+          async () => {
+            expect(await finalizeJob.getState()).toBe("failed");
+            expect(terminalWriteFailures()).toBeGreaterThanOrEqual(2);
+          },
+          {
+            timeout: 30_000,
+            interval: 200,
+          },
+        );
+      });
+
+      try {
+        expect((await readJob(pipelineId)).status).toBe("processing");
+
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === pipelineId)?.resolution).toBe("recovered");
+
+        const row = await readJob(pipelineId);
+        expect(row.status).toBe("completed");
+        expect(row.outputRefs).toEqual([`outputs/${pipelineId}/photo_rotated.jpg`]);
+        expect(
+          (await listObjects(`outputs/${pipelineId}/`)).some(
+            (o) => o.key === `outputs/${pipelineId}/.result-payload.json`,
+          ),
+        ).toBe(true);
+
+        const result = resultOf(row);
+        expect(result.reconciled).toBe(true);
+        expect(result.downloadUrl).toBe(`/api/v1/download/${pipelineId}/photo_rotated.jpg`);
+        expect(result.stepsCompleted).toBe(2);
+        expect(result.steps).toEqual([
+          {
+            step: 1,
+            toolId: "compress",
+            size: 1_800,
+            notes: { targetKb: 2, resizedTo: { width: 600, height: 450 } },
+          },
+          {
+            step: 2,
+            toolId: "rotate",
+            size: step1Bytes.length,
+          },
+        ]);
+
+        const replay = buildSingleFileReplayEvent({
+          jobId: pipelineId,
+          status: row.status,
+          progress: row.progress,
+          error: row.error,
+        });
+        expect(replay).toMatchObject({
+          jobId: pipelineId,
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          stage: "complete",
+          result: {
+            jobId: pipelineId,
+            downloadUrl: `/api/v1/download/${pipelineId}/photo_rotated.jpg`,
+            reconciled: true,
+            stepsCompleted: 2,
+            steps: result.steps,
+          },
+        });
+      } finally {
+        await imageQueue.remove(pipelineId).catch(() => {});
+      }
+    });
+
+    it("restores a batch parent row's zipFilename, fileResults, fileNotes, and progress counters when batch-finalize's terminal DB write fails", async () => {
+      const parentId = await seedJob({
+        status: "processing",
+        toolId: "compress",
+        pool: "system",
+        type: "batch",
+      });
+      // Stale non-terminal progress (as when a child was recovered by
+      // reconciliation before batch-finalize ran, or the final child's
+      // fire-and-forget persistJobProgress lost the race with the outage)
+      // must be superseded by batch-finalize's authoritative terminal counts.
+      await db
+        .update(schema.jobs)
+        .set({
+          progress: {
+            percent: 33,
+            totalFiles: 3,
+            completedFiles: 1,
+            failedFiles: 1,
+          } as never,
+          error: {
+            message: "1 file(s) failed",
+            details: [{ filename: "empty.jpg", error: "File is empty" }],
+          },
+        })
+        .where(eq(schema.jobs.id, parentId));
+
+      const child0Id = `${parentId}-f0`;
+      const child1Id = `${parentId}-f1`;
+      seededPrefixes.push(`outputs/${child0Id}/`, `outputs/${child1Id}/`, `outputs/${parentId}/`);
+      await seedOutput(child0Id, "scan_compressed.jpg", Buffer.from("jpg-bytes-0"));
+      await seedOutput(child1Id, "scan_compressed.jpg", Buffer.from("jpg-bytes-1"));
+
+      await db.insert(schema.jobs).values([
+        {
+          id: child0Id,
+          toolId: "compress",
+          pool: "image",
+          type: "batch-child",
+          status: "completed",
+          inputRefs: [`uploads/${child0Id}/scan.jpg`],
+          outputRefs: [`outputs/${child0Id}/scan_compressed.jpg`],
+          progress: {
+            percent: 100,
+            stage: "complete",
+            result: {
+              jobId: child0Id,
+              targetKb: 2,
+              resizedTo: { width: 480, height: 360 },
+            },
+          },
+          completedAt: new Date(),
+        },
+        {
+          id: child1Id,
+          toolId: "compress",
+          pool: "image",
+          type: "batch-child",
+          status: "completed",
+          inputRefs: [`uploads/${child1Id}/scan.jpg`],
+          outputRefs: [`outputs/${child1Id}/scan_compressed.jpg`],
+          progress: {
+            percent: 100,
+            stage: "complete",
+            result: {
+              jobId: child1Id,
+              targetKb: 1,
+              targetMet: false,
+            },
+          },
+          completedAt: new Date(),
+        },
+      ]);
+
+      const systemQueue = getQueue("system");
+      await withTerminalWriteOutage(async ({ terminalWriteFailures }) => {
+        const finalizeJob = await systemQueue.add(
+          "batch-finalize",
+          {
+            jobId: parentId,
+            toolId: "compress",
+            userId: null,
+            pool: "system",
+            inputRefs: [],
+            filename: "",
+            settings: { flowChildCount: 2, fileIndexMap: [1, 2] },
+            kind: "batch-finalize",
+            totalFiles: 3,
+          } as never,
+          { jobId: parentId, attempts: 1 },
+        );
+        await vi.waitFor(
+          async () => {
+            expect(await finalizeJob.getState()).toBe("failed");
+            expect(terminalWriteFailures()).toBeGreaterThanOrEqual(2);
+          },
+          {
+            timeout: 30_000,
+            interval: 200,
+          },
+        );
+      });
+
+      const expectedZipFilename = `batch-compress-${parentId.slice(0, 8)}.zip`;
+      try {
+        expect((await readJob(parentId)).status).toBe("processing");
+
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === parentId)?.resolution).toBe("recovered");
+
+        const parentRow = await readJob(parentId);
+        expect(parentRow.status).toBe("completed");
+        expect(parentRow.outputRefs).toEqual([`outputs/${parentId}/${expectedZipFilename}`]);
+        expect((await listObjects(`outputs/${parentId}/`)).map((o) => o.key).sort()).toEqual([
+          `outputs/${parentId}/.result-payload.json`,
+          `outputs/${parentId}/${expectedZipFilename}`,
+        ]);
+
+        const replay = buildBatchReplayEvent({
+          jobId: parentId,
+          status: parentRow.status,
+          progress: parentRow.progress,
+          error: parentRow.error,
+        });
+        expect(replay).toEqual({
+          jobId: parentId,
+          type: "batch",
+          status: "completed",
+          totalFiles: 3,
+          completedFiles: 3,
+          failedFiles: 1,
+          errors: [{ filename: "empty.jpg", error: "File is empty" }],
+          result: {
+            jobId: parentId,
+            downloadUrl: `/api/v1/download/${parentId}/${expectedZipFilename}`,
+            zipFilename: expectedZipFilename,
+            fileResults: {
+              "1": "scan_compressed.jpg",
+              "2": "scan_compressed_1.jpg",
+            },
+            fileNotes: {
+              "1": { targetKb: 2, resizedTo: { width: 480, height: 360 } },
+              "2": { targetKb: 1, targetMet: false },
+            },
+            originalSize: 0,
+            processedSize: expect.any(Number),
+            reconciled: true,
+          },
+        });
+      } finally {
+        await systemQueue.remove(parentId).catch(() => {});
+      }
+    });
+
+    it("restores a partially canceled batch parent row when cancelBatchJob's terminal DB write fails", async () => {
+      const parentId = await seedJob({
+        status: "processing",
+        toolId: "compress",
+        pool: "system",
+        type: "batch",
+      });
+      await db
+        .update(schema.jobs)
+        .set({
+          progress: {
+            percent: 100,
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: 1,
+          } as never,
+          error: {
+            message: "1 file(s) failed",
+            details: [{ filename: "b.jpg", error: "Canceled" }],
+          },
+        })
+        .where(eq(schema.jobs.id, parentId));
+
+      const child0Id = `${parentId}-f0`;
+      const child1Id = `${parentId}-f1`;
+      seededPrefixes.push(`outputs/${child0Id}/`, `outputs/${parentId}/`);
+      await seedOutput(child0Id, "a_compress.jpg", Buffer.from("jpg-bytes-0"));
+
+      await db.insert(schema.jobs).values([
+        {
+          id: child0Id,
+          toolId: "compress",
+          pool: "image",
+          type: "batch-child",
+          status: "completed",
+          inputRefs: [`uploads/${child0Id}/a.jpg`],
+          outputRefs: [`outputs/${child0Id}/a_compress.jpg`],
+          progress: {
+            percent: 100,
+            stage: "complete",
+            result: { jobId: child0Id },
+          },
+          completedAt: new Date(),
+        },
+        {
+          id: child1Id,
+          toolId: "compress",
+          pool: "image",
+          type: "batch-child",
+          status: "canceled",
+          inputRefs: [`uploads/${child1Id}/b.jpg`],
+          error: { message: "Canceled" },
+          completedAt: new Date(),
+        },
+      ]);
+
+      const systemQueue = getQueue("system");
+      await withTerminalWriteOutage(async ({ terminalWriteFailures }) => {
+        const finalizeJob = await systemQueue.add(
+          "batch-finalize",
+          {
+            jobId: parentId,
+            toolId: "compress",
+            userId: null,
+            pool: "system",
+            inputRefs: [],
+            filename: "",
+            settings: { flowChildCount: 2 },
+            kind: "batch-finalize",
+            totalFiles: 2,
+          } as never,
+          { jobId: parentId, attempts: 1 },
+        );
+        await vi.waitFor(
+          async () => {
+            expect(await finalizeJob.getState()).toBe("failed");
+            expect(terminalWriteFailures()).toBeGreaterThanOrEqual(2);
+          },
+          {
+            timeout: 30_000,
+            interval: 200,
+          },
+        );
+      });
+
+      const expectedZipFilename = `batch-compress-${parentId.slice(0, 8)}.zip`;
+      try {
+        expect((await readJob(parentId)).status).toBe("processing");
+
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === parentId)?.resolution).toBe("recovered");
+
+        const parentRow = await readJob(parentId);
+        const replay = buildBatchReplayEvent({
+          jobId: parentId,
+          status: parentRow.status,
+          progress: parentRow.progress,
+          error: parentRow.error,
+        });
+        expect(replay).toEqual({
+          jobId: parentId,
+          type: "batch",
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 1,
+          errors: [{ filename: "b.jpg", error: "Canceled" }],
+          result: {
+            jobId: parentId,
+            downloadUrl: `/api/v1/download/${parentId}/${expectedZipFilename}`,
+            zipFilename: expectedZipFilename,
+            fileResults: {
+              "0": "a_compress.jpg",
+            },
+            fileNotes: {},
+            originalSize: 0,
+            processedSize: expect.any(Number),
+            reconciled: true,
+          },
+        });
+      } finally {
+        await systemQueue.remove(parentId).catch(() => {});
+      }
+    });
+
+    it("ignores missing or negative batch progress counters when recovering a batch parent row", async () => {
+      const nullProgressId = await seedJob({
+        status: "processing",
+        toolId: "compress",
+        pool: "system",
+        type: "batch",
+      });
+      await seedOutput(nullProgressId, "batch-compress.zip", Buffer.from("PK-bytes"));
+      await seedOutput(
+        nullProgressId,
+        ".result-payload.json",
+        Buffer.from(
+          JSON.stringify({
+            zipFilename: "batch-compress.zip",
+            fileResults: { "0": "a.jpg" },
+            fileNotes: {},
+          }),
+          "utf8",
+        ),
+      );
+
+      const badCountsId = await seedJob({
+        status: "processing",
+        toolId: "compress",
+        pool: "system",
+        type: "batch",
+      });
+      await db
+        .update(schema.jobs)
+        .set({
+          progress: {
+            percent: 50,
+            totalFiles: -1,
+            completedFiles: "two",
+            failedFiles: 1,
+          } as never,
+        })
+        .where(eq(schema.jobs.id, badCountsId));
+      await seedOutput(badCountsId, "batch-compress.zip", Buffer.from("PK-bytes"));
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === nullProgressId)?.resolution).toBe(
+        "recovered",
+      );
+      expect(summary.outcomes.find((o) => o.jobId === badCountsId)?.resolution).toBe("recovered");
+
+      const nullProgressRow = await readJob(nullProgressId);
+      expect(nullProgressRow.progress).toMatchObject({
+        percent: 100,
+        stage: "complete",
+        result: {
+          jobId: nullProgressId,
+          zipFilename: "batch-compress.zip",
+          fileResults: { "0": "a.jpg" },
+          fileNotes: {},
+          reconciled: true,
+        },
+      });
+      expect(
+        (nullProgressRow.progress as Record<string, unknown> | null)?.totalFiles,
+      ).toBeUndefined();
+
+      const badCountsRow = await readJob(badCountsId);
+      const badCountsProgress = badCountsRow.progress as Record<string, unknown> | null;
+      expect(badCountsProgress?.totalFiles).toBeUndefined();
+      expect(badCountsProgress?.completedFiles).toBeUndefined();
+      expect(badCountsProgress?.failedFiles).toBe(1);
     });
   });
 });
