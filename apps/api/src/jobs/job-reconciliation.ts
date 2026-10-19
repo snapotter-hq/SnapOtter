@@ -32,7 +32,7 @@
  *      cannot double-resolve, and a genuinely canceled job is never
  *      resurrected.
  */
-import { and, eq, inArray, isNotNull, lt, ne, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, ne, type SQL, sql } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -231,6 +231,20 @@ type StrandedRow = {
   inputRefs: string[] | null;
 };
 
+/**
+ * Non-terminal clientJobId alias rows still pointing at this artifact job
+ * (#2682). Guarded on `settings->>'artifactJobId'` and `NON_TERMINAL` so a
+ * channel that a newer run has already re-pointed (#886) or that a cancel
+ * already settled is left untouched.
+ */
+function reconcilableAliasRows(artifactJobId: string): SQL | undefined {
+  return and(
+    eq(schema.jobs.type, "single"),
+    inArray(schema.jobs.status, NON_TERMINAL),
+    sql`${schema.jobs.settings}->>'artifactJobId' = ${artifactJobId}`,
+  );
+}
+
 async function recoverFromOutputs(
   row: StrandedRow,
   artifacts: ObjectInfo[],
@@ -259,18 +273,35 @@ async function recoverFromOutputs(
     delete result.previewUrl;
   }
 
-  const updated = await db
-    .update(schema.jobs)
-    .set({
-      status: "completed",
-      completedAt: new Date(),
-      outputRefs,
-      bytesIn: originalSize || null,
-      bytesOut: primary.size,
-      progress: { percent: 100, stage: "complete", result },
-    })
-    .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
-    .returning({ id: schema.jobs.id });
+  const completedAt = new Date();
+  const progress = { percent: 100, stage: "complete", result };
+  const updated = await db.transaction(async (tx) => {
+    const settled = await tx
+      .update(schema.jobs)
+      .set({
+        status: "completed",
+        completedAt,
+        outputRefs,
+        bytesIn: originalSize || null,
+        bytesOut: primary.size,
+        progress,
+      })
+      .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
+      .returning({ id: schema.jobs.id });
+
+    if (settled.length > 0) {
+      await tx
+        .update(schema.jobs)
+        .set({
+          status: "completed",
+          completedAt,
+          progress,
+          error: null,
+        })
+        .where(reconcilableAliasRows(row.id));
+    }
+    return settled;
+  });
 
   if (updated.length === 0) {
     return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "raced" };
@@ -285,15 +316,32 @@ async function recoverFromOutputs(
 }
 
 async function failWithoutOutput(row: StrandedRow): Promise<StrandedJobOutcome> {
-  const updated = await db
-    .update(schema.jobs)
-    .set({
-      status: "failed",
-      completedAt: new Date(),
-      error: { message: UNRECOVERABLE_STRANDED_JOB_ERROR },
-    })
-    .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
-    .returning({ id: schema.jobs.id });
+  const completedAt = new Date();
+  const error = { message: UNRECOVERABLE_STRANDED_JOB_ERROR };
+  const updated = await db.transaction(async (tx) => {
+    const settled = await tx
+      .update(schema.jobs)
+      .set({
+        status: "failed",
+        completedAt,
+        error,
+      })
+      .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
+      .returning({ id: schema.jobs.id });
+
+    if (settled.length > 0) {
+      await tx
+        .update(schema.jobs)
+        .set({
+          status: "failed",
+          completedAt,
+          progress: { percent: 0 },
+          error,
+        })
+        .where(reconcilableAliasRows(row.id));
+    }
+    return settled;
+  });
 
   if (updated.length === 0) {
     return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "raced" };

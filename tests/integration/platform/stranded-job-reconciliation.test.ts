@@ -25,6 +25,7 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { upsertToolJobAlias } from "../../../apps/api/src/jobs/enqueue.js";
 import {
   reconcileStrandedJobs,
   UNRECOVERABLE_STRANDED_JOB_ERROR,
@@ -34,6 +35,7 @@ import { SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
+import { buildSingleFileReplayEvent } from "../../../apps/api/src/routes/progress.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -328,51 +330,51 @@ describe("stranded-job reconciliation", () => {
     expect(row.outputRefs).toBeNull();
   });
 
+  async function noiseJpeg(w: number, h: number): Promise<Buffer> {
+    const raw = Buffer.alloc(w * h * 3);
+    let seed = 7;
+    for (let i = 0; i < raw.length; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      raw[i] = seed & 0xff;
+    }
+    return sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  }
+
+  /**
+   * Run `fn` while Postgres refuses terminal job writes (`db.transaction` and
+   * `db.update` setting a terminal status), so a worker that finishes writing
+   * `outputs/<jobId>/` leaves its row stranded in `processing`.
+   */
+  async function withTerminalWriteOutage<T>(fn: () => Promise<T>): Promise<T> {
+    const origUpdate = db.update.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      .mockRejectedValue(new Error("simulated Postgres outage on terminal transaction"));
+    const updateSpy = vi.spyOn(db, "update").mockImplementation(((table: unknown) => {
+      const builder = origUpdate(table as never);
+      const origSet = builder.set.bind(builder);
+      builder.set = ((values: Record<string, unknown>) => {
+        if (values.status === "completed" || values.status === "failed") {
+          return {
+            where: () =>
+              Promise.reject(new Error("simulated Postgres outage on terminal status update")),
+          } as never;
+        }
+        return origSet(values as never);
+      }) as typeof builder.set;
+      return builder;
+    }) as typeof db.update);
+    try {
+      return await fn();
+    } finally {
+      txSpy.mockRestore();
+      updateSpy.mockRestore();
+    }
+  }
+
   describe("tool resultPayload preservation (#1389)", () => {
-    async function noiseJpeg(w: number, h: number): Promise<Buffer> {
-      const raw = Buffer.alloc(w * h * 3);
-      let seed = 7;
-      for (let i = 0; i < raw.length; i++) {
-        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-        raw[i] = seed & 0xff;
-      }
-      return sharp(raw, { raw: { width: w, height: h, channels: 3 } })
-        .jpeg({ quality: 90 })
-        .toBuffer();
-    }
-
-    /**
-     * Run `fn` while Postgres refuses terminal job writes (`db.transaction` and
-     * `db.update` setting a terminal status), so a worker that finishes writing
-     * `outputs/<jobId>/` leaves its row stranded in `processing`.
-     */
-    async function withTerminalWriteOutage<T>(fn: () => Promise<T>): Promise<T> {
-      const origUpdate = db.update.bind(db);
-      const txSpy = vi
-        .spyOn(db, "transaction")
-        .mockRejectedValue(new Error("simulated Postgres outage on terminal transaction"));
-      const updateSpy = vi.spyOn(db, "update").mockImplementation(((table: unknown) => {
-        const builder = origUpdate(table as never);
-        const origSet = builder.set.bind(builder);
-        builder.set = ((values: Record<string, unknown>) => {
-          if (values.status === "completed" || values.status === "failed") {
-            return {
-              where: () =>
-                Promise.reject(new Error("simulated Postgres outage on terminal status update")),
-            } as never;
-          }
-          return origSet(values as never);
-        }) as typeof builder.set;
-        return builder;
-      }) as typeof db.update);
-      try {
-        return await fn();
-      } finally {
-        txSpy.mockRestore();
-        updateSpy.mockRestore();
-      }
-    }
-
     it("restores a target-size compress job's resize note when the terminal DB write fails", async () => {
       const id = await seedJob({ status: "queued", toolId: "compress", pool: "image" });
       const uploadPrefix = `uploads/${id}/`;
@@ -689,6 +691,204 @@ describe("stranded-job reconciliation", () => {
       const summary = await reconcileStrandedJobs({ graceMs: 0 });
       expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("recovered");
       expect(resultOf(await readJob(id)).resizedTo).toEqual({ width: 100, height: 80 });
+    });
+  });
+
+  describe("clientJobId alias row settlement (#2682)", () => {
+    it("settles the clientJobId alias row as completed with the recovered result when the terminal DB write fails", async () => {
+      const id = await seedJob({ status: "queued", toolId: "compress", pool: "image" });
+      const clientJobId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: id,
+        clientJobId,
+        userId: null,
+        pool: "image",
+      });
+
+      const uploadPrefix = `uploads/${id}/`;
+      seededPrefixes.push(uploadPrefix, `outputs/${id}/`);
+      const inputRef = `${uploadPrefix}big.jpg`;
+      await putObject(inputRef, await noiseJpeg(1200, 900));
+      await db
+        .update(schema.jobs)
+        .set({ inputRefs: [inputRef] })
+        .where(eq(schema.jobs.id, id));
+
+      const queue = getQueue("image");
+      await withTerminalWriteOutage(async () => {
+        const job = await queue.add(
+          "compress",
+          {
+            jobId: id,
+            clientJobId,
+            toolId: "compress",
+            userId: null,
+            pool: "image",
+            inputRefs: [inputRef],
+            filename: "big.jpg",
+            settings: { mode: "targetSize", targetSizeKb: 2 },
+            kind: "tool",
+          } as never,
+          { jobId: id, attempts: 1 },
+        );
+        await vi.waitFor(async () => expect(await job.getState()).toBe("failed"), {
+          timeout: 30_000,
+          interval: 200,
+        });
+      });
+
+      try {
+        expect((await readJob(id)).status).toBe("processing");
+        expect(["queued", "processing"]).toContain((await readJob(clientJobId)).status);
+
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("recovered");
+
+        const artifactRow = await readJob(id);
+        const aliasRow = await readJob(clientJobId);
+        expect(aliasRow.status).toBe("completed");
+        expect(aliasRow.completedAt).not.toBeNull();
+        expect(aliasRow.error).toBeNull();
+        expect(aliasRow.progress).toEqual(artifactRow.progress);
+
+        const replay = buildSingleFileReplayEvent({
+          jobId: clientJobId,
+          status: aliasRow.status,
+          progress: aliasRow.progress,
+          error: aliasRow.error,
+        });
+        expect(replay).toMatchObject({
+          jobId: clientJobId,
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          stage: "complete",
+          result: {
+            jobId: id,
+            downloadUrl: `/api/v1/download/${id}/big_compress.jpg`,
+            reconciled: true,
+            targetKb: 2,
+          },
+        });
+      } finally {
+        await queue.remove(id).catch(() => {});
+      }
+    });
+
+    it("settles the clientJobId alias row as failed when the stranded job produced no output", async () => {
+      const id = await seedJob({ status: "queued", toolId: "convert", pool: "image" });
+      const clientJobId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: id,
+        clientJobId,
+        userId: null,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({
+          status: "processing",
+          progress: { percent: 40, stage: "Encoding..." },
+        })
+        .where(eq(schema.jobs.id, clientJobId));
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("failed");
+
+      const aliasRow = await readJob(clientJobId);
+      expect(aliasRow.status).toBe("failed");
+      expect(aliasRow.completedAt).not.toBeNull();
+      expect(aliasRow.progress).toEqual({ percent: 0 });
+      expect(aliasRow.error?.message).toBe(UNRECOVERABLE_STRANDED_JOB_ERROR);
+
+      const replay = buildSingleFileReplayEvent({
+        jobId: clientJobId,
+        status: aliasRow.status,
+        progress: aliasRow.progress,
+        error: aliasRow.error,
+      });
+      expect(replay).toEqual({
+        jobId: clientJobId,
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        error: UNRECOVERABLE_STRANDED_JOB_ERROR,
+      });
+    });
+
+    it("leaves a re-pointed, non-single, or already-terminal row untouched while settling matching non-terminal aliases", async () => {
+      const recoveredId = await seedJob({ status: "processing" });
+      await seedOutput(recoveredId, "out.avif", Buffer.from("avif-bytes"));
+      const failedId = await seedJob({ status: "queued" });
+
+      const matchingAlias = randomUUID();
+      await upsertToolJobAlias({
+        jobId: recoveredId,
+        clientJobId: matchingAlias,
+        userId: null,
+        pool: "image",
+      });
+
+      const repointedAlias = randomUUID();
+      await upsertToolJobAlias({
+        jobId: recoveredId,
+        clientJobId: repointedAlias,
+        userId: null,
+        pool: "image",
+      });
+      const newerJobId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: newerJobId,
+        clientJobId: repointedAlias,
+        userId: null,
+        pool: "image",
+      });
+
+      const nonSingleCollision = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: nonSingleCollision,
+        type: "batch",
+        status: "queued",
+        inputRefs: [],
+        settings: { artifactJobId: recoveredId },
+      });
+
+      const canceledAlias = randomUUID();
+      await upsertToolJobAlias({
+        jobId: failedId,
+        clientJobId: canceledAlias,
+        userId: null,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({
+          status: "canceled",
+          completedAt: new Date(),
+          error: { message: "Canceled" },
+        })
+        .where(eq(schema.jobs.id, canceledAlias));
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === recoveredId)?.resolution).toBe("recovered");
+      expect(summary.outcomes.find((o) => o.jobId === failedId)?.resolution).toBe("failed");
+
+      const matchingRow = await readJob(matchingAlias);
+      expect(matchingRow.status).toBe("completed");
+      expect(resultOf(matchingRow).downloadUrl).toBe(`/api/v1/download/${recoveredId}/out.avif`);
+
+      const repointedRow = await readJob(repointedAlias);
+      expect(repointedRow.status).toBe("queued");
+      expect(repointedRow.progress).toBeNull();
+      expect(repointedRow.settings).toEqual({ artifactJobId: newerJobId });
+
+      const nonSingleRow = await readJob(nonSingleCollision);
+      expect(nonSingleRow.status).toBe("queued");
+      expect(nonSingleRow.progress).toBeNull();
+
+      const canceledRow = await readJob(canceledAlias);
+      expect(canceledRow.status).toBe("canceled");
+      expect(canceledRow.error?.message).toBe("Canceled");
     });
   });
 });
