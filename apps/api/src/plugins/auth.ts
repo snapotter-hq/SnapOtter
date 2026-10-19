@@ -1300,7 +1300,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     const validBuiltinRoles = ["admin", "editor", "user"];
     let role: string = "user";
-    if (body.role) {
+    if (body.role !== undefined) {
       if (validBuiltinRoles.includes(body.role)) {
         role = body.role;
       } else {
@@ -1308,9 +1308,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           .select()
           .from(schema.roles)
           .where(eq(schema.roles.name, body.role));
-        if (customRole) {
-          role = body.role;
+        if (!customRole) {
+          return reply.status(400).send({
+            error: "Role not found",
+            code: "UNKNOWN_ROLE",
+          });
         }
+        role = body.role;
       }
     }
 
@@ -1373,6 +1377,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // #928). The locked count and the insert share one transaction so the
     // loser sees the winner's committed row.
     const inserted = await db.transaction(async (tx) => {
+      if (!validBuiltinRoles.includes(role)) {
+        const [lockedRole] = await tx
+          .select({ id: schema.roles.id })
+          .from(schema.roles)
+          .where(eq(schema.roles.name, role))
+          .for("share");
+        if (!lockedRole) return "unknown-role" as const;
+      }
       if (await userLimitReached(tx)) return "limit" as const;
       return tx
         .insert(schema.users)
@@ -1386,6 +1398,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         })
         .onConflictDoNothing({ target: schema.users.username });
     });
+
+    if (inserted === "unknown-role") {
+      return reply.status(400).send({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+    }
 
     if (inserted === "limit") {
       return reply.status(403).send({
@@ -1450,30 +1469,34 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         updatedAt: new Date(),
       };
 
-      if (body.role) {
-        const validBuiltinRoles = ["admin", "editor", "user"];
+      const validBuiltinRoles = ["admin", "editor", "user"];
+      if (body.role !== undefined) {
         const [customRoleRow] = validBuiltinRoles.includes(body.role)
           ? [null]
           : await db.select().from(schema.roles).where(eq(schema.roles.name, body.role));
         const isValid = validBuiltinRoles.includes(body.role) || customRoleRow;
-        if (isValid) {
-          if (!(await canAssignRole(admin, body.role))) {
-            return reply.status(403).send({
-              error: "Cannot assign a role beyond your role authority",
-              code: "ESCALATION_DENIED",
-            });
-          }
-
-          // Prevent removing your own admin role
-          if (id === admin.id && body.role !== "admin") {
-            return reply.status(400).send({
-              error: "Cannot remove your own admin role",
-              code: "SELF_DEMOTE",
-            });
-          }
-
-          updates.role = body.role;
+        if (!isValid) {
+          return reply.status(400).send({
+            error: "Role not found",
+            code: "UNKNOWN_ROLE",
+          });
         }
+        if (!(await canAssignRole(admin, body.role))) {
+          return reply.status(403).send({
+            error: "Cannot assign a role beyond your role authority",
+            code: "ESCALATION_DENIED",
+          });
+        }
+
+        // Prevent removing your own admin role
+        if (id === admin.id && body.role !== "admin") {
+          return reply.status(400).send({
+            error: "Cannot remove your own admin role",
+            code: "SELF_DEMOTE",
+          });
+        }
+
+        updates.role = body.role;
       }
 
       if (body.team?.trim()) {
@@ -1498,6 +1521,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const roleChanged = Boolean(updates.role && updates.role !== user.role);
       try {
         await db.transaction(async (tx) => {
+          if (updates.role && !validBuiltinRoles.includes(updates.role)) {
+            const [lockedRole] = await tx
+              .select({ id: schema.roles.id })
+              .from(schema.roles)
+              .where(eq(schema.roles.name, updates.role))
+              .for("share");
+            if (!lockedRole) {
+              throw new Error("UNKNOWN_ROLE");
+            }
+          }
           // Last admin protection, under the lock every admin removal shares (#2231).
           if (updates.role && updates.role !== "admin") await assertNotLastAdmin(tx, id);
 
@@ -1542,6 +1575,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             error: "Cannot manage a user beyond your role authority",
             code: "ESCALATION_DENIED",
           });
+        }
+        if (err instanceof Error && err.message === "UNKNOWN_ROLE") {
+          return reply.status(400).send({ error: "Role not found", code: "UNKNOWN_ROLE" });
         }
         if (err instanceof Error && err.message === "NOT_FOUND") {
           return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });

@@ -5036,6 +5036,7 @@ export const vi: TranslationKeys = {
       cannotDeleteSelf: "Không thể xóa tài khoản của chính bạn",
       usernameInvalid:
         "Tên người dùng phải dài từ 3 đến 50 ký tự và chỉ dùng a-z, A-Z, 0-9, dấu chấm, dấu gạch ngang và dấu gạch dưới",
+      roleNotFound: "Vai trò này không còn tồn tại",
     },
     teams: {
       heading: "Nhóm",

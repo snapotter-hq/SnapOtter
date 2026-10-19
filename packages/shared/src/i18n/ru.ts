@@ -5053,6 +5053,7 @@ export const ru: TranslationKeys = {
       cannotDeleteSelf: "Нельзя удалить собственную учётную запись",
       usernameInvalid:
         "Имя пользователя должно содержать от 3 до 50 символов и только a-z, A-Z, 0-9, точки, дефисы и подчёркивания",
+      roleNotFound: "Эта роль больше не существует",
     },
     teams: {
       heading: "Команды",

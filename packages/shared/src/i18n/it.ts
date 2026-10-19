@@ -5061,6 +5061,7 @@ export const it: TranslationKeys = {
       cannotDeleteSelf: "Non è possibile eliminare il proprio account",
       usernameInvalid:
         "Il nome utente deve avere da 3 a 50 caratteri e usare solo a-z, A-Z, 0-9, punti, trattini e trattini bassi",
+      roleNotFound: "Questo ruolo non esiste più",
     },
     teams: {
       heading: "Team",

@@ -346,6 +346,7 @@ describe("People", () => {
     reject(409, "CONFLICT", s.people.usernameTaken),
     reject(403, "USER_LIMIT_REACHED", format(s.people.userLimitReached, { max: 5 })),
     reject(403, "ESCALATION_DENIED", de.errors.escalationDenied),
+    reject(400, "UNKNOWN_ROLE", s.people.roleNotFound),
     reject(400, "VALIDATION_ERROR", de.errors.passwordNeedsUppercase, { rule: "uppercase" }),
     reject(429, undefined, de.errors.tooManyRequests),
     reject(500, undefined, s.people.createFailed),
@@ -375,6 +376,7 @@ describe("People", () => {
   it.each([
     reject(400, "SELF_DEMOTE", s.people.cannotRemoveOwnAdmin),
     reject(400, "LAST_ADMIN", s.people.lastAdmin),
+    reject(400, "UNKNOWN_ROLE", s.people.roleNotFound),
     reject(403, "ESCALATION_DENIED", de.errors.escalationDenied),
     reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
     reject(403, "FORBIDDEN", de.errors.forbidden),

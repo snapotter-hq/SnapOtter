@@ -5054,6 +5054,7 @@ export const tr: TranslationKeys = {
       cannotDeleteSelf: "Kendi hesabınızı silemezsiniz",
       usernameInvalid:
         "Kullanıcı adı 3 ile 50 karakter arasında olmalı ve yalnızca a-z, A-Z, 0-9, nokta, kısa çizgi ve alt çizgi içermelidir",
+      roleNotFound: "Bu rol artık mevcut değil",
     },
     teams: {
       heading: "Takımlar",

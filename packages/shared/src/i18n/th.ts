@@ -4976,6 +4976,7 @@ export const th: TranslationKeys = {
       lastAdmin: "ต้องมีผู้ดูแลระบบอย่างน้อยหนึ่งคนเสมอ",
       cannotDeleteSelf: "ไม่สามารถลบบัญชีของตัวเองได้",
       usernameInvalid: "ชื่อผู้ใช้ต้องมี 3 ถึง 50 อักขระ และใช้ได้เฉพาะ a-z, A-Z, 0-9, จุด, ขีดกลาง และขีดล่าง",
+      roleNotFound: "ไม่มีบทบาทนี้อีกต่อไป",
     },
     teams: {
       heading: "ทีม",

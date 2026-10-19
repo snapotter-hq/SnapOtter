@@ -1635,6 +1635,7 @@ export function PeopleSection() {
                       max: maxUsers,
                     }),
                     CONFLICT: t.settings.people.usernameTaken,
+                    UNKNOWN_ROLE: t.settings.people.roleNotFound,
                     ESCALATION_DENIED: t.errors.escalationDenied,
                   },
                   t.settings.people.createFailed,
@@ -1701,6 +1702,7 @@ export function PeopleSection() {
             {
               SELF_DEMOTE: t.settings.people.cannotRemoveOwnAdmin,
               LAST_ADMIN: t.settings.people.lastAdmin,
+              UNKNOWN_ROLE: t.settings.people.roleNotFound,
               ESCALATION_DENIED: t.errors.escalationDenied,
             },
             t.settings.people.updateFailed,

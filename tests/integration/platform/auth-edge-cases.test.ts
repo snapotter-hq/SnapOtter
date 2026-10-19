@@ -509,17 +509,82 @@ describe("Register validation", () => {
     expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
   });
 
-  it("unknown role defaults to user", async () => {
-    const username = uid();
-    const res = await testApp.app.inject({
+  it("unknown or deleted role returns 400 UNKNOWN_ROLE and does not create the user (#1582)", async () => {
+    const roleName = `deleted-role-${Date.now()}`;
+    const createRoleRes = await testApp.app.inject({
       method: "POST",
-      url: "/api/auth/register",
+      url: "/api/v1/roles",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { username, password: "ValidPass1", role: "bogus" },
+      payload: { name: roleName, permissions: ["tools:use"] },
     });
-    expect(res.statusCode).toBe(201);
-    const body = JSON.parse(res.body);
-    expect(body.role).toBe("user");
+    expect(createRoleRes.statusCode).toBe(201);
+    const roleId = JSON.parse(createRoleRes.body).id as string;
+
+    const deleteRoleRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/roles/${roleId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRoleRes.statusCode).toBe(200);
+
+    for (const badRole of ["bogus", roleName, ""]) {
+      const username = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username, password: "ValidPass1", role: badRole },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, username));
+      expect(rows).toHaveLength(0);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a custom role is deleted
+    // during scrypt hashing after passing the initial pre-check.
+    const raceRole = `tx-reg-${Date.now()}`;
+    const raceRoleRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceRole, permissions: ["tools:use"] },
+    });
+    expect(raceRoleRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, raceRole));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const raceUsername = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: raceUsername, password: "ValidPass1", role: raceRole },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+      const rows = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, raceUsername));
+      expect(rows).toHaveLength(0);
+    } finally {
+      txSpy.mockRestore();
+    }
   });
 
   it("duplicate username returns 409", async () => {
@@ -1195,22 +1260,99 @@ describe("Team resolution by id", () => {
 // ADMIN USER-MANAGEMENT GUARDS (update / delete / reset authority + shape)
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Admin user-management guards", () => {
-  it("update with an unknown role is a no-op (200, role unchanged)", async () => {
-    const { id } = await createUser({ role: "user" });
+  it("update with an unknown or deleted role returns 400 UNKNOWN_ROLE and leaves the user unchanged (#1582)", async () => {
+    const { id } = await createUser({ role: "editor" });
 
-    const res = await testApp.app.inject({
-      method: "PUT",
-      url: `/api/auth/users/${id}`,
+    const roleName = `deleted-upd-${Date.now()}`;
+    const createRoleRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { role: "totally-bogus-role" },
+      payload: { name: roleName, permissions: ["tools:use"] },
     });
-    expect(res.statusCode).toBe(200);
+    expect(createRoleRes.statusCode).toBe(201);
+    const roleId = JSON.parse(createRoleRes.body).id as string;
 
-    const [row] = await db
-      .select({ role: schema.users.role })
+    const deleteRoleRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/roles/${roleId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRoleRes.statusCode).toBe(200);
+
+    const [before] = await db
+      .select({ role: schema.users.role, team: schema.users.team })
       .from(schema.users)
       .where(eq(schema.users.id, id));
-    expect(row.role).toBe("user");
+
+    const otherTeamName = `keep-team-${Date.now()}`;
+    const createTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: otherTeamName },
+    });
+    expect(createTeamRes.statusCode).toBe(201);
+
+    for (const badRole of ["totally-bogus-role", roleName, ""]) {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: badRole, team: otherTeamName },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+
+      const [row] = await db
+        .select({ role: schema.users.role, team: schema.users.team })
+        .from(schema.users)
+        .where(eq(schema.users.id, id));
+      expect(row).toEqual(before);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a custom role is deleted
+    // between the pre-check and the transaction.
+    const raceRole = `tx-upd-${Date.now()}`;
+    const raceRoleRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/roles",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceRole, permissions: ["tools:use"] },
+    });
+    expect(raceRoleRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, raceRole));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: raceRole, team: otherTeamName },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+      const [row] = await db
+        .select({ role: schema.users.role, team: schema.users.team })
+        .from(schema.users)
+        .where(eq(schema.users.id, id));
+      expect(row).toEqual(before);
+    } finally {
+      txSpy.mockRestore();
+    }
   });
 
   it("update against an unknown user id returns 404", async () => {

@@ -5064,6 +5064,7 @@ export const nl: TranslationKeys = {
       cannotDeleteSelf: "Je kunt je eigen account niet verwijderen",
       usernameInvalid:
         "Een gebruikersnaam moet 3 tot 50 tekens lang zijn en mag alleen a-z, A-Z, 0-9, punten, koppeltekens en onderstrepingstekens bevatten",
+      roleNotFound: "Die rol bestaat niet meer",
     },
     teams: {
       heading: "Teams",

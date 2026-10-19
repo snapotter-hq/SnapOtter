@@ -5043,6 +5043,7 @@ export const id: TranslationKeys = {
       cannotDeleteSelf: "Tidak dapat menghapus akun Anda sendiri",
       usernameInvalid:
         "Nama pengguna harus 3 sampai 50 karakter dan hanya boleh berisi a-z, A-Z, 0-9, titik, tanda hubung, dan garis bawah",
+      roleNotFound: "Peran itu sudah tidak ada",
     },
     teams: {
       heading: "Tim",

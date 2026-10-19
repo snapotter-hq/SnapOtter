@@ -4838,6 +4838,7 @@ export const hi: TranslationKeys = {
       cannotDeleteSelf: "अपना खुद का खाता नहीं हटा सकते",
       usernameInvalid:
         "उपयोगकर्ता नाम 3 से 50 वर्णों का होना चाहिए और उसमें केवल a-z, A-Z, 0-9, बिंदु, हाइफ़न और अंडरस्कोर हो सकते हैं",
+      roleNotFound: "वह भूमिका अब मौजूद नहीं है",
     },
     teams: {
       heading: "टीमें",

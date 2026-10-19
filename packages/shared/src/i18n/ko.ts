@@ -4967,6 +4967,7 @@ export const ko: TranslationKeys = {
       cannotDeleteSelf: "자신의 계정은 삭제할 수 없습니다",
       usernameInvalid:
         "사용자 이름은 3~50자여야 하며 a-z, A-Z, 0-9, 마침표, 하이픈, 밑줄만 사용할 수 있습니다",
+      roleNotFound: "해당 역할이 더 이상 존재하지 않습니다",
     },
     teams: {
       heading: "팀",

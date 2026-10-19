@@ -415,15 +415,15 @@ describe("Auth endpoints", () => {
       expect(res.statusCode).toBe(403);
     });
 
-    it("defaults role to 'user' when invalid role provided", async () => {
+    it("rejects unknown role with 400 UNKNOWN_ROLE", async () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/auth/register",
         headers: { authorization: `Bearer ${adminToken}` },
         payload: { username: "badrole_user", password: "Password1234", role: "superadmin" },
       });
-      expect(res.statusCode).toBe(201);
-      expect(JSON.parse(res.body).role).toBe("user");
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).code).toBe("UNKNOWN_ROLE");
     });
   });
 
