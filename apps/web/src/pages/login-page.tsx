@@ -99,6 +99,9 @@ function mfaFailureMessage(
   t: TranslationKeys,
   enrolling = false,
 ): { message: string; clearCode: boolean; restart: boolean } {
+  if (code === "USER_DISABLED") {
+    return { message: t.auth.accountDisabled, clearCode: true, restart: true };
+  }
   if (code === "MFA_NOT_CONFIGURED") {
     return { message: t.auth.mfaNotConfigured, clearCode: true, restart: true };
   }

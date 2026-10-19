@@ -887,40 +887,90 @@ describe("POST /api/auth/mfa/complete edge cases", () => {
     await sharedRedis().del(`mfa:${mfaToken}`);
   });
 
-  it("returns 401 MFA_NOT_CONFIGURED when the challenged user's role is disabled", async () => {
+  it("returns 403 USER_DISABLED and burns the challenge when the challenged user's role is disabled (#2049)", async () => {
     // Enroll + verify a disposable user so it has a real secret, then disable
-    // its role. The disabled-role guard must reject even with a valid secret.
+    // its role. The disabled-role guard must reject with 403 USER_DISABLED and
+    // delete both the challenge token and any failed-attempt counter.
     const username = "mfa_disabled_complete_user";
-    const { userId, token: userToken } = await createUserAndLogin(testApp.app, username, "user");
+    const { userId, token: userToken } = await createUserAndLogin(
+      testApp.app,
+      username,
+      "user",
+      "TestPassword1!",
+    );
 
-    const enrollRes = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/mfa/enroll",
-      headers: { authorization: `Bearer ${userToken}` },
-    });
-    const { uri } = JSON.parse(enrollRes.body);
-    await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/mfa/verify",
-      headers: { authorization: `Bearer ${userToken}` },
-      payload: { code: generateTotpCode(uri) },
-    });
+    try {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${userToken}` },
+      });
+      const { uri } = JSON.parse(enrollRes.body);
+      await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${userToken}` },
+        payload: { code: await generatePrevStepTotpCode(uri) },
+      });
 
-    await db.update(schema.users).set({ role: "disabled" }).where(eq(schema.users.id, userId));
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password: "TestPassword1!" },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const { mfaToken } = JSON.parse(loginRes.body);
 
-    const mfaToken = randomUUID();
-    await sharedRedis().setex(`mfa:${mfaToken}`, 300, userId);
+      // Record one wrong attempt before the account is disabled to confirm attemptsKey is cleaned up.
+      const badRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "000000" },
+      });
+      expect(badRes.statusCode).toBe(401);
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
 
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/auth/mfa/complete",
-      payload: { mfaToken, code: generateTotpCode(uri) },
-    });
-    expect(res.statusCode).toBe(401);
-    expect(JSON.parse(res.body).code).toBe("MFA_NOT_CONFIGURED");
+      // Also clear totpSecret and passwordHash (as in MFA reset + SCIM DELETE deprovisioning)
+      // to verify USER_DISABLED takes precedence over MFA_NOT_CONFIGURED and password_removed.
+      await db
+        .update(schema.users)
+        .set({ role: "disabled:user", totpSecret: null, passwordHash: null })
+        .where(eq(schema.users.id, userId));
 
-    await sharedRedis().del(`mfa:${mfaToken}`);
-    await db.delete(schema.users).where(eq(schema.users.id, userId));
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: generateTotpCode(uri) },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "User is disabled",
+        code: "USER_DISABLED",
+      });
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+      const auditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+      const disabledAudit = auditRows.find((row) => {
+        const details = row.details as { userId?: string; reason?: string } | null;
+        return details?.userId === userId && details?.reason === "disabled_user";
+      });
+      expect(disabledAudit).toBeDefined();
+
+      // A subsequent attempt sees an expired token, not another challenge round.
+      const secondRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: generateTotpCode(uri) },
+      });
+      expect(secondRes.statusCode).toBe(401);
+      expect(JSON.parse(secondRes.body).code).toBe("MFA_EXPIRED");
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, userId));
+    }
   });
 
   it("completes login with a recovery code and consumes it", async () => {

@@ -28,6 +28,7 @@ const ENROLLMENT_ATTEMPTS_EXHAUSTED_MESSAGE =
 const NOT_CONFIGURED_MESSAGE = "Two-factor authentication is not set up. Please log in again.";
 const ALREADY_ENABLED_MESSAGE =
   "Two-factor authentication is already enabled. Please log in again.";
+const ACCOUNT_DISABLED_MESSAGE = "This account is disabled. Contact an administrator.";
 const UNREADABLE_MESSAGE =
   "Your two-factor authentication data can't be read on the server. Contact an administrator.";
 
@@ -413,5 +414,55 @@ describe("LoginPage MFA challenge expiry (#1234)", () => {
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
     expect(codeInput).toBeInTheDocument();
     expect(codeInput.value).toBe("123456");
+  });
+
+  it("says the account is disabled and returns to the password form on MFA-complete USER_DISABLED (#2049)", async () => {
+    stubTotpFlow(
+      failedResponse(403, {
+        error: "User is disabled",
+        code: "USER_DISABLED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ACCOUNT_DISABLED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(NOT_CONFIGURED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("000000")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+  });
+
+  it("says the account is disabled and returns to the password form on enroll-complete USER_DISABLED (#2049)", async () => {
+    stubEnrollFlow(
+      failedResponse(403, {
+        error: "User is disabled",
+        code: "USER_DISABLED",
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByLabelText(/6-digit code/i);
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(ACCOUNT_DISABLED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(ENROLLMENT_EXPIRED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(NOT_CONFIGURED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/6-digit code/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
   });
 });

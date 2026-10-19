@@ -766,21 +766,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
 
-        if (hashFingerprint) {
-          if (!dbUser?.passwordHash) {
-            await redis.del(attemptsKey);
-            const audit = auditFromRequest(request);
-            await audit("MFA_VERIFY_FAILED", {
-              userId: dbUser.id,
-              username: dbUser.username,
-              reason: "password_removed",
-            });
-            return reply.status(401).send({
-              error: "MFA challenge expired or invalid",
-              code: "MFA_EXPIRED",
-            });
-          }
-
+        if (hashFingerprint && dbUser.passwordHash) {
           const { createHash } = await import("node:crypto");
           const currentFingerprint = createHash("sha256")
             .update(dbUser.passwordHash)
@@ -800,7 +786,33 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             });
           }
         }
-        if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
+        if (isDisabledRole(dbUser.role)) {
+          await redis.del(attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
+        if (hashFingerprint && !dbUser.passwordHash) {
+          await redis.del(attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_removed",
+          });
+          return reply.status(401).send({
+            error: "MFA challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+        if (!dbUser.totpSecret) {
           await redis.del(attemptsKey);
           return reply.status(401).send({
             error: "User not found or MFA not configured",
@@ -1020,21 +1032,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
 
-        if (hashFingerprint) {
-          if (!dbUser?.passwordHash) {
-            await redis.del(attemptsKey);
-            const audit = auditFromRequest(request);
-            await audit("MFA_VERIFY_FAILED", {
-              userId: dbUser.id,
-              username: dbUser.username,
-              reason: "password_removed",
-            });
-            return reply.status(401).send({
-              error: "Enrollment challenge expired or invalid",
-              code: "MFA_EXPIRED",
-            });
-          }
-
+        if (hashFingerprint && dbUser.passwordHash) {
           const { createHash } = await import("node:crypto");
           const currentFingerprint = createHash("sha256")
             .update(dbUser.passwordHash)
@@ -1054,7 +1052,33 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             });
           }
         }
-        if (!dbUser?.totpSecret || isDisabledRole(dbUser.role)) {
+        if (isDisabledRole(dbUser.role)) {
+          await redis.del(attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "disabled_user",
+          });
+          return reply.status(403).send({
+            error: "User is disabled",
+            code: "USER_DISABLED",
+          });
+        }
+        if (hashFingerprint && !dbUser.passwordHash) {
+          await redis.del(attemptsKey);
+          const audit = auditFromRequest(request);
+          await audit("MFA_VERIFY_FAILED", {
+            userId: dbUser.id,
+            username: dbUser.username,
+            reason: "password_removed",
+          });
+          return reply.status(401).send({
+            error: "Enrollment challenge expired or invalid",
+            code: "MFA_EXPIRED",
+          });
+        }
+        if (!dbUser.totpSecret) {
           await redis.del(attemptsKey);
           return reply.status(401).send({
             error: "User not found or MFA not configured",

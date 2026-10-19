@@ -25,6 +25,7 @@ mockEnterpriseFeatures(["mfa"]);
 
 const { buildTestApp, createUserAndLogin } = await import("../test-server.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
+const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 
 import type { TestApp } from "../test-server.js";
 
@@ -208,6 +209,93 @@ describe("POST /api/auth/login forced enrollment (licensed)", () => {
       payload: { enrollmentToken: "not-a-uuid", code: "123456" },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("enroll-complete returns 403 USER_DISABLED and burns the enrollment token when the user is disabled mid-enrollment (#2049)", async () => {
+    const { username, password, userId } = await createUnenrolledUser();
+    await setMfaPolicy("required");
+
+    const loginRes = await login(username, password);
+    expect(loginRes.statusCode).toBe(200);
+    const { enrollmentToken, uri } = JSON.parse(loginRes.body);
+
+    // Record one wrong attempt first so we can verify attemptsKey is cleaned up.
+    const badRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: "000000" },
+    });
+    expect(badRes.statusCode).toBe(401);
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBe("1");
+
+    await db
+      .update(schema.users)
+      .set({ role: "disabled", totpSecret: null, passwordHash: null })
+      .where(eq(schema.users.id, userId));
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: generateTotpCode(uri) },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body)).toEqual({
+      error: "User is disabled",
+      code: "USER_DISABLED",
+    });
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBeNull();
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    const disabledAudit = auditRows.find((row) => {
+      const details = row.details as { userId?: string; reason?: string } | null;
+      return details?.userId === userId && details?.reason === "disabled_user";
+    });
+    expect(disabledAudit).toBeDefined();
+
+    const [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+    expect(dbUser.totpEnabled).toBe(false);
+
+    // A second attempt finds the enrollment token already burned.
+    const secondRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: generateTotpCode(uri) },
+    });
+    expect(secondRes.statusCode).toBe(401);
+    expect(JSON.parse(secondRes.body).code).toBe("MFA_EXPIRED");
+  });
+
+  it("enroll-complete returns 401 MFA_NOT_CONFIGURED and burns the enrollment token when the pending secret was cleared mid-enrollment (#2018)", async () => {
+    const { username, password, userId } = await createUnenrolledUser();
+    await setMfaPolicy("required");
+
+    const loginRes = await login(username, password);
+    expect(loginRes.statusCode).toBe(200);
+    const { enrollmentToken, uri } = JSON.parse(loginRes.body);
+
+    const badRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: "000000" },
+    });
+    expect(badRes.statusCode).toBe(401);
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBe("1");
+
+    await db.update(schema.users).set({ totpSecret: null }).where(eq(schema.users.id, userId));
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: generateTotpCode(uri) },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(JSON.parse(res.body).code).toBe("MFA_NOT_CONFIGURED");
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBeNull();
   });
 
   it("enroll-complete accepts a TOTP typed with a space or dash, and refuses an empty code without costing an attempt (#2478)", async () => {
