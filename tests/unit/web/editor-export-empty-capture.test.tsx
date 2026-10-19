@@ -79,6 +79,7 @@ vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
 
 import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
 import {
+  clearAutosave,
   ExportDialog,
   loadAutosaveState,
   restoreAutosave,
@@ -1401,5 +1402,315 @@ describe("Load Project (#1622)", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(useEditorStore.getState().levels).toEqual(priorLevels);
     expect(useEditorStore.getState().curves).toEqual(priorCurves);
+  });
+});
+
+describe("Autosave validation and state reconciliation (#2658)", () => {
+  let storageMap: Map<string, string>;
+
+  beforeEach(() => {
+    storageMap = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => storageMap.get(k) ?? null,
+      setItem: (k: string, v: string) => storageMap.set(k, v),
+      removeItem: (k: string) => storageMap.delete(k),
+      clear: () => storageMap.clear(),
+    });
+  });
+
+  it("logs at debug level, clears localStorage, and returns null on malformed autosave JSON", () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    localStorage.setItem("snapotter-editor-autosave", "{not-valid-json");
+
+    expect(loadAutosaveState()).toBeNull();
+    expect(debugSpy).toHaveBeenCalled();
+    expect(localStorage.getItem("snapotter-editor-autosave")).toBeNull();
+  });
+
+  it("logs at debug level and returns null when localStorage.getItem throws", () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    vi.stubGlobal("localStorage", {
+      getItem: () => {
+        throw new DOMException("Storage disabled", "SecurityError");
+      },
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+    });
+
+    expect(loadAutosaveState()).toBeNull();
+    expect(debugSpy).toHaveBeenCalled();
+  });
+
+  it("logs at debug level when localStorage.removeItem throws in clearAutosave", () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {
+        throw new DOMException("Storage disabled", "SecurityError");
+      },
+      clear: () => {},
+    });
+
+    expect(() => clearAutosave()).not.toThrow();
+    expect(debugSpy).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["non-object root", JSON.stringify(null)],
+    [
+      "unsupported version",
+      JSON.stringify({
+        version: 2,
+        timestamp: 1000,
+        state: { canvasSize: { width: 800, height: 600 } },
+      }),
+    ],
+    [
+      "missing timestamp",
+      JSON.stringify({ version: 1, state: { canvasSize: { width: 800, height: 600 } } }),
+    ],
+    [
+      "non-numeric timestamp",
+      JSON.stringify({
+        version: 1,
+        timestamp: "now",
+        state: { canvasSize: { width: 800, height: 600 } },
+      }),
+    ],
+    [
+      "zero or negative timestamp",
+      JSON.stringify({
+        version: 1,
+        timestamp: 0,
+        state: { canvasSize: { width: 800, height: 600 } },
+      }),
+    ],
+    ["non-object state", JSON.stringify({ version: 1, timestamp: 1000, state: "bad" })],
+    [
+      "zero/negative canvasSize",
+      JSON.stringify({
+        version: 1,
+        timestamp: 1000,
+        state: { canvasSize: { width: 0, height: -5 } },
+      }),
+    ],
+    [
+      "empty layers array",
+      JSON.stringify({
+        version: 1,
+        timestamp: 1000,
+        state: { canvasSize: { width: 800, height: 600 }, layers: [] },
+      }),
+    ],
+    [
+      "malformed layer in state",
+      JSON.stringify({
+        version: 1,
+        timestamp: 1000,
+        state: { canvasSize: { width: 800, height: 600 }, layers: [{ id: "layer-only" }] },
+      }),
+    ],
+    [
+      "invalid foregroundColor in state",
+      JSON.stringify({
+        version: 1,
+        timestamp: 1000,
+        state: { canvasSize: { width: 800, height: 600 }, foregroundColor: "not-hex" },
+      }),
+    ],
+  ])("rejects, logs at debug, and clears autosave when payload has %s", (_label, raw) => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    localStorage.setItem("snapotter-editor-autosave", raw);
+
+    expect(loadAutosaveState()).toBeNull();
+    expect(debugSpy).toHaveBeenCalled();
+    expect(localStorage.getItem("snapotter-editor-autosave")).toBeNull();
+  });
+
+  it("reconciles activeLayerId and resets transient selection, crop, text-editing, and clipboard state in restoreAutosave", () => {
+    useEditorStore.setState({
+      isDirty: false,
+      activeLayerId: "layer-current",
+      selection: { x: 10, y: 10, width: 50, height: 50, type: "rect" },
+      cropState: { x: 0, y: 0, width: 100, height: 100, aspectRatio: null },
+      isCropping: true,
+      editingTextId: "obj-1",
+      selectedObjectIds: ["obj-1"],
+      clipboard: [
+        {
+          id: "clip-1",
+          type: "rect",
+          layerId: "layer-current",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+          },
+        },
+      ],
+      _historyVersion: 4,
+    });
+
+    const savedLayer = {
+      id: "layer-saved",
+      name: "Saved Layer",
+      visible: true,
+      locked: false,
+      opacity: 1,
+      blendMode: "source-over" as const,
+      thumbnail: null,
+    };
+
+    act(() => {
+      restoreAutosave({
+        version: 1,
+        timestamp: 1700000000000,
+        state: {
+          canvasSize: { width: 1024, height: 768 },
+          layers: [savedLayer],
+          objects: [],
+          adjustments: {
+            brightness: 10,
+            contrast: 0,
+            hue: 0,
+            saturation: 0,
+            luminance: 0,
+            exposure: 0,
+            vibrance: 0,
+            warmth: 0,
+          },
+          filters: [],
+          levels: defaultLevelsState(),
+          curves: defaultCurvesState(),
+          guides: [],
+          sourceImageUrl: null,
+          sourceImageSize: null,
+          foregroundColor: "#112233",
+          backgroundColor: "#445566",
+        },
+      });
+    });
+
+    const state = useEditorStore.getState();
+    expect(state.canvasSize).toEqual({ width: 1024, height: 768 });
+    expect(state.activeLayerId).toBe("layer-saved");
+    expect(state.selection).toBeNull();
+    expect(state.cropState).toBeNull();
+    expect(state.isCropping).toBe(false);
+    expect(state.editingTextId).toBeNull();
+    expect(state.selectedObjectIds).toEqual([]);
+    expect(state.clipboard).toBeNull();
+    expect(state.isDirty).toBe(true);
+    expect(state.lastAction).toEqual({ id: "restoreAutosave" });
+    expect(state._historyVersion).toBe(5);
+  });
+
+  it("preserves activeLayerId when the restored autosave layers still contain it", () => {
+    useEditorStore.setState({
+      activeLayerId: "layer-keep",
+    });
+
+    act(() => {
+      restoreAutosave({
+        version: 1,
+        timestamp: 1700000000000,
+        state: {
+          canvasSize: { width: 800, height: 600 },
+          layers: [
+            {
+              id: "layer-first",
+              name: "Layer 1",
+              visible: true,
+              locked: false,
+              opacity: 1,
+              blendMode: "source-over",
+              thumbnail: null,
+            },
+            {
+              id: "layer-keep",
+              name: "Layer 2",
+              visible: true,
+              locked: false,
+              opacity: 1,
+              blendMode: "source-over",
+              thumbnail: null,
+            },
+          ],
+          objects: [],
+          adjustments: useEditorStore.getState().adjustments,
+          filters: useEditorStore.getState().filters,
+          levels: defaultLevelsState(),
+          curves: defaultCurvesState(),
+          guides: [],
+          sourceImageUrl: null,
+          sourceImageSize: null,
+          foregroundColor: "#000000",
+          backgroundColor: "#ffffff",
+        },
+      });
+    });
+
+    expect(useEditorStore.getState().activeLayerId).toBe("layer-keep");
+  });
+
+  it("normalizes partial adjustments, partial filters, omitted optional fields, and ignores unknown state keys in restoreAutosave", () => {
+    useEditorStore.setState({
+      objects: [
+        {
+          id: "stale-obj",
+          type: "rect",
+          layerId: "layer-1",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+          },
+        },
+      ],
+      guides: [{ id: "stale-guide", orientation: "horizontal", position: 100 }],
+      foregroundColor: "#abcdef",
+      backgroundColor: "#fedcba",
+    });
+
+    act(() => {
+      restoreAutosave({
+        version: 1,
+        timestamp: 1700000000000,
+        state: {
+          canvasSize: { width: 640, height: 480 },
+          adjustments: { brightness: 30 },
+          filters: [{ type: "blur", enabled: true, params: { radius: 12 } }],
+          unexpectedKey: "should-not-leak",
+        } as unknown as Parameters<typeof restoreAutosave>[0]["state"],
+      });
+    });
+
+    const state = useEditorStore.getState() as unknown as Record<string, unknown>;
+    expect(state.canvasSize).toEqual({ width: 640, height: 480 });
+    expect(state.objects).toEqual([]);
+    expect(state.guides).toEqual([]);
+    expect(state.foregroundColor).toBe("#000000");
+    expect(state.backgroundColor).toBe("#ffffff");
+    expect(useEditorStore.getState().adjustments.brightness).toBe(30);
+    expect(useEditorStore.getState().adjustments.contrast).toBe(0);
+    expect(useEditorStore.getState().filters.length).toBeGreaterThan(1);
+    expect(useEditorStore.getState().filters.find((f) => f.type === "blur")).toEqual({
+      type: "blur",
+      enabled: true,
+      params: { radius: 12 },
+    });
+    expect(state.unexpectedKey).toBeUndefined();
   });
 });

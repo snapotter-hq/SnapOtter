@@ -1594,31 +1594,88 @@ export async function saveEditorState(): Promise<void> {
 }
 
 export function loadAutosaveState(): AutosaveData | null {
+  let raw: string | null;
   try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw) as AutosaveData;
-    if (data.version !== 1 || !data.state?.canvasSize) return null;
-    return data;
-  } catch {
+    raw = localStorage.getItem(AUTOSAVE_KEY);
+  } catch (err) {
+    console.debug("Failed to read autosave state from localStorage:", err);
     return null;
   }
+  if (!raw) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    console.debug("Failed to parse autosave state:", err);
+    clearAutosave();
+    return null;
+  }
+  if (
+    !isPlainRecord(data) ||
+    data.version !== 1 ||
+    typeof data.timestamp !== "number" ||
+    !Number.isFinite(data.timestamp) ||
+    data.timestamp <= 0 ||
+    !isPlainRecord(data.state) ||
+    !isValidProjectData({ ...data.state, version: data.version })
+  ) {
+    console.debug("Autosave state failed structural validation");
+    clearAutosave();
+    return null;
+  }
+  return data as unknown as AutosaveData;
 }
 
 export function clearAutosave(): void {
   try {
     localStorage.removeItem(AUTOSAVE_KEY);
-  } catch {
-    // ignore
+  } catch (err) {
+    console.debug("Failed to clear autosave state from localStorage:", err);
   }
 }
 
 export function restoreAutosave(data: AutosaveData): void {
   const store = useEditorStore.getState();
+  const state = data.state;
+  const layers = state.layers || store.layers;
+  const activeLayerId = layers.some((l) => l.id === store.activeLayerId)
+    ? store.activeLayerId
+    : (layers[0]?.id ?? store.activeLayerId);
+  const adjustments = state.adjustments
+    ? { ...store.adjustments, ...state.adjustments }
+    : store.adjustments;
+  const filters = state.filters
+    ? store.filters.map((existing) => {
+        const match = state.filters?.find((f) => f.type === existing.type);
+        return match
+          ? {
+              ...existing,
+              enabled: match.enabled,
+              params: { ...existing.params, ...match.params },
+            }
+          : existing;
+      })
+    : store.filters;
   useEditorStore.setState({
-    ...data.state,
-    levels: resolveLoadedLevels(data.state.levels),
-    curves: resolveLoadedCurves(data.state.curves),
+    canvasSize: state.canvasSize,
+    layers,
+    activeLayerId,
+    objects: state.objects || [],
+    adjustments,
+    filters,
+    levels: resolveLoadedLevels(state.levels),
+    curves: resolveLoadedCurves(state.curves),
+    guides: state.guides || [],
+    sourceImageUrl: state.sourceImageUrl || null,
+    sourceImageSize: state.sourceImageSize || null,
+    foregroundColor: state.foregroundColor || "#000000",
+    backgroundColor: state.backgroundColor || "#ffffff",
+    selection: null,
+    cropState: null,
+    isCropping: false,
+    editingTextId: null,
+    selectedObjectIds: [],
+    clipboard: null,
     isDirty: true,
     lastAction: { id: "restoreAutosave" },
     _historyVersion: store._historyVersion + 1,
