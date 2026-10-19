@@ -29,7 +29,7 @@ import { requireFileAccess, requirePermission } from "../permissions.js";
 /**
  * Guard against path traversal in URL params.
  */
-function isPathTraversal(segment: string): boolean {
+export function isPathTraversal(segment: string): boolean {
   return (
     segment.includes("..") ||
     segment.includes("/") ||

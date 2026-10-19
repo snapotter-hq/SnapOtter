@@ -51,7 +51,11 @@ import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function extToMime(ext: string): string {
+export const deleteFilesSchema = z.object({
+  ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
+});
+
+export function extToMime(ext: string): string {
   const clean = ext.toLowerCase().replace(/^\./, "");
   const map: Record<string, string> = {
     jpg: "image/jpeg",
@@ -90,7 +94,7 @@ function extToMime(ext: string): string {
  * claim is kept: video, audio, PDF and Office files have no sniff here, and
  * their previews branch on that type.
  */
-function unverifiedMime(claimedMime: string): string {
+export function unverifiedMime(claimedMime: string): string {
   return claimedMime.startsWith("image/") ? "application/octet-stream" : claimedMime;
 }
 
@@ -104,7 +108,7 @@ function unverifiedMime(claimedMime: string): string {
  * 0x0 is never a genuine image dimension, so treat it the same as an
  * invalid/failed validation and store null instead of the literal 0.
  */
-function measuredDimensions(validation: ValidationResult | null): {
+export function measuredDimensions(validation: ValidationResult | null): {
   width: number | null;
   height: number | null;
 } {
@@ -115,7 +119,7 @@ function measuredDimensions(validation: ValidationResult | null): {
   };
 }
 
-function serializeFile(row: typeof schema.userFiles.$inferSelect) {
+export function serializeFile(row: typeof schema.userFiles.$inferSelect) {
   return {
     id: row.id,
     originalName: row.originalName,
@@ -733,10 +737,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       const user = await requireFileAccess(request, reply);
       if (!user) return;
 
-      const deleteSchema = z.object({
-        ids: z.array(z.string()).min(1, "ids must be a non-empty array of strings"),
-      });
-      const parsed = deleteSchema.safeParse(request.body);
+      const parsed = deleteFilesSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
           error: parsed.error.issues.map((i) => i.message).join("; "),

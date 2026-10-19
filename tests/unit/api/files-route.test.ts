@@ -55,51 +55,7 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
   };
 });
 
-import { fileRoutes } from "../../../apps/api/src/routes/files.js";
-
-// ── Reproduce helper functions from files.ts ────────────────────────────
-
-function isPathTraversal(segment: string): boolean {
-  return (
-    segment.includes("..") ||
-    segment.includes("/") ||
-    segment.includes("\\") ||
-    segment.includes("\0")
-  );
-}
-
-function getContentType(ext: string): string {
-  const map: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    tif: "image/tiff",
-    avif: "image/avif",
-    svg: "image/svg+xml",
-    pdf: "application/pdf",
-    zip: "application/zip",
-    ico: "image/x-icon",
-    json: "application/json",
-    jxl: "image/jxl",
-    dng: "image/x-adobe-dng",
-    cr2: "image/x-canon-cr2",
-    nef: "image/x-nikon-nef",
-    arw: "image/x-sony-arw",
-    orf: "image/x-olympus-orf",
-    rw2: "image/x-panasonic-rw2",
-    tga: "image/x-tga",
-    psd: "image/vnd.adobe.photoshop",
-    exr: "image/x-exr",
-    hdr: "image/vnd.radiance",
-    heic: "image/heic",
-    heif: "image/heif",
-  };
-  return map[ext] ?? "application/octet-stream";
-}
+import { fileRoutes, getContentType, isPathTraversal } from "../../../apps/api/src/routes/files.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
@@ -236,6 +192,73 @@ describe("files route logic", () => {
       expect(getContentType("heif")).toBe("image/heif");
     });
 
+    it("appends charset=utf-8 to text/* formats", () => {
+      expect(getContentType("csv")).toBe("text/csv; charset=utf-8");
+      expect(getContentType("tsv")).toBe("text/tab-separated-values; charset=utf-8");
+      expect(getContentType("txt")).toBe("text/plain; charset=utf-8");
+      expect(getContentType("md")).toBe("text/markdown; charset=utf-8");
+      expect(getContentType("markdown")).toBe("text/markdown; charset=utf-8");
+      expect(getContentType("html")).toBe("text/html; charset=utf-8");
+      expect(getContentType("htm")).toBe("text/html; charset=utf-8");
+      expect(getContentType("vtt")).toBe("text/vtt; charset=utf-8");
+    });
+
+    it("maps structured data and subtitle formats correctly", () => {
+      expect(getContentType("xml")).toBe("application/xml");
+      expect(getContentType("yaml")).toBe("application/yaml");
+      expect(getContentType("yml")).toBe("application/yaml");
+      expect(getContentType("srt")).toBe("application/x-subrip");
+    });
+
+    it("maps video formats correctly", () => {
+      expect(getContentType("mp4")).toBe("video/mp4");
+      expect(getContentType("m4v")).toBe("video/mp4");
+      expect(getContentType("mov")).toBe("video/quicktime");
+      expect(getContentType("webm")).toBe("video/webm");
+      expect(getContentType("mkv")).toBe("video/x-matroska");
+      expect(getContentType("avi")).toBe("video/x-msvideo");
+      expect(getContentType("3gp")).toBe("video/3gpp");
+      expect(getContentType("flv")).toBe("video/x-flv");
+      expect(getContentType("wmv")).toBe("video/x-ms-wmv");
+      expect(getContentType("mpg")).toBe("video/mpeg");
+      expect(getContentType("mpeg")).toBe("video/mpeg");
+      expect(getContentType("ts")).toBe("video/mp2t");
+      expect(getContentType("mts")).toBe("video/mp2t");
+      expect(getContentType("m2ts")).toBe("video/mp2t");
+      expect(getContentType("ogv")).toBe("video/ogg");
+    });
+
+    it("maps audio formats correctly", () => {
+      expect(getContentType("mp3")).toBe("audio/mpeg");
+      expect(getContentType("wav")).toBe("audio/wav");
+      expect(getContentType("flac")).toBe("audio/flac");
+      expect(getContentType("aac")).toBe("audio/aac");
+      expect(getContentType("m4a")).toBe("audio/mp4");
+      expect(getContentType("ogg")).toBe("audio/ogg");
+      expect(getContentType("opus")).toBe("audio/opus");
+      expect(getContentType("wma")).toBe("audio/x-ms-wma");
+      expect(getContentType("aiff")).toBe("audio/aiff");
+      expect(getContentType("amr")).toBe("audio/amr");
+      expect(getContentType("ac3")).toBe("audio/ac3");
+    });
+
+    it("maps document and ebook formats correctly", () => {
+      expect(getContentType("docx")).toBe(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      );
+      expect(getContentType("odt")).toBe("application/vnd.oasis.opendocument.text");
+      expect(getContentType("rtf")).toBe("application/rtf");
+      expect(getContentType("pptx")).toBe(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      );
+      expect(getContentType("odp")).toBe("application/vnd.oasis.opendocument.presentation");
+      expect(getContentType("xlsx")).toBe(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      expect(getContentType("ods")).toBe("application/vnd.oasis.opendocument.spreadsheet");
+      expect(getContentType("epub")).toBe("application/epub+zip");
+    });
+
     it("returns application/octet-stream for unknown extension", () => {
       expect(getContentType("xyz")).toBe("application/octet-stream");
     });
@@ -245,44 +268,122 @@ describe("files route logic", () => {
     });
   });
 
-  describe("filename encoding for Content-Disposition", () => {
-    it("encodes special characters", () => {
-      const filename = "my photo (1).jpg";
-      const encoded = encodeURIComponent(filename);
-      expect(encoded).toBe("my%20photo%20(1).jpg");
+  describe("GET /api/v1/download/:jobId/:filename", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let downloadHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        post: vi.fn(),
+        get: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/download/:jobId/:filename") downloadHandler = handler;
+        }),
+      };
+      await fileRoutes(fakeApp as never);
     });
 
-    it("preserves simple filenames", () => {
-      const filename = "photo.jpg";
-      const encoded = encodeURIComponent(filename);
-      expect(encoded).toBe("photo.jpg");
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mocks.isValidObjectKey.mockReturnValue(true);
+      mocks.getObjectSize.mockResolvedValue(5);
+      mocks.getObjectStream.mockImplementation(async () => Readable.from([Buffer.from("hello")]));
     });
 
-    it("encodes unicode characters", () => {
-      const filename = "写真.png";
-      const encoded = encodeURIComponent(filename);
-      expect(encoded).toContain("%");
-    });
-  });
+    function makeDownloadReply() {
+      const headers: Record<string, string> = {};
+      const reply = {
+        statusCode: 200,
+        headers,
+        payload: undefined as unknown,
+        raw: { destroy: vi.fn() },
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        code: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        header: vi.fn((name: string, value: string) => {
+          headers[name] = value;
+          return reply;
+        }),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
 
-  describe("extension extraction from filename", () => {
-    it("extracts extension from simple filename", () => {
-      const filename = "photo.jpg";
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-      expect(ext).toBe("jpg");
+    it("rejects path traversal in jobId or filename with 400", async () => {
+      const reply1 = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: "../secret", filename: "photo.jpg" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        reply1,
+      );
+      expect(reply1.statusCode).toBe(400);
+      expect(reply1.payload).toEqual({ error: "Invalid path" });
+
+      const reply2 = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: "550e8400-e29b-41d4-a716-446655440000", filename: "foo/bar.jpg" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        reply2,
+      );
+      expect(reply2.statusCode).toBe(400);
+      expect(reply2.payload).toEqual({ error: "Invalid path" });
     });
 
-    it("handles filename with multiple dots", () => {
-      const filename = "my.photo.2024.png";
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-      expect(ext).toBe("png");
+    it("encodes special and unicode characters in Content-Disposition", async () => {
+      for (const [filename, expectedEncoded] of [
+        ["my photo (1).jpg", "my%20photo%20(1).jpg"],
+        ["photo.jpg", "photo.jpg"],
+        ["写真.png", encodeURIComponent("写真.png")],
+      ] as const) {
+        const reply = makeDownloadReply();
+        await downloadHandler(
+          {
+            params: { jobId: "job-1", filename },
+            headers: {},
+            log: { warn: vi.fn(), error: vi.fn() },
+          },
+          reply,
+        );
+        expect(reply.statusCode).toBe(200);
+        expect(reply.headers["Content-Disposition"]).toBe(
+          `attachment; filename="${expectedEncoded}"; filename*=UTF-8''${expectedEncoded}`,
+        );
+      }
     });
 
-    it("handles filename without extension", () => {
-      const filename = "no-extension";
-      const parts = filename.split(".");
-      const ext = parts.length > 1 ? (parts.pop()?.toLowerCase() ?? "") : "";
-      expect(ext).toBe("");
+    it("extracts extension from filename and sets Content-Type header", async () => {
+      for (const [filename, expectedType] of [
+        ["photo.jpg", "image/jpeg"],
+        ["my.photo.2024.PNG", "image/png"],
+        ["notes.txt", "text/plain; charset=utf-8"],
+        ["no-extension", "application/octet-stream"],
+      ] as const) {
+        const reply = makeDownloadReply();
+        await downloadHandler(
+          {
+            params: { jobId: "job-1", filename },
+            headers: {},
+            log: { warn: vi.fn(), error: vi.fn() },
+          },
+          reply,
+        );
+        expect(reply.statusCode).toBe(200);
+        expect(reply.headers["Content-Type"]).toBe(expectedType);
+      }
     });
   });
 

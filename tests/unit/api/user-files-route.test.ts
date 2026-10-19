@@ -1,138 +1,199 @@
 /**
- * Unit tests for user file routes helper functions and serialization logic.
+ * Unit tests for user file routes helper functions and route handler logic.
  *
- * Tests the formatToMime, extToMime, and serializeFile helpers that are
- * used throughout the user-files route handlers.
+ * Tests the extToMime, unverifiedMime, measuredDimensions, serializeFile, and
+ * deleteFilesSchema helpers and the GET /api/v1/files, DELETE /api/v1/files,
+ * and POST /api/v1/files/save-result handlers from user-files.ts.
  */
-import { describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
 
+const mocks = vi.hoisted(() => ({
+  likeSpy: vi.fn(),
+  limitSpy: vi.fn(),
+  offsetSpy: vi.fn(),
+  parentRows: [] as unknown[],
+  insertedValues: undefined as Record<string, unknown> | undefined,
+  saveFile: vi.fn(() => Promise.resolve("stored-result.png")),
+  quotaRefusal: vi.fn(() => Promise.resolve(null)),
+  requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
+  hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
+  validateImageBuffer: vi.fn(() =>
+    Promise.resolve({ valid: true as const, format: "png", width: 800, height: 600 }),
+  ),
+}));
+
+vi.mock("drizzle-orm", () => ({
+  and: (...conds: unknown[]) => ({ op: "and", conds }),
+  desc: (col: unknown) => ({ op: "desc", col }),
+  eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+  inArray: (col: unknown, vals: unknown) => ({ op: "inArray", col, vals }),
+  like: (col: unknown, pattern: string) => {
+    mocks.likeSpy(col, pattern);
+    return { op: "like", col, pattern };
+  },
+  sql: Object.assign(() => "sql", { join: () => "sql-join" }),
+}));
+
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
-    select: () => ({
+    select: (fields?: unknown) => ({
       from: () => ({
-        where: () => ({ get: () => null, all: () => [] }),
-        all: () => [],
+        where: () => {
+          if (fields) {
+            return Promise.resolve([{ count: 0 }]);
+          }
+          const orderChain = {
+            orderBy: () => ({
+              limit: (n: number) => {
+                mocks.limitSpy(n);
+                return {
+                  offset: (o: number) => {
+                    mocks.offsetSpy(o);
+                    return Promise.resolve([]);
+                  },
+                };
+              },
+            }),
+            // Thenable so `await db.select().from().where()` resolves to parentRows
+            // biome-ignore lint/suspicious/noThenProperty: mock Drizzle query builder promise chain
+            then: (resolve: (v: unknown) => unknown) =>
+              Promise.resolve(mocks.parentRows).then(resolve),
+          };
+          return orderChain;
+        },
       }),
     }),
-    insert: () => ({ values: () => ({ run: vi.fn() }) }),
-    delete: () => ({ where: () => ({ run: vi.fn() }) }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        insert: () => ({
+          values: (vals: Record<string, unknown>) => {
+            mocks.insertedValues = vals;
+            return {
+              returning: () =>
+                Promise.resolve([
+                  {
+                    ...vals,
+                    createdAt: new Date("2025-06-01T12:00:00Z"),
+                  },
+                ]),
+            };
+          },
+        }),
+        update: () => ({
+          set: () => ({
+            where: () => Promise.resolve(),
+          }),
+        }),
+      };
+      return fn(tx);
+    },
   },
   pool: {},
   closeDb: async () => {},
   schema: {
-    userFiles: { id: {}, userId: {}, parentId: {}, createdAt: {}, originalName: {} },
+    userFiles: {
+      id: "id",
+      userId: "user_id",
+      parentId: "parent_id",
+      createdAt: "created_at",
+      originalName: "original_name",
+    },
+    users: { id: "id", storageUsed: "storage_used" },
   },
 }));
 
-// ── Reproduce helper functions from user-files.ts ──────────────────────
+vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
+  deleteStoredFile: vi.fn(() => Promise.resolve()),
+  getCachedThumbnail: vi.fn(() => Promise.resolve(null)),
+  isStorageServiceFault: vi.fn(() => false),
+  readStoredFile: vi.fn(),
+  saveFile: mocks.saveFile,
+  saveThumbnail: vi.fn(() => Promise.resolve()),
+  streamStoredFile: vi.fn(),
+}));
 
-function formatToMime(format: string): string {
-  const map: Record<string, string> = {
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    avif: "image/avif",
-  };
-  return map[format] ?? "application/octet-stream";
-}
+vi.mock("../../../apps/api/src/lib/quota.js", () => ({
+  quotaRefusal: mocks.quotaRefusal,
+}));
 
-function extToMime(ext: string): string {
-  const clean = ext.toLowerCase().replace(/^\./, "");
-  const map: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    tif: "image/tiff",
-    avif: "image/avif",
-  };
-  return map[clean] ?? "application/octet-stream";
-}
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  hasEffectivePermission: mocks.hasEffectivePermission,
+  requireFileAccess: mocks.requireFileAccess,
+}));
 
-interface UserFileRow {
-  id: string;
-  originalName: string;
-  mimeType: string;
-  size: number;
-  width: number | null;
-  height: number | null;
-  version: number;
-  parentId: string | null;
-  toolChain: string | null;
-  createdAt: Date;
-}
-
-function serializeFile(row: UserFileRow) {
+vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/file-validation.js")>();
   return {
-    id: row.id,
-    originalName: row.originalName,
-    mimeType: row.mimeType,
-    size: row.size,
-    width: row.width,
-    height: row.height,
-    version: row.version,
-    parentId: row.parentId,
-    toolChain: row.toolChain ? JSON.parse(row.toolChain) : [],
-    createdAt: row.createdAt.toISOString(),
+    ...actual,
+    validateImageBuffer: mocks.validateImageBuffer,
   };
-}
+});
 
-// Reproduce the bulk delete validation logic
-function validateDeleteBody(body: unknown): { success: boolean; ids?: string[] } {
-  if (typeof body !== "object" || body === null) return { success: false };
-  const obj = body as Record<string, unknown>;
-  if (!Array.isArray(obj.ids)) return { success: false };
-  if (obj.ids.length === 0) return { success: false };
-  if (!obj.ids.every((id: unknown) => typeof id === "string")) return { success: false };
-  return { success: true, ids: obj.ids as string[] };
-}
+import type { schema } from "../../../apps/api/src/db/index.js";
+import {
+  deleteFilesSchema,
+  extToMime,
+  measuredDimensions,
+  serializeFile,
+  unverifiedMime,
+  userFileRoutes,
+} from "../../../apps/api/src/routes/user-files.js";
+
+type UserFileRow = typeof schema.userFiles.$inferSelect;
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe("user files route logic", () => {
-  describe("formatToMime", () => {
-    it("maps jpeg to image/jpeg", () => {
-      expect(formatToMime("jpeg")).toBe("image/jpeg");
+  describe("unverifiedMime", () => {
+    it("downgrades unverified image/* claims to application/octet-stream", () => {
+      expect(unverifiedMime("image/png")).toBe("application/octet-stream");
+      expect(unverifiedMime("image/jpeg")).toBe("application/octet-stream");
+      expect(unverifiedMime("image/svg+xml")).toBe("application/octet-stream");
     });
 
-    it("maps png to image/png", () => {
-      expect(formatToMime("png")).toBe("image/png");
+    it("preserves non-image MIME types", () => {
+      expect(unverifiedMime("application/pdf")).toBe("application/pdf");
+      expect(unverifiedMime("video/mp4")).toBe("video/mp4");
+      expect(unverifiedMime("audio/mpeg")).toBe("audio/mpeg");
+      expect(unverifiedMime("text/plain")).toBe("text/plain");
+      expect(unverifiedMime("application/octet-stream")).toBe("application/octet-stream");
+    });
+  });
+
+  describe("measuredDimensions", () => {
+    it("returns null dimensions when validation is null", () => {
+      expect(measuredDimensions(null)).toEqual({ width: null, height: null });
     });
 
-    it("maps webp to image/webp", () => {
-      expect(formatToMime("webp")).toBe("image/webp");
+    it("returns null dimensions when validation reports 0x0 (CLI-decoded formats)", () => {
+      expect(measuredDimensions({ valid: true, format: "heif", width: 0, height: 0 })).toEqual({
+        width: null,
+        height: null,
+      });
     });
 
-    it("maps gif to image/gif", () => {
-      expect(formatToMime("gif")).toBe("image/gif");
+    it("returns positive width and height when measured", () => {
+      expect(measuredDimensions({ valid: true, format: "png", width: 1920, height: 1080 })).toEqual(
+        {
+          width: 1920,
+          height: 1080,
+        },
+      );
     });
 
-    it("maps bmp to image/bmp", () => {
-      expect(formatToMime("bmp")).toBe("image/bmp");
-    });
-
-    it("maps tiff to image/tiff", () => {
-      expect(formatToMime("tiff")).toBe("image/tiff");
-    });
-
-    it("maps avif to image/avif", () => {
-      expect(formatToMime("avif")).toBe("image/avif");
-    });
-
-    it("returns application/octet-stream for unknown format", () => {
-      expect(formatToMime("raw")).toBe("application/octet-stream");
-    });
-
-    it("returns application/octet-stream for empty string", () => {
-      expect(formatToMime("")).toBe("application/octet-stream");
+    it("evaluates width and height independently when one axis is zero", () => {
+      expect(measuredDimensions({ valid: true, format: "png", width: 100, height: 0 })).toEqual({
+        width: 100,
+        height: null,
+      });
+      expect(measuredDimensions({ valid: true, format: "png", width: 0, height: 100 })).toEqual({
+        width: null,
+        height: 100,
+      });
     });
   });
 
@@ -157,6 +218,10 @@ describe("user files route logic", () => {
       expect(extToMime(".gif")).toBe("image/gif");
     });
 
+    it("maps .bmp to image/bmp", () => {
+      expect(extToMime(".bmp")).toBe("image/bmp");
+    });
+
     it("maps .tif to image/tiff", () => {
       expect(extToMime(".tif")).toBe("image/tiff");
     });
@@ -169,12 +234,37 @@ describe("user files route logic", () => {
       expect(extToMime(".avif")).toBe("image/avif");
     });
 
+    it("maps video extensions (.mp4, .webm, .mov)", () => {
+      expect(extToMime(".mp4")).toBe("video/mp4");
+      expect(extToMime(".webm")).toBe("video/webm");
+      expect(extToMime(".mov")).toBe("video/quicktime");
+    });
+
+    it("maps audio extensions (.mp3, .wav, .flac, .ogg, .aac)", () => {
+      expect(extToMime(".mp3")).toBe("audio/mpeg");
+      expect(extToMime(".wav")).toBe("audio/wav");
+      expect(extToMime(".flac")).toBe("audio/flac");
+      expect(extToMime(".ogg")).toBe("audio/ogg");
+      expect(extToMime(".aac")).toBe("audio/aac");
+    });
+
+    it("maps document, text, and archive extensions (.pdf, .txt, .csv, .json, .xml, .zip)", () => {
+      expect(extToMime(".pdf")).toBe("application/pdf");
+      expect(extToMime(".txt")).toBe("text/plain");
+      expect(extToMime(".csv")).toBe("text/csv");
+      expect(extToMime(".json")).toBe("application/json");
+      expect(extToMime(".xml")).toBe("application/xml");
+      expect(extToMime(".zip")).toBe("application/zip");
+    });
+
     it("handles uppercase extensions", () => {
       expect(extToMime(".JPG")).toBe("image/jpeg");
+      expect(extToMime(".MP4")).toBe("video/mp4");
     });
 
     it("handles extension without leading dot", () => {
       expect(extToMime("png")).toBe("image/png");
+      expect(extToMime("pdf")).toBe("application/pdf");
     });
 
     it("returns application/octet-stream for unknown extension", () => {
@@ -183,10 +273,12 @@ describe("user files route logic", () => {
   });
 
   describe("serializeFile", () => {
-    it("serializes a complete file row", () => {
+    it("serializes a complete file row and omits internal storage columns", () => {
       const row: UserFileRow = {
         id: "file-1",
+        userId: "user-1",
         originalName: "photo.jpg",
+        storedName: "stored-file-1.jpg",
         mimeType: "image/jpeg",
         size: 12345,
         width: 800,
@@ -198,29 +290,35 @@ describe("user files route logic", () => {
       };
 
       const result = serializeFile(row);
-      expect(result.id).toBe("file-1");
-      expect(result.originalName).toBe("photo.jpg");
-      expect(result.mimeType).toBe("image/jpeg");
-      expect(result.size).toBe(12345);
-      expect(result.width).toBe(800);
-      expect(result.height).toBe(600);
-      expect(result.version).toBe(1);
-      expect(result.parentId).toBeNull();
-      expect(result.toolChain).toEqual([]);
-      expect(result.createdAt).toBe("2025-06-01T12:00:00.000Z");
+      expect(result).toEqual({
+        id: "file-1",
+        originalName: "photo.jpg",
+        mimeType: "image/jpeg",
+        size: 12345,
+        width: 800,
+        height: 600,
+        version: 1,
+        parentId: null,
+        toolChain: [],
+        createdAt: "2025-06-01T12:00:00.000Z",
+      });
+      expect(result).not.toHaveProperty("userId");
+      expect(result).not.toHaveProperty("storedName");
     });
 
-    it("parses toolChain JSON when present", () => {
+    it("preserves toolChain string array from jsonb column when present", () => {
       const row: UserFileRow = {
         id: "file-2",
+        userId: "user-1",
         originalName: "edited.png",
+        storedName: "stored-file-2.png",
         mimeType: "image/png",
         size: 54321,
         width: 1920,
         height: 1080,
         version: 3,
         parentId: "file-1",
-        toolChain: JSON.stringify(["resize", "compress", "convert"]),
+        toolChain: ["resize", "compress", "convert"],
         createdAt: new Date("2025-06-15T08:30:00Z"),
       };
 
@@ -233,7 +331,9 @@ describe("user files route logic", () => {
     it("returns empty array for null toolChain", () => {
       const row: UserFileRow = {
         id: "file-3",
+        userId: "user-1",
         originalName: "upload.gif",
+        storedName: "stored-file-3.gif",
         mimeType: "image/gif",
         size: 999,
         width: null,
@@ -251,7 +351,9 @@ describe("user files route logic", () => {
     it("preserves null width and height", () => {
       const row: UserFileRow = {
         id: "file-4",
+        userId: null,
         originalName: "unknown.bin",
+        storedName: "stored-file-4.bin",
         mimeType: "application/octet-stream",
         size: 100,
         width: null,
@@ -270,126 +372,302 @@ describe("user files route logic", () => {
 
   describe("delete schema validation", () => {
     it("accepts valid ids array", () => {
-      const result = validateDeleteBody({ ids: ["id-1", "id-2"] });
+      const result = deleteFilesSchema.safeParse({ ids: ["id-1", "id-2"] });
       expect(result.success).toBe(true);
     });
 
     it("rejects empty ids array", () => {
-      const result = validateDeleteBody({ ids: [] });
+      const result = deleteFilesSchema.safeParse({ ids: [] });
       expect(result.success).toBe(false);
     });
 
     it("rejects missing ids field", () => {
-      const result = validateDeleteBody({});
+      const result = deleteFilesSchema.safeParse({});
       expect(result.success).toBe(false);
     });
 
     it("rejects non-array ids", () => {
-      const result = validateDeleteBody({ ids: "single-id" });
+      const result = deleteFilesSchema.safeParse({ ids: "single-id" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects non-string elements in ids array", () => {
+      const result = deleteFilesSchema.safeParse({ ids: [123] });
       expect(result.success).toBe(false);
     });
 
     it("accepts single id", () => {
-      const result = validateDeleteBody({ ids: ["only-one"] });
+      const result = deleteFilesSchema.safeParse({ ids: ["only-one"] });
       expect(result.success).toBe(true);
     });
   });
 
-  describe("pagination parsing", () => {
-    it("defaults to limit 50 and offset 0", () => {
-      const limit = parseInt("" || "50", 10) || 50;
-      const offset = parseInt("" || "0", 10) || 0;
-      expect(limit).toBe(50);
-      expect(offset).toBe(0);
+  describe("route handler behavior", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let listHandler: RouteHandler;
+    let deleteHandler: RouteHandler;
+    let saveResultHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        get: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files") listHandler = handler;
+        }),
+        post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files/save-result") saveResultHandler = handler;
+        }),
+        delete: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files") deleteHandler = handler;
+        }),
+        log: { info: vi.fn() },
+      };
+      await userFileRoutes(fakeApp as never);
     });
 
-    it("parses custom limit and offset", () => {
-      const limit = parseInt("25", 10) || 50;
-      const offset = parseInt("10", 10) || 0;
-      expect(limit).toBe(25);
-      expect(offset).toBe(10);
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mocks.parentRows = [];
+      mocks.insertedValues = undefined;
+      mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
+      mocks.hasEffectivePermission.mockResolvedValue(true);
+      mocks.quotaRefusal.mockResolvedValue(null);
+      mocks.saveFile.mockResolvedValue("stored-result.png");
+      mocks.validateImageBuffer.mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 800,
+        height: 600,
+      });
     });
 
-    it("falls back to defaults for non-numeric values", () => {
-      const limit = parseInt("abc", 10) || 50;
-      const offset = parseInt("xyz", 10) || 0;
-      expect(limit).toBe(50);
-      expect(offset).toBe(0);
-    });
-  });
+    function makeReply() {
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
 
-  describe("search escaping", () => {
-    it("escapes SQL LIKE wildcards", () => {
-      const search = "test%name_file\\special";
-      const escaped = search.replace(/[%_\\]/g, "\\$&");
-      expect(escaped).toBe("test\\%name\\_file\\\\special");
+    function makeSaveResultRequest(opts: {
+      filename: string;
+      parentId: string;
+      toolId?: string | null;
+      buffer?: Buffer;
+    }) {
+      const content = opts.buffer ?? Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+      return {
+        log: { warn: vi.fn(), error: vi.fn() },
+        parts: async function* () {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: opts.filename,
+            file: Readable.from([content]),
+          };
+          yield {
+            type: "field" as const,
+            fieldname: "parentId",
+            value: opts.parentId,
+          };
+          if (opts.toolId) {
+            yield {
+              type: "field" as const,
+              fieldname: "toolId",
+              value: opts.toolId,
+            };
+          }
+        },
+      };
+    }
+
+    describe("GET /api/v1/files pagination and search escaping", () => {
+      it("defaults to limit 50 and offset 0", async () => {
+        const reply = makeReply();
+        await listHandler({ query: {} }, reply);
+        expect(mocks.limitSpy).toHaveBeenCalledWith(50);
+        expect(mocks.offsetSpy).toHaveBeenCalledWith(0);
+        expect(reply.payload).toMatchObject({ limit: 50, offset: 0 });
+      });
+
+      it("parses custom limit and offset", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { limit: "25", offset: "10" } }, reply);
+        expect(mocks.limitSpy).toHaveBeenCalledWith(25);
+        expect(mocks.offsetSpy).toHaveBeenCalledWith(10);
+        expect(reply.payload).toMatchObject({ limit: 25, offset: 10 });
+      });
+
+      it("falls back to defaults for non-numeric or zero limit and offset", async () => {
+        const reply1 = makeReply();
+        await listHandler({ query: { limit: "abc", offset: "xyz" } }, reply1);
+        expect(mocks.limitSpy).toHaveBeenCalledWith(50);
+        expect(mocks.offsetSpy).toHaveBeenCalledWith(0);
+        expect(reply1.payload).toMatchObject({ limit: 50, offset: 0 });
+
+        const reply2 = makeReply();
+        await listHandler({ query: { limit: "0", offset: "0" } }, reply2);
+        expect(mocks.limitSpy).toHaveBeenLastCalledWith(50);
+        expect(mocks.offsetSpy).toHaveBeenLastCalledWith(0);
+      });
+
+      it("trims search and escapes SQL LIKE wildcards", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { search: "  test%name_file\\special  " } }, reply);
+        expect(mocks.likeSpy).toHaveBeenCalledWith(
+          "original_name",
+          "%test\\%name\\_file\\\\special%",
+        );
+      });
+
+      it("skips LIKE filter when search is whitespace-only", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { search: "   " } }, reply);
+        expect(mocks.likeSpy).not.toHaveBeenCalled();
+      });
+
+      it("passes unescaped normal search string wrapped in % wildcards", async () => {
+        const reply = makeReply();
+        await listHandler({ query: { search: "normal-search" } }, reply);
+        expect(mocks.likeSpy).toHaveBeenCalledWith("original_name", "%normal-search%");
+      });
     });
 
-    it("does not modify strings without special characters", () => {
-      const search = "normal-search";
-      const escaped = search.replace(/[%_\\]/g, "\\$&");
-      expect(escaped).toBe("normal-search");
+    describe("DELETE /api/v1/files validation", () => {
+      it("returns 400 when ids is empty or missing", async () => {
+        const reply1 = makeReply();
+        await deleteHandler({ body: { ids: [] } }, reply1);
+        expect(reply1.statusCode).toBe(400);
+        expect(reply1.payload).toEqual({ error: "ids must be a non-empty array of strings" });
+
+        const reply2 = makeReply();
+        await deleteHandler({ body: {} }, reply2);
+        expect(reply2.statusCode).toBe(400);
+      });
     });
 
-    it("trims search string", () => {
-      const search = "  hello  ";
-      const trimmed = search.trim();
-      expect(trimmed).toBe("hello");
-    });
-  });
+    describe("POST /api/v1/files/save-result version chain and filename preservation", () => {
+      function makeParent(overrides: Partial<UserFileRow> = {}): UserFileRow {
+        return {
+          id: "parent-1",
+          userId: "user-1",
+          originalName: "vacation-photo.jpg",
+          storedName: "stored-parent.jpg",
+          mimeType: "image/jpeg",
+          size: 1000,
+          width: 800,
+          height: 600,
+          version: 2,
+          parentId: null,
+          toolChain: ["resize", "compress"],
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+          ...overrides,
+        };
+      }
 
-  describe("version chain logic", () => {
-    it("computes next version from parent", () => {
-      const parentVersion = 2;
-      const nextVersion = parentVersion + 1;
-      expect(nextVersion).toBe(3);
-    });
+      it("increments parent version and appends toolId to existing toolChain", async () => {
+        mocks.parentRows = [makeParent({ version: 2, toolChain: ["resize", "compress"] })];
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          reply,
+        );
+        expect(reply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          version: 3,
+          parentId: "parent-1",
+          toolChain: ["resize", "compress", "convert"],
+          originalName: "vacation-photo.png",
+        });
+      });
 
-    it("builds tool chain by appending toolId", () => {
-      const existingChain = ["resize", "compress"];
-      const toolId = "convert";
-      const newChain = [...existingChain, toolId];
-      expect(newChain).toEqual(["resize", "compress", "convert"]);
-    });
+      it("starts from an empty chain when parent toolChain is null", async () => {
+        mocks.parentRows = [makeParent({ version: 1, toolChain: null })];
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          reply,
+        );
+        expect(reply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          version: 2,
+          toolChain: ["resize"],
+        });
+      });
 
-    it("starts with empty chain for first tool", () => {
-      const existingChain: string[] = [];
-      const toolId = "resize";
-      const newChain = [...existingChain, toolId];
-      expect(newChain).toEqual(["resize"]);
-    });
+      it("preserves existing toolChain when no toolId is provided", async () => {
+        mocks.parentRows = [makeParent({ version: 1, toolChain: ["resize"] })];
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: null,
+          }),
+          reply,
+        );
+        expect(reply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          version: 2,
+          toolChain: ["resize"],
+        });
+      });
 
-    it("preserves chain when no toolId provided", () => {
-      const existingChain = ["resize"];
-      const toolId: string | null = null;
-      const newChain = toolId ? [...existingChain, toolId] : existingChain;
-      expect(newChain).toEqual(["resize"]);
-    });
-  });
+      it("preserves parent base name across multiple dots or extensionless names", async () => {
+        mocks.parentRows = [makeParent({ originalName: "my.great.photo.jpg" })];
+        const reply1 = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result.webp",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          reply1,
+        );
+        expect(mocks.insertedValues?.originalName).toBe("my.great.photo.webp");
 
-  describe("filename preservation for results", () => {
-    it("preserves parent base name with new extension", () => {
-      const parentName = "vacation-photo.jpg";
-      const ext = ".png";
-      const baseName = parentName.replace(/\.[^.]+$/, "");
-      const resultName = `${baseName}${ext}`;
-      expect(resultName).toBe("vacation-photo.png");
-    });
+        mocks.parentRows = [makeParent({ originalName: "no-extension" })];
+        const reply2 = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          reply2,
+        );
+        expect(mocks.insertedValues?.originalName).toBe("no-extension.png");
 
-    it("handles parent name with multiple dots", () => {
-      const parentName = "my.great.photo.jpg";
-      const ext = ".webp";
-      const baseName = parentName.replace(/\.[^.]+$/, "");
-      const resultName = `${baseName}${ext}`;
-      expect(resultName).toBe("my.great.photo.webp");
-    });
-
-    it("handles parent name without extension", () => {
-      const parentName = "no-extension";
-      const ext = ".png";
-      const baseName = parentName.replace(/\.[^.]+$/, "");
-      const resultName = `${baseName}${ext}`;
-      expect(resultName).toBe("no-extension.png");
+        mocks.parentRows = [makeParent({ originalName: "vacation-photo.jpg" })];
+        const reply3 = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          reply3,
+        );
+        expect(mocks.insertedValues?.originalName).toBe("vacation-photo.jpg");
+      });
     });
   });
 });
