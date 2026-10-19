@@ -36,7 +36,7 @@ import {
   MalformedResultError,
   reportMalformedResult,
 } from "@/lib/progress-frames";
-import { useEditorStore } from "@/stores/editor-store";
+import { cancelPendingRebakes, useEditorStore } from "@/stores/editor-store";
 
 const SERVER_DECODED_EXTS = new Set(["psd", "tga", "exr", "hdr"]);
 const EDITOR_OPEN_TOOL_ID = "editor-open";
@@ -141,6 +141,7 @@ export function EditorPage() {
           const runId = ++openRunRef.current;
           stopOpenRef.current();
           stopOpenRef.current = () => {};
+          cancelPendingRebakes();
           loadBlobImage(blob, runId);
           return;
         }
@@ -163,6 +164,7 @@ export function EditorPage() {
       if (!file) return;
       const runId = ++openRunRef.current;
       stopOpenRef.current();
+      cancelPendingRebakes();
       const isCurrent = () => openRunRef.current === runId;
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       if (SERVER_DECODED_EXTS.has(ext)) {
@@ -413,6 +415,7 @@ export function EditorPage() {
       const runId = ++openRunRef.current;
       stopOpenRef.current();
       stopOpenRef.current = () => {};
+      cancelPendingRebakes();
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {

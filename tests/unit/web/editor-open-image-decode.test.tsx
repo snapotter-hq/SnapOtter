@@ -146,6 +146,21 @@ beforeEach(() => {
 
   const realCreate = document.createElement.bind(document);
   vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+    if (tag === "canvas") {
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          translate: () => {},
+          rotate: () => {},
+          scale: () => {},
+          fillRect: () => {},
+          clearRect: () => {},
+          drawImage: () => {},
+        }),
+        toDataURL: () => "data:image/png;base64,REBAKED",
+      } as unknown as HTMLCanvasElement;
+    }
     const el = realCreate(tag);
     if (tag === "input") {
       vi.spyOn(el as HTMLInputElement, "click").mockImplementation(() => {});
@@ -845,5 +860,249 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     });
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:opened-1");
     expect(loadImageSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a rebake that was already in flight when File > Open started, without aborting the server-decoded open (#2781)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/tools/image/convert")) {
+          return {
+            ok: true,
+            status: 202,
+            json: async () => ({ jobId: "job-after-rotate", async: true }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(["png-bytes"], { type: "image/png" }),
+        };
+      }),
+    );
+
+    renderEditor();
+
+    // Start a rotate on the current document and queue an Image Size behind it.
+    const rotating = useEditorStore.getState().rotateCanvas(90);
+    const queuedResize = useEditorStore.getState().resizeImage(400, 300);
+    expect(FakeImage.instances).toHaveLength(1);
+    const rebakeImg = FakeImage.instances[0];
+
+    // While the rotate is still decoding, open a server-decoded .psd file.
+    await openFileViaMenu(new File(["psd"], "replacement.psd"));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const stream = FakeEventSource.instances[0];
+    expect(stream.readyState).toBe(FakeEventSource.OPEN);
+
+    // Let the earlier rotate finish decoding before the .psd finishes converting.
+    await act(async () => {
+      rebakeImg.onload?.();
+      await expect(rotating).resolves.toBe(false);
+      await expect(queuedResize).resolves.toBe(false);
+    });
+
+    // Both earlier transforms must be discarded and the in-flight .psd open must stay alive.
+    expect(stream.readyState).toBe(FakeEventSource.OPEN);
+    expect(useEditorStore.getState().sourceImageUrl).toBe("blob:initial");
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 800, height: 600 });
+    expect(toastError).not.toHaveBeenCalled();
+
+    // Now the .psd conversion completes and its decoded PNG finishes loading.
+    await act(async () => {
+      stream.onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: "/api/v1/download/job-after-rotate/replacement.png" },
+        }),
+      });
+    });
+    await waitFor(() => expect(FakeImage.instances).toHaveLength(2));
+    act(() => {
+      FakeImage.instances[1].onload?.();
+    });
+
+    expect(loadImageSpy).toHaveBeenCalledTimes(1);
+    expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240);
+  });
+
+  it("drops a rebake that was already in flight when an image was pasted, without aborting the paste (#2781)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    renderEditor();
+
+    const flipping = useEditorStore.getState().flipCanvasHorizontal();
+    expect(FakeImage.instances).toHaveLength(1);
+    const rebakeImg = FakeImage.instances[0];
+
+    // Pasting plain text must not cancel the in-flight rebake.
+    const textPasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(textPasteEvent, "clipboardData", {
+      value: {
+        items: [{ type: "text/plain", getAsFile: () => null }],
+      },
+    });
+    await act(async () => {
+      document.dispatchEvent(textPasteEvent);
+    });
+
+    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [
+          {
+            type: "image/png",
+            getAsFile: () => new File(["pasted-png"], "paste.png", { type: "image/png" }),
+          },
+        ],
+      },
+    });
+    await act(async () => {
+      document.dispatchEvent(pasteEvent);
+    });
+    expect(FakeImage.instances).toHaveLength(2);
+    const pastedImg = FakeImage.instances[1];
+
+    // Earlier flip finishes decoding before the pasted image finishes decoding.
+    await act(async () => {
+      rebakeImg.onload?.();
+      await expect(flipping).resolves.toBe(false);
+    });
+    expect(useEditorStore.getState().sourceImageUrl).toBe("blob:initial");
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    // Pasted image finishes decoding and loads normally.
+    act(() => {
+      pastedImg.onload?.();
+    });
+    expect(loadImageSpy).toHaveBeenCalledTimes(1);
+    expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240);
+  });
+
+  it("still cancels an in-flight server-decoded open when a new rebake is triggered after the open started (#2781)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 202,
+        json: async () => ({ jobId: "job-superseded-by-rotate", async: true }),
+      })),
+    );
+
+    renderEditor();
+    const preOpenFlip = useEditorStore.getState().flipCanvasHorizontal();
+    expect(FakeImage.instances).toHaveLength(1);
+    const preOpenRebakeImg = FakeImage.instances[0];
+
+    await openFileViaMenu(new File(["psd"], "slow.psd"));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const stream = FakeEventSource.instances[0];
+    expect(stream.readyState).toBe(FakeEventSource.OPEN);
+
+    // User triggers a rotate after starting the open; it runs without waiting on preOpenFlip.
+    const rotating = useEditorStore.getState().rotateCanvas(90);
+    expect(FakeImage.instances).toHaveLength(2);
+    await act(async () => {
+      FakeImage.instances[1].onload?.();
+      await expect(rotating).resolves.toBe(true);
+    });
+
+    expect(stream.readyState).toBe(2);
+    expect(useEditorStore.getState().sourceImageUrl).toBe("data:image/png;base64,REBAKED");
+    expect(loadImageSpy).not.toHaveBeenCalled();
+
+    await act(async () => {
+      preOpenRebakeImg.onload?.();
+      await expect(preOpenFlip).resolves.toBe(false);
+    });
+  });
+
+  it("drops a rebake that was already in flight when a client-decoded image is opened via File > Open (#2781)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    renderEditor();
+
+    const resizing = useEditorStore.getState().resizeCanvas(1000, 800, "center");
+    expect(FakeImage.instances).toHaveLength(1);
+    const rebakeImg = FakeImage.instances[0];
+
+    await openFileViaMenu(new File(["png"], "photo.png", { type: "image/png" }));
+    expect(FakeImage.instances).toHaveLength(2);
+    const openedImg = FakeImage.instances[1];
+
+    await act(async () => {
+      rebakeImg.onload?.();
+      await expect(resizing).resolves.toBe(false);
+    });
+    expect(useEditorStore.getState().sourceImageUrl).toBe("blob:initial");
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 800, height: 600 });
+    expect(toastError).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    act(() => {
+      openedImg.onload?.();
+    });
+    expect(loadImageSpy).toHaveBeenCalledTimes(1);
+    expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240);
+  });
+
+  it("drops a rebake that was already in flight when EditorPage mounts with a ?url= parameter (#2781)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    const rotating = useEditorStore.getState().rotateCanvas(90);
+    expect(FakeImage.instances).toHaveLength(1);
+    const rebakeImg = FakeImage.instances[0];
+
+    const prevHref = window.location.href;
+    window.history.replaceState({}, "", "/editor?url=https%3A%2F%2Fexample.com%2Fnew.png");
+    try {
+      renderEditor();
+      expect(FakeImage.instances).toHaveLength(2);
+      const urlImg = FakeImage.instances[1];
+
+      await act(async () => {
+        rebakeImg.onload?.();
+        await expect(rotating).resolves.toBe(false);
+      });
+      expect(useEditorStore.getState().sourceImageUrl).toBe("blob:initial");
+
+      act(() => {
+        urlImg.onload?.();
+      });
+      expect(loadImageSpy).toHaveBeenCalledTimes(1);
+      expect(loadImageSpy).toHaveBeenCalledWith("https://example.com/new.png", 320, 240);
+    } finally {
+      window.history.replaceState({}, "", prevHref);
+    }
   });
 });

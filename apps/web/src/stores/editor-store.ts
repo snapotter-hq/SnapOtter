@@ -79,10 +79,16 @@ let decodesStarted = 0;
 let rebakesCommitted = 0;
 
 // Counts document replacements or out-of-queue canvas/source changes (loadImage,
-// File > Close, project load, autosave restore, direct setState), so a job queued
-// behind an in-flight rebake is dropped too if the document changed before it ran.
+// File > Close, project load, autosave restore, direct setState, or an async open/paste
+// started in EditorPage), so an in-flight rebake and any job queued behind it are
+// dropped if the document changed or was being replaced before they ran.
 let externalDocumentVersion = 0;
 let committingRebake = false;
+
+export function cancelPendingRebakes(): void {
+  externalDocumentVersion++;
+  rebakeTail = null;
+}
 
 function runInRebakeCommit(apply: () => void): void {
   committingRebake = true;
@@ -1867,8 +1873,7 @@ useEditorStore.subscribe((state, prev) => {
           state.lastAction.id === "loadProject" ||
           state.lastAction.id === "restoreAutosave")))
   ) {
-    externalDocumentVersion++;
-    rebakeTail = null;
+    cancelPendingRebakes();
   }
 });
 
