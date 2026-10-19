@@ -136,21 +136,50 @@ export function usePipelineProcessor() {
     }
   }, []);
 
-  const resetStallTimer = useCallback(() => {
-    clearStallTimer();
-    stallTimerRef.current = setTimeout(() => {
-      stallTimerRef.current = null;
-      if (!activeJobIdRef.current || !asyncModeRef.current) return;
-      reconnectSSERef.current(true);
-    }, SSE_STALL_TIMEOUT_MS);
-  }, [clearStallTimer]);
-
   const clearJobEvidenceTimer = useCallback(() => {
     if (jobEvidenceTimerRef.current) {
       clearTimeout(jobEvidenceTimerRef.current);
       jobEvidenceTimerRef.current = null;
     }
   }, []);
+
+  // A store that no longer carries the run (Clear all, a reset) has nothing
+  // left to settle, and an error or batch ZIP written now would land on
+  // whatever the user does next (#2151, #2622).
+  const storeWasReset = useCallback(() => {
+    if (useFileStore.getState().processing) return false;
+    clearJobEvidenceTimer();
+    clearStallTimer();
+    if (elapsedRef.current) {
+      clearInterval(elapsedRef.current);
+      elapsedRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    try {
+      xhrRef.current?.abort();
+    } catch (_e) {
+      console.debug("Ignored xhr.abort error:", _e);
+    }
+    batchRunRef.current = null;
+    activeJobIdRef.current = null;
+    activeEntryIdRef.current = null;
+    activeEntryIdsRef.current = null;
+    setProgress(IDLE_PROGRESS);
+    return true;
+  }, [clearJobEvidenceTimer, clearStallTimer]);
+
+  const resetStallTimer = useCallback(() => {
+    clearStallTimer();
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      if (!activeJobIdRef.current || !asyncModeRef.current) return;
+      if (storeWasReset()) return;
+      reconnectSSERef.current(true);
+    }, SSE_STALL_TIMEOUT_MS);
+  }, [clearStallTimer, storeWasReset]);
 
   // A run's failure must settle the entries its kickoff reset to
   // "processing": the Automate result pane gates its failure card on
@@ -195,6 +224,7 @@ export function usePipelineProcessor() {
     jobEvidenceTimerRef.current = setTimeout(() => {
       jobEvidenceTimerRef.current = null;
       if (!activeJobIdRef.current) return;
+      if (storeWasReset()) return;
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
@@ -222,6 +252,7 @@ export function usePipelineProcessor() {
     settleProcessingEntries,
     setError,
     setProcessing,
+    storeWasReset,
   ]);
 
   // The pipeline twin of use-tool-processor's cancelCurrentJob (#771): POST
@@ -230,7 +261,7 @@ export function usePipelineProcessor() {
   // job at all (the degraded #722 state: nothing will ever emit a frame).
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
-    if (!jobId) return;
+    if (!jobId || storeWasReset()) return;
     // A cancel that never reached the server says nothing about the job, so
     // the run is left to the progress stream, but the click still gets an
     // answer: the rejection is the cancel button's to show (#1815). A throw
@@ -247,7 +278,10 @@ export function usePipelineProcessor() {
     }
     // A refused cancel throws here and the run carries on: it must not be
     // repainted as canceled (#767), but the button says why (#1815).
-    const answer = await readCancelAnswer(res, () => activeJobIdRef.current === jobId);
+    const answer = await readCancelAnswer(
+      res,
+      () => activeJobIdRef.current === jobId && !storeWasReset(),
+    );
     // Record intent only on an acknowledged cancel.
     if (answer === "acknowledged") {
       canceledByUserRef.current = true;
@@ -296,6 +330,7 @@ export function usePipelineProcessor() {
     settleProcessingEntries,
     setError,
     setProcessing,
+    storeWasReset,
   ]);
 
   // Ends a run whose SSE frame handling threw (#1287). Whatever the frame
@@ -412,7 +447,7 @@ export function usePipelineProcessor() {
   const reconnectSSE = useCallback(
     (force = false) => {
       const jobId = activeJobIdRef.current;
-      if (!jobId) return;
+      if (!jobId || storeWasReset()) return;
       if (
         !force &&
         eventSourceRef.current &&
@@ -433,6 +468,7 @@ export function usePipelineProcessor() {
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
+          if (storeWasReset()) return;
           // Only an unparseable frame is ignorable. Everything past the parse
           // is our own handling, and a throw there must end the run (#1287).
           let data: ProgressFrame;
@@ -607,6 +643,7 @@ export function usePipelineProcessor() {
         };
 
         es.onerror = () => {
+          if (storeWasReset()) return;
           if (!asyncModeRef.current) {
             es.close();
             if (eventSourceRef.current === es) {
@@ -627,6 +664,7 @@ export function usePipelineProcessor() {
       settleProcessingEntries,
       setError,
       setProcessing,
+      storeWasReset,
     ],
   );
 
@@ -639,6 +677,7 @@ export function usePipelineProcessor() {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
       if (!activeJobIdRef.current) return;
+      if (storeWasReset()) return;
       if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
         return;
       }
@@ -661,7 +700,7 @@ export function usePipelineProcessor() {
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
     };
-  }, []);
+  }, [storeWasReset]);
 
   const processSingle = useCallback(
     (file: File, steps: PipelineStep[]) => {
@@ -702,6 +741,7 @@ export function usePipelineProcessor() {
 
         const startTime = Date.now();
         elapsedRef.current = setInterval(() => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({
             ...prev,
             elapsed: Math.floor((Date.now() - startTime) / 1000),
@@ -735,6 +775,7 @@ export function usePipelineProcessor() {
         xhr.timeout = 0;
 
         xhr.upload.onprogress = (event) => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           if (event.lengthComputable) {
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -746,6 +787,7 @@ export function usePipelineProcessor() {
 
         let uploadedFully = false;
         xhr.upload.onload = () => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           uploadedFully = true;
           setProgress((prev) => ({
             ...prev,
@@ -789,6 +831,7 @@ export function usePipelineProcessor() {
 
         xhr.onload = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
 
           if (xhr.status === 202) {
             // The server's sync wait expired while the flow keeps running;
@@ -922,6 +965,7 @@ export function usePipelineProcessor() {
           // Settled runs and successor runs must not be touched by late socket
           // events (#722 run-identity guard).
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -935,6 +979,7 @@ export function usePipelineProcessor() {
 
         xhr.ontimeout = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -971,6 +1016,7 @@ export function usePipelineProcessor() {
       resetStallTimer,
       settleProcessingEntries,
       startJobEvidenceTimer,
+      storeWasReset,
       trackDegrade,
       t,
     ],
@@ -1035,6 +1081,7 @@ export function usePipelineProcessor() {
 
         const startTime = Date.now();
         elapsedRef.current = setInterval(() => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({
             ...prev,
             elapsed: Math.floor((Date.now() - startTime) / 1000),
@@ -1102,6 +1149,7 @@ export function usePipelineProcessor() {
             // The unpack awaits: a cancel or a newer run may have ended this
             // one meanwhile, and its writes would land on that run's state.
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             if (!extracted) {
               failRun(t.errors.batchFailed);
               return;
@@ -1110,6 +1158,7 @@ export function usePipelineProcessor() {
             // Still need to respect cancel across the async tick
             await new Promise((r) => setTimeout(r, 0));
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
           }
 
           // Only a ZIP that opened (or skipped unpacking) is kept as the batch's download.
@@ -1172,7 +1221,7 @@ export function usePipelineProcessor() {
             const unsettled = useFileStore
               .getState()
               .entries.some((entry) => runEntryIds.has(entry.id) && entry.status === "processing");
-            if (activeJobIdRef.current === clientJobId && unsettled) {
+            if (activeJobIdRef.current === clientJobId && !storeWasReset() && unsettled) {
               try {
                 failRun(t.errors.batchFailed);
               } catch (teardownErr) {
@@ -1201,6 +1250,7 @@ export function usePipelineProcessor() {
           let zipBlob: Blob | null = null;
           for (let attempt = 0; attempt < 3 && !zipBlob; attempt++) {
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             try {
               const res = await fetch(url, { headers: formatHeaders() });
               // A 4xx is deterministic: retrying cannot help, and the message
@@ -1220,6 +1270,7 @@ export function usePipelineProcessor() {
             }
           }
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (refusedStatus !== null) {
             failRun(
               refusedStatus === 404
@@ -1238,6 +1289,7 @@ export function usePipelineProcessor() {
         batchRunRef.current = {
           onTerminal: (frame) => {
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             if (
               frame.status === "completed" &&
               frame.result &&
@@ -1285,6 +1337,7 @@ export function usePipelineProcessor() {
         xhr.timeout = 0;
 
         xhr.upload.onprogress = (event) => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           if (event.lengthComputable) {
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -1296,6 +1349,7 @@ export function usePipelineProcessor() {
 
         let uploadedFully = false;
         xhr.upload.onload = () => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           uploadedFully = true;
           setProgress((prev) => ({
             ...prev,
@@ -1319,6 +1373,7 @@ export function usePipelineProcessor() {
 
         xhr.onload = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
 
           if (xhr.status === 202) {
             asyncModeRef.current = true;
@@ -1345,6 +1400,7 @@ export function usePipelineProcessor() {
               // Unreadable body; fall through to the status-based handling.
             }
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             let errorMsg: string;
             // Only the parse sits in this try: failRun runs after it, so a
             // throw from its teardown can't land in the catch and fail the
@@ -1407,12 +1463,14 @@ export function usePipelineProcessor() {
 
         xhr.onerror = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           failRun(t.errors.processingInterrupted);
         };
 
         xhr.ontimeout = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           failRun(t.errors.uploadTimeout);
         };
@@ -1443,6 +1501,7 @@ export function usePipelineProcessor() {
       resetStallTimer,
       settleProcessingEntries,
       startJobEvidenceTimer,
+      storeWasReset,
       trackDegrade,
       t,
     ],

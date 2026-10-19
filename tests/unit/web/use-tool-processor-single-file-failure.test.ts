@@ -2490,4 +2490,212 @@ describe("useToolProcessor entry-identity settle and stale onload guard (#944)",
     });
     unmount();
   });
+
+  it.each([
+    [
+      "a sync error response",
+      () => {},
+      () => {
+        xhrs[0].status = 500;
+        xhrs[0].responseText = JSON.stringify({ error: "boom" });
+        xhrs[0].onload?.();
+      },
+    ],
+    [
+      "a sync 2xx with an invalid body",
+      () => {},
+      () => {
+        xhrs[0].status = 200;
+        xhrs[0].responseText = "<html>not json</html>";
+        xhrs[0].onload?.();
+      },
+    ],
+    [
+      "xhr.onerror mid-upload",
+      () => {},
+      () => {
+        xhrs[0].onerror?.();
+      },
+    ],
+    [
+      "xhr.ontimeout mid-upload",
+      () => {},
+      () => {
+        xhrs[0].ontimeout?.();
+      },
+    ],
+    [
+      "xhr.onerror after upload",
+      () => {
+        xhrs[0].upload.onload?.();
+      },
+      () => {
+        xhrs[0].onerror?.();
+      },
+    ],
+    [
+      "an SSE failed frame",
+      () => {},
+      () => {
+        sendSingleFrame({ phase: "failed", percent: 0, error: "boom" });
+      },
+    ],
+    [
+      "an SSE batch terminal frame",
+      () => {},
+      () => {
+        latestSse().onmessage?.({
+          data: JSON.stringify({
+            type: "batch",
+            jobId: JOB_ID,
+            status: "failed",
+            totalFiles: 1,
+            completedFiles: 1,
+            failedFiles: 1,
+          }),
+        } as MessageEvent);
+      },
+    ],
+  ])(
+    "does not write an error or activeJobId onto a reset store on %s (#2622)",
+    (_label, prepare, fail) => {
+      const fileA = clipFile("a.mp4");
+      const fileB = clipFile("b.mp4");
+      useFileStore.getState().setFiles([fileA]);
+      const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+      act(() => {
+        result.current.processFiles([fileA], { startS: 0, endS: 2 });
+        prepare();
+      });
+
+      act(() => {
+        useFileStore.getState().reset();
+        useFileStore.getState().setFiles([fileB]);
+        fail();
+      });
+
+      const state = useFileStore.getState();
+      expect(state.error).toBeNull();
+      expect(state.processing).toBe(false);
+      expect(state.activeJobId).toBeNull();
+      expect(state.cancelCurrentJob).toBeNull();
+      expect(state.entries[0]).toMatchObject({ status: "pending", error: null });
+      expect(result.current.progress.phase).toBe("idle");
+      unmount();
+    },
+  );
+
+  it("does not re-arm activeJobId or stall timer when a 202 arrives after reset (#2622)", () => {
+    const fileA = clipFile("a.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    const state = useFileStore.getState();
+    expect(state.activeJobId).toBeNull();
+    expect(state.cancelCurrentJob).toBeNull();
+    expect(state.error).toBeNull();
+    expect(latestSse().close).toHaveBeenCalled();
+    expect(result.current.progress.phase).toBe("idle");
+    unmount();
+  });
+
+  it("does not write an error when the job-evidence timer fires after reset (#2622)", () => {
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([fileB]);
+      vi.advanceTimersByTime(30_001);
+    });
+
+    const state = useFileStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.processing).toBe(false);
+    expect(state.activeJobId).toBeNull();
+    expect(state.entries[0]).toMatchObject({ status: "pending", error: null });
+    expect(result.current.progress.phase).toBe("idle");
+    unmount();
+  });
+
+  it("does not write Canceled when a cancel 404 resolves after the store was reset (#2622)", async () => {
+    let resolveCancel: (res: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveCancel = resolve;
+          }),
+      ),
+    );
+    const fileA = clipFile("a.mp4");
+    const fileB = clipFile("b.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+    });
+
+    const cancelPromise = result.current.cancelCurrentJob();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([fileB]);
+    });
+
+    await act(async () => {
+      resolveCancel({ ok: false, status: 404 } as Response);
+      await cancelPromise;
+    });
+
+    const state = useFileStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.processing).toBe(false);
+    expect(state.entries[0]).toMatchObject({ status: "pending", error: null });
+    expect(result.current.progress.phase).toBe("idle");
+    unmount();
+  });
+
+  it("stops the elapsed ticker and does not reconnect SSE when visibilitychange precedes reset (#2622)", () => {
+    const fileA = clipFile("a.mp4");
+    useFileStore.getState().setFiles([fileA]);
+    const { result, unmount } = renderHook(() => useToolProcessor("trim-video"));
+    act(() => {
+      result.current.processFiles([fileA], { startS: 0, endS: 2 });
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+    latestSse().readyState = 2;
+    const sourcesBefore = MockEventSource.instances.length;
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      useFileStore.getState().reset();
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(sourcesBefore);
+    expect(result.current.progress.phase).toBe("idle");
+    unmount();
+  });
 });

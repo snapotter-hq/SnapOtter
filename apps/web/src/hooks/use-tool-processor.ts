@@ -202,21 +202,50 @@ export function useToolProcessor(toolId: string) {
     }
   }, []);
 
-  const resetStallTimer = useCallback(() => {
-    clearStallTimer();
-    stallTimerRef.current = setTimeout(() => {
-      stallTimerRef.current = null;
-      if (!activeJobIdRef.current || !asyncModeRef.current) return;
-      reconnectSSERef.current(true);
-    }, SSE_STALL_TIMEOUT_MS);
-  }, [clearStallTimer]);
-
   const clearJobEvidenceTimer = useCallback(() => {
     if (jobEvidenceTimerRef.current) {
       clearTimeout(jobEvidenceTimerRef.current);
       jobEvidenceTimerRef.current = null;
     }
   }, []);
+
+  // A store that no longer carries the run (Clear all, a reset) has nothing
+  // left to settle, and an error or cancel handle written now would land on
+  // whatever the user does next (#2151, #2622).
+  const storeWasReset = useCallback(() => {
+    if (useFileStore.getState().processing) return false;
+    clearJobEvidenceTimer();
+    clearStallTimer();
+    if (elapsedRef.current) {
+      clearInterval(elapsedRef.current);
+      elapsedRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    try {
+      xhrRef.current?.abort();
+    } catch (_e) {
+      console.debug("Ignored xhr.abort error:", _e);
+    }
+    batchRunRef.current = null;
+    activeJobIdRef.current = null;
+    activeEntryIdRef.current = null;
+    activeEntryIdsRef.current = null;
+    setProgress(IDLE_PROGRESS);
+    return true;
+  }, [clearJobEvidenceTimer, clearStallTimer]);
+
+  const resetStallTimer = useCallback(() => {
+    clearStallTimer();
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      if (!activeJobIdRef.current || !asyncModeRef.current) return;
+      if (storeWasReset()) return;
+      reconnectSSERef.current(true);
+    }, SSE_STALL_TIMEOUT_MS);
+  }, [clearStallTimer, storeWasReset]);
 
   // A terminal failure must settle every entry its run left at "processing":
   // the tool page derives the pulse from that status and gates the failure
@@ -267,6 +296,7 @@ export function useToolProcessor(toolId: string) {
     jobEvidenceTimerRef.current = setTimeout(() => {
       jobEvidenceTimerRef.current = null;
       if (!activeJobIdRef.current) return;
+      if (storeWasReset()) return;
       const message = tRef.current.errors.processingInterruptedUnconfirmed;
       // This teardown ends whatever run armed it; a batch closure left
       // behind would swallow a later run's cancel-404 settle (#767). A batch
@@ -298,11 +328,12 @@ export function useToolProcessor(toolId: string) {
     settleProcessingEntries,
     setError,
     setProcessing,
+    storeWasReset,
   ]);
 
   const cancelCurrentJob = useCallback(async () => {
     const jobId = activeJobIdRef.current;
-    if (!jobId) return;
+    if (!jobId || storeWasReset()) return;
     // A cancel that never reached the server says nothing about the job, so
     // the run is left to the progress stream, but the click still gets an
     // answer: the rejection is the cancel button's to show (#1815). A throw
@@ -318,7 +349,11 @@ export function useToolProcessor(toolId: string) {
     }
     // A refused cancel throws here and the run carries on: it must not be
     // repainted as canceled (#767), but the button says why (#1815).
-    const answer = await readCancelAnswer(res, () => activeJobIdRef.current === jobId, toolId);
+    const answer = await readCancelAnswer(
+      res,
+      () => activeJobIdRef.current === jobId && !storeWasReset(),
+      toolId,
+    );
     // Record intent only once the server acknowledged the cancel. The ack
     // always precedes the terminal frame (the finalize still has children
     // to drain), so labeling cannot race it.
@@ -371,6 +406,7 @@ export function useToolProcessor(toolId: string) {
     settleProcessingEntries,
     setError,
     setProcessing,
+    storeWasReset,
   ]);
 
   // Ends a run whose SSE frame handling threw (#1287). Whatever the frame
@@ -499,7 +535,7 @@ export function useToolProcessor(toolId: string) {
   const reconnectSSE = useCallback(
     (force = false) => {
       const jobId = activeJobIdRef.current;
-      if (!jobId) return;
+      if (!jobId || storeWasReset()) return;
       if (
         !force &&
         eventSourceRef.current &&
@@ -520,6 +556,7 @@ export function useToolProcessor(toolId: string) {
 
         es.onmessage = (event) => {
           if (eventSourceRef.current !== es) return;
+          if (storeWasReset()) return;
           // Only an unparseable frame is ignorable. Everything past the parse
           // is our own handling, and a throw there must end the run (#1287).
           let data: ProgressFrame;
@@ -715,6 +752,7 @@ export function useToolProcessor(toolId: string) {
         };
 
         es.onerror = () => {
+          if (storeWasReset()) return;
           if (!asyncModeRef.current) {
             es.close();
             if (eventSourceRef.current === es) {
@@ -735,6 +773,7 @@ export function useToolProcessor(toolId: string) {
       settleProcessingEntries,
       setError,
       setProcessing,
+      storeWasReset,
       toolId,
     ],
   );
@@ -799,6 +838,7 @@ export function useToolProcessor(toolId: string) {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
       if (!activeJobIdRef.current) return;
+      if (storeWasReset()) return;
       if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
         return;
       }
@@ -827,7 +867,7 @@ export function useToolProcessor(toolId: string) {
       // batch whose ZIP is already in hand is the one thing left to finish.
       settleStoppedRunRef.current();
     };
-  }, [reconnectSSE]);
+  }, [reconnectSSE, storeWasReset]);
 
   const processFiles = useCallback(
     (files: File[], settings: Record<string, unknown>, opts?: { skipLibrarySave?: boolean }) => {
@@ -884,6 +924,7 @@ export function useToolProcessor(toolId: string) {
 
         const startTime = Date.now();
         elapsedRef.current = setInterval(() => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({
             ...prev,
             elapsed: Math.floor((Date.now() - startTime) / 1000),
@@ -925,6 +966,7 @@ export function useToolProcessor(toolId: string) {
         xhr.timeout = isAiTool || LONG_RUNNING_TOOLS.has(toolId) ? 600_000 : 120_000;
 
         xhr.upload.onprogress = (event) => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           if (event.lengthComputable) {
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -936,6 +978,7 @@ export function useToolProcessor(toolId: string) {
 
         let uploadedFully = false;
         xhr.upload.onload = () => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           uploadedFully = true;
           setProgress((prev) => ({
             ...prev,
@@ -1050,6 +1093,7 @@ export function useToolProcessor(toolId: string) {
 
         xhr.onload = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
 
           if (xhr.status === 202) {
             asyncModeRef.current = true;
@@ -1152,6 +1196,7 @@ export function useToolProcessor(toolId: string) {
           // newer run took over: a late socket event must neither error a
           // finished result nor tear down the successor's state.
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -1170,6 +1215,7 @@ export function useToolProcessor(toolId: string) {
 
         xhr.ontimeout = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -1210,6 +1256,7 @@ export function useToolProcessor(toolId: string) {
       resetStallTimer,
       clearJobEvidenceTimer,
       startJobEvidenceTimer,
+      storeWasReset,
       trackDegrade,
       toolName,
       t,
@@ -1311,6 +1358,7 @@ export function useToolProcessor(toolId: string) {
 
         const startTime = Date.now();
         elapsedRef.current = setInterval(() => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({
             ...prev,
             elapsed: Math.floor((Date.now() - startTime) / 1000),
@@ -1335,19 +1383,6 @@ export function useToolProcessor(toolId: string) {
           }
           batchRunRef.current = null;
           setProgress(IDLE_PROGRESS);
-        };
-
-        // A batch whose ZIP is already in hand is left to finish when its panel
-        // unmounts (#2125). If the tool changed, the page reset the file store
-        // after that cleanup, so the results belong to a tool the user left and
-        // would land on the next one's empty store, and its leave guard would
-        // offer a ZIP from a tool they are no longer on (#2151). Ends such a run
-        // without a write. A store that still carries the run is untouched.
-        const storeWasReset = () => {
-          if (useFileStore.getState().processing) return false;
-          releaseRun();
-          clearActiveJob();
-          return true;
         };
 
         // Tear down the run without touching the outcome state; callers set
@@ -1546,7 +1581,7 @@ export function useToolProcessor(toolId: string) {
             const unsettled = useFileStore
               .getState()
               .entries.some((entry) => runEntryIds.has(entry.id) && entry.status === "processing");
-            if (activeJobIdRef.current === clientJobId && unsettled) {
+            if (activeJobIdRef.current === clientJobId && !storeWasReset() && unsettled) {
               try {
                 failRun(t.errors.batchFailed, settle.reason);
               } catch (teardownErr) {
@@ -1578,6 +1613,7 @@ export function useToolProcessor(toolId: string) {
           let zipBlob: Blob | null = null;
           for (let attempt = 0; attempt < 3 && !zipBlob; attempt++) {
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             try {
               const res = await fetch(url, { headers: formatHeaders() });
               // A 4xx is deterministic: the result is gone or this session may
@@ -1644,6 +1680,7 @@ export function useToolProcessor(toolId: string) {
           },
           onTerminal: (frame) => {
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             if (
               frame.status === "completed" &&
               frame.result &&
@@ -1688,6 +1725,7 @@ export function useToolProcessor(toolId: string) {
         xhr.timeout = 0;
 
         xhr.upload.onprogress = (event) => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           if (event.lengthComputable) {
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -1699,6 +1737,7 @@ export function useToolProcessor(toolId: string) {
 
         let uploadedFully = false;
         xhr.upload.onload = () => {
+          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           uploadedFully = true;
           setProgress((prev) => ({
             ...prev,
@@ -1726,6 +1765,7 @@ export function useToolProcessor(toolId: string) {
 
         xhr.onload = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
 
           if (xhr.status === 202) {
             // The server's sync wait expired while the batch keeps running;
@@ -1767,6 +1807,7 @@ export function useToolProcessor(toolId: string) {
               // Unreadable body; fall through to the status-based handling.
             }
             if (activeJobIdRef.current !== clientJobId) return;
+            if (storeWasReset()) return;
             let errorMsg: string;
             let serverCanceled = false;
             // The server's own code (workspace-cap, FEATURE_NOT_INSTALLED) beats
@@ -1819,12 +1860,14 @@ export function useToolProcessor(toolId: string) {
           // Settled runs and successor runs must not be touched by late socket
           // events (#722 run-identity guard).
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           failRun(t.errors.processingInterrupted, "socket", "upload_error");
         };
 
         xhr.ontimeout = () => {
           if (activeJobIdRef.current !== clientJobId) return;
+          if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           failRun(t.errors.uploadTimeout, "timeout", "timeout");
         };
@@ -1855,6 +1898,7 @@ export function useToolProcessor(toolId: string) {
       reconnectSSE,
       resetStallTimer,
       startJobEvidenceTimer,
+      storeWasReset,
       trackDegrade,
       toolName,
       t,

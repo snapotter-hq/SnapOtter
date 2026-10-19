@@ -547,6 +547,11 @@ export function ToolPage() {
     reset();
   }, [reset]);
 
+  const handleClearAll = useCallback(() => {
+    if (!allowIntake()) return;
+    reset();
+  }, [allowIntake, reset]);
+
   const handleAddMore = useCallback(() => {
     if (!allowIntake()) return;
     const input = document.createElement("input");
@@ -1318,7 +1323,7 @@ export function ToolPage() {
               fileEntries={entries}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
-              onClear={reset}
+              onClear={handleClearAll}
               onAddMore={handleAddMore}
             />
           </div>

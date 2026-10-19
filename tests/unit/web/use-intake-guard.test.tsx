@@ -9,7 +9,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const showIgnored = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/intake-notice", () => ({ showIntakeIgnored: showIgnored }));
 
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
+
+vi.mock("@/lib/image-preview", () => ({
+  needsServerPreview: vi.fn(() => false),
+  fetchDecodedPreview: vi.fn(() => Promise.resolve(null)),
+  revokePreviewUrl: vi.fn(),
+}));
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Route, Routes } from "react-router";
+import { I18nProvider } from "@/contexts/i18n-context";
 import { useIntakeGuard } from "@/hooks/use-intake-guard";
+import { ToolPage } from "@/pages/tool-page";
 import { useFileStore } from "@/stores/file-store";
 import { usePassportPhotoStore } from "@/stores/passport-photo-store";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
@@ -35,10 +50,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   useFileStore.getState().reset();
   useSplitStore.setState({ processing: false });
   usePdfToImageStore.setState({ processing: false });
   usePassportPhotoStore.setState({ analyzing: false, generating: false });
+  vi.unstubAllGlobals();
 });
 
 describe("useIntakeGuard (#2108)", () => {
@@ -106,5 +123,106 @@ describe("useIntakeGuard (#2108)", () => {
 
     expect(result.current.allowIntake()).toBe(true);
     expect(showIgnored).not.toHaveBeenCalled();
+  });
+});
+
+describe("ToolPage Clear all intake guard (#2622)", () => {
+  const storageMap = new Map<string, string>();
+  const localStorageMock = {
+    getItem: (key: string) => storageMap.get(key) ?? null,
+    setItem: (key: string, value: string) => storageMap.set(key, value),
+    removeItem: (key: string) => storageMap.delete(key),
+    clear: () => storageMap.clear(),
+    key: () => null,
+    get length() {
+      return storageMap.size;
+    },
+  };
+
+  beforeEach(() => {
+    storageMap.clear();
+    vi.stubGlobal("localStorage", localStorageMock);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: () => "blob:original-input",
+      revokeObjectURL: () => {},
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              authEnabled: false,
+              pageCount: 1,
+              thumbnails: [],
+              bundles: [],
+            }),
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+  });
+
+  function renderToolPage(path: string) {
+    return render(
+      <I18nProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/:section/:toolId" element={<ToolPage />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+  }
+
+  it("refuses Clear all while a file-store run is in flight and shows the intake notice", async () => {
+    renderToolPage("/image/resize");
+    await act(async () => {
+      useFileStore.getState().setFiles([new File(["img"], "first.png", { type: "image/png" })]);
+      useFileStore.getState().setProcessing(true);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
+
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+    expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(true);
+  });
+
+  it.each([
+    ["split", "/image/split", () => useSplitStore.setState({ processing: true })],
+    ["pdf-to-image", "/pdf/pdf-to-image", () => usePdfToImageStore.setState({ processing: true })],
+    [
+      "passport-photo (analysing)",
+      "/image/passport-photo",
+      () => usePassportPhotoStore.setState({ analyzing: true }),
+    ],
+  ])("refuses Clear all while %s is busy in its own store", async (_name, path, start) => {
+    renderToolPage(path);
+    await act(async () => {
+      useFileStore.getState().setFiles([new File(["img"], "scan.png", { type: "image/png" })]);
+      start();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
+
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+    expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(1);
+  });
+
+  it("clears the file store when nothing is running", async () => {
+    renderToolPage("/image/resize");
+    await act(async () => {
+      useFileStore.getState().setFiles([new File(["img"], "first.png", { type: "image/png" })]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
+
+    expect(showIgnored).not.toHaveBeenCalled();
+    expect(useFileStore.getState().entries).toHaveLength(0);
   });
 });

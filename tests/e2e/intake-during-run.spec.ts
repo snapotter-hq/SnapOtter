@@ -110,4 +110,34 @@ test.describe("Files dropped or pasted during a run", () => {
       page.getByText("A run is in progress. Wait for it to finish before adding files."),
     ).toHaveCount(0);
   });
+
+  test("Clear all mid-run is turned away, says why, and the run finishes (#2622)", async ({
+    loggedInPage: page,
+  }) => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/api/v1/tools/image/resize", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await page.goto("/image/resize");
+    await uploadTestImage(page);
+    await page.getByRole("spinbutton", { name: /width/i }).fill("50");
+    const requestSent = page.waitForRequest("**/api/v1/tools/image/resize");
+    await page.getByRole("button", { name: /^resize$/i }).click();
+    await requestSent;
+
+    await page.getByRole("button", { name: /^clear all$/i }).click();
+
+    await expect(
+      page.getByText("A run is in progress. Wait for it to finish before adding files."),
+    ).toBeVisible();
+    await expect(page.getByText(/test-image/i).first()).toBeVisible();
+
+    release();
+    await expect(page.getByTestId("resize-download")).toBeVisible({ timeout: 15_000 });
+  });
 });

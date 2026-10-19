@@ -2488,4 +2488,110 @@ describe("useToolProcessor batch entry-identity settle (#944)", () => {
       unmount();
     }
   });
+
+  it.each([
+    [
+      "a batch error response",
+      () => {
+        xhrs[0].upload.onload?.();
+      },
+      () => {
+        xhrs[0].status = 422;
+        xhrs[0].response = new Blob([JSON.stringify({ error: "All files failed processing" })], {
+          type: "application/json",
+        });
+        xhrs[0].onload?.();
+      },
+    ],
+    [
+      "a batch error response whose body read resolves after reset",
+      () => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 422;
+        xhrs[0].response = new Blob([JSON.stringify({ error: "All files failed processing" })], {
+          type: "application/json",
+        });
+        xhrs[0].onload?.();
+      },
+      () => {},
+    ],
+    [
+      "batch xhr.onerror mid-upload",
+      () => {},
+      () => {
+        xhrs[0].onerror?.();
+      },
+    ],
+    [
+      "batch xhr.ontimeout mid-upload",
+      () => {},
+      () => {
+        xhrs[0].ontimeout?.();
+      },
+    ],
+    [
+      "batch SSE terminal failed frame",
+      () => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 202;
+        xhrs[0].onload?.();
+      },
+      () => {
+        sendBatchFrame({
+          status: "failed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 2,
+          errors: [],
+        });
+      },
+    ],
+  ])("does not write an error onto a reset store on %s (#2622)", async (_label, prepare, fail) => {
+    const { result, unmount } = startBatchRun();
+    act(() => {
+      prepare();
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore
+        .getState()
+        .setFiles([new File([new ArrayBuffer(16)], "fresh.png", { type: "image/png" })]);
+      fail();
+    });
+
+    await new Promise((r) => setTimeout(r, 20));
+    const state = useFileStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.processing).toBe(false);
+    expect(state.activeJobId).toBeNull();
+    expect(state.entries[0]).toMatchObject({ status: "pending", error: null });
+    expect(result.current.progress.phase).toBe("idle");
+    unmount();
+  });
+
+  it("does not write an error when the batch job-evidence timer fires after reset (#2622)", () => {
+    vi.useFakeTimers();
+    const { result, unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore
+        .getState()
+        .setFiles([new File([new ArrayBuffer(16)], "fresh.png", { type: "image/png" })]);
+      vi.advanceTimersByTime(30_001);
+    });
+
+    const state = useFileStore.getState();
+    expect(state.error).toBeNull();
+    expect(state.processing).toBe(false);
+    expect(state.activeJobId).toBeNull();
+    expect(state.entries[0]).toMatchObject({ status: "pending", error: null });
+    expect(result.current.progress.phase).toBe("idle");
+    unmount();
+  });
 });
