@@ -18,6 +18,7 @@ export type RunEndFailure =
   | "Ending a tool run after a frame handling error failed"
   | "Ending a tool run after its panel unmounted failed"
   | "Ending a pipeline run after a frame handling error failed"
+  | "Ending a pipeline run after its panel unmounted failed"
   | "Failing a tool batch after a settle error failed"
   | "Failing a pipeline batch after a settle error failed"
   | "Ending an Erase Object batch after a store error failed"

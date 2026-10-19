@@ -41,6 +41,8 @@ import { failedAnswerMessage, formatHeaders, getFileDownloadUrl } from "@/lib/ap
 import { appUrl } from "@/lib/app-url";
 import { downloadBlob, formatFileSize, triggerDownload } from "@/lib/download";
 import { format, plural } from "@/lib/format";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type SavedPipeline, usePipelineStore } from "@/stores/pipeline-store";
@@ -67,7 +69,51 @@ function previewIcon(kind: string) {
   }
 }
 
+/**
+ * Resets the file store when AutomatePage unmounts (#2634).
+ *
+ * Rendered as a sibling after AutomatePageContent so React runs
+ * usePipelineProcessor's unmount cleanup first (canceling any active server
+ * job while `processing` is still true) and then wipes the file store clean on
+ * the way out. In StrictMode, React's simulated unmount on initial mount runs
+ * while the DOM node is still connected; skipping that simulated pass
+ * preserves files being imported via `state: { libraryFileIds }`.
+ */
+function AutomatePageUnmountReset() {
+  const probeRef = useRef<HTMLSpanElement | null>(null);
+  useEffect(
+    () => () => {
+      if (probeRef.current?.isConnected) return;
+      const teardownError = runEndWrites([() => useFileStore.getState().reset()]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a pipeline run after its panel unmounted failed",
+          teardownError.cause,
+        );
+      }
+    },
+    [],
+  );
+  return (
+    <span
+      ref={(el) => {
+        if (el) probeRef.current = el;
+      }}
+      hidden
+    />
+  );
+}
+
 export function AutomatePage() {
+  return (
+    <>
+      <AutomatePageContent />
+      <AutomatePageUnmountReset />
+    </>
+  );
+}
+
+function AutomatePageContent() {
   const { t } = useTranslation();
   usePageTitle(t.sidebar.automate);
 

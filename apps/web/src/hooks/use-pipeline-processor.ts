@@ -6,7 +6,7 @@ import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { parseFileResultsHeader, unpackBatchZip } from "@/lib/batch-zip";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
-import { failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
+import { CancelRefusedError, failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import { format, plural } from "@/lib/format";
 import {
   checkToolResult,
@@ -104,8 +104,12 @@ export function usePipelineProcessor() {
   // "Canceled" instead of a lookup failure. Reset at every run start.
   const canceledByUserRef = useRef(false);
   // Installed by processAll so the SSE handler can settle a degraded batch
-  // run from its terminal frame. Null outside batch runs.
-  const batchRunRef = useRef<{ onTerminal: (frame: BatchProgressFrame) => void } | null>(null);
+  // run from its terminal frame, and unmount cleanup can fail an in-flight
+  // batch unless its ZIP is already settling (#2634). Null outside batch runs.
+  const batchRunRef = useRef<{
+    abandon: (message: string) => boolean;
+    onTerminal: (frame: BatchProgressFrame) => void;
+  } | null>(null);
   const reconnectSSERef = useRef<(force?: boolean) => void>(() => {});
 
   // Operator-visible record of a sync wait falling back to the async path
@@ -143,11 +147,13 @@ export function usePipelineProcessor() {
     }
   }, []);
 
-  // A store that no longer carries the run (Clear all, a reset) has nothing
-  // left to settle, and an error or batch ZIP written now would land on
-  // whatever the user does next (#2151, #2622).
+  // A store that no longer carries the run (Clear all, a reset, or a newer run
+  // started after an unmounted settling batch) has nothing left to settle, and
+  // an error or batch ZIP written now would land on whatever the user does
+  // next (#2151, #2622, #2634).
   const storeWasReset = useCallback(() => {
-    if (useFileStore.getState().processing) return false;
+    const state = useFileStore.getState();
+    if (state.processing && state.activeJobId === activeJobIdRef.current) return false;
     clearJobEvidenceTimer();
     clearStallTimer();
     if (elapsedRef.current) {
@@ -672,6 +678,55 @@ export function usePipelineProcessor() {
     reconnectSSERef.current = reconnectSSE;
   }, [reconnectSSE]);
 
+  // The cleanup of the effect below aborts the request and closes the stream,
+  // which ends the run. It has to settle it too: left alone the store sits at
+  // `processing` for good, and leaving /automate mid-run leaves the server job
+  // running (#2634, mirroring #2125). A ref, so the cleanup runs the closures
+  // committed for the run it is stopping, not whatever the next render brings.
+  const settleStoppedRunRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    settleStoppedRunRef.current = () => {
+      if (!activeJobIdRef.current) return;
+      // A store that no longer carries the run (Clear all, a reset) has nothing
+      // left to settle, and an error written now would land on whatever the
+      // user does next.
+      if (!useFileStore.getState().processing) return;
+      // The job outlives its observer: the request and stream are gone, and so
+      // is the handle that would cancel it. Ask the server to stop it before
+      // clearing the job id.
+      void cancelCurrentJob().catch((err) => {
+        if (err instanceof CancelRefusedError) return;
+        reportRunEndFailure("Ending a pipeline run after its panel unmounted failed", err);
+      });
+      const batchRun = batchRunRef.current;
+      if (batchRun) {
+        // failRun rethrows a teardown error by design, for callers in a timer.
+        // Out of an effect cleanup it would reach the app's error boundary.
+        try {
+          if (batchRun.abandon(t.errors.runInterrupted)) {
+            return;
+          }
+        } catch (cause) {
+          reportRunEndFailure("Ending a pipeline run after its panel unmounted failed", cause);
+          // failRun got as far as clearing the job: the run is over.
+          if (!activeJobIdRef.current) return;
+        }
+      }
+      const teardownError = runEndWrites([
+        clearActiveJob,
+        () => setError(t.errors.runInterrupted),
+        () => setProcessing(false),
+        () => settleProcessingEntries(t.errors.runInterrupted),
+      ]);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Ending a pipeline run after its panel unmounted failed",
+          teardownError.cause,
+        );
+      }
+    };
+  });
+
   // Reconnect SSE when tab becomes visible again (mobile tab recovery)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -699,6 +754,7 @@ export function usePipelineProcessor() {
       }
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
+      settleStoppedRunRef.current();
     };
   }, [storeWasReset]);
 
@@ -1133,11 +1189,16 @@ export function usePipelineProcessor() {
         // A ZIP that won't unpack fails the run here, once, logged and
         // reported by unpackBatchZip (#1805). Anything else that throws is our
         // own code, and settleOrFail handles it.
+        // Set once a ZIP is in hand or being fetched: the run then finishes on
+        // its own, so an unmounted panel must not fail it and throw the
+        // results away (#2634, mirroring #2125).
+        let settling = false;
         const settleFromZip = async (
           zipBlob: Blob,
           fileResults: Record<string, string>,
           status?: number,
         ) => {
+          settling = true;
           const entriesCount = useFileStore.getState().entries.length;
           // #1240: Unpacking a massive ZIP into memory fails the client with RangeError.
           // Above a threshold, skip extraction and just keep the ZIP as the batch result.
@@ -1244,6 +1305,7 @@ export function usePipelineProcessor() {
         // that arrived and won't settle fails once, without blaming the
         // network (#1805).
         const downloadAndSettle = async (result: Record<string, unknown>) => {
+          settling = true;
           const url = serverUrl(String(result.downloadUrl));
           const fileResults = (result.fileResults ?? {}) as Record<string, string>;
           let refusedStatus: number | null = null;
@@ -1287,6 +1349,12 @@ export function usePipelineProcessor() {
         };
 
         batchRunRef.current = {
+          abandon: (message) => {
+            if (activeJobIdRef.current !== clientJobId) return false;
+            if (settling) return true;
+            failRun(message);
+            return true;
+          },
           onTerminal: (frame) => {
             if (activeJobIdRef.current !== clientJobId) return;
             if (storeWasReset()) return;

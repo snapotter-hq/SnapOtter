@@ -150,6 +150,11 @@ beforeEach(() => {
   xhrs = [];
   MockEventSource.instances = [];
   vi.stubGlobal("EventSource", MockEventSource);
+  // Unmounting mid-run asks the server to cancel the job (#2634); no server here.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
+  );
   vi.stubGlobal(
     "XMLHttpRequest",
     vi.fn(() => {
