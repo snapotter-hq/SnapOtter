@@ -18,7 +18,7 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
   };
 });
 
-const { configureS3, deleteObject, deleteThumbnail } = await import(
+const { configureS3, deleteGenericPrefix, deleteObject, deleteThumbnail } = await import(
   "../../../packages/enterprise/src/storage-s3.js"
 );
 
@@ -70,5 +70,73 @@ describe.each([
   it("rejects on a network failure", async () => {
     send.mockRejectedValueOnce(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
     await expect(del("a.png")).rejects.toThrow("socket hang up");
+  });
+});
+
+describe("deleteGenericPrefix (#2632)", () => {
+  it("resolves without calling DeleteObjects when ListObjectsV2 returns no keys", async () => {
+    send.mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+    await expect(deleteGenericPrefix("uploads/job-empty/")).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves when ListObjectsV2 returns keys and DeleteObjects deletes them cleanly", async () => {
+    send
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "uploads/job-ok/a.png" }, { Key: "uploads/job-ok/b.png" }],
+        IsTruncated: false,
+      })
+      .mockResolvedValueOnce({
+        Deleted: [{ Key: "uploads/job-ok/a.png" }, { Key: "uploads/job-ok/b.png" }],
+      });
+    await expect(deleteGenericPrefix("uploads/job-ok/")).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects when ListObjectsV2 is refused by S3", async () => {
+    send.mockRejectedValueOnce(s3Error("AccessDenied", 403));
+    await expect(deleteGenericPrefix("uploads/job-denied/")).rejects.toMatchObject({
+      name: "AccessDenied",
+    });
+  });
+
+  it("stamps $metadata on a DeleteObjects partial failure so s3WriteFault classifies it as a 503 storage fault", async () => {
+    send
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "uploads/job-1/a.png" }],
+        IsTruncated: false,
+      })
+      .mockResolvedValueOnce({
+        Errors: [{ Key: "uploads/job-1/a.png", Code: "AccessDenied" }],
+        $metadata: { httpStatusCode: 200 },
+      });
+
+    const err = await deleteGenericPrefix("uploads/job-1/").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain(
+      "S3 DeleteObjects partial failure: uploads/job-1/a.png: AccessDenied",
+    );
+    expect(err).toHaveProperty("$metadata", { httpStatusCode: 200 });
+  });
+
+  it("falls back to an empty $metadata object when a DeleteObjects partial failure omits $metadata", async () => {
+    send
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "uploads/job-1/a.png" }],
+        IsTruncated: false,
+      })
+      .mockResolvedValueOnce({
+        Errors: [{ Key: "uploads/job-1/a.png", Code: "InternalError" }],
+      });
+
+    const err = await deleteGenericPrefix("uploads/job-1/").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toHaveProperty("$metadata", {});
   });
 });

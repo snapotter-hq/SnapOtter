@@ -304,7 +304,9 @@ export async function deleteGenericPrefix(prefix: string): Promise<void> {
         );
         if (deleteResult.Errors && deleteResult.Errors.length > 0) {
           const summary = deleteResult.Errors.map((e) => `${e.Key}: ${e.Code}`).join(", ");
-          throw new Error(`S3 DeleteObjects partial failure: ${summary}`);
+          throw Object.assign(new Error(`S3 DeleteObjects partial failure: ${summary}`), {
+            $metadata: deleteResult.$metadata ?? {},
+          });
         }
       }
     }

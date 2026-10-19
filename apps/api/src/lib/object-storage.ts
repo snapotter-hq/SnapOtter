@@ -615,10 +615,18 @@ export async function deletePrefix(prefix: string): Promise<void> {
   }
   if (isS3Enabled()) {
     const s3 = await getS3();
-    await s3.deleteGenericPrefix(prefix);
+    try {
+      await s3.deleteGenericPrefix(prefix);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
-  await rm(join(env.WORKSPACE_PATH, prefix), { recursive: true, force: true });
+  try {
+    await rm(join(env.WORKSPACE_PATH, prefix), { recursive: true, force: true });
+  } catch (err) {
+    throw localWriteFault(err);
+  }
   workspaceSizeCache = null;
 }
 

@@ -129,6 +129,54 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
     expect(s3.deletePrefix).toHaveBeenCalledWith("outputs/job-prefix");
   });
 
+  describe("a failed S3 prefix delete (#2632)", () => {
+    it.each([
+      [
+        "S3 refusing access",
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+      ],
+      [
+        "S3 throttling the delete",
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+      ],
+      [
+        "an S3 DeleteObjects partial failure",
+        Object.assign(
+          new Error("S3 DeleteObjects partial failure: outputs/job-prefix/a.bin: AccessDenied"),
+          {
+            $metadata: { httpStatusCode: 200 },
+          },
+        ),
+      ],
+      [
+        "the endpoint unreachable",
+        Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+      ],
+    ])("answers 503 storage-unavailable for %s", async (_case, cause) => {
+      s3.deletePrefix.mockRejectedValueOnce(cause);
+      await expect(deletePrefix("outputs/job-prefix")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+    });
+
+    it("stamps 500 on an unexpected non-S3 error during deletePrefix", async () => {
+      const bug = new TypeError("unexpected failure");
+      s3.deletePrefix.mockRejectedValueOnce(bug);
+      await expect(deletePrefix("outputs/job-prefix")).rejects.toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
+  });
+
   it("routes listObjects to the S3 backend and returns its result unchanged", async () => {
     const rows = [{ key: "uploads/j/a", size: 3, mtimeMs: 0 }];
     s3.listObjects.mockResolvedValueOnce(rows);

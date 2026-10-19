@@ -733,6 +733,64 @@ describe("object-storage local prefix + listing operations", () => {
   it("rejects deletePrefix for a prefix outside the allowed roots", async () => {
     await expect(deletePrefix("etc/passwd")).rejects.toThrow(/invalid prefix/i);
   });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "classifies a local permission fault in deletePrefix as a 503 storage-not-writable SafeError (#2632)",
+    async () => {
+      const stuckJobId = `stuck-prefix-${process.pid}`;
+      const stuckDir = join(env.WORKSPACE_PATH, "uploads", stuckJobId);
+      await mkdir(stuckDir, { recursive: true });
+      await writeFile(join(stuckDir, "doomed.bin"), Buffer.from("keep"));
+      const { chmod } = await import("node:fs/promises");
+      await chmod(stuckDir, 0o500);
+      try {
+        await expect(deletePrefix(`uploads/${stuckJobId}`)).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: expect.objectContaining({
+            code: expect.stringMatching(/^(EACCES|EPERM)$/),
+          }),
+        });
+        expect(existsSync(join(stuckDir, "doomed.bin"))).toBe(true);
+      } finally {
+        await chmod(stuckDir, 0o755).catch(() => {});
+        await deletePrefix(`uploads/${stuckJobId}`).catch(() => {});
+      }
+    },
+  );
+
+  it("classifies a read-only filesystem fault (EROFS) in deletePrefix as a 503 SafeError regardless of UID (#2632)", async () => {
+    const erofs = Object.assign(new Error("EROFS: read-only file system, rmdir"), {
+      code: "EROFS",
+      syscall: "rmdir",
+    });
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        rm: async () => {
+          throw erofs;
+        },
+      };
+    });
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(isolatedStorage.deletePrefix(`uploads/${jobId}`)).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-not-writable",
+        statusCode: 503,
+        cause: erofs,
+      });
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+  });
 });
 
 describe("object-storage missing-key + robustness paths", () => {

@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { chmod } from "node:fs/promises";
+import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { deletePrefix, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -457,4 +462,77 @@ describe("GDPR purge role hierarchy", () => {
       await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
     }
   });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "aborts purge before deleting jobs and users rows when job-storage deletePrefix fails (#2632)",
+    async () => {
+      const targetId = await createTarget("user");
+      const jobId = randomUUID();
+      const jobDir = join(env.WORKSPACE_PATH, "outputs", jobId);
+      await db.insert(schema.jobs).values({
+        id: jobId,
+        userId: targetId,
+        toolId: "resize",
+        pool: "image",
+        type: "single",
+        status: "completed",
+        outputRefs: [`outputs/${jobId}/result.png`],
+      });
+      await putObject(`outputs/${jobId}/result.png`, Buffer.from("artifact"));
+      await chmod(jobDir, 0o500);
+
+      try {
+        const failedRes = await licensedApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/enterprise/users/${targetId}/purge`,
+          headers: { authorization: `Bearer ${licensedAdminToken}` },
+          payload: { confirm: true },
+        });
+        const [remainingJob] = await db
+          .select({ id: schema.jobs.id })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId));
+        const [remainingUser] = await db
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.id, targetId));
+
+        expect(failedRes.statusCode, failedRes.body).toBe(503);
+        expect(JSON.parse(failedRes.body).code).toBe("storage-not-writable");
+        expect(remainingJob?.id, "job row must remain so a retry can finish the delete").toBe(
+          jobId,
+        );
+        expect(remainingUser?.id, "user row must remain when storage purge fails").toBe(targetId);
+        expect(existsSync(join(jobDir, "result.png"))).toBe(true);
+
+        // Once permissions are restored, retrying the purge removes both the storage prefix and rows.
+        await chmod(jobDir, 0o755);
+        const retryRes = await licensedApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/enterprise/users/${targetId}/purge`,
+          headers: { authorization: `Bearer ${licensedAdminToken}` },
+          payload: { confirm: true },
+        });
+        const [jobAfterRetry] = await db
+          .select({ id: schema.jobs.id })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId));
+        const [userAfterRetry] = await db
+          .select({ id: schema.users.id })
+          .from(schema.users)
+          .where(eq(schema.users.id, targetId));
+
+        expect(retryRes.statusCode, retryRes.body).toBe(200);
+        expect(jobAfterRetry).toBeUndefined();
+        expect(userAfterRetry).toBeUndefined();
+        expect(existsSync(jobDir)).toBe(false);
+      } finally {
+        await chmod(jobDir, 0o755).catch(() => {});
+        await deletePrefix(`outputs/${jobId}`).catch(() => {});
+        await db.delete(schema.jobs).where(eq(schema.jobs.id, jobId));
+        await db.delete(schema.users).where(eq(schema.users.id, targetId));
+      }
+    },
+  );
 });

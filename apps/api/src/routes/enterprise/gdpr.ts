@@ -40,23 +40,18 @@ async function purgeUserData(userId: string): Promise<void> {
   // b. Delete userFiles rows
   await db.delete(schema.userFiles).where(eq(schema.userFiles.userId, userId));
 
-  // c. Delete processing artifacts: workspace objects for each job
+  // c. Delete processing artifacts: workspace objects for each job.
+  // deletePrefix already tolerates a missing directory, so anything thrown here
+  // is a real storage fault that must stop the purge before the jobs rows are
+  // dropped (#2632).
   const jobRows = await db
     .select({ id: schema.jobs.id })
     .from(schema.jobs)
     .where(eq(schema.jobs.userId, userId));
 
   for (const job of jobRows) {
-    try {
-      await deletePrefix(`uploads/${job.id}/`);
-    } catch {
-      // Workspace directory may not exist
-    }
-    try {
-      await deletePrefix(`outputs/${job.id}/`);
-    } catch {
-      // Workspace directory may not exist
-    }
+    await deletePrefix(`uploads/${job.id}/`);
+    await deletePrefix(`outputs/${job.id}/`);
   }
 
   // d. Cancel any active BullMQ jobs before deleting DB rows

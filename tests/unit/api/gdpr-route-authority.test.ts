@@ -15,6 +15,10 @@ const requirePermissionMock = vi.hoisted(() => vi.fn());
 const canManageTargetRoleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
 const insertMock = vi.hoisted(() => vi.fn());
+const deleteMock = vi.hoisted(() => vi.fn());
+const updateMock = vi.hoisted(() => vi.fn());
+const transactionMock = vi.hoisted(() => vi.fn());
+const deletePrefixMock = vi.hoisted(() => vi.fn());
 const queueAddMock = vi.hoisted(() => vi.fn());
 const auditMock = vi.hoisted(() => vi.fn());
 
@@ -48,6 +52,10 @@ async function buildApp(): Promise<FastifyInstance> {
   vi.resetModules();
   selectMock.mockReset();
   insertMock.mockReset();
+  deleteMock.mockReset();
+  updateMock.mockReset();
+  transactionMock.mockReset();
+  deletePrefixMock.mockReset();
   queueAddMock.mockReset();
   auditMock.mockReset();
   requirePermissionMock.mockReset();
@@ -55,6 +63,14 @@ async function buildApp(): Promise<FastifyInstance> {
 
   selectMock.mockImplementation(() => nextChain());
   insertMock.mockImplementation(() => ({ values: vi.fn(() => Promise.resolve()) }));
+  deleteMock.mockImplementation(() => ({ where: vi.fn(() => Promise.resolve()) }));
+  updateMock.mockImplementation(() => ({
+    set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })),
+  }));
+  transactionMock.mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+    fn({ select: selectMock, delete: deleteMock }),
+  );
+  deletePrefixMock.mockResolvedValue(undefined);
   auditMock.mockImplementation(() => vi.fn(() => Promise.resolve()));
   // Set after the resets above, otherwise buildApp() would wipe it and the route
   // would bail at `if (!user) return`, answering 200 with an empty body.
@@ -74,11 +90,36 @@ async function buildApp(): Promise<FastifyInstance> {
   }));
 
   vi.doMock("../../../apps/api/src/db/index.js", () => ({
-    db: { select: selectMock, insert: insertMock, delete: vi.fn(), update: vi.fn() },
+    db: {
+      select: selectMock,
+      insert: insertMock,
+      delete: deleteMock,
+      update: updateMock,
+      transaction: transactionMock,
+    },
     schema: {
-      users: { id: "users.id", role: "users.role", team: "users.team" },
+      users: {
+        id: "users.id",
+        role: "users.role",
+        team: "users.team",
+        legalHold: "users.legal_hold",
+      },
       teams: { id: "teams.id", legalHold: "teams.legal_hold" },
-      jobs: { id: "jobs.id", userId: "jobs.user_id", toolId: "jobs.tool_id" },
+      jobs: {
+        id: "jobs.id",
+        userId: "jobs.user_id",
+        toolId: "jobs.tool_id",
+        status: "jobs.status",
+      },
+      userFiles: {
+        id: "user_files.id",
+        storedName: "user_files.stored_name",
+        userId: "user_files.user_id",
+      },
+      auditLog: { actorId: "audit_log.actor_id" },
+      sessions: { userId: "sessions.user_id" },
+      apiKeys: { userId: "api_keys.user_id" },
+      userPreferences: { userId: "user_preferences.user_id" },
     },
   }));
 
@@ -95,6 +136,10 @@ async function buildApp(): Promise<FastifyInstance> {
   }));
   vi.doMock("../../../apps/api/src/jobs/cancel.js", () => ({ requestCancel: vi.fn() }));
   vi.doMock("../../../apps/api/src/lib/audit.js", () => ({ auditFromRequest: auditMock }));
+  vi.doMock("../../../apps/api/src/lib/last-admin.js", () => ({
+    assertNotLastAdmin: vi.fn(() => Promise.resolve()),
+    LastAdminError: class LastAdminError extends Error {},
+  }));
   vi.doMock("../../../apps/api/src/lib/file-storage.js", () => ({
     deleteStoredFile: vi.fn(),
     deleteThumbnail: vi.fn(),
@@ -102,7 +147,9 @@ async function buildApp(): Promise<FastifyInstance> {
   vi.doMock("../../../apps/api/src/routes/file-preview.js", () => ({
     deletePreview: vi.fn(),
   }));
-  vi.doMock("../../../apps/api/src/lib/object-storage.js", () => ({ deletePrefix: vi.fn() }));
+  vi.doMock("../../../apps/api/src/lib/object-storage.js", () => ({
+    deletePrefix: deletePrefixMock,
+  }));
 
   const { registerGdprRoutes } = await import("../../../apps/api/src/routes/enterprise/gdpr.js");
   const app = Fastify();
@@ -231,5 +278,67 @@ describe("GDPR export route authority", () => {
         { op: "ne", col: "users.id", val: "anonymous" },
       ]),
     );
+  });
+
+  it.each(["uploads/job-1/", "outputs/job-1/"])(
+    "aborts user purge before deleting jobs or users rows when deletePrefix fails on %s (#2632)",
+    async (failingPrefix) => {
+      app = await buildApp();
+      selectResults = [
+        [{ id: "user-9", role: "user", team: "team-1", legalHold: false }],
+        [{ legalHold: false }],
+        [],
+        [{ id: "job-1" }],
+      ];
+      canManageTargetRoleMock.mockResolvedValue(true);
+      const storageErr = Object.assign(new Error("The server's storage service is unavailable."), {
+        statusCode: 503,
+        code: "storage-unavailable",
+      });
+      deletePrefixMock.mockImplementation(async (prefix: string) => {
+        if (prefix === failingPrefix) throw storageErr;
+      });
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: "/api/v1/enterprise/users/user-9/purge",
+        payload: { confirm: true },
+      });
+
+      expect(res.statusCode).toBe(503);
+      const deletedTables = deleteMock.mock.calls.map(([table]) => table);
+      expect(deletedTables).toEqual([expect.objectContaining({ id: "user_files.id" })]);
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(auditMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("aborts team purge before deleting jobs, users, or teams rows when deletePrefix fails (#2632)", async () => {
+    app = await buildApp();
+    selectResults = [
+      [{ id: "team-1", legalHold: false }],
+      [{ id: "user-9", role: "user", legalHold: false }],
+      [{ id: "admin-1" }],
+      [],
+      [{ id: "job-1" }],
+    ];
+    canManageTargetRoleMock.mockResolvedValue(true);
+    const storageErr = Object.assign(new Error("The server's storage service is unavailable."), {
+      statusCode: 503,
+      code: "storage-unavailable",
+    });
+    deletePrefixMock.mockRejectedValueOnce(storageErr);
+
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/enterprise/teams/team-1/purge",
+      payload: { confirm: true },
+    });
+
+    expect(res.statusCode).toBe(503);
+    const deletedTables = deleteMock.mock.calls.map(([table]) => table);
+    expect(deletedTables).toEqual([expect.objectContaining({ id: "user_files.id" })]);
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
   });
 });
