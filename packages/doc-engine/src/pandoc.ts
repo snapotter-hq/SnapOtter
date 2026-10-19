@@ -47,21 +47,27 @@ export interface PandocOptions {
   extraArgs?: string[];
 }
 
-// Pandoc exit codes 63 (PandocXMLError / PandocDocxError), 64 (PandocParseError /
-// PandocEpubSubdirectoryError), and 91 (PandocUTF8DecodingError), plus stderr
-// signatures for corrupt/DRM containers and malformed metadata blocks. These
-// mean the caller's input file is unreadable or invalid, not a server bug.
-const PANDOC_INPUT_ERROR_CODES = new Set([63, 64, 91]);
+// Pandoc exit codes 44 (PandocXMLError), 63 (PandocDocxError),
+// 64 (PandocParseError / PandocEpubSubdirectoryError), and
+// 91 (PandocUTF8DecodingError), plus stderr signatures for corrupt/DRM
+// containers and malformed metadata blocks. These mean the caller's input
+// file is unreadable or invalid, not a server bug.
+const PANDOC_INPUT_ERROR_CODES = new Set([44, 63, 64, 91]);
 const PANDOC_INPUT_ERROR_PATTERNS = [
   /No entry on path: META-INF\/container\.xml/i,
   /Couldn't extract ePub file/i,
-  /couldn't parse docx file/i,
+  /couldn't (?:parse|unpack) docx/i,
+  /Invalid XML in/i,
   /Invalid UTF-8 stream|UTF-8 decoding error/i,
   /Error parsing .* metadata/i,
 ];
 
 function stripGhcBacktrace(stderr: string): string {
-  return stderr.replace(/\n+HasCallStack backtrace:[\s\S]*$/, "").trimEnd();
+  return stderr
+    .replace(/\n+HasCallStack backtrace:[\s\S]*$/, "")
+    .replace(/^(?:\[WARNING\][^\n]*\n)+/, "")
+    .replace(/\n{2,}/g, "\n")
+    .trimEnd();
 }
 
 export function markIfPandocInputError<E extends Error>(
@@ -99,24 +105,16 @@ export function runPandoc(
   outPath: string,
   opts: PandocOptions = {},
 ): Promise<void> {
+  if (opts.signal?.aborted) {
+    return Promise.reject(new Error("Canceled"));
+  }
   const timeoutMs = opts.timeoutMs ?? 120_000;
   const args = buildPandocArgs(inPath, outPath, opts);
   return new Promise<void>((resolvePromise, reject) => {
-    if (opts.signal?.aborted) {
-      reject(new Error("Canceled"));
-      return;
-    }
     const [limBin, limArgs] = wrapWithMemoryLimit(pandocBin(), args);
     const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let err = "";
     let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      opts.signal?.removeEventListener("abort", onAbort);
-      child.kill("SIGKILL");
-      reject(new Error(`pandoc timed out after ${Math.round(timeoutMs / 1000)}s`));
-    }, timeoutMs);
     const onAbort = () => {
       if (settled) return;
       settled = true;
@@ -125,7 +123,13 @@ export function runPandoc(
       child.kill("SIGKILL");
       reject(new Error("Canceled"));
     };
-    opts.signal?.addEventListener("abort", onAbort, { once: true });
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      opts.signal?.removeEventListener("abort", onAbort);
+      child.kill("SIGKILL");
+      reject(new Error(`pandoc timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
     child.stderr.on("data", (c: Buffer) => {
       err = (err + c.toString("utf8")).slice(-4096);
     });
@@ -148,5 +152,6 @@ export function runPandoc(
         reject(markIfPandocInputError(failure, code, err));
       }
     });
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
   });
 }

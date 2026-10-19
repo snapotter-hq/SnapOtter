@@ -3,6 +3,7 @@
 // the Docker compose smoke is the real proof.
 
 import { pandocAvailable } from "@snapotter/doc-engine";
+import AdmZip from "adm-zip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -114,6 +115,29 @@ describe.skipIf(!pandocAvailable())("to-epub (requires pandoc)", () => {
     });
     expect(dl.statusCode).toBe(200);
     expect(dl.rawPayload.subarray(0, 2).toString()).toBe("PK");
+  }, 90_000);
+
+  it("classifies a non-DOCX zip container as a 400 input error", async () => {
+    const zip = new AdmZip();
+    zip.addFile("hello.txt", Buffer.from("not a docx"));
+    const res = await runTool("not-a-docx.docx", zip.toBuffer());
+    expect(res.statusCode).toBe(202);
+    const { jobId } = JSON.parse(res.body);
+    const { db, schema } = await import("../../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    let row:
+      | { status: string; error: { message?: string; httpStatus?: number } | null }
+      | undefined;
+    for (let i = 0; i < 120; i++) {
+      [row] = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      if (row && ["completed", "failed", "canceled"].includes(row.status)) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    expect(row?.status).toBe("failed");
+    expect(row?.error?.httpStatus).toBe(400);
   }, 90_000);
 });
 

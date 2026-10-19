@@ -167,11 +167,10 @@ describe.skipIf(!pandocAvailable())("epub-convert (requires pandoc)", () => {
 
   it("converts an epub with a remote ref without fetching it (no SSRF)", async () => {
     const remoteEpub = buildRemoteRefEpub();
-    // The book references a remote image on a closed port (127.0.0.1:9). The
-    // conversion must complete from the book's own content and never fetch that
-    // ref (resource embedding is off in the route). pandoc strips the
-    // unmanifested remote <img> rather than inlining it; either way it must not
-    // be fetched and inlined as a data: URI.
+    // The book references a remote image on a closed port (127.0.0.1:9).
+    // runPandoc always passes --sandbox (PandocPure), so even with
+    // selfContained: true the conversion completes from the book's own
+    // MediaBag and never fetches or base64-inlines the remote ref.
     const dl = await convertAndDownload("remote.epub", remoteEpub, { format: "html" });
     expect(dl.payload).toContain("RemoteRefBook");
     expect(dl.payload).not.toContain("base64");

@@ -42,6 +42,7 @@ vi.mock("@snapotter/doc-engine", () => ({
   resolveGs: vi.fn(() => null),
   resolveQpdf: vi.fn(() => null),
   resolveSoffice: vi.fn(() => null),
+  runPandoc: vi.fn(),
   sofficeAvailable: vi.fn(() => false),
 }));
 
@@ -53,15 +54,18 @@ import {
   pdfRedactPy,
   pdfScrubProducerPy,
   pdfTextPy,
+  runPandoc,
 } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
+import { registerEpubConvert } from "../../../apps/api/src/routes/tools/epub-convert.js";
 import { registerFlattenPdf } from "../../../apps/api/src/routes/tools/flatten-pdf.js";
 import { registerHtmlToPdf } from "../../../apps/api/src/routes/tools/html-to-pdf.js";
 import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdown-to-pdf.js";
 import { registerPdfToText } from "../../../apps/api/src/routes/tools/pdf-to-text.js";
 import { registerRedactPdf } from "../../../apps/api/src/routes/tools/redact-pdf.js";
+import { registerToEpub } from "../../../apps/api/src/routes/tools/to-epub.js";
 
 function createMockApp(): FastifyInstance {
   return {
@@ -197,6 +201,93 @@ describe("document route processors", () => {
         filename: "release-notes.pdf",
         contentType: "application/pdf",
       });
+    });
+  });
+
+  it("epub-convert chains self-contained runPandoc into htmlToPdfPy with ctx.signal for pdf", async () => {
+    registerEpubConvert(createMockApp());
+    const config = getToolConfig("epub-convert");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = { ...createCtx(scratchDir, "My Book.epub"), settings: { format: "pdf" } };
+      const result = await config?.processV2?.(ctx);
+
+      expect(runPandoc).toHaveBeenCalledWith(
+        join(scratchDir, "in-My_Book.epub"),
+        join(scratchDir, "book.html"),
+        { selfContained: true, signal: ctx.signal },
+      );
+      expect(htmlToPdfPy).toHaveBeenCalledWith(
+        join(scratchDir, "book.html"),
+        join(scratchDir, "My Book.pdf"),
+        "html",
+        { signal: ctx.signal },
+      );
+      expect(result).toEqual({
+        scratchPath: join(scratchDir, "My Book.pdf"),
+        filename: "My Book.pdf",
+        contentType: "application/pdf",
+      });
+    });
+  });
+
+  it("epub-convert passes selfContained only for html and forwards ctx.signal for html, docx, and md", async () => {
+    registerEpubConvert(createMockApp());
+    const config = getToolConfig("epub-convert");
+
+    await withScratch(async (scratchDir) => {
+      const htmlCtx = { ...createCtx(scratchDir, "novel.epub"), settings: { format: "html" } };
+      await config?.processV2?.(htmlCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-novel.epub"),
+        join(scratchDir, "novel.html"),
+        { selfContained: true, signal: htmlCtx.signal },
+      );
+
+      const docxCtx = { ...createCtx(scratchDir, "novel.epub"), settings: { format: "docx" } };
+      await config?.processV2?.(docxCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-novel.epub"),
+        join(scratchDir, "novel.docx"),
+        { signal: docxCtx.signal },
+      );
+
+      const mdCtx = { ...createCtx(scratchDir, "novel.epub"), settings: { format: "md" } };
+      await config?.processV2?.(mdCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-novel.epub"),
+        join(scratchDir, "novel.md"),
+        { signal: mdCtx.signal },
+      );
+    });
+  });
+
+  it("to-epub disables yaml_metadata_block only for .txt inputs and forwards ctx.signal", async () => {
+    registerToEpub(createMockApp());
+    const config = getToolConfig("to-epub");
+
+    await withScratch(async (scratchDir) => {
+      const txtCtx = createCtx(scratchDir, "Notes.TXT");
+      await config?.processV2?.(txtCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-Notes.TXT"),
+        join(scratchDir, "Notes.epub"),
+        {
+          signal: txtCtx.signal,
+          extraArgs: ["-f", "markdown-yaml_metadata_block", "--metadata", "title=Notes"],
+        },
+      );
+
+      const mdCtx = createCtx(scratchDir, "chapter.md");
+      await config?.processV2?.(mdCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-chapter.md"),
+        join(scratchDir, "chapter.epub"),
+        {
+          signal: mdCtx.signal,
+          extraArgs: ["--metadata", "title=chapter"],
+        },
+      );
     });
   });
 });

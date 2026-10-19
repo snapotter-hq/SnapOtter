@@ -260,9 +260,10 @@ describe("runPandoc", () => {
     const mod = await import("../src/pandoc.js");
     const ac = new AbortController();
     ac.abort();
-    await expect(mod.runPandoc("/in.epub", "/out.html", { signal: ac.signal })).rejects.toThrow(
-      "Canceled",
-    );
+    await expect(
+      mod.runPandoc("/in.epub", "/out.html", { selfContained: true, signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    expect(mockSpawnSync).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
@@ -283,27 +284,23 @@ describe("runPandoc", () => {
     expect(removeSpy2).toHaveBeenCalledWith("abort", expect.any(Function));
   });
 
-  it("marks corrupt/invalid container and parse exits (63, 64, 91) as ToolInputError", async () => {
+  it("marks corrupt/invalid container and parse exits (44, 63, 64, 91) as ToolInputError even with non-matching stderr", async () => {
     const mod = await import("../src/pandoc.js");
-    h.nextClose({ stderr: "No entry on path: META-INF/container.xml\n", code: 64 });
-    const err64 = await mod.runPandoc("/bad.epub", "/out.html").catch((e: unknown) => e);
-    expect(isToolInputError(err64)).toBe(true);
-
-    h.nextClose({ stderr: "couldn't parse docx file: DocxError\n", code: 63 });
-    const err63 = await mod.runPandoc("/bad.docx", "/out.epub").catch((e: unknown) => e);
-    expect(isToolInputError(err63)).toBe(true);
-
-    h.nextClose({ stderr: "UTF-8 decoding error", code: 91 });
-    const err91 = await mod.runPandoc("/bad.txt", "/out.epub").catch((e: unknown) => e);
-    expect(isToolInputError(err91)).toBe(true);
+    for (const code of [44, 63, 64, 91]) {
+      h.nextClose({ stderr: `PandocExit_${code}\n`, code });
+      const err = await mod.runPandoc("/bad.epub", "/out.html").catch((e: unknown) => e);
+      expect(isToolInputError(err)).toBe(true);
+    }
   });
 
-  it("markIfPandocInputError matches each stderr pattern even when exit code is not 63/64/91", async () => {
+  it("markIfPandocInputError matches each stderr pattern even when exit code is not 44/63/64/91", async () => {
     const { markIfPandocInputError } = await import("../src/pandoc.js");
     const samples = [
       "No entry on path: META-INF/container.xml",
       "Couldn't extract ePub file: Unknown compression method",
       "couldn't parse docx file: DocxError",
+      "couldn't unpack docx container",
+      "Invalid XML in 'META-INF/container.xml': unexpected EOF",
       "UTF-8 decoding error at byte 42",
       "Error parsing YAML metadata at line 4",
     ];
@@ -316,23 +313,25 @@ describe("runPandoc", () => {
     ).toBe(false);
   });
 
-  it("marks DRM/invalid-UTF-8 exception on exit 1 as ToolInputError and strips GHC HasCallStack backtrace", async () => {
+  it("marks DRM/invalid-UTF-8 exception on exit 1 as ToolInputError and strips leading warnings and GHC HasCallStack backtrace", async () => {
     const mod = await import("../src/pandoc.js");
     const ghcStderr = [
+      "[WARNING] Could not fetch resource http:/127.0.0.1:9/remote.png",
       "pandoc: Uncaught exception text-2.1.3:Data.Text.Encoding.Error.UnicodeException:",
       "",
       "Cannot decode byte '\\x89': Data.Text.Internal.Encoding: Invalid UTF-8 stream",
       "",
       "HasCallStack backtrace:",
       "  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37",
-      "  throw, called at libraries/text/src/Data/Text/Encoding/Error.hs:101:23",
+      "  throw, called at libraries/text/src/Data/Text/Encoding.Error.hs:101:23",
     ].join("\n");
     h.nextClose({ stderr: ghcStderr, code: 1 });
     const err = (await mod.runPandoc("/drm.epub", "/out.html").catch((e: unknown) => e)) as Error;
     expect(isToolInputError(err)).toBe(true);
     expect(err.message).toContain("Invalid UTF-8 stream");
+    expect(err.message).not.toContain("[WARNING]");
     expect(err.message).not.toContain("HasCallStack backtrace");
-    expect(err.message.split("\n").length).toBeLessThanOrEqual(3);
+    expect(err.message.split("\n").length).toBeLessThanOrEqual(2);
   });
 
   it("leaves non-input pandoc failures unmarked so genuine bugs still report", async () => {
