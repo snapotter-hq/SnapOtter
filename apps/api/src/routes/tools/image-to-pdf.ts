@@ -10,6 +10,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -236,6 +237,7 @@ export function registerImageToPdfRoute(
             const fileExt = file.filename.split(".").pop()?.toLowerCase();
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
           } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
             try {
               await sharp(buf).metadata();
             } catch (err) {

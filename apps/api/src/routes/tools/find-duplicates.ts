@@ -8,6 +8,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -195,6 +196,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
             const fileExt = file.filename.split(".").pop()?.toLowerCase();
             file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
           } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
             // Sharp reads some of these formats itself (DNG is a TIFF), so the
             // decoder's failure only matters once that fallback fails too.
             try {

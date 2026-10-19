@@ -11,6 +11,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -235,6 +236,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
             const fileExt = filename.split(".").pop()?.toLowerCase();
             fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
           } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
             try {
               await sharp(fileBuffer).metadata();
             } catch (err) {

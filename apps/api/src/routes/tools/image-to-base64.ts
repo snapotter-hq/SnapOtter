@@ -4,7 +4,12 @@ import sharp from "sharp";
 import { z } from "zod";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -120,8 +125,14 @@ export function registerImageToBase64(app: FastifyInstance) {
             try {
               const fileExt = filename.split(".").pop()?.toLowerCase();
               decoded = await decodeToSharpCompat(decoded, validation.format, fileExt);
-            } catch {
-              await sharp(decoded).metadata();
+            } catch (decodeErr) {
+              if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+              try {
+                await sharp(decoded).metadata();
+              } catch (err) {
+                if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+                throw err;
+              }
             }
           }
           if (validation.valid && validation.format === "svg") {
@@ -221,6 +232,7 @@ export function registerImageToBase64(app: FastifyInstance) {
             dataUri: `data:${mimeType};base64,${base64}`,
           });
         } catch (err) {
+          if (isDecoderUnavailable(err)) throw err;
           errors.push({
             filename,
             error: err instanceof Error ? err.message : "Failed to process image",

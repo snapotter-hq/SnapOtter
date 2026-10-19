@@ -669,7 +669,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // over-cap output ships without one: the poster pipeline needs the bytes
       // in memory, and no preview beats no result.
       const previewRef = resultBuffer
-        ? await generatePreview(resultBuffer, resultContentType, jobId)
+        ? await generatePreview(resultBuffer, resultContentType, jobId, data.toolId)
         : undefined;
 
       // Auto-save when the input came from the user's library (data.fileId is
@@ -831,7 +831,12 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       }
 
       const isInputMissing = isSafeMessageError(err) && err.code === "INPUT_MISSING";
-      const isUnrecoverable = isCanceled || isValidationError || isInputMissing;
+      const isEngineUnavailable =
+        (isSafeMessageError(err) ||
+          (err instanceof Error && err.name === "InputValidationError")) &&
+        (err as { code?: unknown }).code === "ENGINE_UNAVAILABLE";
+      const isUnrecoverable =
+        isCanceled || isValidationError || isInputMissing || isEngineUnavailable;
       const maxAttempts = job.opts.attempts ?? 1;
       const willRetry = !isUnrecoverable && job.attemptsMade + 1 < maxAttempts;
 
@@ -1453,7 +1458,12 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   // image thumb) so the pipeline result carries a previewUrl like single-tool
   // results do. Content type is derived from the output extension.
   const contentType = contentTypeForFilename(outFilename);
-  const previewRef = await generatePreview(lastOutputBuffer, contentType, data.jobId);
+  const previewRef = await generatePreview(
+    lastOutputBuffer,
+    contentType,
+    data.jobId,
+    steps.at(-1)?.toolId ?? "pipeline",
+  );
 
   const result: ToolJobResult = {
     outputRefs: [parentKey],

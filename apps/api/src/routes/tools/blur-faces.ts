@@ -21,6 +21,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -243,8 +244,14 @@ export function registerBlurFaces(app: FastifyInstance) {
       if (validation.valid && needsCliDecode(validation.format)) {
         try {
           decoded = await decodeToSharpCompat(decoded, validation.format);
-        } catch {
-          /* batch handler already decoded */
+        } catch (decodeErr) {
+          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          try {
+            await sharp(decoded).metadata();
+          } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            throw err;
+          }
         }
       }
       const orientedBuffer = await autoOrient(decoded);

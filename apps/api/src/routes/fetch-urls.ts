@@ -10,14 +10,20 @@
  */
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
-import type { FastifyInstance } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
 import {
   FETCH_TIMEOUT_MS,
@@ -26,6 +32,7 @@ import {
   safeFetch,
   URL_FETCH_CONCURRENCY,
 } from "../lib/ssrf.js";
+import { engineUnavailable } from "../modality/image-input.js";
 
 /** Formats browsers can display natively (no preview needed). */
 const BROWSER_PREVIEWABLE = new Set([
@@ -165,7 +172,7 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
       await Promise.all(
         urls.map((url, index) =>
           queue.add(async () => {
-            resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames);
+            resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames, request.log);
           }),
         ),
       );
@@ -179,6 +186,7 @@ async function fetchSingleUrl(
   url: string,
   jobId: string,
   usedFilenames: Set<string>,
+  log: Pick<FastifyBaseLogger, "warn"> = logger,
 ): Promise<FetchResult> {
   try {
     // Fetch with SSRF protection and timeout
@@ -277,8 +285,11 @@ async function fetchSingleUrl(
           decodedBuffer = Buffer.from(await decodeToSharpCompat(buffer, validation.format));
           didDecode = true;
         }
-      } catch {
-        // Decode failed -- non-fatal, fall back to the raw buffer below.
+      } catch (err) {
+        if (isDecoderUnavailable(err)) {
+          reportEngineUnavailable(engineUnavailable(err), "fetch-urls", log);
+        }
+        // Decode failed: non-fatal, fall back to the raw buffer below.
         decodedBuffer = buffer;
         didDecode = false;
       }

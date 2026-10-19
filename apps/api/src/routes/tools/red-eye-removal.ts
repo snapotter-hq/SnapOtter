@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { removeRedEye } from "@snapotter/ai";
 import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
@@ -20,6 +21,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -242,8 +244,14 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
       if (validation.valid && needsCliDecode(validation.format)) {
         try {
           decoded = await decodeToSharpCompat(decoded, validation.format);
-        } catch {
-          /* batch handler already decoded */
+        } catch (decodeErr) {
+          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          try {
+            await sharp(decoded).metadata();
+          } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            throw err;
+          }
         }
       }
       const orientedBuffer = await autoOrient(decoded);

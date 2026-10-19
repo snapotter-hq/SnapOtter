@@ -8,6 +8,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -490,6 +491,7 @@ export function registerCollage(app: FastifyInstance) {
           const fileExt = file.filename.split(".").pop()?.toLowerCase();
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
         } catch (decodeErr) {
+          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
           try {
             await sharp(file.buffer).metadata();
           } catch (err) {

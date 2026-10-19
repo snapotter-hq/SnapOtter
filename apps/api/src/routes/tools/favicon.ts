@@ -11,7 +11,12 @@ import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../../lib/format-decoders.js";
 import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -139,8 +144,14 @@ export function registerFavicon(app: FastifyInstance) {
         if (needsCliDecode(validation.format)) {
           try {
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch {
-            await sharp(buf).metadata();
+          } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            try {
+              await sharp(buf).metadata();
+            } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              throw err;
+            }
           }
         }
 
@@ -164,6 +175,7 @@ export function registerFavicon(app: FastifyInstance) {
 
         decodedFiles.push({ buffer: buf, filename: file.filename });
       } catch (err) {
+        if (isDecoderUnavailable(err)) throw err;
         const reason = err instanceof Error ? err.message : "Unknown decode error";
         skippedFiles.push({ filename: file.filename, reason });
       }

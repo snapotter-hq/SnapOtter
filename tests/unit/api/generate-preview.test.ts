@@ -30,13 +30,31 @@ const loggerMock = vi.hoisted(() => ({
 }));
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
+const decodeHeicMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
+  decodeHeic: decodeHeicMock,
+}));
+
+const reportEngineUnavailableMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/engine-unavailable.js")>();
+  return {
+    ...actual,
+    reportEngineUnavailable: reportEngineUnavailableMock,
+  };
+});
+
 import { generatePreview } from "../../../apps/api/src/jobs/postprocess.js";
+import { DecoderUnavailableError } from "../../../apps/api/src/lib/format-decoders.js";
 
 const JOB_ID = "job-preview-test";
 
 beforeEach(() => {
   putObjectMock.mockReset();
   loggerMock.warn.mockReset();
+  decodeHeicMock.mockReset();
+  reportEngineUnavailableMock.mockReset();
 });
 
 describe("generatePreview honesty (#746)", () => {
@@ -56,7 +74,7 @@ describe("generatePreview honesty (#746)", () => {
 
   it("returns no preview and logs when the result can't be decoded, never fabricating one from the input", async () => {
     const undecodableResult = Buffer.from("this is not a decodable image at all");
-    const decodableInput = await sharp({
+    const decodableInput: Buffer = await sharp({
       create: { width: 8, height: 8, channels: 3, background: { r: 1, g: 2, b: 3 } },
     })
       .png()
@@ -71,6 +89,28 @@ describe("generatePreview honesty (#746)", () => {
     expect(key).toBeUndefined();
     expect(putObjectMock).not.toHaveBeenCalled();
     expect(loggerMock.warn).toHaveBeenCalledOnce();
+  });
+
+  it("reports a missing HEIF decoder through reportEngineUnavailable and stays non-fatal (#1453)", async () => {
+    decodeHeicMock.mockRejectedValueOnce(new DecoderUnavailableError("No HEIF decoder found."));
+
+    const key = await generatePreview(Buffer.from("heic-bytes"), "image/heic", JOB_ID, "convert");
+
+    expect(key).toBeUndefined();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+    expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      message: "No HEIF decoder found.",
+    });
+    expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("convert");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+
+    reportEngineUnavailableMock.mockReset();
+    decodeHeicMock.mockRejectedValueOnce(new DecoderUnavailableError("No HEIF decoder found."));
+    await generatePreview(Buffer.from("heic-bytes"), "image/heif", JOB_ID);
+    expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("output-preview");
   });
 
   it.each([

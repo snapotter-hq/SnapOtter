@@ -36,6 +36,7 @@ import {
 } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -692,8 +693,14 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           try {
             const fileExt = file.originalName.split(".").pop()?.toLowerCase();
             decoded = Buffer.from(await decodeToSharpCompat(rawBuffer, validation.format, fileExt));
-          } catch {
-            // Sharp will attempt the raw buffer directly
+          } catch (decodeErr) {
+            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            try {
+              await sharp(rawBuffer).metadata();
+            } catch (err) {
+              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              throw err;
+            }
           }
         }
         const fileBuffer = decoded;

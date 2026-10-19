@@ -9,6 +9,7 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -214,8 +215,14 @@ export function registerMemeGenerator(app: FastifyInstance) {
         try {
           const fileExt = filename.split(".").pop()?.toLowerCase();
           buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-        } catch {
-          /* batch handler already decoded */
+        } catch (decodeErr) {
+          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          try {
+            await sharp(buf).metadata();
+          } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            throw err;
+          }
         }
       }
       buf = await autoOrient(buf);
@@ -321,6 +328,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
           const fileExt = filename.split(".").pop()?.toLowerCase();
           imageBuffer = await decodeToSharpCompat(imageBuffer, validation.format, fileExt);
         } catch (decodeErr) {
+          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
           try {
             await sharp(imageBuffer).metadata();
           } catch (err) {

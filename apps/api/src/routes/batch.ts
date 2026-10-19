@@ -39,7 +39,12 @@ import {
 import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  needsCliDecode,
+} from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
 import {
@@ -67,6 +72,7 @@ import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { InputValidationError } from "../modality/contract.js";
+import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
@@ -497,7 +503,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     processBuffer = await decodeHeic(processBuffer);
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch {
+                  } catch (err) {
+                    if (isDecoderUnavailable(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
                     preFailures.push({
                       originalIndex: i,
                       filename: file.filename,
@@ -515,15 +532,37 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       validation.format,
                       fileExt,
                     );
-                  } catch {
+                    const ext = processFilename.match(/\.[^.]+$/)?.[0];
+                    if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
+                  } catch (decodeErr) {
+                    if (decodeErr instanceof DecoderOutOfMemoryError) {
+                      const unavailable = engineUnavailable(decodeErr);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
                     try {
                       await sharp(processBuffer).metadata();
                     } catch {
+                      if (isDecoderUnavailable(decodeErr)) {
+                        const unavailable = engineUnavailable(decodeErr);
+                        reportEngineUnavailable(unavailable, toolId, request.log);
+                        preFailures.push({
+                          originalIndex: i,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
                       // Neither CLI decode nor Sharp can handle it; upload raw
                     }
                   }
-                  const ext = processFilename.match(/\.[^.]+$/)?.[0];
-                  if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
                 }
 
                 if (!skipPreprocess) {

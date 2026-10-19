@@ -4,6 +4,7 @@ import { autoOrient } from "../lib/auto-orient.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
+  DecoderOutOfMemoryError,
   decodeAnyFormat,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -91,6 +92,11 @@ export class ImageInputHandler implements InputHandler {
           throw new InputValidationError(
             decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
           );
+        }
+        // Out of memory says nothing about whether Sharp can read the format
+        // (DNG's TIFF header, say): surface it instead of falling back (#1453).
+        if (decodeErr instanceof DecoderOutOfMemoryError) {
+          throw engineUnavailable(decodeErr);
         }
         try {
           await boundedSharp(fileBuffer, opts.maxPixels).metadata();

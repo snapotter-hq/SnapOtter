@@ -25,6 +25,13 @@ import {
   vi,
 } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { getQueue } from "../../../apps/api/src/jobs/queues.js";
+import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+} from "../../../apps/api/src/lib/format-decoders.js";
+import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { DocumentInputHandler } from "../../../apps/api/src/modality/document-input.js";
@@ -674,5 +681,281 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     ]);
     expect(res.statusCode, res.body).toBe(422);
     expect(res.json().error).toBe("Step 1: Resize ran out of road");
+  });
+
+  describe("image decoder unavailability in batch, pipeline, previews, and workers (#1453)", () => {
+    const HEIC = readFixture(fixtures.image.base.heic200);
+    const ICO = readFixture(fixtures.image.formats("ico"));
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const SVG = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#336699"/></svg>',
+    );
+
+    it("batch image decode reports a missing HEIF or CLI decoder once and answers 503 with per-file codes", async () => {
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/rotate/batch", [
+          { name: "file", filename: "a.heic", contentType: "image/heic", content: HEIC },
+          { name: "file", filename: "b.heic", contentType: "image/heic", content: HEIC },
+          { name: "settings", content: JSON.stringify({ angle: 90 }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          error: "No HEIF decoder found.",
+          errors: [
+            { filename: "a.heic", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.heic", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(helperSawEngineDown("rotate")).toBe(true);
+        expect(engineReports("rotate")).toHaveLength(1);
+      } finally {
+        heicSpy.mockRestore();
+      }
+    });
+
+    it("pipeline batch image decode reports a missing CLI decoder once and answers 503 with per-file codes", async () => {
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderUnavailableError("No ImageMagick found."));
+      try {
+        const res = await post("/api/v1/pipeline/batch", [
+          { name: "file", filename: "a.ico", contentType: "image/x-icon", content: ICO },
+          { name: "file", filename: "b.ico", contentType: "image/x-icon", content: ICO },
+          {
+            name: "pipeline",
+            content: JSON.stringify({
+              steps: [{ toolId: "compress", settings: {} }],
+            }),
+          },
+        ]);
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          error: "No ImageMagick found.",
+          errors: [
+            { filename: "a.ico", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.ico", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(helperSawEngineDown("compress")).toBe(true);
+        expect(engineReports("compress")).toHaveLength(1);
+      } finally {
+        cliSpy.mockRestore();
+      }
+    });
+
+    it("edit-metadata preview keeps the 200 result and reports a missing HEIF decoder once", async () => {
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.heic", contentType: "image/heic", content: HEIC },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("edit-metadata")).toBe(true);
+        expect(engineReports("edit-metadata")).toHaveLength(1);
+      } finally {
+        heicSpy.mockRestore();
+      }
+    });
+
+    it("svg-to-raster HEIF preview keeps the 200 result and reports a missing HEIF decoder once", async () => {
+      const encSpy = vi.spyOn(heicConverter, "encodeHeic").mockResolvedValue(HEIC);
+      const decSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "heif" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+      } finally {
+        encSpy.mockRestore();
+        decSpy.mockRestore();
+      }
+    });
+
+    it("fetch-urls preview decode keeps the stored file and reports a missing decoder once", async () => {
+      const decSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderOutOfMemoryError("Decoder out of memory."));
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith(".ico")) {
+            return new Response(new Uint8Array(ICO), {
+              status: 200,
+              headers: { "Content-Type": "image/x-icon" },
+            });
+          }
+          return new Response(new Uint8Array(HEIC), {
+            status: 200,
+            headers: { "Content-Type": "image/heic" },
+          });
+        }),
+      );
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          payload: {
+            urls: ["http://1.2.3.4:9999/photo.heic", "http://1.2.3.4:9999/icon.ico"],
+          },
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().results[0]).toMatchObject({
+          success: true,
+          filename: "photo.heic",
+          previewUrl: null,
+        });
+        expect(res.json().results[1]).toMatchObject({
+          success: true,
+          filename: "icon.ico",
+          previewUrl: null,
+        });
+        expect(helperSawEngineDown("fetch-urls")).toBe(true);
+        // Both the missing decoder and the OOM cause are reported independently (#1628).
+        expect(engineReports("fetch-urls")).toHaveLength(2);
+      } finally {
+        vi.unstubAllGlobals();
+        cliSpy.mockRestore();
+        decSpy.mockRestore();
+      }
+    });
+
+    it("worker process functions propagate a CLI decoder fault even on a DNG Sharp can read, and do not retry ENGINE_UNAVAILABLE", async () => {
+      for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
+        const config = getToolConfig(toolId);
+        expect(config, toolId).toBeDefined();
+        const cliSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(new DecoderOutOfMemoryError("Decoder out of memory."));
+        try {
+          await expect(
+            config?.process(DNG, {}, "photo.dng", {
+              scratchDir: "/tmp",
+              signal: new AbortController().signal,
+              report: () => {},
+            }),
+          ).rejects.toMatchObject({
+            name: "DecoderOutOfMemoryError",
+            code: "ENGINE_UNAVAILABLE",
+            statusCode: 503,
+          });
+        } finally {
+          cliSpy.mockRestore();
+        }
+      }
+
+      // A DecoderUnavailableError thrown inside a 2-attempt pool worker
+      // settles on attempt 1 without retrying.
+      let calls = 0;
+      const config = getToolConfig("resize");
+      if (!config?.processV2) throw new Error("resize has no processV2");
+      const real = config.processV2;
+      config.processV2 = async () => {
+        calls++;
+        throw new DecoderUnavailableError("No ImageMagick found.");
+      };
+      restoreWorker = () => {
+        config.processV2 = real;
+      };
+      const clientJobId = randomUUID();
+      const res = await post("/api/v1/tools/image/resize", [
+        pngPart("one.png"),
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        error: "No ImageMagick found.",
+      });
+      expect(calls).toBe(1);
+      const [aliasRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(aliasRow?.error).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+      });
+      const artifactId =
+        (aliasRow?.settings as { artifactJobId?: string } | null)?.artifactJobId ?? clientJobId;
+      const [artifactRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, artifactId));
+      expect(artifactRow?.attempts).toBe(1);
+      expect(artifactRow?.error).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+      });
+      const queueJob = await getQueue("image").getJob(artifactId);
+      if (queueJob) {
+        expect(queueJob.attemptsMade).toBe(1);
+      }
+    });
+
+    it("an OCR job whose HEIF decoder is missing in the worker keeps ENGINE_UNAVAILABLE on the job row (#1453)", async () => {
+      const errorSpy = vi.spyOn(logger, "error");
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValue(new DecoderUnavailableError("No HEIF decoder found."));
+      try {
+        const res = await post("/api/v1/tools/image/ocr", [
+          { name: "file", filename: "scan.heic", contentType: "image/heic", content: HEIC },
+          { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(202);
+        const { jobId } = res.json() as { jobId: string };
+
+        let row: typeof schema.jobs.$inferSelect | undefined;
+        for (let i = 0; i < 150; i++) {
+          [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+          if (row?.status === "failed") break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        expect(row?.status).toBe("failed");
+        expect(row?.error).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          httpStatus: 503,
+          message: expect.stringContaining("No HEIF decoder found"),
+        });
+
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ jobId, toolId: "ocr" }),
+          "tool job failed",
+        );
+
+        const replay = await app.inject({
+          method: "GET",
+          url: `/api/v1/jobs/${jobId}/progress`,
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+        expect(frame).toMatchObject({
+          phase: "failed",
+          code: "ENGINE_UNAVAILABLE",
+          httpStatus: 503,
+        });
+      } finally {
+        heicSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
   });
 });

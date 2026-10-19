@@ -9,6 +9,7 @@ import { readImageDimensions } from "../lib/exiftool.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -383,7 +384,15 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       try {
         buffer = await decodeToSharpCompat(buffer, validation.format);
       } catch (decodeErr) {
-        // CLI decoder unavailable -- try Sharp directly as fallback for preview
+        if (decodeErr instanceof DecoderOutOfMemoryError) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(decodeErr),
+            "file-preview",
+            request.log,
+          );
+        }
+        // CLI decoder unavailable: try Sharp directly as fallback for preview
         try {
           await sharp(buffer).metadata();
         } catch {

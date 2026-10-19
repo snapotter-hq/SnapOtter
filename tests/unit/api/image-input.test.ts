@@ -285,6 +285,20 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
     expect(result.buffer).toBe(ORIENTED);
   });
 
+  it("turns a CLI decoder out-of-memory error into 503 even when Sharp can read the header (#1453)", async () => {
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(
+      new DecoderOutOfMemoryError("The image decoder ran out of memory."),
+    );
+
+    await expect(prepare("photo.dng")).rejects.toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+    });
+    expect(mocks.metadata).not.toHaveBeenCalled();
+  });
+
   it("keeps 422 for a CLI format the decoder rejected", async () => {
     detected("raw");
     mocks.decodeToSharpCompat.mockRejectedValue(new Error("Command failed: magick"));

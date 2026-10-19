@@ -21,6 +21,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -90,8 +91,14 @@ export async function processBeautify(
     try {
       const fileExt = _filename.split(".").pop()?.toLowerCase();
       buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-    } catch {
-      await sharp(buf).metadata();
+    } catch (decodeErr) {
+      if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+      try {
+        await sharp(buf).metadata();
+      } catch (err) {
+        if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+        throw err;
+      }
     }
   }
   if (validation.valid && validation.format === "svg") {

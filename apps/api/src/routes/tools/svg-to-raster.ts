@@ -9,15 +9,18 @@ import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
 
@@ -602,7 +605,10 @@ export function registerSvgToRasterRoute(
             .toBuffer();
           await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
           previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-        } catch {
+        } catch (err) {
+          if (isDecoderUnavailable(err)) {
+            reportEngineUnavailable(engineUnavailable(err), opts.toolId, request.log);
+          }
           // Non-fatal - frontend shows success card fallback
         }
       }

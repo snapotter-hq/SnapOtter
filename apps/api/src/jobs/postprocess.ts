@@ -15,9 +15,12 @@ import { type LibrarySaveMode, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
+import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
+import { isDecoderUnavailable } from "../lib/format-decoders.js";
 import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
+import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 
 // ── Content-type to extension map ──────────────────────────────
@@ -122,6 +125,7 @@ export async function generatePreview(
   buffer: Buffer,
   contentType: string,
   jobId: string,
+  toolId = "output-preview",
 ): Promise<string | undefined> {
   // Per-modality dispatch (before the image logic)
   if (contentType.startsWith("video/")) {
@@ -157,6 +161,10 @@ export async function generatePreview(
     await putObject(key, previewBuffer);
     return key;
   } catch (err) {
+    if (isDecoderUnavailable(err)) {
+      reportEngineUnavailable(engineUnavailable(err), toolId, logger);
+      return undefined;
+    }
     // The result itself can't be decoded for a preview. Do NOT fall back to the
     // pre-processing input: the client renders this preview under the processed
     // filename, so an input-derived preview would show the untouched original as

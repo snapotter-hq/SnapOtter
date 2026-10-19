@@ -33,11 +33,15 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     rm: vi.fn(),
   }));
 
-  const { SafeError } = await vi.importActual<
-    typeof import("../../../../packages/shared/src/tool-errors.js")
-  >("../../../../packages/shared/src/tool-errors.js");
+  const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
+    await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+      "../../../../packages/shared/src/tool-errors.js",
+    );
   vi.doMock("@snapotter/shared", () => ({
     SafeError,
+    isSafeMessageError,
+    isToolInputError,
+    hasServerErrorStatus,
     ANALYTICS_EVENTS: {},
     TOOLS: [],
     // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load.
@@ -456,6 +460,10 @@ describe("worker result payload behavior", () => {
 
   it("writes outputs/<jobId>/.result-payload.json before the primary output only when resultPayload is non-empty (#1389)", async () => {
     const processV2Mock = vi.fn();
+    const dbSetMock = vi.fn(() => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }));
+    const generatePreviewMock = vi.fn().mockResolvedValue(undefined);
     const workerMod = await loadWorker("", () => {
       vi.doMock("node:fs/promises", () => ({
         mkdir: vi.fn().mockResolvedValue(undefined),
@@ -465,9 +473,7 @@ describe("worker result payload behavior", () => {
       vi.doMock("../../../../apps/api/src/db/index.js", () => ({
         db: {
           update: vi.fn(() => ({
-            set: vi.fn(() => ({
-              where: vi.fn().mockResolvedValue(undefined),
-            })),
+            set: dbSetMock,
           })),
         },
         schema: { jobs: { id: "jobs.id" } },
@@ -484,7 +490,7 @@ describe("worker result payload behavior", () => {
       vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
         autoSaveToLibrary: vi.fn().mockResolvedValue({}),
         buildOutputName: vi.fn((out: string) => out),
-        generatePreview: vi.fn().mockResolvedValue(undefined),
+        generatePreview: generatePreviewMock,
       }));
       vi.doMock("@snapotter/media-engine", () => ({
         HW_ACCEL_FAMILIES: [],
@@ -568,6 +574,38 @@ describe("worker result payload behavior", () => {
     expect(objectStorageMocks.putObject.mock.calls.map(([key]) => key)).toEqual([
       "outputs/job-no-payload/out.jpg",
     ]);
+
+    // 4. ENGINE_UNAVAILABLE (DecoderUnavailableError) on a multi-attempt pool is
+    // unrecoverable on attempt 1 and writes the terminal row immediately (#1453).
+    expect(generatePreviewMock).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "image/jpeg",
+      "job-with-payload",
+      "compress",
+    );
+    dbSetMock.mockClear();
+    const { DecoderUnavailableError } = await import(
+      "../../../../apps/api/src/lib/format-decoders.js"
+    );
+    const { UnrecoverableError } = await import("bullmq");
+    const missingDecoder = new DecoderUnavailableError("No ImageMagick found.");
+    processV2Mock.mockRejectedValueOnce(missingDecoder);
+    await expect(
+      processor({
+        ...makeJob("job-missing-decoder"),
+        opts: { attempts: 2 },
+      }),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: expect.objectContaining({
+          code: "ENGINE_UNAVAILABLE",
+          httpStatus: 503,
+          message: "No ImageMagick found.",
+        }),
+      }),
+    );
   });
 });
 

@@ -3,6 +3,7 @@ import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import {
   buildTagArgs,
@@ -12,9 +13,11 @@ import {
 } from "../../lib/exiftool.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
+import { engineUnavailable } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -216,7 +219,10 @@ export function registerEditMetadata(app: FastifyInstance) {
             const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
             await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
             previewUrl = `/api/v1/download/${jobId}/preview.webp`;
-          } catch {
+          } catch (err) {
+            if (isDecoderUnavailable(err)) {
+              reportEngineUnavailable(engineUnavailable(err), "edit-metadata", request.log);
+            }
             // Non-fatal - frontend shows fallback
           }
         }

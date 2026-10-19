@@ -155,6 +155,53 @@ const ROUTES: RouteCase[] = [
     url: "/api/v1/tools/image/vectorize",
     parts: (s) => [{ name: "file", ...s }, settings({})],
   },
+  // #1453: multi-file, inline-decode, and batch routes that previously
+  // swallowed a missing decoder into per-file errors/skips or raw uploads.
+  {
+    name: "find-duplicates",
+    url: "/api/v1/tools/image/find-duplicates",
+    parts: (s) => [
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", ...s },
+    ],
+  },
+  {
+    name: "favicon",
+    url: "/api/v1/tools/image/favicon",
+    parts: (s) => [
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", ...s },
+    ],
+  },
+  {
+    name: "image-to-base64",
+    url: "/api/v1/tools/image/image-to-base64",
+    parts: (s) => [
+      { name: "file", filename: "good.png", contentType: "image/png", content: PNG },
+      { name: "file", ...s },
+    ],
+  },
+  {
+    name: "beautify",
+    url: "/api/v1/tools/image/beautify",
+    parts: (s) => [{ name: "file", ...s }, settings({})],
+  },
+  {
+    name: "batch",
+    url: "/api/v1/tools/image/resize/batch",
+    parts: (s) => [{ name: "file", ...s }, settings({ width: 32 })],
+  },
+  {
+    name: "pipeline batch",
+    url: "/api/v1/pipeline/batch",
+    parts: (s) => [
+      { name: "file", ...s },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 32 } }] }),
+      },
+    ],
+  },
 ];
 
 const EXPECTED_MESSAGE = {
@@ -193,18 +240,20 @@ describe("Hand-written image routes: decoder availability (#1428)", () => {
     }
   }
 
-  it("stitch: Sharp's own decode still wins when the CLI decoder is missing", async () => {
-    process.env.PATH = emptyBinDir;
+  for (const routeName of ["stitch", "pipeline execute", "batch", "pipeline batch"]) {
+    it(`${routeName}: Sharp's own decode still wins when the CLI decoder is missing`, async () => {
+      process.env.PATH = emptyBinDir;
 
-    // DNG is a TIFF container; the guard sits behind the Sharp fallback.
-    const res = await post(ROUTES[0], {
-      filename: "photo.dng",
-      contentType: "image/x-adobe-dng",
-      content: readFixture(fixtures.image.formats("dng")),
+      // DNG is a TIFF container; the guard sits behind the Sharp fallback.
+      const res = await post(ROUTES.find((r) => r.name === routeName) as RouteCase, {
+        filename: "photo.dng",
+        contentType: "image/x-adobe-dng",
+        content: readFixture(fixtures.image.formats("dng")),
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
     });
-
-    expect(res.statusCode, res.body).toBe(200);
-  });
+  }
 
   it("split: a corrupt ICO still answers 422 when ImageMagick is installed", async () => {
     const ico = SAMPLES.ico.content;
@@ -229,4 +278,33 @@ describe("Hand-written image routes: decoder availability (#1428)", () => {
 
     expect(res.statusCode, res.body).toBe(422);
   });
+
+  for (const [format, sample] of Object.entries(SAMPLES)) {
+    it(`user-file thumbnail: a missing decoder for ${format} answers 503 ENGINE_UNAVAILABLE (#1453)`, async () => {
+      const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+        { name: "file", ...sample },
+      ]);
+      const uploadRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/upload",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": uploadCt },
+        body: uploadBody,
+      });
+      expect(uploadRes.statusCode, uploadRes.body).toBe(201);
+      const fileId = uploadRes.json().files[0].id as string;
+
+      process.env.PATH = emptyBinDir;
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${fileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
+      expect(res.json().error).toMatch(
+        format === "heic" ? /HEIF decoder/ : /ImageMagick|image decoder.*could not be started/,
+      );
+    });
+  }
 });
