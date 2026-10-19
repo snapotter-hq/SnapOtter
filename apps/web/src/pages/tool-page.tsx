@@ -51,6 +51,7 @@ import { downloadBlob, formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
+import { showUnsupportedFileType } from "@/lib/intake-notice";
 import { playerDownloadClaim, shouldShowConversionCard } from "@/lib/result-display";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
@@ -723,7 +724,10 @@ function ToolPageContent({
       const droppedFiles = Array.from(e.dataTransfer.files);
       if (droppedFiles.length === 0) return;
       const validFiles = toolFileFilter ? droppedFiles.filter(toolFileFilter) : droppedFiles;
-      if (validFiles.length === 0) return;
+      if (validFiles.length === 0) {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+        return;
+      }
       if (!allowIntake()) return;
       if (isMultiFileTool) {
         addFiles(validFiles);
@@ -731,7 +735,14 @@ function ToolPageContent({
         setFiles(validFiles);
       }
     },
-    [toolFileFilter, addFiles, setFiles, isMultiFileTool, allowIntake],
+    [
+      toolFileFilter,
+      addFiles,
+      setFiles,
+      isMultiFileTool,
+      allowIntake,
+      t.dropzone.unsupportedFileType,
+    ],
   );
 
   // Document-level paste handler (skip for generator tools that don't accept file input)
@@ -751,12 +762,14 @@ function ToolPageContent({
         }
       }
       if (pastedFiles.length > 0) {
-        e.preventDefault();
         const filtered = toolFileFilter ? pastedFiles.filter(toolFileFilter) : pastedFiles;
         if (filtered.length > 0) {
+          e.preventDefault();
           if (!allowIntake()) return;
           if (isMultiFileTool) addFiles(filtered);
           else setFiles(filtered);
+        } else {
+          showUnsupportedFileType(t.dropzone.unsupportedFileType);
         }
       }
     };
@@ -770,6 +783,7 @@ function ToolPageContent({
     setFiles,
     registryEntry?.displayMode,
     allowIntake,
+    t.dropzone.unsupportedFileType,
   ]);
 
   const handleDownloadAll = useCallback(() => {

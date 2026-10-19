@@ -7,3 +7,7 @@ import { toast } from "sonner";
 export function showIntakeIgnored(message: string): void {
   toast.info(message, { id: "intake-ignored-while-running" });
 }
+
+export function showUnsupportedFileType(message: string): void {
+  toast.error(message, { id: "intake-unsupported-file-type" });
+}
