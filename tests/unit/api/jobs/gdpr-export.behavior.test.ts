@@ -6,10 +6,13 @@ const selectMock = vi.hoisted(() => vi.fn());
 const readStoredFileMock = vi.hoisted(() => vi.fn());
 const isStorageServiceFaultMock = vi.hoisted(() => vi.fn<(_err: unknown) => boolean>(() => false));
 const loggerWarnMock = vi.hoisted(() => vi.fn());
+const loggerErrorMock = vi.hoisted(() => vi.fn());
+const reportErrorMock = vi.hoisted(() => vi.fn());
 const putObjectMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const registerCancelableMock = vi.hoisted(() => vi.fn(() => new AbortController()));
 const unregisterCancelableMock = vi.hoisted(() => vi.fn());
+const wasUserCanceledMock = vi.hoisted(() => vi.fn(() => false));
 /** Every archive written through putObjectStream, drained to a buffer. */
 const written = vi.hoisted(() => [] as Array<{ key: string; body: Buffer }>);
 const putObjectStreamMock = vi.hoisted(() =>
@@ -55,12 +58,16 @@ async function loadGdprExport() {
   isStorageServiceFaultMock.mockReset();
   isStorageServiceFaultMock.mockReturnValue(false);
   loggerWarnMock.mockReset();
+  loggerErrorMock.mockReset();
+  reportErrorMock.mockReset();
   putObjectMock.mockReset();
   deletePrefixMock.mockReset();
   deletePrefixMock.mockResolvedValue(undefined);
   registerCancelableMock.mockReset();
   registerCancelableMock.mockImplementation(() => new AbortController());
   unregisterCancelableMock.mockReset();
+  wasUserCanceledMock.mockReset();
+  wasUserCanceledMock.mockReturnValue(false);
   putObjectStreamMock.mockClear();
   written.length = 0;
 
@@ -103,6 +110,11 @@ async function loadGdprExport() {
   vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
     registerCancelable: registerCancelableMock,
     unregisterCancelable: unregisterCancelableMock,
+    wasUserCanceled: wasUserCanceledMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+    reportError: reportErrorMock,
   }));
 
   vi.doMock("../../../../apps/api/src/lib/file-storage.js", () => ({
@@ -113,7 +125,7 @@ async function loadGdprExport() {
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({
     logger: {
       warn: loggerWarnMock,
-      error: vi.fn(),
+      error: loggerErrorMock,
       info: vi.fn(),
       debug: vi.fn(),
     },
@@ -830,6 +842,300 @@ describe("GDPR export job behavior", () => {
     expect(unregisterCancelableMock).toHaveBeenCalledWith("export-write-err");
   });
 
+  describe("export timeout deadline (#1497)", () => {
+    it("passes an AbortSignal to readStoredFile for each library file", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      selectMock
+        .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+        .mockReturnValueOnce(
+          queryChain([
+            {
+              id: "file-1",
+              userId: "user-1",
+              storedName: "stored/a",
+              originalName: "a.txt",
+              createdAt: new Date("2026-06-02T00:00:00.000Z"),
+            },
+          ]),
+        )
+        .mockReturnValueOnce(queryChain([]))
+        .mockReturnValueOnce(queryChain([]));
+      readStoredFileMock.mockResolvedValueOnce(Buffer.from("hello"));
+
+      await gdprExportJob("user-1", "export-signal-arg");
+
+      expect(readStoredFileMock).toHaveBeenCalledWith("stored/a", {
+        signal: expect.any(AbortSignal),
+      });
+    });
+
+    it("aborts a hung library file read and fails the export when GDPR_EXPORT_TIMEOUT_MS fires", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+          .mockReturnValueOnce(
+            queryChain([
+              {
+                id: "file-1",
+                userId: "user-1",
+                storedName: "stored/hung",
+                originalName: "hung.png",
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+              },
+            ]),
+          )
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]));
+
+        let readSignal: AbortSignal | undefined;
+        readStoredFileMock.mockImplementationOnce(
+          (_name: string, opts?: { signal?: AbortSignal }) => {
+            readSignal = opts?.signal;
+            // Simulate a read that never resolves on its own.
+            return new Promise<Buffer>(() => {});
+          },
+        );
+
+        await expect(gdprExportJob("user-1", "export-hung-read")).rejects.toMatchObject({
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
+          message: expect.stringContaining("GDPR export timed out after 40ms"),
+        });
+
+        expect(readSignal).toBeInstanceOf(AbortSignal);
+        expect(readSignal?.aborted).toBe(true);
+        expect(putObjectStreamMock).not.toHaveBeenCalled();
+        expect(loggerWarnMock).not.toHaveBeenCalled();
+        expect(unregisterCancelableMock).toHaveBeenCalledWith("export-hung-read");
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+
+    it("cleans up outputs and fails (rather than returning null as canceled) when the timeout fires during putObjectStream", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([{ id: "export-hung-write", status: "processing" }]));
+
+        putObjectStreamMock.mockImplementationOnce(
+          (_key: string, _source: AsyncIterable<Buffer>, opts?: { signal?: AbortSignal }) =>
+            new Promise<number>((_resolve, reject) => {
+              opts?.signal?.addEventListener(
+                "abort",
+                () => {
+                  reject(
+                    Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+                  );
+                },
+                { once: true },
+              );
+            }),
+        );
+
+        await expect(gdprExportJob("user-1", "export-hung-write")).rejects.toMatchObject({
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
+          message: expect.stringContaining("GDPR export timed out after 40ms"),
+        });
+
+        expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-hung-write/");
+        expect(unregisterCancelableMock).toHaveBeenCalledWith("export-hung-write");
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+
+    it("treats GDPR_EXPORT_TIMEOUT_MS=0 as unlimited", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 0;
+      try {
+        const ac = new AbortController();
+        registerCancelableMock.mockReturnValueOnce(ac);
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+          .mockReturnValueOnce(
+            queryChain([
+              {
+                id: "file-1",
+                userId: "user-1",
+                storedName: "stored/a",
+                originalName: "a.txt",
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+              },
+            ]),
+          )
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]));
+        readStoredFileMock.mockResolvedValueOnce(Buffer.from("ok"));
+
+        await expect(gdprExportJob("user-1", "export-unlimited")).resolves.toEqual({
+          outputRef: "outputs/export-unlimited/gdpr-export.zip",
+        });
+
+        expect(readStoredFileMock).toHaveBeenCalledWith("stored/a", { signal: ac.signal });
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+
+    it("fails with TimeoutError when an initial metadata query hangs past GDPR_EXPORT_TIMEOUT_MS", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock.mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          where: vi.fn(() => new Promise(() => {})),
+        });
+
+        await expect(gdprExportJob("user-1", "export-hung-db")).rejects.toMatchObject({
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
+          message: expect.stringContaining("GDPR export timed out after 40ms"),
+        });
+        expect(unregisterCancelableMock).toHaveBeenCalledWith("export-hung-db");
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+
+    it("cleans up outputs and throws TimeoutError if the deadline fires during the post-write liveness check", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([{ id: "export-post-write-timeout", status: "queued" }]))
+          .mockReturnValueOnce({
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn(() => new Promise(() => {})),
+          });
+
+        await expect(gdprExportJob("user-1", "export-post-write-timeout")).rejects.toMatchObject({
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
+        });
+
+        expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-post-write-timeout/");
+        expect(unregisterCancelableMock).toHaveBeenCalledWith("export-post-write-timeout");
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+
+    it("returns null (canceled) rather than TimeoutError when a user cancel arrives after the deadline fired", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+          .mockReturnValueOnce(
+            queryChain([
+              {
+                id: "file-1",
+                userId: "user-1",
+                storedName: "stored/a",
+                originalName: "a.png",
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+              },
+            ]),
+          )
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]));
+
+        readStoredFileMock.mockImplementationOnce(
+          (_name: string, opts?: { signal?: AbortSignal }) =>
+            new Promise<Buffer>((_resolve, reject) => {
+              opts?.signal?.addEventListener(
+                "abort",
+                () => {
+                  wasUserCanceledMock.mockReturnValue(true);
+                  reject(
+                    Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+                  );
+                },
+                { once: true },
+              );
+            }),
+        );
+
+        await expect(gdprExportJob("user-1", "export-cancel-wins")).resolves.toEqual({
+          outputRef: null,
+        });
+        expect(putObjectStreamMock).not.toHaveBeenCalled();
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+
+    it("logs and reports when deletePrefix fails during timeout cleanup and still throws TimeoutError", async () => {
+      const { gdprExportJob } = await loadGdprExport();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([{ id: "export-cleanup-fault", status: "processing" }]));
+
+        const cleanupFault = new Error("S3 cleanup failed");
+        deletePrefixMock.mockRejectedValueOnce(cleanupFault);
+        putObjectStreamMock.mockImplementationOnce(() => new Promise<number>(() => {}));
+
+        await expect(gdprExportJob("user-1", "export-cleanup-fault")).rejects.toMatchObject({
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
+        });
+
+        expect(loggerErrorMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            err: cleanupFault,
+            jobId: "export-cleanup-fault",
+            userId: "user-1",
+            prefix: "outputs/export-cleanup-fault/",
+          }),
+          "gdpr export: failed to clean up outputs after abort or fault",
+        );
+        expect(reportErrorMock).toHaveBeenCalledWith(
+          cleanupFault,
+          expect.objectContaining({
+            source: "worker",
+            pool: "system",
+            toolId: "gdpr-export",
+            jobId: "export-cleanup-fault",
+          }),
+        );
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      }
+    });
+  });
+
   describe("with real file-storage S3 classification (#975)", () => {
     async function loadGdprExportWithRealFileStorage() {
       vi.resetModules();
@@ -878,6 +1184,7 @@ describe("GDPR export job behavior", () => {
       vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
         registerCancelable: registerCancelableMock,
         unregisterCancelable: unregisterCancelableMock,
+        wasUserCanceled: wasUserCanceledMock,
       }));
 
       vi.doUnmock("../../../../apps/api/src/lib/file-storage.js");
@@ -1019,5 +1326,64 @@ describe("GDPR export job behavior", () => {
         }
       },
     );
+
+    it("forwards the export AbortSignal through readStoredFile to s3.getObject and aborts a hung S3 read on timeout (#1497)", async () => {
+      const { env, getObjectSpy, gdprExportJob } = await loadGdprExportWithRealFileStorage();
+      const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
+      env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-s3", email: "s3@example.test" }]))
+          .mockReturnValueOnce(
+            queryChain([
+              {
+                id: "file-1",
+                userId: "user-s3",
+                storedName: "11111111-1111-1111-1111-111111111111.png",
+                originalName: "hung-s3.png",
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+              },
+            ]),
+          )
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]));
+
+        let s3Signal: AbortSignal | undefined;
+        getObjectSpy.mockImplementationOnce((...args: unknown[]) => {
+          const sig = args[1] as AbortSignal | undefined;
+          s3Signal = sig;
+          return new Promise<Buffer>((_resolve, reject) => {
+            sig?.addEventListener(
+              "abort",
+              () => {
+                reject(
+                  Object.assign(new Error("Request aborted"), {
+                    name: "AbortError",
+                  }),
+                );
+              },
+              { once: true },
+            );
+          });
+        });
+
+        await expect(gdprExportJob("user-s3", "export-s3-hung")).rejects.toMatchObject({
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
+          message: expect.stringContaining("GDPR export timed out after 40ms"),
+        });
+
+        expect(getObjectSpy).toHaveBeenCalledWith(
+          "11111111-1111-1111-1111-111111111111.png",
+          expect.any(AbortSignal),
+        );
+        expect(s3Signal?.aborted).toBe(true);
+        expect(putObjectStreamMock).not.toHaveBeenCalled();
+        expect(loggerWarnMock).not.toHaveBeenCalled();
+      } finally {
+        env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+        (env as Record<string, unknown>).STORAGE_MODE = "local";
+      }
+    });
   });
 });

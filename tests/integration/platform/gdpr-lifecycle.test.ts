@@ -734,4 +734,83 @@ describe("GDPR purge role hierarchy", () => {
       await db.delete(schema.users).where(eq(schema.users.id, targetId));
     }
   });
+
+  it("times out a GDPR export hung on a library file read so subsequent system jobs still run (#1497)", async () => {
+    const { env: activeEnv } = await import("../../../apps/api/src/config.js");
+    const fileStorage = await import("../../../apps/api/src/lib/file-storage.js");
+    const { getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const { SYSTEM_JOBS } = await import("../../../apps/api/src/jobs/system-jobs.js");
+    const targetId = await createTarget("user");
+    const fileId = randomUUID();
+    const exportJobId = randomUUID();
+    const followUpJobId = `session-purge-after-${exportJobId}`;
+    const storedName = await fileStorage.saveFile(Buffer.from("library bytes"), "hung.png");
+    await db.insert(schema.userFiles).values({
+      id: fileId,
+      userId: targetId,
+      originalName: "hung.png",
+      storedName,
+      mimeType: "image/png",
+      size: 13,
+    });
+    await db.insert(schema.jobs).values({
+      id: exportJobId,
+      userId: targetId,
+      toolId: "gdpr-export",
+      pool: "system",
+      type: "system",
+      status: "queued",
+    });
+
+    const prevTimeout = activeEnv.GDPR_EXPORT_TIMEOUT_MS;
+    activeEnv.GDPR_EXPORT_TIMEOUT_MS = 100;
+
+    let observedSignal: AbortSignal | undefined;
+    const readSpy = vi
+      .spyOn(fileStorage, "readStoredFile")
+      .mockImplementationOnce((_name, opts) => {
+        observedSignal = opts instanceof AbortSignal ? opts : opts?.signal;
+        // Hang indefinitely unless the export deadline aborts the read.
+        return new Promise<Buffer>(() => {});
+      });
+
+    const systemQueue = getQueue("system");
+    try {
+      const exportQueueJob = await systemQueue.add(
+        SYSTEM_JOBS.gdprExport,
+        { userId: targetId, jobId: exportJobId } as never,
+        { jobId: exportJobId, attempts: 1 },
+      );
+      const followUpQueueJob = await systemQueue.add(SYSTEM_JOBS.sessionPurge, {} as never, {
+        jobId: followUpJobId,
+        attempts: 1,
+      });
+
+      await vi.waitFor(async () => expect(await exportQueueJob.getState()).toBe("failed"), {
+        timeout: 10_000,
+        interval: 50,
+      });
+      const failedExportJob = await systemQueue.getJob(exportJobId);
+      expect(failedExportJob?.failedReason).toMatch(/GDPR export timed out after 100ms/);
+      expect(observedSignal).toBeInstanceOf(AbortSignal);
+      expect(observedSignal?.aborted).toBe(true);
+      expect(await objectExists(`outputs/${exportJobId}/gdpr-export.zip`)).toBe(false);
+
+      // The concurrency-1 system worker is no longer wedged behind the hung export.
+      await vi.waitFor(async () => expect(await followUpQueueJob.getState()).toBe("completed"), {
+        timeout: 10_000,
+        interval: 50,
+      });
+    } finally {
+      activeEnv.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      readSpy.mockRestore();
+      await systemQueue.remove(exportJobId).catch(() => {});
+      await systemQueue.remove(followUpJobId).catch(() => {});
+      await deletePrefix(`outputs/${exportJobId}/`).catch(() => {});
+      await fileStorage.deleteStoredFile(storedName).catch(() => {});
+      await db.delete(schema.userFiles).where(eq(schema.userFiles.id, fileId));
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, exportJobId));
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  });
 });

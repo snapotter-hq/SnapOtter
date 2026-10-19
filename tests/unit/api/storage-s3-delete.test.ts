@@ -1,3 +1,4 @@
+import { PassThrough } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -18,7 +19,7 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
   };
 });
 
-const { configureS3, deleteGenericPrefix, deleteObject, deleteThumbnail } = await import(
+const { configureS3, deleteGenericPrefix, deleteObject, deleteThumbnail, getObject } = await import(
   "../../../packages/enterprise/src/storage-s3.js"
 );
 
@@ -138,5 +139,127 @@ describe("deleteGenericPrefix (#2632)", () => {
     );
     expect(err).toBeInstanceOf(Error);
     expect(err).toHaveProperty("$metadata", {});
+  });
+});
+
+describe("getObject abort signal support (#1497)", () => {
+  it("omits send options when no signal is passed", async () => {
+    send.mockResolvedValueOnce({
+      Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) },
+    });
+
+    const buf = await getObject("photo.png");
+
+    expect(buf).toEqual(Buffer.from([1, 2, 3]));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]).toHaveLength(1);
+  });
+
+  it("forwards abortSignal to S3Client.send when a signal is passed", async () => {
+    const ac = new AbortController();
+    send.mockResolvedValueOnce({
+      Body: { transformToByteArray: async () => new Uint8Array([4, 5]) },
+    });
+
+    const buf = await getObject("photo.png", ac.signal);
+
+    expect(buf).toEqual(Buffer.from([4, 5]));
+    expect(send).toHaveBeenCalledWith(expect.anything(), { abortSignal: ac.signal });
+  });
+
+  it("rejects without calling S3Client.send when the signal is already aborted", async () => {
+    const ac = new AbortController();
+    ac.abort(new Error("already timed out"));
+
+    await expect(getObject("photo.png", ac.signal)).rejects.toThrow("already timed out");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("destroys the response body stream if the signal aborts while reading the body", async () => {
+    const ac = new AbortController();
+    let rejectTransform!: (err: unknown) => void;
+    const body = {
+      destroy: vi.fn((err?: Error) => {
+        rejectTransform(err ?? new Error("stream destroyed"));
+      }),
+      transformToByteArray: () =>
+        new Promise<Uint8Array>((_resolve, reject) => {
+          rejectTransform = reject;
+          const timeoutReason = Object.assign(
+            new Error("The operation was aborted due to timeout"),
+            {
+              name: "TimeoutError",
+            },
+          );
+          ac.abort(timeoutReason);
+        }),
+    };
+    send.mockResolvedValueOnce({ Body: body });
+
+    await expect(getObject("photo.png", ac.signal)).rejects.toMatchObject({
+      name: "TimeoutError",
+      message: "The operation was aborted due to timeout",
+    });
+    expect(body.destroy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "TimeoutError",
+      }),
+    );
+  });
+
+  it("detaches the abort listener after getObject resolves so a later abort does not destroy the body", async () => {
+    const ac = new AbortController();
+    const body = {
+      destroy: vi.fn(),
+      transformToByteArray: async () => new Uint8Array([9, 8]),
+    };
+    send.mockResolvedValueOnce({ Body: body });
+
+    const buf = await getObject("photo.png", ac.signal);
+    expect(buf).toEqual(Buffer.from([9, 8]));
+
+    ac.abort(new Error("later abort"));
+    expect(body.destroy).not.toHaveBeenCalled();
+  });
+
+  it("destroys a real Readable body without an uncaught error event when the signal aborts as send() resolves", async () => {
+    const ac = new AbortController();
+    const stream = Object.assign(new PassThrough(), {
+      transformToByteArray: vi.fn(async () => new Uint8Array([1])),
+    });
+    send.mockImplementationOnce(async () => {
+      ac.abort(new Error("aborted on headers"));
+      return { Body: stream };
+    });
+
+    const uncaught: unknown[] = [];
+    const onUncaught = (err: unknown) => uncaught.push(err);
+    process.on("uncaughtException", onUncaught);
+    try {
+      await expect(getObject("photo.png", ac.signal)).rejects.toThrow("aborted on headers");
+      await new Promise((r) => setImmediate(r));
+    } finally {
+      process.off("uncaughtException", onUncaught);
+    }
+
+    expect(uncaught).toEqual([]);
+    expect(stream.destroyed).toBe(true);
+    expect(stream.transformToByteArray).not.toHaveBeenCalled();
+  });
+
+  it("rejects if transformToByteArray resolves after the signal aborted", async () => {
+    const ac = new AbortController();
+    const body = {
+      destroy: vi.fn(),
+      transformToByteArray: async () => {
+        ac.abort(new Error("aborted before byte array returned"));
+        return new Uint8Array([7]);
+      },
+    };
+    send.mockResolvedValueOnce({ Body: body });
+
+    await expect(getObject("photo.png", ac.signal)).rejects.toThrow(
+      "aborted before byte array returned",
+    );
   });
 });

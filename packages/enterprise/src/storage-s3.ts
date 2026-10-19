@@ -103,15 +103,44 @@ export async function putObject(storedName: string, buffer: Buffer): Promise<voi
   );
 }
 
-export async function getObject(storedName: string): Promise<Buffer> {
+export async function getObject(storedName: string, signal?: AbortSignal): Promise<Buffer> {
+  signal?.throwIfAborted();
   const key = fileKey(storedName);
-  const response = await getClient().send(
-    new GetObjectCommand({
-      Bucket: cfg().bucket,
-      Key: key,
-    }),
-  );
-  return Buffer.from(await requireObjectBody(response, key).transformToByteArray());
+  const command = new GetObjectCommand({
+    Bucket: cfg().bucket,
+    Key: key,
+  });
+  const response = await (signal
+    ? getClient().send(command, { abortSignal: signal })
+    : getClient().send(command));
+  const body = requireObjectBody(response, key);
+  const abortBody = () => {
+    const reason =
+      signal?.reason instanceof Error
+        ? signal.reason
+        : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    const readable = body as {
+      listenerCount?: (event: string) => number;
+      once?: (event: string, listener: () => void) => void;
+      destroy?: (err?: Error) => void;
+    };
+    if (typeof readable.listenerCount === "function" && readable.listenerCount("error") === 0) {
+      readable.once?.("error", () => {});
+    }
+    readable.destroy?.(reason);
+  };
+  if (signal?.aborted) {
+    abortBody();
+    signal.throwIfAborted();
+  }
+  signal?.addEventListener("abort", abortBody, { once: true });
+  try {
+    const bytes = await body.transformToByteArray();
+    signal?.throwIfAborted();
+    return Buffer.from(bytes);
+  } finally {
+    signal?.removeEventListener("abort", abortBody);
+  }
 }
 
 export async function getObjectStream(storedName: string): Promise<Readable> {

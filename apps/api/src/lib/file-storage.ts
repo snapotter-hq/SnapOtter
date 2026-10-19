@@ -217,13 +217,19 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
   return storedName;
 }
 
-export async function readStoredFile(storedName: string): Promise<Buffer> {
+export async function readStoredFile(
+  storedName: string,
+  opts?: { signal?: AbortSignal } | AbortSignal,
+): Promise<Buffer> {
   assertSafeStoredName(storedName);
+  const signal = opts instanceof AbortSignal ? opts : opts?.signal;
+  signal?.throwIfAborted();
   if (isS3Enabled()) {
     const s3 = await getS3();
-    return s3.getObject(storedName);
+    signal?.throwIfAborted();
+    return s3.getObject(storedName, signal);
   }
-  return readFile(join(env.FILES_STORAGE_PATH, storedName));
+  return readFile(join(env.FILES_STORAGE_PATH, storedName), signal ? { signal } : undefined);
 }
 
 /**

@@ -203,6 +203,7 @@ const envSchema = z
     SYNC_WAIT_MS: z.coerce.number().default(8000),
     JOB_TIMEOUT_FAST_S: z.coerce.number().default(120),
     JOB_TIMEOUT_LONG_S: z.coerce.number().default(7200),
+    GDPR_EXPORT_TIMEOUT_MS: z.coerce.number().default(900_000),
     // AI bundle install watchdog. A wedged installer (dead download socket,
     // hung pip) otherwise holds the venv writer lock forever and blocks every
     // other install. STALL = max time with no progress frame before a kill;

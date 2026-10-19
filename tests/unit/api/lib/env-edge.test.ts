@@ -122,3 +122,16 @@ describe("loadEnv TRUST_PROXY validation", () => {
     }
   });
 });
+
+describe("loadEnv GDPR_EXPORT_TIMEOUT_MS (#1497)", () => {
+  it("defaults GDPR_EXPORT_TIMEOUT_MS to 15 minutes and accepts 0 for unlimited", () => {
+    const { GDPR_EXPORT_TIMEOUT_MS: _omitted, ...withoutTimeout } = originalEnv;
+    expect(loadEnv(withoutTimeout).GDPR_EXPORT_TIMEOUT_MS).toBe(900_000);
+    expect(loadEnv({ ...withoutTimeout, GDPR_EXPORT_TIMEOUT_MS: "0" }).GDPR_EXPORT_TIMEOUT_MS).toBe(
+      0,
+    );
+    expect(
+      loadEnv({ ...withoutTimeout, GDPR_EXPORT_TIMEOUT_MS: "45000" }).GDPR_EXPORT_TIMEOUT_MS,
+    ).toBe(45_000);
+  });
+});

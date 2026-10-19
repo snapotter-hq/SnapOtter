@@ -302,6 +302,31 @@ describe("path traversal containment", () => {
   });
 });
 
+describe("readStoredFile abort signal (#1497)", () => {
+  it("reads the file when passed a live AbortSignal (options object or bare signal)", async () => {
+    const { saveFile, readStoredFile } = await importModule();
+    const name = await saveFile(Buffer.from("hello"), "photo.png");
+    const ac = new AbortController();
+
+    expect((await readStoredFile(name, { signal: ac.signal })).toString()).toBe("hello");
+    expect((await readStoredFile(name, ac.signal)).toString()).toBe("hello");
+  });
+
+  it("rejects when the passed AbortSignal is already aborted", async () => {
+    const { saveFile, readStoredFile } = await importModule();
+    const name = await saveFile(Buffer.from("hello"), "photo.png");
+    const ac = new AbortController();
+    ac.abort();
+
+    await expect(readStoredFile(name, { signal: ac.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    await expect(readStoredFile(name, ac.signal)).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+});
+
 describe("ensureStorageDir", () => {
   it("creates directory if not exists", async () => {
     await rm(testDir, { recursive: true, force: true });
