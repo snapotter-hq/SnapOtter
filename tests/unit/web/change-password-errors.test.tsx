@@ -169,6 +169,16 @@ describe("change-password errors are translated (#1446)", () => {
     expect(await screen.findByText(de.errors.tooManyRequests)).toBeVisible();
   });
 
+  it("says the IP address is not allowed when the allowlist blocks the request (#2697)", async () => {
+    answer(403, { error: "IP address not allowed", code: "IP_NOT_ALLOWED" });
+
+    await submit();
+
+    expect(await screen.findByText(de.auth.ipNotAllowed)).toBeVisible();
+    expect(screen.queryByText(de.changePassword.failedError)).toBeNull();
+    expect(screen.queryByText("IP address not allowed")).toBeNull();
+  });
+
   it("falls back to the translated generic message, never the server's text", async () => {
     answer(500, { error: "Internal server error" });
 

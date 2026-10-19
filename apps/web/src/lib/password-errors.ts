@@ -66,6 +66,7 @@ export function passwordErrorMessage(
   if (body.code === "INVALID_PASSWORD") return t.settings.security.currentPasswordIncorrect;
   if (body.code === "PASSWORD_CHANGED") return t.settings.security.passwordChangedElsewhere;
   if (body.code === "OIDC_NO_PASSWORD") return t.auth.passwordManagedByProvider;
+  if (body.code === "IP_NOT_ALLOWED") return t.auth.ipNotAllowed;
   if (body.code === "VALIDATION_ERROR" && isPasswordRule(body.rule)) {
     return ruleMessage(t, body.rule, body);
   }

@@ -226,6 +226,14 @@ describe("Security: change password", () => {
     expect(screen.queryByText(s.security.changeFailed)).toBeNull();
   });
 
+  it("403 IP_NOT_ALLOWED says the IP address is not allowed (#2697)", async () => {
+    apiPost.mockRejectedValueOnce(apiError(403, "IP_NOT_ALLOWED"));
+    await submit();
+
+    await expectShown(de.auth.ipNotAllowed);
+    expect(screen.queryByText(s.security.changeFailed)).toBeNull();
+  });
+
   it("shows a rule the server repeats only once", async () => {
     apiPost.mockRejectedValueOnce(
       apiError(400, "VALIDATION_ERROR", {
@@ -301,6 +309,7 @@ describe("Admin security settings: save", () => {
     reject(400, "DEPENDENCY_VALIDATION_FAILED", s.security.ssoNeedsProvider),
     reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
     reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(429, undefined, de.errors.tooManyRequests),
     reject(500, undefined, s.security.securitySettingsFailed),
   ])("%s", async (_name, err, expected) => {
@@ -346,6 +355,7 @@ describe("People", () => {
     reject(409, "CONFLICT", s.people.usernameTaken),
     reject(403, "USER_LIMIT_REACHED", format(s.people.userLimitReached, { max: 5 })),
     reject(403, "ESCALATION_DENIED", de.errors.escalationDenied),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(400, "UNKNOWN_ROLE", s.people.roleNotFound),
     reject(400, "UNKNOWN_TEAM", s.people.teamNotFound),
     reject(400, "VALIDATION_ERROR", de.errors.passwordNeedsUppercase, { rule: "uppercase" }),
@@ -385,6 +395,7 @@ describe("People", () => {
     reject(403, "ESCALATION_DENIED", de.errors.escalationDenied),
     reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
     reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(500, undefined, s.people.updateFailed),
   ])("editing a user's role or team: %s", async (_name, err, expected) => {
     apiPut.mockRejectedValueOnce(err);
@@ -397,6 +408,7 @@ describe("People", () => {
     reject(400, "VALIDATION_ERROR", de.errors.passwordNeedsDigit, { rule: "digit" }),
     reject(400, "OIDC_NO_PASSWORD", de.auth.passwordManagedByProvider),
     reject(403, "ESCALATION_DENIED", de.errors.escalationDenied),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(500, undefined, s.people.resetFailed),
   ])("resetting a password: %s", async (_name, err, expected) => {
     apiPost.mockRejectedValueOnce(err);
@@ -731,6 +743,7 @@ describe("Roles", () => {
 describe("Two-factor authentication", () => {
   it.each([
     reject(403, "FEATURE_NOT_LICENSED", de.errors.featureNotLicensed),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(409, "MFA_ALREADY_ENABLED", s.security.twoFactorStateChanged),
     reject(500, undefined, s.security.securitySettingsFailed),
   ])("starting enrolment: %s", async (_name, err, expected) => {
@@ -755,6 +768,7 @@ describe("Two-factor authentication", () => {
   it.each([
     reject(401, "INVALID_CODE", de.auth.mfaInvalidCode),
     reject(400, "VALIDATION_ERROR", de.auth.mfaInvalidCode),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(429, undefined, de.auth.mfaThrottledUnknownWait),
     reject(409, "MFA_ALREADY_ENABLED", s.security.twoFactorStateChanged),
     reject(400, "NO_PENDING_ENROLLMENT", s.security.twoFactorStateChanged),
@@ -767,6 +781,7 @@ describe("Two-factor authentication", () => {
 
   it.each([
     reject(401, "INVALID_CODE", de.auth.mfaInvalidCode),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
     reject(400, "MFA_NOT_ENABLED", s.security.twoFactorStateChanged),
     reject(500, "DECRYPTION_FAILED", s.security.twoFactorUnreadable),
     reject(500, undefined, de.errors.generic),

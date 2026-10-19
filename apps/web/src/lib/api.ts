@@ -136,8 +136,8 @@ export class ApiError extends Error {
 /**
  * Translated copy for a failed request: the message `byCode` gives the
  * error's code, then the refusals any request can meet (an ended session,
- * a missing permission, a rate limit), else `fallback`. Never the server's
- * English text (#1445).
+ * a missing permission, a disallowed IP, a rate limit), else `fallback`.
+ * Never the server's English text (#1445).
  */
 export function apiErrorMessage(
   t: TranslationKeys,
@@ -149,6 +149,7 @@ export function apiErrorMessage(
     const byAnyCode: Partial<Record<string, string>> = {
       AUTH_REQUIRED: t.errors.sessionEnded,
       FORBIDDEN: t.errors.forbidden,
+      IP_NOT_ALLOWED: t.auth.ipNotAllowed,
       ...byCode,
     };
     const mapped = err.code !== undefined ? byAnyCode[err.code] : undefined;

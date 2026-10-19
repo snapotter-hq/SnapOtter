@@ -63,6 +63,7 @@ describe("passwordErrorMessage (#1446)", () => {
     expect(passwordErrorMessage(en, 400, { code: "OIDC_NO_PASSWORD" })).toBe(
       en.auth.passwordManagedByProvider,
     );
+    expect(passwordErrorMessage(en, 403, { code: "IP_NOT_ALLOWED" })).toBe(en.auth.ipNotAllowed);
     expect(passwordErrorMessage(en, 429, {})).toBe(en.errors.tooManyRequests);
   });
 });

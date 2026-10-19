@@ -71,6 +71,9 @@ describe("apiErrorMessage (#1445)", () => {
       en.errors.sessionEnded,
     );
     expect(apiErrorMessage(en, err(403, "FORBIDDEN"), {}, "fallback")).toBe(en.errors.forbidden);
+    expect(apiErrorMessage(en, err(403, "IP_NOT_ALLOWED"), {}, "fallback")).toBe(
+      en.auth.ipNotAllowed,
+    );
     expect(apiErrorMessage(en, err(429), {}, "fallback")).toBe(en.errors.tooManyRequests);
   });
 
