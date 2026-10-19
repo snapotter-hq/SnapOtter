@@ -155,6 +155,7 @@ export function useToolProcessor(toolId: string) {
   // already-settled run refuses, and the caller must fall through to the
   // single-run settle instead of treating the cancel as handled.
   const batchRunRef = useRef<{
+    jobId: string;
     onTerminal: (frame: BatchProgressFrame) => void;
     markCanceled: () => void;
     cancelLocally: () => boolean;
@@ -204,11 +205,19 @@ export function useToolProcessor(toolId: string) {
     }
   }, []);
 
-  // A store that no longer carries the run (Clear all, a reset) has nothing
-  // left to settle, and an error or cancel handle written now would land on
-  // whatever the user does next (#2151, #2622).
+  // A store that no longer carries the run (Clear all, a reset, or a newer run
+  // started after an unmounted settling batch) has nothing left to settle, and
+  // an error, cancel handle, or batch ZIP written now would land on whatever
+  // the user does next (#2151, #2622, #2637).
   const storeWasReset = useCallback(() => {
-    if (useFileStore.getState().processing) return false;
+    const state = useFileStore.getState();
+    const expectedActiveJobId =
+      asyncModeRef.current || batchRunRef.current?.jobId === activeJobIdRef.current
+        ? activeJobIdRef.current
+        : null;
+    if (state.processing && state.activeJobId === expectedActiveJobId) {
+      return false;
+    }
     clearJobEvidenceTimer();
     clearStallTimer();
     if (elapsedRef.current) {
@@ -793,10 +802,11 @@ export function useToolProcessor(toolId: string) {
   useEffect(() => {
     settleStoppedRunRef.current = () => {
       if (!activeJobIdRef.current) return;
-      // A store that no longer carries the run (Clear all, a reset) has nothing
-      // left to settle, and an error written now would land on whatever the
-      // user does next.
-      if (!useFileStore.getState().processing) return;
+      // A store that no longer carries the run (Clear all, a reset, or a newer
+      // run started after an unmounted settling batch) has nothing left to
+      // settle, and an error written now would land on whatever the user does
+      // next (#2637).
+      if (storeWasReset()) return;
       // The job outlives its observer: the request and stream are gone, and so
       // is the handle that would cancel it. Ask the server to stop it, or the
       // user is told to run it again while the first copy finishes (and, for a
@@ -915,6 +925,9 @@ export function useToolProcessor(toolId: string) {
         activeEntryIdRef.current = capturedEntryId;
         activeEntryIdsRef.current = runEntryIds;
         asyncModeRef.current = false;
+        if (useFileStore.getState().activeJobId !== null) {
+          setActiveJob(null, null);
+        }
 
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
@@ -1663,6 +1676,7 @@ export function useToolProcessor(toolId: string) {
         };
 
         batchRunRef.current = {
+          jobId: clientJobId,
           markCanceled: () => {
             canceledByUser = true;
           },

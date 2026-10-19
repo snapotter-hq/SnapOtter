@@ -551,4 +551,400 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
     ]);
     expect(useFileStore.getState().batchZipBlob).not.toBeNull();
   });
+
+  it("drops an unmounted settling batch's ZIP when a new run with its own activeJobId has started (#2637)", async () => {
+    vi.useRealTimers();
+    const zip = new AdmZip();
+    zip.addFile("one_resize.png", Buffer.from([1, 2, 3, 4]));
+    zip.addFile("two_resize.png", Buffer.from([5, 6]));
+    const bytes = new Uint8Array(zip.toBuffer());
+    let deliverZip: (blob: Blob) => void = () => {};
+    const download = new Promise<Blob>((resolve) => {
+      deliverZip = resolve;
+    });
+    fetchMock.mockImplementation(async (url: string) =>
+      url === CANCEL_URL
+        ? new Response(null, { status: 409 })
+        : { ok: true, status: 200, blob: () => download },
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+            zipFilename: "batch-resize.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: bytes.length,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    await act(async () => {
+      deliverZip(new Blob([bytes.slice().buffer], { type: "application/zip" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+    });
+    expect(vi.mocked(track)).not.toHaveBeenCalledWith(
+      "batch_processed",
+      expect.objectContaining({ status: "completed" }),
+    );
+  });
+
+  it("drops an unmounted settling batch's ZIP when a new sync single-file run has started, even without an intervening reset (#2637)", async () => {
+    vi.useRealTimers();
+    const zip = new AdmZip();
+    zip.addFile("one_resize.png", Buffer.from([1, 2, 3, 4]));
+    zip.addFile("two_resize.png", Buffer.from([5, 6]));
+    const bytes = new Uint8Array(zip.toBuffer());
+    let deliverZip: (blob: Blob) => void = () => {};
+    const download = new Promise<Blob>((resolve) => {
+      deliverZip = resolve;
+    });
+    fetchMock.mockImplementation(async (url: string) =>
+      url === CANCEL_URL
+        ? new Response(null, { status: 409 })
+        : { ok: true, status: 200, blob: () => download },
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+            zipFilename: "batch-resize.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: bytes.length,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    hook.unmount();
+    const nextFile = image("single.png");
+    useFileStore.getState().setFiles([nextFile]);
+    const nextHook = renderHook(() => useToolProcessor("rotate"));
+    act(() => {
+      nextHook.result.current.processFiles([nextFile], { angle: 90 });
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().activeJobId).toBeNull();
+
+    await act(async () => {
+      deliverZip(new Blob([bytes.slice().buffer], { type: "application/zip" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+    });
+    expect(vi.mocked(track)).not.toHaveBeenCalledWith(
+      "batch_processed",
+      expect.objectContaining({ status: "completed" }),
+    );
+    nextHook.unmount();
+  });
+
+  it("does not fail a new run when an unmounted settling batch's ZIP download returns 404 (#2637)", async () => {
+    vi.useRealTimers();
+    let resolveDownload: (res: Response) => void = () => {};
+    const download = new Promise<Response>((resolve) => {
+      resolveDownload = resolve;
+    });
+    fetchMock.mockImplementation((url: string) =>
+      url === CANCEL_URL ? Promise.resolve(new Response(null, { status: 409 })) : download,
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+            zipFilename: "batch-resize.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: 16,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    await act(async () => {
+      resolveDownload(new Response("not found", { status: 404 }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.entries[0].status).toBe("processing");
+  });
+
+  it("stops retrying a settling batch's ZIP download when a new run starts during retry backoff (#2637)", async () => {
+    let downloadCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === CANCEL_URL) {
+        return Promise.resolve(new Response(null, { status: 409 }));
+      }
+      downloadCalls++;
+      return Promise.reject(new Error("network blip"));
+    });
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+            zipFilename: "batch-resize.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: 16,
+          },
+        }),
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(downloadCalls).toBe(1);
+
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(downloadCalls).toBe(1);
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+  });
+
+  it("drops an unmounted sync 200 batch's ZIP when a new run starts while the ZIP is unpacking (#2637)", async () => {
+    vi.useRealTimers();
+    fetchMock.mockImplementation(async () => new Response(null, { status: 409 }));
+    const zip = new AdmZip();
+    zip.addFile("one_resize.png", Buffer.from([1, 2, 3, 4]));
+    zip.addFile("two_resize.png", Buffer.from([5, 6]));
+    const bytes = new Uint8Array(zip.toBuffer());
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].response = new Blob([bytes.slice().buffer], { type: "application/zip" });
+      xhrs[0].getResponseHeader = vi.fn((name: string) =>
+        name === "X-File-Results"
+          ? encodeURIComponent(JSON.stringify({ "0": "one_resize.png", "1": "two_resize.png" }))
+          : null,
+      );
+      xhrs[0].onload?.();
+    });
+
+    // Unmount while unpackBatchZip is still awaiting its async buffer read / unzip.
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+    });
+    expect(vi.mocked(track)).not.toHaveBeenCalledWith(
+      "batch_processed",
+      expect.objectContaining({ status: "completed" }),
+    );
+  });
+
+  it("does not overwrite a new run when a preset switch left a settling batch and the panel later unmounts (#2637)", () => {
+    const download = new Promise<Blob>(() => {});
+    fetchMock.mockImplementation(async (url: string) =>
+      url === CANCEL_URL
+        ? new Response(null, { status: 409 })
+        : { ok: true, status: 200, blob: () => download },
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(
+      ({ toolId }) => {
+        const processor = useToolProcessor(toolId);
+        // biome-ignore lint/correctness/useExhaustiveDependencies: toolId is the trigger, as on the tool page
+        useEffect(() => {
+          useFileStore.getState().reset();
+        }, [toolId]);
+        return processor;
+      },
+      { initialProps: { toolId: "jpg-to-png" } },
+    );
+    act(() => {
+      void hook.result.current.processAllFiles(files, {});
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+            zipFilename: "batch-resize.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: 16,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    hook.rerender({ toolId: "png-to-webp" });
+    act(() => {
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    hook.unmount();
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.entries[0].status).toBe("processing");
+    expect(cancelPosts()).toHaveLength(1);
+  });
 });
