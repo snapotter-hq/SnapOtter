@@ -1,4 +1,11 @@
 import { create } from "zustand";
+import { useFileStore } from "@/stores/file-store";
+import {
+  base64ResultKey,
+  claimToolResult,
+  isUnclaimed,
+  useToolResultClaims,
+} from "@/stores/tool-result-claims";
 
 export interface Base64Result {
   /**
@@ -85,3 +92,55 @@ export const useBase64Store = create<Base64State>((set) => ({
     set({ results: [], errors: [], processing: false, progress: null, expandedIndex: 0 });
   },
 }));
+
+useFileStore.subscribe((state, prevState) => {
+  if (state.entries === prevState.entries) return;
+
+  const prevIds = new Set(prevState.entries.map((e) => e.id));
+  const nextIds = new Set(state.entries.map((e) => e.id));
+
+  if (nextIds.size === prevIds.size && state.entries.every((e) => prevIds.has(e.id))) {
+    return;
+  }
+
+  if (state.entries.length === 0 || state.entries.some((e) => !prevIds.has(e.id))) {
+    const s = useBase64Store.getState();
+    if (
+      activeBase64Abort !== null ||
+      s.processing ||
+      s.results.length > 0 ||
+      s.errors.length > 0 ||
+      s.progress !== null ||
+      s.expandedIndex !== 0
+    ) {
+      s.reset();
+    }
+    return;
+  }
+
+  const { results, errors } = useBase64Store.getState();
+  const nextResults = results.filter((r) => nextIds.has(r.entryId));
+  const nextErrors = errors.filter((e) => nextIds.has(e.entryId));
+  const resultsChanged = nextResults.length !== results.length;
+  const errorsChanged = nextErrors.length !== errors.length;
+  if (!resultsChanged && !errorsChanged) {
+    return;
+  }
+
+  const wholeClaimed =
+    resultsChanged &&
+    nextResults.length > 0 &&
+    !isUnclaimed(
+      base64ResultKey(results),
+      useToolResultClaims.getState().claimed["image-to-base64"],
+    );
+
+  useBase64Store.setState({
+    ...(resultsChanged ? { results: nextResults } : {}),
+    ...(errorsChanged ? { errors: nextErrors } : {}),
+  });
+
+  if (wholeClaimed) {
+    claimToolResult("image-to-base64", base64ResultKey(nextResults));
+  }
+});

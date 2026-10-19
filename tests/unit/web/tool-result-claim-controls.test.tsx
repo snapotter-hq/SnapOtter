@@ -504,6 +504,113 @@ describe("image-to-base64 download controls", () => {
     });
   });
 
+  describe("when the file list changes after encoding (#1718)", () => {
+    it("goes quiet once a removed file is gone and the remaining file is taken", () => {
+      seedEncoded();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      act(() => {
+        useFileStore.getState().removeFile(1);
+      });
+      expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+
+      fireEvent.click(getByText("Download .txt"));
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("goes quiet as soon as the only untaken file is removed", () => {
+      seedEncoded();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      fireEvent.click(getByText("Download .txt"));
+      expect(workAt(ROUTE)).toEqual({ kind: "unsaved", downloads: [] });
+
+      act(() => {
+        useFileStore.getState().removeFile(1);
+      });
+
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("stays quiet after Download All when one of the encoded files is later removed", () => {
+      seedEncoded();
+      const { getByText } = renderPanel(<ImageToBase64Results />);
+
+      fireEvent.click(getByText("Download All as Text"));
+      expect(workAt(ROUTE)).toBeNull();
+
+      act(() => {
+        useFileStore.getState().removeFile(1);
+      });
+
+      expect(useBase64Store.getState().results).toHaveLength(1);
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("drops a removed file's result and error from the batch summary", () => {
+      useFileStore
+        .getState()
+        .setFiles([
+          new File(["a"], "a.png", { type: "image/png" }),
+          new File(["b"], "b.png", { type: "image/png" }),
+          new File(["c"], "c.png", { type: "image/png" }),
+        ]);
+      const [a, b, c] = useFileStore.getState().entries;
+      useBase64Store.setState({
+        results: [base64Result("a.png", a.id), base64Result("b.png", b.id)],
+        errors: [{ entryId: c.id, filename: "c.png", error: "Bad file" }],
+      });
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+      expect(queryByText("2 of 3 converted - 1 failed")).not.toBeNull();
+
+      act(() => {
+        useFileStore.getState().removeFile(2);
+      });
+
+      expect(useBase64Store.getState().errors).toEqual([]);
+      expect(queryByText("2 of 2 converted")).not.toBeNull();
+    });
+
+    it("clears the previous run's results when a new file is added", () => {
+      seedEncoded();
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+
+      act(() => {
+        useFileStore.getState().addFiles([new File(["c"], "c.png", { type: "image/png" })]);
+        useFileStore.getState().setSelectedIndex(2);
+      });
+
+      expect(useBase64Store.getState().results).toEqual([]);
+      expect(queryByText(/No result for this file/)).toBeNull();
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("clears the previous run's results when the file set is replaced", () => {
+      seedEncoded();
+      const { queryByText } = renderPanel(<ImageToBase64Results />);
+
+      act(() => {
+        useFileStore.getState().setFiles([new File(["fresh"], "image.png", { type: "image/png" })]);
+      });
+
+      expect(useBase64Store.getState().results).toEqual([]);
+      expect(queryByText(/No result for this file/)).toBeNull();
+      expect(workAt(ROUTE)).toBeNull();
+    });
+
+    it("preserves encoded results when the existing files are reordered", () => {
+      seedEncoded();
+      const before = useBase64Store.getState().results;
+
+      act(() => {
+        useFileStore.getState().reorderFiles(0, 1);
+      });
+
+      expect(useBase64Store.getState().results).toBe(before);
+    });
+  });
+
   // With two results, taking one leaves the other, and the guard has to keep
   // saying so.
   it("keeps warning after one file's text is saved out of two", () => {

@@ -37,15 +37,24 @@ export function ImageToBase64Settings() {
     reset();
     setProcessing(true);
 
-    const controller = new AbortController();
-    const run = beginBase64Run(() => controller.abort());
-    const runFiles = new Set(entries.map((e) => e.file));
+    const runController = new AbortController();
+    let currentEntryId: string | null = null;
+    let currentEntryController: AbortController | null = null;
+    const run = beginBase64Run(() => {
+      runController.abort();
+      currentEntryController?.abort();
+    });
+    const runEntryIds = new Set(entries.map((e) => e.id));
+    const isEntryPresent = (id: string) => useFileStore.getState().entries.some((e) => e.id === id);
     const unsubscribeFiles = useFileStore.subscribe((state) => {
-      if (!state.files.some((f) => runFiles.has(f))) {
-        controller.abort();
+      if (!state.entries.some((e) => runEntryIds.has(e.id))) {
+        runController.abort();
+        currentEntryController?.abort();
+      } else if (currentEntryId && !state.entries.some((e) => e.id === currentEntryId)) {
+        currentEntryController?.abort();
       }
     });
-    const isCanceled = () => !run.isCurrent() || controller.signal.aborted;
+    const isCanceled = () => !run.isCurrent() || runController.signal.aborted;
 
     const settings = JSON.stringify({ outputFormat, quality, maxWidth, maxHeight });
 
@@ -53,7 +62,12 @@ export function ImageToBase64Settings() {
       for (let i = 0; i < entries.length; i++) {
         if (isCanceled()) break;
         const { id: entryId, file } = entries[i];
+        if (!isEntryPresent(entryId)) continue;
         setProgress({ completed: i, total: entries.length, currentFile: file.name });
+
+        const entryController = new AbortController();
+        currentEntryId = entryId;
+        currentEntryController = entryController;
 
         try {
           const formData = new FormData();
@@ -64,12 +78,13 @@ export function ImageToBase64Settings() {
             method: "POST",
             headers: formatHeaders(),
             body: formData,
-            signal: controller.signal,
+            signal: entryController.signal,
           });
 
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
             if (isCanceled()) break;
+            if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
             addError({
               entryId,
               filename: file.name,
@@ -80,10 +95,18 @@ export function ImageToBase64Settings() {
 
           const data = await res.json();
           if (isCanceled()) break;
+          if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
           for (const r of data.results) addResult({ ...r, entryId });
           for (const e of data.errors) addError({ ...e, entryId });
         } catch (err) {
-          if (isCanceled() || (err instanceof DOMException && err.name === "AbortError")) break;
+          if (isCanceled()) break;
+          if (
+            entryController.signal.aborted ||
+            !isEntryPresent(entryId) ||
+            (err instanceof DOMException && err.name === "AbortError")
+          ) {
+            continue;
+          }
           addError({
             entryId,
             filename: file.name,
@@ -92,6 +115,8 @@ export function ImageToBase64Settings() {
         }
       }
     } finally {
+      currentEntryId = null;
+      currentEntryController = null;
       unsubscribeFiles();
       run.end();
       if (run.isCurrent()) {
