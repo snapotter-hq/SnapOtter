@@ -9,6 +9,7 @@
  * route end to end; CI has no minio, so the shapes are pinned here.
  */
 
+import net from "node:net";
 import { loadS3Storage, type S3StorageModule } from "@snapotter/enterprise";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -62,5 +63,88 @@ describe("isMissingObjectError", () => {
     expect(s3.isMissingObjectError(null)).toBe(false);
     expect(s3.isMissingObjectError(undefined)).toBe(false);
     expect(s3.isMissingObjectError("NoSuchKey")).toBe(false);
+  });
+});
+
+describe("S3Client stalled endpoint timeout (#2755)", () => {
+  it("rejects un-signaled S3 helpers with a non-missing TimeoutError when an endpoint accepts TCP and never replies", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "stalled-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        connectionTimeout: 80,
+        socketTimeout: 80,
+      });
+
+      const headErr = await Promise.race([
+        s3.getGenericObjectSize("outputs/job-1/result.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(headErr).toBeInstanceOf(Error);
+      expect(headErr).toMatchObject({ name: "TimeoutError" });
+      expect(headErr).toHaveProperty("$metadata");
+      expect(
+        (headErr as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode,
+      ).toBeUndefined();
+      expect(s3.isMissingObjectError(headErr)).toBe(false);
+
+      const listErr = await Promise.race([
+        s3.listGenericJobDirs("outputs").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(listErr).toBeInstanceOf(Error);
+      expect(listErr).toMatchObject({ name: "TimeoutError" });
+      expect(listErr).toHaveProperty("$metadata");
+      expect(
+        (listErr as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode,
+      ).toBeUndefined();
+      expect(s3.isMissingObjectError(listErr)).toBe(false);
+
+      s3.configureS3({
+        bucket: "stalled-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        connectionTimeout: 80,
+        socketTimeout: 0,
+        requestTimeout: 80,
+      });
+
+      const reqTimeoutErr = await Promise.race([
+        s3.getGenericObjectSize("outputs/job-1/result.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(reqTimeoutErr).toBeInstanceOf(Error);
+      expect(reqTimeoutErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(reqTimeoutErr).toHaveProperty("$metadata");
+      expect(s3.isMissingObjectError(reqTimeoutErr)).toBe(false);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

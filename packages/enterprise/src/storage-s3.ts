@@ -12,6 +12,9 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 
+export const S3_CONNECTION_TIMEOUT_MS = 10_000;
+export const S3_SOCKET_TIMEOUT_MS = 30_000;
+
 export interface S3Config {
   bucket: string;
   region: string;
@@ -20,6 +23,9 @@ export interface S3Config {
   secretAccessKey: string;
   forcePathStyle: boolean;
   prefix: string;
+  connectionTimeout?: number;
+  socketTimeout?: number;
+  requestTimeout?: number;
 }
 
 let config: S3Config | null = null;
@@ -40,6 +46,9 @@ function cfg(): S3Config {
 function getClient(): S3Client {
   if (!client) {
     const c = cfg();
+    const connectionTimeout = c.connectionTimeout ?? S3_CONNECTION_TIMEOUT_MS;
+    const socketTimeout = c.socketTimeout ?? S3_SOCKET_TIMEOUT_MS;
+    const requestTimeout = c.requestTimeout ?? 0;
     client = new S3Client({
       region: c.region,
       endpoint: c.endpoint || undefined,
@@ -47,6 +56,11 @@ function getClient(): S3Client {
       credentials: {
         accessKeyId: c.accessKeyId,
         secretAccessKey: c.secretAccessKey,
+      },
+      requestHandler: {
+        connectionTimeout,
+        socketTimeout,
+        ...(requestTimeout > 0 ? { requestTimeout, throwOnRequestTimeout: true } : {}),
       },
     });
   }

@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * 404, which some S3-compatible stores send) may pass quietly (#1455).
  */
 const send = vi.hoisted(() => vi.fn());
+const s3ClientConfigs = vi.hoisted(() => [] as Record<string, unknown>[]);
 
 vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@aws-sdk/client-s3")>();
@@ -15,13 +16,22 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
     ...actual,
     S3Client: class {
       send = send;
+      constructor(opts: Record<string, unknown>) {
+        s3ClientConfigs.push(opts);
+      }
     },
   };
 });
 
-const { configureS3, deleteGenericPrefix, deleteObject, deleteThumbnail, getObject } = await import(
-  "../../../packages/enterprise/src/storage-s3.js"
-);
+const {
+  S3_CONNECTION_TIMEOUT_MS,
+  S3_SOCKET_TIMEOUT_MS,
+  configureS3,
+  deleteGenericPrefix,
+  deleteObject,
+  deleteThumbnail,
+  getObject,
+} = await import("../../../packages/enterprise/src/storage-s3.js");
 
 configureS3({
   bucket: "b",
@@ -261,5 +271,81 @@ describe("getObject abort signal support (#1497)", () => {
     await expect(getObject("photo.png", ac.signal)).rejects.toThrow(
       "aborted before byte array returned",
     );
+  });
+});
+
+describe("S3Client requestHandler timeouts (#2755)", () => {
+  beforeEach(() => {
+    s3ClientConfigs.length = 0;
+  });
+
+  it("configures default connectionTimeout and socketTimeout on S3Client.requestHandler", async () => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+    });
+    send.mockResolvedValueOnce({});
+    await deleteObject("a.png");
+
+    expect(S3_CONNECTION_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(S3_SOCKET_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(s3ClientConfigs).toHaveLength(1);
+    expect(s3ClientConfigs[0]?.requestHandler).toEqual({
+      connectionTimeout: S3_CONNECTION_TIMEOUT_MS,
+      socketTimeout: S3_SOCKET_TIMEOUT_MS,
+    });
+  });
+
+  it("forwards custom connectionTimeout, socketTimeout, and requestTimeout overrides to S3Client.requestHandler", async () => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "http://127.0.0.1:9000",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+      connectionTimeout: 250,
+      socketTimeout: 500,
+      requestTimeout: 750,
+    });
+    send.mockResolvedValueOnce({});
+    await deleteObject("a.png");
+
+    expect(s3ClientConfigs).toHaveLength(1);
+    expect(s3ClientConfigs[0]?.requestHandler).toEqual({
+      connectionTimeout: 250,
+      socketTimeout: 500,
+      requestTimeout: 750,
+      throwOnRequestTimeout: true,
+    });
+  });
+
+  it("preserves explicit 0 timeout overrides when disabling connection or socket timeouts", async () => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+      connectionTimeout: 0,
+      socketTimeout: 0,
+      requestTimeout: 0,
+    });
+    send.mockResolvedValueOnce({});
+    await deleteObject("a.png");
+
+    expect(s3ClientConfigs).toHaveLength(1);
+    expect(s3ClientConfigs[0]?.requestHandler).toEqual({
+      connectionTimeout: 0,
+      socketTimeout: 0,
+    });
   });
 });
