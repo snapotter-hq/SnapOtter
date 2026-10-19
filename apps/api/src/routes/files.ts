@@ -277,6 +277,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       reply.header("X-Accel-Buffering", "no");
 
       const range = request.headers.range;
+      let byteRange: { start: number; end: number } | undefined;
       if (range) {
         const m = range.match(/^bytes=(\d+)-(\d*)$/);
         const start = m ? Number.parseInt(m[1], 10) : Number.NaN;
@@ -287,37 +288,39 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
             .header("Content-Range", `bytes */${size}`)
             .send({ error: "Range not satisfiable" });
         }
-        const clampedEnd = Math.min(end, size - 1);
+        byteRange = { start, end: Math.min(end, size - 1) };
+      }
+
+      // Open the stream before setting attachment headers (#997). If the blob
+      // vanished or became unreadable after the size probe above, an already-set
+      // Content-Type or Content-Disposition would either pollute the 404/500 or
+      // make the error handler fail JSON serialization.
+      let stream: Readable;
+      try {
+        stream = await getObjectStream(key, byteRange);
+      } catch (streamErr) {
+        rethrowIfStorageFault(streamErr);
+        request.log.warn({ jobId, filename }, "result download: object missing in storage");
+        return reply.status(404).send({ error: "File not found" });
+      }
+
+      const contentDisposition = `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+      if (byteRange) {
+        const rangeLength = byteRange.end - byteRange.start + 1;
         return reply
           .code(206)
           .header("Content-Type", contentType)
-          .header(
-            "Content-Disposition",
-            `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-          )
-          .header("Content-Range", `bytes ${start}-${clampedEnd}/${size}`)
-          .header("Content-Length", String(clampedEnd - start + 1))
-          .send(
-            guardedDownloadStream(
-              request,
-              reply,
-              await getObjectStream(key, { start, end: clampedEnd }),
-              key,
-              clampedEnd - start + 1,
-            ),
-          );
+          .header("Content-Disposition", contentDisposition)
+          .header("Content-Range", `bytes ${byteRange.start}-${byteRange.end}/${size}`)
+          .header("Content-Length", String(rangeLength))
+          .send(guardedDownloadStream(request, reply, stream, key, rangeLength));
       }
 
       reply
         .header("Content-Type", contentType)
-        .header(
-          "Content-Disposition",
-          `attachment; filename="${encodeURIComponent(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-        )
+        .header("Content-Disposition", contentDisposition)
         .header("Content-Length", String(size));
-      return reply.send(
-        guardedDownloadStream(request, reply, await getObjectStream(key), key, size),
-      );
+      return reply.send(guardedDownloadStream(request, reply, stream, key, size));
     },
   );
 

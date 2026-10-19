@@ -11,10 +11,13 @@
  * symmetrically; the fault cases here exercise the outputs site.
  */
 
-import { chmod } from "node:fs/promises";
+import { chmod, unlink } from "node:fs/promises";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
+import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
@@ -33,11 +36,11 @@ afterAll(async () => {
   await testApp?.cleanup();
 }, 10_000);
 
-async function download(jobId: string, filename: string) {
+async function download(jobId: string, filename: string, headers: Record<string, string> = {}) {
   return testApp.app.inject({
     method: "GET",
     url: `/api/v1/download/${encodeURIComponent(jobId)}/${encodeURIComponent(filename)}`,
-    headers: { authorization: `Bearer ${adminToken}` },
+    headers: { authorization: `Bearer ${adminToken}`, ...headers },
   });
 }
 
@@ -98,6 +101,124 @@ describe("tool-result download fault classification (local mode)", () => {
       expect(JSON.parse(res.body).error).toMatch(/not found/i);
     } finally {
       (env as Record<string, unknown>).STORAGE_MODE = originalMode;
+    }
+  });
+
+  // #997: when the blob vanishes between getObjectSize and getObjectStream
+  // (TTL sweeper race, manual prune), the open-time ENOENT must be caught
+  // before response headers go out and return a clean 404, not tear down
+  // mid-response or escape as an uncaught 500.
+  it("returns a clean 404 when the blob vanishes after the size probe (full and ranged)", async () => {
+    const jobId = "resfault-vanish";
+    const realGetObjectSize = objectStorage.getObjectSize;
+    const spy = vi.spyOn(objectStorage, "getObjectSize").mockImplementation(async (key: string) => {
+      const size = await realGetObjectSize(key);
+      if (key.startsWith(`outputs/${jobId}/`)) {
+        await unlink(join(env.WORKSPACE_PATH, key));
+      }
+      return size;
+    });
+
+    try {
+      await putObject(`outputs/${jobId}/full.png`, PNG);
+      const fullRes = await download(jobId, "full.png");
+      expect(fullRes.statusCode).toBe(404);
+      expect(fullRes.headers["content-disposition"]).toBeUndefined();
+      expect(fullRes.headers["content-type"]).toMatch(/application\/json/);
+      expect(JSON.parse(fullRes.body)).toEqual({ error: "File not found" });
+
+      await putObject(`outputs/${jobId}/ranged.png`, PNG);
+      const rangedRes = await download(jobId, "ranged.png", { range: "bytes=0-15" });
+      expect(rangedRes.statusCode).toBe(404);
+      expect(rangedRes.headers["content-disposition"]).toBeUndefined();
+      expect(rangedRes.headers["content-range"]).toBeUndefined();
+      expect(rangedRes.headers["content-type"]).toMatch(/application\/json/);
+      expect(JSON.parse(rangedRes.body)).toEqual({ error: "File not found" });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+      await deletePrefix(`outputs/${jobId}`);
+    }
+  });
+
+  // #997: a blob file that is unreadable (0o000) inside a readable job
+  // directory (0o755) passes stat() in getObjectSize and fails with EACCES at
+  // getObjectStream. It must reject eagerly and rethrow as a 500 before
+  // attachment headers are set on the reply.
+  it.skipIf(isRoot)(
+    "returns 500 without attachment headers when opening the blob stream hits EACCES",
+    async () => {
+      const jobId = "resfault-stream-acc";
+      await putObject(`outputs/${jobId}/result.png`, PNG);
+      const blobPath = join(env.WORKSPACE_PATH, "outputs", jobId, "result.png");
+      await chmod(blobPath, 0o000);
+      try {
+        const fullRes = await download(jobId, "result.png");
+        expect(fullRes.statusCode).toBe(500);
+        expect(fullRes.headers["content-disposition"]).toBeUndefined();
+        expect(fullRes.headers["content-type"]).toMatch(/application\/json/);
+        expect(JSON.parse(fullRes.body).code).not.toBe("FST_ERR_REP_INVALID_PAYLOAD_TYPE");
+        expect(JSON.parse(fullRes.body).error).not.toMatch(/not found/i);
+
+        const rangedRes = await download(jobId, "result.png", { range: "bytes=0-15" });
+        expect(rangedRes.statusCode).toBe(500);
+        expect(rangedRes.headers["content-disposition"]).toBeUndefined();
+        expect(rangedRes.headers["content-range"]).toBeUndefined();
+        expect(rangedRes.headers["content-type"]).toMatch(/application\/json/);
+        expect(JSON.parse(rangedRes.body).code).not.toBe("FST_ERR_REP_INVALID_PAYLOAD_TYPE");
+        expect(JSON.parse(rangedRes.body).error).not.toMatch(/not found/i);
+      } finally {
+        await chmod(blobPath, 0o644);
+        await deletePrefix(`outputs/${jobId}`);
+      }
+    },
+  );
+
+  // #997: a literal "." filename segment over a raw HTTP path used to pass
+  // isPathTraversal and VALID_KEY, stat the job directory, and fail with
+  // EISDIR after headers. Pre-rejecting "." in isValidObjectKey returns 404
+  // before touching storage.
+  it("returns 404 for a literal '.' filename over HTTP without touching the job directory", async () => {
+    const jobId = "resfault-dot";
+    await putObject(`outputs/${jobId}/result.png`, PNG);
+    const sizeSpy = vi.spyOn(objectStorage, "getObjectSize");
+    await testApp.app.listen({ port: 0, host: "127.0.0.1" });
+    const port = (testApp.app.server.address() as AddressInfo).port;
+    try {
+      const res = await new Promise<{
+        statusCode: number;
+        headers: http.IncomingHttpHeaders;
+        body: string;
+      }>((resolve, reject) => {
+        const req = http.get(
+          {
+            host: "127.0.0.1",
+            port,
+            path: `/api/v1/download/${jobId}/.`,
+            headers: { authorization: `Bearer ${adminToken}` },
+          },
+          (incoming) => {
+            const chunks: Buffer[] = [];
+            incoming.on("data", (c: Buffer) => chunks.push(c));
+            incoming.on("end", () =>
+              resolve({
+                statusCode: incoming.statusCode ?? 0,
+                headers: incoming.headers,
+                body: Buffer.concat(chunks).toString("utf8"),
+              }),
+            );
+            incoming.on("error", reject);
+          },
+        );
+        req.on("error", reject);
+      });
+      expect(res.statusCode).toBe(404);
+      expect(res.headers["content-disposition"]).toBeUndefined();
+      expect(JSON.parse(res.body)).toEqual({ error: "File not found" });
+      expect(sizeSpy).not.toHaveBeenCalled();
+    } finally {
+      sizeSpy.mockRestore();
+      await deletePrefix(`outputs/${jobId}`);
     }
   });
 });

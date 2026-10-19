@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -15,6 +15,7 @@ import {
   getObjectBuffer,
   getObjectSize,
   getObjectStream,
+  isValidObjectKey,
   listJobDirs,
   listObjects,
   objectExists,
@@ -800,6 +801,94 @@ describe("object-storage missing-key + robustness paths", () => {
 
   it("propagates a stat error as a rejection from getObjectSize on a missing key", async () => {
     await expect(getObjectSize(`outputs/absent-${process.pid}/none.bin`)).rejects.toBeDefined();
+  });
+
+  // #997: a path-based createReadStream defers the open, so a missing or
+  // unreadable blob only surfaced as an async "error" event after the route's
+  // try/catch had exited and response headers were already on the wire.
+  it("rejects getObjectStream with ENOENT up front when the object is missing", async () => {
+    const err = (await getObjectStream(`outputs/absent-${process.pid}/none.bin`).then(
+      (s) => {
+        s.on("error", () => {});
+        s.destroy();
+        return null;
+      },
+      (e: unknown) => e,
+    )) as NodeJS.ErrnoException | null;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.code).toBe("ENOENT");
+  });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "rejects getObjectStream with EACCES up front when the object is unreadable",
+    async () => {
+      const lockedJobId = `locked-stream-${process.pid}`;
+      const lockedKey = `outputs/${lockedJobId}/locked.bin`;
+      const lockedPath = join(env.WORKSPACE_PATH, "outputs", lockedJobId, "locked.bin");
+      await putObject(lockedKey, Buffer.from("locked bytes"));
+      await chmod(lockedPath, 0o000);
+      try {
+        for (const range of [undefined, { start: 0, end: 5 }] as const) {
+          const err = (await getObjectStream(lockedKey, range).then(
+            (s) => {
+              s.on("error", () => {});
+              s.destroy();
+              return null;
+            },
+            (e: unknown) => e,
+          )) as NodeJS.ErrnoException | null;
+          expect(err).toBeInstanceOf(Error);
+          expect(err?.code).toBe("EACCES");
+        }
+      } finally {
+        await chmod(lockedPath, 0o600).catch(() => {});
+        await deletePrefix(`outputs/${lockedJobId}`).catch(() => {});
+      }
+    },
+  );
+
+  it("rejects a single-dot or staging-dir filename segment in isValidObjectKey and object operations", async () => {
+    expect(isValidObjectKey("outputs/job-1/.")).toBe(false);
+    expect(isValidObjectKey("uploads/job-1/.")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.snapotter-staging")).toBe(false);
+    expect(isValidObjectKey("uploads/job-1/.snapotter-staging")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.hidden")).toBe(true);
+    expect(isValidObjectKey("outputs/job-1/file.")).toBe(true);
+    await expect(getObjectSize("outputs/job-1/.")).rejects.toThrow(/invalid object key/i);
+    await expect(getObjectStream("outputs/job-1/.")).rejects.toThrow(/invalid object key/i);
+    await expect(getObjectStream("outputs/job-1/.snapotter-staging")).rejects.toThrow(
+      /invalid object key/i,
+    );
+  });
+
+  it("rejects an invalid byte range before opening a FileHandle", async () => {
+    const rangeJobId = `bad-range-${process.pid}`;
+    const rangeKey = `outputs/${rangeJobId}/data.bin`;
+    await putObject(rangeKey, Buffer.from("0123456789"));
+    try {
+      await expect(getObjectStream(rangeKey, { start: 8, end: 2 })).rejects.toMatchObject({
+        code: "ERR_OUT_OF_RANGE",
+      });
+      await expect(getObjectStream(rangeKey, { start: -1 })).rejects.toMatchObject({
+        code: "ERR_OUT_OF_RANGE",
+      });
+    } finally {
+      await deletePrefix(`outputs/${rangeJobId}`).catch(() => {});
+    }
+  });
+
+  it("destroys the source stream when copyReadableToFile fails before pipeline()", async () => {
+    const source = new Readable({
+      read() {
+        this.push(Buffer.from("payload"));
+        this.push(null);
+      },
+    });
+    await expect(copyReadableToFile(source, "/tmp/unused", { maxBytes: -1 })).rejects.toThrow(
+      /maxBytes/i,
+    );
+    expect(source.destroyed).toBe(true);
   });
 
   it("silently ignores deleting an object that is not present", async () => {

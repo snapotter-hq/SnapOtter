@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import {
   mkdir,
+  open,
   readdir,
   rename,
   rm,
@@ -40,7 +41,12 @@ const VALID_KEY = /^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[^/\0]+$/;
  * Error, which fault classification cannot tell apart from a storage fault.
  */
 export function isValidObjectKey(key: string): boolean {
-  return VALID_KEY.test(key) && !key.includes("..");
+  return (
+    VALID_KEY.test(key) &&
+    !key.includes("..") &&
+    !key.endsWith("/.") &&
+    !key.endsWith("/.snapotter-staging")
+  );
 }
 
 function assertValidKey(key: string): void {
@@ -380,11 +386,27 @@ export async function getObjectStream(
   range?: { start: number; end?: number },
 ): Promise<Readable> {
   assertValidKey(key);
+  if (
+    range !== undefined &&
+    (!Number.isSafeInteger(range.start) ||
+      range.start < 0 ||
+      (range.end !== undefined && (!Number.isSafeInteger(range.end) || range.end < range.start)))
+  ) {
+    throw Object.assign(new RangeError("Invalid byte range"), { code: "ERR_OUT_OF_RANGE" });
+  }
   if (isS3Enabled()) {
     const s3 = await getS3();
     return s3.getGenericObjectStream(key, range);
   }
-  return createReadStream(localPath(key), range ? { start: range.start, end: range.end } : {});
+  // A path-based createReadStream defers the open, so any open-time failure
+  // (a blob swept after the size probe, EACCES) only surfaces as an async
+  // "error" event after response headers are already on the wire (#997).
+  // Open eagerly so those reject here, matching streamStoredFile (#926).
+  // Range bounds are checked before open() because Node's FileHandle
+  // createReadStream increments kRefs before validating start/end, which
+  // would strand the descriptor on ERR_OUT_OF_RANGE and trip GC.
+  const handle = await open(localPath(key), "r");
+  return handle.createReadStream(range ? { start: range.start, end: range.end } : {});
 }
 
 export async function getObjectBuffer(key: string): Promise<Buffer> {
@@ -536,10 +558,16 @@ export async function copyReadableToFile(
   destination: string,
   opts: CopyReadableToFileOptions = {},
 ): Promise<number> {
+  const destroySource = () => {
+    if (!source.destroyed) {
+      if (source.listenerCount("error") === 0) source.once("error", () => {});
+      source.destroy();
+    }
+  };
   if (opts.maxBytes !== undefined && (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0)) {
+    destroySource();
     throw new Error("maxBytes must be a non-negative safe integer");
   }
-  opts.signal?.throwIfAborted();
   const stagingPath = `${destination}.${randomUUID()}.partial`;
   let stagingOwned = false;
   let written = 0;
@@ -556,6 +584,7 @@ export async function copyReadableToFile(
   };
 
   try {
+    opts.signal?.throwIfAborted();
     await mkdir(dirname(destination), { recursive: true });
     opts.signal?.throwIfAborted();
     // Create the staging inode before constructing the stream. A write stream
@@ -573,6 +602,7 @@ export async function copyReadableToFile(
     await rename(stagingPath, destination);
     return written;
   } catch (error) {
+    destroySource();
     if (stagingOwned) await unlink(stagingPath).catch(() => {});
     throw normalizeOperationalWriteError(error);
   }
