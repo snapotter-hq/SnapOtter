@@ -8,7 +8,7 @@ import { isValidRoleName, isValidUsername, normalizeRoleName } from "@snapotter/
 import { describe, expect, it } from "vitest";
 
 describe("isValidUsername", () => {
-  it.each(["abc", "a".repeat(50), "A.B-C_D", "123"])("accepts %j", (username) => {
+  it.each(["abc", "a".repeat(50), "A.B-C_D", "123", "anonymous_2"])("accepts %j", (username) => {
     expect(isValidUsername(username)).toBe(true);
   });
 
@@ -25,6 +25,9 @@ describe("isValidUsername", () => {
     ["Cyrillic", "пользователь"],
     // Not trimmed: the server checks the name as sent.
     ["surrounding spaces", " jane "],
+    ["reserved anonymous lowercase (#2469)", "anonymous"],
+    ["reserved anonymous mixed case (#2469)", "Anonymous"],
+    ["reserved anonymous uppercase (#2469)", "ANONYMOUS"],
   ])("rejects %s", (_case, username) => {
     expect(isValidUsername(username)).toBe(false);
   });

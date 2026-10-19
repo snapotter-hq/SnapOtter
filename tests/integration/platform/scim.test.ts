@@ -1096,6 +1096,32 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       },
     );
 
+    it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+      "rejects creation with reserved userName '%s' using a 400 invalidValue SCIM error (#2469)",
+      async (userName) => {
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName, active: true },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName 'anonymous' is reserved",
+        });
+
+        const rows = await db
+          .select()
+          .from(schema.users)
+          .where(sql`lower(${schema.users.username}) = 'anonymous'`);
+        expect(rows).toHaveLength(0);
+      },
+    );
+
     it("concurrent duplicate creates return one 201 and one SCIM 409, never 500", async () => {
       // Issue #927: IdP provisioning retries can race. Requests that pass
       // the duplicate pre-check before the winner's insert commits used to
@@ -1355,6 +1381,31 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           status: 400,
           scimType: "invalidValue",
           detail: "userName must not be empty",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.username).toBe(victim.userName);
+        expect(row?.role).toBe("user");
+      },
+    );
+
+    it.each(["anonymous", "Anonymous", "ANONYMOUS"])(
+      "rejects a PUT rename onto reserved userName '%s' with 400 invalidValue and leaves the row unchanged (#2469)",
+      async (reserved) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-put-anon") });
+
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: { userName: reserved, active: false },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName 'anonymous' is reserved",
         });
         const row = await userRow(victim.id);
         expect(row?.username).toBe(victim.userName);
@@ -1622,6 +1673,44 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const row = await userRow(victim.id);
       expect(row?.username).toBe(victim.userName);
     });
+
+    it.each([
+      [
+        "path replace",
+        (userName: string) => ({ op: "replace", path: "userName", value: userName }),
+      ],
+      ["path add", (userName: string) => ({ op: "add", path: "USERNAME", value: userName })],
+      ["valueless replace", (userName: string) => ({ op: "replace", value: { userName } })],
+      ["valueless add", (userName: string) => ({ op: "add", value: { USERNAME: userName } })],
+    ])(
+      "rejects a PATCH setting reserved 'anonymous' userName via %s with 400 invalidValue (#2469)",
+      async (_label, makeOp) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-anon") });
+
+        for (const reserved of ["anonymous", "Anonymous", "ANONYMOUS"]) {
+          const res = await crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Users/${victim.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [{ op: "replace", path: "active", value: false }, makeOp(reserved)],
+            },
+          });
+
+          expect(res.statusCode, res.body).toBe(400);
+          expect(JSON.parse(res.body)).toEqual({
+            schemas: [SCIM_ERROR_SCHEMA],
+            status: 400,
+            scimType: "invalidValue",
+            detail: "userName 'anonymous' is reserved",
+          });
+          const row = await userRow(victim.id);
+          expect(row?.username).toBe(victim.userName);
+          expect(row?.role).toBe("user");
+        }
+      },
+    );
 
     it("concurrent PATCH renames onto one userName return one 200 and one SCIM 409", async () => {
       const a = await createScimUser({ userName: uniqueName("scim-patch-race-a") });

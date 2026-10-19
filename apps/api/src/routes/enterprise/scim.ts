@@ -606,6 +606,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           scimType: "invalidValue",
         });
       }
+      if (userName.toLowerCase() === "anonymous") {
+        return scimInvalid(request, reply, {
+          detail: "userName 'anonymous' is reserved",
+          scimType: "invalidValue",
+        });
+      }
 
       // Check for duplicate username
       const [existing] = await db
@@ -819,6 +825,12 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           scimType: "invalidValue",
         });
       }
+      if (userName && userName.toLowerCase() === "anonymous") {
+        return scimInvalid(request, reply, {
+          detail: "userName 'anonymous' is reserved",
+          scimType: "invalidValue",
+        });
+      }
 
       if (userName && userName !== existing.username) {
         // Check for username conflict
@@ -932,7 +944,14 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
 
           // normalizeUserOps has checked and coerced these values already.
           if (op.path === "userName") {
-            updates.username = op.value as string;
+            const nextUserName = op.value as string;
+            if (nextUserName.toLowerCase() === "anonymous") {
+              return scimInvalid(request, reply, {
+                detail: "userName 'anonymous' is reserved",
+                scimType: "invalidValue",
+              });
+            }
+            updates.username = nextUserName;
           } else if (op.path === "externalId") {
             updates.scimExternalId = scimExternalId(op.value as string | null);
           } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
@@ -947,7 +966,16 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
           // Handle valueless replace (bulk value object)
           if (!op.path && typeof op.value === "object" && op.value !== null) {
             const valObj = op.value as Record<string, unknown>;
-            if (valObj.userName) updates.username = valObj.userName as string;
+            if (valObj.userName) {
+              const nextUserName = valObj.userName as string;
+              if (nextUserName.toLowerCase() === "anonymous") {
+                return scimInvalid(request, reply, {
+                  detail: "userName 'anonymous' is reserved",
+                  scimType: "invalidValue",
+                });
+              }
+              updates.username = nextUserName;
+            }
             if (valObj.externalId !== undefined) {
               updates.scimExternalId = scimExternalId(valObj.externalId as string | null);
             }

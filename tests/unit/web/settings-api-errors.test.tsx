@@ -362,6 +362,9 @@ describe("People", () => {
     ["a space", "jane doe"],
     ["an email address", "jane@example.com"],
     ["non-Latin letters", "ユーザー"],
+    ["reserved anonymous lowercase (#2469)", "anonymous"],
+    ["reserved anonymous mixed case (#2469)", "Anonymous"],
+    ["reserved anonymous uppercase (#2469)", "ANONYMOUS"],
   ])("explains the username rule for %s without asking the server", async (_case, username) => {
     await openAddForm(username);
     await expectShown(s.people.usernameInvalid);

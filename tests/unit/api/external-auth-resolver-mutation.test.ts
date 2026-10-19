@@ -416,6 +416,20 @@ describe("resolveExternalUser: auto-create", () => {
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result.action).toBe("created");
   });
+
+  it("suffixes a sanitized 'anonymous' username to 'anonymous_2' even when no 'anonymous' row exists (#2469)", async () => {
+    state.selectRows = [
+      [], // extId miss
+      [], // findUniqueUsername skips 'anonymous' and checks 'anonymous_2' directly
+      [{ id: "team-default" }],
+    ];
+    const result = await resolveExternalUser(
+      baseParams({ autoCreate: true, username: "anonymous" }),
+    );
+    expect(result.action).toBe("created");
+    expect(result.user?.username).toBe("anonymous_2");
+    expect(state.inserts[0].username).toBe("anonymous_2");
+  });
 });
 
 // ── 3b. Auto-create username races (issue #927) ─────────────────────────

@@ -72,12 +72,14 @@ export function sanitizeUsername(raw: string): string {
 }
 
 export async function findUniqueUsername(base: string): Promise<string> {
-  const [existing] = await db
-    .select({ username: schema.users.username })
-    .from(schema.users)
-    .where(eq(schema.users.username, base));
+  if (base.toLowerCase() !== "anonymous") {
+    const [existing] = await db
+      .select({ username: schema.users.username })
+      .from(schema.users)
+      .where(eq(schema.users.username, base));
 
-  if (!existing) return base;
+    if (!existing) return base;
+  }
 
   for (let i = 2; i <= 1000; i++) {
     const candidate = `${base}_${i}`;
