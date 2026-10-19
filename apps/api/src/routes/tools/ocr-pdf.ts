@@ -12,6 +12,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   parseClientJobIdField,
   parseSaveModeField,
+  type ToolJobData,
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -289,20 +290,22 @@ export function registerOcrPdf(app: FastifyInstance) {
       }
 
       const { engine: _legacyEngine, ...normalizedSettings } = settings;
+      const jobData: ToolJobData = {
+        jobId,
+        toolId,
+        userId,
+        pool: "ai",
+        inputRefs: [uploadedInputKey],
+        filename,
+        settings: { ...normalizedSettings, quality },
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        saveMode,
+        kind: "ai-tool",
+      };
       try {
-        await enqueueToolJob({
-          jobId,
-          toolId,
-          userId,
-          pool: "ai",
-          inputRefs: [uploadedInputKey],
-          filename,
-          settings: { ...normalizedSettings, quality },
-          clientJobId: clientJobId ?? undefined,
-          fileId: fileId ?? undefined,
-          saveMode,
-          kind: "ai-tool",
-        });
+        await enqueueToolJob(jobData);
+        clientJobId = jobData.clientJobId ?? null;
       } catch (err) {
         if (disconnect.clientGone()) {
           await disconnect.settleAbandoned({

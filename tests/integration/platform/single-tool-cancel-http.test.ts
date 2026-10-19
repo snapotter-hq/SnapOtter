@@ -343,6 +343,65 @@ describe("route-stamped alias metadata (#808)", () => {
       enqueueMock.timeoutOnce = false;
     }
   });
+
+  it("does not clobber a same-owner batch parent row or return its id on 202 when a custom route collides (#2651)", async () => {
+    const owner = await createUserAndLogin(app, `single-custom-collide-${Date.now()}`);
+    const clientJobId = randomUUID();
+    const initialProgress = {
+      percent: 50,
+      totalFiles: 2,
+      completedFiles: 1,
+      failedFiles: 0,
+    };
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner.userId,
+      type: "batch",
+      status: "processing",
+      progress: initialProgress,
+      inputRefs: [],
+      settings: { flowChildCount: 2, stepCount: 1 },
+    });
+
+    const queue = getQueue("ai");
+    await queue.pause();
+    let enqueuedJobId: string | undefined;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ quality: "fast", language: "en" }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/ocr",
+        headers: { "content-type": contentType, authorization: `Bearer ${owner.token}` },
+        body,
+      });
+      expect(res.statusCode).toBe(202);
+      const payload = JSON.parse(res.body) as {
+        jobId: string;
+        progressJobId?: string;
+        artifactJobId?: string;
+        async: boolean;
+      };
+      enqueuedJobId = payload.artifactJobId ?? payload.jobId;
+      expect(payload).toEqual({ jobId: expect.any(String), async: true });
+      expect(payload.jobId).not.toBe(clientJobId);
+
+      const parent = await jobRow(clientJobId);
+      expect(parent?.type).toBe("batch");
+      expect(parent?.status).toBe("processing");
+      expect(parent?.progress).toEqual(initialProgress);
+      expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
+    } finally {
+      if (enqueuedJobId) {
+        const queuedJob = await queue.getJob(enqueuedJobId);
+        await queuedJob?.remove().catch(() => {});
+      }
+      await queue.resume();
+    }
+  });
 });
 
 describe("HTTP cancel on route-created single-tool rows", () => {

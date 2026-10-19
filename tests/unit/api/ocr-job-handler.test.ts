@@ -157,6 +157,53 @@ describe("OCR route enqueue safety", () => {
     expect(mocks.waitForJob).not.toHaveBeenCalled();
   });
 
+  it("falls back to the server jobId on 202 when enqueueToolJob clears a refused clientJobId (#2651)", async () => {
+    const refusedClientJobId = "11111111-1111-4111-8111-111111111111";
+    mocks.enqueueToolJob.mockImplementationOnce(async (data: { clientJobId?: string }) => {
+      expect(data.clientJobId).toBe(refusedClientJobId);
+      data.clientJobId = undefined;
+      return undefined;
+    });
+
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn() },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: refusedClientJobId };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await expect(routeHandler?.(request, reply)).resolves.toBeDefined();
+
+    const artifactJobId = mocks.enqueueToolJob.mock.calls[0]?.[0]?.jobId;
+    expect(reply.statusCode).toBe(202);
+    expect(reply.payload).toEqual({
+      jobId: artifactJobId,
+      async: true,
+    });
+  });
+
   it("preserves storage-pressure failures as a truthful 503 response", async () => {
     mocks.receiveUpload.mockRejectedValueOnce(
       Object.assign(new Error("Upload storage is below its free-space reserve"), {

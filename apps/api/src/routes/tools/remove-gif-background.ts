@@ -15,6 +15,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   parseClientJobIdField,
   parseSaveModeField,
+  type ToolJobData,
 } from "../../jobs/types.js";
 import { detectAnimation } from "../../lib/animation-detect.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -274,21 +275,23 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
         }
 
         enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings: { ...settings, bgImageKey },
+          dbSettings: settings, // keep the internal bgImageKey out of the audit row
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
         try {
-          await enqueueToolJob({
-            jobId,
-            toolId,
-            userId,
-            pool: "ai",
-            inputRefs: [inputKey],
-            filename,
-            settings: { ...settings, bgImageKey },
-            dbSettings: settings, // keep the internal bgImageKey out of the audit row
-            clientJobId: clientJobId ?? undefined,
-            fileId: fileId ?? undefined,
-            saveMode,
-            kind: "ai-tool",
-          });
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
         } catch (err) {
           if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
           throw err;

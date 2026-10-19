@@ -16,6 +16,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   parseClientJobIdField,
   parseSaveModeField,
+  type ToolJobData,
 } from "../../jobs/types.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
@@ -252,21 +253,23 @@ export function registerOcr(app: FastifyInstance) {
       }
 
       const { engine: _legacyEngine, ...normalizedSettings } = settings;
+      const jobData: ToolJobData = {
+        jobId,
+        toolId,
+        userId,
+        pool: "ai",
+        inputRefs: [inputKey],
+        filename,
+        settings: { ...normalizedSettings, quality },
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        saveMode,
+        kind: "ai-tool",
+        analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+      };
       try {
-        await enqueueToolJob({
-          jobId,
-          toolId,
-          userId,
-          pool: "ai",
-          inputRefs: [inputKey],
-          filename,
-          settings: { ...normalizedSettings, quality },
-          clientJobId: clientJobId ?? undefined,
-          fileId: fileId ?? undefined,
-          saveMode,
-          kind: "ai-tool",
-          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-        });
+        await enqueueToolJob(jobData);
+        clientJobId = jobData.clientJobId ?? null;
       } catch (err) {
         if (disconnect.clientGone()) {
           await disconnect.settleAbandoned({

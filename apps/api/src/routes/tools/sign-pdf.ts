@@ -13,6 +13,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   parseClientJobIdField,
   parseSaveModeField,
+  type ToolJobData,
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { stripInternalPaths } from "../../lib/errors.js";
@@ -182,20 +183,22 @@ export function registerSignPdf(app: FastifyInstance) {
       }
 
       enqueued = true;
+      const jobData: ToolJobData = {
+        jobId,
+        toolId: TOOL_ID,
+        userId,
+        pool: "docs",
+        inputRefs: [pdfKey, ...orderedSigKeys],
+        filename,
+        settings: { placements: parsed.placements },
+        clientJobId: clientJobId ?? undefined,
+        fileId: fileId ?? undefined,
+        saveMode,
+        kind: "ai-tool",
+      };
       try {
-        await enqueueToolJob({
-          jobId,
-          toolId: TOOL_ID,
-          userId,
-          pool: "docs",
-          inputRefs: [pdfKey, ...orderedSigKeys],
-          filename,
-          settings: { placements: parsed.placements },
-          clientJobId: clientJobId ?? undefined,
-          fileId: fileId ?? undefined,
-          saveMode,
-          kind: "ai-tool",
-        });
+        await enqueueToolJob(jobData);
+        clientJobId = jobData.clientJobId ?? null;
       } catch (err) {
         if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
         throw err;

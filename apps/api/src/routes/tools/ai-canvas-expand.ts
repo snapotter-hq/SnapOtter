@@ -14,6 +14,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   parseClientJobIdField,
   parseSaveModeField,
+  type ToolJobData,
 } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
@@ -291,20 +292,22 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         }
 
         enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId,
+          userId,
+          pool: "ai",
+          inputRefs: [inputKey],
+          filename,
+          settings,
+          clientJobId: clientJobId ?? undefined,
+          fileId: fileId ?? undefined,
+          saveMode,
+          kind: "ai-tool",
+        };
         try {
-          await enqueueToolJob({
-            jobId,
-            toolId,
-            userId,
-            pool: "ai",
-            inputRefs: [inputKey],
-            filename,
-            settings,
-            clientJobId: clientJobId ?? undefined,
-            fileId: fileId ?? undefined,
-            saveMode,
-            kind: "ai-tool",
-          });
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
         } catch (err) {
           if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
           throw err;

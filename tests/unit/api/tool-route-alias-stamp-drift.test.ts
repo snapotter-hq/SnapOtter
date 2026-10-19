@@ -74,4 +74,34 @@ describe("custom tool routes stamp the SSE alias pre-enqueue (#892)", () => {
       .map((r) => r.file);
     expect(misplaced).toEqual([]);
   });
+
+  it("syncs clientJobId from the ToolJobData carrier after enqueueToolJob (#2651)", () => {
+    // enqueueToolJob clears data.clientJobId in place when upsertToolJobAlias
+    // refuses a claim (#895). Passing an inline object literal to
+    // enqueueToolJob leaves the route's local clientJobId unchanged, so
+    // buildAsyncAcceptedPayload(jobId, clientJobId) returns the refused id on
+    // 202. Every in-scope route must pass jobData to enqueueToolJob and read
+    // jobData.clientJobId back before building the 202 payload.
+    const unsynced = inScope
+      .filter(({ source }) => {
+        const carrierIdx = source.indexOf("const jobData: ToolJobData = {");
+        const fieldIdx = source.indexOf("clientJobId: clientJobId ?? undefined,", carrierIdx);
+        const enqueueIdx = source.indexOf("await enqueueToolJob(jobData);");
+        const syncIdx = source.indexOf("clientJobId = jobData.clientJobId ?? null;");
+        const payloadIdx = source.indexOf("buildAsyncAcceptedPayload(jobId, clientJobId)");
+        return (
+          carrierIdx === -1 ||
+          fieldIdx === -1 ||
+          enqueueIdx === -1 ||
+          syncIdx === -1 ||
+          payloadIdx === -1 ||
+          carrierIdx > fieldIdx ||
+          fieldIdx > enqueueIdx ||
+          enqueueIdx > syncIdx ||
+          syncIdx > payloadIdx
+        );
+      })
+      .map((r) => r.file);
+    expect(unsynced).toEqual([]);
+  });
 });
