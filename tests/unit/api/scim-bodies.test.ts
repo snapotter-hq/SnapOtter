@@ -241,6 +241,24 @@ describe("normalizeUserOps", () => {
     );
   });
 
+  it("refuses a value object whose userName is empty or whitespace, rather than ignore or write it", () => {
+    expect(normalizeUserOps([{ op: "replace", value: { userName: "" } }])).toEqual(
+      invalid("Operations.0.value.userName must not be empty"),
+    );
+    expect(normalizeUserOps([{ op: "replace", value: { userName: "   " } }])).toEqual(
+      invalid("Operations.0.value.userName must not be empty"),
+    );
+    expect(normalizeUserOps([{ op: "add", value: { USERNAME: " \t " } }])).toEqual(
+      invalid("Operations.0.value.userName must not be empty"),
+    );
+    expect(normalizeUserOps([{ op: "replace", value: { userName: null, active: false } }])).toEqual(
+      {
+        ok: true,
+        data: [{ op: "replace", value: { userName: null, active: false } }],
+      },
+    );
+  });
+
   it("refuses to remove userName or active, and a remove with no path", () => {
     expect(normalizeUserOps([{ op: "remove", path: "USERNAME" }])).toEqual(
       invalid("Operations.0: userName can't be removed"),

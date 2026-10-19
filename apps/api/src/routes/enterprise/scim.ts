@@ -600,8 +600,11 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const externalId = scimExternalId(body.externalId);
       const active = body.active ?? true;
       const emails = body.emails ?? undefined;
-      if (!userName) {
-        return reply.status(400).send(scimError(400, "userName is required"));
+      if (!userName?.trim()) {
+        return scimInvalid(request, reply, {
+          detail: "userName is required",
+          scimType: "invalidValue",
+        });
       }
 
       // Check for duplicate username
@@ -809,6 +812,13 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       const emails = body.emails ?? undefined;
 
       const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+      if (userName !== undefined && !userName.trim()) {
+        return scimInvalid(request, reply, {
+          detail: "userName must not be empty",
+          scimType: "invalidValue",
+        });
+      }
 
       if (userName && userName !== existing.username) {
         // Check for username conflict

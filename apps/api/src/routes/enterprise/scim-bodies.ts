@@ -284,6 +284,17 @@ export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
       } else if (!op.path && typeof op.value === "object" && op.value !== null) {
         const keyed = canonicalValueObject(op.value as Record<string, unknown>, at);
         value = keyed.ok ? parseWith(scimUserBody, keyed.data, "invalidValue", at) : keyed;
+        if (
+          value.ok &&
+          typeof (value.data as { userName?: unknown }).userName === "string" &&
+          !(value.data as { userName: string }).userName.trim()
+        ) {
+          value = {
+            ok: false,
+            detail: `${at.join(".")}.userName must not be empty`,
+            scimType: "invalidValue",
+          };
+        }
         // Null reads as "not sent" on a resource body, but here the route
         // tests `"active" in value` and would read null as a deactivation.
         // Refuse it, as the path form does.

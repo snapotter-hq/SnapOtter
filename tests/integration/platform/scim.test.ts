@@ -1069,6 +1069,33 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       });
     });
 
+    it.each(["", "   ", "\t\n"])(
+      "rejects creation with an empty or whitespace-only userName (%j) using a 400 invalidValue SCIM error (#2639)",
+      async (userName) => {
+        const externalId = uniqueName("scim-post-blank-un");
+        const res = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: { userName, externalId, active: true },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName is required",
+        });
+
+        const rows = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.scimExternalId, externalId));
+        expect(rows).toHaveLength(0);
+      },
+    );
+
     it("concurrent duplicate creates return one 201 and one SCIM 409, never 500", async () => {
       // Issue #927: IdP provisioning retries can race. Requests that pass
       // the duplicate pre-check before the winner's insert commits used to
@@ -1309,6 +1336,31 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       const row = await userRow(victim.id);
       expect(row?.username).toBe(victim.userName);
     });
+
+    it.each(["", "   ", "\t\n"])(
+      "rejects a PUT with an empty or whitespace-only userName (%j) with 400 invalidValue and leaves the row unchanged (#2639)",
+      async (userName) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-put-blank-un") });
+
+        const res = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: { userName, active: false },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "userName must not be empty",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.username).toBe(victim.userName);
+        expect(row?.role).toBe("user");
+      },
+    );
 
     it("concurrent renames onto one userName return one 200 and one SCIM 409, never 500", async () => {
       // Issue #968: both renames pass the conflict pre-check before either
@@ -1823,6 +1875,38 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.scimExternalId).toBe("bulk-ext");
       expect(row?.email).toBe("bulk@example.com");
     });
+
+    it.each([
+      ["replace with empty userName", { op: "replace", value: { userName: "" } }],
+      ["replace with whitespace userName", { op: "replace", value: { userName: "   " } }],
+      ["add with cased whitespace USERNAME", { op: "add", value: { USERNAME: " \t " } }],
+    ])(
+      "rejects a path-less PATCH (%s) with 400 invalidValue and leaves the row unchanged (#2639)",
+      async (_label, op) => {
+        const victim = await createScimUser({ userName: uniqueName("scim-patch-blank-un") });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${victim.id}`,
+          headers: authHeaders(),
+          payload: {
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            Operations: [{ op: "replace", path: "active", value: false }, op],
+          },
+        });
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          scimType: "invalidValue",
+          detail: "Operations.1.value.userName must not be empty",
+        });
+        const row = await userRow(victim.id);
+        expect(row?.username).toBe(victim.userName);
+        expect(row?.role).toBe("user");
+      },
+    );
 
     it("deactivates via path active and reactivates via a bulk string True", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-patch-active") });
