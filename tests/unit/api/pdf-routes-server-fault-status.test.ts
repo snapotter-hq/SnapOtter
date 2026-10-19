@@ -421,4 +421,78 @@ describe("pdf-to-image batch route (#1552)", () => {
     );
     await app.close();
   });
+
+  it("masks non-SafeError 500 messages as 'Internal server error' when readOwnOutput fails mid-batch (#2786)", async () => {
+    getObjectBuffer.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw new Error("read failed");
+      }
+      return Buffer.from("page");
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "Internal server error" });
+    expect(failBatchJob).toHaveBeenCalledWith({
+      jobId: expect.any(String),
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+    await app.close();
+  });
+
+  it("masks non-SafeError 500 messages from putObject when settling the batch (#2786)", async () => {
+    putObject.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw Object.assign(
+          new TypeError("Cannot read properties of undefined (reading 'byteLength')"),
+          {
+            statusCode: 500,
+          },
+        );
+      }
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "Internal server error" });
+    expect(failBatchJob).toHaveBeenCalledWith({
+      jobId: expect.any(String),
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+    await app.close();
+  });
+
+  it("masks non-SafeError 5xx messages above 500 (such as 502) when settling the batch (#2786)", async () => {
+    putObject.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw Object.assign(new Error("upstream gateway failure details"), {
+          statusCode: 502,
+        });
+      }
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await sendBatch(app);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toEqual({ error: "Internal server error" });
+    expect(failBatchJob).toHaveBeenCalledWith({
+      jobId: expect.any(String),
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+    await app.close();
+  });
 });

@@ -600,17 +600,22 @@ export function registerPdfToImageRoute(
           // A storage or infrastructure fault is not a bad document. Let it
           // reach the error handler (which logs it, reports it, and honors its
           // status) instead of telling the user their PDF is broken.
-          if (typeof (err as { statusCode?: number })?.statusCode === "number") {
+          const statusCode = (err as { statusCode?: unknown })?.statusCode;
+          if (typeof statusCode === "number") {
             // But settle the progress row first: skipping the terminal frame
             // below left a client watching this job over SSE on "processing"
             // until the next restart (#1443). Guarded, so it never overwrites a
             // terminal row, and a failed settle can't mask the real fault.
-            const message = friendlyError(err instanceof Error ? err.message : String(err));
+            const safe = isSafeMessageError(err);
+            const message =
+              statusCode >= 500 && !safe
+                ? "Internal server error"
+                : friendlyError(err instanceof Error ? err.message : String(err));
             await settleFaultedBatch(
               files.length,
               [{ filename: "", error: message }],
               message,
-              isSafeMessageError(err) ? err.code : undefined,
+              safe ? err.code : undefined,
             );
             // Nothing will be sent, so what this run already rendered (every
             // document up to this one) is only stranded storage with no jobs

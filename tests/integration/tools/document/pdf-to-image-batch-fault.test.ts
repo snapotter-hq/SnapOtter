@@ -395,4 +395,37 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     });
     expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
   });
+
+  it("masks non-SafeError 500 messages in the progress row and cached terminal frame (#2786)", async () => {
+    const clientJobId = "batch-2786-unmasked-500";
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
+    faults.poisonError = () =>
+      Object.assign(new TypeError("Cannot read properties of undefined (reading 'byteLength')"), {
+        statusCode: 500,
+      });
+
+    const res = await postBatch(clientJobId);
+
+    expect(res.statusCode).toBe(500);
+    const row = await readRow(clientJobId);
+    expect(row?.status).toBe("failed");
+    expect(row?.completedAt).not.toBeNull();
+    expect(row?.error).toEqual({
+      message: "Internal server error",
+      details: [{ filename: "", error: "Internal server error" }],
+    });
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(cached).not.toBeNull();
+    expect(JSON.parse(cached as string)).toMatchObject({
+      jobId: clientJobId,
+      type: "batch",
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [{ filename: "", error: "Internal server error" }],
+    });
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+  });
 });
