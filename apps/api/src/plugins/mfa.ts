@@ -8,7 +8,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { sharedRedis } from "../jobs/connection.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decryptSetting, encrypt } from "../lib/encryption.js";
+import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -404,6 +404,31 @@ async function encryptSecret(secretBase32: string): Promise<string> {
 }
 
 /**
+ * Decrypt a user's stored TOTP secret. When the ciphertext only opens with
+ * DATA_ENCRYPTION_KEY_PREVIOUS (mid-rotation), re-encrypt and persist it under
+ * DATA_ENCRYPTION_KEY so dropping the previous key later does not lock the user
+ * out (#2033).
+ */
+export async function decryptSecret(userId: string, stored: string): Promise<string | null> {
+  if (!isEncrypted(stored)) return stored;
+  if (!env.DATA_ENCRYPTION_KEY) return null;
+
+  const current = await decrypt(stored, env.DATA_ENCRYPTION_KEY);
+  if (current !== null) return current;
+
+  if (!env.DATA_ENCRYPTION_KEY_PREVIOUS) return null;
+  const rotated = await decrypt(stored, env.DATA_ENCRYPTION_KEY_PREVIOUS);
+  if (!rotated) return rotated;
+
+  const reencrypted = await encryptSecret(rotated);
+  await db
+    .update(schema.users)
+    .set({ totpSecret: reencrypted, updatedAt: new Date() })
+    .where(and(eq(schema.users.id, userId), eq(schema.users.totpSecret, stored)));
+  return rotated;
+}
+
+/**
  * A stored TOTP secret that won't decrypt means DATA_ENCRYPTION_KEY (and its
  * PREVIOUS key) no longer matches what enrolled it, so every enrolled user hits
  * this at once. The 500 body alone is invisible to an operator: log it and
@@ -672,7 +697,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Decrypt the stored secret
-      const secretBase32 = await decryptSetting(dbUser.totpSecret);
+      const secretBase32 = await decryptSecret(user.id, dbUser.totpSecret);
       if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
       const audit = auditFromRequest(request);
@@ -821,7 +846,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         }
 
         // Decrypt the stored secret
-        secretBase32 = await decryptSetting(dbUser.totpSecret);
+        secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
         if (!secretBase32) {
           await restoreMfaChallenge(redis, challengeKey, claimed);
           return replyDecryptionFailed(request, reply, userId);
@@ -1121,7 +1146,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
 
-        secretBase32 = await decryptSetting(dbUser.totpSecret);
+        secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
         if (!secretBase32) {
           await restoreMfaChallenge(redis, challengeKey, claimed);
           return replyDecryptionFailed(request, reply, userId);
@@ -1317,7 +1342,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       // Decrypt and verify the code
-      const secretBase32 = await decryptSetting(dbUser.totpSecret);
+      const secretBase32 = await decryptSecret(user.id, dbUser.totpSecret);
       if (!secretBase32) return replyDecryptionFailed(request, reply, user.id);
 
       const audit = auditFromRequest(request);

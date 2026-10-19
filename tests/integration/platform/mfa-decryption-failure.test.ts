@@ -20,7 +20,7 @@ const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
 const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
-const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
 const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
 
 import type { TestApp } from "../test-server.js";
@@ -265,5 +265,147 @@ describe("MFA routes when the stored TOTP secret can't be decrypted (#2020)", ()
     expect(JSON.parse(res.body).code).toBe("INVALID_CODE");
     expect(reportErrorSpy).not.toHaveBeenCalled();
     expect(logError).not.toHaveBeenCalled();
+  });
+
+  it("re-encrypts the stored secret under DATA_ENCRYPTION_KEY on /api/auth/mfa/complete so dropping DATA_ENCRYPTION_KEY_PREVIOUS does not lock the user out (#2033)", async () => {
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    await setAdminMfa(true);
+
+    const firstToken = randomUUID();
+    await sharedRedis().set(`mfa:${firstToken}`, adminId, "EX", 60);
+    const duringRotation = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: firstToken, code: generateTotpCode() },
+    });
+    expect(duringRotation.statusCode).toBe(200);
+
+    const [rotatedRow] = await db
+      .select({ totpSecret: schema.users.totpSecret })
+      .from(schema.users)
+      .where(eq(schema.users.id, adminId));
+    const rotatedSecret = rotatedRow.totpSecret ?? "";
+    expect(rotatedSecret).not.toBe("");
+    expect(await decrypt(rotatedSecret, KEY_B)).toBe(SECRET);
+    expect(await decrypt(rotatedSecret, KEY_A)).toBeNull();
+
+    // Drop the previous key as documented in guide/configuration.md
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+    const stepKeys = await sharedRedis().keys(`mfa:totp-step:${adminId}:*`);
+    if (stepKeys.length > 0) await sharedRedis().del(...stepKeys);
+
+    const secondToken = randomUUID();
+    await sharedRedis().set(`mfa:${secondToken}`, adminId, "EX", 60);
+    const afterDrop = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: secondToken, code: generateTotpCode() },
+    });
+    expect(afterDrop.statusCode).toBe(200);
+    expect(reportErrorSpy).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it("re-encrypts the stored secret across /verify, /enroll-complete, and /disable when opened via DATA_ENCRYPTION_KEY_PREVIOUS (#2033)", async () => {
+    // 1. /api/auth/mfa/verify (200 during rotation, then readable after dropping previous key)
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    await setAdminMfa(false);
+
+    const verifyOk = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/verify",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode() },
+    });
+    expect(verifyOk.statusCode).toBe(200);
+
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+    const [afterVerify] = await db
+      .select({ totpSecret: schema.users.totpSecret })
+      .from(schema.users)
+      .where(eq(schema.users.id, adminId));
+    expect(await decrypt(afterVerify.totpSecret ?? "", KEY_B)).toBe(SECRET);
+
+    // 2. /api/auth/mfa/enroll-complete
+    await clearAdminMfa();
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    await setAdminMfa(false);
+
+    const enrollmentToken = randomUUID();
+    await sharedRedis().set(`mfa:enroll:${enrollmentToken}`, adminId, "EX", 60);
+    const enrollComplete = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: generateTotpCode() },
+    });
+    expect(enrollComplete.statusCode).toBe(200);
+
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+    const [afterEnrollComplete] = await db
+      .select({ totpSecret: schema.users.totpSecret })
+      .from(schema.users)
+      .where(eq(schema.users.id, adminId));
+    expect(await decrypt(afterEnrollComplete.totpSecret ?? "", KEY_B)).toBe(SECRET);
+
+    // 3. /api/auth/mfa/disable with its own KEY_A secret: a wrong code during
+    // rotation re-encrypts the secret, so a retry after dropping KEY_A succeeds.
+    await clearAdminMfa();
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    await setAdminMfa(true);
+
+    const disableWrong = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: "000000" },
+    });
+    expect(disableWrong.statusCode).toBe(401);
+
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+    const disableRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/disable",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { code: generateTotpCode() },
+    });
+    expect(disableRes.statusCode).toBe(200);
+    expect(reportErrorSpy).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite a concurrently cleared or replaced totpSecret when decryptSecret loses a race (#2033)", async () => {
+    const { decryptSecret } = await import("../../../apps/api/src/plugins/mfa.js");
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    const staleStored = await encrypt(SECRET, KEY_A);
+
+    // Case 1: concurrent MFA reset/disable cleared totpSecret to null.
+    await clearAdminMfa();
+    await expect(decryptSecret(adminId, staleStored)).resolves.toBe(SECRET);
+
+    const [clearedRow] = await db
+      .select({ totpSecret: schema.users.totpSecret })
+      .from(schema.users)
+      .where(eq(schema.users.id, adminId));
+    expect(clearedRow.totpSecret).toBeNull();
+
+    // Case 2: concurrent re-enrollment replaced totpSecret with a newer non-null ciphertext.
+    const newerSecret = await encrypt("JBSWY3DPEHPK3PXQ", KEY_B);
+    await db
+      .update(schema.users)
+      .set({ totpSecret: newerSecret, totpEnabled: false, updatedAt: new Date() })
+      .where(eq(schema.users.id, adminId));
+
+    await expect(decryptSecret(adminId, staleStored)).resolves.toBe(SECRET);
+
+    const [replacedRow] = await db
+      .select({ totpSecret: schema.users.totpSecret })
+      .from(schema.users)
+      .where(eq(schema.users.id, adminId));
+    expect(replacedRow.totpSecret).toBe(newerSecret);
   });
 });

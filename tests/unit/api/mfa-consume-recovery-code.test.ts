@@ -26,10 +26,16 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   },
   pool: {},
   closeDb: async () => {},
-  schema: { users: { id: {}, recoveryCodesHash: {} } },
+  schema: { users: { id: {}, recoveryCodesHash: {}, totpSecret: {} } },
 }));
 
-import { consumeRecoveryCode, hashRecoveryCodes } from "../../../apps/api/src/plugins/mfa.js";
+import { env } from "../../../apps/api/src/config.js";
+import { decrypt, encrypt } from "../../../apps/api/src/lib/encryption.js";
+import {
+  consumeRecoveryCode,
+  decryptSecret,
+  hashRecoveryCodes,
+} from "../../../apps/api/src/plugins/mfa.js";
 
 const CODES = ["aaaa1111", "bbbb2222", "cccc3333"];
 const list = (codes: string[]) => hashRecoveryCodes(codes);
@@ -102,5 +108,74 @@ describe("consumeRecoveryCode", () => {
     ];
 
     await expect(consumeRecoveryCode("u1", "bbbb2222", list(CODES))).resolves.toBe("consumed");
+  });
+});
+
+describe("decryptSecret (#2033)", () => {
+  const KEY_A = "a".repeat(64);
+  const KEY_B = "b".repeat(64);
+  const SECRET = "JBSWY3DPEHPK3PXP";
+  const originalKey = env.DATA_ENCRYPTION_KEY;
+  const originalPrev = env.DATA_ENCRYPTION_KEY_PREVIOUS;
+
+  beforeEach(() => {
+    env.DATA_ENCRYPTION_KEY = originalKey;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = originalPrev;
+  });
+
+  it("decrypts with DATA_ENCRYPTION_KEY without writing back to the database", async () => {
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    const stored = await encrypt(SECRET, KEY_B);
+
+    await expect(decryptSecret("u1", stored)).resolves.toBe(SECRET);
+    expect(db.updates).toHaveLength(0);
+  });
+
+  it("re-encrypts with DATA_ENCRYPTION_KEY and persists when opened via DATA_ENCRYPTION_KEY_PREVIOUS", async () => {
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    const stored = await encrypt(SECRET, KEY_A);
+
+    await expect(decryptSecret("u1", stored)).resolves.toBe(SECRET);
+    expect(db.updates).toHaveLength(1);
+    const reencrypted = db.updates[0].set.totpSecret as string;
+    expect(await decrypt(reencrypted, KEY_B)).toBe(SECRET);
+    expect(await decrypt(reencrypted, KEY_A)).toBeNull();
+  });
+
+  it("returns null and does not write when neither key can decrypt the secret", async () => {
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = "c".repeat(64);
+    const stored = await encrypt(SECRET, KEY_A);
+
+    await expect(decryptSecret("u1", stored)).resolves.toBeNull();
+    expect(db.updates).toHaveLength(0);
+  });
+
+  it("returns null without writing when DATA_ENCRYPTION_KEY_PREVIOUS is unset and current key fails", async () => {
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+    const stored = await encrypt(SECRET, KEY_A);
+
+    await expect(decryptSecret("u1", stored)).resolves.toBeNull();
+    expect(db.updates).toHaveLength(0);
+  });
+
+  it("returns null without writing when DATA_ENCRYPTION_KEY is unset for an encrypted secret", async () => {
+    env.DATA_ENCRYPTION_KEY = "";
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+    const stored = await encrypt(SECRET, KEY_A);
+
+    await expect(decryptSecret("u1", stored)).resolves.toBeNull();
+    expect(db.updates).toHaveLength(0);
+  });
+
+  it("passes plaintext secrets through without writing", async () => {
+    env.DATA_ENCRYPTION_KEY = KEY_B;
+    env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+
+    await expect(decryptSecret("u1", SECRET)).resolves.toBe(SECRET);
+    expect(db.updates).toHaveLength(0);
   });
 });
