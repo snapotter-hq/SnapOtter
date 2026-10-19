@@ -90,6 +90,12 @@ export function registerDuotone(app: FastifyInstance) {
             .toBuffer({ resolveWithObject: true });
           const duo = await sharp(buf).removeAlpha().toColourspace("srgb").raw().toBuffer();
           const pixels = origRaw.data;
+          if (duo.length !== pixels.length) {
+            throw new Error(
+              `duotone blend: duotone buffer is ${duo.length} bytes, original is ${pixels.length} ` +
+                `(${origRaw.info.width}x${origRaw.info.height}x${origRaw.info.channels})`,
+            );
+          }
           const blended = Buffer.alloc(pixels.length);
           for (let i = 0; i < pixels.length; i++) {
             blended[i] = Math.round(pixels[i] * (1 - k) + duo[i] * k);
@@ -98,7 +104,7 @@ export function registerDuotone(app: FastifyInstance) {
             raw: {
               width: origRaw.info.width,
               height: origRaw.info.height,
-              channels: origRaw.info.channels as 1 | 2 | 3 | 4,
+              channels: origRaw.info.channels,
             },
           })
             .png()

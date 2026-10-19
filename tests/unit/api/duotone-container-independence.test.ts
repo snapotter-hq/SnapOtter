@@ -1,7 +1,9 @@
 import { join } from "node:path";
+import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerDuotone } from "../../../apps/api/src/routes/tools/duotone.js";
 import { fixtureDir, readFixture } from "../../fixtures/index.js";
@@ -197,4 +199,77 @@ describe("duotone answers by pixels, not by container (#1180)", () => {
       expect(worst).toBeLessThanOrEqual(8);
     },
   );
+});
+
+describe("duotone blend buffer guard (#1189)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("throws a processing fault when the original blend buffer is longer than the duotone buffer", async () => {
+    const rgbaPng = await sharp({
+      create: {
+        width: 60,
+        height: 60,
+        channels: 4,
+        background: { r: 200, g: 120, b: 80, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const sharpProto = Object.getPrototypeOf(sharp()) as {
+      removeAlpha: (this: sharp.Sharp) => sharp.Sharp;
+    };
+    const origRemoveAlpha = sharpProto.removeAlpha;
+    let removeAlphaCalls = 0;
+    vi.spyOn(sharpProto, "removeAlpha").mockImplementation(function (this: sharp.Sharp) {
+      removeAlphaCalls++;
+      // Call 1 builds grayBuf; call 2 builds origRaw in the k < 1 blend branch;
+      // call 3 builds duo. Skipping call 2 leaves origRaw at 4 channels (14400 B)
+      // while duo is 3 channels (10800 B), which previously indexed past duo's end
+      // and wrote NaN -> 0 (15 black rows) without throwing.
+      if (removeAlphaCalls === 2) {
+        return this;
+      }
+      return origRemoveAlpha.call(this);
+    });
+
+    let caught: unknown;
+    try {
+      await runDuotone(rgbaPng, "rgba.png", 40);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe(
+      "duotone blend: duotone buffer is 10800 bytes, original is 14400 (60x60x4)",
+    );
+    expect(isToolInputError(caught)).toBe(false);
+    expect(classifyError(caught, "worker")).toBe("bug");
+  });
+
+  it("throws a processing fault when the duotone blend buffer is longer than the original buffer", async () => {
+    const rgbPng = await swatch([200, 120, 80], "png");
+
+    const sharpProto = Object.getPrototypeOf(sharp()) as {
+      removeAlpha: (this: sharp.Sharp) => sharp.Sharp;
+    };
+    const origRemoveAlpha = sharpProto.removeAlpha;
+    let removeAlphaCalls = 0;
+    vi.spyOn(sharpProto, "removeAlpha").mockImplementation(function (this: sharp.Sharp) {
+      removeAlphaCalls++;
+      // Replacing call 3 (duo in the k < 1 blend branch) with ensureAlpha()
+      // makes duo 4 channels (40000 B) against a 3-channel origRaw (30000 B).
+      if (removeAlphaCalls === 3) {
+        return this.ensureAlpha();
+      }
+      return origRemoveAlpha.call(this);
+    });
+
+    await expect(runDuotone(rgbPng, "rgb.png", 40)).rejects.toThrow(
+      "duotone blend: duotone buffer is 40000 bytes, original is 30000 (100x100x3)",
+    );
+  });
 });
