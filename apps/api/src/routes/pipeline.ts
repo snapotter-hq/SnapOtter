@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { FEATURE_BUNDLES, isSafeMessageError, MODALITY_POOL, TOOLS } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
@@ -685,6 +685,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // authorization. A foreign or pre-#771 ownerless row is left
             // alone, the old lazy-create semantics, with no 409 so the
             // response cannot become an id-existence oracle.
+            const isRepoint = sql`${schema.jobs.settings}->>'pipelineFlowId' is distinct from ${jobId}`;
             const aliasRes = await db
               .insert(schema.jobs)
               .values({
@@ -702,7 +703,16 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 // batch parent or tool artifact the same user owns must
                 // keep its own cancel metadata (batch parent ids ARE
                 // client-supplied, so that collision is reachable).
-                set: { settings: { pipelineFlowId: jobId } },
+                // Reset terminal columns when the flow pointer changes (#2650,
+                // mirroring upsertToolJobAlias in #886) so a reused channel
+                // accepts nonterminal progress, cancel, and finalize writes.
+                set: {
+                  settings: { pipelineFlowId: jobId },
+                  status: sql`CASE WHEN ${isRepoint} THEN 'queued' ELSE ${schema.jobs.status} END`,
+                  completedAt: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.completedAt} END`,
+                  error: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.error} END`,
+                  progress: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.progress} END`,
+                },
                 setWhere: and(eq(schema.jobs.type, "single"), eq(schema.jobs.userId, userId)),
               });
             if (((aliasRes as { rowCount?: number | null })?.rowCount ?? 0) === 0) {

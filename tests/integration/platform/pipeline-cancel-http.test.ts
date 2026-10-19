@@ -26,12 +26,25 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 const enqueueMock = vi.hoisted(() => ({
   cannedByPool: new Map<string, Record<string, unknown>>(),
   timeoutOnce: false,
+  captureFlowOnce: false,
+  capturedFlow: null as unknown,
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/jobs/enqueue.js")>();
   return {
     ...actual,
+    getFlowProducer: () => {
+      const producer = actual.getFlowProducer();
+      if (!enqueueMock.captureFlowOnce) return producer;
+      enqueueMock.captureFlowOnce = false;
+      return {
+        add: async (tree: unknown) => {
+          enqueueMock.capturedFlow = tree;
+          return {} as Awaited<ReturnType<typeof producer.add>>;
+        },
+      } as unknown as ReturnType<typeof actual.getFlowProducer>;
+    },
     waitForJob: async (...args: Parameters<typeof actual.waitForJob>) => {
       if (enqueueMock.timeoutOnce) {
         enqueueMock.timeoutOnce = false;
@@ -48,6 +61,7 @@ const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { isBatchCanceled } = await import("../../../apps/api/src/jobs/batch-progress.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+const { getFlowProducer } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { completeBatchJob } = await import("../../../apps/api/src/routes/progress.js");
 const { fixtures, readFixture } = await import("../../fixtures/index.js");
@@ -330,6 +344,91 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ canceled: true });
     expect(await isBatchCanceled(clientJobId)).toBe(true);
+  });
+
+  it("resets terminal status on a reused alias row so in-flight progress, cancel, and finalize work (#2650)", async () => {
+    const clientJobId = randomUUID();
+    await runPipeline(clientJobId);
+
+    // Seed a stale error on the completed alias row from run 1 so the re-point
+    // must clear status, completedAt, error, and progress alike.
+    await db
+      .update(schema.jobs)
+      .set({ error: { message: "prior error" } })
+      .where(eq(schema.jobs.id, clientJobId));
+    const first = await jobRow(clientJobId);
+    const firstFlow = ((first?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
+    expect(first?.status).toBe("completed");
+    expect(first?.completedAt).not.toBeNull();
+    expect(first?.error).toEqual({ message: "prior error" });
+
+    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+    enqueueMock.captureFlowOnce = true;
+    enqueueMock.timeoutOnce = true;
+    enqueueMock.capturedFlow = null;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+        },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const execRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/execute",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+      expect(execRes.statusCode).toBe(202);
+
+      // The alias row was reset on re-point and accepted run 2's initial
+      // nonterminal progress write instead of staying terminal from run 1.
+      const inFlightAlias = await jobRow(clientJobId);
+      const secondFlow = ((inFlightAlias?.settings ?? {}) as { pipelineFlowId?: string })
+        .pipelineFlowId;
+      expect(secondFlow).toBeDefined();
+      expect(secondFlow).not.toBe(firstFlow);
+      expect(inFlightAlias?.status).toBe("processing");
+      expect(inFlightAlias?.completedAt).toBeNull();
+      expect(inFlightAlias?.error).toBeNull();
+      expect(inFlightAlias?.progress).toEqual({
+        percent: 0,
+        stage: "Preparing pipeline...",
+      });
+
+      // Canceling via clientJobId during run 2 now succeeds instead of being
+      // refused by run 1's terminal status.
+      const cancelRes = await app.inject({
+        method: "POST",
+        url: `/api/v1/jobs/${clientJobId}/cancel`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(cancelRes.statusCode).toBe(200);
+      expect(JSON.parse(cancelRes.body)).toEqual({ canceled: true });
+      expect(await isBatchCanceled(clientJobId)).toBe(true);
+
+      // Enqueue run 2's captured flow so processPipelineFinalize settles both
+      // the flow row and the re-pointed alias row as canceled.
+      expect(enqueueMock.capturedFlow).not.toBeNull();
+      await getFlowProducer().add(
+        enqueueMock.capturedFlow as Parameters<ReturnType<typeof getFlowProducer>["add"]>[0],
+      );
+      const terminalFrame = await waitForTerminalFrame(clientJobId);
+      expect(terminalFrame).toMatchObject({
+        jobId: clientJobId,
+        type: "single",
+        phase: "failed",
+        error: "Canceled",
+      });
+      expect((await jobRow(secondFlow as string))?.status).toBe("canceled");
+      expect((await jobRow(clientJobId))?.status).toBe("canceled");
+    } finally {
+      enqueueMock.captureFlowOnce = false;
+      enqueueMock.timeoutOnce = false;
+      enqueueMock.capturedFlow = null;
+    }
   });
 
   it("blocks a non-owner from canceling a pipeline via its alias (404)", async () => {
