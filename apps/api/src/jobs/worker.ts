@@ -116,7 +116,14 @@ import { createMonotonicReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
 import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
 import { runSystemJob } from "./system-jobs.js";
-import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
+import {
+  POOLS,
+  type Pool,
+  queueName,
+  resultPayloadKey,
+  type ToolJobData,
+  type ToolJobResult,
+} from "./types.js";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -613,6 +620,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // abort alone is left be: that result is finished and good, and throwing here
       // would retry the whole job.
       if (wasUserCanceled(jobId)) throw new Error("Canceled");
+
+      // Persist the tool's own resultPayload before the primary output (#1389)
+      // so the deliverable artifact never exists on disk without its sidecar,
+      // and stranded-job reconciliation can restore resize and target-size notes
+      // when the terminal DB write is lost. orderArtifacts ignores the sidecar,
+      // so a crash between the two writes still reconciles as failed.
+      if (resultPayload) {
+        const payloadJson = JSON.stringify(resultPayload);
+        if (payloadJson !== "{}") {
+          await putObject(resultPayloadKey(jobId), Buffer.from(payloadJson, "utf8"));
+        }
+      }
 
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;

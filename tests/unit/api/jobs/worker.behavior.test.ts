@@ -453,6 +453,122 @@ describe("worker result payload behavior", () => {
       processedSize: 8,
     });
   });
+
+  it("writes outputs/<jobId>/.result-payload.json before the primary output only when resultPayload is non-empty (#1389)", async () => {
+    const processV2Mock = vi.fn();
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: vi.fn(() => ({
+              where: vi.fn().mockResolvedValue(undefined),
+            })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    const makeJob = (jobId: string) => ({
+      id: jobId,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId,
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        inputRefs: [`uploads/${jobId}/in.jpg`],
+        filename: "in.jpg",
+        settings: {},
+        kind: "tool",
+      },
+    });
+
+    // 1. Non-empty resultPayload: writes sidecar first, then primary output
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+      resultPayload: { targetKb: 5, resizedTo: { width: 100, height: 80 } },
+    });
+    await processor(makeJob("job-with-payload"));
+    expect(objectStorageMocks.putObject.mock.calls.map(([key]) => key)).toEqual([
+      "outputs/job-with-payload/.result-payload.json",
+      "outputs/job-with-payload/out.jpg",
+    ]);
+    expect(
+      JSON.parse((objectStorageMocks.putObject.mock.calls[0][1] as Buffer).toString("utf8")),
+    ).toEqual({
+      targetKb: 5,
+      resizedTo: { width: 100, height: 80 },
+    });
+
+    // 2. Empty object resultPayload ({}): skips sidecar write
+    objectStorageMocks.putObject.mockClear();
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+      resultPayload: {},
+    });
+    await processor(makeJob("job-empty-payload"));
+    expect(objectStorageMocks.putObject.mock.calls.map(([key]) => key)).toEqual([
+      "outputs/job-empty-payload/out.jpg",
+    ]);
+
+    // 3. Undefined resultPayload: skips sidecar write
+    objectStorageMocks.putObject.mockClear();
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    await processor(makeJob("job-no-payload"));
+    expect(objectStorageMocks.putObject.mock.calls.map(([key]) => key)).toEqual([
+      "outputs/job-no-payload/out.jpg",
+    ]);
+  });
 });
 
 describe("pipelineExecutedProps", () => {

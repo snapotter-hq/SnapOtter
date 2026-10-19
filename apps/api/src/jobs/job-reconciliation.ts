@@ -34,10 +34,17 @@
  */
 import { and, eq, inArray, isNotNull, lt, ne, type SQL } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
-import { getObjectSize, listObjects, type ObjectInfo } from "../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  getObjectSize,
+  isMissingObjectError,
+  listObjects,
+  type ObjectInfo,
+} from "../lib/object-storage.js";
 import { getQueue } from "./queues.js";
-import { POOLS, type Pool } from "./types.js";
+import { POOLS, type Pool, RESULT_PAYLOAD_FILENAME } from "./types.js";
 
 /** DB statuses a reconciler may resolve. Terminal rows are never touched. */
 const NON_TERMINAL = ["queued", "processing"] as const;
@@ -122,6 +129,53 @@ function isPreviewKey(key: string): boolean {
   return name === "preview.webp" || name === "preview.png";
 }
 
+/** Sidecar carrying the tool's own resultPayload fields (#1389), never a deliverable artifact. */
+function isResultPayloadKey(key: string): boolean {
+  const name = key.slice(key.lastIndexOf("/") + 1);
+  return name === RESULT_PAYLOAD_FILENAME;
+}
+
+/**
+ * Read the tool's resultPayload sidecar when one was written alongside the
+ * output (#1389). Storage/IO faults from `getObjectBuffer` propagate so a
+ * transient storage blip does not irreversibly complete the row without its
+ * payload; a corrupt or non-object JSON payload is logged at error level and
+ * reported to Sentry while still allowing the primary artifact to be recovered.
+ */
+async function readResultPayload(
+  jobId: string,
+  objects: ObjectInfo[],
+): Promise<Record<string, unknown> | undefined> {
+  const sidecar = objects.find((object) => isResultPayloadKey(object.key));
+  if (!sidecar) return undefined;
+  let raw: Buffer;
+  try {
+    raw = await getObjectBuffer(sidecar.key);
+  } catch (err) {
+    if (isMissingObjectError(err)) return undefined;
+    throw err;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw.toString("utf8"));
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    const shapeErr = new Error(`Result payload sidecar ${sidecar.key} is not a JSON object`);
+    logger.error(
+      { err: shapeErr, jobId, key: sidecar.key },
+      "Result payload sidecar is not a JSON object; ignoring",
+    );
+    void reportError(shapeErr, { source: "worker", pool: "system", jobId });
+  } catch (err) {
+    logger.error(
+      { err, jobId, key: sidecar.key },
+      "Failed to parse result payload sidecar during job reconciliation; continuing without tool payload",
+    );
+    void reportError(err, { source: "worker", pool: "system", jobId });
+  }
+  return undefined;
+}
+
 /**
  * Is there still a BullMQ entry that will run this job?
  *
@@ -162,7 +216,9 @@ async function resolveOriginalSize(bytesIn: number | null, inputRefs: string[] |
  */
 function orderArtifacts(objects: ObjectInfo[]): ObjectInfo[] {
   return objects
-    .filter((object) => object.size > 0 && !isPreviewKey(object.key))
+    .filter(
+      (object) => object.size > 0 && !isPreviewKey(object.key) && !isResultPayloadKey(object.key),
+    )
     .sort((a, b) => a.mtimeMs - b.mtimeMs || a.key.localeCompare(b.key));
 }
 
@@ -185,8 +241,10 @@ async function recoverFromOutputs(
   const preview = objects.find((object) => isPreviewKey(object.key));
   const originalSize = await resolveOriginalSize(row.bytesIn, row.inputRefs);
   const outputRefs = artifacts.map((artifact) => artifact.key);
+  const toolPayload = await readResultPayload(row.id, objects);
 
   const result: Record<string, unknown> = {
+    ...toolPayload,
     jobId: row.id,
     downloadUrl: `/api/v1/download/${row.id}/${encodeURIComponent(filename)}`,
     originalSize,
@@ -197,6 +255,8 @@ async function recoverFromOutputs(
   };
   if (preview) {
     result.previewUrl = `/api/v1/download/${row.id}/${preview.key.slice(preview.key.lastIndexOf("/") + 1)}`;
+  } else {
+    delete result.previewUrl;
   }
 
   const updated = await db

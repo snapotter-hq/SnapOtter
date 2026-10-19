@@ -101,3 +101,14 @@ export interface ToolJobResult {
   autoSaveError?: string;
   resultPayload?: Record<string, unknown>;
 }
+
+/**
+ * Sidecar object written next to a job's output so stranded-job reconciliation
+ * can restore the tool's own `resultPayload` fields (such as `resizedTo`,
+ * `targetKb`, and `targetMet`) when the worker's terminal DB write is lost (#1389).
+ */
+export const RESULT_PAYLOAD_FILENAME = ".result-payload.json";
+
+export function resultPayloadKey(jobId: string): string {
+  return `outputs/${jobId}/${RESULT_PAYLOAD_FILENAME}`;
+}
