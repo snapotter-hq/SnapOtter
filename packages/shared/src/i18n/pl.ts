@@ -4776,6 +4776,8 @@ export const pl: TranslationKeys = {
         message: "Odzyskano niezapisaną pracę z {time}.",
         restore: "Przywróć",
         discard: "Odrzuć",
+        saveFailed:
+          "Nie udało się zapisać pracy w tej przeglądarce. Wyeksportuj ją lub użyj opcji Zapisz projekt, aby zachować kopię.",
       },
       fillDialog: {
         heading: "Wypełnij",

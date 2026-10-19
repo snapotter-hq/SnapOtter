@@ -1105,4 +1105,42 @@ describe("EditorPage Open Image server decode (#2530)", () => {
       window.history.replaceState({}, "", prevHref);
     }
   });
+
+  it("surfaces saveFailed toast and reports QuotaExceededError when File > Save fails (#2173)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal("indexedDB", undefined);
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      },
+      removeItem: () => {},
+      clear: () => {},
+    });
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    renderEditor();
+
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-save"));
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.autosaveRecovery.saveFailed);
+    });
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Editor autosave exceeded storage quota" }),
+      expect.objectContaining({ error_class: "operational", tool_id: "editor-autosave" }),
+    );
+
+    toastError.mockClear();
+    fireEvent.keyDown(document, { key: "s", code: "KeyS", ctrlKey: true });
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.autosaveRecovery.saveFailed);
+    });
+  });
 });

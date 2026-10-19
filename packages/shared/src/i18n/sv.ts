@@ -4766,6 +4766,8 @@ export const sv: TranslationKeys = {
         message: "Återställde osparat arbete från {time}.",
         restore: "Återställ",
         discard: "Förkasta",
+        saveFailed:
+          "Det gick inte att spara ditt arbete i den här webbläsaren. Exportera eller använd Spara projekt för att behålla en kopia.",
       },
       fillDialog: {
         heading: "Fyll",

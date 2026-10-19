@@ -4794,6 +4794,8 @@ export const de: TranslationKeys = {
         message: "Nicht gespeicherte Arbeit von {time} wiederhergestellt.",
         restore: "Wiederherstellen",
         discard: "Verwerfen",
+        saveFailed:
+          "Deine Arbeit konnte in diesem Browser nicht gespeichert werden. Exportiere sie oder nutze „Projekt speichern“, um eine Kopie zu behalten.",
       },
       fillDialog: {
         heading: "Füllen",

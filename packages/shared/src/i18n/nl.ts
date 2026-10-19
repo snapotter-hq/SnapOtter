@@ -4785,6 +4785,8 @@ export const nl: TranslationKeys = {
         message: "Niet-opgeslagen werk van {time} hersteld.",
         restore: "Herstellen",
         discard: "Verwerpen",
+        saveFailed:
+          "Kon je werk niet opslaan in deze browser. Exporteer of gebruik Project opslaan om een kopie te bewaren.",
       },
       fillDialog: {
         heading: "Vullen",

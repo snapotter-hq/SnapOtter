@@ -4778,6 +4778,8 @@ export const ptBR: TranslationKeys = {
         message: "Trabalho não salvo recuperado de {time}.",
         restore: "Restaurar",
         discard: "Descartar",
+        saveFailed:
+          "Não foi possível salvar seu trabalho neste navegador. Exporte ou use Salvar projeto para manter uma cópia.",
       },
       fillDialog: {
         heading: "Preencher",

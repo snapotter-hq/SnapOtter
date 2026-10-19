@@ -4490,6 +4490,7 @@ export const zhCN: TranslationKeys = {
         message: "已恢复 {time} 未保存的内容。",
         restore: "恢复",
         discard: "放弃",
+        saveFailed: "无法在此浏览器中保存当前工作。请导出或使用“保存项目”保留副本。",
       },
       fillDialog: {
         heading: "填充",

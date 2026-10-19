@@ -4711,6 +4711,7 @@ export const th: TranslationKeys = {
         message: "กู้คืนงานที่ยังไม่ได้บันทึกจาก {time} แล้ว",
         restore: "กู้คืน",
         discard: "ทิ้ง",
+        saveFailed: "ไม่สามารถบันทึกงานของคุณในเบราว์เซอร์นี้ได้ ส่งออกหรือใช้บันทึกโปรเจกต์เพื่อเก็บสำเนาไว้",
       },
       fillDialog: {
         heading: "เติมสี",

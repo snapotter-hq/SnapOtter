@@ -4704,6 +4704,8 @@ export const en = {
         message: "Recovered unsaved work from {time}.",
         restore: "Restore",
         discard: "Discard",
+        saveFailed:
+          "Couldn't save your work in this browser. Export or Save Project to keep a copy.",
       },
       fillDialog: {
         heading: "Fill",

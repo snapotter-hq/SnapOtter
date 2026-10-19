@@ -4767,6 +4767,8 @@ export const es: TranslationKeys = {
         message: "Se recuperó trabajo sin guardar de {time}.",
         restore: "Restaurar",
         discard: "Descartar",
+        saveFailed:
+          "No se pudo guardar tu trabajo en este navegador. Exporta o usa Guardar proyecto para conservar una copia.",
       },
       fillDialog: {
         heading: "Rellenar",

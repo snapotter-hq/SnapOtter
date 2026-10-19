@@ -5,6 +5,7 @@ import {
   ANALYTICS_EVENTS,
   apiToolPath,
   type EditorExportedProperties,
+  en,
   SafeError,
 } from "@snapotter/shared";
 import type Konva from "konva";
@@ -1473,7 +1474,21 @@ function isValidProjectData(data: unknown): data is Partial<AutosaveState> & {
 }
 
 const AUTOSAVE_KEY = "snapotter-editor-autosave";
+const AUTOSAVE_DB_NAME = "snapotter-editor-autosave";
+const AUTOSAVE_DB_VERSION = 1;
+const AUTOSAVE_STORE_NAME = "blobs";
+const AUTOSAVE_IDB_SOURCE_URL = "idb://snapotter-editor-autosave/source";
+const AUTOSAVE_IDB_OBJECT_PREFIX = "idb://snapotter-editor-autosave/object/";
 const AUTOSAVE_INTERVAL_MS = 60_000;
+
+let autosaveFailureReported = false;
+let activeSaveRunId = 0;
+let pendingManualSaveOptions: SaveEditorStateOptions | null = null;
+
+export interface SaveEditorStateOptions {
+  manual?: boolean;
+  errorMessage?: string;
+}
 
 interface AutosaveState {
   canvasSize: { width: number; height: number };
@@ -1504,21 +1519,8 @@ function withoutLiveStroke(obj: CanvasObject): CanvasObject {
   return { ...obj, attrs };
 }
 
-/**
- * Convert a blob: URL to a data: URL. Returns the original string if it is not
- * a blob URL, and throws if the blob cannot be read into a non-empty data URL.
- */
-async function blobUrlToDataUrl(url: string): Promise<string> {
-  if (!url.startsWith("blob:")) return url;
-  const res = await fetch(url);
-  if (res.ok === false) {
-    throw new Error(`Failed to fetch blob URL (${res.status})`);
-  }
-  const blob = await res.blob();
-  if (blob.size === 0) {
-    throw new Error("Blob URL resolved to an empty blob");
-  }
-  return await new Promise<string>((resolve, reject) => {
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const result = reader.result;
@@ -1537,6 +1539,59 @@ async function blobUrlToDataUrl(url: string): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error("Failed to read blob as data URL"));
     reader.readAsDataURL(blob);
   });
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const commaIdx = dataUrl.indexOf(",");
+  if (!dataUrl.startsWith("data:") || commaIdx === -1 || commaIdx >= dataUrl.length - 1) {
+    throw new Error("Invalid data URL");
+  }
+  const header = dataUrl.slice(5, commaIdx);
+  const payload = dataUrl.slice(commaIdx + 1);
+  const isBase64 = header.endsWith(";base64");
+  const mime = (isBase64 ? header.slice(0, -7) : header) || "application/octet-stream";
+  if (isBase64) {
+    const binary = atob(payload);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    if (bytes.byteLength === 0) {
+      throw new Error("Data URL resolved to an empty blob");
+    }
+    return new Blob([bytes], { type: mime });
+  }
+  const decoded = decodeURIComponent(payload);
+  const bytes = new TextEncoder().encode(decoded);
+  if (bytes.byteLength === 0) {
+    throw new Error("Data URL resolved to an empty blob");
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+async function urlToBlob(url: string): Promise<Blob> {
+  if (url.startsWith("data:")) {
+    return dataUrlToBlob(url);
+  }
+  const res = await fetch(url);
+  if (res.ok === false) {
+    throw new Error(`Failed to fetch blob URL (${res.status})`);
+  }
+  const blob = await res.blob();
+  if (blob.size === 0) {
+    throw new Error("Blob URL resolved to an empty blob");
+  }
+  return blob;
+}
+
+/**
+ * Convert a blob: URL to a data: URL. Returns the original string if it is not
+ * a blob URL, and throws if the blob cannot be read into a non-empty data URL.
+ */
+async function blobUrlToDataUrl(url: string): Promise<string> {
+  if (!url.startsWith("blob:")) return url;
+  const blob = await urlToBlob(url);
+  return await blobToDataUrl(blob);
 }
 
 async function serializeEditorState(s = useEditorStore.getState()): Promise<AutosaveState> {
@@ -1573,22 +1628,484 @@ async function serializeEditorState(s = useEditorStore.getState()): Promise<Auto
   };
 }
 
-export async function saveEditorState(): Promise<void> {
+function isIndexedDbAvailable(): boolean {
   try {
+    return typeof indexedDB !== "undefined" && typeof indexedDB?.open === "function";
+  } catch {
+    return false;
+  }
+}
+
+function isQuotaExceededError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = (err as { name?: unknown }).name;
+  if (
+    name === "QuotaExceededError" ||
+    name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    name === "QuotaExceeded"
+  ) {
+    return true;
+  }
+  const code = (err as { code?: unknown }).code;
+  return code === 22 || code === 1014;
+}
+
+function openAutosaveDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    let req: IDBOpenDBRequest;
+    try {
+      req = indexedDB.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
+        db.createObjectStore(AUTOSAVE_STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("Failed to open autosave IndexedDB"));
+    req.onblocked = () => reject(new Error("Autosave IndexedDB open was blocked"));
+  });
+}
+
+async function writeAutosaveBlobs(blobs: Map<string, Blob>): Promise<void> {
+  const db = await openAutosaveDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const fail = (err: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      };
+      let tx: IDBTransaction;
+      try {
+        tx = db.transaction(AUTOSAVE_STORE_NAME, "readwrite");
+      } catch (err) {
+        fail(err);
+        return;
+      }
+      tx.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      tx.onerror = (e) => {
+        const reqErr = (e?.target as IDBRequest | null)?.error;
+        fail(reqErr ?? tx.error ?? new Error("Failed to write autosave blobs to IndexedDB"));
+      };
+      tx.onabort = (e) => {
+        const reqErr = (e?.target as IDBRequest | null)?.error;
+        fail(reqErr ?? tx.error ?? new DOMException("IndexedDB transaction aborted", "AbortError"));
+      };
+      try {
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        store.clear();
+        for (const [key, blob] of blobs) {
+          store.put(blob, key);
+        }
+      } catch (err) {
+        fail(err);
+      }
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function readAutosaveBlobs(keys: string[]): Promise<Map<string, Blob>> {
+  if (keys.length === 0) return new Map();
+  const db = await openAutosaveDb();
+  try {
+    return await new Promise<Map<string, Blob>>((resolve, reject) => {
+      let settled = false;
+      const fail = (err: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      };
+      let tx: IDBTransaction;
+      try {
+        tx = db.transaction(AUTOSAVE_STORE_NAME, "readonly");
+      } catch (err) {
+        fail(err);
+        return;
+      }
+      const results = new Map<string, Blob>();
+      tx.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve(results);
+      };
+      tx.onerror = () => {
+        fail(tx.error ?? new Error("Failed to read autosave blobs from IndexedDB"));
+      };
+      tx.onabort = () => {
+        fail(tx.error ?? new Error("Autosave IndexedDB read transaction aborted"));
+      };
+      try {
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        for (const key of keys) {
+          const req = store.get(key);
+          req.onsuccess = () => {
+            const val = req.result;
+            if (val instanceof Blob && val.size > 0) {
+              results.set(key, val);
+            } else if (
+              val &&
+              typeof val === "object" &&
+              typeof (val as { size?: unknown }).size === "number" &&
+              (val as { size: number }).size > 0 &&
+              typeof (val as { slice?: unknown }).slice === "function"
+            ) {
+              results.set(key, val as Blob);
+            }
+          };
+          req.onerror = () => {
+            fail(req.error ?? new Error(`Failed to read key "${key}" from IndexedDB`));
+          };
+        }
+      } catch (err) {
+        fail(err);
+      }
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function clearAutosaveBlobs(expectedRunId = activeSaveRunId): Promise<void> {
+  if (!isIndexedDbAvailable() || expectedRunId !== activeSaveRunId) return;
+  const db = await openAutosaveDb();
+  try {
+    if (expectedRunId !== activeSaveRunId) return;
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const fail = (err: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      };
+      let tx: IDBTransaction;
+      try {
+        tx = db.transaction(AUTOSAVE_STORE_NAME, "readwrite");
+      } catch (err) {
+        fail(err);
+        return;
+      }
+      tx.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      tx.onerror = () => fail(tx.error ?? new Error("Failed to clear autosave IndexedDB"));
+      tx.onabort = () => fail(tx.error ?? new Error("Clear autosave IndexedDB aborted"));
+      try {
+        tx.objectStore(AUTOSAVE_STORE_NAME).clear();
+      } catch (err) {
+        fail(err);
+      }
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function isBlobOrDataUrl(url: string | null | undefined): url is string {
+  return typeof url === "string" && (url.startsWith("blob:") || url.startsWith("data:"));
+}
+
+async function prepareAutosavePayload(
+  s = useEditorStore.getState(),
+): Promise<{ idbState: AutosaveState; blobs: Map<string, Blob> }> {
+  const blobs = new Map<string, Blob>();
+  let sourceImageUrl = s.sourceImageUrl;
+  if (isBlobOrDataUrl(s.sourceImageUrl)) {
+    blobs.set("source", await urlToBlob(s.sourceImageUrl));
+    sourceImageUrl = AUTOSAVE_IDB_SOURCE_URL;
+  }
+
+  const objects = await Promise.all(
+    s.objects.map(async (obj) => {
+      const saved = withoutLiveStroke(obj);
+      if (saved.type === "image" && isBlobOrDataUrl(saved.attrs.src)) {
+        blobs.set(`object:${saved.id}`, await urlToBlob(saved.attrs.src));
+        return {
+          ...saved,
+          attrs: { ...saved.attrs, src: `${AUTOSAVE_IDB_OBJECT_PREFIX}${saved.id}` },
+        };
+      }
+      return saved;
+    }),
+  );
+
+  return {
+    idbState: {
+      canvasSize: s.canvasSize,
+      layers: s.layers,
+      objects,
+      adjustments: s.adjustments,
+      filters: s.filters,
+      levels: s.levels,
+      curves: s.curves,
+      guides: s.guides,
+      sourceImageUrl,
+      sourceImageSize: s.sourceImageSize,
+      foregroundColor: s.foregroundColor,
+      backgroundColor: s.backgroundColor,
+    },
+    blobs,
+  };
+}
+
+async function stateWithInlineBlobs(
+  state: AutosaveState,
+  blobs: Map<string, Blob>,
+): Promise<AutosaveState> {
+  const sourceBlob = blobs.get("source");
+  const sourceImageUrl =
+    state.sourceImageUrl === AUTOSAVE_IDB_SOURCE_URL && sourceBlob
+      ? await blobToDataUrl(sourceBlob)
+      : state.sourceImageUrl;
+
+  const objects = await Promise.all(
+    state.objects.map(async (obj) => {
+      if (
+        obj.type === "image" &&
+        typeof obj.attrs.src === "string" &&
+        obj.attrs.src.startsWith(AUTOSAVE_IDB_OBJECT_PREFIX)
+      ) {
+        const objBlob = blobs.get(`object:${obj.id}`);
+        if (objBlob) {
+          return {
+            ...obj,
+            attrs: { ...obj.attrs, src: await blobToDataUrl(objBlob) },
+          };
+        }
+      }
+      return obj;
+    }),
+  );
+
+  return {
+    ...state,
+    sourceImageUrl,
+    objects,
+  };
+}
+
+function neededAutosaveBlobKeys(data: AutosaveData): string[] {
+  const keys: string[] = [];
+  if (data.state.sourceImageUrl === AUTOSAVE_IDB_SOURCE_URL) {
+    keys.push("source");
+  }
+  for (const obj of data.state.objects ?? []) {
+    if (
+      obj.type === "image" &&
+      typeof obj.attrs.src === "string" &&
+      obj.attrs.src.startsWith(AUTOSAVE_IDB_OBJECT_PREFIX)
+    ) {
+      const id = obj.attrs.src.slice(AUTOSAVE_IDB_OBJECT_PREFIX.length);
+      if (id) keys.push(`object:${id}`);
+    }
+  }
+  return keys;
+}
+
+async function hydrateAutosaveState(
+  data: AutosaveData,
+): Promise<{ data: AutosaveData; createdUrls: string[] } | null> {
+  const keys = neededAutosaveBlobKeys(data);
+  if (keys.length === 0) {
+    return { data, createdUrls: [] };
+  }
+  if (!isIndexedDbAvailable()) {
+    console.debug("Autosave references IndexedDB blobs, but IndexedDB is unavailable");
+    return null;
+  }
+  let blobs: Map<string, Blob>;
+  try {
+    blobs = await readAutosaveBlobs(keys);
+  } catch (err) {
+    console.debug("Failed to read autosave blobs from IndexedDB:", err);
+    return null;
+  }
+  for (const key of keys) {
+    if (!blobs.has(key)) {
+      console.debug(`Autosave blob "${key}" missing from IndexedDB`);
+      return null;
+    }
+  }
+
+  const createdUrls: string[] = [];
+  try {
+    let sourceImageUrl = data.state.sourceImageUrl;
+    const sourceBlob = blobs.get("source");
+    if (sourceImageUrl === AUTOSAVE_IDB_SOURCE_URL && sourceBlob) {
+      const sourceUrl = URL.createObjectURL(sourceBlob);
+      createdUrls.push(sourceUrl);
+      sourceImageUrl = sourceUrl;
+    }
+    const objects = (data.state.objects ?? []).map((obj) => {
+      if (
+        obj.type === "image" &&
+        typeof obj.attrs.src === "string" &&
+        obj.attrs.src.startsWith(AUTOSAVE_IDB_OBJECT_PREFIX)
+      ) {
+        const id = obj.attrs.src.slice(AUTOSAVE_IDB_OBJECT_PREFIX.length);
+        const objBlob = blobs.get(`object:${id}`);
+        if (objBlob) {
+          const objUrl = URL.createObjectURL(objBlob);
+          createdUrls.push(objUrl);
+          return {
+            ...obj,
+            attrs: { ...obj.attrs, src: objUrl },
+          };
+        }
+      }
+      return obj;
+    });
+    return {
+      data: {
+        ...data,
+        state: {
+          ...data.state,
+          sourceImageUrl,
+          objects,
+        },
+      },
+      createdUrls,
+    };
+  } catch (err) {
+    for (const url of createdUrls) {
+      URL.revokeObjectURL(url);
+    }
+    console.debug("Failed to create object URLs for autosave blobs:", err);
+    return null;
+  }
+}
+
+function reportAutosaveFailure(
+  err: unknown,
+  phase: "storage" | "serialization",
+  options?: SaveEditorStateOptions,
+): void {
+  const isQuota = isQuotaExceededError(err);
+  if (phase === "storage") {
+    console.warn("[SnapOtter] Autosave failed (localStorage quota may be exceeded):", err);
+  } else {
+    console.warn("[SnapOtter] Autosave serialization failed:", err);
+  }
+  if (options?.manual || !autosaveFailureReported) {
+    autosaveFailureReported = true;
+    const message = isQuota
+      ? "Editor autosave exceeded storage quota"
+      : phase === "storage"
+        ? "Editor autosave storage failed"
+        : "Editor autosave serialization failed";
+    void captureHandledError(
+      new SafeError(message, {
+        kind: "operational",
+        cause: err,
+      }),
+      { error_class: "operational", tool_id: "editor-autosave" },
+    );
+  }
+  if (options?.manual) {
+    toast.error(options.errorMessage ?? en.editor.ui.autosaveRecovery.saveFailed);
+  }
+}
+
+export async function saveEditorState(options?: SaveEditorStateOptions): Promise<boolean> {
+  if (options?.manual) {
+    pendingManualSaveOptions = options;
+  }
+  const effectiveOptions = options?.manual ? options : (pendingManualSaveOptions ?? options);
+  const runId = ++activeSaveRunId;
+  const timestamp = Date.now();
+  let idbState: AutosaveState;
+  let blobs: Map<string, Blob>;
+  try {
+    const prepared = await prepareAutosavePayload();
+    idbState = prepared.idbState;
+    blobs = prepared.blobs;
+  } catch (err) {
+    if (runId === activeSaveRunId) {
+      pendingManualSaveOptions = null;
+      reportAutosaveFailure(err, "serialization", effectiveOptions);
+    }
+    return false;
+  }
+  if (runId !== activeSaveRunId) return false;
+
+  try {
+    if (blobs.size > 0 && isIndexedDbAvailable()) {
+      let wroteToIdb = false;
+      try {
+        await writeAutosaveBlobs(blobs);
+        wroteToIdb = true;
+      } catch (idbErr) {
+        if (isQuotaExceededError(idbErr)) {
+          throw idbErr;
+        }
+        console.debug("Autosave IndexedDB write failed; falling back to localStorage:", idbErr);
+      }
+      if (runId !== activeSaveRunId) return false;
+      if (wroteToIdb) {
+        const data: AutosaveData = {
+          version: 1,
+          timestamp,
+          state: idbState,
+        };
+        try {
+          localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+        } catch (lsErr) {
+          try {
+            localStorage.removeItem(AUTOSAVE_KEY);
+          } catch (rmErr) {
+            console.debug(
+              "Failed to remove stale autosave key after localStorage write failure:",
+              rmErr,
+            );
+          }
+          void clearAutosaveBlobs(runId).catch((err) => {
+            console.debug("Failed to clear autosave blobs from IndexedDB:", err);
+          });
+          throw lsErr;
+        }
+        pendingManualSaveOptions = null;
+        autosaveFailureReported = false;
+        useEditorStore.setState({ lastAutoSave: timestamp });
+        return true;
+      }
+    }
+
+    const inlineState = blobs.size > 0 ? await stateWithInlineBlobs(idbState, blobs) : idbState;
+    if (runId !== activeSaveRunId) return false;
     const data: AutosaveData = {
       version: 1,
-      timestamp: Date.now(),
-      state: await serializeEditorState(),
+      timestamp,
+      state: inlineState,
     };
-
-    try {
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
-      useEditorStore.setState({ lastAutoSave: Date.now() });
-    } catch (storageErr) {
-      console.warn("[SnapOtter] Autosave failed (localStorage quota may be exceeded):", storageErr);
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+    if (blobs.size === 0 && isIndexedDbAvailable()) {
+      void clearAutosaveBlobs(runId).catch((err) => {
+        console.debug("Failed to clear autosave blobs from IndexedDB:", err);
+      });
     }
-  } catch (err) {
-    console.warn("[SnapOtter] Autosave serialization failed:", err);
+    pendingManualSaveOptions = null;
+    autosaveFailureReported = false;
+    useEditorStore.setState({ lastAutoSave: timestamp });
+    return true;
+  } catch (storageErr) {
+    if (runId === activeSaveRunId) {
+      pendingManualSaveOptions = null;
+      reportAutosaveFailure(storageErr, "storage", effectiveOptions);
+    }
+    return false;
   }
 }
 
@@ -1626,16 +2143,23 @@ export function loadAutosaveState(): AutosaveData | null {
 }
 
 export function clearAutosave(): void {
+  const runId = ++activeSaveRunId;
+  pendingManualSaveOptions = null;
+  autosaveFailureReported = false;
   try {
     localStorage.removeItem(AUTOSAVE_KEY);
   } catch (err) {
     console.debug("Failed to clear autosave state from localStorage:", err);
   }
+  void clearAutosaveBlobs(runId).catch((err) => {
+    console.debug("Failed to clear autosave blobs from IndexedDB:", err);
+  });
 }
 
 export function restoreAutosave(data: AutosaveData): void {
   const store = useEditorStore.getState();
   const state = data.state;
+  const needsHydration = neededAutosaveBlobKeys(data).length > 0;
   const layers = state.layers || store.layers;
   const activeLayerId = layers.some((l) => l.id === store.activeLayerId)
     ? store.activeLayerId
@@ -1655,17 +2179,27 @@ export function restoreAutosave(data: AutosaveData): void {
           : existing;
       })
     : store.filters;
+  const initialObjects = (state.objects || []).filter(
+    (obj) =>
+      !(
+        obj.type === "image" &&
+        typeof obj.attrs.src === "string" &&
+        obj.attrs.src.startsWith(AUTOSAVE_IDB_OBJECT_PREFIX)
+      ),
+  );
+  const targetHistoryVersion = store._historyVersion + 1;
   useEditorStore.setState({
     canvasSize: state.canvasSize,
     layers,
     activeLayerId,
-    objects: state.objects || [],
+    objects: initialObjects,
     adjustments,
     filters,
     levels: resolveLoadedLevels(state.levels),
     curves: resolveLoadedCurves(state.curves),
     guides: state.guides || [],
-    sourceImageUrl: state.sourceImageUrl || null,
+    sourceImageUrl:
+      state.sourceImageUrl === AUTOSAVE_IDB_SOURCE_URL ? null : state.sourceImageUrl || null,
     sourceImageSize: state.sourceImageSize || null,
     foregroundColor: state.foregroundColor || "#000000",
     backgroundColor: state.backgroundColor || "#ffffff",
@@ -1677,8 +2211,33 @@ export function restoreAutosave(data: AutosaveData): void {
     clipboard: null,
     isDirty: true,
     lastAction: { id: "restoreAutosave" },
-    _historyVersion: store._historyVersion + 1,
+    _historyVersion: targetHistoryVersion,
   });
+  if (needsHydration) {
+    void hydrateAutosaveState(data)
+      .then((hydrated) => {
+        if (!hydrated) {
+          console.debug("Failed to hydrate autosave state during restoreAutosave");
+          clearAutosave();
+          return;
+        }
+        if (useEditorStore.getState()._historyVersion !== targetHistoryVersion) {
+          for (const url of hydrated.createdUrls) {
+            URL.revokeObjectURL(url);
+          }
+          return;
+        }
+        useEditorStore.setState({
+          sourceImageUrl: hydrated.data.state.sourceImageUrl || null,
+          objects: hydrated.data.state.objects || [],
+          lastAction: { id: "restoreAutosave" },
+          _historyVersion: targetHistoryVersion + 1,
+        });
+      })
+      .catch((err) => {
+        console.debug("Failed to hydrate autosave state during restoreAutosave:", err);
+      });
+  }
 }
 
 /**
@@ -1693,14 +2252,59 @@ export function useAutosave(): {
   const [recoveryData, setRecoveryData] = useState<AutosaveData | null>(null);
   const isDirty = useEditorStore((s) => s.isDirty);
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
+  const lastAutoSave = useEditorStore((s) => s.lastAutoSave);
+  const createdUrlsRef = useRef<string[]>([]);
+  const restoredRef = useRef(false);
 
   // Check for recovery on mount
   useEffect(() => {
+    let cancelled = false;
+    restoredRef.current = false;
     const data = loadAutosaveState();
-    if (data) {
+    if (!data) return;
+    if (neededAutosaveBlobKeys(data).length === 0) {
       setRecoveryData(data);
+      return;
     }
+    void hydrateAutosaveState(data)
+      .then((hydrated) => {
+        if (cancelled) {
+          for (const url of hydrated?.createdUrls ?? []) {
+            URL.revokeObjectURL(url);
+          }
+          return;
+        }
+        if (!hydrated) {
+          clearAutosave();
+          return;
+        }
+        createdUrlsRef.current = hydrated.createdUrls;
+        setRecoveryData(hydrated.data);
+      })
+      .catch((err) => {
+        console.debug("Failed to hydrate autosave state on mount:", err);
+      });
+    return () => {
+      cancelled = true;
+      if (!restoredRef.current) {
+        for (const url of createdUrlsRef.current) {
+          URL.revokeObjectURL(url);
+        }
+        createdUrlsRef.current = [];
+      }
+    };
   }, []);
+
+  // If a new save overwrites the autosave slot while an older recovery banner is still
+  // up, hide the stale banner and release its object URLs without clearing storage.
+  useEffect(() => {
+    if (!recoveryData || lastAutoSave === null || lastAutoSave <= recoveryData.timestamp) return;
+    for (const url of createdUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    createdUrlsRef.current = [];
+    setRecoveryData(null);
+  }, [recoveryData, lastAutoSave]);
 
   // Autosave interval
   useEffect(() => {
@@ -1709,9 +2313,9 @@ export function useAutosave(): {
     const timer = setInterval(() => {
       if (isDirty) {
         if (typeof requestIdleCallback === "function") {
-          requestIdleCallback(() => saveEditorState());
+          requestIdleCallback(() => void saveEditorState());
         } else {
-          saveEditorState();
+          void saveEditorState();
         }
       }
     }, AUTOSAVE_INTERVAL_MS);
@@ -1720,12 +2324,18 @@ export function useAutosave(): {
   }, [isDirty, sourceImageUrl]);
 
   const dismissRecovery = useCallback(() => {
+    for (const url of createdUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    createdUrlsRef.current = [];
     clearAutosave();
     setRecoveryData(null);
   }, []);
 
   const handleRestore = useCallback(() => {
     if (recoveryData) {
+      restoredRef.current = true;
+      createdUrlsRef.current = [];
       restoreAutosave(recoveryData);
       clearAutosave();
       setRecoveryData(null);

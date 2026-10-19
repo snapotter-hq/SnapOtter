@@ -81,11 +81,13 @@ vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
 
 import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
 import {
+  AutosaveRecoveryBanner,
   clearAutosave,
   ExportDialog,
   loadAutosaveState,
   restoreAutosave,
   saveEditorState,
+  useAutosave,
 } from "@/components/editor/common/export-dialog";
 import { captureHandledError } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
@@ -1754,5 +1756,721 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
       params: { radius: 12 },
     });
     expect(state.unexpectedKey).toBeUndefined();
+  });
+});
+
+function createFakeIndexedDb(options?: {
+  quotaErrorOnPut?: boolean;
+  errorOnOpen?: Error;
+  errorOnGet?: Error;
+}) {
+  const stores = new Map<string, Map<string, unknown>>();
+  return {
+    stores,
+    indexedDB: {
+      open: (_name: string, _version?: number) => {
+        const req: {
+          result?: unknown;
+          error?: unknown;
+          onupgradeneeded?: () => void;
+          onsuccess?: () => void;
+          onerror?: () => void;
+          onblocked?: () => void;
+        } = {};
+        queueMicrotask(() => {
+          if (options?.errorOnOpen) {
+            req.error = options.errorOnOpen;
+            req.onerror?.();
+            return;
+          }
+          const db = {
+            objectStoreNames: {
+              contains: (name: string) => stores.has(name),
+            },
+            createObjectStore: (name: string) => {
+              if (!stores.has(name)) stores.set(name, new Map());
+              return {};
+            },
+            transaction: (storeName: string, _mode?: string) => {
+              let backing = stores.get(storeName);
+              if (!backing) {
+                backing = new Map();
+                stores.set(storeName, backing);
+              }
+              let aborted = false;
+              const tx: {
+                error?: unknown;
+                oncomplete?: () => void;
+                onerror?: () => void;
+                onabort?: () => void;
+                objectStore: (name: string) => unknown;
+              } = {
+                objectStore: () => ({
+                  clear: () => {
+                    backing.clear();
+                    return {};
+                  },
+                  put: (value: unknown, key: string) => {
+                    if (options?.quotaErrorOnPut) {
+                      aborted = true;
+                      tx.error = new DOMException("Quota exceeded", "QuotaExceededError");
+                      queueMicrotask(() => tx.onabort?.());
+                      return {};
+                    }
+                    backing.set(key, value);
+                    return {};
+                  },
+                  get: (key: string) => {
+                    const getReq: {
+                      result?: unknown;
+                      error?: unknown;
+                      onsuccess?: () => void;
+                      onerror?: () => void;
+                    } = {};
+                    queueMicrotask(() => {
+                      if (options?.errorOnGet) {
+                        getReq.error = options.errorOnGet;
+                        getReq.onerror?.();
+                        return;
+                      }
+                      getReq.result = backing.get(key);
+                      getReq.onsuccess?.();
+                    });
+                    return getReq;
+                  },
+                }),
+              };
+              queueMicrotask(() => {
+                queueMicrotask(() => {
+                  if (!aborted) tx.oncomplete?.();
+                });
+              });
+              return tx;
+            },
+            close: () => {},
+          };
+          req.result = db;
+          req.onupgradeneeded?.();
+          req.onsuccess?.();
+        });
+        return req;
+      },
+    },
+  };
+}
+
+function RecoveryHarness() {
+  const { recoveryData, dismissRecovery, restoreRecovery } = useAutosave();
+  if (!recoveryData) return <div data-testid="no-recovery" />;
+  return (
+    <AutosaveRecoveryBanner
+      data={recoveryData}
+      onRestore={restoreRecovery}
+      onDiscard={dismissRecovery}
+    />
+  );
+}
+
+describe("Autosave IndexedDB storage and quota failure handling (#2173)", () => {
+  it("stores the source bitmap and image objects as Blobs in IndexedDB when localStorage rejects large payloads, and restores across reload", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        // Simulate localStorage throwing QuotaExceededError on large base64 payloads
+        if (v.length > 4096) {
+          throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+        }
+        lsStore.set(k, v);
+      },
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    vi.spyOn(URL, "createObjectURL").mockImplementation(
+      (obj) => `blob:http://localhost:1351/restored-${(obj as Blob).size}`,
+    );
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    const largeBase64 = Buffer.alloc(6000, 0x42).toString("base64");
+    const rebakedPngDataUrl = `data:image/png;base64,${largeBase64}`;
+    const strokePngDataUrl = `data:image/png;base64,${Buffer.alloc(3500, 0x24).toString("base64")}`;
+
+    useEditorStore.setState({
+      canvasSize: { width: 3000, height: 4000 },
+      sourceImageUrl: rebakedPngDataUrl,
+      sourceImageSize: { width: 3000, height: 4000 },
+      objects: [
+        {
+          id: "stroke-1",
+          type: "image",
+          layerId: "layer-1",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 3000,
+            height: 4000,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            src: strokePngDataUrl,
+          },
+        },
+      ],
+      lastAutoSave: null,
+    });
+
+    await (saveEditorState as (opts?: { manual?: boolean }) => Promise<unknown>)({ manual: true });
+
+    expect(toastError).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().lastAutoSave).toEqual(expect.any(Number));
+    const savedJson = lsStore.get("snapotter-editor-autosave");
+    expect(savedJson).toBeDefined();
+    expect(savedJson?.length).toBeLessThan(4096);
+
+    // Simulate reload: clear editor store and mount RecoveryHarness
+    useEditorStore.setState({
+      canvasSize: { width: 800, height: 600 },
+      sourceImageUrl: null,
+      sourceImageSize: null,
+      objects: [],
+    });
+
+    const { unmount } = render(<RecoveryHarness />);
+
+    const restoreBtn = await screen.findByRole("button", {
+      name: en.editor.ui.autosaveRecovery.restore,
+    });
+    fireEvent.click(restoreBtn);
+
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 3000, height: 4000 });
+    expect(useEditorStore.getState().sourceImageUrl).toBe(
+      "blob:http://localhost:1351/restored-6000",
+    );
+    expect(useEditorStore.getState().objects).toHaveLength(1);
+    expect(useEditorStore.getState().objects[0]?.attrs.src).toBe(
+      "blob:http://localhost:1351/restored-3500",
+    );
+    expect(lsStore.get("snapotter-editor-autosave")).toBeUndefined();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    // Unmounting after Restore must not revoke the blob URLs now owned by the editor store
+    unmount();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("reports QuotaExceededError with captureHandledError and shows a toast on manual save failure", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fakeIdb = createFakeIndexedDb({ quotaErrorOnPut: true });
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+      lastAutoSave: null,
+    });
+
+    await (
+      saveEditorState as (opts?: { manual?: boolean; errorMessage?: string }) => Promise<unknown>
+    )({
+      manual: true,
+      errorMessage: "Custom save failed toast",
+    });
+
+    expect(toastError).toHaveBeenCalledWith("Custom save failed toast");
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Editor autosave exceeded storage quota",
+      }),
+      expect.objectContaining({
+        error_class: "operational",
+        tool_id: "editor-autosave",
+      }),
+    );
+    expect(useEditorStore.getState().lastAutoSave).toBeNull();
+  });
+
+  it("reports QuotaExceededError once without toasting on background autosaves", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    clearAutosave();
+    vi.stubGlobal("indexedDB", undefined);
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      },
+      removeItem: () => {},
+      clear: () => {},
+    });
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await saveEditorState();
+    await saveEditorState();
+
+    expect(toastError).not.toHaveBeenCalled();
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Editor autosave exceeded storage quota",
+      }),
+      expect.objectContaining({
+        error_class: "operational",
+        tool_id: "editor-autosave",
+      }),
+    );
+  });
+
+  it("clears broken autosave and hides recovery banner when IndexedDB blob is missing on reload", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await saveEditorState();
+    expect(lsStore.get("snapotter-editor-autosave")).toBeDefined();
+
+    // Simulate IndexedDB blob store being wiped while localStorage remained
+    fakeIdb.stores.clear();
+
+    render(<RecoveryHarness />);
+
+    await waitFor(() => {
+      expect(lsStore.get("snapotter-editor-autosave")).toBeUndefined();
+    });
+    expect(screen.getByTestId("no-recovery")).toBeInTheDocument();
+  });
+
+  it("revokes hydrated object URLs and clears IndexedDB and localStorage when Discard is clicked", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(URL, "createObjectURL").mockImplementation(
+      (obj) => `blob:http://localhost:1351/discard-${(obj as Blob).size}`,
+    );
+
+    useEditorStore.setState({
+      sourceImageUrl:
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%2F%3E",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await saveEditorState();
+    expect(fakeIdb.stores.get("blobs")?.size).toBe(1);
+
+    render(<RecoveryHarness />);
+
+    const discardBtn = await screen.findByRole("button", {
+      name: en.editor.ui.autosaveRecovery.discard,
+    });
+    fireEvent.click(discardBtn);
+
+    expect(revokeSpy).toHaveBeenCalledWith("blob:http://localhost:1351/discard-41");
+    expect(lsStore.get("snapotter-editor-autosave")).toBeUndefined();
+    await waitFor(() => {
+      expect(fakeIdb.stores.get("blobs")?.size ?? 0).toBe(0);
+    });
+    expect(screen.getByTestId("no-recovery")).toBeInTheDocument();
+  });
+
+  it("revokes hydrated object URLs without clearing storage when unmounted before Restore or Discard", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(URL, "createObjectURL").mockImplementation(
+      () => "blob:http://localhost:1351/unmount-1",
+    );
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await saveEditorState();
+
+    const { unmount } = render(<RecoveryHarness />);
+    await screen.findByRole("button", { name: en.editor.ui.autosaveRecovery.restore });
+
+    unmount();
+
+    expect(revokeSpy).toHaveBeenCalledWith("blob:http://localhost:1351/unmount-1");
+    expect(lsStore.get("snapotter-editor-autosave")).toBeDefined();
+  });
+
+  it("falls back to inline localStorage when IndexedDB open fails with a non-quota error", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb({
+      errorOnOpen: new DOMException("IndexedDB disabled", "SecurityError"),
+    });
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await expect(saveEditorState({ manual: true })).resolves.toBe(true);
+    expect(toastError).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+    const saved = JSON.parse(lsStore.get("snapotter-editor-autosave") ?? "{}");
+    expect(saved.state.sourceImageUrl).toBe("data:image/png;base64,iVBORw0KGgo=");
+  });
+
+  it("clears newly written IndexedDB blobs and toasts when localStorage.setItem fails after IndexedDB write", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new DOMException("Storage disabled", "SecurityError");
+      },
+      removeItem: () => {},
+      clear: () => {},
+    });
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await expect(saveEditorState({ manual: true })).resolves.toBe(false);
+    expect(toastError).toHaveBeenCalledWith(en.editor.ui.autosaveRecovery.saveFailed);
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Editor autosave storage failed" }),
+      expect.objectContaining({ error_class: "operational", tool_id: "editor-autosave" }),
+    );
+    await waitFor(() => {
+      expect(fakeIdb.stores.get("blobs")?.size ?? 0).toBe(0);
+    });
+  });
+
+  it("surfaces the default saveFailed toast and reports serialization errors on manual save", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/broken",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404 })),
+    );
+
+    await expect(saveEditorState({ manual: true })).resolves.toBe(false);
+    expect(toastError).toHaveBeenCalledWith(en.editor.ui.autosaveRecovery.saveFailed);
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Editor autosave serialization failed" }),
+      expect.objectContaining({ error_class: "operational", tool_id: "editor-autosave" }),
+    );
+  });
+
+  it("hydrates IndexedDB blobs asynchronously when restoreAutosave is called directly with unhydrated state", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    vi.spyOn(URL, "createObjectURL").mockImplementation(
+      (obj) => `blob:http://localhost:1351/direct-${(obj as Blob).size}`,
+    );
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+      objects: [
+        {
+          id: "img-obj-1",
+          type: "image",
+          layerId: "layer-1",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 50,
+            height: 50,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            src: "data:image/png;base64,AAAA",
+          },
+        },
+      ],
+    });
+
+    await saveEditorState();
+    const unhydrated = loadAutosaveState();
+    if (!unhydrated) throw new Error("Expected unhydrated autosave state");
+    expect(unhydrated.state.sourceImageUrl).toBe("idb://snapotter-editor-autosave/source");
+    expect(unhydrated.state.objects[0]?.attrs.src).toBe(
+      "idb://snapotter-editor-autosave/object/img-obj-1",
+    );
+
+    act(() => {
+      restoreAutosave(unhydrated);
+    });
+    // Never puts raw idb:// URIs into sourceImageUrl or objects while hydrating
+    expect(useEditorStore.getState().sourceImageUrl).toBeNull();
+    expect(useEditorStore.getState().objects).toEqual([]);
+
+    await waitFor(() => {
+      expect(useEditorStore.getState().sourceImageUrl).toBe("blob:http://localhost:1351/direct-8");
+    });
+    expect(useEditorStore.getState().objects).toHaveLength(1);
+    expect(useEditorStore.getState().objects[0]?.attrs.src).toBe(
+      "blob:http://localhost:1351/direct-3",
+    );
+  });
+
+  it("saves blob: URLs for sourceImageUrl and image objects into IndexedDB and clears IndexedDB when saving a document with no blobs", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        status: 200,
+        blob: async () =>
+          new Blob([url.includes("obj") ? "obj-bytes" : "source-bytes-123"], {
+            type: "image/png",
+          }),
+      })),
+    );
+
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/source-1",
+      sourceImageSize: { width: 200, height: 150 },
+      objects: [
+        {
+          id: "blob-obj",
+          type: "image",
+          layerId: "layer-1",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 20,
+            height: 20,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+            src: "blob:http://localhost:1351/obj-1",
+          },
+        },
+      ],
+    });
+
+    await expect(saveEditorState()).resolves.toBe(true);
+    expect(fakeIdb.stores.get("blobs")?.size).toBe(2);
+
+    // Saving a document with no image blobs clears the stale IndexedDB blobs
+    useEditorStore.setState({
+      sourceImageUrl: null,
+      sourceImageSize: null,
+      objects: [],
+    });
+    await expect(saveEditorState()).resolves.toBe(true);
+    await waitFor(() => {
+      expect(fakeIdb.stores.get("blobs")?.size ?? 0).toBe(0);
+    });
+  });
+
+  it("resets autosaveFailureReported after a successful save and preserves manual toast when superseded by a background save", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    clearAutosave();
+    let shouldFail = true;
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("indexedDB", undefined);
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (shouldFail) {
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }
+        lsStore.set(k, v);
+      },
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    // First background failure reports once
+    await saveEditorState();
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+
+    // Subsequent successful save resets the deduplication flag
+    shouldFail = false;
+    await expect(saveEditorState()).resolves.toBe(true);
+
+    // Next background failure reports again
+    shouldFail = true;
+    await saveEditorState();
+    expect(captureHandledError).toHaveBeenCalledTimes(2);
+
+    // Start a manual save that is superseded by a background save before settling
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/slow-manual",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+    let resolveSlowFetch: (value: unknown) => void = () => {};
+    let slowFetchCaptured = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            if (!slowFetchCaptured) {
+              slowFetchCaptured = true;
+              resolveSlowFetch = resolve;
+            } else {
+              resolve({
+                ok: true,
+                status: 200,
+                blob: async () => new Blob(["fast"], { type: "image/png" }),
+              });
+            }
+          }),
+      ),
+    );
+
+    const manualPromise = saveEditorState({ manual: true, errorMessage: "Manual save failed" });
+    const backgroundPromise = saveEditorState();
+    resolveSlowFetch({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(["slow"], { type: "image/png" }),
+    });
+
+    await expect(manualPromise).resolves.toBe(false);
+    await expect(backgroundPromise).resolves.toBe(false);
+    expect(toastError).toHaveBeenCalledWith("Manual save failed");
+  });
+
+  it("aborts an in-flight saveEditorState when clearAutosave is called before it commits", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+
+    let resolveFetch: (value: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+
+    useEditorStore.setState({
+      sourceImageUrl: "blob:http://localhost:1351/in-flight",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    const savePromise = saveEditorState();
+    clearAutosave();
+
+    resolveFetch({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(["late-bytes"], { type: "image/png" }),
+    });
+
+    await expect(savePromise).resolves.toBe(false);
+    expect(lsStore.get("snapotter-editor-autosave")).toBeUndefined();
+    expect(fakeIdb.stores.get("blobs")?.size ?? 0).toBe(0);
+  });
+
+  it("dismisses a stale recovery banner and revokes its URLs when a new save succeeds", async () => {
+    const lsStore = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => lsStore.get(k) ?? null,
+      setItem: (k: string, v: string) => lsStore.set(k, v),
+      removeItem: (k: string) => lsStore.delete(k),
+      clear: () => lsStore.clear(),
+    });
+    const fakeIdb = createFakeIndexedDb();
+    vi.stubGlobal("indexedDB", fakeIdb.indexedDB);
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(URL, "createObjectURL").mockImplementation(
+      () => "blob:http://localhost:1351/stale-banner",
+    );
+
+    useEditorStore.setState({
+      sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+      sourceImageSize: { width: 100, height: 100 },
+    });
+
+    await saveEditorState();
+
+    render(<RecoveryHarness />);
+    await screen.findByRole("button", { name: en.editor.ui.autosaveRecovery.restore });
+
+    // A new save overwrites the autosave slot with a newer timestamp
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      await saveEditorState();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("no-recovery")).toBeInTheDocument();
+    });
+    expect(revokeSpy).toHaveBeenCalledWith("blob:http://localhost:1351/stale-banner");
+    expect(lsStore.get("snapotter-editor-autosave")).toBeDefined();
   });
 });

@@ -4696,6 +4696,8 @@ export const ko: TranslationKeys = {
         message: "{time}의 저장되지 않은 작업을 복구했습니다.",
         restore: "복원",
         discard: "버리기",
+        saveFailed:
+          "이 브라우저에 작업을 저장할 수 없습니다. 사본을 보관하려면 내보내기 또는 프로젝트 저장을 사용하세요.",
       },
       fillDialog: {
         heading: "채우기",

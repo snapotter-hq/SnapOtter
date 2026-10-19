@@ -4767,6 +4767,8 @@ export const id: TranslationKeys = {
         message: "Memulihkan pekerjaan yang belum tersimpan dari {time}.",
         restore: "Pulihkan",
         discard: "Buang",
+        saveFailed:
+          "Tidak dapat menyimpan pekerjaan Anda di browser ini. Ekspor atau gunakan Simpan Proyek untuk menyimpan salinan.",
       },
       fillDialog: {
         heading: "Isi",

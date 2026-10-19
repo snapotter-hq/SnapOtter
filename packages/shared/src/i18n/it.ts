@@ -4778,6 +4778,8 @@ export const it: TranslationKeys = {
         message: "Recuperato il lavoro non salvato del {time}.",
         restore: "Ripristina",
         discard: "Scarta",
+        saveFailed:
+          "Impossibile salvare il lavoro in questo browser. Esporta o usa Salva progetto per conservarne una copia.",
       },
       fillDialog: {
         heading: "Riempimento",

@@ -4790,6 +4790,8 @@ export const fr: TranslationKeys = {
         message: "Travail non enregistré récupéré ({time}).",
         restore: "Restaurer",
         discard: "Abandonner",
+        saveFailed:
+          "Impossible d'enregistrer votre travail dans ce navigateur. Exportez-le ou utilisez Enregistrer le projet pour en garder une copie.",
       },
       fillDialog: {
         heading: "Remplissage",

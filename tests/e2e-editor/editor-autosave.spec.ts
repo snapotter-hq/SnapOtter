@@ -135,4 +135,54 @@ test.describe("Editor Autosave", () => {
     expect(parsedAfter.state.canvasSize.width).toBe(parsedBefore.state.canvasSize.width);
     expect(parsedAfter.state.canvasSize.height).toBe(parsedBefore.state.canvasSize.height);
   });
+
+  test("File > Save stores rotated source image in IndexedDB and restores across page reload (#2173)", async ({
+    editorPage: page,
+  }) => {
+    test.slow();
+
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByTestId("menu-file").click();
+    await page.getByTestId("menu-item-open").click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles("tests/fixtures/image/valid/test-200x150.png");
+
+    await expect(page.getByTestId("status-dimensions")).toContainText("200 x 150 px");
+
+    // Rotate 90 degrees CW so sourceImageUrl is rebaked into a PNG data URL (150 x 200 px)
+    await page.getByTestId("menu-image").click();
+    await page.getByTestId("menu-item-image-rotation").hover();
+    await page.getByTestId("menu-item-90-cw").click();
+    await expect(page.getByTestId("status-dimensions")).toContainText("150 x 200 px");
+
+    await page.getByTestId("menu-file").click();
+    await page.getByTestId("menu-item-save").click();
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => localStorage.getItem("snapotter-editor-autosave"));
+      })
+      .not.toBeNull();
+
+    const savedMeta = await page.evaluate(() => {
+      const raw = localStorage.getItem("snapotter-editor-autosave");
+      return raw ? JSON.parse(raw) : null;
+    });
+    expect(savedMeta?.state?.sourceImageUrl).toBe("idb://snapotter-editor-autosave/source");
+    expect(savedMeta?.state?.canvasSize).toEqual({ width: 150, height: 200 });
+
+    await page.reload();
+
+    const restoreBtn = page.getByRole("button", { name: "Restore", exact: true });
+    await expect(restoreBtn).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("status-dimensions")).toHaveText("");
+    await restoreBtn.click();
+
+    await expect(restoreBtn).toBeHidden();
+    await expect(page.getByTestId("status-dimensions")).toContainText("150 x 200 px");
+    const afterRestoreMeta = await page.evaluate(() =>
+      localStorage.getItem("snapotter-editor-autosave"),
+    );
+    expect(afterRestoreMeta).toBeNull();
+  });
 });

@@ -4761,6 +4761,8 @@ export const vi: TranslationKeys = {
         message: "Đã khôi phục phần việc chưa lưu từ {time}.",
         restore: "Khôi phục",
         discard: "Bỏ qua",
+        saveFailed:
+          "Không thể lưu công việc của bạn trong trình duyệt này. Hãy xuất hoặc dùng Lưu dự án để giữ lại một bản sao.",
       },
       fillDialog: {
         heading: "Tô màu",

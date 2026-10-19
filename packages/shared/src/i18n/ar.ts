@@ -4737,6 +4737,7 @@ export const ar: TranslationKeys = {
         message: "تم استرجاع عمل غير محفوظ من {time}.",
         restore: "استرجاع",
         discard: "تجاهل",
+        saveFailed: "تعذّر حفظ عملك في هذا المتصفح. صدّر العمل أو احفظ المشروع للاحتفاظ بنسخة.",
       },
       fillDialog: {
         heading: "تعبئة",

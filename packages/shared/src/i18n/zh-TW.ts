@@ -4489,6 +4489,7 @@ export const zhTW: TranslationKeys = {
         message: "已復原 {time} 尚未儲存的工作內容。",
         restore: "還原",
         discard: "捨棄",
+        saveFailed: "無法在此瀏覽器中儲存目前的工作內容。請匯出或使用「儲存專案」保留副本。",
       },
       fillDialog: {
         heading: "填滿",

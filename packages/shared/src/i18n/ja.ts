@@ -4723,6 +4723,8 @@ export const ja: TranslationKeys = {
         message: "{time} の未保存の作業を復元しました。",
         restore: "復元",
         discard: "破棄",
+        saveFailed:
+          "このブラウザに作業内容を保存できませんでした。コピーを残すには書き出すか「プロジェクトを保存」を使ってください。",
       },
       fillDialog: {
         heading: "塗りつぶし",

@@ -4773,6 +4773,8 @@ export const tr: TranslationKeys = {
         message: "{time} tarihinden kaydedilmemiş çalışma kurtarıldı.",
         restore: "Geri Yükle",
         discard: "Yoksay",
+        saveFailed:
+          "Çalışmanız bu tarayıcıya kaydedilemedi. Bir kopyasını saklamak için dışa aktarın veya Projeyi Kaydet'i kullanın.",
       },
       fillDialog: {
         heading: "Doldur",
