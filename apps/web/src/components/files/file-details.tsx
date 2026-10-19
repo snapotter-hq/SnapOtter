@@ -457,6 +457,7 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
     if (valid.length === 0) return;
 
     setFiles(valid.map((d) => d.file));
+    const entryIds = useFileStore.getState().entries.map((e) => e.id);
 
     if (selectForTool) {
       const tool = TOOLS.find((t) => t.id === selectForTool);
@@ -471,8 +472,8 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
     setTimeout(() => {
       const store = useFileStore.getState();
       for (let i = 0; i < valid.length; i++) {
-        if (store.entries[i]) {
-          store.updateEntry(i, { serverFileId: valid[i].serverId });
+        if (entryIds[i]) {
+          store.updateEntryById(entryIds[i], { serverFileId: valid[i].serverId });
         }
       }
     }, 0);

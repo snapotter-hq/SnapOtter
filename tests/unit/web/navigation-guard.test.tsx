@@ -758,6 +758,34 @@ describe("NavigationGuard download then leave", () => {
     expect(router.state.location.pathname).toBe("/files");
   });
 
+  it("claims the downloaded entry by id when entries are reordered before the deferred tick (#1114)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);
+    useFileStore
+      .getState()
+      .updateEntry(0, { processedUrl: "blob:result-a", processedFilename: "a-small.png" });
+    const started = recordDownloads();
+    const { router } = renderGuard();
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+
+    // Reorder [a.png, b.png] -> [b.png, a.png] before the deferred claim runs.
+    await act(async () => {
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+    await act(async () => {
+      vi.runAllTimers();
+    });
+
+    expect(started).toEqual([{ url: "blob:result-a", filename: "a-small.png" }]);
+    expect(useFileStore.getState().entries.map((e) => [e.file.name, e.claimed])).toEqual([
+      ["b.png", false],
+      ["a.png", true],
+    ]);
+    expect(router.state.location.pathname).toBe("/files");
+  });
+
   // An impatient double click lands both clicks before the deferred tick, and
   // the dialog is still on screen for the second one.
   it("takes the result once however many times the button is clicked", async () => {

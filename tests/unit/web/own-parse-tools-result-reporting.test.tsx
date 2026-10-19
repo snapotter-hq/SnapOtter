@@ -672,6 +672,32 @@ describe("barcode read: a malformed sync answer apart from our own store write",
         useFileStore.setState({ updateEntry: realUpdateEntry });
       }
     });
+
+    it("lands each file's annotated image on its own entry when reordered mid-scan (#1114)", async () => {
+      render(<BarcodeReadSettings />);
+      fireEvent.click(screen.getByTestId("barcode-read-submit"));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+
+      // Reorder [one.png, two.png] -> [two.png, one.png] while one.png is in flight.
+      act(() => useFileStore.getState().reorderFiles(0, 1));
+      FakeXhr.instances[0].respond(200, { ...GOOD_BODY, filename: "one.png" });
+      await act(async () => {});
+
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, {
+        ...GOOD_BODY,
+        filename: "two.png",
+        annotatedUrl: undefined,
+      });
+      await act(async () => {});
+      await settle();
+
+      const { entries } = useFileStore.getState();
+      expect(entries[1].file.name).toBe("one.png");
+      expect(entries[1].processedUrl).toBe(ANNOTATED_URL);
+      expect(entries[0].file.name).toBe("two.png");
+      expect(entries[0].processedUrl).toBeNull();
+    });
   });
 
   it("shows the server's error text for a failed request without reporting it", async () => {

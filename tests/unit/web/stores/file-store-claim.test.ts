@@ -69,10 +69,13 @@ describe("file store claim tracking", () => {
   it("ignores a claim for an entry that is not there", () => {
     useFileStore.getState().setFiles([makeFile("a.png")]);
     useFileStore.getState().markClaimed(7);
+    useFileStore.getState().markClaimedById("entry-missing");
+    useFileStore.getState().updateEntryById("entry-missing", { processedUrl: "blob:ghost" });
 
     const { entries } = useFileStore.getState();
     expect(entries).toHaveLength(1);
     expect(entries[0].claimed).toBe(false);
+    expect(entries[0].processedUrl).toBeNull();
   });
 
   it("marks every entry claimed when the batch zip is taken", () => {

@@ -11,6 +11,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 import { FileDetails } from "@/components/files/file-details";
 import { apiGetFileDetails, type UserFileDetail } from "@/lib/api";
 import { fileFormatLabel } from "@/lib/file-format-label";
+import { useFileStore } from "@/stores/file-store";
 import { useFilesPageStore } from "@/stores/files-page-store";
 
 /**
@@ -149,5 +150,65 @@ describe("fileFormatLabel", () => {
     ["Scan 2026.10.02", "image/png", "PNG"],
   ])("ignores what isn't an extension in %j", (name, mime, expected) => {
     expect(fileFormatLabel(name, mime)).toBe(expected);
+  });
+});
+
+describe("FileDetails handleOpenInTool deferred serverFileId (#1114)", () => {
+  it("attaches each library file's serverFileId by entry id even when reordered before the timer runs", async () => {
+    try {
+      URL.createObjectURL = vi.fn(() => "blob:mock");
+      URL.revokeObjectURL = vi.fn();
+      const fileA = entry("first.png", "image/png");
+      const fileB = entry("second.png", "image/png");
+      vi.mocked(apiGetFileDetails).mockResolvedValue(fileA);
+      useFilesPageStore.setState({
+        files: [fileA, fileB],
+        selectedFileId: fileA.id,
+        checkedIds: new Set([fileA.id, fileB.id]),
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ "Content-Type": "image/png" }),
+            blob: () => Promise.resolve(new Blob([input], { type: "image/png" })),
+          } as Response),
+        ),
+      );
+
+      const { fireEvent, act } = await import("@testing-library/react");
+      render(
+        <MemoryRouter>
+          <FileDetails mobile />
+        </MemoryRouter>,
+      );
+
+      const openBtn = await screen.findByRole("button", { name: /open.*file/i });
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      await act(async () => {
+        fireEvent.click(openBtn);
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      });
+
+      expect(useFileStore.getState().entries).toHaveLength(2);
+      // Reorder [first.png, second.png] -> [second.png, first.png] before the 0ms timer runs.
+      act(() => {
+        useFileStore.getState().reorderFiles(0, 1);
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      const { entries } = useFileStore.getState();
+      expect(entries[1].file.name).toBe("first.png");
+      expect(entries[1].serverFileId).toBe(fileA.id);
+      expect(entries[0].file.name).toBe("second.png");
+      expect(entries[0].serverFileId).toBe(fileB.id);
+    } finally {
+      useFileStore.getState().reset();
+      vi.useRealTimers();
+    }
   });
 });

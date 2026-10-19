@@ -71,8 +71,10 @@ export function WatermarkImageSettings() {
       // Multiple files: process each one individually, writing results to each entry
       try {
         const store = useFileStore.getState();
+        const entryIds = store.entries.map((e) => e.id);
         for (let i = 0; i < files.length; i++) {
-          store.updateEntry(i, { status: "processing", error: null });
+          const entryId = entryIds[i];
+          if (entryId) store.updateEntryById(entryId, { status: "processing", error: null });
           try {
             const formData = new FormData();
             formData.append("file", files[i]);
@@ -87,27 +89,38 @@ export function WatermarkImageSettings() {
 
             if (!res.ok) {
               const body = await res.json().catch(() => ({}));
-              store.updateEntry(i, {
-                status: "failed",
-                error: failedAnswerMessage(t, body, res.status, t.errors.processingFailedNoDetail),
-              });
+              if (entryId) {
+                store.updateEntryById(entryId, {
+                  status: "failed",
+                  error: failedAnswerMessage(
+                    t,
+                    body,
+                    res.status,
+                    t.errors.processingFailedNoDetail,
+                  ),
+                });
+              }
               continue;
             }
 
             const result = resolveServerUrls(await res.json());
-            store.updateEntry(i, {
-              processedUrl: result.downloadUrl,
-              processedPreviewUrl: result.previewUrl ?? null,
-              processedFilename: null,
-              status: "completed",
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
-            });
+            if (entryId) {
+              store.updateEntryById(entryId, {
+                processedUrl: result.downloadUrl,
+                processedPreviewUrl: result.previewUrl ?? null,
+                processedFilename: null,
+                status: "completed",
+                originalSize: result.originalSize,
+                processedSize: result.processedSize,
+              });
+            }
           } catch (err) {
-            store.updateEntry(i, {
-              status: "failed",
-              error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
-            });
+            if (entryId) {
+              store.updateEntryById(entryId, {
+                status: "failed",
+                error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+              });
+            }
           }
         }
       } finally {

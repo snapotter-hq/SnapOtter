@@ -261,7 +261,7 @@ export function EraseObjectSettings({
   const hqSize = hqSizeBytes ? formatFileSize(hqSizeBytes) : (hqBundle?.estimatedSize ?? "5-7 GB");
 
   const processOneFile = (
-    entryIndex: number,
+    entryId: string,
     file: File,
     maskBlob: Blob,
     onProgress: (percent: number) => void,
@@ -271,7 +271,7 @@ export function EraseObjectSettings({
       const clientJobId = generateId();
 
       const applyResult = (r: Record<string, unknown>) => {
-        useFileStore.getState().updateEntry(entryIndex, {
+        useFileStore.getState().updateEntryById(entryId, {
           processedUrl: r.downloadUrl as string,
           processedPreviewUrl: (r.previewUrl as string) ?? null,
           processedFilename: null,
@@ -426,6 +426,7 @@ export function EraseObjectSettings({
     // Library file this single-file run derives from (#565). Batch runs
     // (handleProcessAll) never auto-save, matching the standard processor.
     const capturedEntry = useFileStore.getState().entries[capturedIndex];
+    const capturedEntryId = capturedEntry.id;
     const runFile = capturedEntry.file;
     const saveMode = useFileStore.getState().librarySaveMode;
     useFileStore.getState().setLastSavedLibraryFileId(null);
@@ -460,7 +461,7 @@ export function EraseObjectSettings({
       if (r.savedFileId) {
         useFileStore.getState().setLastSavedLibraryFileId(r.savedFileId as string);
       }
-      useFileStore.getState().updateEntry(capturedIndex, {
+      useFileStore.getState().updateEntryById(capturedEntryId, {
         processedUrl: r.downloadUrl as string,
         processedPreviewUrl: (r.previewUrl as string) ?? null,
         processedFilename: null,
@@ -472,8 +473,8 @@ export function EraseObjectSettings({
           : {}),
       });
       // An auto-saved result is already in the library, so it was never at risk.
-      // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-      if (r.savedFileId) useFileStore.getState().markClaimed(capturedIndex);
+      // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+      if (r.savedFileId) useFileStore.getState().markClaimedById(capturedEntryId);
     };
 
     // The store watch below ends with the run. Every terminal handler calls
@@ -728,17 +729,14 @@ export function EraseObjectSettings({
 
     const { entries: currentEntries } = useFileStore.getState();
 
-    // Map blobUrl -> entry index
-    const blobToIndex = new Map<string, number>();
-    for (let i = 0; i < currentEntries.length; i++) {
-      blobToIndex.set(currentEntries[i].blobUrl, i);
-    }
+    // Map blobUrl -> entry
+    const blobToEntry = new Map(currentEntries.map((entry) => [entry.blobUrl, entry]));
 
-    const work: { index: number; file: File; maskBlob: Blob }[] = [];
+    const work: { entryId: string; file: File; maskBlob: Blob }[] = [];
     for (const [blobUrl, maskBlob] of masks) {
-      const idx = blobToIndex.get(blobUrl);
-      if (idx !== undefined) {
-        work.push({ index: idx, file: currentEntries[idx].file, maskBlob });
+      const entry = blobToEntry.get(blobUrl);
+      if (entry) {
+        work.push({ entryId: entry.id, file: entry.file, maskBlob });
       }
     }
     if (work.length === 0) return;
@@ -787,7 +785,7 @@ export function EraseObjectSettings({
 
       for (let wi = 0; wi < work.length; wi++) {
         if (filesGone) break;
-        const { index, file, maskBlob } = work[wi];
+        const { entryId, file, maskBlob } = work[wi];
         const basePercent = (wi / work.length) * 100;
         const sliceWeight = 100 / work.length;
 
@@ -800,11 +798,11 @@ export function EraseObjectSettings({
           }),
         );
 
-        useFileStore.getState().updateEntry(index, { status: "processing", error: null });
+        useFileStore.getState().updateEntryById(entryId, { status: "processing", error: null });
 
         try {
           await processOneFile(
-            index,
+            entryId,
             file,
             maskBlob,
             (pct) => {
@@ -816,7 +814,7 @@ export function EraseObjectSettings({
           );
         } catch (err) {
           if (filesGone) break;
-          useFileStore.getState().updateEntry(index, {
+          useFileStore.getState().updateEntryById(entryId, {
             status: "failed",
             error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
             errorCategory: feedbackCategoryOf(err),
@@ -854,9 +852,11 @@ export function EraseObjectSettings({
       // at "processing" would pulse for good. Fails only this batch's files.
       () => {
         if (!batchError) return;
-        for (const { index } of work) {
-          if (useFileStore.getState().entries[index]?.status === "processing") {
-            useFileStore.getState().updateEntry(index, {
+        for (const { entryId } of work) {
+          if (
+            useFileStore.getState().entries.find((e) => e.id === entryId)?.status === "processing"
+          ) {
+            useFileStore.getState().updateEntryById(entryId, {
               status: "failed",
               error: trackingFailed,
               errorCategory: null,

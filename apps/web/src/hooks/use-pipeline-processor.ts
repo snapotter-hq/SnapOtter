@@ -62,11 +62,6 @@ const SSE_STALL_TIMEOUT_MS = 300_000;
 // so a silent 30s on a fresh SSE means the request tail never arrived.
 const JOB_EVIDENCE_TIMEOUT_MS = 30_000;
 
-function findEntryIndex(entryId: string | null): number {
-  if (!entryId) return -1;
-  return useFileStore.getState().entries.findIndex((entry) => entry.id === entryId);
-}
-
 /**
  * Pipeline twin of use-tool-processor's #722/#750 recovery machinery. A dead
  * response after the upload finished does not mean a dead flow: the terminal
@@ -206,13 +201,12 @@ export function usePipelineProcessor() {
   const settleProcessingEntries = useCallback(
     (message: string, entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current) => {
       if (!entryIds || entryIds.size === 0) return;
-      const { entries, updateEntry } = useFileStore.getState();
+      const { entries, updateEntryById } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
+      for (const entry of entries) {
         if (!entry || !entryIds.has(entry.id) || entry.status !== "processing") continue;
         try {
-          updateEntry(i, { status: "failed", error: message });
+          updateEntryById(entry.id, { status: "failed", error: message });
         } catch (err) {
           console.error("Failing the run's entry failed", err);
           firstError ??= { cause: err };
@@ -602,9 +596,9 @@ export function usePipelineProcessor() {
               } catch (_e) {
                 console.debug("Ignored xhr.abort error:", _e);
               }
-              const idx = findEntryIndex(activeEntryIdRef.current);
-              if (idx !== -1) {
-                useFileStore.getState().updateEntry(idx, {
+              const entryId = activeEntryIdRef.current;
+              if (entryId) {
+                useFileStore.getState().updateEntryById(entryId, {
                   processedUrl: result.downloadUrl,
                   processedPreviewUrl: result.previewUrl ?? null,
                   processedFilename: null,
@@ -936,9 +930,8 @@ export function usePipelineProcessor() {
             }
             if (result) {
               try {
-                const idx = findEntryIndex(capturedEntryId);
-                if (idx !== -1) {
-                  useFileStore.getState().updateEntry(idx, {
+                if (capturedEntryId) {
+                  useFileStore.getState().updateEntryById(capturedEntryId, {
                     processedUrl: result.downloadUrl,
                     processedPreviewUrl: result.previewUrl ?? null,
                     processedFilename: null,
@@ -1089,7 +1082,7 @@ export function usePipelineProcessor() {
         return;
       }
 
-      const { updateEntry, setBatchZip } = useFileStore.getState();
+      const { updateEntry, updateEntryById, setBatchZip } = useFileStore.getState();
       const priorEntries = useFileStore.getState().entries;
       const capturedEntryIds = priorEntries.map((entry) => entry.id);
       const runEntryIds = new Set(capturedEntryIds);
@@ -1226,8 +1219,8 @@ export function usePipelineProcessor() {
           setBatchZip(zipBlob, "batch-pipeline.zip");
 
           for (let i = 0; i < capturedEntryIds.length; i++) {
-            const entryIndex = findEntryIndex(capturedEntryIds[i]);
-            if (entryIndex === -1) continue;
+            const entryId = capturedEntryIds[i];
+            if (!useFileStore.getState().entries.some((entry) => entry.id === entryId)) continue;
             const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
@@ -1239,7 +1232,7 @@ export function usePipelineProcessor() {
                 processedSize = blob.size;
               }
 
-              updateEntry(entryIndex, {
+              updateEntryById(entryId, {
                 processedUrl,
                 processedFilename: processedName,
                 processedSize,
@@ -1249,7 +1242,7 @@ export function usePipelineProcessor() {
             } else {
               // After a user cancel, a missing result is the cancel doing its
               // job, not a lookup failure (#771).
-              updateEntry(entryIndex, {
+              updateEntryById(entryId, {
                 // No result for this file, so none may show: the pane's failure
                 // card only renders without a processedUrl (#1699).
                 processedUrl: null,

@@ -73,14 +73,16 @@ export function OptimizeForWebSettings() {
   // reactive entry (which changes when we write processedUrl back to the store).
   const fileRef = useRef<File | null>(null);
   const fileSizeRef = useRef(0);
-  const selectedIndexRef = useRef(selectedIndex);
+  const entryIdRef = useRef<string | null>(entries[selectedIndex]?.id ?? null);
   useEffect(() => {
     const entry = entries[selectedIndex];
     if (entry) {
       fileRef.current = entry.file;
       fileSizeRef.current = entry.file.size;
+      entryIdRef.current = entry.id;
+    } else {
+      entryIdRef.current = null;
     }
-    selectedIndexRef.current = selectedIndex;
   }, [entries, selectedIndex]);
 
   // Build settings object
@@ -112,7 +114,7 @@ export function OptimizeForWebSettings() {
     abortRef.current = controller;
     setPreview((prev) => ({ ...prev, loading: true }));
 
-    const idx = selectedIndexRef.current;
+    const entryId = entryIdRef.current;
     const formData = new FormData();
     formData.append("file", file);
     formData.append("settings", JSON.stringify(buildSettings()));
@@ -138,14 +140,16 @@ export function OptimizeForWebSettings() {
         prevPreviewUrlRef.current = previewUrl;
 
         // Write the preview into the file store so BeforeAfterSlider picks it up
-        useFileStore.getState().updateEntry(idx, {
-          processedUrl: previewUrl,
-          processedPreviewUrl: null,
-          processedFilename: null,
-          status: "completed",
-          originalSize,
-          processedSize,
-        });
+        if (entryId) {
+          useFileStore.getState().updateEntryById(entryId, {
+            processedUrl: previewUrl,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            status: "completed",
+            originalSize,
+            processedSize,
+          });
+        }
 
         setPreview({
           loading: false,
@@ -175,14 +179,22 @@ export function OptimizeForWebSettings() {
     };
   }, [hasFile, fetchPreview]);
 
-  // Re-preview when the user switches between files in batch mode
-  const prevSelectedIndex = useRef(selectedIndex);
+  // Re-preview when the user switches between files in batch mode. Keyed by
+  // entry id rather than selectedIndex so a reorder (which moves selectedIndex
+  // to follow the selected entry) does not abort an in-flight preview or
+  // re-fetch the same file (#1114).
+  const selectedEntryId = entries[selectedIndex]?.id ?? null;
+  const prevSelectedEntryId = useRef(selectedEntryId);
   useEffect(() => {
-    if (prevSelectedIndex.current !== selectedIndex && hasFile) {
-      prevSelectedIndex.current = selectedIndex;
+    if (
+      prevSelectedEntryId.current !== selectedEntryId &&
+      prevSelectedEntryId.current !== null &&
+      hasFile
+    ) {
       fetchPreview();
     }
-  }, [selectedIndex, hasFile, fetchPreview]);
+    prevSelectedEntryId.current = selectedEntryId;
+  }, [selectedEntryId, hasFile, fetchPreview]);
 
   // Cleanup on unmount
   useEffect(() => {

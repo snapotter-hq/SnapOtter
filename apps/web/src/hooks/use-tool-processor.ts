@@ -110,11 +110,6 @@ const MIME_BY_EXT: Record<string, string> = {
   zip: "application/zip",
 };
 
-function findEntryIndex(entryId: string | null): number {
-  if (!entryId) return -1;
-  return useFileStore.getState().entries.findIndex((entry) => entry.id === entryId);
-}
-
 export function useToolProcessor(toolId: string) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -269,13 +264,16 @@ export function useToolProcessor(toolId: string) {
       entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
     ) => {
       if (!entryIds || entryIds.size === 0) return;
-      const { entries, updateEntry } = useFileStore.getState();
+      const { entries, updateEntryById } = useFileStore.getState();
       let firstError: { cause: unknown } | null = null;
-      for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
+      for (const entry of entries) {
         if (!entry || !entryIds.has(entry.id) || entry.status !== "processing") continue;
         try {
-          updateEntry(i, { status: "failed", error: message, errorCategory: category ?? null });
+          updateEntryById(entry.id, {
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          });
         } catch (err) {
           console.error("Failing the run's entry failed", err);
           firstError ??= { cause: err };
@@ -690,12 +688,15 @@ export function useToolProcessor(toolId: string) {
               } catch (_e) {
                 console.debug("Ignored xhr.abort error:", _e);
               }
-              const idx = findEntryIndex(activeEntryIdRef.current);
-              if (idx !== -1) {
+              const entryId = activeEntryIdRef.current;
+              if (
+                entryId &&
+                useFileStore.getState().entries.some((entry) => entry.id === entryId)
+              ) {
                 if (result.savedFileId) {
                   useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
                 }
-                useFileStore.getState().updateEntry(idx, {
+                useFileStore.getState().updateEntryById(entryId, {
                   processedUrl: result.downloadUrl,
                   processedPreviewUrl: result.previewUrl ?? null,
                   processedFilename: null,
@@ -708,8 +709,8 @@ export function useToolProcessor(toolId: string) {
                     : {}),
                 });
                 // An auto-saved result is already in the library, so it was never at risk.
-                // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-                if (result.savedFileId) useFileStore.getState().markClaimed(idx);
+                // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+                if (result.savedFileId) useFileStore.getState().markClaimedById(entryId);
                 // After the store writes, as in landSyncResult: tools that
                 // render straight from the payload (histogram, sprite sheet)
                 // must not show a result beside the error a failed write ends
@@ -1026,9 +1027,12 @@ export function useToolProcessor(toolId: string) {
         // #1812).
         const failEntry = (message: string, category?: FeedbackErrorCategory) => {
           try {
-            const idx = findEntryIndex(capturedEntryId);
-            if (idx !== -1 && useFileStore.getState().entries[idx]?.status === "processing") {
-              useFileStore.getState().updateEntry(idx, {
+            if (
+              capturedEntryId &&
+              useFileStore.getState().entries.find((e) => e.id === capturedEntryId)?.status ===
+                "processing"
+            ) {
+              useFileStore.getState().updateEntryById(capturedEntryId, {
                 status: "failed",
                 error: message,
                 errorCategory: category ?? null,
@@ -1064,12 +1068,16 @@ export function useToolProcessor(toolId: string) {
         // Writes a sync 2xx result the way the SSE completion branch does.
         // Any throw from here is ours, not the server's (#1354).
         const landSyncResult = (result: ProcessResult) => {
-          const idx = findEntryIndex(capturedEntryId);
-          if (idx === -1) return;
+          if (
+            !capturedEntryId ||
+            !useFileStore.getState().entries.some((entry) => entry.id === capturedEntryId)
+          ) {
+            return;
+          }
           if (result.savedFileId) {
             useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
           }
-          useFileStore.getState().updateEntry(idx, {
+          useFileStore.getState().updateEntryById(capturedEntryId, {
             processedUrl: result.downloadUrl,
             processedPreviewUrl: result.previewUrl ?? null,
             processedFilename: null,
@@ -1082,8 +1090,8 @@ export function useToolProcessor(toolId: string) {
               : {}),
           });
           // An auto-saved result is already in the library, so it was never at risk.
-          // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-          if (result.savedFileId) useFileStore.getState().markClaimed(idx);
+          // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+          if (result.savedFileId) useFileStore.getState().markClaimedById(capturedEntryId);
           // Last: tools that render straight from the payload (histogram, sprite
           // sheet) must not show a result beside the error a failed write ends
           // the run with.
@@ -1304,7 +1312,7 @@ export function useToolProcessor(toolId: string) {
       // status; this flag only shapes what this client shows (#767).
       let canceledByUser = false;
 
-      const { updateEntry, setBatchZip } = useFileStore.getState();
+      const { updateEntry, updateEntryById, setBatchZip } = useFileStore.getState();
       const priorEntries = useFileStore.getState().entries;
       const capturedEntryIds = priorEntries.map((entry) => entry.id);
       const runEntryIds = new Set(capturedEntryIds);
@@ -1433,11 +1441,10 @@ export function useToolProcessor(toolId: string) {
             // once, not once per entry.
             const runEntries = useFileStore.getState().entries;
             let settleError: { cause: unknown } | null = null;
-            for (let i = 0; i < runEntries.length; i++) {
-              const entry = runEntries[i];
+            for (const entry of runEntries) {
               if (!entry || !runEntryIds.has(entry.id) || entry.status !== "processing") continue;
               try {
-                updateEntry(i, {
+                updateEntryById(entry.id, {
                   status: "failed",
                   error: message,
                   errorCategory: category ?? null,
@@ -1509,8 +1516,8 @@ export function useToolProcessor(toolId: string) {
           setBatchZip(zipBlob, `batch-${toolId}.zip`);
 
           for (let i = 0; i < capturedEntryIds.length; i++) {
-            const entryIndex = findEntryIndex(capturedEntryIds[i]);
-            if (entryIndex === -1) continue;
+            const entryId = capturedEntryIds[i];
+            if (!useFileStore.getState().entries.some((entry) => entry.id === entryId)) continue;
             const processedName = fileResults[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
@@ -1527,7 +1534,7 @@ export function useToolProcessor(toolId: string) {
                 processedSize = blob.size;
               }
 
-              updateEntry(entryIndex, {
+              updateEntryById(entryId, {
                 processedUrl,
                 processedFilename: processedName,
                 processedSize,
@@ -1546,7 +1553,7 @@ export function useToolProcessor(toolId: string) {
             } else {
               // After a user cancel, a missing result is the cancel doing its
               // job, not a lookup failure.
-              updateEntry(entryIndex, {
+              updateEntryById(entryId, {
                 // Clear the result so hasProcessed goes false and the failure
                 // screen (guarded by !hasProcessed) renders instead of a stale
                 // previous result (#746).

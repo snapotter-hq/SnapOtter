@@ -201,14 +201,16 @@ interface FileState {
   navigatePrev: () => void;
   /** `claimed` is excluded: a patch touching `processedUrl` always resets it. */
   updateEntry: (index: number, patch: Omit<Partial<FileEntry>, "claimed">) => void;
+  updateEntryById: (id: string, patch: Omit<Partial<FileEntry>, "claimed">) => void;
   setBatchZip: (blob: Blob, filename: string) => void;
   clearBatchZip: () => void;
   /** Index is required: selectedIndex can change while a job runs. */
   markClaimed: (index: number) => void;
+  markClaimedById: (id: string) => void;
   markBatchClaimed: () => void;
   /** Claim the entry the UI is currently showing. Safe only from synchronous
-   *  handlers: across an await the selection can move, so capture the index
-   *  first and use markClaimed instead. */
+   *  handlers: across an await the selection or order can move, so capture the
+   *  entry's id first and use markClaimedById instead. */
   claimSelected: () => void;
   setProcessing: (v: boolean) => void;
   setError: (e: string | null) => void;
@@ -264,14 +266,16 @@ export const useFileStore = create<FileState>((set, get) => ({
     // Async: decode HEIC/HEIF files for browser preview
     for (let i = 0; i < entries.length; i++) {
       if (needsServerPreview(entries[i].file)) {
+        const entryId = entries[i].id;
         const file = entries[i].file;
         fetchDecodedPreview(file).then((result) => {
           const state = get();
-          if (state.entries[i]?.file !== file) return;
+          const idx = state.entries.findIndex((e) => e.id === entryId && e.file === file);
+          if (idx === -1) return;
           const updated = [...state.entries];
-          const oldBlobUrl = updated[i].blobUrl;
-          updated[i] = {
-            ...updated[i],
+          const oldBlobUrl = updated[idx].blobUrl;
+          updated[idx] = {
+            ...updated[idx],
             previewLoading: false,
             ...(result
               ? {
@@ -292,7 +296,6 @@ export const useFileStore = create<FileState>((set, get) => ({
     import("@/lib/analytics").then(({ track }) => {
       track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
     });
-    const oldLen = get().entries.length;
     const newEntries = files.map(createEntry);
     const entries = [...get().entries, ...newEntries];
     const idx = get().selectedIndex;
@@ -311,16 +314,17 @@ export const useFileStore = create<FileState>((set, get) => ({
     });
     // Async: decode HEIC/HEIF files for browser preview
     for (let j = 0; j < newEntries.length; j++) {
-      const i = oldLen + j;
       if (needsServerPreview(newEntries[j].file)) {
+        const entryId = newEntries[j].id;
         const file = newEntries[j].file;
         fetchDecodedPreview(file).then((result) => {
           const state = get();
-          if (state.entries[i]?.file !== file) return;
+          const foundIdx = state.entries.findIndex((e) => e.id === entryId && e.file === file);
+          if (foundIdx === -1) return;
           const updated = [...state.entries];
-          const oldBlobUrl = updated[i].blobUrl;
-          updated[i] = {
-            ...updated[i],
+          const oldBlobUrl = updated[foundIdx].blobUrl;
+          updated[foundIdx] = {
+            ...updated[foundIdx],
             previewLoading: false,
             ...(result
               ? {
@@ -440,6 +444,11 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({ entries, files: deriveFiles(entries), ...deriveSelected(entries, idx) });
   },
 
+  updateEntryById: (id, patch) => {
+    const index = get().entries.findIndex((e) => e.id === id);
+    if (index !== -1) get().updateEntry(index, patch);
+  },
+
   setBatchZip: (blob, filename) =>
     set({ batchZipBlob: blob, batchZipFilename: filename, batchZipClaimed: false }),
 
@@ -451,6 +460,11 @@ export const useFileStore = create<FileState>((set, get) => ({
     const next = [...entries];
     next[index] = { ...next[index], claimed: true };
     set({ entries: next, files: deriveFiles(next), ...deriveSelected(next, selectedIndex) });
+  },
+
+  markClaimedById: (id) => {
+    const index = get().entries.findIndex((e) => e.id === id);
+    if (index !== -1) get().markClaimed(index);
   },
 
   markBatchClaimed: () => {

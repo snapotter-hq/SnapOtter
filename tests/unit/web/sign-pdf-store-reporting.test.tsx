@@ -611,6 +611,24 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
     expect(entry(0).status).toBe("pending");
   });
 
+  it("lands a completed result and auto-save claim on the run's file when reordered mid-run (#1114)", async () => {
+    useFileStore.getState().setFiles([pdf("contract.pdf"), pdf("lease.pdf")]);
+    renderPanel();
+
+    const xhr = await apply();
+    act(() => useFileStore.getState().reorderFiles(0, 1));
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL, savedFileId: "file-1" });
+
+    expect(entry(1).file.name).toBe("contract.pdf");
+    expect(entry(1).status).toBe("completed");
+    expect(entry(1).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(1).claimed).toBe(true);
+    expect(entry(0).file.name).toBe("lease.pdf");
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).claimed).toBe(false);
+  });
+
   it("still marks the entry failed when ending the run throws", async () => {
     const realSetProcessing = useFileStore.getState().setProcessing;
     try {

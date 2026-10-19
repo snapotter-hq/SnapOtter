@@ -9,7 +9,7 @@
 import "@testing-library/jest-dom/vitest";
 import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { en } from "@snapotter/shared/i18n/en.js";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const processFiles = vi.hoisted(() => vi.fn());
@@ -125,5 +125,70 @@ describe("Optimize for Web max dimensions stay within what the API accepts (#205
     fireEvent.change(width, { target: { value: "" } });
     expect(width.value).toBe("");
     expect(submit()).not.toHaveProperty("maxWidth");
+  });
+
+  it("writes the live preview to the entry it was requested for after a reorder (#1114)", async () => {
+    vi.useFakeTimers();
+    try {
+      useFileStore
+        .getState()
+        .setFiles([
+          new File(["a"], "first.png", { type: "image/png" }),
+          new File(["b"], "second.png", { type: "image/png" }),
+        ]);
+      let resolvePreview: ((res: Response) => void) | undefined;
+      let previewCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          if (!String(input).includes("/optimize-for-web/preview")) {
+            return Promise.resolve(new Response("{}", { status: 200 }));
+          }
+          previewCalls++;
+          return new Promise<Response>((resolve) => {
+            resolvePreview = resolve;
+          });
+        }),
+      );
+
+      render(
+        <I18nProvider>
+          <OptimizeForWebSettings />
+        </I18nProvider>,
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(350);
+      });
+      expect(resolvePreview).toBeDefined();
+      expect(previewCalls).toBe(1);
+
+      // Reorder [first.png, second.png] -> [second.png, first.png] while the preview is in flight.
+      act(() => {
+        useFileStore.getState().reorderFiles(0, 1);
+      });
+      // Reordering keeps the same entry selected, so no second preview fetch is started.
+      expect(previewCalls).toBe(1);
+
+      await act(async () => {
+        resolvePreview?.({
+          ok: true,
+          status: 200,
+          headers: new Headers({ "X-Original-Size": "100", "X-Processed-Size": "50" }),
+          blob: () => Promise.resolve(new Blob(["preview"])),
+        } as Response);
+      });
+      await vi.waitFor(() => {
+        expect(useFileStore.getState().entries[1].processedUrl).toBe("blob:fake");
+      });
+
+      const { entries } = useFileStore.getState();
+      expect(entries[1].file.name).toBe("first.png");
+      expect(entries[1].processedSize).toBe(50);
+      expect(entries[0].file.name).toBe("second.png");
+      expect(entries[0].processedUrl).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

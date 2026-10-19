@@ -422,6 +422,58 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     expect(screen.getByTestId("remove-background-edge-refine")).toHaveValue("0");
   });
 
+  it("re-anchors serverFileId on the moved entry when reordered during a Phase 2 overwrite save (#1114)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([new File([new Uint8Array([1, 2, 3])], "pic-a.png", { type: "image/png" })]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a-v1" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveEffects = resolve;
+          }),
+      ),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(<RemoveBgSettings />);
+    const btn = await screen.findByTestId("remove-background-download-effects");
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+    // Add a second file and reorder [pic-a.png, pic-b.png] -> [pic-b.png, pic-a.png] while /effects is in flight.
+    act(() => {
+      useFileStore
+        .getState()
+        .addFiles([new File([new Uint8Array([4, 5, 6])], "pic-b.png", { type: "image/png" })]);
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOB123/pic_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    await waitFor(() => expect(useFileStore.getState().lastSavedLibraryFileId).toBe("lib-a-v2"));
+    const { entries } = useFileStore.getState();
+    expect(entries[1].file.name).toBe("pic-a.png");
+    expect(entries[1].serverFileId).toBe("lib-a-v2");
+    expect(entries[0].file.name).toBe("pic-b.png");
+    expect(entries[0].serverFileId).toBeUndefined();
+  });
+
   it.each([
     "birefnet-portrait",
     "birefnet-matting",

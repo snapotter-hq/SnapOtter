@@ -120,4 +120,52 @@ describe("ReviewPanel claim tracking", () => {
     expect(entries[0].claimed).toBe(true);
     expect(entries[1].claimed).toBe(false);
   });
+
+  it("claims the entry that was saved even when the files are reordered mid-save (#1114)", async () => {
+    useFileStore
+      .getState()
+      .setFiles([
+        new File(["x"], "a.png", { type: "image/png" }),
+        new File(["y"], "b.png", { type: "image/png" }),
+        new File(["z"], "c.png", { type: "image/png" }),
+      ]);
+    const savedId = useFileStore.getState().entries[0].id;
+
+    let resolveUpload: ((res: { ok: boolean }) => void) | undefined;
+    const upload = new Promise<{ ok: boolean }>((resolve) => {
+      resolveUpload = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string) =>
+        input === "blob:result"
+          ? Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(["result"])) })
+          : upload,
+      ),
+    );
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /save to files/i }));
+    await act(async () => {});
+
+    // Drag a.png from index 0 to index 2 while the library upload is in flight.
+    act(() => {
+      useFileStore.getState().reorderFiles(0, 2);
+    });
+
+    await act(async () => {
+      resolveUpload?.({ ok: true });
+      await upload;
+    });
+    await act(async () => {});
+
+    expect(await screen.findByRole("button", { name: /saved to files/i })).toBeTruthy();
+
+    const { entries } = useFileStore.getState();
+    expect(entries.map((e) => [e.id === savedId, e.claimed])).toEqual([
+      [false, false],
+      [false, false],
+      [true, true],
+    ]);
+  });
 });

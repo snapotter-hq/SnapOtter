@@ -585,4 +585,54 @@ describe("no panel reads a failed answer's body by hand", () => {
     expect(source).toContain("failedAnswerMessage(");
     expect(source).not.toMatch(/body\??\.(error|details)\s*\|\|/);
   });
+
+  it("watermark-image multi-file loop lands each file's outcome on its own entry after a reorder (#1114)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const resolvers: Array<(res: Response) => void> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolvers.push(resolve);
+          }),
+      ),
+    );
+    const { container } = render(<WatermarkImageSettings />);
+    chooseFile(container, image("mark.png"));
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+
+    await waitFor(() => expect(resolvers).toHaveLength(1));
+    // Reorder [one.png, two.png] -> [two.png, one.png] while one.png is in flight.
+    act(() => {
+      useFileStore.getState().reorderFiles(0, 1);
+    });
+    await act(async () => {
+      resolvers[0](
+        new Response(
+          JSON.stringify({
+            jobId: "j1",
+            downloadUrl: "/api/v1/download/j1/one-watermarked.png",
+            originalSize: 100,
+            processedSize: 90,
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    await waitFor(() => expect(resolvers).toHaveLength(2));
+    await act(async () => {
+      resolvers[1](new Response(JSON.stringify({ error: "Second failed" }), { status: 422 }));
+    });
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    const { entries } = useFileStore.getState();
+    expect(entries[1].file.name).toBe("one.png");
+    expect(entries[1].status).toBe("completed");
+    expect(entries[1].processedUrl).toBe("/api/v1/download/j1/one-watermarked.png");
+    expect(entries[0].file.name).toBe("two.png");
+    expect(entries[0].status).toBe("failed");
+    expect(entries[0].error).toBe("Second failed");
+  });
 });

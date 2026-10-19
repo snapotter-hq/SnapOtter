@@ -229,6 +229,27 @@ describe("erase-object single file: its own failures apart from a bad response",
     expect(entry().claimed).toBe(true);
   });
 
+  it("lands the single-file result and auto-save claim on the erased entry after a reorder (#1114)", async () => {
+    useFileStore.getState().setFiles([image("first.png"), image("second.png")]);
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    useFileStore.getState().updateEntry(0, { serverFileId: "file-1" });
+    renderPanel();
+
+    const xhr = await submit();
+    act(() => useFileStore.getState().reorderFiles(0, 1));
+    xhr.respond(200, { ...GOOD_BODY, savedFileId: "file-2" });
+
+    expect(entry(1).file.name).toBe("first.png");
+    expect(entry(1).status).toBe("completed");
+    expect(entry(1).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(1).serverFileId).toBe("file-2");
+    expect(entry(1).claimed).toBe(true);
+    expect(entry(0).file.name).toBe("second.png");
+    expect(entry(0).status).toBe("pending");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).claimed).toBe(false);
+  });
+
   it("ends the run with the tracking message when landing the result throws", async () => {
     renderPanel();
     const xhr = await submit();
@@ -785,6 +806,26 @@ describe("erase-object batch: a completed frame with nothing to download (#1830)
     expect(entry(0).status).toBe("completed");
     expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("lands each batch file's result on its own entry when reordered mid-batch (#1114)", async () => {
+    renderPanel(2);
+
+    const first = await submit(1);
+    // Reorder [one.png, two.png] -> [two.png, one.png] while one.png is in flight.
+    act(() => useFileStore.getState().reorderFiles(0, 1));
+    first.respond(200, { ...GOOD_BODY, downloadUrl: "/api/v1/download/job-1/one.png" });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(422, { error: "Second failed" });
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(1).file.name).toBe("one.png");
+    expect(entry(1).status).toBe("completed");
+    expect(entry(1).processedUrl).toBe("/api/v1/download/job-1/one.png");
+    expect(entry(0).file.name).toBe("two.png");
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Second failed");
   });
 });
 

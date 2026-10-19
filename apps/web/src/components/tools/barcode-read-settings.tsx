@@ -254,7 +254,8 @@ export function BarcodeReadSettings() {
     const total = files.length;
     const allResults: FileResult[] = [];
     const errors: string[] = [];
-    const { updateEntry } = useFileStore.getState();
+    const { entries: initialEntries, updateEntryById } = useFileStore.getState();
+    const entryIds = initialEntries.map((e) => e.id);
 
     // Leaving for another tool resets the file store, and opening library
     // files replaces it. Either way the scan's files are gone, so it stops
@@ -282,6 +283,7 @@ export function BarcodeReadSettings() {
       for (let i = 0; i < total; i++) {
         if (filesGone) break;
         const file = files[i];
+        const entryId = entryIds[i];
         const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
         const fileBase = (i / total) * 100;
         const fileShare = 100 / total;
@@ -308,8 +310,8 @@ export function BarcodeReadSettings() {
               });
 
               // Set annotated image as processedUrl for before/after view
-              if (answer.annotatedUrl) {
-                updateEntry(i, {
+              if (answer.annotatedUrl && entryId) {
+                updateEntryById(entryId, {
                   processedUrl: answer.annotatedUrl,
                   processedPreviewUrl: answer.annotatedUrl,
                   processedFilename: `annotated-${file.name.replace(/\.[^.]+$/, "")}.png`,

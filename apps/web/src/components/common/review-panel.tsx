@@ -120,10 +120,11 @@ export function ReviewPanel({
   const saveFailure = saveState?.status === "error" ? saveState.failure : "generic";
 
   const handleSaveToFiles = useCallback(async () => {
-    // Capture before the awaits below: the thumbnail strip can move the
-    // selection while the upload is in flight, and the outcome and the claim
-    // must land on the result that was actually saved.
-    const claimIndex = useFileStore.getState().selectedIndex;
+    // Capture the entry's stable id before the awaits below: the thumbnail
+    // strip can move the selection or reorder entries while the upload is in
+    // flight, and the claim must land on the entry that was actually saved.
+    const { entries, selectedIndex } = useFileStore.getState();
+    const claimEntryId = entries[selectedIndex]?.id;
     const url = downloadUrl;
     if (!url) return;
     const saves = useSaveToFilesStore.getState();
@@ -161,7 +162,7 @@ export function ReviewPanel({
         });
       }
       saves.saved(url);
-      useFileStore.getState().markClaimed(claimIndex);
+      if (claimEntryId) useFileStore.getState().markClaimedById(claimEntryId);
       // "Save to library" is the real success signal for a self-hosted tool
       // (there is no purchase). result_saved was defined + allowlisted but never
       // fired, so save-rate was unmeasurable.

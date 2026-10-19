@@ -281,10 +281,14 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
     const failEntry = (message: string, category?: FeedbackErrorCategory) => {
       try {
-        const { entries, updateEntry } = useFileStore.getState();
-        const index = entries.findIndex((e) => e.id === capturedEntryId);
-        if (index !== -1 && entries[index].status === "pending") {
-          updateEntry(index, { status: "failed", error: message, errorCategory: category ?? null });
+        if (!capturedEntryId) return;
+        const { entries, updateEntryById } = useFileStore.getState();
+        if (entries.find((e) => e.id === capturedEntryId)?.status === "pending") {
+          updateEntryById(capturedEntryId, {
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          });
         }
       } catch (err) {
         console.error("Failing the Sign PDF run's entry failed", err);
@@ -397,18 +401,22 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       if (settled) return;
       settled = true;
       const url = r.downloadUrl;
-      useFileStore.getState().updateEntry(capturedIndex, {
-        processedUrl: url,
-        processedFilename: signedFilenameFrom(url),
-        status: "completed",
-        // processedSize stays null on purpose. tool-page renders its
-        // ReviewPanel on `hasProcessed && processedSize != null`, and this
-        // panel already offers the signed PDF, so filling the size in would
-        // put a second download button beside this tool's own.
-      });
-      // An auto-saved result is already in the library, so it was never at risk.
-      // Must follow the updateEntry above; see the `claimed` invariant in file-store.
-      if (typeof r.savedFileId === "string") useFileStore.getState().markClaimed(capturedIndex);
+      if (capturedEntryId) {
+        useFileStore.getState().updateEntryById(capturedEntryId, {
+          processedUrl: url,
+          processedFilename: signedFilenameFrom(url),
+          status: "completed",
+          // processedSize stays null on purpose. tool-page renders its
+          // ReviewPanel on `hasProcessed && processedSize != null`, and this
+          // panel already offers the signed PDF, so filling the size in would
+          // put a second download button beside this tool's own.
+        });
+        // An auto-saved result is already in the library, so it was never at risk.
+        // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
+        if (typeof r.savedFileId === "string") {
+          useFileStore.getState().markClaimedById(capturedEntryId);
+        }
+      }
       // Last, so a throw above never leaves the link up beside the error the
       // run ends with (#1354).
       setDownloadUrl(url, capturedEntryId);

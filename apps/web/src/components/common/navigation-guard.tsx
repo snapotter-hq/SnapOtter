@@ -220,6 +220,12 @@ export function NavigationGuard() {
     downloadPendingRef.current = true;
 
     const tookTheZip = reason.downloads.some((item) => item.kind === "zip");
+    const storeAtClick = useFileStore.getState();
+    const claimEntryIds = reason.downloads.flatMap((item) => {
+      if (item.kind !== "result") return [];
+      const id = storeAtClick.entries[item.index]?.id;
+      return id ? [id] : [];
+    });
     // Total over the union, so no member can be silently skipped.
     for (const item of reason.downloads) {
       // A zip carries a raw Blob, so downloadBlob mints an object url for it
@@ -236,16 +242,16 @@ export function NavigationGuard() {
     leaveTimerRef.current = setTimeout(() => {
       leaveTimerRef.current = null;
       const store = useFileStore.getState();
-      // Claims exactly what went out above, by the indices the downloads
-      // carry, never whatever the store holds now. A result that lands in this
-      // window is not in the list, so it stays unclaimed and keeps warning.
-      // The zip needs no such care: it holds every result, so taking it claims
-      // the whole batch.
+      // Claims exactly what went out above, by the entry ids captured when the
+      // downloads started, never whatever the store holds now. A result that
+      // lands in this window is not in the list, so it stays unclaimed and
+      // keeps warning. The zip needs no such care: it holds every result, so
+      // taking it claims the whole batch.
       if (tookTheZip) {
         store.markBatchClaimed();
       } else {
-        for (const item of reason.downloads) {
-          if (item.kind === "result") store.markClaimed(item.index);
+        for (const id of claimEntryIds) {
+          store.markClaimedById(id);
         }
       }
       blocker.proceed?.();

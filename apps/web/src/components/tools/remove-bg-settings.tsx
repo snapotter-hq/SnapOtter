@@ -1317,8 +1317,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       if (result.savedFileId) {
         const store = useFileStore.getState();
         store.setLastSavedLibraryFileId(result.savedFileId as string);
-        if (librarySaveMode === "overwrite") {
-          store.updateEntry(selectedIndex, { serverFileId: result.savedFileId as string });
+        if (librarySaveMode === "overwrite" && capturedEntry?.id) {
+          store.updateEntryById(capturedEntry.id, { serverFileId: result.savedFileId as string });
         }
       }
 
