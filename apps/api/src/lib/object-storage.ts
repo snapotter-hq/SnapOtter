@@ -117,7 +117,8 @@ const WORKSPACE_SIZE_CACHE_MS = 30_000;
 /**
  * Sum the sizes of every file under `<root>/uploads` and `<root>/outputs`. Keys
  * are always `<prefix>/<jobId>/<filename>` (two levels), so a shallow job-dir
- * walk suffices. Missing or unreadable paths contribute 0.
+ * walk suffices. Missing paths and non-directory entries under `<prefix>`
+ * contribute 0; storage faults (`EACCES`, `EPERM`, `EIO`, ...) propagate.
  */
 export async function computeWorkspaceUsedBytes(root: string): Promise<number> {
   let total = 0;
@@ -125,19 +126,25 @@ export async function computeWorkspaceUsedBytes(root: string): Promise<number> {
     let jobDirs: string[];
     try {
       jobDirs = await readdir(join(root, prefix));
-    } catch {
-      continue;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") continue;
+      throw err;
     }
     for (const jobDir of jobDirs) {
       const dir = join(root, prefix, jobDir);
       let names: string[];
       try {
         names = await readdir(dir);
-      } catch {
-        continue;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException | null)?.code;
+        if (code === "ENOENT" || code === "ENOTDIR") continue;
+        throw err;
       }
       for (const name of names) {
-        const s = await stat(join(dir, name)).catch(() => null);
+        const s = await stat(join(dir, name)).catch((err: unknown) => {
+          if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+          throw err;
+        });
         if (s?.isFile()) total += s.size;
       }
     }
@@ -155,7 +162,12 @@ async function cachedWorkspaceUsedBytes(root: string): Promise<number> {
   if (workspaceSizeCache && now - workspaceSizeCache.at < WORKSPACE_SIZE_CACHE_MS) {
     return workspaceSizeCache.bytes;
   }
-  const used = await computeWorkspaceUsedBytes(root);
+  let used: number;
+  try {
+    used = await computeWorkspaceUsedBytes(root);
+  } catch (err) {
+    throw localWriteFault(err);
+  }
   workspaceSizeCache = { bytes: used, at: now };
   return used;
 }
@@ -233,12 +245,12 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
     }
     return;
   }
-  await assertLocalCapacity();
   const p = localPath(key);
   const stagingDir = join(dirname(p), ".snapotter-staging");
   const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
   let stagingOwned = false;
   try {
+    await assertLocalCapacity();
     await mkdir(dirname(p), { recursive: true });
     await mkdir(stagingDir, { recursive: true, mode: 0o700 });
     try {
