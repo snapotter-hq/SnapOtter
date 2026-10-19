@@ -21,9 +21,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Canned sync-wait results, keyed by pool: lets the route's post-wait
 // branches (the 422 canceled shapes) run deterministically. Null entries
-// keep the real waitForJob.
+// keep the real waitForJob; `timeoutOnce` forces one null return so the 202
+// fallback payload is reachable without waiting 10 minutes.
 const enqueueMock = vi.hoisted(() => ({
   cannedByPool: new Map<string, Record<string, unknown>>(),
+  timeoutOnce: false,
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
@@ -31,6 +33,10 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
   return {
     ...actual,
     waitForJob: async (...args: Parameters<typeof actual.waitForJob>) => {
+      if (enqueueMock.timeoutOnce) {
+        enqueueMock.timeoutOnce = false;
+        return null;
+      }
       const canned = enqueueMock.cannedByPool.get(args[0]);
       if (canned) return canned;
       return actual.waitForJob(...args);
@@ -43,6 +49,7 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { isBatchCanceled } = await import("../../../apps/api/src/jobs/batch-progress.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
+const { completeBatchJob } = await import("../../../apps/api/src/routes/progress.js");
 const { fixtures, readFixture } = await import("../../fixtures/index.js");
 const { buildTestApp, createMultipartPayload, createUserAndLogin, loginAsAdmin } = await import(
   "../test-server.js"
@@ -148,18 +155,26 @@ describe("route-stamped cancel metadata (#771)", () => {
     expect(flow?.type).toBe("pipeline");
   });
 
-  it("does not clobber a same-owner batch parent row that collides with the alias id (#887)", async () => {
+  it("does not clobber a same-owner batch parent row that collides with the alias id (#887, #895)", async () => {
     // Batch parent ids ARE the client-supplied id, so this collision is
     // reachable by an API caller reusing an id across the two endpoints.
-    // The alias upsert must not replace the parent's cancel metadata, or a
-    // later cancel of that batch publishes zero child aborts.
+    // The alias upsert refuses to re-point the row (#887), and the run must
+    // fall back to its own flow id so it never publishes or persists onto
+    // the batch parent's channel (#895).
     const owner = await createUserAndLogin(app, `pipe-alias-collide-${Date.now()}`);
     const clientJobId = randomUUID();
+    const initialProgress = {
+      percent: 50,
+      totalFiles: 2,
+      completedFiles: 1,
+      failedFiles: 0,
+    };
     await db.insert(schema.jobs).values({
       id: clientJobId,
       userId: owner.userId,
       type: "batch",
       status: "processing",
+      progress: initialProgress,
       inputRefs: [],
       settings: { flowChildCount: 2, stepCount: 1 },
     });
@@ -179,11 +194,79 @@ describe("route-stamped cancel metadata (#771)", () => {
       body,
     });
     expect([200, 202]).toContain(res.statusCode);
-    await waitForTerminalFrame(clientJobId);
+    const { jobId: flowId } = JSON.parse(res.body) as { jobId: string };
+    expect(flowId).not.toBe(clientJobId);
+    await waitForTerminalFrame(flowId);
 
+    // Nothing from the pipeline landed on the refused batch channel.
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const parent = await jobRow(clientJobId);
     expect(parent?.type).toBe("batch");
+    expect(parent?.status).toBe("processing");
+    expect(parent?.progress).toEqual(initialProgress);
     expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
+
+    const flow = await jobRow(flowId);
+    expect(flow?.type).toBe("pipeline");
+    expect((flow?.settings ?? {}) as { clientJobId?: string }).toMatchObject({
+      clientJobId: flowId,
+    });
+
+    // The batch parent's guarded completion transition still succeeds and
+    // announces its own terminal frame on clientJobId.
+    await completeBatchJob({
+      jobId: clientJobId,
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 0,
+      errors: [],
+      outputRefs: [`outputs/${clientJobId}/batch.zip`],
+      bytesOut: 128,
+      result: { jobId: clientJobId, downloadUrl: `/api/v1/download/${clientJobId}/batch.zip` },
+    });
+    expect((await jobRow(clientJobId))?.status).toBe("completed");
+    const batchFrame = await waitForTerminalFrame(clientJobId);
+    expect(batchFrame.type).toBe("batch");
+    expect(batchFrame.status).toBe("completed");
+  });
+
+  it("answers the server flow id on 202 when the alias claim was refused (#895)", async () => {
+    const owner = await createUserAndLogin(app, `pipe-202-collide-${Date.now()}`);
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner.userId,
+      type: "batch",
+      status: "processing",
+      inputRefs: [],
+      settings: { flowChildCount: 1, stepCount: 1 },
+    });
+
+    enqueueMock.timeoutOnce = true;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        {
+          name: "pipeline",
+          content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+        },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/execute",
+        headers: { "content-type": contentType, authorization: `Bearer ${owner.token}` },
+        body,
+      });
+      expect(res.statusCode).toBe(202);
+      const payload = JSON.parse(res.body) as { jobId: string; async: boolean };
+      expect(payload.async).toBe(true);
+      expect(payload.jobId).not.toBe(clientJobId);
+      await waitForTerminalFrame(payload.jobId);
+      expect((await jobRow(clientJobId))?.status).toBe("processing");
+    } finally {
+      enqueueMock.timeoutOnce = false;
+    }
   });
 
   it("stamps stepCount on the pipeline-batch parent", async () => {
@@ -262,26 +345,25 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("does not let a second user take over an alias row by reusing its id", async () => {
+  it("does not let a second user take over or write to an alias row by reusing its id (#895)", async () => {
     const clientJobId = randomUUID();
     await runPipeline(clientJobId);
     const before = await jobRow(clientJobId);
     const ownerBefore = before?.userId;
+    const progressBefore = before?.progress;
     const pointerBefore = ((before?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
     expect(ownerBefore).not.toBeNull();
 
     // A second user submits their own pipeline under the first user's id.
-    // The run may proceed (colliding channels were always latest-run-wins),
-    // but the alias row's owner and pointer must survive: transferring them
-    // would hand the second user the row and strip the first user's own
-    // cancel authorization.
+    // The claim is refused, so the second run falls back to its own flow id
+    // and never publishes or persists on the first user's channel (#895).
     const attacker = await createUserAndLogin(app, `alias-reuse-${Date.now()}`);
     await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
       {
         name: "pipeline",
-        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 25 } }] }),
       },
       { name: "clientJobId", content: clientJobId },
     ]);
@@ -292,10 +374,15 @@ describe("HTTP cancel on route-created pipeline rows", () => {
       body,
     });
     expect([200, 202]).toContain(res.statusCode);
-    await waitForTerminalFrame(clientJobId);
+    const { jobId: attackerFlowId } = JSON.parse(res.body) as { jobId: string };
+    expect(attackerFlowId).not.toBe(clientJobId);
+    await waitForTerminalFrame(attackerFlowId);
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
 
     const after = await jobRow(clientJobId);
     expect(after?.userId).toBe(ownerBefore);
+    expect(after?.status).toBe("completed");
+    expect(after?.progress).toEqual(progressBefore);
     expect(((after?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId).toBe(
       pointerBefore,
     );

@@ -151,8 +151,8 @@ export async function insertToolJobAlias(args: {
   clientJobId: string;
   userId: string | null;
   pool: Pool;
-}): Promise<void> {
-  await db
+}): Promise<boolean> {
+  const res = await db
     .insert(schema.jobs)
     .values({
       id: args.clientJobId,
@@ -164,6 +164,7 @@ export async function insertToolJobAlias(args: {
       settings: { artifactJobId: args.jobId },
     })
     .onConflictDoNothing();
+  return ((res as { rowCount?: number | null })?.rowCount ?? 0) > 0;
 }
 
 /**
@@ -196,7 +197,7 @@ export async function upsertToolJobAlias(args: {
   clientJobId: string;
   userId: string | null;
   pool: Pool;
-}): Promise<void> {
+}): Promise<boolean> {
   const aliasSettings = { artifactJobId: args.jobId };
   const claimableOwner = args.userId
     ? or(isNull(schema.jobs.userId), eq(schema.jobs.userId, args.userId))
@@ -227,12 +228,15 @@ export async function upsertToolJobAlias(args: {
     });
   if (((res as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
     // The claim was skipped (foreign owner or non-alias collision). The
-    // run proceeds, but its starter cannot cancel through this id; make
-    // that debuggable instead of a silent 404 months later.
+    // run falls back to the server jobId, so neither SSE progress nor
+    // cancel by clientJobId resolves here; log the refusal instead of
+    // leaving a silent 404 later (#808, #895).
     console.warn(
-      `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); cancel by this id will not resolve`,
+      `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); progress and cancel fell back to the server job id`,
     );
+    return false;
   }
+  return true;
 }
 
 /**
@@ -269,12 +273,17 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   // parse (#886), so for factory runs this second upsert is an idempotent
   // re-point of the same values.
   if (data.clientJobId && data.clientJobId !== data.jobId) {
-    await upsertToolJobAlias({
+    const claimed = await upsertToolJobAlias({
       jobId: data.jobId,
       clientJobId: data.clientJobId,
       userId: data.userId,
       pool: data.pool,
     });
+    if (!claimed) {
+      // Refused claim (#895): fall back to the server jobId so the worker
+      // never publishes or persists on a channel this run does not own.
+      data.clientJobId = undefined;
+    }
   }
 
   // Fire-and-forget: compute deleteAfter from team retention override

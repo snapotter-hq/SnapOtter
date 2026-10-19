@@ -702,15 +702,19 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               });
             if (((aliasRes as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
               // The claim was skipped (foreign owner or non-alias
-              // collision). The run proceeds, but its starter cannot
-              // cancel through this id; make that debuggable instead of a
-              // silent 404 months later.
+              // collision). Fall back to the server flow id so this run
+              // never publishes or persists on a channel it does not own
+              // (#895); its starter cannot cancel through clientJobId, so
+              // log the refusal instead of leaving a silent 404 later.
               request.log.warn(
                 { clientJobId, pipelineFlowId: jobId },
-                "pipeline alias claim skipped; cancel by this id will not resolve",
+                "pipeline alias claim skipped; progress and cancel fell back to the flow id",
               );
+              clientJobId = null;
             }
+          }
 
+          if (clientJobId) {
             // Report initial progress. Awaited: this write settles the
             // client-facing row the SSE replays, which is the evidence a
             // degraded client's fresh connection relies on (#766). Dropped

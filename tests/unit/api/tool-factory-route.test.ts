@@ -42,8 +42,8 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   enqueueToolJob: vi.fn().mockResolvedValue({}),
-  insertToolJobAlias: vi.fn().mockResolvedValue(undefined),
-  upsertToolJobAlias: vi.fn().mockResolvedValue(undefined),
+  insertToolJobAlias: vi.fn().mockResolvedValue(true),
+  upsertToolJobAlias: vi.fn().mockResolvedValue(true),
   waitForJob: vi.fn().mockResolvedValue({
     outputRefs: ["outputs/mock-job/result.png"],
     filename: "result.png",
@@ -772,6 +772,102 @@ describe("createToolRoute", () => {
       const artifactJobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
       expect(waitForJob).not.toHaveBeenCalled();
       expect(artifactJobId).not.toBe(clientJobId);
+      expect(reply.status).toHaveBeenCalledWith(202);
+      expect(reply.send).toHaveBeenCalledWith({
+        jobId: clientJobId,
+        progressJobId: clientJobId,
+        artifactJobId,
+        async: true,
+      });
+    });
+
+    it("falls back to the server job ID on 202 and skips validation progress when the alias claim is refused (#895)", async () => {
+      const { insertToolJobAlias } = await import("../../../apps/api/src/jobs/enqueue.js");
+      const { updateSingleFileProgress } = await import("../../../apps/api/src/routes/progress.js");
+      vi.mocked(insertToolJobAlias).mockResolvedValueOnce(false);
+      vi.mocked(enqueueToolJob).mockImplementationOnce(async (data) => {
+        data.clientJobId = undefined;
+        return {} as never;
+      });
+      vi.mocked(waitForJob).mockResolvedValueOnce(null);
+      vi.mocked(updateSingleFileProgress).mockClear();
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        clientJobId: "colliding-batch-id",
+      });
+
+      await handler(req, reply);
+
+      const artifactJobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(updateSingleFileProgress).not.toHaveBeenCalled();
+      expect(reply.status).toHaveBeenCalledWith(202);
+      expect(reply.send).toHaveBeenCalledWith({
+        jobId: artifactJobId,
+        async: true,
+      });
+    });
+
+    it("falls back to the server job ID immediately on 202 for long tools when the alias claim is refused (#895)", async () => {
+      const { insertToolJobAlias } = await import("../../../apps/api/src/jobs/enqueue.js");
+      vi.mocked(isToolInstalled).mockReturnValue(true);
+      vi.mocked(insertToolJobAlias).mockResolvedValueOnce(false);
+      vi.mocked(enqueueToolJob).mockImplementationOnce(async (data) => {
+        data.clientJobId = undefined;
+        return {} as never;
+      });
+
+      const app = createMockApp();
+      const id = "upscale";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        clientJobId: "colliding-long-id",
+      });
+
+      await handler(req, reply);
+
+      const artifactJobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(waitForJob).not.toHaveBeenCalled();
+      expect(reply.status).toHaveBeenCalledWith(202);
+      expect(reply.send).toHaveBeenCalledWith({
+        jobId: artifactJobId,
+        async: true,
+      });
+    });
+
+    it("skips validation progress on a reused alias id while still returning the re-pointed clientJobId on 202 (#886, #895)", async () => {
+      const { insertToolJobAlias } = await import("../../../apps/api/src/jobs/enqueue.js");
+      const { updateSingleFileProgress } = await import("../../../apps/api/src/routes/progress.js");
+      vi.mocked(insertToolJobAlias).mockResolvedValueOnce(false);
+      vi.mocked(waitForJob).mockResolvedValueOnce(null);
+      vi.mocked(updateSingleFileProgress).mockClear();
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const clientJobId = "reused-owned-id";
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+        clientJobId,
+      });
+
+      await handler(req, reply);
+
+      const artifactJobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(updateSingleFileProgress).not.toHaveBeenCalled();
       expect(reply.status).toHaveBeenCalledWith(202);
       expect(reply.send).toHaveBeenCalledWith({
         jobId: clientJobId,

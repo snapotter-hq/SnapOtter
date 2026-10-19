@@ -441,17 +441,26 @@ describe("enqueueToolJob alias stamping (#808)", () => {
     expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(jobId);
   });
 
-  it("does not clobber a same-owner batch parent row that collides with the alias id", async () => {
+  it("does not clobber a same-owner batch parent row that collides with the alias id (#808, #895)", async () => {
     // Batch parent ids ARE the client-supplied id, so a collision with a
     // later single-tool run is reachable for the same user. The upsert must
-    // not replace the parent's cancel metadata with an alias pointer.
+    // not replace the parent's cancel metadata with an alias pointer, and the
+    // worker must fall back to its own jobId instead of publishing or
+    // persisting onto the batch parent row (#895).
     const owner = await createOwner();
     const clientJobId = randomUUID();
+    const initialProgress = {
+      percent: 50,
+      totalFiles: 2,
+      completedFiles: 1,
+      failedFiles: 0,
+    };
     await db.insert(schema.jobs).values({
       id: clientJobId,
       userId: owner,
       type: "batch",
       status: "processing",
+      progress: initialProgress,
       inputRefs: [],
       settings: { flowChildCount: 2, stepCount: 1 },
     });
@@ -463,13 +472,17 @@ describe("enqueueToolJob alias stamping (#808)", () => {
       userId: owner,
     });
     await terminalRow(jobId);
+    await terminalFrame(jobId);
 
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const parent = await jobRow(clientJobId);
     expect(parent?.type).toBe("batch");
+    expect(parent?.status).toBe("processing");
+    expect(parent?.progress).toEqual(initialProgress);
     expect(parent?.settings).toMatchObject({ flowChildCount: 2, stepCount: 1 });
   });
 
-  it("leaves a foreign user's row untouched when its id is reused", async () => {
+  it("leaves a foreign user's row untouched when its id is reused (#808, #895)", async () => {
     const foreignOwner = await createOwner();
     const clientJobId = randomUUID();
     await db.insert(schema.jobs).values({
@@ -483,9 +496,51 @@ describe("enqueueToolJob alias stamping (#808)", () => {
 
     const { jobId } = await enqueueSingleRun({ mode: "fast", tag: "stamp-foreign", clientJobId });
     await terminalRow(jobId);
+    await terminalFrame(jobId);
 
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
     const alias = await jobRow(clientJobId);
     expect(alias?.userId).toBe(foreignOwner);
+    expect(alias?.status).toBe("queued");
+    expect(alias?.progress).toBeNull();
+    expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      "foreign-artifact",
+    );
+  });
+
+  it("refuses an anonymous caller's claim on an owned row and does not publish on the refused channel when canceled (#895)", async () => {
+    const foreignOwner = await createOwner();
+    const clientJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: foreignOwner,
+      type: "single",
+      status: "completed",
+      progress: { percent: 100, result: { jobId: "foreign-artifact" } },
+      inputRefs: [],
+      settings: { artifactJobId: "foreign-artifact" },
+    });
+    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+
+    const { jobId } = await enqueueSingleRun({
+      mode: "slow",
+      tag: "anon-collide-cancel",
+      clientJobId,
+      userId: null,
+    });
+    await waitFor(async () => (invoked.includes("anon-collide-cancel") ? true : undefined));
+
+    expect(await requestCancel(jobId)).toBe(true);
+    expect((await terminalRow(jobId)).status).toBe("canceled");
+    const frame = await terminalFrame(jobId);
+    expect(frame.error).toBe("Canceled");
+
+    // Neither cancelSingleJobGuarded nor publishEphemeral touched the refused channel.
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    const alias = await jobRow(clientJobId);
+    expect(alias?.userId).toBe(foreignOwner);
+    expect(alias?.status).toBe("completed");
+    expect(alias?.progress).toEqual({ percent: 100, result: { jobId: "foreign-artifact" } });
     expect(((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       "foreign-artifact",
     );

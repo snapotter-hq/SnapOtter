@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ToolJobData } from "../../../../apps/api/src/jobs/types.js";
 
 const insertedValues = vi.hoisted(() => vi.fn());
+const onConflictDoNothingMock = vi.hoisted(() => vi.fn());
+const onConflictDoUpdateMock = vi.hoisted(() => vi.fn());
 const queueAdd = vi.hoisted(() => vi.fn());
 const getJob = vi.hoisted(() => vi.fn());
 const queueEventClose = vi.hoisted(() => vi.fn());
@@ -42,6 +44,8 @@ async function loadEnqueueModule(
 ) {
   vi.resetModules();
   insertedValues.mockReset();
+  onConflictDoNothingMock.mockReset();
+  onConflictDoUpdateMock.mockReset();
   queueAdd.mockReset();
   getJob.mockReset();
   queueEventClose.mockReset();
@@ -57,7 +61,18 @@ async function loadEnqueueModule(
   queueEventOn.mockReset();
   queueEventsCtor.mockReset();
 
-  queueAdd.mockResolvedValue({ id: "job-1" });
+  queueAdd.mockImplementation(async (_name: string, data: unknown) => ({ id: "job-1", data }));
+  onConflictDoNothingMock.mockResolvedValue({ rowCount: 1 });
+  onConflictDoUpdateMock.mockResolvedValue({ rowCount: 1 });
+  insertedValues.mockImplementation(() => {
+    const p = Promise.resolve(undefined) as Promise<undefined> & {
+      onConflictDoNothing: typeof onConflictDoNothingMock;
+      onConflictDoUpdate: typeof onConflictDoUpdateMock;
+    };
+    p.onConflictDoNothing = onConflictDoNothingMock;
+    p.onConflictDoUpdate = onConflictDoUpdateMock;
+    return p;
+  });
   queueEventClose.mockResolvedValue(undefined);
   // run() resolves only when the consumer is closing; a never-settling promise
   // is the honest stand-in for a loop that stays up for the process's life.
@@ -103,7 +118,13 @@ async function loadEnqueueModule(
   }));
 
   vi.doMock("drizzle-orm", () => ({
+    and: vi.fn((...args: unknown[]) => ({ and: args })),
     eq: vi.fn((a: unknown, b: unknown) => ({ eq: [a, b] })),
+    isNull: vi.fn((a: unknown) => ({ isNull: a })),
+    or: vi.fn((...args: unknown[]) => ({ or: args })),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      sql: [strings, values],
+    })),
   }));
 
   if (options.enterpriseImportThrows) {
@@ -127,13 +148,23 @@ async function loadEnqueueModule(
   vi.doMock("../../../../apps/api/src/db/index.js", () => ({
     db: {
       insert: vi.fn(() => ({
-        values: insertedValues.mockResolvedValue(undefined),
+        values: insertedValues,
       })),
       select: selectMock,
       update: updateMock,
     },
     schema: {
-      jobs: { id: "jobs.id", deleteAfter: "jobs.deleteAfter" },
+      jobs: {
+        id: "jobs.id",
+        type: "jobs.type",
+        userId: "jobs.userId",
+        settings: "jobs.settings",
+        status: "jobs.status",
+        completedAt: "jobs.completedAt",
+        error: "jobs.error",
+        progress: "jobs.progress",
+        deleteAfter: "jobs.deleteAfter",
+      },
       users: { id: "users.id", team: "users.team" },
       teams: { id: "teams.id", retentionHours: "teams.retentionHours" },
     },
@@ -591,5 +622,95 @@ describe("computeDeleteAfter (via enqueueToolJob fire-and-forget)", () => {
       } as never),
     ).resolves.toBeDefined();
     await flushMicrotasks();
+  });
+});
+
+describe("alias claim outcomes (#895)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("insertToolJobAlias returns true when the row is inserted and false on conflict", async () => {
+    const { mod } = await loadEnqueueModule();
+
+    onConflictDoNothingMock.mockResolvedValueOnce({ rowCount: 1 });
+    await expect(
+      mod.insertToolJobAlias({
+        jobId: "job-1",
+        clientJobId: "client-1",
+        userId: "user-1",
+        pool: "image",
+      }),
+    ).resolves.toBe(true);
+
+    onConflictDoNothingMock.mockResolvedValueOnce({ rowCount: 0 });
+    await expect(
+      mod.insertToolJobAlias({
+        jobId: "job-2",
+        clientJobId: "client-1",
+        userId: "user-1",
+        pool: "image",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("enqueueToolJob strips clientJobId from job data when upsertToolJobAlias is refused", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { mod } = await loadEnqueueModule();
+    onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 0 });
+
+    const data: ToolJobData = {
+      jobId: "job-refused",
+      clientJobId: "colliding-batch-id",
+      userId: "user-1",
+      toolId: "resize",
+      pool: "image",
+      kind: "tool",
+      inputRefs: ["uploads/job-refused/x.png"],
+      filename: "x.png",
+      settings: {},
+    };
+
+    const job = await mod.enqueueToolJob(data);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "alias claim skipped for clientJobId colliding-batch-id (job job-refused); progress and cancel fell back to the server job id",
+      ),
+    );
+    expect(data.clientJobId).toBeUndefined();
+    expect(job.data.clientJobId).toBeUndefined();
+    expect(queueAdd).toHaveBeenCalledWith(
+      "resize",
+      expect.objectContaining({ jobId: "job-refused", clientJobId: undefined }),
+      { jobId: "job-refused" },
+    );
+  });
+
+  it("enqueueToolJob preserves clientJobId when upsertToolJobAlias claims the row", async () => {
+    const { mod } = await loadEnqueueModule();
+    onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 1 });
+
+    const data: ToolJobData = {
+      jobId: "job-claimed",
+      clientJobId: "owned-alias-id",
+      userId: null,
+      toolId: "resize",
+      pool: "image",
+      kind: "tool",
+      inputRefs: ["uploads/job-claimed/x.png"],
+      filename: "x.png",
+      settings: {},
+    };
+
+    const job = await mod.enqueueToolJob(data);
+
+    expect(data.clientJobId).toBe("owned-alias-id");
+    expect(job.data.clientJobId).toBe("owned-alias-id");
+    expect(queueAdd).toHaveBeenCalledWith(
+      "resize",
+      expect.objectContaining({ jobId: "job-claimed", clientJobId: "owned-alias-id" }),
+      { jobId: "job-claimed" },
+    );
   });
 });

@@ -21,6 +21,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   parseClientJobIdField,
   parseSaveModeField,
+  type ToolJobData,
 } from "../jobs/types.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
@@ -397,12 +398,18 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // create the row first. Insert-only: a reused id keeps its previous
         // run's state until enqueueToolJob claims and re-points it.
         const pool = resolveToolPool(config.toolId);
+        let ownsPreEnqueueAlias = true;
         if (clientJobId && clientJobId !== jobId) {
-          await insertToolJobAlias({ jobId, clientJobId, userId: authUser.id, pool });
+          ownsPreEnqueueAlias = await insertToolJobAlias({
+            jobId,
+            clientJobId,
+            userId: authUser.id,
+            pool,
+          });
         }
 
         const reportProgress = (percent: number, stage?: string) => {
-          if (!clientJobId) return;
+          if (!clientJobId || !ownsPreEnqueueAlias) return;
           void updateSingleFileProgress({
             jobId: clientJobId,
             phase: "processing",
@@ -610,22 +617,24 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // finally below must leave the upload alone. If it threw before the
         // row landed, nothing else will ever remove the upload.
         enqueued = true;
+        const jobData: ToolJobData = {
+          jobId,
+          toolId: config.toolId,
+          userId,
+          pool,
+          inputRefs,
+          filename,
+          settings,
+          dbSettings,
+          fileId: fileId ?? undefined,
+          saveMode,
+          clientJobId: clientJobId ?? undefined,
+          kind: "tool",
+          analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
+        };
         try {
-          await enqueueToolJob({
-            jobId,
-            toolId: config.toolId,
-            userId,
-            pool,
-            inputRefs,
-            filename,
-            settings,
-            dbSettings,
-            fileId: fileId ?? undefined,
-            saveMode,
-            clientJobId: clientJobId ?? undefined,
-            kind: "tool",
-            analyticsDistinctId: request.headers["x-posthog-distinct-id"] as string | undefined,
-          });
+          await enqueueToolJob(jobData);
+          clientJobId = jobData.clientJobId ?? null;
         } catch (err) {
           const rowExists = await db
             .select({ id: schema.jobs.id })
