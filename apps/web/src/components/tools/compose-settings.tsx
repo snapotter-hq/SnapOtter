@@ -9,8 +9,7 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 export function ComposeSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
-    useFileStore();
+  const { files, processing, error, setProcessing, setError, setJobId } = useFileStore();
   const [overlayFile, setOverlayFile] = useState<File | null>(null);
   const [x, setX] = useState(0);
   const [y, setY] = useState(0);
@@ -29,6 +28,9 @@ export function ComposeSettings() {
 
   const handleProcess = async () => {
     if (files.length === 0 || !overlayFile) return;
+    const { entries, selectedIndex } = useFileStore.getState();
+    const capturedEntry = entries[selectedIndex] ?? entries[0];
+    if (!capturedEntry) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -50,7 +52,7 @@ export function ComposeSettings() {
 
     try {
       const formData = new FormData();
-      formData.append("file", files[0]);
+      formData.append("file", capturedEntry.file);
       formData.append("overlay", overlayFile);
       formData.append("settings", JSON.stringify({ x, y, opacity, blendMode }));
 
@@ -76,11 +78,17 @@ export function ComposeSettings() {
       const result = resolveServerUrls(await res.json());
       if (controller.signal.aborted || storeReset) return;
       setJobId(result.jobId);
-      setProcessedUrl(result.downloadUrl);
+      useFileStore.getState().updateEntryById(capturedEntry.id, {
+        processedUrl: result.downloadUrl,
+        processedPreviewUrl: result.previewUrl ?? null,
+        processedFilename: null,
+        status: "completed",
+        originalSize: result.originalSize,
+        processedSize: result.processedSize,
+      });
       setDownloadUrl(result.downloadUrl);
       setOriginalSize(result.originalSize);
       setProcessedSize(result.processedSize);
-      setSizes(result.originalSize, result.processedSize);
     } catch (err) {
       if (
         controller.signal.aborted ||

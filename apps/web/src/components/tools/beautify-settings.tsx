@@ -1354,7 +1354,7 @@ export function BeautifySettings({
   onImageOverlay?: (children: React.ReactNode) => void;
 }) {
   const { t } = useTranslation();
-  const { files, setProcessedUrl, setSizes, setJobId } = useFileStore();
+  const { files, setJobId } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("beautify");
 
@@ -1383,13 +1383,16 @@ export function BeautifySettings({
 
     // For image background mode, use manual FormData (like compose-settings)
     if (isImageBg && bgImageFile) {
+      const { entries, selectedIndex } = useFileStore.getState();
+      const capturedEntry = entries[selectedIndex] ?? entries[0];
+      if (!capturedEntry) return;
       setManualProcessing(true);
       setManualError(null);
       setManualDownloadUrl(null);
 
       try {
         const formData = new FormData();
-        formData.append("file", files[0]);
+        formData.append("file", capturedEntry.file);
         formData.append("backgroundImage", bgImageFile);
         formData.append("settings", JSON.stringify(settings));
 
@@ -1413,9 +1416,15 @@ export function BeautifySettings({
 
         const result = resolveServerUrls(await res.json());
         setJobId(result.jobId);
-        setProcessedUrl(result.downloadUrl);
+        useFileStore.getState().updateEntryById(capturedEntry.id, {
+          processedUrl: result.downloadUrl,
+          processedPreviewUrl: result.previewUrl ?? null,
+          processedFilename: null,
+          status: "completed",
+          originalSize: result.originalSize,
+          processedSize: result.processedSize,
+        });
         setManualDownloadUrl(result.downloadUrl);
-        setSizes(result.originalSize, result.processedSize);
       } catch (err) {
         setManualError(
           err instanceof Error ? err.message : t.toolSettings.beautify.processingFailed,
@@ -1427,6 +1436,8 @@ export function BeautifySettings({
     }
 
     // Standard processing via useToolProcessor
+    setManualError(null);
+    setManualDownloadUrl(null);
     if (files.length > 1) {
       processAllFiles(files, settings);
     } else {

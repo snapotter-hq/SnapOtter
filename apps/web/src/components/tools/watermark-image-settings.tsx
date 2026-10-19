@@ -13,8 +13,7 @@ import { useFileStore } from "@/stores/file-store";
 type Position = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export function WatermarkImageSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
-    useFileStore();
+  const { files, processing, error, setProcessing, setError, setJobId } = useFileStore();
   const [position, setPosition] = useState<Position>("bottom-right");
   const [opacity, setOpacity] = useState(50);
   const [scale, setScale] = useState(25);
@@ -73,9 +72,17 @@ export function WatermarkImageSettings() {
     const settingsJson = JSON.stringify({ position, opacity, scale });
 
     if (files.length === 1) {
+      const { entries, selectedIndex } = useFileStore.getState();
+      const capturedEntry = entries[selectedIndex] ?? entries[0];
+      if (!capturedEntry) {
+        unsubscribe();
+        if (abortRef.current === controller) abortRef.current = null;
+        setProcessing(false);
+        return;
+      }
       try {
         const formData = new FormData();
-        formData.append("file", files[0]);
+        formData.append("file", capturedEntry.file);
         formData.append("watermark", watermarkFile);
         formData.append("settings", settingsJson);
 
@@ -101,11 +108,17 @@ export function WatermarkImageSettings() {
         const result = resolveServerUrls(await res.json());
         if (controller.signal.aborted || storeReset) return;
         setJobId(result.jobId);
-        setProcessedUrl(result.downloadUrl);
+        useFileStore.getState().updateEntryById(capturedEntry.id, {
+          processedUrl: result.downloadUrl,
+          processedPreviewUrl: result.previewUrl ?? null,
+          processedFilename: null,
+          status: "completed",
+          originalSize: result.originalSize,
+          processedSize: result.processedSize,
+        });
         setDownloadUrl(result.downloadUrl);
         setOriginalSize(result.originalSize);
         setProcessedSize(result.processedSize);
-        setSizes(result.originalSize, result.processedSize);
       } catch (err) {
         if (
           controller.signal.aborted ||

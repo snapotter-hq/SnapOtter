@@ -26,8 +26,7 @@ interface StitchResult {
 
 export function StitchSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setProcessedUrl, setSizes, setJobId } =
-    useFileStore();
+  const { files, processing, error, setProcessing, setError, setJobId } = useFileStore();
 
   const [direction, setDirection] = useState<Direction>("horizontal");
   const [gridColumns, setGridColumns] = useState(3);
@@ -57,6 +56,9 @@ export function StitchSettings() {
 
   const handleProcess = () => {
     if (files.length < 2) return;
+    const { entries, selectedIndex } = useFileStore.getState();
+    const capturedEntry = entries[selectedIndex] ?? entries[0];
+    if (!capturedEntry) return;
 
     unsubscribeRef.current?.();
     xhrRef.current?.abort();
@@ -142,9 +144,15 @@ export function StitchSettings() {
           }
           try {
             setJobId(result.jobId);
-            setProcessedUrl(result.downloadUrl);
+            useFileStore.getState().updateEntryById(capturedEntry.id, {
+              processedUrl: result.downloadUrl,
+              processedPreviewUrl: null,
+              processedFilename: null,
+              status: "completed",
+              originalSize: result.originalSize,
+              processedSize: result.processedSize,
+            });
             setDownloadUrl(result.downloadUrl);
-            setSizes(result.originalSize, result.processedSize);
             setProcessing(false);
           } catch (err) {
             setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));

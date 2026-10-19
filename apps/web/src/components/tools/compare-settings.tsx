@@ -9,7 +9,7 @@ import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 export function CompareSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setProcessedUrl } = useFileStore();
+  const { files, processing, error, setProcessing, setError } = useFileStore();
   const [secondFile, setSecondFile] = useState<File | null>(null);
   const [similarity, setSimilarity] = useState<number | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -23,6 +23,9 @@ export function CompareSettings() {
 
   const handleProcess = async () => {
     if (files.length === 0 || !secondFile) return;
+    const { entries, selectedIndex } = useFileStore.getState();
+    const capturedEntry = entries[selectedIndex] ?? entries[0];
+    if (!capturedEntry) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -45,7 +48,7 @@ export function CompareSettings() {
 
     try {
       const formData = new FormData();
-      formData.append("file", files[0]);
+      formData.append("file", capturedEntry.file);
       formData.append("file", secondFile);
 
       const res = await fetch(appUrl("/api/v1/tools/image/compare"), {
@@ -73,7 +76,20 @@ export function CompareSettings() {
       setDownloadUrl(result.downloadUrl);
       // Show the second image in the slider (not the diff) so the user can
       // visually compare their two originals. The diff is still downloadable.
-      setProcessedUrl(URL.createObjectURL(secondFile));
+      const currentTarget = useFileStore
+        .getState()
+        .entries.find((entry) => entry.id === capturedEntry.id);
+      if (currentTarget) {
+        if (currentTarget.processedUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(currentTarget.processedUrl);
+        }
+        useFileStore.getState().updateEntryById(capturedEntry.id, {
+          processedUrl: URL.createObjectURL(secondFile),
+          processedPreviewUrl: null,
+          processedFilename: null,
+          status: "completed",
+        });
+      }
     } catch (err) {
       if (
         controller.signal.aborted ||
