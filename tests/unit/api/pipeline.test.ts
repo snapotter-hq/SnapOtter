@@ -4,7 +4,13 @@
  * Tests pipeline step validation schemas, tool resolution (content-aware resize),
  * unique filename deduplication, and the pipeline step schema constraints.
  */
+import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
+
+const insertValuesMock = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<{ rowCount: number }>>(async () => ({ rowCount: 1 })),
+);
+const reportErrorMock = vi.hoisted(() => vi.fn());
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -15,7 +21,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         all: () => [],
       }),
     }),
-    insert: () => ({ values: () => ({ run: vi.fn() }) }),
+    insert: () => ({ values: (...args: unknown[]) => insertValuesMock(...args) }),
     delete: () => ({ where: () => ({ run: vi.fn() }) }),
     update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
   },
@@ -28,6 +34,11 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     jobs: { id: {}, status: {} },
   },
 }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return { ...actual, reportError: reportErrorMock };
+});
 
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
@@ -77,9 +88,14 @@ vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
   isToolInstalled: vi.fn(() => true),
 }));
 
-vi.mock("../../../apps/api/src/lib/errors.js", () => ({
-  formatZodErrors: (issues: Array<{ message: string }>) => issues.map((i) => i.message).join("; "),
-}));
+vi.mock("../../../apps/api/src/lib/errors.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/errors.js")>();
+  return {
+    ...actual,
+    formatZodErrors: (issues: Array<{ message: string }>) =>
+      issues.map((i) => i.message).join("; "),
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/env.js", () => ({
   resolveConcurrency: () => 2,
@@ -98,9 +114,12 @@ vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
 
 vi.mock("../../../apps/api/src/permissions.js", () => ({
   hasEffectivePermission: vi.fn(() => true),
+  hasEffectiveToolAccess: vi.fn(async () => true),
   requirePermission: () => vi.fn(() => ({ id: "user-1", username: "test", role: "admin" })),
 }));
 
+import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+import { registerPipelineRoutes } from "../../../apps/api/src/routes/pipeline.js";
 import {
   getRegisteredToolIds,
   getToolConfig,
@@ -278,5 +297,74 @@ describe("pipeline step error message formatting", () => {
     const stepErr = "some string";
     const msg = stepErr instanceof Error ? stepErr.message : "Processing failed";
     expect(msg).toBe("Processing failed");
+  });
+});
+
+// ── POST /api/v1/pipeline/save database failure (#1988) ────────────────
+
+describe("POST /api/v1/pipeline/save database error handling (#1988)", () => {
+  it("lets a database insert failure reach registerErrorHandler (500 + logged) instead of returning 409", async () => {
+    const saveTestToolId = `pipeline-save-test-${Math.random().toString(36).slice(2, 8)}`;
+    registerToolProcessFn({
+      toolId: saveTestToolId,
+      settingsSchema: {
+        safeParse: (d: unknown) => ({ success: true, data: d }),
+        parse: (d: unknown) => d,
+      } as never,
+      process: async (buf: Buffer) => ({
+        buffer: buf,
+        filename: "out.png",
+        contentType: "image/png",
+      }),
+    });
+
+    const dbErr = new Error("connection terminated unexpectedly");
+    insertValuesMock.mockRejectedValueOnce(dbErr);
+    reportErrorMock.mockReset();
+
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    await registerPipelineRoutes(app);
+
+    const errorLogs: Array<{ bindings: unknown; msg: unknown }> = [];
+    app.addHook("onRequest", async (request: FastifyRequest) => {
+      vi.spyOn(request.log, "error").mockImplementation(((bindings: unknown, msg?: unknown) => {
+        errorLogs.push({ bindings, msg });
+      }) as typeof request.log.error);
+    });
+
+    await app.ready();
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "My Saved Pipeline",
+          steps: [{ toolId: saveTestToolId, settings: {} }],
+        },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: "Internal server error" });
+      expect(errorLogs).toHaveLength(1);
+      expect(errorLogs[0]?.bindings).toMatchObject({
+        err: dbErr,
+        url: "/api/v1/pipeline/save",
+        method: "POST",
+      });
+      expect(errorLogs[0]?.msg).toBe("Unhandled request error");
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        dbErr,
+        expect.objectContaining({
+          source: "http",
+          route: "/api/v1/pipeline/save",
+          method: "POST",
+          statusCode: 500,
+        }),
+      );
+    } finally {
+      await app.close();
+    }
   });
 });

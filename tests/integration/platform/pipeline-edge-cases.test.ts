@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { qpdfAvailable } from "@snapotter/doc-engine";
 import { ffmpegAvailable } from "@snapotter/media-engine";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -417,6 +417,45 @@ describe("Save pipeline edge cases", () => {
       headers: { authorization: `Bearer ${adminToken}` },
     });
     expect(deleteRes.statusCode).toBe(200);
+  });
+
+  it("answers 500 when the database insert fails instead of a misleading 409", async () => {
+    const realInsert = db.insert.bind(db);
+    const spy = vi.spyOn(db, "insert").mockImplementation(((
+      table: Parameters<typeof db.insert>[0],
+    ) => {
+      if (table === schema.pipelines) {
+        return {
+          values: () => Promise.reject(new Error("database unavailable")),
+        } as unknown as ReturnType<typeof db.insert>;
+      }
+      return realInsert(table);
+    }) as typeof db.insert);
+
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          name: "db-error-pipeline",
+          steps: [{ toolId: "resize", settings: { width: 100 } }],
+        },
+      });
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).id).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+
+    const rows = await db
+      .select()
+      .from(schema.pipelines)
+      .where(eq(schema.pipelines.name, "db-error-pipeline"));
+    expect(rows).toHaveLength(0);
   });
 });
 
