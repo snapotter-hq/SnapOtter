@@ -11,7 +11,13 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 // Imports
 // ---------------------------------------------------------------------------
 
-import { useEditorStore } from "@/stores/editor-store";
+import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
+import {
+  jumpEditorToHistoryState,
+  redoEditor,
+  undoEditor,
+  useEditorStore,
+} from "@/stores/editor-store";
 import type { CanvasObject, CropState, SelectionState } from "@/types/editor";
 import { stubRaster } from "../../helpers/editor-raster-stub.js";
 
@@ -1913,5 +1919,145 @@ describe("canvas transforms update rotation attribute", () => {
     if (after.type === "rect") {
       expect(after.attrs.rotation).toBe(300); // (360 - 60) % 360
     }
+  });
+});
+
+// ===========================================================================
+// Levels and Curves undo/redo (#2654)
+// ===========================================================================
+
+describe("Levels and Curves undo/redo (#2654)", () => {
+  beforeEach(() => {
+    useEditorStore.temporal.getState().clear();
+  });
+
+  it("undoes and redoes setLevels and resetLevels across channels", async () => {
+    act((s) => s.setLevels("rgb", { blackPoint: 20, whitePoint: 230, gamma: 1.5 }));
+    act((s) => s.setLevels("red", { outBlack: 15, outWhite: 240 }));
+    expect(state().levels.rgb).toEqual({
+      blackPoint: 20,
+      whitePoint: 230,
+      gamma: 1.5,
+      outBlack: 0,
+      outWhite: 255,
+    });
+    expect(state().levels.red).toEqual({
+      blackPoint: 0,
+      whitePoint: 255,
+      gamma: 1,
+      outBlack: 15,
+      outWhite: 240,
+    });
+
+    act((s) => s.resetLevels());
+    expect(state().levels).toEqual(defaultLevelsState());
+
+    await undoEditor();
+    expect(state().levels.rgb.blackPoint).toBe(20);
+    expect(state().levels.red.outBlack).toBe(15);
+
+    await undoEditor();
+    expect(state().levels.rgb.blackPoint).toBe(20);
+    expect(state().levels.red).toEqual(defaultLevelsState().red);
+
+    await undoEditor();
+    expect(state().levels).toEqual(defaultLevelsState());
+
+    await redoEditor(3);
+    expect(state().levels).toEqual(defaultLevelsState());
+  });
+
+  it("undoes and redoes setCurves, resetCurves, and resetAllAdjustments", async () => {
+    const customCurve = [
+      { x: 0, y: 10 },
+      { x: 128, y: 180 },
+      { x: 255, y: 245 },
+    ];
+    act((s) => s.setCurves("green", customCurve));
+    expect(state().curves.green).toEqual(customCurve);
+
+    act((s) => s.resetCurves());
+    expect(state().curves).toEqual(defaultCurvesState());
+
+    await undoEditor();
+    expect(state().curves.green).toEqual(customCurve);
+
+    await redoEditor();
+    expect(state().curves).toEqual(defaultCurvesState());
+
+    await undoEditor();
+    expect(state().curves.green).toEqual(customCurve);
+
+    act((s) => s.setLevels("blue", { blackPoint: 30 }));
+    const beforeBrightnessTarget = useEditorStore.temporal.getState().pastStates.at(-1);
+    act((s) => s.setAdjustment("brightness", 40));
+    act((s) => s.resetAllAdjustments());
+    expect(state().levels).toEqual(defaultLevelsState());
+    expect(state().curves).toEqual(defaultCurvesState());
+    expect(state().adjustments.brightness).toBe(0);
+
+    await undoEditor();
+    expect(state().levels.blue.blackPoint).toBe(30);
+    expect(state().curves.green).toEqual(customCurve);
+    expect(state().adjustments.brightness).toBe(40);
+
+    await redoEditor();
+    expect(state().levels).toEqual(defaultLevelsState());
+    expect(state().curves).toEqual(defaultCurvesState());
+    expect(state().adjustments.brightness).toBe(0);
+
+    await jumpEditorToHistoryState(beforeBrightnessTarget);
+    expect(state().curves.green).toEqual(customCurve);
+    expect(state().levels).toEqual(defaultLevelsState());
+  });
+
+  it("clamps setLevels values and normalizes setCurves points", () => {
+    act((s) =>
+      s.setLevels("rgb", {
+        blackPoint: 300,
+        whitePoint: 100,
+        gamma: 0,
+        outBlack: 220,
+        outWhite: 180,
+      }),
+    );
+    expect(state().levels.rgb).toEqual({
+      blackPoint: 99,
+      whitePoint: 100,
+      gamma: 0.01,
+      outBlack: 180,
+      outWhite: 180,
+    });
+
+    // Lowering whitePoint below an already-high blackPoint clamps blackPoint down
+    act((s) => s.setLevels("rgb", { whitePoint: 50, outWhite: 120 }));
+    expect(state().levels.rgb.whitePoint).toBe(50);
+    expect(state().levels.rgb.blackPoint).toBe(49);
+    expect(state().levels.rgb.outWhite).toBe(120);
+    expect(state().levels.rgb.outBlack).toBe(120);
+
+    // Duplicate x coordinates keep the last point, and out-of-range coordinates clamp to 0..255
+    act((s) =>
+      s.setCurves("rgb", [
+        { x: 255, y: 260 },
+        { x: 0, y: -10 },
+        { x: 100, y: 80 },
+        { x: 100, y: 140 },
+      ]),
+    );
+    expect(state().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 140 },
+      { x: 255, y: 255 },
+    ]);
+
+    // Fewer than 2 distinct x coordinates fall back to identity
+    act((s) =>
+      s.setCurves("rgb", [
+        { x: 128, y: 50 },
+        { x: 128, y: 200 },
+      ]),
+    );
+    expect(state().curves.rgb).toEqual(defaultCurvesState().rgb);
   });
 });

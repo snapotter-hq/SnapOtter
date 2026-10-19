@@ -8,6 +8,7 @@ import {
   type CurvesState,
   defaultCurvesState,
   defaultLevelsState,
+  IDENTITY_CURVE,
   type LevelsState,
   type LevelsValues,
   type ToneChannel,
@@ -352,6 +353,60 @@ const FILTER_ENABLE_DEFAULTS: Record<string, { key: string; noop: number; value:
   pixelate: { key: "size", noop: 1, value: 10 },
   emboss: { key: "strength", noop: 0, value: 0.5 },
 };
+
+function clampLevelsChannel(current: LevelsValues, values: Partial<LevelsValues>): LevelsValues {
+  const next: LevelsValues = { ...current };
+  if (typeof values.whitePoint === "number" && Number.isFinite(values.whitePoint)) {
+    next.whitePoint = Math.max(1, Math.min(255, values.whitePoint));
+  }
+  if (typeof values.blackPoint === "number" && Number.isFinite(values.blackPoint)) {
+    next.blackPoint = Math.max(0, Math.min(next.whitePoint - 1, values.blackPoint));
+  } else if (next.blackPoint >= next.whitePoint) {
+    next.blackPoint = Math.max(0, next.whitePoint - 1);
+  }
+  if (typeof values.gamma === "number" && Number.isFinite(values.gamma)) {
+    next.gamma = Math.max(0.01, Math.min(10, values.gamma));
+  }
+  if (typeof values.outWhite === "number" && Number.isFinite(values.outWhite)) {
+    next.outWhite = Math.max(0, Math.min(255, values.outWhite));
+  }
+  if (typeof values.outBlack === "number" && Number.isFinite(values.outBlack)) {
+    next.outBlack = Math.max(0, Math.min(next.outWhite, values.outBlack));
+  } else if (next.outBlack > next.outWhite) {
+    next.outBlack = next.outWhite;
+  }
+  return next;
+}
+
+function normalizeCurvePoints(points: CurvePoint[]): CurvePoint[] {
+  const valid = points
+    .filter(
+      (p) =>
+        p !== null &&
+        typeof p === "object" &&
+        typeof p.x === "number" &&
+        Number.isFinite(p.x) &&
+        typeof p.y === "number" &&
+        Number.isFinite(p.y),
+    )
+    .map((p) => ({
+      x: Math.max(0, Math.min(255, Math.round(p.x))),
+      y: Math.max(0, Math.min(255, Math.round(p.y))),
+    }))
+    .sort((a, b) => a.x - b.x);
+  const deduped: CurvePoint[] = [];
+  for (const pt of valid) {
+    if (deduped.length > 0 && deduped[deduped.length - 1].x === pt.x) {
+      deduped[deduped.length - 1] = pt;
+    } else {
+      deduped.push(pt);
+    }
+  }
+  if (deduped.length < 2) {
+    return IDENTITY_CURVE.map((p) => ({ ...p }));
+  }
+  return deduped;
+}
 
 function createDefaultLayer(id: string, name: string): EditorLayer {
   return {
@@ -1326,7 +1381,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         set({
           levels: {
             ...get().levels,
-            [channel]: { ...get().levels[channel], ...values },
+            [channel]: clampLevelsChannel(get().levels[channel], values),
           },
           isDirty: true,
           lastAction: { id: "levels" },
@@ -1335,7 +1390,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       setCurves: (channel, points) =>
         set({
-          curves: { ...get().curves, [channel]: points },
+          curves: { ...get().curves, [channel]: normalizeCurvePoints(points) },
           isDirty: true,
           lastAction: { id: "curves" },
           _historyVersion: get()._historyVersion + 1,
@@ -1727,6 +1782,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         canvasSize: state.canvasSize,
         adjustments: state.adjustments,
         filters: state.filters,
+        levels: state.levels,
+        curves: state.curves,
         guides: state.guides,
         sourceImageUrl: state.sourceImageUrl,
         sourceImageSize: state.sourceImageSize,

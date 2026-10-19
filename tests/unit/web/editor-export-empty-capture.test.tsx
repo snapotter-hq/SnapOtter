@@ -12,7 +12,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared/i18n/en.js";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toastError = vi.hoisted(() => vi.fn());
@@ -77,7 +77,13 @@ vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   },
 }));
 
-import { ExportDialog, saveEditorState } from "@/components/editor/common/export-dialog";
+import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
+import {
+  ExportDialog,
+  loadAutosaveState,
+  restoreAutosave,
+  saveEditorState,
+} from "@/components/editor/common/export-dialog";
 import { captureHandledError } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -104,6 +110,8 @@ beforeEach(() => {
     sourceImageUrl: null,
     sourceImageSize: null,
     objects: [],
+    levels: defaultLevelsState(),
+    curves: defaultCurvesState(),
   });
   const realCreate = document.createElement.bind(document);
   vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
@@ -1069,5 +1077,329 @@ describe("Load Project (#1622)", () => {
     );
     expect(captureHandledError).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("round-trips levels and curves through Save Project and Load Project (#2654)", async () => {
+    const editedLevels = {
+      ...defaultLevelsState(),
+      rgb: { blackPoint: 12, whitePoint: 240, gamma: 1.4, outBlack: 5, outWhite: 250 },
+      red: { blackPoint: 20, whitePoint: 220, gamma: 0.8, outBlack: 10, outWhite: 245 },
+    };
+    const editedCurves = {
+      ...defaultCurvesState(),
+      rgb: [
+        { x: 0, y: 15 },
+        { x: 128, y: 160 },
+        { x: 255, y: 240 },
+      ],
+      blue: [
+        { x: 0, y: 255 },
+        { x: 255, y: 0 },
+      ],
+    };
+    useEditorStore.setState({
+      levels: editedLevels,
+      curves: editedCurves,
+    });
+
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+    clickSaveProject();
+
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    const saved = await savedProjectJson();
+    expect(saved.levels).toEqual(editedLevels);
+    expect(saved.curves).toEqual(editedCurves);
+
+    useEditorStore.setState({
+      levels: defaultLevelsState(),
+      curves: defaultCurvesState(),
+    });
+
+    pickProjectFile(JSON.stringify(saved), "roundtrip.snapotter");
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+    expect(useEditorStore.getState().levels).toEqual(editedLevels);
+    expect(useEditorStore.getState().curves).toEqual(editedCurves);
+  });
+
+  it("resets levels and curves to defaults when loading a legacy v1 project without them (#2654)", async () => {
+    const staleLevels = {
+      ...defaultLevelsState(),
+      rgb: { blackPoint: 40, whitePoint: 200, gamma: 2, outBlack: 0, outWhite: 255 },
+    };
+    const staleCurves = {
+      ...defaultCurvesState(),
+      green: [
+        { x: 0, y: 50 },
+        { x: 255, y: 200 },
+      ],
+    };
+    useEditorStore.setState({
+      levels: staleLevels,
+      curves: staleCurves,
+    });
+
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+      }),
+      "legacy.snapotter",
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(useEditorStore.getState().levels).toEqual(defaultLevelsState());
+    expect(useEditorStore.getState().curves).toEqual(defaultCurvesState());
+  });
+
+  it("round-trips levels and curves through autosave and resets them on legacy autosaves (#2654)", async () => {
+    const staleLevels = {
+      ...defaultLevelsState(),
+      rgb: { blackPoint: 40, whitePoint: 200, gamma: 2, outBlack: 0, outWhite: 255 },
+    };
+    const staleCurves = {
+      ...defaultCurvesState(),
+      green: [
+        { x: 0, y: 50 },
+        { x: 255, y: 200 },
+      ],
+    };
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k),
+      clear: () => store.clear(),
+    });
+    useEditorStore.setState({
+      levels: staleLevels,
+      curves: staleCurves,
+    });
+    await saveEditorState();
+    const autosaved = loadAutosaveState();
+    if (!autosaved) throw new Error("Expected autosave state");
+    expect(autosaved.state.levels).toEqual(staleLevels);
+    expect(autosaved.state.curves).toEqual(staleCurves);
+
+    useEditorStore.setState({
+      levels: defaultLevelsState(),
+      curves: defaultCurvesState(),
+    });
+    act(() => {
+      restoreAutosave(autosaved);
+    });
+    expect(useEditorStore.getState().levels).toEqual(staleLevels);
+    expect(useEditorStore.getState().curves).toEqual(staleCurves);
+
+    // Legacy autosave payload omitting levels/curves resets them to defaults
+    const legacyState = { ...autosaved.state } as Record<string, unknown>;
+    delete legacyState.levels;
+    delete legacyState.curves;
+    act(() => {
+      restoreAutosave({
+        version: 1,
+        timestamp: Date.now(),
+        state: legacyState as unknown as typeof autosaved.state,
+      });
+    });
+    expect(useEditorStore.getState().levels).toEqual(defaultLevelsState());
+    expect(useEditorStore.getState().curves).toEqual(defaultCurvesState());
+  });
+
+  it("normalizes partial levels channels and unsorted curve points on Load Project (#2654)", async () => {
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: {
+          rgb: { blackPoint: 15, outBlack: 100, outWhite: 100 },
+        },
+        curves: {
+          red: [
+            { x: 255, y: 240, extra: "ignored" },
+            { x: 0, y: 10 },
+            { x: 128, y: 150 },
+          ],
+        },
+      }),
+      "partial.snapotter",
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(useEditorStore.getState().levels).toEqual({
+      ...defaultLevelsState(),
+      rgb: { blackPoint: 15, whitePoint: 255, gamma: 1, outBlack: 100, outWhite: 100 },
+    });
+    expect(useEditorStore.getState().curves).toEqual({
+      ...defaultCurvesState(),
+      red: [
+        { x: 0, y: 10 },
+        { x: 128, y: 150 },
+        { x: 255, y: 240 },
+      ],
+    });
+  });
+
+  it.each([
+    [
+      "non-object levels",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: "invalid",
+      }),
+    ],
+    [
+      "unknown levels channel",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { alpha: { blackPoint: 0, whitePoint: 255, gamma: 1, outBlack: 0, outWhite: 255 } },
+      }),
+    ],
+    [
+      "unknown key inside levels channel",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { blackPoint: 10, extraKey: 5 } },
+      }),
+    ],
+    [
+      "non-numeric levels field",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { blackPoint: "low" } },
+      }),
+    ],
+    [
+      "inverted levels blackPoint >= whitePoint",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { blackPoint: 200, whitePoint: 100 } },
+      }),
+    ],
+    [
+      "equal levels blackPoint and whitePoint",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { blackPoint: 100, whitePoint: 100 } },
+      }),
+    ],
+    [
+      "inverted levels outBlack > outWhite",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { outBlack: 200, outWhite: 100 } },
+      }),
+    ],
+    [
+      "out-of-range levels gamma below 0.01",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { gamma: 0 } },
+      }),
+    ],
+    [
+      "out-of-range levels gamma above 10",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        levels: { rgb: { gamma: 15 } },
+      }),
+    ],
+    [
+      "non-object curves",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        curves: [],
+      }),
+    ],
+    [
+      "unknown curves channel",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        curves: {
+          r: [
+            { x: 0, y: 0 },
+            { x: 255, y: 255 },
+          ],
+        },
+      }),
+    ],
+    [
+      "curves channel with fewer than 2 points",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        curves: { rgb: [{ x: 0, y: 0 }] },
+      }),
+    ],
+    [
+      "curves point with out-of-range coordinate",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        curves: {
+          rgb: [
+            { x: 0, y: 0 },
+            { x: 300, y: 255 },
+          ],
+        },
+      }),
+    ],
+    [
+      "curves channel with duplicate x coordinates",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        curves: {
+          rgb: [
+            { x: 100, y: 50 },
+            { x: 100, y: 200 },
+          ],
+        },
+      }),
+    ],
+  ])("rejects project JSON with %s and preserves store state (#2654)", async (_label, content) => {
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    const priorLevels = {
+      ...defaultLevelsState(),
+      rgb: { blackPoint: 18, whitePoint: 235, gamma: 1.2, outBlack: 0, outWhite: 255 },
+    };
+    const priorCurves = {
+      ...defaultCurvesState(),
+      blue: [
+        { x: 0, y: 25 },
+        { x: 255, y: 230 },
+      ],
+    };
+    useEditorStore.setState({
+      levels: priorLevels,
+      curves: priorCurves,
+    });
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile(content);
+
+    const expectedMsg = en.editor.ui.exportDialog.invalidProject;
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(expectedMsg));
+    expect(toastError).toHaveBeenCalledWith(expectedMsg);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().levels).toEqual(priorLevels);
+    expect(useEditorStore.getState().curves).toEqual(priorCurves);
   });
 });

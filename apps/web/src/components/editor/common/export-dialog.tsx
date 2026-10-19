@@ -22,6 +22,16 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  type CurvePoint,
+  type CurvesState,
+  defaultCurvesState,
+  defaultLevelsState,
+  IDENTITY_LEVELS,
+  type LevelsState,
+  type LevelsValues,
+  type ToneChannel,
+} from "@/components/editor/adjustment-lut";
 import { editorStageRefHolder } from "@/components/editor/editor-canvas";
 import {
   type CaptureFailure,
@@ -917,6 +927,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   : existing;
               })
             : store.filters;
+          const levels = resolveLoadedLevels(data.levels);
+          const curves = resolveLoadedCurves(data.curves);
 
           setState({
             canvasSize: data.canvasSize,
@@ -925,6 +937,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             objects: data.objects || [],
             adjustments,
             filters,
+            levels,
+            curves,
             guides: data.guides || [],
             sourceImageUrl: data.sourceImageUrl || null,
             sourceImageSize: data.sourceImageSize || null,
@@ -1291,6 +1305,101 @@ function isValidGuide(guide: unknown): boolean {
   );
 }
 
+const TONE_CHANNELS: readonly ToneChannel[] = ["rgb", "red", "green", "blue"];
+const LEVELS_VALUE_KEYS: readonly (keyof LevelsValues)[] = [
+  "blackPoint",
+  "whitePoint",
+  "gamma",
+  "outBlack",
+  "outWhite",
+];
+
+function isValidLevelsChannel(value: unknown): value is Partial<LevelsValues> {
+  if (!isPlainRecord(value)) return false;
+  for (const key of Object.keys(value)) {
+    if (!LEVELS_VALUE_KEYS.includes(key as keyof LevelsValues)) return false;
+    const v = value[key];
+    if (typeof v !== "number" || !Number.isFinite(v)) return false;
+  }
+  const merged: LevelsValues = {
+    ...IDENTITY_LEVELS,
+    ...(value as Partial<LevelsValues>),
+  };
+  return (
+    merged.blackPoint >= 0 &&
+    merged.blackPoint < merged.whitePoint &&
+    merged.whitePoint <= 255 &&
+    merged.gamma >= 0.01 &&
+    merged.gamma <= 10 &&
+    merged.outBlack >= 0 &&
+    merged.outBlack <= merged.outWhite &&
+    merged.outWhite <= 255
+  );
+}
+
+function isValidLevels(levels: unknown): boolean {
+  if (!isPlainRecord(levels)) return false;
+  return Object.entries(levels).every(
+    ([channel, val]) => TONE_CHANNELS.includes(channel as ToneChannel) && isValidLevelsChannel(val),
+  );
+}
+
+function isValidCurvePoint(pt: unknown): pt is CurvePoint {
+  if (!isPlainRecord(pt)) return false;
+  return (
+    typeof pt.x === "number" &&
+    Number.isFinite(pt.x) &&
+    pt.x >= 0 &&
+    pt.x <= 255 &&
+    typeof pt.y === "number" &&
+    Number.isFinite(pt.y) &&
+    pt.y >= 0 &&
+    pt.y <= 255
+  );
+}
+
+function isValidCurveChannel(pts: unknown): pts is CurvePoint[] {
+  if (!Array.isArray(pts) || pts.length < 2 || !pts.every(isValidCurvePoint)) {
+    return false;
+  }
+  const sorted = [...pts].sort((a, b) => a.x - b.x);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].x <= sorted[i - 1].x) return false;
+  }
+  return true;
+}
+
+function isValidCurves(curves: unknown): boolean {
+  if (!isPlainRecord(curves)) return false;
+  return Object.entries(curves).every(
+    ([channel, pts]) => TONE_CHANNELS.includes(channel as ToneChannel) && isValidCurveChannel(pts),
+  );
+}
+
+function resolveLoadedLevels(raw: Partial<LevelsState> | undefined): LevelsState {
+  const base = defaultLevelsState();
+  if (!isPlainRecord(raw)) return base;
+  for (const channel of TONE_CHANNELS) {
+    const chVal = raw[channel];
+    if (isValidLevelsChannel(chVal)) {
+      base[channel] = { ...base[channel], ...chVal };
+    }
+  }
+  return base;
+}
+
+function resolveLoadedCurves(raw: Partial<CurvesState> | undefined): CurvesState {
+  const base = defaultCurvesState();
+  if (!isPlainRecord(raw)) return base;
+  for (const channel of TONE_CHANNELS) {
+    const pts = raw[channel];
+    if (isValidCurveChannel(pts)) {
+      base[channel] = [...pts].sort((a, b) => a.x - b.x).map((p) => ({ x: p.x, y: p.y }));
+    }
+  }
+  return base;
+}
+
 function isValidProjectData(data: unknown): data is Partial<AutosaveState> & {
   version: number;
   canvasSize: { width: number; height: number };
@@ -1327,6 +1436,12 @@ function isValidProjectData(data: unknown): data is Partial<AutosaveState> & {
     (!isPlainRecord(data.adjustments) ||
       !Object.values(data.adjustments).every((v) => typeof v === "number" && Number.isFinite(v)))
   ) {
+    return false;
+  }
+  if (data.levels !== undefined && !isValidLevels(data.levels)) {
+    return false;
+  }
+  if (data.curves !== undefined && !isValidCurves(data.curves)) {
     return false;
   }
   if (
@@ -1367,6 +1482,8 @@ interface AutosaveState {
   objects: CanvasObject[];
   adjustments: AdjustmentValues;
   filters: FilterConfig[];
+  levels: LevelsState;
+  curves: CurvesState;
   guides: Guide[];
   sourceImageUrl: string | null;
   sourceImageSize: { width: number; height: number } | null;
@@ -1447,6 +1564,8 @@ async function serializeEditorState(s = useEditorStore.getState()): Promise<Auto
     objects,
     adjustments: s.adjustments,
     filters: s.filters,
+    levels: s.levels,
+    curves: s.curves,
     guides: s.guides,
     sourceImageUrl,
     sourceImageSize: s.sourceImageSize,
@@ -1498,6 +1617,8 @@ export function restoreAutosave(data: AutosaveData): void {
   const store = useEditorStore.getState();
   useEditorStore.setState({
     ...data.state,
+    levels: resolveLoadedLevels(data.state.levels),
+    curves: resolveLoadedCurves(data.state.curves),
     isDirty: true,
     lastAction: { id: "restoreAutosave" },
     _historyVersion: store._historyVersion + 1,
