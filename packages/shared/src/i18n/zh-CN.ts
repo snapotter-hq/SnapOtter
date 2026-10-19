@@ -4484,6 +4484,7 @@ export const zhCN: TranslationKeys = {
         tooLarge: "导出内容太大，浏览器无法生成。请尝试更小的尺寸。",
         saveProject: "保存项目",
         loadProject: "载入项目",
+        invalidProject: "此文件不是有效的 SnapOtter 项目。",
       },
       autosaveRecovery: {
         message: "已恢复 {time} 未保存的内容。",

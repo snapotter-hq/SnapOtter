@@ -84,6 +84,7 @@ import { useEditorStore } from "@/stores/editor-store";
 const markClean = vi.fn();
 const TOO_LARGE = en.editor.ui.exportDialog.tooLarge;
 const TAINTED = en.editor.ui.captureFailure.crossOriginBlocked;
+let createdFileInputs: HTMLInputElement[] = [];
 
 beforeEach(() => {
   markClean.mockReset();
@@ -95,6 +96,7 @@ beforeEach(() => {
   capture.throwOnEncode = null;
   capture.ratios = [];
   capture.giveContext = true;
+  createdFileInputs = [];
   useEditorStore.setState({
     markClean,
     isDirty: true,
@@ -104,10 +106,16 @@ beforeEach(() => {
     objects: [],
   });
   const realCreate = document.createElement.bind(document);
-  vi.spyOn(document, "createElement").mockImplementation(((tag: string) =>
-    tag === "canvas"
-      ? (fakeCanvas(0, 0) as unknown as HTMLCanvasElement)
-      : realCreate(tag)) as typeof document.createElement);
+  vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+    if (tag === "canvas") {
+      return fakeCanvas(0, 0) as unknown as HTMLCanvasElement;
+    }
+    const el = realCreate(tag);
+    if (tag === "input" && !el.isConnected) {
+      createdFileInputs.push(el as HTMLInputElement);
+    }
+    return el;
+  }) as typeof document.createElement);
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => ({
@@ -657,5 +665,409 @@ describe("Save Project with a blob: source image (#2132)", () => {
     await saveEditorState();
     expect(localStorage.getItem("snapotter-editor-autosave")).toBeNull();
     expect(console.warn).toHaveBeenCalled();
+  });
+});
+
+function pickProjectFile(content: string, name = "bad.snapotter") {
+  fireEvent.click(screen.getByRole("button", { name: en.editor.ui.exportDialog.loadProject }));
+  const fileInputs = createdFileInputs.filter((input) => input.type === "file");
+  const input = fileInputs[fileInputs.length - 1];
+  expect(input).toBeDefined();
+  const file = new File([content], name, { type: "application/json" });
+  Object.defineProperty(input, "files", {
+    value: [file],
+    configurable: true,
+  });
+  fireEvent.change(input);
+}
+
+describe("Load Project (#1622)", () => {
+  it("surfaces invalidProject, logs at debug level, and keeps the dialog open on malformed JSON", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile("{truncated");
+
+    const expectedMsg = en.editor.ui.exportDialog.invalidProject;
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(expectedMsg));
+    expect(toastError).toHaveBeenCalledWith(expectedMsg);
+    expect(debugSpy).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 1920, height: 1080 });
+    expect(useEditorStore.getState().isDirty).toBe(true);
+  });
+
+  it.each([
+    ["missing version and canvasSize", JSON.stringify({ hello: "world" })],
+    ["missing version", JSON.stringify({ canvasSize: { width: 800, height: 600 } })],
+    [
+      "unsupported version",
+      JSON.stringify({ version: 2, canvasSize: { width: 800, height: 600 } }),
+    ],
+    ["missing canvasSize", JSON.stringify({ version: 1 })],
+    [
+      "invalid canvasSize dimensions",
+      JSON.stringify({ version: 1, canvasSize: { width: 0, height: 600 } }),
+    ],
+    ["non-object JSON root", JSON.stringify(null)],
+    [
+      "empty layers array",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, layers: [] }),
+    ],
+    [
+      "layer without id",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, layers: [{}] }),
+    ],
+    [
+      "non-array objects",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, objects: "bad" }),
+    ],
+    [
+      "non-array filters",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, filters: {} }),
+    ],
+    [
+      "non-array guides",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, guides: 42 }),
+    ],
+    [
+      "non-object adjustments",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, adjustments: [] }),
+    ],
+    [
+      "invalid sourceImageUrl",
+      JSON.stringify({ version: 1, canvasSize: { width: 800, height: 600 }, sourceImageUrl: 123 }),
+    ],
+    [
+      "invalid sourceImageSize",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        sourceImageSize: { width: -1, height: 100 },
+      }),
+    ],
+    ["array JSON root", JSON.stringify([1, 2, 3])],
+    [
+      "layer with empty id",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        layers: [
+          { id: "", name: "L1", visible: true, locked: false, opacity: 1, blendMode: "normal" },
+        ],
+      }),
+    ],
+    [
+      "layer missing required fields",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        layers: [{ id: "layer-1" }],
+      }),
+    ],
+    [
+      "malformed object item",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        objects: [{}],
+      }),
+    ],
+    [
+      "malformed filter item",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        filters: [{ type: "blur", enabled: true }],
+      }),
+    ],
+    [
+      "malformed guide item",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        guides: [{ id: "g1", orientation: "diagonal", position: 10 }],
+      }),
+    ],
+    [
+      "non-numeric adjustment value",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        adjustments: { brightness: "high" },
+      }),
+    ],
+    [
+      "invalid foregroundColor",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        foregroundColor: "not-a-color",
+      }),
+    ],
+    [
+      "invalid backgroundColor",
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+        backgroundColor: 123,
+      }),
+    ],
+  ])(
+    "surfaces invalidProject and leaves the store untouched when project JSON has %s",
+    async (_label, content) => {
+      const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+      const onClose = vi.fn();
+      render(<ExportDialog onClose={onClose} />);
+
+      pickProjectFile(content);
+
+      const expectedMsg = en.editor.ui.exportDialog.invalidProject;
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(expectedMsg));
+      expect(toastError).toHaveBeenCalledWith(expectedMsg);
+      expect(debugSpy).toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(useEditorStore.getState().canvasSize).toEqual({ width: 1920, height: 1080 });
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    },
+  );
+
+  it("surfaces invalidProject when FileReader fails to read the project file", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (this: FileReader) {
+      this.onerror?.(new ProgressEvent("error") as ProgressEvent<FileReader>);
+    });
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile("{}");
+
+    const expectedMsg = en.editor.ui.exportDialog.invalidProject;
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(expectedMsg));
+    expect(toastError).toHaveBeenCalledWith(expectedMsg);
+    expect(debugSpy).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().isDirty).toBe(true);
+  });
+
+  it("clears the inline error when Load Project is clicked again and aborts an in-flight read on unmount", async () => {
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    const onClose = vi.fn();
+    const { unmount } = render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile("{truncated");
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(en.editor.ui.exportDialog.invalidProject),
+    );
+
+    let capturedReader: FileReader | null = null;
+    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (this: FileReader) {
+      capturedReader = this;
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.editor.ui.exportDialog.loadProject }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    const fileInputs = createdFileInputs.filter((input) => input.type === "file");
+    const input = fileInputs[fileInputs.length - 1];
+    Object.defineProperty(input, "files", {
+      value: [
+        new File(
+          [JSON.stringify({ version: 1, canvasSize: { width: 500, height: 400 } })],
+          "good.snapotter",
+          { type: "application/json" },
+        ),
+      ],
+      configurable: true,
+    });
+    fireEvent.change(input);
+    if (!capturedReader) throw new Error("Expected FileReader instance");
+    const readerInstance: FileReader = capturedReader;
+
+    unmount();
+    Object.defineProperty(readerInstance, "result", {
+      value: JSON.stringify({ version: 1, canvasSize: { width: 500, height: 400 } }),
+      configurable: true,
+    });
+    readerInstance.onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 1920, height: 1080 });
+  });
+
+  it("loads a valid project without clearing isDirty on an unsaved document and updates activeLayerId", async () => {
+    const onClose = vi.fn();
+    useEditorStore.setState({
+      isDirty: true,
+      activeLayerId: "old-layer",
+      clipboard: [
+        {
+          id: "clip-1",
+          type: "rect",
+          layerId: "old-layer",
+          attrs: {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+          },
+        },
+      ],
+    });
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 640, height: 480 },
+        layers: [
+          {
+            id: "loaded-layer-1",
+            name: "Background",
+            visible: true,
+            locked: false,
+            opacity: 1,
+            blendMode: "normal",
+            thumbnail: null,
+          },
+        ],
+        objects: [],
+        sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+        sourceImageSize: { width: 640, height: 480 },
+      }),
+      "good.snapotter",
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+    const state = useEditorStore.getState();
+    expect(state.canvasSize).toEqual({ width: 640, height: 480 });
+    expect(state.activeLayerId).toBe("loaded-layer-1");
+    expect(state.clipboard).toBeNull();
+    expect(state.isDirty).toBe(true);
+    expect(state.lastAction).toEqual({ id: "loadProject" });
+  });
+
+  it("keeps isDirty false when loading a valid project into a clean document", async () => {
+    const onClose = vi.fn();
+    useEditorStore.setState({ isDirty: false });
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 640, height: 480 },
+      }),
+      "good.snapotter",
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(useEditorStore.getState().isDirty).toBe(false);
+  });
+
+  it("preserves activeLayerId when the loaded project layers include it and merges partial adjustments and filters", async () => {
+    const onClose = vi.fn();
+    useEditorStore.setState({
+      isDirty: false,
+      activeLayerId: "kept-layer",
+    });
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 640, height: 480 },
+        layers: [
+          {
+            id: "first-layer",
+            name: "Layer 1",
+            visible: true,
+            locked: false,
+            opacity: 1,
+            blendMode: "normal",
+            thumbnail: null,
+          },
+          {
+            id: "kept-layer",
+            name: "Layer 2",
+            visible: true,
+            locked: false,
+            opacity: 0.8,
+            blendMode: "normal",
+            thumbnail: null,
+          },
+        ],
+        adjustments: { brightness: 25 },
+        filters: [{ type: "blur", enabled: true, params: { radius: 8 } }],
+      }),
+      "good.snapotter",
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const state = useEditorStore.getState();
+    expect(state.activeLayerId).toBe("kept-layer");
+    expect(state.adjustments.brightness).toBe(25);
+    expect(state.adjustments.contrast).toBe(0);
+    expect(state.filters.length).toBeGreaterThan(1);
+    expect(state.filters.find((f) => f.type === "blur")).toEqual({
+      type: "blur",
+      enabled: true,
+      params: { radius: 8 },
+    });
+  });
+
+  it("cancels an earlier in-flight FileReader when a second project file is selected", async () => {
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    const readers: FileReader[] = [];
+    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (this: FileReader) {
+      readers.push(this);
+    });
+    const onClose = vi.fn();
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile("{broken-first");
+    pickProjectFile(JSON.stringify({ version: 1, canvasSize: { width: 512, height: 512 } }));
+    expect(readers).toHaveLength(2);
+
+    Object.defineProperty(readers[0], "result", {
+      value: "{broken-first",
+      configurable: true,
+    });
+    readers[0].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>);
+    expect(toastError).not.toHaveBeenCalled();
+
+    Object.defineProperty(readers[1], "result", {
+      value: JSON.stringify({ version: 1, canvasSize: { width: 512, height: 512 } }),
+      configurable: true,
+    });
+    readers[1].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 512, height: 512 });
+  });
+
+  it("reports an unexpected error during state application via handleUnexpectedError instead of invalidProject", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const onClose = vi.fn(() => {
+      throw new TypeError("unexpected teardown failure");
+    });
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 640, height: 480 },
+      }),
+      "good.snapotter",
+    );
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(en.editor.ui.exportDialog.exportFailed),
+    );
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

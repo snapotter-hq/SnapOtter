@@ -4731,6 +4731,7 @@ export const ar: TranslationKeys = {
         tooLarge: "هذا التصدير أكبر من أن يعرضه المتصفح. جرّب أبعادًا أصغر.",
         saveProject: "حفظ المشروع",
         loadProject: "تحميل المشروع",
+        invalidProject: "هذا الملف ليس مشروع SnapOtter صالحًا.",
       },
       autosaveRecovery: {
         message: "تم استرجاع عمل غير محفوظ من {time}.",

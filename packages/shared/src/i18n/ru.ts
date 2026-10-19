@@ -4772,6 +4772,7 @@ export const ru: TranslationKeys = {
           "Этот экспорт слишком большой, чтобы браузер мог его создать. Попробуйте уменьшить размеры.",
         saveProject: "Сохранить проект",
         loadProject: "Загрузить проект",
+        invalidProject: "Этот файл не является допустимым проектом SnapOtter.",
       },
       autosaveRecovery: {
         message: "Восстановлена несохранённая работа от {time}.",

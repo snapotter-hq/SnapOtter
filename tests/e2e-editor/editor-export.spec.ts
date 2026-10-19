@@ -105,4 +105,59 @@ test.describe("Editor Export", () => {
     expect(saved.sourceImageUrl).toMatch(/^data:image\/png;base64,/);
     expect(saved.sourceImageSize).toEqual({ width: 200, height: 150 });
   });
+
+  test("Load Project surfaces an error on invalid JSON and loads a valid project (#1622)", async ({
+    editorPage: page,
+  }) => {
+    await page.keyboard.press("Control+Shift+s");
+    await expect(page.getByText("Export Image")).toBeVisible();
+
+    const badChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Load Project" }).click();
+    const badChooser = await badChooserPromise;
+    await badChooser.setFiles({
+      name: "broken.snapotter",
+      mimeType: "application/json",
+      buffer: Buffer.from("{not-valid-json"),
+    });
+
+    await expect(page.getByRole("alert")).toContainText(
+      "This file isn't a valid SnapOtter project.",
+    );
+    await expect(page.getByText("Export Image")).toBeVisible();
+
+    const wrongShapeChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Load Project" }).click();
+    const wrongShapeChooser = await wrongShapeChooserPromise;
+    await wrongShapeChooser.setFiles({
+      name: "wrong-shape.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ hello: "world" })),
+    });
+
+    await expect(page.getByRole("alert")).toContainText(
+      "This file isn't a valid SnapOtter project.",
+    );
+    await expect(page.getByText("Export Image")).toBeVisible();
+
+    const goodChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Load Project" }).click();
+    const goodChooser = await goodChooserPromise;
+    await goodChooser.setFiles({
+      name: "valid.snapotter",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          version: 1,
+          canvasSize: { width: 320, height: 240 },
+          sourceImageUrl:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+          sourceImageSize: { width: 320, height: 240 },
+        }),
+      ),
+    });
+
+    await expect(page.getByText("Export Image")).toBeHidden();
+    await expect(page.getByTestId("status-dimensions")).toHaveText("320 x 240 px");
+  });
 });

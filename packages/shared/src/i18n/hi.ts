@@ -4563,6 +4563,7 @@ export const hi: TranslationKeys = {
         tooLarge: "यह एक्सपोर्ट इतना बड़ा है कि ब्राउज़र उसे रेंडर नहीं कर सकता। छोटे आयाम आज़माकर देखें।",
         saveProject: "प्रोजेक्ट सहेजें",
         loadProject: "प्रोजेक्ट लोड करें",
+        invalidProject: "यह फ़ाइल एक वैध SnapOtter प्रोजेक्ट नहीं है।",
       },
       autosaveRecovery: {
         message: "{time} का सहेजा न गया काम पुनर्प्राप्त किया गया।",

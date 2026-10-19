@@ -4773,6 +4773,7 @@ export const pl: TranslationKeys = {
           "Ten eksport jest zbyt duży, aby przeglądarka mogła go wygenerować. Spróbuj użyć mniejszych wymiarów.",
         saveProject: "Zapisz projekt",
         loadProject: "Wczytaj projekt",
+        invalidProject: "Ten plik nie jest prawidłowym projektem SnapOtter.",
       },
       autosaveRecovery: {
         message: "Odzyskano niezapisaną pracę z {time}.",

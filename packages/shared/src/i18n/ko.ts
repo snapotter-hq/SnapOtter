@@ -4692,6 +4692,7 @@ export const ko: TranslationKeys = {
         tooLarge: "이 내보내기는 너무 커서 브라우저에서 처리할 수 없습니다. 크기를 줄여 보세요.",
         saveProject: "프로젝트 저장",
         loadProject: "프로젝트 불러오기",
+        invalidProject: "이 파일은 유효한 SnapOtter 프로젝트가 아닙니다.",
       },
       autosaveRecovery: {
         message: "{time}의 저장되지 않은 작업을 복구했습니다.",

@@ -4770,6 +4770,7 @@ export const tr: TranslationKeys = {
           "Bu dışa aktarma, tarayıcının oluşturamayacağı kadar büyük. Daha küçük boyutlar deneyin.",
         saveProject: "Projeyi Kaydet",
         loadProject: "Projeyi Yükle",
+        invalidProject: "Bu dosya geçerli bir SnapOtter projesi değil.",
       },
       autosaveRecovery: {
         message: "{time} tarihinden kaydedilmemiş çalışma kurtarıldı.",

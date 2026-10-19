@@ -46,7 +46,7 @@ import {
   reportMalformedResult,
 } from "@/lib/progress-frames";
 import { cn, copyImageToClipboard } from "@/lib/utils";
-import { useEditorStore } from "@/stores/editor-store";
+import { isHexColor, useEditorStore } from "@/stores/editor-store";
 import type {
   AdjustmentValues,
   CanvasObject,
@@ -316,12 +316,20 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const exportingRef = useRef(false);
   const stopExportRef = useRef<() => void>(() => {});
+  const stopLoadRef = useRef<() => void>(() => {});
   const later = useTimeouts();
 
-  useEffect(() => () => stopExportRef.current(), []);
+  useEffect(
+    () => () => {
+      stopExportRef.current();
+      stopLoadRef.current();
+    },
+    [],
+  );
 
   const aspectRatio = canvasSize.width / canvasSize.height;
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -840,27 +848,83 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   // Project load (.snapotter file)
   const handleLoadProject = useCallback(() => {
+    setLoadError(null);
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".snapotter,.json";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      stopLoadRef.current();
+      let cancelled = false;
       const reader = new FileReader();
-      reader.onload = () => {
+      stopLoadRef.current = () => {
+        cancelled = true;
         try {
-          const data = JSON.parse(reader.result as string);
-          if (!data.version || !data.canvasSize) return;
+          reader.abort();
+        } catch {
+          // ignore abort errors
+        }
+      };
+      const failLoad = (err: unknown) => {
+        if (cancelled) return;
+        stopLoadRef.current = () => {};
+        console.debug("Failed to load project file:", err);
+        setLoadError(t.editor.ui.exportDialog.invalidProject);
+        toast.error(t.editor.ui.exportDialog.invalidProject);
+      };
+      reader.onerror = () => {
+        failLoad(reader.error ?? new Error("FileReader failed to read project file"));
+      };
+      reader.onload = () => {
+        if (cancelled) return;
+        stopLoadRef.current = () => {};
+        if (typeof reader.result !== "string") {
+          failLoad(new Error("FileReader result was not a string"));
+          return;
+        }
+        let data: unknown;
+        try {
+          data = JSON.parse(reader.result);
+        } catch (err) {
+          failLoad(err);
+          return;
+        }
+        if (!isValidProjectData(data)) {
+          failLoad(new Error("Project JSON failed structural validation"));
+          return;
+        }
 
+        try {
           const store = useEditorStore.getState();
           const setState = useEditorStore.setState;
+          const layers = data.layers || store.layers;
+          const activeLayerId = layers.some((l) => l.id === store.activeLayerId)
+            ? store.activeLayerId
+            : (layers[0]?.id ?? store.activeLayerId);
+          const adjustments = data.adjustments
+            ? { ...store.adjustments, ...data.adjustments }
+            : store.adjustments;
+          const filters = data.filters
+            ? store.filters.map((existing) => {
+                const match = data.filters?.find((f) => f.type === existing.type);
+                return match
+                  ? {
+                      ...existing,
+                      enabled: match.enabled,
+                      params: { ...existing.params, ...match.params },
+                    }
+                  : existing;
+              })
+            : store.filters;
 
           setState({
             canvasSize: data.canvasSize,
-            layers: data.layers || store.layers,
+            layers,
+            activeLayerId,
             objects: data.objects || [],
-            adjustments: data.adjustments || store.adjustments,
-            filters: data.filters || store.filters,
+            adjustments,
+            filters,
             guides: data.guides || [],
             sourceImageUrl: data.sourceImageUrl || null,
             sourceImageSize: data.sourceImageSize || null,
@@ -868,22 +932,28 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             backgroundColor: data.backgroundColor || "#ffffff",
             selection: null,
             cropState: null,
+            isCropping: false,
+            editingTextId: null,
             selectedObjectIds: [],
-            clipboard: [],
-            isDirty: false,
+            clipboard: null,
             lastAction: { id: "loadProject" },
             _historyVersion: store._historyVersion + 1,
           });
 
           onClose();
-        } catch {
-          // Invalid project file
+        } catch (err) {
+          console.error("Load project failed:", err);
+          handleUnexpectedError(err);
         }
       };
-      reader.readAsText(file);
+      try {
+        reader.readAsText(file);
+      } catch (err) {
+        failLoad(err);
+      }
     };
     input.click();
-  }, [onClose]);
+  }, [onClose, t, handleUnexpectedError]);
 
   // Close on Escape
   useEffect(() => {
@@ -1140,6 +1210,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               {t.editor.ui.exportDialog.loadProject}
             </button>
           </div>
+          {loadError && (
+            <p role="alert" className="text-xs text-destructive-ink text-center">
+              {loadError}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -1147,6 +1222,141 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 }
 
 // ---- Autosave utilities (Feature 44) ----
+
+function isValidDimensions(size: unknown): size is { width: number; height: number } {
+  if (typeof size !== "object" || size === null) return false;
+  const { width, height } = size as { width?: unknown; height?: unknown };
+  return (
+    typeof width === "number" &&
+    Number.isFinite(width) &&
+    width > 0 &&
+    typeof height === "number" &&
+    Number.isFinite(height) &&
+    height > 0
+  );
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidLayer(layer: unknown): boolean {
+  if (!isPlainRecord(layer)) return false;
+  return (
+    typeof layer.id === "string" &&
+    layer.id.length > 0 &&
+    typeof layer.name === "string" &&
+    typeof layer.visible === "boolean" &&
+    typeof layer.locked === "boolean" &&
+    typeof layer.opacity === "number" &&
+    Number.isFinite(layer.opacity) &&
+    layer.opacity >= 0 &&
+    layer.opacity <= 1 &&
+    typeof layer.blendMode === "string"
+  );
+}
+
+function isValidCanvasObject(obj: unknown): boolean {
+  if (!isPlainRecord(obj)) return false;
+  return (
+    typeof obj.id === "string" &&
+    obj.id.length > 0 &&
+    typeof obj.type === "string" &&
+    obj.type.length > 0 &&
+    typeof obj.layerId === "string" &&
+    obj.layerId.length > 0 &&
+    isPlainRecord(obj.attrs)
+  );
+}
+
+function isValidFilterConfig(filter: unknown): boolean {
+  if (!isPlainRecord(filter)) return false;
+  return (
+    typeof filter.type === "string" &&
+    filter.type.length > 0 &&
+    typeof filter.enabled === "boolean" &&
+    isPlainRecord(filter.params) &&
+    Object.values(filter.params).every((v) => typeof v === "number" && Number.isFinite(v))
+  );
+}
+
+function isValidGuide(guide: unknown): boolean {
+  if (!isPlainRecord(guide)) return false;
+  return (
+    typeof guide.id === "string" &&
+    guide.id.length > 0 &&
+    (guide.orientation === "horizontal" || guide.orientation === "vertical") &&
+    typeof guide.position === "number" &&
+    Number.isFinite(guide.position)
+  );
+}
+
+function isValidProjectData(data: unknown): data is Partial<AutosaveState> & {
+  version: number;
+  canvasSize: { width: number; height: number };
+} {
+  if (!isPlainRecord(data)) return false;
+  if (data.version !== 1) return false;
+  if (!isValidDimensions(data.canvasSize)) return false;
+  if (
+    data.layers !== undefined &&
+    (!Array.isArray(data.layers) || data.layers.length === 0 || !data.layers.every(isValidLayer))
+  ) {
+    return false;
+  }
+  if (
+    data.objects !== undefined &&
+    (!Array.isArray(data.objects) || !data.objects.every(isValidCanvasObject))
+  ) {
+    return false;
+  }
+  if (
+    data.filters !== undefined &&
+    (!Array.isArray(data.filters) || !data.filters.every(isValidFilterConfig))
+  ) {
+    return false;
+  }
+  if (
+    data.guides !== undefined &&
+    (!Array.isArray(data.guides) || !data.guides.every(isValidGuide))
+  ) {
+    return false;
+  }
+  if (
+    data.adjustments !== undefined &&
+    (!isPlainRecord(data.adjustments) ||
+      !Object.values(data.adjustments).every((v) => typeof v === "number" && Number.isFinite(v)))
+  ) {
+    return false;
+  }
+  if (
+    data.sourceImageUrl !== undefined &&
+    data.sourceImageUrl !== null &&
+    typeof data.sourceImageUrl !== "string"
+  ) {
+    return false;
+  }
+  if (
+    data.sourceImageSize !== undefined &&
+    data.sourceImageSize !== null &&
+    !isValidDimensions(data.sourceImageSize)
+  ) {
+    return false;
+  }
+  if (
+    data.foregroundColor !== undefined &&
+    (typeof data.foregroundColor !== "string" || !isHexColor(data.foregroundColor))
+  ) {
+    return false;
+  }
+  if (
+    data.backgroundColor !== undefined &&
+    (typeof data.backgroundColor !== "string" || !isHexColor(data.backgroundColor))
+  ) {
+    return false;
+  }
+  return true;
+}
 
 const AUTOSAVE_KEY = "snapotter-editor-autosave";
 const AUTOSAVE_INTERVAL_MS = 60_000;

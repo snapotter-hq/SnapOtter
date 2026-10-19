@@ -4757,6 +4757,7 @@ export const vi: TranslationKeys = {
         tooLarge: "Bản xuất này quá lớn để trình duyệt tạo ra. Hãy thử kích thước nhỏ hơn.",
         saveProject: "Lưu dự án",
         loadProject: "Mở dự án",
+        invalidProject: "Tệp này không phải là dự án SnapOtter hợp lệ.",
       },
       autosaveRecovery: {
         message: "Đã khôi phục phần việc chưa lưu từ {time}.",

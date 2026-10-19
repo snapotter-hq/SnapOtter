@@ -4782,6 +4782,7 @@ export const nl: TranslationKeys = {
           "Deze export is te groot voor de browser om te verwerken. Probeer kleinere afmetingen.",
         saveProject: "Project opslaan",
         loadProject: "Project laden",
+        invalidProject: "Dit bestand is geen geldig SnapOtter-project.",
       },
       autosaveRecovery: {
         message: "Niet-opgeslagen werk van {time} hersteld.",

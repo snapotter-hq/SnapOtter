@@ -4483,6 +4483,7 @@ export const zhTW: TranslationKeys = {
         tooLarge: "匯出內容太大，瀏覽器無法產生。請嘗試較小的尺寸。",
         saveProject: "儲存專案",
         loadProject: "載入專案",
+        invalidProject: "此檔案不是有效的 SnapOtter 專案。",
       },
       autosaveRecovery: {
         message: "已復原 {time} 尚未儲存的工作內容。",

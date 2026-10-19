@@ -4720,6 +4720,7 @@ export const ja: TranslationKeys = {
           "この書き出しは大きすぎて、ブラウザで処理できません。サイズを小さくしてみてください。",
         saveProject: "プロジェクトを保存",
         loadProject: "プロジェクトを読み込み",
+        invalidProject: "このファイルは有効なSnapOtterプロジェクトではありません。",
       },
       autosaveRecovery: {
         message: "{time} の未保存の作業を復元しました。",

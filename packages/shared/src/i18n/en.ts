@@ -4699,6 +4699,7 @@ export const en = {
         tooLarge: "This export is too big for your browser to render. Try smaller dimensions.",
         saveProject: "Save Project",
         loadProject: "Load Project",
+        invalidProject: "This file isn't a valid SnapOtter project.",
       },
       autosaveRecovery: {
         message: "Recovered unsaved work from {time}.",

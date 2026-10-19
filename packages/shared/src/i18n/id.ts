@@ -4763,6 +4763,7 @@ export const id: TranslationKeys = {
         tooLarge: "Ekspor ini terlalu besar untuk dirender browser. Coba dimensi yang lebih kecil.",
         saveProject: "Simpan Proyek",
         loadProject: "Muat Proyek",
+        invalidProject: "File ini bukan proyek SnapOtter yang valid.",
       },
       autosaveRecovery: {
         message: "Memulihkan pekerjaan yang belum tersimpan dari {time}.",
