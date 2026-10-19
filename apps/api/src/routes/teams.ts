@@ -28,11 +28,13 @@ const teamNameField = z
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
-const createTeamSchema = z.object({
-  name: teamNameField,
-  storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
-  retentionHours: z.number().int().positive().max(POSTGRES_INTEGER_MAX).nullable().optional(),
-});
+const createTeamSchema = z
+  .object({
+    name: teamNameField,
+    storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
+    retentionHours: z.number().int().positive().max(POSTGRES_INTEGER_MAX).nullable().optional(),
+  })
+  .strict();
 
 const updateTeamSchema = z
   .object({

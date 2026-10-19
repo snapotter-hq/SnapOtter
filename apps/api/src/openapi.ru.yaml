@@ -6877,6 +6877,7 @@ paths:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               required:
                 - name
               properties:

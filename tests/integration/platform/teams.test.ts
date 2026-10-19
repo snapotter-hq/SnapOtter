@@ -281,6 +281,24 @@ describe("POST /api/v1/teams", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("rejects a misspelled field instead of creating the team with null quotas", async () => {
+    // Without .strict() on createTeamSchema, Zod strips storagequota and
+    // inserts the team with storageQuota: null and answers 201 (#2767).
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: "Ops", storagequota: 5_000_000 },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.error).toContain("storagequota");
+
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.name, "Ops"));
+    expect(team).toBeUndefined();
+  });
+
   it.each([
     { field: "retentionHours", value: 2_147_483_648 },
     { field: "storageQuota", value: Number.MAX_SAFE_INTEGER + 1 },

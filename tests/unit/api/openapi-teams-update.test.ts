@@ -33,8 +33,25 @@ function putTeam(file: string): Operation {
   return op;
 }
 
+function postTeam(file: string): Operation {
+  const spec = load(readFileSync(path.join(SPEC_DIR, file), "utf8")) as {
+    paths: Record<string, { post?: Operation }>;
+  };
+  const op = spec.paths["/api/v1/teams"]?.post;
+  if (!op) throw new Error(`${file} has no POST /api/v1/teams`);
+  return op;
+}
+
 const english = putTeam("openapi.yaml");
 const bodySchema = english.requestBody?.content?.["application/json"]?.schema ?? {};
+const englishPost = postTeam("openapi.yaml");
+const postBodySchema = englishPost.requestBody?.content?.["application/json"]?.schema ?? {};
+
+describe("POST /api/v1/teams in the API reference (#2767)", () => {
+  it("rejects unknown keys in the request body", () => {
+    expect(postBodySchema.additionalProperties).toBe(false);
+  });
+});
 
 describe("PUT /api/v1/teams/{id} in the API reference (#2011)", () => {
   it("no longer calls the operation a rename", () => {
