@@ -48,7 +48,9 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 
 // What the worker's failed listener hands the Sentry path, per job, so a test
 // can tell a report of the real fault from a synthesized timeout error.
-const reported = vi.hoisted(() => [] as Array<{ jobId?: string; message: string }>);
+const reported = vi.hoisted(
+  () => [] as Array<{ jobId?: string; message: string; timeoutMessage?: string }>,
+);
 
 vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
@@ -58,6 +60,7 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
       reported.push({
         jobId: ctx.jobId,
         message: err instanceof Error ? err.message : String(err),
+        timeoutMessage: (err as { timeoutMessage?: string } | null)?.timeoutMessage,
       });
       return actual.reportError(err, ctx);
     },
@@ -153,6 +156,17 @@ registerToolProcessFn({
   },
 });
 
+// A tool that ignores the signal, runs past the deadline, and then throws its
+// own non-abort error (#2294).
+registerToolProcessFn({
+  toolId: "timeout-handler-fault",
+  settingsSchema: { parse: (v: unknown) => v } as never,
+  process: async () => {
+    await new Promise((r) => setTimeout(r, 2_500));
+    throw new Error("ffmpeg exited 1: bad frame after deadline");
+  },
+});
+
 // Ensure workspace dir exists (test-server.ts normally does this, but
 // we bypass it to avoid loading the full app).
 const { mkdirSync } = await import("node:fs");
@@ -177,61 +191,80 @@ describe("Worker timeout classification", () => {
   it("timed-out job is retried then fails with timeout message, not canceled", async () => {
     const jobId = randomUUID();
     const inputBuffer = Buffer.from("timeout-test-data");
+    const errorLog = vi.spyOn(logger, "error");
 
-    // Store input so the worker can retrieve it
-    const inputRef = `uploads/${jobId}/test.png`;
-    await putObject(inputRef, inputBuffer);
+    try {
+      // Store input so the worker can retrieve it
+      const inputRef = `uploads/${jobId}/test.png`;
+      await putObject(inputRef, inputBuffer);
 
-    await enqueueToolJob({
-      jobId,
-      toolId: "timeout-slow",
-      userId: null,
-      pool: "image", // image pool: default attempts = 2, backoff 1s
-      inputRefs: [inputRef],
-      filename: "test.png",
-      settings: {},
-      kind: "tool",
-    });
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-slow",
+        userId: null,
+        pool: "image", // image pool: default attempts = 2, backoff 1s
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
 
-    // Poll the DB until the job reaches a terminal state.
-    // Budget: ~20s (attempt 1 times out at 1s, 1s backoff, attempt 2
-    // times out at 1s, plus processing overhead).
-    let finalRow: Record<string, unknown> | undefined;
-    for (let i = 0; i < 100; i++) {
-      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
-      if (row && row.status !== "processing" && row.status !== "queued") {
-        finalRow = row as Record<string, unknown>;
-        break;
+      // Poll the DB until the job reaches a terminal state.
+      // Budget: ~20s (attempt 1 times out at 1s, 1s backoff, attempt 2
+      // times out at 1s, plus processing overhead).
+      let finalRow: Record<string, unknown> | undefined;
+      for (let i = 0; i < 100; i++) {
+        const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+        if (row && row.status !== "processing" && row.status !== "queued") {
+          finalRow = row as Record<string, unknown>;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
       }
-      await new Promise((r) => setTimeout(r, 200));
+
+      expect(finalRow).toBeDefined();
+
+      // Must be "failed", NOT "canceled"
+      expect(finalRow?.status).toBe("failed");
+
+      // Error message must mention timeout
+      const error = finalRow?.error as { message: string };
+      expect(error.message).toMatch(/timed out after 1s/i);
+      // Fail-fast message must include actionable guidance (issue #494)
+      expect(error.message).toMatch(
+        /model may still be downloading|too large for CPU|worker may be busy/i,
+      );
+
+      // Both attempts ran (attempts column is set at the start of each attempt)
+      expect(finalRow?.attempts).toBe(2);
+
+      // Terminal SSE replay key must exist with the timeout message
+      const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
+      const cached = await sharedRedis().get(terminalKeyName);
+      expect(cached).not.toBeNull();
+      const parsed = JSON.parse(cached ?? "{}");
+      expect(parsed.phase).toBe("failed");
+      expect(parsed.error).toMatch(/timed out after 1s/i);
+      // Must NOT say "Canceled"
+      expect(parsed.error).not.toBe("Canceled");
+      expect(parsed.jobId).toBe(jobId);
+
+      // Cooperative signal abort stays a quiet timeout: no error log, and the
+      // failed listener gets the synthesized timeout message (#2294).
+      const logged = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(logged).toEqual([]);
+      await vi.waitFor(() => {
+        expect(reported.filter((r) => r.jobId === jobId)).toHaveLength(2);
+      });
+      for (const report of reported.filter((r) => r.jobId === jobId)) {
+        expect(report.message).toMatch(/timed out after 1s/i);
+        expect(report.timeoutMessage).toBeUndefined();
+      }
+    } finally {
+      errorLog.mockRestore();
     }
-
-    expect(finalRow).toBeDefined();
-
-    // Must be "failed", NOT "canceled"
-    expect(finalRow?.status).toBe("failed");
-
-    // Error message must mention timeout
-    const error = finalRow?.error as { message: string };
-    expect(error.message).toMatch(/timed out after 1s/i);
-    // Fail-fast message must include actionable guidance (issue #494)
-    expect(error.message).toMatch(
-      /model may still be downloading|too large for CPU|worker may be busy/i,
-    );
-
-    // Both attempts ran (attempts column is set at the start of each attempt)
-    expect(finalRow?.attempts).toBe(2);
-
-    // Terminal SSE replay key must exist with the timeout message
-    const terminalKeyName = `${bullPrefix()}:terminal:${jobId}`;
-    const cached = await sharedRedis().get(terminalKeyName);
-    expect(cached).not.toBeNull();
-    const parsed = JSON.parse(cached ?? "{}");
-    expect(parsed.phase).toBe("failed");
-    expect(parsed.error).toMatch(/timed out after 1s/i);
-    // Must NOT say "Canceled"
-    expect(parsed.error).not.toBe("Canceled");
-    expect(parsed.jobId).toBe(jobId);
   }, 25_000);
 
   it("does not stamp a storage fault's code or status on a job that timed out (#2210)", async () => {
@@ -515,6 +548,62 @@ describe("Worker timeout classification", () => {
       errorLog.mockRestore();
     }
   }, 25_000);
+
+  it("logs and reports the handler's own error when it ignores the signal and fails after the deadline (#2294)", async () => {
+    // The deadline did pass while the handler was running, so the row and the
+    // terminal frame still tell the user the job timed out. The handler's own
+    // non-abort error must still reach logger.error and the failed listener
+    // with the timeout message attached as context instead of being replaced by
+    // a synthesized Error(timeoutMessage) that classifyError drops.
+    const jobId = randomUUID();
+    const inputRef = `uploads/${jobId}/test.png`;
+    await putObject(inputRef, Buffer.from("timeout-test-data"));
+    const errorLog = vi.spyOn(logger, "error");
+
+    try {
+      await enqueueToolJob({
+        jobId,
+        toolId: "timeout-handler-fault",
+        userId: null,
+        pool: "image",
+        inputRefs: [inputRef],
+        filename: "test.png",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId);
+      expect(finalRow?.status).toBe("failed");
+      expect(finalRow?.attempts).toBe(2);
+      const error = finalRow?.error as { message: string };
+      expect(error.message).toMatch(/timed out after 1s/i);
+
+      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
+      expect(JSON.parse(cached ?? "{}").error).toMatch(/timed out after 1s/i);
+
+      const logged = errorLog.mock.calls.filter(
+        ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,
+      );
+      expect(logged).toHaveLength(2);
+      for (const [ctx] of logged) {
+        const record = ctx as { err: Error; toolId?: string; timeoutMessage?: string };
+        expect(record.err.message).toBe("ffmpeg exited 1: bad frame after deadline");
+        expect(record.toolId).toBe("timeout-handler-fault");
+        expect(record.timeoutMessage).toMatch(/timed out after 1s/i);
+      }
+
+      await vi.waitFor(() => {
+        expect(reported.filter((r) => r.jobId === jobId)).toHaveLength(2);
+      });
+      const jobReports = reported.filter((r) => r.jobId === jobId);
+      for (const report of jobReports) {
+        expect(report.message).toBe("ffmpeg exited 1: bad frame after deadline");
+        expect(report.timeoutMessage).toMatch(/timed out after 1s/i);
+      }
+    } finally {
+      errorLog.mockRestore();
+    }
+  }, 30_000);
 });
 
 /** Poll the job row until it leaves queued/processing; undefined after ~20s. */

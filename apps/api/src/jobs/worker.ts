@@ -383,6 +383,29 @@ function failureStatus(err: unknown): { httpStatus?: number } {
   return isToolInputError(err) ? { httpStatus: 400 } : {};
 }
 
+const ABORT_ERROR_MESSAGE =
+  /^(?:cancel+ed|aborted(?: by signal| before start)?|the operation was aborted|(?:job|python script|ffprobe|tesseract(?: ocr| language-pack preflight)?|pdf ocr) (?:was )?cancel+ed|accurate ocr runtime request was aborted|timeout)$/i;
+
+/**
+ * True when an error thrown after the job deadline is the abort signal itself
+ * rather than the handler's own failure (#2294). Handlers and engine runners
+ * surface a cooperative abort as an AbortError, AnimatedRemovalCanceledError,
+ * the raw "timeout" abort reason from signal.throwIfAborted(), or a short
+ * cancel/abort message ("Canceled", "Aborted by signal", ...).
+ */
+export function isTimeoutAbortError(err: unknown): boolean {
+  if (err === "timeout") return true;
+  if (err instanceof Error) {
+    if (err.name === "AbortError" || err.name === "AnimatedRemovalCanceledError") {
+      return true;
+    }
+    const code = (err as { code?: unknown }).code;
+    if (code === "ABORT_ERR" || code === "canceled") return true;
+  }
+  const message = err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  return ABORT_ERROR_MESSAGE.test(message.trim());
+}
+
 async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
   const { jobId } = data;
@@ -810,14 +833,21 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Log genuine processing faults at error level (clients only ever see
       // friendlyError(finalError)). Expected validation rejections -- bad user
       // input, not a server fault -- would otherwise flood error logs, so skip
-      // them here; they still reach the OTel span recorded below.
+      // them here; they still reach the OTel span recorded below. A handler
+      // that ignored the signal and threw its own non-abort error after the
+      // deadline is still logged and handed to the failed listener with the
+      // timeout message attached as context (#2294).
+      const isAbort = isTimeout && isTimeoutAbortError(err);
       const isValidationError =
         err instanceof Error &&
         ((err.name === "InputValidationError" &&
           ((err as { statusCode?: number }).statusCode ?? 400) < 500) ||
           isToolInputError(err));
-      if (!isCanceled && !isTimeout && !isValidationError) {
-        logger.error({ err, jobId, toolId: data.toolId }, "tool job failed");
+      if (!isCanceled && !isAbort && !isValidationError) {
+        logger.error(
+          { err, jobId, toolId: data.toolId, ...(isTimeout && { timeoutMessage: finalError }) },
+          "tool job failed",
+        );
       }
 
       // Record error on the OTel span, with the job age the success path
@@ -989,13 +1019,21 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       }
 
       if (isCanceled) throw new UnrecoverableError("Canceled");
-      if (isTimeout) throw new Error(finalError);
+      if (isTimeout && isAbort) throw new Error(finalError);
+      const thrownErr = isTimeout
+        ? Object.assign(err instanceof Error ? err : new Error(errorMessage), {
+            timeoutMessage: finalError,
+          })
+        : err;
       if (isUnrecoverable) {
         const unrecoverable = new UnrecoverableError(errorMessage);
-        if (err instanceof Error && err.stack) unrecoverable.stack = err.stack;
-        throw Object.assign(unrecoverable, { cause: err });
+        if (thrownErr instanceof Error && thrownErr.stack) unrecoverable.stack = thrownErr.stack;
+        throw Object.assign(unrecoverable, {
+          cause: thrownErr,
+          ...(isTimeout && { timeoutMessage: finalError }),
+        });
       }
-      throw err;
+      throw thrownErr;
     } finally {
       if (span) span.end();
       clearTimeout(timeoutHandle);
@@ -1126,7 +1164,10 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
     // Step failed -- return failure marker. processToolJob already
     // updated the DB row to "failed" and emitted a terminal event
     // on the step's own progress channel.
-    const errorMsg = friendlyError(err instanceof Error ? err.message : String(err));
+    const rawError =
+      (err as { timeoutMessage?: string } | null)?.timeoutMessage ??
+      (err instanceof Error ? err.message : String(err));
+    const errorMsg = friendlyError(rawError);
     return {
       outputRefs: [],
       filename: data.filename,
@@ -1597,7 +1638,10 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
   try {
     result = await processToolJob(job);
   } catch (err) {
-    const error = friendlyError(err instanceof Error ? err.message : String(err));
+    const rawError =
+      (err as { timeoutMessage?: string } | null)?.timeoutMessage ??
+      (err instanceof Error ? err.message : String(err));
+    const error = friendlyError(rawError);
     try {
       await recordChildOutcome(parentId, totalFiles, job.data.filename, error);
     } catch (outcomeErr) {

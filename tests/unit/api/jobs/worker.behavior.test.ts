@@ -1036,3 +1036,51 @@ describe("worker failure reports carry the job age (#1414)", () => {
     });
   });
 });
+
+describe("isTimeoutAbortError (#2294)", () => {
+  it.each([
+    ["raw timeout abort reason", "timeout"],
+    ["non-timeout string abort", "Canceled"],
+    ["AbortError instance", Object.assign(new Error("unmatched message"), { name: "AbortError" })],
+    [
+      "AnimatedRemovalCanceledError instance",
+      Object.assign(new Error("unmatched message"), { name: "AnimatedRemovalCanceledError" }),
+    ],
+    ["ABORT_ERR code", Object.assign(new Error("anything"), { code: "ABORT_ERR" })],
+    ["canceled code", Object.assign(new Error("anything"), { code: "canceled" })],
+    ["Canceled message", new Error("Canceled")],
+    ["Cancelled message", new Error("Cancelled")],
+    ["Aborted message", new Error("Aborted")],
+    ["Aborted by signal message", new Error("Aborted by signal")],
+    ["aborted before start message", new Error("aborted before start")],
+    ["The operation was aborted message", new Error("The operation was aborted")],
+    ["Job was canceled message", new Error("Job was canceled")],
+    ["Python script canceled message", new Error("Python script canceled")],
+    ["ffprobe canceled message", new Error("ffprobe canceled")],
+    ["Tesseract OCR was canceled message", new Error("Tesseract OCR was canceled")],
+    [
+      "Tesseract language-pack preflight was canceled message",
+      new Error("Tesseract language-pack preflight was canceled"),
+    ],
+    ["PDF OCR was canceled message", new Error("PDF OCR was canceled")],
+    ["Accurate OCR abort message", new Error("Accurate OCR runtime request was aborted")],
+    ["timeout Error message", new Error("timeout")],
+  ])("recognizes %s as a cooperative abort shape", async (_label, err) => {
+    const { isTimeoutAbortError } = await loadWorker();
+    expect(isTimeoutAbortError(err)).toBe(true);
+  });
+
+  it.each([
+    ["ffmpeg exit failure", new Error("ffmpeg exited 1: bad frame")],
+    ["ffmpeg own timeout", new Error("ffmpeg timed out")],
+    ["OOM sidecar failure", new Error("Process killed (out of memory) -- try a lighter model")],
+    ["storage fault", new Error("The server's storage is full.")],
+    ["redis MULTI aborted", new Error("login throttle: redis MULTI transaction aborted")],
+    ["upstream request canceled", new Error("upstream request canceled by peer")],
+    ["empty error", new Error("")],
+    ["null", null],
+  ])("does not treat %s as an abort shape", async (_label, err) => {
+    const { isTimeoutAbortError } = await loadWorker();
+    expect(isTimeoutAbortError(err)).toBe(false);
+  });
+});
