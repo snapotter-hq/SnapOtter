@@ -26,13 +26,15 @@ function selfContainedArgs(): string[] {
     stdio: ["ignore", "pipe", "ignore"],
   });
   if (r.status !== 0 || !r.stdout) {
-    // Fallback to 2.x flag if we cannot determine the version.
-    cachedSelfContainedArgs = ["--self-contained"];
-    return cachedSelfContainedArgs;
+    // Fallback to 3.x flags without caching if the version probe failed.
+    return ["--embed-resources", "--standalone"];
   }
   // First line: "pandoc 2.17.1.1" or "pandoc 3.1.2"
   const match = r.stdout.match(/pandoc\s+(\d+)/);
-  const major = match ? Number(match[1]) : 2;
+  if (!match) {
+    return ["--embed-resources", "--standalone"];
+  }
+  const major = Number(match[1]);
   cachedSelfContainedArgs =
     major >= 3 ? ["--embed-resources", "--standalone"] : ["--self-contained"];
   return cachedSelfContainedArgs;

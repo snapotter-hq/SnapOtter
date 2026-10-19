@@ -98,23 +98,94 @@ describe("selfContainedArgs version detection", () => {
     expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--embed-resources");
   });
 
-  it("falls back to --self-contained when --version exits non-zero", async () => {
-    mockSpawnSync.mockReturnValue({ status: 1, stdout: "" } as never);
+  it("falls back to --embed-resources --standalone without caching when --version exits non-zero", async () => {
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 1, stdout: "pandoc 2.17.1.1\n" } as never)
+      .mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" } as never);
     const { buildPandocArgs } = await import("../src/pandoc.js");
-    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--self-contained");
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--embed-resources",
+      "--standalone",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
-  it("falls back to --self-contained when stdout is empty", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0, stdout: "" } as never);
+  it("falls back to --embed-resources --standalone without caching when stdout is empty", async () => {
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 0, stdout: "" } as never)
+      .mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" } as never);
     const { buildPandocArgs } = await import("../src/pandoc.js");
-    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--self-contained");
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--embed-resources",
+      "--standalone",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
-  it("defaults the major to 2 when the version string is unparseable", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0, stdout: "some banner without a number\n" } as never);
+  it("falls back to --embed-resources --standalone without caching when the version string is unparseable", async () => {
+    mockSpawnSync
+      .mockReturnValueOnce({ status: 0, stdout: "some banner without a number\n" } as never)
+      .mockReturnValueOnce({ status: 0, stdout: "pandoc 2.17.1.1\n" } as never);
     const { buildPandocArgs } = await import("../src/pandoc.js");
-    // major defaults to 2, so we get the 2.x flag.
-    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toContain("--self-contained");
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--embed-resources",
+      "--standalone",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(buildPandocArgs("/i", "/o", { selfContained: true })).toEqual([
+      "--sandbox",
+      "/i",
+      "-o",
+      "/o",
+      "--self-contained",
+    ]);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
   it("caches the detected flags: the version is probed only once", async () => {
