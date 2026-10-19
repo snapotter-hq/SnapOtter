@@ -5055,6 +5055,7 @@ export const uk: TranslationKeys = {
       usernameInvalid:
         "Ім'я користувача має містити від 3 до 50 символів і лише a-z, A-Z, 0-9, крапки, дефіси та підкреслення",
       roleNotFound: "Ця роль більше не існує",
+      teamNotFound: "Ця команда більше не існує",
     },
     teams: {
       heading: "Команди",

@@ -4979,6 +4979,7 @@ export const en = {
       usernameInvalid:
         "Username must be 3 to 50 characters, using only a-z, A-Z, 0-9, dots, hyphens and underscores",
       roleNotFound: "That role no longer exists",
+      teamNotFound: "That team no longer exists",
     },
     teams: {
       heading: "Teams",

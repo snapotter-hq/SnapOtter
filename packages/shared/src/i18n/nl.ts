@@ -5065,6 +5065,7 @@ export const nl: TranslationKeys = {
       usernameInvalid:
         "Een gebruikersnaam moet 3 tot 50 tekens lang zijn en mag alleen a-z, A-Z, 0-9, punten, koppeltekens en onderstrepingstekens bevatten",
       roleNotFound: "Die rol bestaat niet meer",
+      teamNotFound: "Dat team bestaat niet meer",
     },
     teams: {
       heading: "Teams",

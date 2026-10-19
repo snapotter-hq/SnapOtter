@@ -5000,6 +5000,7 @@ export const ja: TranslationKeys = {
       usernameInvalid:
         "ユーザー名は 3〜50 文字で、a-z、A-Z、0-9、ドット、ハイフン、アンダースコアのみ使用できます",
       roleNotFound: "そのロールはもう存在しません",
+      teamNotFound: "そのチームはもう存在しません",
     },
     teams: {
       heading: "チーム",

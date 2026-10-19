@@ -5037,6 +5037,7 @@ export const vi: TranslationKeys = {
       usernameInvalid:
         "Tên người dùng phải dài từ 3 đến 50 ký tự và chỉ dùng a-z, A-Z, 0-9, dấu chấm, dấu gạch ngang và dấu gạch dưới",
       roleNotFound: "Vai trò này không còn tồn tại",
+      teamNotFound: "Nhóm này không còn tồn tại",
     },
     teams: {
       heading: "Nhóm",

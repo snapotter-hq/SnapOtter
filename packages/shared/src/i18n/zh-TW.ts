@@ -4754,6 +4754,7 @@ export const zhTW: TranslationKeys = {
       cannotDeleteSelf: "無法刪除自己的帳戶",
       usernameInvalid: "使用者名稱須為 3 到 50 個字元，只能包含 a-z、A-Z、0-9、句點、連字號和底線",
       roleNotFound: "此角色已不存在",
+      teamNotFound: "此團隊已不存在",
     },
     teams: {
       heading: "團隊",

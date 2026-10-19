@@ -5060,6 +5060,7 @@ export const pl: TranslationKeys = {
       usernameInvalid:
         "Nazwa użytkownika musi mieć od 3 do 50 znaków i może zawierać tylko a-z, A-Z, 0-9, kropki, łączniki i podkreślenia",
       roleNotFound: "Ta rola już nie istnieje",
+      teamNotFound: "Ten zespół już nie istnieje",
     },
     teams: {
       heading: "Zespoły",

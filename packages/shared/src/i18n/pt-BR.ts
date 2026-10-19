@@ -5059,6 +5059,7 @@ export const ptBR: TranslationKeys = {
       usernameInvalid:
         "O nome de usuário deve ter de 3 a 50 caracteres e usar apenas a-z, A-Z, 0-9, pontos, hifens e sublinhados",
       roleNotFound: "Essa função não existe mais",
+      teamNotFound: "Essa equipe não existe mais",
     },
     teams: {
       heading: "Equipes",

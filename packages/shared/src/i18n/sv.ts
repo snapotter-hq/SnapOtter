@@ -5046,6 +5046,7 @@ export const sv: TranslationKeys = {
       usernameInvalid:
         "Användarnamnet måste vara 3 till 50 tecken och får bara innehålla a-z, A-Z, 0-9, punkter, bindestreck och understreck",
       roleNotFound: "Den rollen finns inte längre",
+      teamNotFound: "Det teamet finns inte längre",
     },
     teams: {
       heading: "Team",

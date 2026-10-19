@@ -1326,11 +1326,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Resolve team -- frontend sends team name (e.g. "Default"), not ID
-    const requestedTeam = body.team;
+    const requestedTeam = body.team?.trim();
     let teamId: string;
     let teamName: string;
 
-    if (requestedTeam) {
+    if (body.team !== undefined) {
+      if (!requestedTeam) {
+        return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+      }
       // Look up by name first, then fall back to ID
       const [teamByName] = await db
         .select()
@@ -1340,8 +1343,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         ? [null]
         : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
       const found = teamByName || teamById;
-      if (!found)
-        return reply.status(400).send({ error: "Team not found", code: "VALIDATION_ERROR" });
+      if (!found) {
+        return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+      }
       teamId = found.id;
       teamName = found.name;
     } else {
@@ -1385,6 +1389,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           .for("share");
         if (!lockedRole) return "unknown-role" as const;
       }
+      if (body.team !== undefined) {
+        const [lockedTeam] = await tx
+          .select({ id: schema.teams.id, name: schema.teams.name })
+          .from(schema.teams)
+          .where(eq(schema.teams.id, teamId))
+          .for("share");
+        if (!lockedTeam) return "unknown-team" as const;
+        teamName = lockedTeam.name;
+      }
       if (await userLimitReached(tx)) return "limit" as const;
       return tx
         .insert(schema.users)
@@ -1403,6 +1416,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({
         error: "Role not found",
         code: "UNKNOWN_ROLE",
+      });
+    }
+
+    if (inserted === "unknown-team") {
+      return reply.status(400).send({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
       });
     }
 
@@ -1499,18 +1519,22 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         updates.role = body.role;
       }
 
-      if (body.team?.trim()) {
+      if (body.team !== undefined) {
+        const requestedTeam = body.team.trim();
+        if (!requestedTeam) {
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
+        }
         // Look up by name first, then fall back to ID
         const [teamByName] = await db
           .select()
           .from(schema.teams)
-          .where(eq(schema.teams.name, body.team.trim()));
+          .where(eq(schema.teams.name, requestedTeam));
         const [teamById] = teamByName
           ? [null]
-          : await db.select().from(schema.teams).where(eq(schema.teams.id, body.team.trim()));
+          : await db.select().from(schema.teams).where(eq(schema.teams.id, requestedTeam));
         const found = teamByName || teamById;
         if (!found) {
-          return reply.status(400).send({ error: "Team not found", code: "VALIDATION_ERROR" });
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
         }
         updates.team = found.id;
       }
@@ -1529,6 +1553,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
               .for("share");
             if (!lockedRole) {
               throw new Error("UNKNOWN_ROLE");
+            }
+          }
+          if (updates.team) {
+            const [lockedTeam] = await tx
+              .select({ id: schema.teams.id })
+              .from(schema.teams)
+              .where(eq(schema.teams.id, updates.team))
+              .for("share");
+            if (!lockedTeam) {
+              throw new Error("UNKNOWN_TEAM");
             }
           }
           // Last admin protection, under the lock every admin removal shares (#2231).
@@ -1578,6 +1612,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         }
         if (err instanceof Error && err.message === "UNKNOWN_ROLE") {
           return reply.status(400).send({ error: "Role not found", code: "UNKNOWN_ROLE" });
+        }
+        if (err instanceof Error && err.message === "UNKNOWN_TEAM") {
+          return reply.status(400).send({ error: "Team not found", code: "UNKNOWN_TEAM" });
         }
         if (err instanceof Error && err.message === "NOT_FOUND") {
           return reply.status(404).send({ error: "User not found", code: "NOT_FOUND" });

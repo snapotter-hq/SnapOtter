@@ -494,19 +494,122 @@ describe("Register validation", () => {
     expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
   });
 
-  it("non-existent team name returns 400", async () => {
-    const res = await testApp.app.inject({
+  it("unknown, deleted, or blank team returns 400 UNKNOWN_TEAM and does not create the user (#2646)", async () => {
+    const teamName = `deleted-team-${Date.now()}`;
+    const createTeamRes = await testApp.app.inject({
       method: "POST",
-      url: "/api/auth/register",
+      url: "/api/v1/teams",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: {
-        username: uid(),
-        password: "ValidPass1",
-        team: `ghost_team_${Date.now()}`,
-      },
+      payload: { name: teamName },
     });
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    expect(createTeamRes.statusCode).toBe(201);
+    const teamId = JSON.parse(createTeamRes.body).id as string;
+
+    const deleteTeamRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteTeamRes.statusCode).toBe(200);
+
+    for (const badTeam of [`ghost_team_${Date.now()}`, teamName, teamId, "", "   "]) {
+      const username = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          username,
+          password: "ValidPass1",
+          team: badTeam,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const rows = await db.select().from(schema.users).where(eq(schema.users.username, username));
+      expect(rows).toHaveLength(0);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a team is deleted
+    // during scrypt hashing after passing the initial pre-check.
+    const raceTeam = `tx-reg-team-${Date.now()}`;
+    const raceTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceTeam },
+    });
+    expect(raceTeamRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.teams).where(eq(schema.teams.name, raceTeam));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const raceUsername = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: raceUsername, password: "ValidPass1", team: raceTeam },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+      const rows = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, raceUsername));
+      expect(rows).toHaveLength(0);
+    } finally {
+      txSpy.mockRestore();
+    }
+
+    // If the team is renamed during scrypt hashing, the 201 response reflects
+    // the new name read from the FOR SHARE row inside the transaction.
+    const oldTeamName = `tx-rename-old-${Date.now()}`;
+    const newTeamName = `tx-rename-new-${Date.now()}`;
+    const renameTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: oldTeamName },
+    });
+    expect(renameTeamRes.statusCode).toBe(201);
+
+    const renameSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db
+          .update(schema.teams)
+          .set({ name: newTeamName })
+          .where(eq(schema.teams.name, oldTeamName));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const renamedUsername = uid();
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { username: renamedUsername, password: "ValidPass1", team: oldTeamName },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(JSON.parse(res.body).team).toBe(newTeamName);
+    } finally {
+      renameSpy.mockRestore();
+    }
   });
 
   it("unknown or deleted role returns 400 UNKNOWN_ROLE and does not create the user (#1582)", async () => {
@@ -1238,21 +1341,83 @@ describe("Team resolution by id", () => {
     expect(row.team).toBe(defaultTeam.id);
   });
 
-  it("update with an unknown team returns 400 and does not touch the row", async () => {
-    const { id } = await createUser();
+  it("update with an unknown, deleted, or blank team returns 400 UNKNOWN_TEAM and does not touch the row (#2646)", async () => {
+    const { id } = await createUser({ role: "user" });
     const [before] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
-    const res = await testApp.app.inject({
-      method: "PUT",
-      url: `/api/auth/users/${id}`,
+    const teamName = `deleted-upd-team-${Date.now()}`;
+    const createTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
       headers: { authorization: `Bearer ${adminToken}` },
-      payload: { team: `ghost_team_${Date.now()}` },
+      payload: { name: teamName },
     });
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).code).toBe("VALIDATION_ERROR");
+    expect(createTeamRes.statusCode).toBe(201);
+    const teamId = JSON.parse(createTeamRes.body).id as string;
 
-    const [after] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-    expect(after.team).toBe(before.team);
+    const deleteTeamRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/teams/${teamId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteTeamRes.statusCode).toBe(200);
+
+    for (const badTeam of [`ghost_team_${Date.now()}`, teamName, teamId, "", "   "]) {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: "editor", team: badTeam },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const [after] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+      expect(after.role).toBe(before.role);
+      expect(after.team).toBe(before.team);
+    }
+
+    // Also cover the in-transaction FOR SHARE guard when a team is deleted
+    // between the pre-check and the transaction.
+    const raceTeam = `tx-upd-team-${Date.now()}`;
+    const raceTeamRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/teams",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { name: raceTeam },
+    });
+    expect(raceTeamRes.statusCode).toBe(201);
+
+    const origTx = db.transaction.bind(db);
+    const txSpy = vi
+      .spyOn(db, "transaction")
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough wrapper around db.transaction
+      .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+        await db.delete(schema.teams).where(eq(schema.teams.name, raceTeam));
+        return origTx(fn, ...rest);
+      });
+    try {
+      const res = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: "editor", team: raceTeam },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const [after] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+      expect(after.role).toBe(before.role);
+      expect(after.team).toBe(before.team);
+    } finally {
+      txSpy.mockRestore();
+    }
   });
 });
 

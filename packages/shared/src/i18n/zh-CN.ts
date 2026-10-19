@@ -4755,6 +4755,7 @@ export const zhCN: TranslationKeys = {
       cannotDeleteSelf: "无法删除自己的账户",
       usernameInvalid: "用户名须为 3 到 50 个字符，只能包含 a-z、A-Z、0-9、点、连字符和下划线",
       roleNotFound: "该角色已不存在",
+      teamNotFound: "该团队已不存在",
     },
     teams: {
       heading: "团队",

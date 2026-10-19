@@ -5078,6 +5078,7 @@ export const de: TranslationKeys = {
       usernameInvalid:
         "Der Benutzername muss 3 bis 50 Zeichen lang sein und darf nur a-z, A-Z, 0-9, Punkte, Bindestriche und Unterstriche enthalten",
       roleNotFound: "Diese Rolle existiert nicht mehr",
+      teamNotFound: "Dieses Team existiert nicht mehr",
     },
     teams: {
       heading: "Teams",

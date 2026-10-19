@@ -5006,6 +5006,7 @@ export const ar: TranslationKeys = {
       usernameInvalid:
         "يجب أن يتكون اسم المستخدم من 3 إلى 50 حرفًا، باستخدام a-z وA-Z و0-9 والنقاط والشرطات والشرطات السفلية فقط",
       roleNotFound: "هذا الدور لم يعد موجودًا",
+      teamNotFound: "هذا الفريق لم يعد موجودًا",
     },
     teams: {
       heading: "الفرق",
