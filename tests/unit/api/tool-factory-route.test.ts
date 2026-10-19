@@ -156,6 +156,7 @@ import {
 } from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import { deletePrefix } from "../../../apps/api/src/lib/object-storage.js";
+import { receiveUpload } from "../../../apps/api/src/lib/upload-stream.js";
 import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import {
   createToolRoute,
@@ -1026,6 +1027,87 @@ describe("createToolRoute", () => {
         expect.objectContaining({
           error: "Failed to parse multipart request",
         }),
+      );
+    });
+
+    it("deletes earlier uploaded parts before answering when a later file part fails with 413 (#1644)", async () => {
+      const tooLarge = Object.assign(new Error("Object exceeds the maximum allowed size"), {
+        statusCode: 413,
+        limitBytes: 1024 * 1024,
+      });
+      vi.mocked(receiveUpload)
+        .mockImplementationOnce((_part, jobId) =>
+          Promise.resolve({ key: `uploads/${jobId}/first.png`, filename: "first.png", size: 100 }),
+        )
+        .mockRejectedValueOnce(tooLarge);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, { ...makeMockConfig(id), maxInputs: 2 });
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), fileCount: 2 });
+
+      await handler(req, reply);
+
+      const uploadedJobId = vi.mocked(receiveUpload).mock.calls[0][1];
+      expect(reply.status).toHaveBeenCalledWith(413);
+      expect(deletePrefix).toHaveBeenCalledTimes(1);
+      expect(deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+      expect(vi.mocked(deletePrefix).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(reply.send as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
+      );
+    });
+
+    it("deletes earlier uploaded parts before rethrowing when a later file part fails with 503 (#1644)", async () => {
+      const capFault = Object.assign(new Error("The server's workspace is full."), {
+        statusCode: 503,
+        code: "workspace-cap",
+      });
+      vi.mocked(receiveUpload)
+        .mockImplementationOnce((_part, jobId) =>
+          Promise.resolve({ key: `uploads/${jobId}/first.png`, filename: "first.png", size: 100 }),
+        )
+        .mockRejectedValueOnce(capFault);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, { ...makeMockConfig(id), maxInputs: 2 });
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), fileCount: 2 });
+
+      await expect(handler(req, reply)).rejects.toBe(capFault);
+
+      const uploadedJobId = vi.mocked(receiveUpload).mock.calls[0][1];
+      expect(deletePrefix).toHaveBeenCalledTimes(1);
+      expect(deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+    });
+
+    it("logs a warning and does not mask a mid-loop 503 when deletePrefix fails (#1644)", async () => {
+      const capFault = Object.assign(new Error("The server's workspace is full."), {
+        statusCode: 503,
+        code: "workspace-cap",
+      });
+      vi.mocked(receiveUpload)
+        .mockImplementationOnce((_part, jobId) =>
+          Promise.resolve({ key: `uploads/${jobId}/first.png`, filename: "first.png", size: 100 }),
+        )
+        .mockRejectedValueOnce(capFault);
+      vi.mocked(deletePrefix).mockRejectedValueOnce(new Error("S3 cleanup fault"));
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, { ...makeMockConfig(id), maxInputs: 2 });
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), fileCount: 2 });
+
+      await expect(handler(req, reply)).rejects.toBe(capFault);
+
+      expect(req.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to discard a rejected request's uploads",
       );
     });
   });

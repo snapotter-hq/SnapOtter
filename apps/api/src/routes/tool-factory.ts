@@ -345,10 +345,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           }
         }
       } catch (err) {
-        const failure = multipartFailure(err);
-        reply.status(failure.status).send(failure.body);
         await discardUploads();
-        return reply;
+        const failure = multipartFailure(err);
+        return reply.status(failure.status).send(failure.body);
       }
 
       // Per-request scratch dir for input handlers that need temp files during

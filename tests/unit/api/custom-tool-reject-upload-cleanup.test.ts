@@ -447,4 +447,130 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     expect(zeroDirReply.statusCode).toBe(400);
     expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["erase-object", "/api/v1/tools/image/erase-object"],
+    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf"],
+  ] as const)(
+    "%s deletes earlier uploaded parts before answering when the second file part fails with 413 (#1644)",
+    async (toolId, path) => {
+      const tooLarge = Object.assign(new Error("Object exceeds the maximum allowed size"), {
+        statusCode: 413,
+        limitBytes: 1024 * 1024,
+      });
+      mocks.receiveUpload
+        .mockImplementationOnce((_part: { filename?: string }, jobId: string) =>
+          Promise.resolve({
+            key: `uploads/${jobId}/${_part.filename ?? "first"}`,
+            filename: _part.filename ?? "first",
+            size: 100,
+          }),
+        )
+        .mockRejectedValueOnce(tooLarge);
+
+      const req = makeRequest(validPartsFor(toolId));
+      const reply = makeReply();
+      const sendSpy = vi.spyOn(reply, "send");
+
+      await handlers[path](req, reply);
+
+      const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+      expect(reply.statusCode).toBe(413);
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+      expect(mocks.deletePrefix.mock.invocationCallOrder[0]).toBeLessThan(
+        sendSpy.mock.invocationCallOrder[0],
+      );
+    },
+  );
+
+  it.each([
+    ["erase-object", "/api/v1/tools/image/erase-object"],
+    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf"],
+  ] as const)(
+    "%s deletes earlier uploaded parts before rethrowing when the second file part fails with 503 (#1644)",
+    async (toolId, path) => {
+      const capFault = Object.assign(new Error("The server's workspace is full."), {
+        statusCode: 503,
+        code: "workspace-cap",
+      });
+      mocks.receiveUpload
+        .mockImplementationOnce((_part: { filename?: string }, jobId: string) =>
+          Promise.resolve({
+            key: `uploads/${jobId}/${_part.filename ?? "first"}`,
+            filename: _part.filename ?? "first",
+            size: 100,
+          }),
+        )
+        .mockRejectedValueOnce(capFault);
+
+      const req = makeRequest(validPartsFor(toolId));
+      const reply = makeReply();
+
+      await expect(handlers[path](req, reply)).rejects.toBe(capFault);
+
+      const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+    },
+  );
+
+  it.each([
+    ["erase-object", "/api/v1/tools/image/erase-object"],
+    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf"],
+  ] as const)(
+    "%s deletes earlier uploaded parts and logs a warning without masking a mid-loop 400 or 503 when deletePrefix fails (#1644)",
+    async (toolId, path) => {
+      const parseErr = new Error("Unexpected end of form");
+      mocks.receiveUpload
+        .mockImplementationOnce((_part: { filename?: string }, jobId: string) =>
+          Promise.resolve({
+            key: `uploads/${jobId}/${_part.filename ?? "first"}`,
+            filename: _part.filename ?? "first",
+            size: 100,
+          }),
+        )
+        .mockRejectedValueOnce(parseErr);
+      mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
+
+      const req = makeRequest(validPartsFor(toolId));
+      const reply = makeReply();
+
+      await handlers[path](req, reply);
+
+      expect(reply.statusCode).toBe(400);
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(req.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to discard a rejected request's uploads",
+      );
+
+      vi.clearAllMocks();
+      const capFault = Object.assign(new Error("The server's workspace is full."), {
+        statusCode: 503,
+        code: "workspace-cap",
+      });
+      mocks.receiveUpload
+        .mockImplementationOnce((_part: { filename?: string }, jobId: string) =>
+          Promise.resolve({
+            key: `uploads/${jobId}/${_part.filename ?? "first"}`,
+            filename: _part.filename ?? "first",
+            size: 100,
+          }),
+        )
+        .mockRejectedValueOnce(capFault);
+      mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
+
+      const req503 = makeRequest(validPartsFor(toolId));
+      const reply503 = makeReply();
+
+      await expect(handlers[path](req503, reply503)).rejects.toBe(capFault);
+
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(req503.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to discard a rejected request's uploads",
+      );
+    },
+  );
 });

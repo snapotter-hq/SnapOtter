@@ -86,7 +86,6 @@ export function registerEraseObject(app: FastifyInstance) {
       // The web client always names the mask part mask.png.
       const uniqueName = createUniqueNamer();
       const disconnect = trackClientDisconnect(request, reply);
-      let parsedParts = false;
       let uploadsCleaned = false;
       let enqueued = false;
 
@@ -118,10 +117,11 @@ export function registerEraseObject(app: FastifyInstance) {
             }
           }
         } catch (err) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          uploadsCleaned = true;
           const failure = multipartFailure(err);
           return reply.status(failure.status).send(failure.body);
         }
-        parsedParts = true;
 
         const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
         if (clientJobIdField === null) {
@@ -313,7 +313,7 @@ export function registerEraseObject(app: FastifyInstance) {
         return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
       } finally {
         disconnect.release();
-        if (parsedParts && !enqueued && !uploadsCleaned) {
+        if (!enqueued && !uploadsCleaned) {
           await discardUnenqueuedUploads(jobId, request.log);
         }
       }

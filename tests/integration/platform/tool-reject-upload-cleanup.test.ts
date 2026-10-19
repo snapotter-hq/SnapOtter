@@ -21,6 +21,7 @@ import {
 const PNG = readFixture(fixtures.image.base.png200);
 const PDF = readFixture(fixtures.document.pdf2);
 const RESIZE = apiToolPath("resize");
+const CREATE_ZIP = apiToolPath("create-zip");
 const SIGN_PDF = apiToolPath("sign-pdf");
 
 let testApp: TestApp;
@@ -89,6 +90,28 @@ describe("tool-factory discards the upload of a rejected request", () => {
     );
   });
 
+  it("leaves no uploads dir behind when a multi-file upload fails on the second file part (#1644)", async () => {
+    const before = uploadDirs();
+    const { body, contentType } = createMultipartPayload([
+      file,
+      { ...file, filename: "second.png" },
+    ]);
+    // Truncate inside the second file part (before the closing boundary) so
+    // the first part finishes streaming to uploads/<jobId>/ and the second part
+    // fails inside receiveUpload.
+    const truncated = body.subarray(0, body.length - 12);
+
+    const res = await app.inject({
+      method: "POST",
+      url: CREATE_ZIP,
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body: truncated,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
+  });
+
   it("keeps the upload of a request it accepts", async () => {
     const res = await post([file, { name: "settings", content: JSON.stringify({ width: 50 }) }]);
 
@@ -150,5 +173,21 @@ describe("custom tool route (sign-pdf) discards the upload of a rejected request
       () => expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]),
       { timeout: 5_000 },
     );
+  });
+
+  it("leaves no uploads dir behind when the signature file part fails mid-upload (#1644)", async () => {
+    const before = uploadDirs();
+    const { body, contentType } = createMultipartPayload([pdfFile, sigFile]);
+    const truncated = body.subarray(0, body.length - 12);
+
+    const res = await app.inject({
+      method: "POST",
+      url: SIGN_PDF,
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body: truncated,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
   });
 });
