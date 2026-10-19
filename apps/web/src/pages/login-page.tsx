@@ -310,6 +310,7 @@ export function LoginPage() {
   const [notice, setNotice] = useState<"idp_logout_failed" | null>(null);
   const [loading, setLoading] = useState(false);
   const [showMfaPrompt, setShowMfaPrompt] = useState(false);
+  const [mfaFromRedirect, setMfaFromRedirect] = useState(false);
   const [mfaToken, setMfaToken] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   // A recovery code the server just refused stays on screen; Verify waits for an edit.
@@ -336,6 +337,7 @@ export function LoginPage() {
     const redirectedMfaToken = searchParams.get("mfaToken");
     if (redirectedMfaToken) {
       setMfaToken(redirectedMfaToken);
+      setMfaFromRedirect(true);
       setShowMfaPrompt(true);
       later(() => mfaInputRef.current?.focus(), 100);
       // Drop it from the URL: it's a one-time credential and has no business
@@ -378,6 +380,7 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setMfaFromRedirect(false);
     setNotice(null);
     let navigating = false;
     try {
@@ -471,7 +474,21 @@ export function LoginPage() {
     setEnrollmentCode("");
     setError(message);
     // The focused code input is about to unmount; don't let focus fall to <body>.
-    later(() => document.getElementById("username")?.focus(), 100);
+    // A challenge that started from an SSO redirect points back at the SSO
+    // button when one is present instead of the local username field (#2022).
+    const focusSso = mfaFromRedirect;
+    later(() => {
+      if (focusSso) {
+        const ssoLink = document.querySelector<HTMLElement>(
+          'a[href$="/api/auth/oidc/login"], a[href$="/api/auth/saml/login"]',
+        );
+        if (ssoLink) {
+          ssoLink.focus();
+          return;
+        }
+      }
+      document.getElementById("username")?.focus();
+    }, 100);
   };
 
   const mfaCodeReady = MFA_CODE_SHAPE.test(mfaCode) && mfaCode !== rejectedMfaCode;
@@ -590,6 +607,9 @@ export function LoginPage() {
             >
               {t.auth.idpLogoutFailed}
             </p>
+          )}
+          {!showMfaEnrollment && !showMfaPrompt && mfaFromRedirect && error && (
+            <p className="text-sm text-destructive">{error}</p>
           )}
           {ssoEnforced && (oidcEnabled || samlEnabled) && (
             <div className="space-y-3">
@@ -787,6 +807,7 @@ export function LoginPage() {
                   setMfaToken("");
                   setMfaCode("");
                   setRejectedMfaCode("");
+                  setMfaFromRedirect(false);
                   setError("");
                 }}
                 className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -837,7 +858,7 @@ export function LoginPage() {
                   required
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {!mfaFromRedirect && error && <p className="text-sm text-destructive">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || !username || !password}
