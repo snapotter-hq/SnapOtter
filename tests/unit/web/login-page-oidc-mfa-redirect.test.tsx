@@ -318,4 +318,114 @@ describe("LoginPage OIDC/SAML MFA redirect handling", () => {
     expect(errorEl.closest("form")).toBe(form);
     await waitFor(() => expect(screen.getByLabelText(/username/i)).toHaveFocus());
   });
+
+  it.each([
+    ["oidc_auth_failed", "Authentication failed. Please try again."],
+    ["oidc_provider_unreachable", "Could not reach the identity provider. Please try again later."],
+    ["oidc_session_expired", "Login session expired. Please try again."],
+    [
+      "oidc_user_not_authorized",
+      "Your account is not authorized to access this application. Contact your administrator.",
+    ],
+    ["oidc_user_limit_reached", "User limit reached. Contact your administrator."],
+    ["saml_auth_failed", "SAML authentication failed. Please try again."],
+    [
+      "saml_user_not_authorized",
+      "Your account is not authorized to access this application. Contact your administrator.",
+    ],
+    ["saml_user_limit_reached", "User limit reached. Contact your administrator."],
+    [
+      "mfa_enrollment_required",
+      "Your organization requires multi-factor authentication. Please set up MFA in your account settings.",
+    ],
+    [
+      "mfa_policy_unavailable",
+      "The MFA policy could not be checked. Please try again in a moment.",
+    ],
+    ["unrecognized_sso_error", "Authentication error. Please try again."],
+  ])(
+    "renders ?error=%s outside the dimmed local form above the SSO buttons when ssoEnforced is on (#2777)",
+    (code, expectedText) => {
+      renderLoginPage(`/login?error=${code}`, undefined, { ssoEnforced: true });
+
+      const errorEl = screen.getByText(expectedText);
+      const form = screen.getByLabelText(/username/i).closest("form");
+      const ssoLink = screen.getByRole("link", { name: /sign in with test idp/i });
+      expect(form).not.toBeNull();
+      expect(form).toHaveClass("opacity-60");
+      expect(errorEl.closest("form")).toBeNull();
+      expect(errorEl.closest(".opacity-60")).toBeNull();
+      expect(
+        errorEl.compareDocumentPosition(ssoLink) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        errorEl.compareDocumentPosition(form as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    },
+  );
+
+  it("moves the error back inside the local form when a local login is submitted after an ?error= redirect (#2777)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: async () => ({ error: "Invalid credentials" }),
+      }),
+    );
+
+    renderLoginPage("/login?error=oidc_auth_failed", undefined, { ssoEnforced: true });
+
+    const redirectErrorEl = screen.getByText("Authentication failed. Please try again.");
+    expect(redirectErrorEl.closest("form")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    const invalidEl = await screen.findByText(/invalid username or password/i);
+    const form = screen.getByLabelText(/username/i).closest("form");
+    expect(invalidEl.closest("form")).toBe(form);
+    expect(screen.queryByText("Authentication failed. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it("does not carry redirect-error placement into a later local-login MFA challenge after an ?error= redirect (#2777)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: async () => ({ requiresMfa: true, mfaToken: "local-mfa-token" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          headers: new Headers(),
+          json: async () => ({ error: "MFA session expired", code: "MFA_EXPIRED" }),
+        }),
+    );
+
+    renderLoginPage("/login?error=oidc_auth_failed", undefined, { ssoEnforced: true });
+
+    expect(screen.getByText("Authentication failed. Please try again.").closest("form")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "correct-password" } });
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    const errorEl = await screen.findByText(
+      "Your verification session expired. Please log in again.",
+    );
+    const form = screen.getByLabelText(/username/i).closest("form");
+    expect(errorEl.closest("form")).toBe(form);
+    await waitFor(() => expect(screen.getByLabelText(/username/i)).toHaveFocus());
+  });
 });
