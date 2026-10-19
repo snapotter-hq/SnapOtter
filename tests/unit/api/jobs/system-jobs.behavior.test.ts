@@ -64,7 +64,8 @@ async function loadSystemJobs(cleanupIntervalMinutes = 15) {
   }));
 
   vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
-    getSettingNumber: vi.fn(),
+    getSettingStrict: vi.fn(),
+    parseNumericSettingValue: vi.fn(),
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/audit-archive.js", () => ({

@@ -34,7 +34,12 @@ const runAuditArchiveMock = vi.hoisted(() => vi.fn());
 const getMaxAgeMsMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn());
 const listJobDirsMock = vi.hoisted(() => vi.fn());
-const getSettingNumberMock = vi.hoisted(() => vi.fn());
+const getSettingStrictMock = vi.hoisted(() => vi.fn());
+const parseNumericSettingValueMock = vi.hoisted(() =>
+  vi.fn((_key: string, raw: string | undefined, defaultValue = 0) =>
+    raw === undefined ? defaultValue : Number(raw),
+  ),
+);
 const analyticsEnabledMock = vi.hoisted(() => vi.fn());
 const dbExecuteMock = vi.hoisted(() => vi.fn());
 const dbUpdateMock = vi.hoisted(() => vi.fn());
@@ -134,7 +139,8 @@ async function loadSystemJobs(
   getMaxAgeMsMock.mockReset();
   deletePrefixMock.mockReset();
   listJobDirsMock.mockReset();
-  getSettingNumberMock.mockReset();
+  getSettingStrictMock.mockReset();
+  parseNumericSettingValueMock.mockClear();
   analyticsEnabledMock.mockReset();
   dbExecuteMock.mockReset();
   dbUpdateMock.mockReset();
@@ -186,8 +192,14 @@ async function loadSystemJobs(
     listJobDirs: listJobDirsMock,
   }));
 
+  const actualSettingsHelpers = await vi.importActual<
+    typeof import("../../../../apps/api/src/lib/settings-helpers.js")
+  >("../../../../apps/api/src/lib/settings-helpers.js");
+  parseNumericSettingValueMock.mockImplementation(actualSettingsHelpers.parseNumericSettingValue);
+
   vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
-    getSettingNumber: getSettingNumberMock,
+    getSettingStrict: getSettingStrictMock,
+    parseNumericSettingValue: parseNumericSettingValueMock,
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/audit-archive.js", () => ({
@@ -315,7 +327,7 @@ describe("dispatchSystemJob retention", () => {
   it("deletes old jobs and old audit rows when both retentions are positive and tamper mode is off", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(30).mockResolvedValueOnce(90);
+    getSettingStrictMock.mockResolvedValueOnce("60").mockResolvedValueOnce("180");
     // tamperResistantAudit setting lookup returns no rows -> not tamper resistant.
     queueSelect("settings", []);
 
@@ -323,14 +335,16 @@ describe("dispatchSystemJob retention", () => {
 
     // One DELETE FROM jobs + one DELETE FROM audit_log.
     expect(dbExecuteMock).toHaveBeenCalledTimes(2);
-    expect(getSettingNumberMock).toHaveBeenCalledWith("jobsRetentionDays", 30);
-    expect(getSettingNumberMock).toHaveBeenCalledWith("auditRetentionDays", 90);
+    expect(getSettingStrictMock).toHaveBeenCalledWith("jobsRetentionDays");
+    expect(getSettingStrictMock).toHaveBeenCalledWith("auditRetentionDays");
+    expect(parseNumericSettingValueMock).toHaveBeenCalledWith("jobsRetentionDays", "60", 0);
+    expect(parseNumericSettingValueMock).toHaveBeenCalledWith("auditRetentionDays", "180", 0);
   });
 
   it("skips the jobs delete when jobsRetentionDays is 0", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(0).mockResolvedValueOnce(90);
+    getSettingStrictMock.mockResolvedValueOnce("0").mockResolvedValueOnce("90");
     queueSelect("settings", []);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
@@ -342,7 +356,7 @@ describe("dispatchSystemJob retention", () => {
   it("skips the audit delete when auditRetentionDays is 0", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(30).mockResolvedValueOnce(0);
+    getSettingStrictMock.mockResolvedValueOnce("30").mockResolvedValueOnce("0");
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
@@ -353,13 +367,74 @@ describe("dispatchSystemJob retention", () => {
   it("preserves audit rows when tamper-resistant mode is on", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingNumberMock.mockResolvedValueOnce(30).mockResolvedValueOnce(90);
+    getSettingStrictMock.mockResolvedValueOnce("30").mockResolvedValueOnce("90");
     queueSelect("settings", [{ value: "true" }]);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
     // Jobs delete runs, but the audit_log delete is suppressed.
     expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs the error and skips the jobs sweep when reading jobsRetentionDays fails (#2718)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const readErr = new Error("connection terminated unexpectedly");
+    getSettingStrictMock.mockRejectedValueOnce(readErr).mockResolvedValueOnce("90");
+    queueSelect("settings", []);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    // Only the audit_log delete runs; the jobs delete is skipped.
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(parseNumericSettingValueMock).toHaveBeenCalledTimes(1);
+    expect(parseNumericSettingValueMock).toHaveBeenCalledWith("auditRetentionDays", "90", 0);
+    expect(errSpy).toHaveBeenCalledWith(
+      { err: readErr },
+      "Retention: jobsRetentionDays read failed; skipping jobs sweep",
+    );
+    errSpy.mockRestore();
+  });
+
+  it("logs the error and skips the audit_log sweep when reading auditRetentionDays fails (#2718)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const readErr = new Error("connection terminated unexpectedly");
+    getSettingStrictMock.mockResolvedValueOnce("30").mockRejectedValueOnce(readErr);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    // Only the jobs delete runs; the audit_log delete is skipped.
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(parseNumericSettingValueMock).toHaveBeenCalledTimes(1);
+    expect(parseNumericSettingValueMock).toHaveBeenCalledWith("jobsRetentionDays", "30", 0);
+    expect(errSpy).toHaveBeenCalledWith(
+      { err: readErr },
+      "Retention: auditRetentionDays read failed; skipping audit_log sweep",
+    );
+    errSpy.mockRestore();
+  });
+
+  it("skips pruning a table when its stored retention setting row is corrupt (#2718)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    getSettingStrictMock.mockResolvedValueOnce("corrupt").mockResolvedValueOnce("-5");
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(dbExecuteMock).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      { key: "jobsRetentionDays", value: "corrupt" },
+      "invalid numeric setting, using default",
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      { key: "auditRetentionDays", value: "-5" },
+      "invalid numeric setting, using default",
+    );
+    warnSpy.mockRestore();
   });
 });
 

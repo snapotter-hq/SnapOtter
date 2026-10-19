@@ -17,7 +17,7 @@ import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
 import { logger } from "../lib/logger.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
-import { getSettingNumber } from "../lib/settings-helpers.js";
+import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { runAuditArchive } from "./audit-archive.js";
 import { reconcilableJobRows } from "./job-reconciliation.js";
 import { getQueue } from "./queues.js";
@@ -494,7 +494,18 @@ async function retentionSweep(): Promise<void> {
   // The Data Retention settings UI writes jobsRetentionDays / auditRetentionDays to
   // the DB. Honor those (the env vars are the fallback default), mirroring how the
   // temp-file sweep reads tempFileMaxAgeHours; otherwise the UI controls are no-ops.
-  const jobsRetentionDays = await getSettingNumber("jobsRetentionDays", env.JOBS_RETENTION_DAYS);
+  // A failed read or corrupt row must not fall back to the env default, which
+  // would shorten a longer retention the admin configured in Settings (#2718).
+  let jobsRetentionDays = 0;
+  try {
+    const rawJobsRetention = await getSettingStrict("jobsRetentionDays");
+    jobsRetentionDays =
+      rawJobsRetention === undefined
+        ? env.JOBS_RETENTION_DAYS
+        : parseNumericSettingValue("jobsRetentionDays", rawJobsRetention, 0);
+  } catch (err) {
+    logger.error({ err }, "Retention: jobsRetentionDays read failed; skipping jobs sweep");
+  }
   if (jobsRetentionDays > 0) {
     await db.execute(
       sql`DELETE FROM jobs
@@ -503,7 +514,16 @@ async function retentionSweep(): Promise<void> {
         AND (user_id IS NULL OR user_id NOT IN ${heldUsersSubquery})`,
     );
   }
-  const auditRetentionDays = await getSettingNumber("auditRetentionDays", env.AUDIT_RETENTION_DAYS);
+  let auditRetentionDays = 0;
+  try {
+    const rawAuditRetention = await getSettingStrict("auditRetentionDays");
+    auditRetentionDays =
+      rawAuditRetention === undefined
+        ? env.AUDIT_RETENTION_DAYS
+        : parseNumericSettingValue("auditRetentionDays", rawAuditRetention, 0);
+  } catch (err) {
+    logger.error({ err }, "Retention: auditRetentionDays read failed; skipping audit_log sweep");
+  }
   if (auditRetentionDays > 0) {
     const tamperResult = await db
       .select({ value: schema.settings.value })

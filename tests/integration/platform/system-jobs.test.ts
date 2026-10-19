@@ -248,6 +248,138 @@ describe("runSystemJob", () => {
     }
   });
 
+  it("retention skips pruning jobs and audit_log when reading retention settings fails (#2718)", async () => {
+    const protectedJobId = `prot-j-${randomUUID().slice(0, 8)}`;
+    const protectedAuditId = `prot-a-${randomUUID().slice(0, 8)}`;
+
+    // Aged 60 days: older than env defaults (30d), younger than the admin's 365d setting
+    await db.execute(
+      sql`INSERT INTO jobs (id, type, status, created_at) VALUES (${protectedJobId}, 'tool', 'completed', now() - interval '60 days')`,
+    );
+    await db.execute(
+      sql`INSERT INTO audit_log (id, actor_username, action, created_at) VALUES (${protectedAuditId}, 'test', 'test', now() - interval '60 days')`,
+    );
+
+    await db
+      .insert(schema.settings)
+      .values([
+        { key: "jobsRetentionDays", value: "365" },
+        { key: "auditRetentionDays", value: "365" },
+      ])
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: "365", updatedAt: new Date() },
+      });
+
+    const origJobsRetention = env.JOBS_RETENTION_DAYS;
+    const origAuditRetention = env.AUDIT_RETENTION_DAYS;
+    (env as Record<string, unknown>).JOBS_RETENTION_DAYS = 30;
+    (env as Record<string, unknown>).AUDIT_RETENTION_DAYS = 30;
+
+    const readError = new Error("connection terminated unexpectedly");
+    const originalSelect = db.select.bind(db);
+    let settingsSelectCount = 0;
+    const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      const originalFrom = builder.from.bind(builder);
+      builder.from = (table: unknown) => {
+        if (table === schema.settings && settingsSelectCount < 2) {
+          settingsSelectCount++;
+          throw readError;
+        }
+        return originalFrom(table);
+      };
+      return builder;
+    });
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    try {
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId));
+      expect(jobRow).toBeDefined();
+
+      const [auditRow] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId));
+      expect(auditRow).toBeDefined();
+
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: readError },
+        "Retention: jobsRetentionDays read failed; skipping jobs sweep",
+      );
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: readError },
+        "Retention: auditRetentionDays read failed; skipping audit_log sweep",
+      );
+
+      // Corrupt setting values also skip pruning rather than falling back to 30d
+      selectSpy.mockRestore();
+      await db
+        .update(schema.settings)
+        .set({ value: "corrupt", updatedAt: new Date() })
+        .where(inArray(schema.settings.key, ["jobsRetentionDays", "auditRetentionDays"]));
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobRowAfterCorrupt] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId));
+      expect(jobRowAfterCorrupt).toBeDefined();
+
+      const [auditRowAfterCorrupt] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId));
+      expect(auditRowAfterCorrupt).toBeDefined();
+
+      // Restoring valid 365d settings continues protecting the 60-day-old rows
+      await db
+        .update(schema.settings)
+        .set({ value: "365", updatedAt: new Date() })
+        .where(inArray(schema.settings.key, ["jobsRetentionDays", "auditRetentionDays"]));
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobRowAfterRecovery] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId));
+      expect(jobRowAfterRecovery).toBeDefined();
+
+      const [auditRowAfterRecovery] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId));
+      expect(auditRowAfterRecovery).toBeDefined();
+    } finally {
+      selectSpy.mockRestore();
+      errSpy.mockRestore();
+      warnSpy.mockRestore();
+      (env as Record<string, unknown>).JOBS_RETENTION_DAYS = origJobsRetention;
+      (env as Record<string, unknown>).AUDIT_RETENTION_DAYS = origAuditRetention;
+      await db
+        .delete(schema.jobs)
+        .where(eq(schema.jobs.id, protectedJobId))
+        .catch(() => {});
+      await db
+        .delete(schema.auditLog)
+        .where(eq(schema.auditLog.id, protectedAuditId))
+        .catch(() => {});
+      await db
+        .delete(schema.settings)
+        .where(inArray(schema.settings.key, ["jobsRetentionDays", "auditRetentionDays"]))
+        .catch(() => {});
+    }
+  });
+
   it("throws on unknown system job name", async () => {
     await expect(runSystemJob({ name: "system:bogus" } as unknown as Job)).rejects.toThrow(
       "Unknown system job: system:bogus",
