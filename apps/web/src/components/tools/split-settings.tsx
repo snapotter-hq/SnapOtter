@@ -7,7 +7,7 @@ import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 import type { SplitMode } from "@/stores/split-store";
-import { useSplitStore } from "@/stores/split-store";
+import { beginSplitRun, useSplitStore } from "@/stores/split-store";
 import {
   claimToolResult,
   claimToolResultItem,
@@ -101,10 +101,28 @@ export function SplitSettings() {
 
   const handleProcess = useCallback(async () => {
     if (files.length === 0) return;
+
+    const controller = new AbortController();
+    const run = beginSplitRun(() => controller.abort());
+
     setProcessing(true);
     setError(null);
     setTiles([]);
     setZipBlobUrl(null);
+
+    const runFiles = new Set(files);
+    const unsubscribeFiles = useFileStore.subscribe((state) => {
+      if (!state.files.some((f) => runFiles.has(f))) {
+        controller.abort();
+      }
+    });
+    const isCanceled = () => !run.isCurrent() || controller.signal.aborted;
+    const previewTiles: Array<{ row: number; col: number; blobUrl: string | null }> = [];
+    const revokePreviewTiles = () => {
+      for (const t of previewTiles) {
+        if (t.blobUrl) URL.revokeObjectURL(t.blobUrl);
+      }
+    };
 
     try {
       const effectiveGrid = getEffectiveGrid();
@@ -123,11 +141,15 @@ export function SplitSettings() {
       const settingsJson = JSON.stringify(settings);
 
       const JSZip = (await import("jszip")).default;
+      if (isCanceled()) return;
       const combinedZip = new JSZip();
-      const previewTiles: Array<{ row: number; col: number; blobUrl: string | null }> = [];
       const multiFile = files.length > 1;
 
       for (let fi = 0; fi < files.length; fi++) {
+        if (isCanceled()) {
+          revokePreviewTiles();
+          return;
+        }
         const file = files[fi];
         const formData = new FormData();
         formData.append("file", file);
@@ -137,6 +159,7 @@ export function SplitSettings() {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
+          signal: controller.signal,
         });
         if (!res.ok) {
           const text = await res.text();
@@ -150,6 +173,10 @@ export function SplitSettings() {
 
         const blob = await res.blob();
         const fileZip = await JSZip.loadAsync(blob);
+        if (isCanceled()) {
+          revokePreviewTiles();
+          return;
+        }
         const baseName = file.name.replace(/\.[^.]+$/, "");
         const prefix = multiFile ? `${baseName}/` : "";
 
@@ -158,6 +185,10 @@ export function SplitSettings() {
 
         for (const name of fileNames) {
           const data = await fileZip.files[name].async("uint8array");
+          if (isCanceled()) {
+            revokePreviewTiles();
+            return;
+          }
           combinedZip.file(`${prefix}${name}`, data);
 
           if (fi === 0) {
@@ -174,6 +205,10 @@ export function SplitSettings() {
       }
 
       const combinedBlob = await combinedZip.generateAsync({ type: "blob" });
+      if (isCanceled()) {
+        revokePreviewTiles();
+        return;
+      }
       setZipBlobUrl(URL.createObjectURL(combinedBlob));
 
       previewTiles.sort((a, b) => a.row - b.row || a.col - b.col);
@@ -189,9 +224,15 @@ export function SplitSettings() {
         files.length,
       );
     } catch (err) {
+      revokePreviewTiles();
+      if (isCanceled() || (err instanceof DOMException && err.name === "AbortError")) return;
       setError(err instanceof Error ? err.message : t.toolSettings.split.splitFailed);
     } finally {
-      setProcessing(false);
+      unsubscribeFiles();
+      run.end();
+      if (run.isCurrent()) {
+        setProcessing(false);
+      }
     }
   }, [
     files,

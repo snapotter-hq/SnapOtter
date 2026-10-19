@@ -74,6 +74,52 @@ const INITIAL_STATE = {
   generating: false,
 };
 
+let activeAnalyzeAbort: (() => void) | null = null;
+let analyzeRunId = 0;
+let activeGenerateAbort: (() => void) | null = null;
+let generateRunId = 0;
+
+export function beginPassportAnalyzeRun(abort: () => void): {
+  isCurrent: () => boolean;
+  end: () => void;
+} {
+  activeAnalyzeAbort?.();
+  const runId = ++analyzeRunId;
+  activeAnalyzeAbort = abort;
+  return {
+    isCurrent: () => runId === analyzeRunId,
+    end: () => {
+      if (activeAnalyzeAbort === abort) activeAnalyzeAbort = null;
+    },
+  };
+}
+
+export function beginPassportGenerateRun(abort: () => void): {
+  isCurrent: () => boolean;
+  end: () => void;
+} {
+  activeGenerateAbort?.();
+  const runId = ++generateRunId;
+  activeGenerateAbort = abort;
+  return {
+    isCurrent: () => runId === generateRunId,
+    end: () => {
+      if (activeGenerateAbort === abort) activeGenerateAbort = null;
+    },
+  };
+}
+
+function cancelPassportRuns() {
+  analyzeRunId++;
+  generateRunId++;
+  const aAbort = activeAnalyzeAbort;
+  const gAbort = activeGenerateAbort;
+  activeAnalyzeAbort = null;
+  activeGenerateAbort = null;
+  aAbort?.();
+  gAbort?.();
+}
+
 /**
  * passport-photo hand-rolls both of its requests, so nothing it does reaches
  * the file store: the analysis, the generated photo and the two in-flight flags
@@ -101,5 +147,8 @@ export const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
   setGenerateResult: (generateResult) => set({ generateResult }),
   setAnalyzing: (analyzing) => set({ analyzing }),
   setGenerating: (generating) => set({ generating }),
-  reset: () => set({ ...INITIAL_STATE }),
+  reset: () => {
+    cancelPassportRuns();
+    set({ ...INITIAL_STATE });
+  },
 }));

@@ -2,9 +2,12 @@ import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { useFileStore } from "@/stores/file-store";
 
 type Position = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -20,13 +23,52 @@ export function WatermarkImageSettings() {
   const [originalSize, setOriginalSize] = useState<number | null>(null);
   const [processedSize, setProcessedSize] = useState<number | null>(null);
   const watermarkInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => {
+      abortRef.current?.abort();
+      const store = useFileStore.getState();
+      if (!store.processing) return;
+      const writes: Array<() => void> = [];
+      for (let i = 0; i < store.entries.length; i++) {
+        if (store.entries[i].status === "processing") {
+          const idx = i;
+          writes.push(() => store.updateEntry(idx, { status: "pending", error: null }));
+        }
+      }
+      const teardownError = runEndWrites(writes);
+      if (teardownError) {
+        reportRunEndFailure(
+          "Failing a tool run's entries failed",
+          teardownError.cause,
+          "watermark-image",
+        );
+      }
+    },
+  );
 
   const handleProcess = async () => {
     if (files.length === 0 || !watermarkFile) return;
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setProcessing(true);
     setError(null);
     setDownloadUrl(null);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (abortRef.current === controller) abortRef.current = null;
+        unsubscribe();
+        controller.abort();
+      }
+    });
 
     const settingsJson = JSON.stringify({ position, opacity, scale });
 
@@ -41,6 +83,7 @@ export function WatermarkImageSettings() {
           method: "POST",
           headers: formatHeaders(),
           body: formData,
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -56,6 +99,7 @@ export function WatermarkImageSettings() {
         }
 
         const result = resolveServerUrls(await res.json());
+        if (controller.signal.aborted || storeReset) return;
         setJobId(result.jobId);
         setProcessedUrl(result.downloadUrl);
         setDownloadUrl(result.downloadUrl);
@@ -63,9 +107,21 @@ export function WatermarkImageSettings() {
         setProcessedSize(result.processedSize);
         setSizes(result.originalSize, result.processedSize);
       } catch (err) {
+        if (
+          controller.signal.aborted ||
+          storeReset ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
+          return;
+        }
+        unsubscribe();
         setError(err instanceof Error ? err.message : t.errors.processingFailedNoDetail);
       } finally {
-        setProcessing(false);
+        unsubscribe();
+        if (abortRef.current === controller) abortRef.current = null;
+        if (!controller.signal.aborted && !storeReset) {
+          setProcessing(false);
+        }
       }
     } else {
       // Multiple files: process each one individually, writing results to each entry
@@ -73,6 +129,7 @@ export function WatermarkImageSettings() {
         const store = useFileStore.getState();
         const entryIds = store.entries.map((e) => e.id);
         for (let i = 0; i < files.length; i++) {
+          if (controller.signal.aborted || storeReset) break;
           const entryId = entryIds[i];
           if (entryId) store.updateEntryById(entryId, { status: "processing", error: null });
           try {
@@ -85,10 +142,12 @@ export function WatermarkImageSettings() {
               method: "POST",
               headers: formatHeaders(),
               body: formData,
+              signal: controller.signal,
             });
 
             if (!res.ok) {
               const body = await res.json().catch(() => ({}));
+              if (controller.signal.aborted || storeReset) break;
               if (entryId) {
                 store.updateEntryById(entryId, {
                   status: "failed",
@@ -104,6 +163,7 @@ export function WatermarkImageSettings() {
             }
 
             const result = resolveServerUrls(await res.json());
+            if (controller.signal.aborted || storeReset) break;
             if (entryId) {
               store.updateEntryById(entryId, {
                 processedUrl: result.downloadUrl,
@@ -115,6 +175,13 @@ export function WatermarkImageSettings() {
               });
             }
           } catch (err) {
+            if (
+              controller.signal.aborted ||
+              storeReset ||
+              (err instanceof DOMException && err.name === "AbortError")
+            ) {
+              break;
+            }
             if (entryId) {
               store.updateEntryById(entryId, {
                 status: "failed",
@@ -124,7 +191,11 @@ export function WatermarkImageSettings() {
           }
         }
       } finally {
-        setProcessing(false);
+        unsubscribe();
+        if (abortRef.current === controller) abortRef.current = null;
+        if (!controller.signal.aborted && !storeReset) {
+          setProcessing(false);
+        }
       }
     }
   };

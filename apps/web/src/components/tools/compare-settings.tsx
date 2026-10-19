@@ -2,6 +2,7 @@ import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -13,14 +14,34 @@ export function CompareSettings() {
   const [similarity, setSimilarity] = useState<number | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const secondInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = async () => {
     if (files.length === 0 || !secondFile) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setProcessing(true);
     setError(null);
     setDownloadUrl(null);
     setSimilarity(null);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (abortRef.current === controller) abortRef.current = null;
+        unsubscribe();
+        controller.abort();
+      }
+    });
 
     try {
       const formData = new FormData();
@@ -31,6 +52,7 @@ export function CompareSettings() {
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -46,15 +68,28 @@ export function CompareSettings() {
       }
 
       const result = resolveServerUrls(await res.json());
+      if (controller.signal.aborted || storeReset) return;
       setSimilarity(result.similarity);
       setDownloadUrl(result.downloadUrl);
       // Show the second image in the slider (not the diff) so the user can
       // visually compare their two originals. The diff is still downloadable.
       setProcessedUrl(URL.createObjectURL(secondFile));
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
       setError(err instanceof Error ? err.message : t.toolSettings.compare.comparisonFailed);
     } finally {
-      setProcessing(false);
+      unsubscribe();
+      if (abortRef.current === controller) abortRef.current = null;
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
   };
 

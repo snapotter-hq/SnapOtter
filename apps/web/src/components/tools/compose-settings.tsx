@@ -2,6 +2,7 @@ import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -19,13 +20,33 @@ export function ComposeSettings() {
   const [originalSize, setOriginalSize] = useState<number | null>(null);
   const [processedSize, setProcessedSize] = useState<number | null>(null);
   const overlayInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = async () => {
     if (files.length === 0 || !overlayFile) return;
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setProcessing(true);
     setError(null);
     setDownloadUrl(null);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (abortRef.current === controller) abortRef.current = null;
+        unsubscribe();
+        controller.abort();
+      }
+    });
 
     try {
       const formData = new FormData();
@@ -37,6 +58,7 @@ export function ComposeSettings() {
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -52,6 +74,7 @@ export function ComposeSettings() {
       }
 
       const result = resolveServerUrls(await res.json());
+      if (controller.signal.aborted || storeReset) return;
       setJobId(result.jobId);
       setProcessedUrl(result.downloadUrl);
       setDownloadUrl(result.downloadUrl);
@@ -59,9 +82,21 @@ export function ComposeSettings() {
       setProcessedSize(result.processedSize);
       setSizes(result.originalSize, result.processedSize);
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
       setError(err instanceof Error ? err.message : t.errors.processingFailedNoDetail);
     } finally {
-      setProcessing(false);
+      unsubscribe();
+      if (abortRef.current === controller) abortRef.current = null;
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
   };
 

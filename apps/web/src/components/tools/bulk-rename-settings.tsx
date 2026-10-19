@@ -1,6 +1,7 @@
 import { Download, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -11,13 +12,33 @@ export function BulkRenameSettings() {
   const [pattern, setPattern] = useState("file-{{index}}");
   const [startIndex, setStartIndex] = useState(1);
   const [downloadReady, setDownloadReady] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = async () => {
     if (files.length === 0) return;
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setProcessing(true);
     setError(null);
     setDownloadReady(false);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (abortRef.current === controller) abortRef.current = null;
+        unsubscribe();
+        controller.abort();
+      }
+    });
 
     try {
       const formData = new FormData();
@@ -30,6 +51,7 @@ export function BulkRenameSettings() {
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -38,6 +60,7 @@ export function BulkRenameSettings() {
       }
 
       const blob = await res.blob();
+      if (controller.signal.aborted || storeReset) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -46,9 +69,21 @@ export function BulkRenameSettings() {
       URL.revokeObjectURL(url);
       setDownloadReady(true);
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
       setError(err instanceof Error ? err.message : t.toolSettings["bulk-rename"].renameFailed);
     } finally {
-      setProcessing(false);
+      unsubscribe();
+      if (abortRef.current === controller) abortRef.current = null;
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
   };
 

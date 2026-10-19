@@ -27,6 +27,8 @@ import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
 import {
+  beginPassportAnalyzeRun,
+  beginPassportGenerateRun,
   type FaceLandmarks,
   type GenerateResult,
   usePassportPhotoStore,
@@ -324,6 +326,16 @@ export function PassportPhotoSettings() {
   // Analyze
   const runAnalyze = useCallback(
     async (file: File) => {
+      const controller = new AbortController();
+      const run = beginPassportAnalyzeRun(() => controller.abort());
+      const unsubscribeFiles = useFileStore.subscribe((state) => {
+        if (state.files[0] !== file) {
+          controller.abort();
+        }
+      });
+      const isCurrent = () =>
+        run.isCurrent() && !controller.signal.aborted && useFileStore.getState().files[0] === file;
+
       setAnalyzing(true);
       setAnalyzeError(null);
       setAnalyzeResult(null);
@@ -340,6 +352,7 @@ export function PassportPhotoSettings() {
           method: "POST",
           headers,
           body: formData,
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -359,13 +372,19 @@ export function PassportPhotoSettings() {
         }
 
         const result = resolveServerUrls(await response.json());
+        if (!isCurrent()) return;
         setAnalyzeResult(result);
       } catch (err) {
+        if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
         setAnalyzeError(
           err instanceof Error ? err.message : t.toolSettings["passport-photo"].faceAnalysisFailed,
         );
       } finally {
-        setAnalyzing(false);
+        unsubscribeFiles();
+        run.end();
+        if (run.isCurrent()) {
+          setAnalyzing(false);
+        }
       }
     },
     [setAnalyzing, setAnalyzeResult, setGenerateResult, t],
@@ -386,6 +405,14 @@ export function PassportPhotoSettings() {
   // Generate
   const handleGenerate = useCallback(async () => {
     if (!analyzeResult) return;
+
+    const controller = new AbortController();
+    const run = beginPassportGenerateRun(() => controller.abort());
+    const targetAnalysis = analyzeResult;
+    const isCurrent = () =>
+      run.isCurrent() &&
+      !controller.signal.aborted &&
+      usePassportPhotoStore.getState().analyzeResult === targetAnalysis;
 
     setGenerating(true);
     setGenerateError(null);
@@ -415,6 +442,7 @@ export function PassportPhotoSettings() {
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -422,10 +450,13 @@ export function PassportPhotoSettings() {
         // The server no longer holds this analysis's background-removed image
         // (#1674). Analyze the same file again so generate has one to read.
         if (errBody?.code === "ANALYSIS_EXPIRED" && files[0]) {
+          if (!isCurrent()) return;
           // The note only holds while that analysis runs: once it settles the
           // Generate button (or the analysis error) says what happens next.
           setGenerateError(t.toolSettings["passport-photo"].analysisExpired);
-          void runAnalyze(files[0]).finally(() => setGenerateError(null));
+          void runAnalyze(files[0]).finally(() => {
+            if (run.isCurrent()) setGenerateError(null);
+          });
           return;
         }
         const msg = errBody
@@ -443,13 +474,18 @@ export function PassportPhotoSettings() {
       }
 
       const result: GenerateResult = resolveServerUrls(await response.json());
+      if (!isCurrent()) return;
       setGenerateResult(result);
     } catch (err) {
+      if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       setGenerateError(
         err instanceof Error ? err.message : t.toolSettings["passport-photo"].photoGenerationFailed,
       );
     } finally {
-      setGenerating(false);
+      run.end();
+      if (run.isCurrent()) {
+        setGenerating(false);
+      }
     }
   }, [
     t,

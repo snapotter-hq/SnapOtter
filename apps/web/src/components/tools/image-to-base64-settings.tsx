@@ -4,7 +4,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { useBase64Store } from "@/stores/base64-store";
+import { beginBase64Run, useBase64Store } from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
 
 // Format names (JPEG, PNG, ...) are locale-invariant; "original" resolves via i18n.
@@ -37,47 +37,68 @@ export function ImageToBase64Settings() {
     reset();
     setProcessing(true);
 
+    const controller = new AbortController();
+    const run = beginBase64Run(() => controller.abort());
+    const runFiles = new Set(entries.map((e) => e.file));
+    const unsubscribeFiles = useFileStore.subscribe((state) => {
+      if (!state.files.some((f) => runFiles.has(f))) {
+        controller.abort();
+      }
+    });
+    const isCanceled = () => !run.isCurrent() || controller.signal.aborted;
+
     const settings = JSON.stringify({ outputFormat, quality, maxWidth, maxHeight });
 
-    for (let i = 0; i < entries.length; i++) {
-      const { id: entryId, file } = entries[i];
-      setProgress({ completed: i, total: entries.length, currentFile: file.name });
+    try {
+      for (let i = 0; i < entries.length; i++) {
+        if (isCanceled()) break;
+        const { id: entryId, file } = entries[i];
+        setProgress({ completed: i, total: entries.length, currentFile: file.name });
 
-      try {
-        const formData = new FormData();
-        formData.append("files", file);
-        formData.append("settings", settings);
+        try {
+          const formData = new FormData();
+          formData.append("files", file);
+          formData.append("settings", settings);
 
-        const res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
-          method: "POST",
-          headers: formatHeaders(),
-          body: formData,
-        });
+          const res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
+            method: "POST",
+            headers: formatHeaders(),
+            body: formData,
+            signal: controller.signal,
+          });
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            if (isCanceled()) break;
+            addError({
+              entryId,
+              filename: file.name,
+              error: failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`),
+            });
+            continue;
+          }
+
+          const data = await res.json();
+          if (isCanceled()) break;
+          for (const r of data.results) addResult({ ...r, entryId });
+          for (const e of data.errors) addError({ ...e, entryId });
+        } catch (err) {
+          if (isCanceled() || (err instanceof DOMException && err.name === "AbortError")) break;
           addError({
             entryId,
             filename: file.name,
-            error: failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`),
+            error: err instanceof Error ? err.message : "Failed to convert",
           });
-          continue;
         }
-
-        const data = await res.json();
-        for (const r of data.results) addResult({ ...r, entryId });
-        for (const e of data.errors) addError({ ...e, entryId });
-      } catch (err) {
-        addError({
-          entryId,
-          filename: file.name,
-          error: err instanceof Error ? err.message : "Failed to convert",
-        });
+      }
+    } finally {
+      unsubscribeFiles();
+      run.end();
+      if (run.isCurrent()) {
+        setProgress(null);
+        setProcessing(false);
       }
     }
-
-    setProgress(null);
-    setProcessing(false);
   };
 
   const hasFiles = entries.length > 0;

@@ -46,6 +46,24 @@ interface Base64State {
   reset: () => void;
 }
 
+let activeBase64Abort: (() => void) | null = null;
+let base64RunId = 0;
+
+export function beginBase64Run(abort: () => void): {
+  isCurrent: () => boolean;
+  end: () => void;
+} {
+  activeBase64Abort?.();
+  const runId = ++base64RunId;
+  activeBase64Abort = abort;
+  return {
+    isCurrent: () => runId === base64RunId,
+    end: () => {
+      if (activeBase64Abort === abort) activeBase64Abort = null;
+    },
+  };
+}
+
 export const useBase64Store = create<Base64State>((set) => ({
   results: [],
   errors: [],
@@ -59,6 +77,11 @@ export const useBase64Store = create<Base64State>((set) => ({
   addResult: (result) => set((s) => ({ results: [...s.results, result] })),
   addError: (error) => set((s) => ({ errors: [...s.errors, error] })),
   setExpandedIndex: (i) => set({ expandedIndex: i }),
-  reset: () =>
-    set({ results: [], errors: [], processing: false, progress: null, expandedIndex: 0 }),
+  reset: () => {
+    base64RunId++;
+    const abort = activeBase64Abort;
+    activeBase64Abort = null;
+    abort?.();
+    set({ results: [], errors: [], processing: false, progress: null, expandedIndex: 0 });
+  },
 }));

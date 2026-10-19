@@ -59,6 +59,24 @@ interface SplitState {
   getComputedTileDimensions: () => { width: number; height: number } | null;
 }
 
+let activeSplitAbort: (() => void) | null = null;
+let splitRunId = 0;
+
+export function beginSplitRun(abort: () => void): {
+  isCurrent: () => boolean;
+  end: () => void;
+} {
+  activeSplitAbort?.();
+  const runId = ++splitRunId;
+  activeSplitAbort = abort;
+  return {
+    isCurrent: () => runId === splitRunId,
+    end: () => {
+      if (activeSplitAbort === abort) activeSplitAbort = null;
+    },
+  };
+}
+
 export const useSplitStore = create<SplitState>((set, get) => ({
   mode: "grid",
   columns: 3,
@@ -98,6 +116,10 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     set({ mode: "grid", columns: cols, rows, tiles: [], zipBlobUrl: null, error: null }),
 
   reset: () => {
+    splitRunId++;
+    const abort = activeSplitAbort;
+    activeSplitAbort = null;
+    abort?.();
     const prev = get();
     if (prev.zipBlobUrl) URL.revokeObjectURL(prev.zipBlobUrl);
     for (const t of prev.tiles) {

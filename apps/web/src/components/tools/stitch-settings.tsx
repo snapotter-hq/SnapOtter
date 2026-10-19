@@ -1,7 +1,8 @@
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
@@ -40,14 +41,51 @@ export function StitchSettings() {
   const [quality, setQuality] = useState(90);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const handleProcess = async () => {
+  useSettleOnUnmount(
+    () => xhrRef.current !== null,
+    () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      const xhr = xhrRef.current;
+      xhrRef.current = null;
+      xhr?.abort();
+    },
+  );
+
+  const handleProcess = () => {
     if (files.length < 2) return;
+
+    unsubscribeRef.current?.();
+    xhrRef.current?.abort();
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
 
     setError(null);
     setProcessing(true);
     setDownloadUrl(null);
     setUploadProgress(0);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (xhrRef.current === xhr) xhrRef.current = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+        unsubscribe();
+        xhr.abort();
+      }
+    });
+    unsubscribeRef.current = unsubscribe;
+
+    const endSubscription = () => {
+      if (unsubscribeRef.current === unsubscribe) {
+        unsubscribeRef.current = null;
+      }
+      unsubscribe();
+    };
 
     try {
       const formData = new FormData();
@@ -70,80 +108,90 @@ export function StitchSettings() {
         }),
       );
 
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
+      xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
 
-        const headers = formatHeaders();
-        headers.forEach((value, key) => {
-          xhr.setRequestHeader(key, value);
-        });
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            // Only a body that isn't a result is the server's fault, and it gets
-            // reported (#1740). A throw while landing a good one is our own
-            // store write failing: it fails the run with the tracking message
-            // and is rethrown so it still surfaces (#1795, after #1354).
-            let result: StitchResult;
-            try {
-              result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
-            } catch (err) {
-              reject(new Error(t.errors.invalidResponse));
-              reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
-              return;
-            }
-            try {
-              setJobId(result.jobId);
-              setProcessedUrl(result.downloadUrl);
-              setDownloadUrl(result.downloadUrl);
-              setSizes(result.originalSize, result.processedSize);
-            } catch (err) {
-              reject(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
-              throw err;
-            }
-            resolve();
-          } else {
-            try {
-              const body = JSON.parse(xhr.responseText);
-              reject(
-                new Error(
-                  failedAnswerMessage(
-                    t,
-                    body,
-                    xhr.status,
-                    formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
-                  ),
-                ),
-              );
-            } catch {
-              reject(
-                new Error(
-                  failedAnswerMessage(
-                    t,
-                    null,
-                    xhr.status,
-                    formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
-                  ),
-                ),
-              );
-            }
-          }
-        };
-
-        xhr.onerror = () => reject(new Error(t.errors.network));
-        xhr.send(formData);
+      const headers = formatHeaders();
+      headers.forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
       });
+
+      xhr.upload.onprogress = (e) => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        if (e.lengthComputable) {
+          setUploadProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        xhrRef.current = null;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          // Only a body that isn't a result is the server's fault, and it gets
+          // reported (#1740). A throw while landing a good one is our own
+          // store write failing: it fails the run with the tracking message
+          // and is rethrown so it still surfaces (#1795, after #1354).
+          let result: StitchResult;
+          try {
+            result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
+          } catch (err) {
+            setError(t.errors.invalidResponse);
+            setProcessing(false);
+            reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
+            return;
+          }
+          try {
+            setJobId(result.jobId);
+            setProcessedUrl(result.downloadUrl);
+            setDownloadUrl(result.downloadUrl);
+            setSizes(result.originalSize, result.processedSize);
+            setProcessing(false);
+          } catch (err) {
+            setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+            setProcessing(false);
+            throw err;
+          }
+        } else {
+          try {
+            const body = JSON.parse(xhr.responseText);
+            setError(
+              failedAnswerMessage(
+                t,
+                body,
+                xhr.status,
+                formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+              ),
+            );
+          } catch {
+            setError(
+              failedAnswerMessage(
+                t,
+                null,
+                xhr.status,
+                formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
+              ),
+            );
+          }
+          setProcessing(false);
+        }
+      };
+
+      xhr.onerror = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        xhrRef.current = null;
+        setError(t.errors.network);
+        setProcessing(false);
+      };
+
+      xhr.send(formData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
-    } finally {
-      setProcessing(false);
+      endSubscription();
+      if (xhrRef.current === xhr) xhrRef.current = null;
+      if (!storeReset) {
+        setError(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
+        setProcessing(false);
+      }
     }
   };
 

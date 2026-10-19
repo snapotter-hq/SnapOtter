@@ -15,7 +15,12 @@ import { format, plural } from "@/lib/format";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn } from "@/lib/utils";
-import { type AspectRatio, type OutputFormat, useCollageStore } from "@/stores/collage-store";
+import {
+  type AspectRatio,
+  beginCollageRun,
+  type OutputFormat,
+  useCollageStore,
+} from "@/stores/collage-store";
 import { claimToolResult, collageResultKey } from "@/stores/tool-result-claims";
 
 /** What the panel reads off the answer besides its URL. The API always sends them (#1857). */
@@ -84,6 +89,20 @@ export function CollageSettings() {
     store.setProgress(0);
     store.setError(null);
 
+    let activeXhr: XMLHttpRequest | null = null;
+    let rejectXhr: ((err: Error) => void) | null = null;
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
+    let resolveDelay: (() => void) | null = null;
+    const run = beginCollageRun(() => {
+      activeXhr?.abort();
+      rejectXhr?.(new DOMException("Aborted", "AbortError"));
+      if (delayTimer !== null) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+      resolveDelay?.();
+    });
+
     let result: CollageResult;
     try {
       const formData = new FormData();
@@ -115,7 +134,9 @@ export function CollageSettings() {
 
       const startTime = Date.now();
       result = await new Promise<CollageResult>((resolve, reject) => {
+        rejectXhr = reject;
         const xhr = new XMLHttpRequest();
+        activeXhr = xhr;
         xhr.open("POST", appUrl("/api/v1/tools/image/collage"));
 
         const headers = formatHeaders();
@@ -124,12 +145,14 @@ export function CollageSettings() {
         });
 
         xhr.upload.onprogress = (e) => {
+          if (!run.isCurrent()) return;
           if (e.lengthComputable) {
             store.setProgress(Math.round((e.loaded / e.total) * 80));
           }
         };
 
         xhr.onload = () => {
+          if (!run.isCurrent()) return;
           if (xhr.status >= 200 && xhr.status < 300) {
             // Only a body that isn't a result is the server's fault, and it
             // gets reported (#1740, #1795). A throw from our own progress write
@@ -177,18 +200,36 @@ export function CollageSettings() {
           }
         };
 
-        xhr.onerror = () => reject(new Error(t.errors.network));
+        xhr.onerror = () => {
+          if (!run.isCurrent()) return;
+          reject(new Error(t.errors.network));
+        };
         xhr.send(formData);
 
-        store.setProgress(5);
+        if (run.isCurrent()) {
+          store.setProgress(5);
+        }
       });
 
       const elapsed = Date.now() - startTime;
-      if (elapsed < 800) await new Promise((r) => setTimeout(r, 800 - elapsed));
+      if (elapsed < 800 && run.isCurrent()) {
+        await new Promise<void>((r) => {
+          resolveDelay = r;
+          delayTimer = setTimeout(() => {
+            delayTimer = null;
+            r();
+          }, 800 - elapsed);
+        });
+      }
     } catch (err) {
+      run.end();
+      if (!run.isCurrent()) return;
       store.setError(err instanceof Error ? err.message : t.toolSettings.collage.collageFailed);
       return;
     }
+
+    run.end();
+    if (!run.isCurrent()) return;
 
     // A throw while landing a good result is our own store write failing, not
     // a bad answer: it ends the run with the tracking message and is rethrown

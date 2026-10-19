@@ -198,6 +198,16 @@ interface MemeState {
   reset: () => void;
 }
 
+let generateController: AbortController | null = null;
+let generateRunId = 0;
+
+function cancelActiveGeneration() {
+  generateRunId++;
+  const controller = generateController;
+  generateController = null;
+  controller?.abort();
+}
+
 export const useMemeStore = create<MemeState>((set, get) => ({
   phase: "gallery",
   templates: [],
@@ -225,6 +235,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   setActiveCategory: (c) => set({ activeCategory: c }),
 
   selectTemplate: (t) => {
+    cancelActiveGeneration();
     const oldUrl = get().customImageUrl;
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     set({
@@ -242,6 +253,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   },
 
   setCustomImage: (file) => {
+    cancelActiveGeneration();
     const oldUrl = get().customImageUrl;
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     set({
@@ -293,6 +305,12 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   },
 
   generateMeme: async (t = en) => {
+    cancelActiveGeneration();
+    const controller = new AbortController();
+    generateController = controller;
+    const runId = ++generateRunId;
+    const isCurrent = () => runId === generateRunId && !controller.signal.aborted;
+
     const state = get();
     set({ generating: true, error: null });
 
@@ -319,12 +337,14 @@ export const useMemeStore = create<MemeState>((set, get) => ({
           method: "POST",
           headers: formatHeaders(),
           body: formData,
+          signal: controller.signal,
         });
       } else {
         response = await fetch(appUrl("/api/v1/tools/image/meme-generator"), {
           method: "POST",
           headers: formatHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(apiSettings),
+          signal: controller.signal,
         });
       }
 
@@ -341,6 +361,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
         originalSize: number;
         processedSize: number;
       };
+      if (!isCurrent()) return;
 
       set({
         resultUrl: result.downloadUrl,
@@ -349,14 +370,19 @@ export const useMemeStore = create<MemeState>((set, get) => ({
         generating: false,
       });
     } catch (err) {
+      if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         error: err instanceof Error ? err.message : "Meme generation failed",
         generating: false,
       });
+    } finally {
+      if (generateController === controller) generateController = null;
+      if (isCurrent()) set({ generating: false });
     }
   },
 
   backToGallery: () => {
+    cancelActiveGeneration();
     const oldUrl = get().customImageUrl;
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     set({
@@ -376,6 +402,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   backToEditor: () => set({ phase: "editor", resultUrl: null, downloadUrl: null }),
 
   reset: () => {
+    cancelActiveGeneration();
     const oldUrl = get().customImageUrl;
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     set({

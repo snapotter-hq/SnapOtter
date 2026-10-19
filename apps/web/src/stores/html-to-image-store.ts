@@ -48,6 +48,9 @@ const DEFAULTS = {
   error: null as string | null,
 };
 
+let captureController: AbortController | null = null;
+let captureRunId = 0;
+
 export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
   ...DEFAULTS,
 
@@ -66,6 +69,12 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     const hasInput = state.mode === "url" ? state.url : state.htmlContent;
     if (!hasInput || state.capturing) return;
 
+    captureController?.abort();
+    const controller = new AbortController();
+    captureController = controller;
+    const runId = ++captureRunId;
+    const isCurrent = () => runId === captureRunId && !controller.signal.aborted;
+
     set({ capturing: true, error: null, resultUrl: null, resultSize: null });
 
     try {
@@ -81,11 +90,13 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
           viewportWidth: state.viewportWidth,
           viewportHeight: state.viewportHeight,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
         // A proxy's error page is not JSON; it still ends on the fallback.
         const body = await res.json().catch(() => null);
+        if (!isCurrent()) return;
         set({
           error: failedAnswerMessage(t, body, res.status, "Capture failed"),
           capturing: false,
@@ -94,6 +105,7 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
       }
 
       const data = resolveServerUrls(await res.json());
+      if (!isCurrent()) return;
 
       set({
         resultUrl: data.downloadUrl,
@@ -101,12 +113,22 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         capturing: false,
       });
     } catch (err) {
+      if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         error: err instanceof Error ? err.message : "Network error",
         capturing: false,
       });
+    } finally {
+      if (captureController === controller) captureController = null;
+      if (isCurrent()) set({ capturing: false });
     }
   },
 
-  reset: () => set({ ...DEFAULTS }),
+  reset: () => {
+    captureRunId++;
+    const controller = captureController;
+    captureController = null;
+    controller?.abort();
+    set({ ...DEFAULTS });
+  },
 }));

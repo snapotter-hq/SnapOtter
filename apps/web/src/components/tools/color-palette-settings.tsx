@@ -1,6 +1,7 @@
 import { Check, ClipboardCopy, Copy, Loader2, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
@@ -20,14 +21,34 @@ export function ColorPaletteSettings() {
   const [swatchCopy, setSwatchCopy] = useState<{ idx: number; ok: boolean } | null>(null);
   const [exportCopy, setExportCopy] = useState<{ kind: "css" | "json"; ok: boolean } | null>(null);
   const later = useTimeouts();
+  const abortRef = useRef<AbortController | null>(null);
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleProcess = async () => {
     if (files.length === 0) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setProcessing(true);
     setError(null);
     setColors([]);
     setHexColors([]);
+
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (abortRef.current === controller) abortRef.current = null;
+        unsubscribe();
+        controller.abort();
+      }
+    });
 
     try {
       const formData = new FormData();
@@ -38,6 +59,7 @@ export function ColorPaletteSettings() {
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -46,12 +68,25 @@ export function ColorPaletteSettings() {
       }
 
       const data = await res.json();
+      if (controller.signal.aborted || storeReset) return;
       setColors(data.colors);
       setHexColors(data.hex);
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
       setError(err instanceof Error ? err.message : ts.extracting);
     } finally {
-      setProcessing(false);
+      unsubscribe();
+      if (abortRef.current === controller) abortRef.current = null;
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
   };
 

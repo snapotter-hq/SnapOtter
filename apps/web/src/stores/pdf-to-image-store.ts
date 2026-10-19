@@ -124,8 +124,22 @@ const initialState = {
   zipSize: null as number | null,
 };
 
-/** Counts loadPreview calls so only the newest one writes its outcome. */
+/** Counts loadPreview and convert calls so only the newest one writes its outcome. */
 let latestPreviewRequest = 0;
+let previewController: AbortController | null = null;
+let latestConvertRequest = 0;
+let convertController: AbortController | null = null;
+
+function cancelActiveRequests() {
+  latestPreviewRequest++;
+  latestConvertRequest++;
+  const pCtrl = previewController;
+  const cCtrl = convertController;
+  previewController = null;
+  convertController = null;
+  pCtrl?.abort();
+  cCtrl?.abort();
+}
 
 export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   ...initialState,
@@ -146,7 +160,12 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   setFile: (file) => {
+    latestPreviewRequest++;
+    const pCtrl = previewController;
+    previewController = null;
+    pCtrl?.abort();
     if (!file) {
+      cancelActiveRequests();
       set({ ...initialState });
       return;
     }
@@ -191,10 +210,13 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   loadPreview: async (file, t = en) => {
+    previewController?.abort();
+    const controller = new AbortController();
+    previewController = controller;
     const request = ++latestPreviewRequest;
     // A slower answer for a file the viewer has since moved off must not
     // overwrite the newer request's pages, error, or spinner.
-    const isLatest = () => request === latestPreviewRequest;
+    const isLatest = () => request === latestPreviewRequest && !controller.signal.aborted;
     set({ loadingPreview: true, error: null });
     try {
       const formData = new FormData();
@@ -203,6 +225,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
@@ -216,7 +239,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         selectedPages: new Set(Array.from({ length: data.pageCount }, (_, i) => i + 1)),
       });
     } catch (err) {
-      if (!isLatest()) return;
+      if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
       // `file` stays: the panel asks for a preview whenever the selected file
       // differs from it, so clearing it here asked again on every render
       // (#1954). A null pageCount keeps Convert disabled.
@@ -226,6 +249,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         thumbnails: [],
       });
     } finally {
+      if (previewController === controller) previewController = null;
       if (isLatest()) set({ loadingPreview: false });
     }
   },
@@ -233,6 +257,11 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   convert: async (t = en) => {
     const { file, format, dpi, quality, colorMode, pages, selectedPages } = get();
     if (!file) return;
+    convertController?.abort();
+    const controller = new AbortController();
+    convertController = controller;
+    const request = ++latestConvertRequest;
+    const isLatest = () => request === latestConvertRequest && !controller.signal.aborted;
     set({ processing: true, error: null, results: null, zipUrl: null, zipSize: null });
     try {
       const formData = new FormData();
@@ -249,6 +278,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         method: "POST",
         headers: formatHeaders(),
         body: formData,
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
@@ -257,15 +287,21 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         );
       }
       const data = resolveServerUrls(await res.json());
+      if (!isLatest()) return;
       set({ results: data.pages, zipUrl: data.zipUrl, zipSize: data.zipSize });
     } catch (err) {
+      if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         error: err instanceof Error ? err.message : "Conversion failed",
       });
     } finally {
-      set({ processing: false });
+      if (convertController === controller) convertController = null;
+      if (isLatest()) set({ processing: false });
     }
   },
 
-  reset: () => set({ ...initialState }),
+  reset: () => {
+    cancelActiveRequests();
+    set({ ...initialState });
+  },
 }));

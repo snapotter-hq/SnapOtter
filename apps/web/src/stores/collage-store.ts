@@ -84,6 +84,30 @@ interface CollageState {
 const DEFAULT_TRANSFORM: CellTransform = { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
 
 let nextImageId = 0;
+let activeCollageAbort: (() => void) | null = null;
+let collageRunId = 0;
+
+export function beginCollageRun(abort: () => void): {
+  isCurrent: () => boolean;
+  end: () => void;
+} {
+  activeCollageAbort?.();
+  const runId = ++collageRunId;
+  activeCollageAbort = abort;
+  return {
+    isCurrent: () => runId === collageRunId,
+    end: () => {
+      if (activeCollageAbort === abort) activeCollageAbort = null;
+    },
+  };
+}
+
+function cancelActiveCollageRun() {
+  collageRunId++;
+  const abort = activeCollageAbort;
+  activeCollageAbort = null;
+  abort?.();
+}
 
 function buildDefaultAssignments(imageCount: number, cellCount: number): number[] {
   const assignments: number[] = [];
@@ -115,6 +139,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   jobId: null,
 
   addImages: (files) => {
+    cancelActiveCollageRun();
     const newImages: CollageImage[] = files.map((f) => ({
       id: `img-${++nextImageId}`,
       file: f,
@@ -158,6 +183,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   },
 
   removeImage: (index) => {
+    cancelActiveCollageRun();
     const state = get();
     const img = state.images[index];
     if (img) {
@@ -182,6 +208,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   },
 
   clearImages: () => {
+    cancelActiveCollageRun();
     const state = get();
     for (const img of state.images) {
       URL.revokeObjectURL(img.blobUrl);
@@ -271,6 +298,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     set({ resultUrl: url, resultSize: size, originalSize, jobId, phase: "result", error: null }),
   setError: (e) => set({ error: e, phase: "editing" }),
   reset: () => {
+    cancelActiveCollageRun();
     const state = get();
     for (const img of state.images) {
       URL.revokeObjectURL(img.blobUrl);
