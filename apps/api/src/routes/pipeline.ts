@@ -711,6 +711,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 // accepts nonterminal progress, cancel, and finalize writes.
                 set: {
                   settings: { pipelineFlowId: jobId },
+                  pool: pipelinePool,
+                  createdAt: sql`CASE WHEN ${isRepoint} THEN now() ELSE ${schema.jobs.createdAt} END`,
                   status: sql`CASE WHEN ${isRepoint} THEN 'queued' ELSE ${schema.jobs.status} END`,
                   completedAt: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.completedAt} END`,
                   error: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.error} END`,

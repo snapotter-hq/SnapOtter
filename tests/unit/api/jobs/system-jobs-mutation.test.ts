@@ -528,6 +528,13 @@ describe("dispatchSystemJob jobReconciliation (#1726)", () => {
     expect(text).toContain("status IN ('processing', 'queued')");
     expect(text).toContain("(tool_id IS NULL OR tool_id = '')");
     expect(text).toContain("created_at < now() - interval '1 hour'");
+    expect(text).toContain("AND NOT (");
+    expect(text).toContain("type = 'single'");
+    expect(text).toContain("jobs.settings->>'artifactJobId'");
+    expect(text).toContain("jobs.settings->>'pipelineFlowId'");
+    expect(text).toContain("target.status IN ('processing', 'queued')");
+    expect(text).toContain("AND target.tool_id IS NOT NULL");
+    expect(text).toContain("AND target.tool_id <> ''");
     expect(logSpy).toHaveBeenCalledWith({ count: 2 }, "Reconciled orphaned job rows");
     expect(result).toEqual({
       scanned: 1,

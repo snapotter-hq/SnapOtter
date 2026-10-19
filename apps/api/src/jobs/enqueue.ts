@@ -219,6 +219,8 @@ export async function upsertToolJobAlias(args: {
       set: {
         settings: aliasSettings,
         userId: args.userId,
+        pool: args.pool,
+        createdAt: sql`CASE WHEN ${isRepoint} THEN now() ELSE ${schema.jobs.createdAt} END`,
         status: sql`CASE WHEN ${isRepoint} THEN 'queued' ELSE ${schema.jobs.status} END`,
         completedAt: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.completedAt} END`,
         error: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.error} END`,

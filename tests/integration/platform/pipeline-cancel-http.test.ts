@@ -62,6 +62,7 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { isBatchCanceled } = await import("../../../apps/api/src/jobs/batch-progress.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { getFlowProducer } = await import("../../../apps/api/src/jobs/enqueue.js");
+const { runSystemJob, SYSTEM_JOBS } = await import("../../../apps/api/src/jobs/system-jobs.js");
 const { bullPrefix } = await import("../../../apps/api/src/jobs/types.js");
 const { completeBatchJob } = await import("../../../apps/api/src/routes/progress.js");
 const { fixtures, readFixture } = await import("../../fixtures/index.js");
@@ -350,23 +351,27 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     const clientJobId = randomUUID();
     await runPipeline(clientJobId);
 
-    // Seed a stale error on the completed alias row from run 1 so the re-point
-    // must clear status, completedAt, error, and progress alike.
+    // Seed a stale error and a >1h createdAt on the completed alias row from
+    // run 1 so the re-point must clear status, completedAt, error, and progress
+    // while refreshing createdAt (#2650, #2807).
+    const staleCreatedAt = new Date(Date.now() - 65 * 60_000);
     await db
       .update(schema.jobs)
-      .set({ error: { message: "prior error" } })
+      .set({ error: { message: "prior error" }, createdAt: staleCreatedAt })
       .where(eq(schema.jobs.id, clientJobId));
     const first = await jobRow(clientJobId);
     const firstFlow = ((first?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
     expect(first?.status).toBe("completed");
     expect(first?.completedAt).not.toBeNull();
     expect(first?.error).toEqual({ message: "prior error" });
+    expect(first?.createdAt.getTime()).toBe(staleCreatedAt.getTime());
 
     await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
     enqueueMock.captureFlowOnce = true;
     enqueueMock.timeoutOnce = true;
     enqueueMock.capturedFlow = null;
     try {
+      const beforeSecondRunMs = Date.now() - 5_000;
       const { body, contentType } = createMultipartPayload([
         { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
         {
@@ -393,10 +398,15 @@ describe("HTTP cancel on route-created pipeline rows", () => {
       expect(inFlightAlias?.status).toBe("processing");
       expect(inFlightAlias?.completedAt).toBeNull();
       expect(inFlightAlias?.error).toBeNull();
+      expect(inFlightAlias?.createdAt.getTime()).toBeGreaterThanOrEqual(beforeSecondRunMs);
       expect(inFlightAlias?.progress).toEqual({
         percent: 0,
         stage: "Preparing pipeline...",
       });
+
+      // Periodic jobReconciliation must not fail the re-pointed alias row (#2807).
+      await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+      expect((await jobRow(clientJobId))?.status).toBe("processing");
 
       // Canceling via clientJobId during run 2 now succeeds instead of being
       // refused by run 1's terminal status.

@@ -179,7 +179,9 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
       // placeholders reserve rows with no tool_id, so reconcileStrandedJobs
       // leaves them alone. Settle any that are still non-terminal after an hour
       // so a lost terminal write cannot hold a user's concurrency slot until
-      // the next restart (#1726).
+      // the next restart (#1726), while skipping single-file clientJobId alias
+      // rows whose target artifact or pipeline flow row is still non-terminal
+      // (#2807).
       const orphanResult = await db.execute(
         sql`UPDATE jobs
           SET status = 'failed',
@@ -187,7 +189,21 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
               completed_at = now()
           WHERE status IN ('processing', 'queued')
             AND (tool_id IS NULL OR tool_id = '')
-            AND created_at < now() - interval '1 hour'`,
+            AND created_at < now() - interval '1 hour'
+            AND NOT (
+              type = 'single'
+              AND EXISTS (
+                SELECT 1
+                FROM jobs AS target
+                WHERE target.id IN (
+                  jobs.settings->>'artifactJobId',
+                  jobs.settings->>'pipelineFlowId'
+                )
+                  AND target.status IN ('processing', 'queued')
+                  AND target.tool_id IS NOT NULL
+                  AND target.tool_id <> ''
+              )
+            )`,
       );
       const orphaned = (orphanResult as { rowCount?: number }).rowCount ?? 0;
       if (orphaned > 0) {

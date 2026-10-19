@@ -1704,5 +1704,263 @@ describe("stranded-job reconciliation", () => {
           .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
       }
     });
+
+    it("resets created_at when re-pointing a clientJobId alias row and skips alias rows whose target job is still non-terminal (#2807)", async () => {
+      const user = await createUserAndLogin(testApp.app, `orphan-alias-${Date.now()}`);
+      const backdatedCreatedAt = new Date(Date.now() - 65 * 60_000);
+
+      // 1. Re-pointed single-tool alias row: first run settled >1h ago, then re-pointed to a new live run.
+      const firstRunJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "completed",
+        ageMs: 65 * 60_000,
+      });
+      const repointedClientJobId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: firstRunJobId,
+        clientJobId: repointedClientJobId,
+        userId: user.userId,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({
+          status: "completed",
+          createdAt: backdatedCreatedAt,
+          completedAt: backdatedCreatedAt,
+        })
+        .where(eq(schema.jobs.id, repointedClientJobId));
+
+      // Second stamp with the SAME jobId must NOT reset created_at.
+      await upsertToolJobAlias({
+        jobId: firstRunJobId,
+        clientJobId: repointedClientJobId,
+        userId: user.userId,
+        pool: "image",
+      });
+      expect((await readJob(repointedClientJobId)).createdAt.getTime()).toBe(
+        backdatedCreatedAt.getTime(),
+      );
+
+      // Re-pointing to a fresh jobId MUST reset created_at to now().
+      const secondRunJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "queued",
+        ageMs: 0,
+      });
+      const beforeRepointMs = Date.now() - 5_000;
+      await upsertToolJobAlias({
+        jobId: secondRunJobId,
+        clientJobId: repointedClientJobId,
+        userId: user.userId,
+        pool: "image",
+      });
+      const repointedBeforeSweep = await readJob(repointedClientJobId);
+      expect(repointedBeforeSweep.status).toBe("queued");
+      expect(repointedBeforeSweep.createdAt.getTime()).toBeGreaterThanOrEqual(beforeRepointMs);
+
+      // 2. Long-running (>1h) single-tool alias row whose target artifactJobId is still live in BullMQ.
+      const longToolJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        ageMs: 65 * 60_000,
+      });
+      const longToolAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: longToolJobId,
+        clientJobId: longToolAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({ status: "processing", createdAt: backdatedCreatedAt })
+        .where(eq(schema.jobs.id, longToolAliasId));
+
+      // 3. Long-running (>1h) pipeline alias row whose target pipelineFlowId is still live in BullMQ.
+      const longPipelineFlowId = await seedJob({
+        userId: user.userId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "processing",
+        ageMs: 65 * 60_000,
+      });
+      const longPipelineAliasId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: longPipelineAliasId,
+        userId: user.userId,
+        pool: "image",
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { pipelineFlowId: longPipelineFlowId },
+        createdAt: backdatedCreatedAt,
+      });
+
+      // 4. Dangling (>1h) pre-enqueue alias row whose target artifactJobId was never inserted.
+      const danglingAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: randomUUID(),
+        clientJobId: danglingAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({ createdAt: backdatedCreatedAt })
+        .where(eq(schema.jobs.id, danglingAliasId));
+
+      // 5. Stuck (>1h) pipeline alias row whose target pipelineFlowId already settled.
+      const settledPipelineFlowId = await seedJob({
+        userId: user.userId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "completed",
+        ageMs: 65 * 60_000,
+      });
+      const settledPipelineAliasId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: settledPipelineAliasId,
+        userId: user.userId,
+        pool: "image",
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { pipelineFlowId: settledPipelineFlowId },
+        createdAt: backdatedCreatedAt,
+      });
+
+      // 6. Colliding (>1h) non-single batch row carrying artifactJobId in settings: must still be reconciled.
+      const nonSingleBatchId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: nonSingleBatchId,
+        userId: user.userId,
+        type: "batch",
+        status: "processing",
+        inputRefs: [],
+        settings: { artifactJobId: longToolJobId },
+        createdAt: backdatedCreatedAt,
+      });
+
+      // 7. Self-referential (>1h) tool_id-less single row: target has no tool_id, so it must still be reconciled.
+      const selfRefAliasId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: selfRefAliasId,
+        userId: user.userId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { artifactJobId: selfRefAliasId },
+        createdAt: backdatedCreatedAt,
+      });
+
+      // 8. Alias row (>1h) pointing at an empty-string tool_id row: target.tool_id <> '' must exclude it.
+      const emptyToolTargetId = await seedJob({
+        userId: user.userId,
+        toolId: "",
+        pool: null,
+        type: "tool",
+        status: "processing",
+        ageMs: 65 * 60_000,
+      });
+      const emptyToolAliasId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: emptyToolAliasId,
+        userId: user.userId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { artifactJobId: emptyToolTargetId },
+        createdAt: backdatedCreatedAt,
+      });
+
+      // 9. Stranded (>1h) recoverable tool job and its (>1h) alias row: reconcileStrandedJobs() runs first
+      // inside SYSTEM_JOBS.jobReconciliation and must recover both to completed rather than the orphan
+      // UPDATE failing the alias row.
+      const recoverableStrandedJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        ageMs: 65 * 60_000,
+      });
+      await seedOutput(recoverableStrandedJobId, "recovered.avif", Buffer.from("avif-bytes"));
+      const recoverableStrandedAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: recoverableStrandedJobId,
+        clientJobId: recoverableStrandedAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({ status: "processing", createdAt: backdatedCreatedAt })
+        .where(eq(schema.jobs.id, recoverableStrandedAliasId));
+
+      const queue = getQueue("image");
+      await queue.add("convert", { jobId: secondRunJobId } as never, {
+        jobId: secondRunJobId,
+        delay: 10 * 60_000,
+      });
+      await queue.add("convert", { jobId: longToolJobId } as never, {
+        jobId: longToolJobId,
+        delay: 10 * 60_000,
+      });
+      await queue.add("pipeline-finalize", { jobId: longPipelineFlowId } as never, {
+        jobId: longPipelineFlowId,
+        delay: 10 * 60_000,
+      });
+
+      try {
+        await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as unknown as Job);
+
+        expect((await readJob(repointedClientJobId)).status).toBe("queued");
+        expect((await readJob(longToolAliasId)).status).toBe("processing");
+        expect((await readJob(longPipelineAliasId)).status).toBe("processing");
+
+        const danglingAfter = await readJob(danglingAliasId);
+        expect(danglingAfter.status).toBe("failed");
+        expect(danglingAfter.error).toEqual({ message: "Orphaned job reconciled" });
+
+        const settledPipelineAliasAfter = await readJob(settledPipelineAliasId);
+        expect(settledPipelineAliasAfter.status).toBe("failed");
+        expect(settledPipelineAliasAfter.error).toEqual({ message: "Orphaned job reconciled" });
+
+        const nonSingleBatchAfter = await readJob(nonSingleBatchId);
+        expect(nonSingleBatchAfter.status).toBe("failed");
+        expect(nonSingleBatchAfter.error).toEqual({ message: "Orphaned job reconciled" });
+
+        const selfRefAfter = await readJob(selfRefAliasId);
+        expect(selfRefAfter.status).toBe("failed");
+        expect(selfRefAfter.error).toEqual({ message: "Orphaned job reconciled" });
+
+        const emptyToolAliasAfter = await readJob(emptyToolAliasId);
+        expect(emptyToolAliasAfter.status).toBe("failed");
+        expect(emptyToolAliasAfter.error).toEqual({ message: "Orphaned job reconciled" });
+
+        const recoveredAliasAfter = await readJob(recoverableStrandedAliasId);
+        expect(recoveredAliasAfter.status).toBe("completed");
+        expect(recoveredAliasAfter.error).toBeNull();
+        expect(resultOf(recoveredAliasAfter).downloadUrl).toBe(
+          `/api/v1/download/${recoverableStrandedJobId}/recovered.avif`,
+        );
+      } finally {
+        await queue.remove(secondRunJobId).catch(() => {});
+        await queue.remove(longToolJobId).catch(() => {});
+        await queue.remove(longPipelineFlowId).catch(() => {});
+      }
+    });
   });
 });

@@ -159,6 +159,7 @@ async function loadEnqueueModule(
         type: "jobs.type",
         userId: "jobs.userId",
         settings: "jobs.settings",
+        createdAt: "jobs.createdAt",
         status: "jobs.status",
         completedAt: "jobs.completedAt",
         error: "jobs.error",
@@ -712,5 +713,38 @@ describe("alias claim outcomes (#895)", () => {
       expect.objectContaining({ jobId: "job-claimed", clientJobId: "owned-alias-id" }),
       { jobId: "job-claimed" },
     );
+  });
+
+  it("upsertToolJobAlias resets createdAt alongside terminal columns when re-pointing (#2807)", async () => {
+    const { mod } = await loadEnqueueModule();
+    onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 1 });
+
+    await expect(
+      mod.upsertToolJobAlias({
+        jobId: "job-next",
+        clientJobId: "reused-client-id",
+        userId: "user-1",
+        pool: "docs",
+      }),
+    ).resolves.toBe(true);
+
+    expect(onConflictDoUpdateMock).toHaveBeenCalledTimes(1);
+    const conflictArg = onConflictDoUpdateMock.mock.calls[0][0] as {
+      set: Record<string, unknown>;
+    };
+    expect(conflictArg.set.pool).toBe("docs");
+    const createdAtSql = conflictArg.set.createdAt as { sql?: [TemplateStringsArray, unknown[]] };
+    expect(createdAtSql).toBeDefined();
+    const [strings, values] = createdAtSql.sql ?? [[], []];
+    expect(strings.join(" ")).toContain("CASE WHEN");
+    expect(strings.join(" ")).toContain("THEN now() ELSE");
+    const isRepointSql = values[0] as { sql?: [TemplateStringsArray, unknown[]] };
+    expect(isRepointSql.sql?.[0].join(" ")).toContain("->>'artifactJobId' is distinct from");
+    expect(isRepointSql.sql?.[1]).toEqual(["jobs.settings", "job-next"]);
+    expect(values[1]).toBe("jobs.createdAt");
+    expect(conflictArg.set.status).toBeDefined();
+    expect(conflictArg.set.completedAt).toBeDefined();
+    expect(conflictArg.set.error).toBeDefined();
+    expect(conflictArg.set.progress).toBeDefined();
   });
 });
