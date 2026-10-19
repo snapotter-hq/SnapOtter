@@ -9,7 +9,7 @@
  * Returns a ZIP file containing all processed images.
  */
 import { randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { FEATURE_BUNDLES, isSafeMessageError, TOOLS, toolSection } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { eq, inArray } from "drizzle-orm";
@@ -39,7 +39,6 @@ import {
 import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
-import { sanitizeFilename } from "../lib/filename.js";
 import { decodeToSharpCompat, needsCliDecode } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
@@ -57,6 +56,7 @@ import {
   resolveOcrUploadLimits,
 } from "../lib/ocr-limits.js";
 import {
+  configuredUploadLimit,
   type SpooledMultipartFile,
   spoolMultipartFile,
   storeValidatedOcrPdf,
@@ -71,10 +71,6 @@ import { inputHandlerFor } from "../modality/input-handler.js";
 import { requireToolAccess } from "../permissions.js";
 import { failBatchJob, updateJobProgress } from "./progress.js";
 import { getToolConfig } from "./tool-factory.js";
-
-type ParsedFile =
-  | { kind: "buffer"; buffer: Buffer; filename: string; size: number }
-  | ({ kind: "path" } & SpooledMultipartFile);
 
 const formatMb = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
@@ -155,8 +151,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
-          // Parse multipart: collect all files and the settings field
-          const files: ParsedFile[] = [];
+          // Parse multipart: spool all files to scratch and collect the settings field
+          const files: SpooledMultipartFile[] = [];
           let settingsRaw: string | null = null;
           let clientJobId: string | null = null;
           let clientJobIdRaw: string | null = null;
@@ -164,6 +160,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             toolId === "ocr" || toolId === "ocr-pdf"
               ? resolveOcrUploadLimits(env.MAX_UPLOAD_SIZE_MB)
               : undefined;
+          const fileMaxBytes =
+            ocrUploadLimits?.fileBytes ?? configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB);
           let totalEncodedBytes = 0;
           let filePartIndex = 0;
 
@@ -175,54 +173,50 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             );
             for await (const part of parts) {
               if (part.type === "file") {
-                if (toolId === "ocr-pdf") {
-                  const remainingAggregate =
-                    (ocrUploadLimits?.aggregateBytes ?? Number.MAX_SAFE_INTEGER) -
-                    totalEncodedBytes;
-                  const file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
-                    maxBytes: Math.min(
-                      ocrUploadLimits?.fileBytes ?? Number.MAX_SAFE_INTEGER,
-                      Math.max(0, remainingAggregate),
-                    ),
+                const remainingAggregate =
+                  ocrUploadLimits !== undefined
+                    ? Math.max(0, ocrUploadLimits.aggregateBytes - totalEncodedBytes)
+                    : undefined;
+                const partMaxBytes =
+                  fileMaxBytes !== undefined && remainingAggregate !== undefined
+                    ? Math.min(fileMaxBytes, remainingAggregate)
+                    : (fileMaxBytes ?? remainingAggregate);
+                let file: SpooledMultipartFile;
+                try {
+                  file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
+                    maxBytes: partMaxBytes,
                     signal: ingressAbort.signal,
                   });
-                  totalEncodedBytes += file.size;
+                } catch (spoolErr) {
                   if (
                     ocrUploadLimits !== undefined &&
-                    totalEncodedBytes > ocrUploadLimits.aggregateBytes
+                    remainingAggregate !== undefined &&
+                    (fileMaxBytes === undefined || remainingAggregate < fileMaxBytes) &&
+                    (spoolErr as { statusCode?: unknown })?.statusCode === 413 &&
+                    (spoolErr as { limitBytes?: unknown })?.limitBytes === remainingAggregate
                   ) {
                     throw new InputValidationError(
                       `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
                       413,
                     );
                   }
-                  // Empty parts keep their slot: the client maps results back
-                  // onto its own file list by index, so dropping one here
-                  // would label a converted file with a different file's name
-                  // (issue #645). They fail in place in the loop below.
-                  files.push({ kind: "path", ...file });
-                } else {
-                  const chunks: Buffer[] = [];
-                  for await (const chunk of part.file) {
-                    if (ocrUploadLimits !== undefined) {
-                      totalEncodedBytes += chunk.length;
-                      if (totalEncodedBytes > ocrUploadLimits.aggregateBytes) {
-                        throw new InputValidationError(
-                          `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
-                          413,
-                        );
-                      }
-                    }
-                    chunks.push(chunk);
-                  }
-                  const buffer = Buffer.concat(chunks);
-                  files.push({
-                    kind: "buffer",
-                    buffer,
-                    filename: sanitizeFilename(part.filename ?? "file"),
-                    size: buffer.length,
-                  });
+                  throw spoolErr;
                 }
+                totalEncodedBytes += file.size;
+                if (
+                  ocrUploadLimits !== undefined &&
+                  totalEncodedBytes > ocrUploadLimits.aggregateBytes
+                ) {
+                  throw new InputValidationError(
+                    `OCR batch input exceeds the ${formatLimit(ocrUploadLimits.aggregateBytes)} aggregate safety limit`,
+                    413,
+                  );
+                }
+                // Empty parts keep their slot: the client maps results back
+                // onto its own file list by index, so dropping one here
+                // would label a converted file with a different file's name
+                // (issue #645). They fail in place in the loop below.
+                files.push(file);
                 filePartIndex++;
               } else if (part.fieldname === "settings") {
                 settingsRaw = part.value as string;
@@ -410,7 +404,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 filename: file.filename,
                 error: "File is empty",
               });
-              if (file.kind === "path") await rm(file.path, { force: true }).catch(() => {});
+              await rm(file.path, { force: true }).catch(() => {});
               continue;
             }
 
@@ -430,7 +424,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
               stagedBatch?.childIds.push(childId);
             };
 
-            if (file.kind === "path") {
+            if (toolId === "ocr-pdf") {
               try {
                 await storeValidatedOcrPdf(file, key, {
                   maxBytes: ocrUploadLimits?.fileBytes ?? file.size,
@@ -456,7 +450,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 await rm(file.path, { force: true }).catch(() => {});
               }
             } else {
-              let processBuffer = file.buffer;
+              let processBuffer: Buffer;
+              try {
+                processBuffer = await readFile(file.path);
+              } finally {
+                await rm(file.path, { force: true }).catch(() => {});
+              }
               if (modality === "image" && toolId === "ocr") {
                 try {
                   const prepared = await prepareOcrIngressImage(
