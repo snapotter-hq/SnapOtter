@@ -80,31 +80,52 @@ import { userFileRoutes } from "../../apps/api/src/routes/user-files.js";
 // ensures the __drizzle_migrations journal is consistent in each fork).
 await runMigrations();
 
-// ── Job spine lifecycle (once per fork) ────────────────────────────
+// ── Job spine lifecycle (once per module graph) ────────────────────
 // Workers idle when unused; starting them for every integration file is cheap.
+// Track live TestApp instances so cleanup() stops the spine when the last app
+// in this module graph closes, before a later describe block calls
+// vi.resetModules() and boots a second module graph on the same Redis queues.
 let spineStarted = false;
+let activeApps = 0;
 
 async function ensureSpine(): Promise<void> {
   if (spineStarted) return;
   spineStarted = true;
-  await startCancelListener();
-  startWorkers();
-  // Position every pool's QueueEvents consumer at the stream tail *before* the
-  // first job is enqueued. Without this, the first sync-wait per fork lazily
-  // creates a consumer that can miss a fast job's completion event and block
-  // for the full SYNC_WAIT_MS window -- the root cause of the csv-json 30s
-  // timeout flake. Awaited here so it is deterministic for the first request.
-  await warmQueueEvents();
+  try {
+    await startCancelListener();
+    startWorkers();
+    // Position every pool's QueueEvents consumer at the stream tail *before* the
+    // first job is enqueued. Without this, the first sync-wait per fork lazily
+    // creates a consumer that can miss a fast job's completion event and block
+    // for the full SYNC_WAIT_MS window (the root cause of the csv-json 30s
+    // timeout flake). Awaited here so it is deterministic for the first request.
+    await warmQueueEvents();
+  } catch (err) {
+    await stopSpine().catch(() => {});
+    throw err;
+  }
+}
+
+async function stopSpine(): Promise<void> {
+  if (!spineStarted) return;
+  spineStarted = false;
+  const results = await Promise.allSettled([
+    closeWorkers(),
+    stopCancelListener(),
+    closeQueueEvents(),
+  ]);
+  const rejected = results.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  if (rejected) {
+    throw rejected.reason;
+  }
 }
 
 // Module-scope afterAll: vitest registers this into any importing file's
 // suite, so every fork cleans up workers and cancel listener on exit.
 afterAll(async () => {
-  if (spineStarted) {
-    await closeWorkers();
-    await stopCancelListener();
-    await closeQueueEvents();
-  }
+  await stopSpine();
 }, 10_000);
 
 // ---------------------------------------------------------------------------
@@ -335,8 +356,19 @@ export async function buildTestApp(): Promise<TestApp> {
   // Ensure Fastify is ready (all plugins loaded)
   await app.ready();
 
+  activeApps += 1;
+  let cleanedUp = false;
   const cleanup = async () => {
-    await app.close();
+    if (cleanedUp) return;
+    cleanedUp = true;
+    try {
+      await app.close();
+    } finally {
+      activeApps = Math.max(0, activeApps - 1);
+      if (activeApps === 0) {
+        await stopSpine();
+      }
+    }
     // The pg pool is a module-level singleton shared across the fork.
     // Do NOT call closeDb() here; let the fork process exit naturally.
     // Closing prematurely would break tests that run DB queries after
