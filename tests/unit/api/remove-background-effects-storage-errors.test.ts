@@ -31,8 +31,10 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   };
 });
 
+import { UNDECODABLE_IMAGE_MESSAGE } from "../../../apps/api/src/lib/image-error.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerRemoveBackground } from "../../../apps/api/src/routes/tools/remove-background.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 const EFFECTS_URL = "/api/v1/tools/image/remove-background/effects";
 
@@ -45,15 +47,30 @@ async function buildApp() {
   return app;
 }
 
-function effectsRequest(settings: Record<string, unknown>) {
+function effectsRequest(
+  settings: Record<string, unknown>,
+  backgroundImage?: { filename: string; contentType: string; content: Buffer },
+) {
   const boundary = "----unit";
-  const payload = Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="settings"\r\n\r\n${JSON.stringify(settings)}\r\n--${boundary}--\r\n`,
-  );
+  const parts: Buffer[] = [
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="settings"\r\n\r\n${JSON.stringify(settings)}\r\n`,
+    ),
+  ];
+  if (backgroundImage) {
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="backgroundImage"; filename="${backgroundImage.filename}"\r\nContent-Type: ${backgroundImage.contentType}\r\n\r\n`,
+      ),
+      backgroundImage.content,
+      Buffer.from("\r\n"),
+    );
+  }
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
   return {
     method: "POST" as const,
     url: EFFECTS_URL,
-    payload,
+    payload: Buffer.concat(parts),
     headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
   };
 }
@@ -174,6 +191,122 @@ describe("remove-background effects: reading the stored mask and original", () =
     );
     expect(res.statusCode).toBe(200);
     expect(res.json().downloadUrl).toContain("/api/v1/download/job/");
+    expect(putObject).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers 400 Invalid background image when backgroundImage fails validateImageBuffer (#2827)", async () => {
+    getObjectBuffer.mockImplementation(async (key: string) =>
+      key.endsWith("_mask.png")
+        ? sharp(await png(3))
+            .greyscale()
+            .png()
+            .toBuffer()
+        : png(3),
+    );
+    app = await buildApp();
+    const res = await app.inject(
+      effectsRequest(
+        { ...settings, backgroundType: "image" },
+        {
+          filename: "bg.png",
+          contentType: "image/png",
+          content: Buffer.from("not an image"),
+        },
+      ),
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/^Invalid background image:/);
+    expect(putObject).not.toHaveBeenCalled();
+  });
+
+  it("answers 422 UNDECODABLE_IMAGE_MESSAGE when backgroundImage passes header validation but fails pixel decode", async () => {
+    const truncatedJpg = readFixture(fixtures.image.hostile.truncated);
+    getObjectBuffer.mockImplementation(async (key: string) =>
+      key.endsWith("_mask.png")
+        ? sharp(await png(3))
+            .greyscale()
+            .png()
+            .toBuffer()
+        : png(3),
+    );
+    app = await buildApp();
+    const res = await app.inject(
+      effectsRequest(
+        { ...settings, backgroundType: "image" },
+        {
+          filename: "truncated.jpg",
+          contentType: "image/jpeg",
+          content: truncatedJpg,
+        },
+      ),
+    );
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({
+      error: "Effects processing failed",
+      details: UNDECODABLE_IMAGE_MESSAGE,
+    });
+    expect(putObject).not.toHaveBeenCalled();
+  });
+
+  it("composites a valid uploaded backgroundImage when backgroundType is image", async () => {
+    const validBg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 0, g: 255, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    const transparentMask = await sharp({
+      create: { width: 8, height: 8, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+    getObjectBuffer.mockImplementation(async (key: string) =>
+      key.endsWith("_mask.png") ? transparentMask : png(3),
+    );
+    putObject.mockResolvedValue(undefined);
+    app = await buildApp();
+    const res = await app.inject(
+      effectsRequest(
+        { ...settings, backgroundType: "image" },
+        {
+          filename: "bg.png",
+          contentType: "image/png",
+          content: validBg,
+        },
+      ),
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().downloadUrl).toContain("/api/v1/download/job/");
+    expect(putObject).toHaveBeenCalledTimes(1);
+    const savedBuf = putObject.mock.calls[0]?.[1] as Buffer;
+    const { data } = await sharp(savedBuf)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect([...data.subarray(0, 4)]).toEqual([0, 255, 0, 255]);
+  });
+
+  it("ignores an unused backgroundImage part when backgroundType is not image", async () => {
+    getObjectBuffer.mockImplementation(async (key: string) =>
+      key.endsWith("_mask.png")
+        ? sharp(await png(3))
+            .greyscale()
+            .png()
+            .toBuffer()
+        : png(3),
+    );
+    putObject.mockResolvedValue(undefined);
+    app = await buildApp();
+    const res = await app.inject(
+      effectsRequest(
+        { ...settings, backgroundType: "color", backgroundColor: "#ff0000" },
+        {
+          filename: "unused.bin",
+          contentType: "application/octet-stream",
+          content: Buffer.from("not an image"),
+        },
+      ),
+    );
+    expect(res.statusCode).toBe(200);
     expect(putObject).toHaveBeenCalledTimes(1);
   });
 });

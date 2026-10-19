@@ -513,13 +513,18 @@ export function registerRemoveBackground(app: FastifyInstance) {
       const originalBuffer = originalRead.value;
 
       try {
-        // Decode HEIC/HEIF background image if needed
-        if (bgImageBuffer) {
+        // Validate and decode the custom background image when one is used
+        if (settings.backgroundType === "image" && bgImageBuffer) {
           const bgValidation = await validateImageBuffer(bgImageBuffer, bgFilename);
-          if (bgValidation.valid && bgValidation.format === "heif") {
+          if (!bgValidation.valid) {
+            return reply
+              .status(400)
+              .send({ error: `Invalid background image: ${bgValidation.reason}` });
+          }
+          if (bgValidation.format === "heif") {
             bgImageBuffer = await decodeHeic(bgImageBuffer);
           }
-          if (bgValidation.valid && needsCliDecode(bgValidation.format)) {
+          if (needsCliDecode(bgValidation.format)) {
             bgImageBuffer = await decodeToSharpCompat(bgImageBuffer, bgValidation.format);
           }
         }
@@ -534,7 +539,8 @@ export function registerRemoveBackground(app: FastifyInstance) {
             gradientColor1: settings.gradientColor1,
             gradientColor2: settings.gradientColor2,
             gradientAngle: settings.gradientAngle,
-            backgroundImageBuffer: bgImageBuffer ?? undefined,
+            backgroundImageBuffer:
+              settings.backgroundType === "image" ? (bgImageBuffer ?? undefined) : undefined,
             blurEnabled: settings.blurEnabled,
             blurIntensity: settings.blurIntensity,
             shadowEnabled: settings.shadowEnabled,
@@ -542,7 +548,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
             outputFormat: fmt,
           });
         } catch (err) {
-          if (bgImageBuffer) {
+          if (settings.backgroundType === "image" && bgImageBuffer) {
             throw await asInputErrorIfUndecodable(bgImageBuffer, err);
           }
           throw err;

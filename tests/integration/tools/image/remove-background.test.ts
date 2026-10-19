@@ -406,6 +406,41 @@ describe("Remove Background", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("effects route rejects an invalid backgroundImage with 400 (#2827)", async () => {
+    const jobId = randomUUID();
+    await seedPhase1Cache(jobId, "test");
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "backgroundImage",
+        filename: "bg.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          jobId,
+          filename: "test.png",
+          backgroundType: "image",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/^Invalid background image:/);
+  });
+
   it("effects route lets a storage fault reading the mask reach the error handler (#2119)", async () => {
     // A directory where the mask should be makes the read fail with EISDIR:
     // the object exists but can't be read, which is the server's fault.
