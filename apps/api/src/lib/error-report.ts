@@ -102,6 +102,11 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
   if (e && typeof e.message === "string" && /^(Canceled$|Timed out after )/.test(e.message)) {
     return "expected";
   }
+  // An authored SafeError has already been classified by its thrower; check it
+  // before isClientAbort so an S3 connection reset (TimeoutError with
+  // code="ECONNRESET") or an upstream "aborted"/"Premature close" wrapped in a
+  // storage SafeError is not mistaken for the browser hanging up (#1643).
+  if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   // The next two shortcuts only make sense at the HTTP boundary (undefined
   // keeps the http-ish default for direct calls). Off the request path a bare
   // ECONNRESET is an upstream socket loss, not a client abort, and a ZodError
@@ -119,7 +124,6 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
   // the job's lock alive: an environmental strain, not a defect in our code.
   // Operational (one warning/hour) instead of bug spam (NODE-27).
   if (e?.name === "UnrecoverableError") return "operational";
-  if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
   if (isOperationalErrno(err)) return "operational";

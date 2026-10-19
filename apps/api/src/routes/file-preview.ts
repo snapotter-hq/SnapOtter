@@ -23,16 +23,17 @@ import { basename, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
 import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
-import { isSafeMessageError } from "@snapotter/shared";
+import { connectivityClass, isClientAbort, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { reportError } from "../lib/error-report.js";
 import { friendlyError } from "../lib/errors.js";
-import { getStoredFilePath, streamStoredFile } from "../lib/file-storage.js";
+import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
 import { mp4TimescaleArgs } from "../lib/media-tool.js";
+import { STORAGE_UNAVAILABLE_MESSAGE } from "../lib/object-storage.js";
 import { hasEffectivePermission, requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 
@@ -234,9 +235,46 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+function s3PreviewStorageFault(cause: unknown): SafeError {
+  return new SafeError(STORAGE_UNAVAILABLE_MESSAGE, {
+    kind: "operational",
+    code: "storage-unavailable",
+    statusCode: 503,
+    cause,
+  });
+}
+
+function isS3ReadUnavailable(err: unknown): boolean {
+  if (!isStorageServiceFault(err)) return false;
+  const s3Answered = typeof err === "object" && err !== null && "$metadata" in err;
+  if (s3Answered || connectivityClass(err) === "net-unavailable") return true;
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  return code === "ERR_STREAM_PREMATURE_CLOSE" || code === "EIO" || isClientAbort(err);
+}
+
+async function openStoredStream(storedName: string): ReturnType<typeof streamStoredFile> {
+  try {
+    return await streamStoredFile(storedName);
+  } catch (err) {
+    if (isS3ReadUnavailable(err)) throw s3PreviewStorageFault(err);
+    throw err;
+  }
+}
+
 async function stageStoredFile(storedName: string, destPath: string): Promise<void> {
-  const source = await streamStoredFile(storedName);
-  await pipeline(source, createWriteStream(destPath));
+  const source = await openStoredStream(storedName);
+  try {
+    await pipeline(source, createWriteStream(destPath));
+  } catch (err) {
+    if (!source.destroyed) {
+      if (source.listenerCount("error") === 0) source.once("error", () => {});
+      source.destroy();
+    }
+    if ((err as NodeJS.ErrnoException | null)?.path !== destPath && isS3ReadUnavailable(err)) {
+      throw s3PreviewStorageFault(err);
+    }
+    throw err;
+  }
 }
 
 const OFFICE_MIMES = new Set([
@@ -290,7 +328,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
       if (isPdf) {
         let stream: Awaited<ReturnType<typeof streamStoredFile>>;
         try {
-          stream = await streamStoredFile(file.storedName);
+          stream = await openStoredStream(file.storedName);
         } catch (err) {
           reportPreviewFault(
             err,

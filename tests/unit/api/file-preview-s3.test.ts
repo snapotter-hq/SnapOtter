@@ -27,6 +27,8 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 
 const s3Objects = vi.hoisted(() => new Map<string, Buffer>());
 const s3MidStreamError = vi.hoisted(() => new Set<string>());
+const s3MidStreamPrematureClose = vi.hoisted(() => new Set<string>());
+const s3OpenError = vi.hoisted(() => new Map<string, unknown>());
 const s3GetStreamCalls = vi.hoisted(() => [] as string[]);
 
 vi.mock("@snapotter/enterprise", () => ({
@@ -48,11 +50,21 @@ vi.mock("@snapotter/enterprise", () => ({
     }),
     getObjectStream: vi.fn(async (storedName: string) => {
       s3GetStreamCalls.push(storedName);
+      const openErr = s3OpenError.get(storedName);
+      if (openErr) throw openErr;
       if (s3MidStreamError.has(storedName)) {
         return new Readable({
           read() {
             this.push(Buffer.from("partial-bytes"));
             this.destroy(Object.assign(new Error("S3 stream reset"), { code: "EIO" }));
+          },
+        });
+      }
+      if (s3MidStreamPrematureClose.has(storedName)) {
+        return new Readable({
+          read() {
+            this.push(Buffer.from("partial-bytes"));
+            this.destroy();
           },
         });
       }
@@ -117,9 +129,13 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
   requirePermission: () => async () => true,
 }));
 
-vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
-  reportError: mocks.reportError,
-}));
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: mocks.reportError,
+  };
+});
 
 vi.mock("@snapotter/doc-engine", () => ({
   sofficeAvailable: () => true,
@@ -142,6 +158,8 @@ describe("GET /api/v1/files/:id/preview in S3 storage mode (#1575)", () => {
     config.STORAGE_MODE = "s3";
     s3Objects.clear();
     s3MidStreamError.clear();
+    s3MidStreamPrematureClose.clear();
+    s3OpenError.clear();
     s3GetStreamCalls.length = 0;
     fileRows.clear();
     mocks.reportError.mockReset();
@@ -221,6 +239,11 @@ describe("GET /api/v1/files/:id/preview in S3 storage mode (#1575)", () => {
     expect(res.headers["cache-control"]).toBeUndefined();
     expect(s3GetStreamCalls).toEqual([row.storedName]);
     expect(mocks.reportError).toHaveBeenCalledTimes(1);
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+    const [reportedErr, reportedCtx] = mocks.reportError.mock.calls[0];
+    expect(reportedErr).toMatchObject({ name: "NoSuchKey" });
+    expect((reportedErr as { isSafeMessage?: unknown }).isSafeMessage).toBeUndefined();
+    expect(classifyError(reportedErr, reportedCtx.source)).toBe("bug");
   });
 
   it("stages an office document from S3 for LibreOffice conversion and caches the PDF", async () => {
@@ -383,6 +406,84 @@ describe("GET /api/v1/files/:id/preview in S3 storage mode (#1575)", () => {
     expect(mocks.runFfmpeg).not.toHaveBeenCalled();
     expect(mocks.reportError).toHaveBeenCalledTimes(1);
     expect(await readdir(join(testDir, ".previews"))).toEqual([]);
+  });
+
+  it("reports S3 ECONNRESET and mid-stream premature close as operational instead of dropping them as client aborts (#1643)", async () => {
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+
+    const pdfRow = await seedS3File({
+      id: "pdf-s3-reset",
+      originalName: "reset.pdf",
+      mimeType: "application/pdf",
+      content: Buffer.from("%PDF-1.4"),
+    });
+    const resetErr = Object.assign(new Error("read ECONNRESET"), {
+      name: "TimeoutError",
+      code: "ECONNRESET",
+      $metadata: { attempts: 3 },
+    });
+    s3OpenError.set(pdfRow.storedName, resetErr);
+
+    const pdfRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/files/pdf-s3-reset/preview",
+    });
+    expect(pdfRes.statusCode).toBe(500);
+    expect(mocks.reportError).toHaveBeenCalledTimes(1);
+    const [pdfReportedErr, pdfCtx] = mocks.reportError.mock.calls[0];
+    expect(classifyError(pdfReportedErr, pdfCtx.source)).toBe("operational");
+    expect(pdfReportedErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      cause: resetErr,
+    });
+
+    mocks.reportError.mockReset();
+
+    const docxRow = await seedS3File({
+      id: "docx-s3-premature",
+      originalName: "cut.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      content: Buffer.from("PK-docx"),
+    });
+    s3MidStreamPrematureClose.add(docxRow.storedName);
+
+    const docxRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/files/docx-s3-premature/preview",
+    });
+    expect(docxRes.statusCode).toBe(500);
+    expect(mocks.reportError).toHaveBeenCalledTimes(1);
+    const [docxReportedErr, docxCtx] = mocks.reportError.mock.calls[0];
+    expect(classifyError(docxReportedErr, docxCtx.source)).toBe("operational");
+    expect(docxReportedErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      cause: expect.objectContaining({ code: "ERR_STREAM_PREMATURE_CLOSE" }),
+    });
+
+    mocks.reportError.mockReset();
+
+    const bugRow = await seedS3File({
+      id: "docx-s3-bug",
+      originalName: "bug.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      content: Buffer.from("PK-docx"),
+    });
+    const unexpectedBug = new TypeError("unexpected S3 client defect");
+    s3OpenError.set(bugRow.storedName, unexpectedBug);
+
+    const bugRes = await app.inject({
+      method: "GET",
+      url: "/api/v1/files/docx-s3-bug/preview",
+    });
+    expect(bugRes.statusCode).toBe(500);
+    expect(mocks.reportError).toHaveBeenCalledTimes(1);
+    const [bugReportedErr, bugCtx] = mocks.reportError.mock.calls[0];
+    expect(bugReportedErr).toBe(unexpectedBug);
+    expect(classifyError(bugReportedErr, bugCtx.source)).toBe("bug");
   });
 
   it("removes both the S3 temp input dir and partial output when ffmpeg fails mid-encode", async () => {

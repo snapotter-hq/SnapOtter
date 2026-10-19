@@ -14,6 +14,7 @@ import type { S3StorageModule } from "@snapotter/enterprise";
 import { CAMERA_RAW_INPUTS, SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
 import { logger } from "./logger.js";
+import { s3WriteFault } from "./object-storage.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
 
@@ -188,8 +189,12 @@ function storageWriteError(e: unknown): unknown {
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {
   const storedName = generateStoredName(originalName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.putObject(storedName, buffer);
+    try {
+      const s3 = await getS3();
+      await s3.putObject(storedName, buffer);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return storedName;
   }
   await ensureStorageDir();

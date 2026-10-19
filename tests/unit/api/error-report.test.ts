@@ -182,6 +182,37 @@ describe("classifyError", () => {
     expect(classifyError(wrap(inputMissing), "worker")).toBe("operational");
     expect(classifyError(wrap(new Error("unexpected crash")), "worker")).toBe("bug");
   });
+  it("trusts a SafeError over client-abort shapes in its cause chain (#1643)", () => {
+    const s3Reset = Object.assign(new Error("aborted"), {
+      name: "TimeoutError",
+      code: "ECONNRESET",
+      $metadata: { attempts: 3 },
+    });
+    const prematureClose = Object.assign(new Error("Premature close"), {
+      code: "ERR_STREAM_PREMATURE_CLOSE",
+    });
+    const operationalReset = new SafeError("The server's storage service is unavailable.", {
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: s3Reset,
+    });
+    const operationalPremature = new SafeError("The server's storage service is unavailable.", {
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: prematureClose,
+    });
+    const bugWrappedAbort = new SafeError("Unexpected internal failure", {
+      kind: "bug",
+      cause: new Error("aborted"),
+    });
+
+    expect(classifyError(operationalReset, "http")).toBe("operational");
+    expect(classifyError(operationalReset)).toBe("operational");
+    expect(classifyError(operationalPremature, "http")).toBe("operational");
+    expect(classifyError(bugWrappedAbort, "http")).toBe("bug");
+  });
 });
 
 describe("classifyError undici", () => {

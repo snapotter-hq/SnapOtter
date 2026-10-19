@@ -122,6 +122,21 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
         }),
       ],
       [
+        "S3 resetting the connection",
+        Object.assign(new Error("socket hang up"), {
+          name: "TimeoutError",
+          code: "ECONNRESET",
+          $metadata: { attempts: 3 },
+        }),
+      ],
+      [
+        "an unmodeled S3 404 on write",
+        Object.assign(new Error("NotFound"), {
+          name: "NotFound",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ],
+      [
         "the endpoint unreachable",
         Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
       ],

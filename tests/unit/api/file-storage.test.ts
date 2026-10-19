@@ -7,6 +7,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const config = vi.hoisted(() => ({
   FILES_STORAGE_PATH: "",
+  STORAGE_MODE: "local" as "local" | "s3",
+  S3_BUCKET: "snap-bucket",
+  S3_REGION: "us-east-1",
+  S3_ENDPOINT: "http://localhost:19000",
+  S3_ACCESS_KEY_ID: "minioadmin",
+  S3_SECRET_ACCESS_KEY: "minioadmin",
+  S3_FORCE_PATH_STYLE: true,
+  S3_PREFIX: "",
+}));
+
+const s3Mocks = vi.hoisted(() => ({
+  load: vi.fn<() => Promise<unknown>>(),
+  configure: vi.fn(),
+  putObject: vi.fn(),
+}));
+
+vi.mock("@snapotter/enterprise", () => ({
+  loadS3Storage: () => s3Mocks.load(),
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({
@@ -60,6 +78,15 @@ beforeEach(async () => {
   testDir = join(tmpdir(), `snapotter-fs-test-${randomUUID().slice(0, 8)}`);
   await mkdir(testDir, { recursive: true });
   config.FILES_STORAGE_PATH = testDir;
+  config.STORAGE_MODE = "local";
+  s3Mocks.configure.mockReset();
+  s3Mocks.putObject.mockReset();
+  s3Mocks.putObject.mockResolvedValue(undefined);
+  s3Mocks.load.mockReset();
+  s3Mocks.load.mockResolvedValue({
+    configureS3: s3Mocks.configure,
+    putObject: s3Mocks.putObject,
+  });
   vi.resetModules();
 });
 
@@ -612,5 +639,88 @@ describe("saveFile after a failed write", () => {
       }),
       expect.any(String),
     );
+  });
+});
+
+describe("saveFile in S3 mode (#1643)", () => {
+  beforeEach(() => {
+    config.STORAGE_MODE = "s3";
+  });
+
+  it.each([
+    [
+      "S3 refusing access",
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "S3 throttling the write",
+      Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      }),
+    ],
+    [
+      "S3 resetting the connection",
+      Object.assign(new Error("socket hang up"), {
+        name: "TimeoutError",
+        code: "ECONNRESET",
+        $metadata: { attempts: 3 },
+      }),
+    ],
+    [
+      "an unmodeled S3 404 on write",
+      Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "the S3 endpoint unreachable",
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+    ],
+  ])("classifies %s as a 503 storage-unavailable SafeError", async (_case, cause) => {
+    s3Mocks.putObject.mockRejectedValueOnce(cause);
+    const { saveFile } = await importModule();
+
+    await expect(saveFile(Buffer.from("x"), "photo.png")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause,
+    });
+  });
+
+  it("classifies a getS3() initialization failure through s3WriteFault", async () => {
+    const netCause = Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+      code: "ECONNREFUSED",
+    });
+    s3Mocks.load.mockRejectedValueOnce(netCause);
+    const { saveFile } = await importModule();
+
+    await expect(saveFile(Buffer.from("x"), "photo.png")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: netCause,
+    });
+
+    const initBug = new TypeError("Invalid S3 configuration");
+    s3Mocks.load.mockRejectedValueOnce(initBug);
+    await expect(saveFile(Buffer.from("x"), "photo.png")).rejects.toBe(initBug);
+    expect((initBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+  });
+
+  it("stamps 500 on an unexpected non-S3 error during saveFile", async () => {
+    const bug = new TypeError("unexpected failure");
+    s3Mocks.putObject.mockRejectedValueOnce(bug);
+    const { saveFile } = await importModule();
+
+    await expect(saveFile(Buffer.from("x"), "photo.png")).rejects.toBe(bug);
+    expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
   });
 });

@@ -554,7 +554,7 @@ function localWriteFault(error: unknown): unknown {
  * or an endpoint it couldn't reach is a 503 storage fault; the client's own
  * faults pass through; anything else is ours.
  */
-function s3WriteFault(error: unknown): unknown {
+export function s3WriteFault(error: unknown): unknown {
   const normalized = normalizeOperationalWriteError(error);
   if (alreadyClassified(normalized)) return normalized;
   const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
