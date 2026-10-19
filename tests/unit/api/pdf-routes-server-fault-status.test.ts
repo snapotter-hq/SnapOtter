@@ -197,6 +197,7 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
   beforeEach(() => {
     putObject.mockReset().mockResolvedValue(undefined);
     getObjectBuffer.mockReset();
+    deletePrefix.mockReset().mockResolvedValue(undefined);
   });
 
   const send = async (app: Awaited<ReturnType<typeof buildApp>>) => {

@@ -18,6 +18,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
+  deletePrefix,
   getObjectBuffer,
   normalizeOperationalWriteError,
   putObject,
@@ -205,6 +206,8 @@ export function registerImageToPdfRoute(
       }
     }
 
+    const jobId = randomUUID();
+    let wroteOutput = false;
     try {
       let [pageW, pageH] = PAGE_SIZES[settings.pageSize] ?? PAGE_SIZES.A4;
 
@@ -230,8 +233,9 @@ export function registerImageToPdfRoute(
         if (validation.format === "heif") {
           try {
             buf = await decodeHeic(buf);
-          } catch (err) {
-            if (isDecoderUnavailable(err)) throw err;
+          } catch (rawErr) {
+            const err = normalizeOperationalWriteError(rawErr);
+            if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
             return reply.status(422).send({
               error: `Failed to decode HEIC file "${file.filename}"`,
               details: err instanceof Error ? err.message : String(err),
@@ -241,12 +245,20 @@ export function registerImageToPdfRoute(
           try {
             const fileExt = file.filename.split(".").pop()?.toLowerCase();
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
             try {
               await sharp(buf).metadata();
             } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                throw decodeErr;
+              }
               return reply.status(422).send({
                 error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
                 details: err instanceof Error ? err.message : String(err),
@@ -321,7 +333,6 @@ export function registerImageToPdfRoute(
         return scrubPdfProducer(await pdfDone);
       }
 
-      const jobId = randomUUID();
       const originalSize = files.reduce((s, f) => s + f.buffer.length, 0);
 
       if (settings.collate) {
@@ -332,6 +343,7 @@ export function registerImageToPdfRoute(
         }
 
         const filename = "images.pdf";
+        wroteOutput = true;
         await putObject(`outputs/${jobId}/${filename}`, pdfBuffer);
 
         return reply.send({
@@ -351,6 +363,7 @@ export function registerImageToPdfRoute(
         const pdfBuffer = await buildPdf([imageBuffers[i]]);
         const baseName = files[i].filename.replace(/\.[^.]+$/, "");
         const pdfName = `${baseName}.pdf`;
+        wroteOutput = true;
         await putObject(`outputs/${jobId}/${pdfName}`, pdfBuffer);
         pdfNames.push(pdfName);
         totalProcessedSize += pdfBuffer.length;
@@ -385,6 +398,14 @@ export function registerImageToPdfRoute(
       });
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(rawErr);
+      if (wroteOutput) {
+        await deletePrefix(`outputs/${jobId}`).catch((cleanupErr) =>
+          request.log.warn(
+            { err: cleanupErr, jobId, toolId: opts.toolId },
+            "cleanup of a failed PDF creation failed",
+          ),
+        );
+      }
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
       request.log.error({ err, toolId: opts.toolId }, "PDF creation failed");
