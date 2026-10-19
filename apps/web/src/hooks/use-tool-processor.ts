@@ -148,6 +148,26 @@ export function useToolProcessor(toolId: string) {
   // proof the job reached the server, consulted when a dead POST degrades
   // (#722, #750).
   const sawJobEvidenceRef = useRef(false);
+  // Whether the browser finished sending the current run's request body
+  // (upload.onload, or the final progress event in Firefox, which fires
+  // upload.onload only once the response starts; #2136, #2240). Cleared once
+  // the XHR settles or the run ends.
+  const uploadedFullyRef = useRef(false);
+  // Runs stopped after their upload finished and before the server confirmed
+  // the job (#2240). Their XHR and progress stream stay open so the cancel
+  // goes out as soon as a 202 or progress frame proves the alias exists.
+  const stoppedRunsRef = useRef(
+    new Set<{
+      jobId: string;
+      toolId: string;
+      xhr: XMLHttpRequest | null;
+      es: EventSource | null;
+    }>(),
+  );
+  // Job ids whose unmount/preset-switch stop has already been handled, so a
+  // settling batch that outlives a preset switch is not canceled a second time
+  // when the panel later unmounts.
+  const stoppedJobIdsRef = useRef(new Set<string>());
   // Installed by processAllFiles so the SSE handler can settle a degraded
   // batch run from its terminal frame (#750) and the cancel path can record
   // intent or settle a run the server never saw (#767). Null outside batch
@@ -188,6 +208,7 @@ export function useToolProcessor(toolId: string) {
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
     activeEntryIdRef.current = null;
+    uploadedFullyRef.current = false;
     setActiveJob(null, null);
   }, [setActiveJob]);
 
@@ -237,9 +258,84 @@ export function useToolProcessor(toolId: string) {
     activeJobIdRef.current = null;
     activeEntryIdRef.current = null;
     activeEntryIdsRef.current = null;
+    uploadedFullyRef.current = false;
     setProgress(IDLE_PROGRESS);
     return true;
   }, [clearJobEvidenceTimer, clearStallTimer]);
+
+  const cancelStoppedJob = useCallback(async (jobId: string, stoppedToolId: string) => {
+    try {
+      let res: Response;
+      try {
+        res = await fetch(appUrl(`/api/v1/jobs/${jobId}/cancel`), {
+          method: "POST",
+          headers: formatHeaders(),
+        });
+      } catch (cause) {
+        throw failedCancelRequest(cause, stoppedToolId);
+      }
+      await readCancelAnswer(res, () => false, stoppedToolId);
+    } catch (err) {
+      if (err instanceof CancelRefusedError) return;
+      reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, stoppedToolId);
+    }
+  }, []);
+
+  const finishStoppedRun = useCallback(
+    (
+      stopped: {
+        jobId: string;
+        toolId: string;
+        xhr: XMLHttpRequest | null;
+        es: EventSource | null;
+      },
+      shouldCancel: boolean,
+      abortXhr: boolean,
+    ) => {
+      if (!stoppedRunsRef.current.delete(stopped)) return;
+      if (shouldCancel) {
+        void cancelStoppedJob(stopped.jobId, stopped.toolId);
+      }
+      if (stopped.es) {
+        stopped.es.onmessage = null;
+        stopped.es.onerror = null;
+        try {
+          stopped.es.close();
+        } catch {
+          // Ignore close error
+        }
+      }
+      if (stopped.xhr) {
+        stopped.xhr.onload = null;
+        stopped.xhr.onerror = null;
+        stopped.xhr.ontimeout = null;
+        stopped.xhr.upload.onprogress = null;
+        stopped.xhr.upload.onload = null;
+        if (abortXhr) {
+          try {
+            stopped.xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+        }
+      }
+    },
+    [cancelStoppedJob],
+  );
+
+  const findStoppedByXhr = useCallback((xhr: XMLHttpRequest) => {
+    for (const stopped of stoppedRunsRef.current) {
+      if (stopped.xhr === xhr) return stopped;
+    }
+    return null;
+  }, []);
+
+  const findStoppedByEs = useCallback((es: EventSource) => {
+    for (const stopped of stoppedRunsRef.current) {
+      if (stopped.es === es) return stopped;
+    }
+    return null;
+  }, []);
 
   const resetStallTimer = useCallback(() => {
     clearStallTimer();
@@ -562,6 +658,28 @@ export function useToolProcessor(toolId: string) {
         if (asyncModeRef.current) resetStallTimer();
 
         es.onmessage = (event) => {
+          const stopped = findStoppedByEs(es);
+          if (stopped) {
+            let data: ProgressFrame;
+            try {
+              data = resolveServerUrls(JSON.parse(event.data));
+            } catch {
+              return;
+            }
+            if (!data || typeof data !== "object") return;
+            if (data.type === "heartbeat") return;
+            if (data.type === "batch") {
+              const frame = data as BatchProgressFrame;
+              const isTerminal = frame.status === "completed" || frame.status === "failed";
+              finishStoppedRun(stopped, !isTerminal, true);
+              return;
+            }
+            if (data.type === "single") {
+              const isTerminal = data.phase === "complete" || data.phase === "failed";
+              finishStoppedRun(stopped, !isTerminal, true);
+            }
+            return;
+          }
           if (eventSourceRef.current !== es) return;
           if (storeWasReset()) return;
           // Only an unparseable frame is ignorable. Everything past the parse
@@ -572,6 +690,7 @@ export function useToolProcessor(toolId: string) {
           } catch {
             return;
           }
+          if (!data || typeof data !== "object") return;
           try {
             if (data.type === "heartbeat") {
               if (asyncModeRef.current) resetStallTimer();
@@ -762,6 +881,12 @@ export function useToolProcessor(toolId: string) {
         };
 
         es.onerror = () => {
+          const stopped = findStoppedByEs(es);
+          if (stopped) {
+            es.close();
+            return;
+          }
+          if (eventSourceRef.current !== es) return;
           if (storeWasReset()) return;
           if (!asyncModeRef.current) {
             es.close();
@@ -779,6 +904,8 @@ export function useToolProcessor(toolId: string) {
       clearStallTimer,
       clearJobEvidenceTimer,
       failRunOnHandlerError,
+      findStoppedByEs,
+      finishStoppedRun,
       resetStallTimer,
       settleProcessingEntries,
       setError,
@@ -801,20 +928,46 @@ export function useToolProcessor(toolId: string) {
   const settleStoppedRunRef = useRef<() => void>(() => {});
   useEffect(() => {
     settleStoppedRunRef.current = () => {
-      if (!activeJobIdRef.current) return;
+      const jobId = activeJobIdRef.current;
+      if (!jobId) return;
       // A store that no longer carries the run (Clear all, a reset, or a newer
       // run started after an unmounted settling batch) has nothing left to
       // settle, and an error written now would land on whatever the user does
       // next (#2637).
       if (storeWasReset()) return;
-      // The job outlives its observer: the request and stream are gone, and so
-      // is the handle that would cancel it. Ask the server to stop it, or the
-      // user is told to run it again while the first copy finishes (and, for a
-      // library file, saves). It reads the job id before the run is cleared.
-      void cancelCurrentJob().catch((err) => {
-        if (err instanceof CancelRefusedError) return;
-        reportRunEndFailure("Ending a tool run after its panel unmounted failed", err, toolId);
-      });
+      // Once the server has accepted the job (a 202 response, a degraded
+      // post-upload wait, or any progress frame), the alias row exists and
+      // can be canceled immediately. After the upload finished and before
+      // acceptance, aborting and canceling immediately can beat the server's
+      // alias insert and 404, leaving the job to run anyway (#2240): keep the
+      // request and stream open so the cancel goes out when the 202 or
+      // progress frame arrives. While the upload is still in flight, aborting
+      // cuts off the body before any job exists.
+      const accepted = asyncModeRef.current || sawJobEvidenceRef.current;
+      const keepRequest = !accepted && uploadedFullyRef.current;
+      uploadedFullyRef.current = false;
+      if (!stoppedJobIdsRef.current.has(jobId)) {
+        if (accepted) {
+          stoppedJobIdsRef.current.add(jobId);
+          void cancelStoppedJob(jobId, toolId);
+        } else if (keepRequest) {
+          stoppedJobIdsRef.current.add(jobId);
+          // A sync-mode SSE error during the upload closes the stream and nulls
+          // the ref; reopen it so a progress frame emitted while a fast or
+          // batch route blocks in waitForJob still cancels the job.
+          if (!eventSourceRef.current) {
+            reconnectSSE(true);
+          }
+          stoppedRunsRef.current.add({
+            jobId,
+            toolId,
+            xhr: xhrRef.current,
+            es: eventSourceRef.current,
+          });
+          xhrRef.current = null;
+          eventSourceRef.current = null;
+        }
+      }
       const batchRun = batchRunRef.current;
       if (batchRun) {
         // failRun rethrows a teardown error by design, for callers in a timer.
@@ -861,14 +1014,6 @@ export function useToolProcessor(toolId: string) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
-      if (eventSourceRef.current) eventSourceRef.current.close();
-      if (xhrRef.current) {
-        try {
-          xhrRef.current.abort();
-        } catch (_e) {
-          console.debug("Ignored xhr.abort error:", _e);
-        }
-      }
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
       // This runs on unmount, but also whenever reconnectSSE changes, which it
@@ -876,7 +1021,24 @@ export function useToolProcessor(toolId: string) {
       // the id from the route, so moving between them stops a run without an
       // unmount (#2151). Whatever stopped it, the run is over, so settle it; a
       // batch whose ZIP is already in hand is the one thing left to finish.
-      settleStoppedRunRef.current();
+      // Runs before closing the stream or aborting the XHR so a run stopped
+      // after its upload finished can keep them open until the 202 (#2240).
+      try {
+        settleStoppedRunRef.current();
+      } finally {
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+        if (xhrRef.current) {
+          try {
+            xhrRef.current.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhrRef.current = null;
+        }
+      }
     };
   }, [reconnectSSE, storeWasReset]);
 
@@ -935,6 +1097,8 @@ export function useToolProcessor(toolId: string) {
         // into this run, and evidence never carries across runs (#722).
         clearJobEvidenceTimer();
         sawJobEvidenceRef.current = false;
+        uploadedFullyRef.current = false;
+        stoppedJobIdsRef.current.delete(clientJobId);
 
         const startTime = Date.now();
         elapsedRef.current = setInterval(() => {
@@ -979,9 +1143,19 @@ export function useToolProcessor(toolId: string) {
 
         xhr.timeout = isAiTool || LONG_RUNNING_TOOLS.has(toolId) ? 600_000 : 120_000;
 
+        let uploadedFully = false;
         xhr.upload.onprogress = (event) => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
           if (event.lengthComputable) {
+            // Firefox fires upload.onload only once the response starts, so the
+            // final progress event also counts as the body having left the
+            // browser (#2136, #2240).
+            if (event.loaded >= event.total) {
+              uploadedFully = true;
+              uploadedFullyRef.current = true;
+            }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
               if (prev.phase !== "uploading") return prev;
@@ -990,10 +1164,12 @@ export function useToolProcessor(toolId: string) {
           }
         };
 
-        let uploadedFully = false;
         xhr.upload.onload = () => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
           uploadedFully = true;
+          uploadedFullyRef.current = true;
           setProgress((prev) => ({
             ...prev,
             phase: "processing",
@@ -1113,7 +1289,13 @@ export function useToolProcessor(toolId: string) {
         };
 
         xhr.onload = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, xhr.status === 202, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          uploadedFullyRef.current = false;
           if (storeWasReset()) return;
 
           if (xhr.status === 202) {
@@ -1213,10 +1395,16 @@ export function useToolProcessor(toolId: string) {
         };
 
         xhr.onerror = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
           // This run already settled (SSE delivered its terminal frame) or a
           // newer run took over: a late socket event must neither error a
           // finished result nor tear down the successor's state.
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           clearStallTimer();
@@ -1235,7 +1423,13 @@ export function useToolProcessor(toolId: string) {
         };
 
         xhr.ontimeout = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           clearStallTimer();
@@ -1267,6 +1461,8 @@ export function useToolProcessor(toolId: string) {
       isAiTool,
       endRunAtStart,
       endStartBeforeClaim,
+      findStoppedByXhr,
+      finishStoppedRun,
       setProcessing,
       setError,
       setActiveJob,
@@ -1376,6 +1572,8 @@ export function useToolProcessor(toolId: string) {
         // into this run, and evidence never carries across runs (#722).
         clearJobEvidenceTimer();
         sawJobEvidenceRef.current = false;
+        uploadedFullyRef.current = false;
+        stoppedJobIdsRef.current.delete(clientJobId);
 
         const startTime = Date.now();
         elapsedRef.current = setInterval(() => {
@@ -1745,9 +1943,19 @@ export function useToolProcessor(toolId: string) {
         // stall and evidence timers own liveness, not a wall-clock cap.
         xhr.timeout = 0;
 
+        let uploadedFully = false;
         xhr.upload.onprogress = (event) => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
           if (event.lengthComputable) {
+            // Firefox fires upload.onload only once the response starts, so the
+            // final progress event also counts as the body having left the
+            // browser (#2136, #2240).
+            if (event.loaded >= event.total) {
+              uploadedFully = true;
+              uploadedFullyRef.current = true;
+            }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
               if (prev.phase !== "uploading") return prev;
@@ -1756,10 +1964,12 @@ export function useToolProcessor(toolId: string) {
           }
         };
 
-        let uploadedFully = false;
         xhr.upload.onload = () => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
           uploadedFully = true;
+          uploadedFullyRef.current = true;
           setProgress((prev) => ({
             ...prev,
             phase: "processing",
@@ -1785,7 +1995,13 @@ export function useToolProcessor(toolId: string) {
         };
 
         xhr.onload = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, xhr.status === 202, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          uploadedFullyRef.current = false;
           if (storeWasReset()) return;
 
           if (xhr.status === 202) {
@@ -1878,16 +2094,28 @@ export function useToolProcessor(toolId: string) {
         };
 
         xhr.onerror = () => {
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
           // Settled runs and successor runs must not be touched by late socket
           // events (#722 run-identity guard).
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           failRun(t.errors.processingInterrupted, "socket", "upload_error");
         };
 
         xhr.ontimeout = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          const stopped = findStoppedByXhr(xhr);
+          if (stopped) {
+            finishStoppedRun(stopped, false, false);
+            return;
+          }
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           failRun(t.errors.uploadTimeout, "timeout", "timeout");
@@ -1909,6 +2137,8 @@ export function useToolProcessor(toolId: string) {
       processFiles,
       endRunAtStart,
       endStartBeforeClaim,
+      findStoppedByXhr,
+      finishStoppedRun,
       setProcessing,
       setError,
       setActiveJob,

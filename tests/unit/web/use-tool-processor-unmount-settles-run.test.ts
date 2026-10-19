@@ -35,7 +35,10 @@ interface MockXhr {
   responseType: string;
   response: unknown;
   timeout: number;
-  upload: { onprogress?: unknown; onload?: (() => void) | null };
+  upload: {
+    onprogress?: ((event: ProgressEvent) => void) | null;
+    onload?: (() => void) | null;
+  };
   onload?: () => void;
   onerror?: (() => void) | null;
   ontimeout?: (() => void) | null;
@@ -128,7 +131,7 @@ function cancelPosts() {
  * showed a run that could never end.
  */
 describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
-  it("settles a single-file run in flight and cancels its job", () => {
+  it("settles a single-file run still uploading, aborts its request, and sends no cancel (#2125, #2240)", () => {
     const file = image("photo.png");
     useFileStore.getState().setFiles([file]);
     const hook = renderHook(() => useToolProcessor("resize"));
@@ -140,6 +143,7 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
     hook.unmount();
 
     expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
     const state = useFileStore.getState();
     expect(state.processing).toBe(false);
     expect(state.error).toBe(INTERRUPTED);
@@ -149,8 +153,392 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
       errorCategory: "processing_error",
     });
     expect(state.activeJobId).toBeNull();
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("keeps the request after the upload finished and cancels when the 202 arrives (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+    expect(MockEventSource.instances.at(-1)?.close).not.toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(false);
+    expect(state.error).toBe(INTERRUPTED);
+    expect(state.entries[0]).toMatchObject({
+      status: "failed",
+      error: INTERRUPTED,
+      errorCategory: "processing_error",
+    });
+    expect(state.activeJobId).toBeNull();
+
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+
     expect(cancelPosts()).toHaveLength(1);
     expect(cancelPosts()[0][1]).toMatchObject({ method: "POST" });
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+  });
+
+  it("cancels and closes the kept request when a progress frame arrives after unmount (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          jobId: JOB_ID,
+          phase: "processing",
+          percent: 15,
+          stage: "Preparing...",
+        }),
+      } as MessageEvent);
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+
+    // A late 202 slipping past abort() does not fire a second cancel.
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+    expect(cancelPosts()).toHaveLength(1);
+  });
+
+  it.each(["complete", "failed"] as const)(
+    "sends no cancel and closes the kept request when a terminal %s frame arrives after unmount (#2240)",
+    (phase) => {
+      const file = image("photo.png");
+      useFileStore.getState().setFiles([file]);
+      const hook = renderHook(() => useToolProcessor("resize"));
+      act(() => {
+        hook.result.current.processFiles([file], { width: 50 });
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      hook.unmount();
+
+      act(() => {
+        MockEventSource.instances.at(-1)?.onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            jobId: JOB_ID,
+            phase,
+            ...(phase === "complete"
+              ? {
+                  result: {
+                    jobId: JOB_ID,
+                    downloadUrl: "/api/v1/download/job-1/photo.png",
+                    originalSize: 16,
+                    processedSize: 8,
+                  },
+                }
+              : { error: "Processing failed" }),
+          }),
+        } as MessageEvent);
+      });
+
+      expect(cancelPosts()).toHaveLength(0);
+      expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+      expect(xhrs[0].abort).toHaveBeenCalled();
+      expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+    },
+  );
+
+  it("ignores heartbeat and unparseable SSE frames on a kept request until a 202 arrives (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+
+    act(() => {
+      const es = MockEventSource.instances.at(-1);
+      es?.onmessage?.({ data: "not-json" } as MessageEvent);
+      es?.onmessage?.({ data: "null" } as MessageEvent);
+      es?.onmessage?.({ data: JSON.stringify({ type: "heartbeat" }) } as MessageEvent);
+    });
+
+    expect(cancelPosts()).toHaveLength(0);
+    expect(MockEventSource.instances.at(-1)?.close).not.toHaveBeenCalled();
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+  });
+
+  it("reopens the progress stream for a kept request when a sync SSE error closed it during upload (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      MockEventSource.instances[0].onerror?.();
+      xhrs[0].upload.onload?.();
+    });
+    expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+
+    hook.unmount();
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    expect(cancelPosts()).toHaveLength(0);
+
+    act(() => {
+      MockEventSource.instances[1].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          jobId: JOB_ID,
+          phase: "processing",
+          percent: 5,
+        }),
+      } as MessageEvent);
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+    expect(MockEventSource.instances[1].close).toHaveBeenCalled();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+  });
+
+  it("still cancels on the 202 when the kept progress stream errors before the answer (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+
+    act(() => {
+      MockEventSource.instances.at(-1)?.onerror?.();
+    });
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+  });
+
+  it("treats the final upload progress event as the upload being done (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onprogress?.(
+        new ProgressEvent("progress", { loaded: 100, total: 100, lengthComputable: true }),
+      );
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+
+    // Firefox fires upload.onload once the response starts, after the stop.
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+  });
+
+  it("aborts when the upload progress shows the body is only partly sent (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onprogress?.(
+        new ProgressEvent("progress", { loaded: 40, total: 100, lengthComputable: true }),
+      );
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("aborts when an upload progress event has lengthComputable false (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onprogress?.(
+        new ProgressEvent("progress", { loaded: 0, total: 0, lengthComputable: false }),
+      );
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("sends no cancel when the answer to a stopped, uploaded file is not a 202 (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+    act(() => {
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        jobId: "job-1",
+        downloadUrl: "/api/v1/download/job-1/photo.png",
+        originalSize: 16,
+        processedSize: 8,
+      });
+      xhrs[0].onload?.();
+    });
+
+    expect(cancelPosts()).toHaveLength(0);
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+    expect(useFileStore.getState().entries[0].status).toBe("failed");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it.each(["422", "error", "timeout"] as const)(
+    "ignores a kept request's late %s once a new run has started (#2240)",
+    (outcome) => {
+      const file = image("photo.png");
+      useFileStore.getState().setFiles([file]);
+      const hook = renderHook(() => useToolProcessor("resize"));
+      act(() => {
+        hook.result.current.processFiles([file], { width: 50 });
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      hook.unmount();
+      act(() => {
+        useFileStore.getState().setError(null);
+        useFileStore.getState().setProcessing(true);
+      });
+
+      act(() => {
+        if (outcome === "422") {
+          xhrs[0].status = 422;
+          xhrs[0].responseText = JSON.stringify({ error: "Processing failed" });
+          xhrs[0].onload?.();
+        } else if (outcome === "error") {
+          xhrs[0].onerror?.();
+        } else {
+          xhrs[0].ontimeout?.();
+        }
+      });
+
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(useFileStore.getState().error).toBeNull();
+      expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+      expect(cancelPosts()).toHaveLength(0);
+    },
+  );
+
+  it("cancels once and aborts when a progress frame arrived before unmount (#2240)", () => {
+    const file = image("photo.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      hook.result.current.processFiles([file], { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          jobId: JOB_ID,
+          phase: "processing",
+          percent: 40,
+        }),
+      } as MessageEvent);
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(1);
+
+    // Even if a late 202 slips past abort(), it does not fire a second cancel.
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+      xhrs[0].onload?.();
+    });
+    expect(cancelPosts()).toHaveLength(1);
   });
 
   it("settles a 202 run being followed over the progress stream", () => {
@@ -191,6 +579,7 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
 
     hook.unmount();
 
+    expect(xhrs[0].abort).toHaveBeenCalled();
     const state = useFileStore.getState();
     expect(state.processing).toBe(false);
     expect(state.entries).toMatchObject([
@@ -198,13 +587,180 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
       { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
     ]);
     expect(state.activeJobId).toBeNull();
-    expect(cancelPosts()).toHaveLength(1);
+    expect(cancelPosts()).toHaveLength(0);
     // Not the "server never confirmed" signal the evidence timer reports.
     expect(vi.mocked(track)).toHaveBeenCalledWith(
       "batch_processed",
       expect.objectContaining({ status: "failed", reason: "panel-unmounted" }),
     );
   });
+
+  it("keeps a batch request after the upload finished and cancels when the 202 arrives (#2240)", () => {
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+    expect(MockEventSource.instances.at(-1)?.close).not.toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries).toMatchObject([
+      { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+      { status: "failed", error: INTERRUPTED, errorCategory: "processing_error" },
+    ]);
+
+    act(() => {
+      xhrs[0].status = 202;
+      xhrs[0].responseText = JSON.stringify({ jobId: JOB_ID, async: true });
+      xhrs[0].onload?.();
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+  });
+
+  it("cancels and aborts a kept batch request when a batch progress frame arrives after unmount (#2240)", () => {
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).not.toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(0);
+
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "processing",
+          totalFiles: 2,
+          completedFiles: 0,
+          failedFiles: 0,
+          errors: [],
+        }),
+      } as MessageEvent);
+    });
+
+    expect(cancelPosts()).toHaveLength(1);
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    expect(xhrs[0].abort).toHaveBeenCalled();
+  });
+
+  it("cancels and aborts a batch immediately on unmount when a progress frame already arrived (#2240)", () => {
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => useToolProcessor("resize"));
+    act(() => {
+      void hook.result.current.processAllFiles(files, { width: 50 });
+    });
+    act(() => {
+      xhrs[0].upload.onprogress?.(
+        new ProgressEvent("progress", { loaded: 100, total: 100, lengthComputable: true }),
+      );
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "processing",
+          totalFiles: 2,
+          completedFiles: 1,
+          failedFiles: 0,
+          errors: [],
+        }),
+      } as MessageEvent);
+    });
+
+    hook.unmount();
+
+    expect(xhrs[0].abort).toHaveBeenCalled();
+    expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    expect(cancelPosts()).toHaveLength(1);
+  });
+
+  it.each(["completed", "failed"] as const)(
+    "sends no cancel and closes the kept batch request when a terminal %s frame arrives after unmount (#2240)",
+    (status) => {
+      const files = [image("one.png"), image("two.png")];
+      useFileStore.getState().setFiles(files);
+      const hook = renderHook(() => useToolProcessor("resize"));
+      act(() => {
+        void hook.result.current.processAllFiles(files, { width: 50 });
+      });
+      act(() => {
+        xhrs[0].upload.onprogress?.(
+          new ProgressEvent("progress", { loaded: 100, total: 100, lengthComputable: true }),
+        );
+      });
+
+      hook.unmount();
+
+      act(() => {
+        MockEventSource.instances.at(-1)?.onmessage?.({
+          data: JSON.stringify({
+            type: "batch",
+            jobId: JOB_ID,
+            status,
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: status === "failed" ? 2 : 0,
+            errors: [],
+          }),
+        } as MessageEvent);
+      });
+
+      expect(cancelPosts()).toHaveLength(0);
+      expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+      expect(xhrs[0].abort).toHaveBeenCalled();
+    },
+  );
+
+  it.each(["200", "error", "timeout"] as const)(
+    "closes a kept batch request without canceling on a late %s (#2240)",
+    (outcome) => {
+      const files = [image("one.png"), image("two.png")];
+      useFileStore.getState().setFiles(files);
+      const hook = renderHook(() => useToolProcessor("resize"));
+      act(() => {
+        void hook.result.current.processAllFiles(files, { width: 50 });
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      hook.unmount();
+
+      act(() => {
+        if (outcome === "200") {
+          xhrs[0].status = 200;
+          xhrs[0].response = new Blob([]);
+          xhrs[0].onload?.();
+        } else if (outcome === "error") {
+          xhrs[0].onerror?.();
+        } else {
+          xhrs[0].ontimeout?.();
+        }
+      });
+
+      expect(cancelPosts()).toHaveLength(0);
+      expect(MockEventSource.instances.at(-1)?.close).toHaveBeenCalled();
+    },
+  );
 
   // #2151: every conversion preset shares one panel that reads its tool id from
   // the route, so moving between presets changes the hook's toolId without an
@@ -271,6 +827,122 @@ describe("useToolProcessor unmount settles the run it stops (#2125)", () => {
         error: INTERRUPTED,
         errorCategory: "processing_error",
       });
+      expect(cancelPosts()).toHaveLength(0);
+    });
+
+    it("keeps an uploaded run's request across a tool id change and cancels when the 202 arrives (#2151, #2240)", () => {
+      const file = image("photo.png");
+      useFileStore.getState().setFiles([file]);
+      const hook = renderHook(({ toolId }) => useToolProcessor(toolId), {
+        initialProps: { toolId: "jpg-to-png" },
+      });
+      act(() => {
+        hook.result.current.processFiles([file], {});
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      hook.rerender({ toolId: "png-to-webp" });
+
+      expect(xhrs[0].abort).not.toHaveBeenCalled();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(cancelPosts()).toHaveLength(0);
+
+      hook.unmount();
+      // Unmounting after the preset switch must not abort the kept request either.
+      expect(xhrs[0].abort).not.toHaveBeenCalled();
+      expect(cancelPosts()).toHaveLength(0);
+
+      act(() => {
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+        xhrs[0].onload?.();
+      });
+
+      expect(cancelPosts()).toHaveLength(1);
+      expect(MockEventSource.instances[0].close).toHaveBeenCalled();
+    });
+
+    it("reports an unexpected cancel failure under the stopped run's toolId after a preset switch (#2151, #2240)", async () => {
+      fetchMock.mockImplementationOnce(async () => ({
+        ok: true,
+        status: 200,
+        json: () => {
+          throw new Error("corrupt response");
+        },
+      }));
+      const file = image("photo.png");
+      useFileStore.getState().setFiles([file]);
+      const hook = renderHook(({ toolId }) => useToolProcessor(toolId), {
+        initialProps: { toolId: "jpg-to-png" },
+      });
+      act(() => {
+        hook.result.current.processFiles([file], {});
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      hook.rerender({ toolId: "png-to-webp" });
+      await act(async () => {
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: "job-1", async: true });
+        xhrs[0].onload?.();
+      });
+
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Ending a tool run after its panel unmounted failed",
+        }),
+        { error_class: "bug", tool_id: "jpg-to-png" },
+      );
+    });
+
+    it("does not cancel a settling batch a second time when a preset switch is followed by unmount without a store reset (#2151, #2240)", () => {
+      const download = new Promise<Blob>(() => {});
+      fetchMock.mockImplementation(async (url: string) =>
+        url === CANCEL_URL
+          ? new Response(null, { status: 409 })
+          : { ok: true, status: 200, blob: () => download },
+      );
+      const files = [image("one.png"), image("two.png")];
+      useFileStore.getState().setFiles(files);
+      const hook = renderHook(({ toolId }) => useToolProcessor(toolId), {
+        initialProps: { toolId: "jpg-to-png" },
+      });
+      act(() => {
+        void hook.result.current.processAllFiles(files, {});
+      });
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].onerror?.();
+      });
+      act(() => {
+        MockEventSource.instances.at(-1)?.onmessage?.({
+          data: JSON.stringify({
+            type: "batch",
+            jobId: JOB_ID,
+            status: "completed",
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: 0,
+            errors: [],
+            result: {
+              jobId: JOB_ID,
+              downloadUrl: `/api/v1/download/${JOB_ID}/batch-resize.zip`,
+              zipFilename: "batch-resize.zip",
+              fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+              processedSize: 16,
+            },
+          }),
+        } as MessageEvent);
+      });
+
+      hook.rerender({ toolId: "png-to-webp" });
+      expect(cancelPosts()).toHaveLength(1);
+
+      hook.unmount();
       expect(cancelPosts()).toHaveLength(1);
     });
 

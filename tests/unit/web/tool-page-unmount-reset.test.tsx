@@ -224,6 +224,16 @@ describe("ToolPage resets file and tool stores on unmount (#1122)", () => {
 
     expect(useFileStore.getState().processing).toBe(true);
     expect(xhrs).toHaveLength(1);
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          jobId: JOB_ID,
+          phase: "processing",
+          percent: 25,
+        }),
+      } as MessageEvent);
+    });
 
     fireEvent.click(screen.getByTestId("go-files"));
     expect(await screen.findByTestId("files-page")).toBeInTheDocument();
@@ -486,6 +496,16 @@ describe("ToolPage resets file and tool stores on unmount (#1122)", () => {
 
     expect(useFileStore.getState().processing).toBe(true);
     expect(xhrs).toHaveLength(1);
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          jobId: JOB_ID,
+          phase: "processing",
+          percent: 25,
+        }),
+      } as MessageEvent);
+    });
 
     fireEvent.click(screen.getByTestId("go-split"));
 
