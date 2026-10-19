@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * S3's DeleteObject succeeds for a key that isn't there, so the old catch-all
@@ -27,10 +27,12 @@ const {
   S3_CONNECTION_TIMEOUT_MS,
   S3_SOCKET_TIMEOUT_MS,
   configureS3,
+  deleteGenericObject,
   deleteGenericPrefix,
   deleteObject,
   deleteThumbnail,
   getObject,
+  getThumbnail,
 } = await import("../../../packages/enterprise/src/storage-s3.js");
 
 configureS3({
@@ -52,35 +54,96 @@ beforeEach(() => {
 });
 
 describe.each([
-  ["deleteObject", deleteObject],
-  ["deleteThumbnail", deleteThumbnail],
-])("%s (#1455)", (_name, del) => {
+  ["deleteObject", deleteObject, "a.png", "files/a.png"],
+  ["deleteThumbnail", deleteThumbnail, "a.png", "thumbs/a.png.thumb.jpg"],
+  ["deleteGenericObject", deleteGenericObject, "uploads/job-1/a.png", "uploads/job-1/a.png"],
+])("%s (#1455, #976)", (_name, del, arg, expectedKey) => {
   it("resolves when the delete succeeds", async () => {
     send.mockResolvedValue({});
-    await expect(del("a.png")).resolves.toBeUndefined();
+    await expect(del(arg)).resolves.toBeUndefined();
     expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]?.input).toEqual({ Bucket: "b", Key: expectedKey });
   });
 
   it("resolves when the object is already gone", async () => {
     send.mockRejectedValueOnce(s3Error("NoSuchKey", 404));
-    await expect(del("a.png")).resolves.toBeUndefined();
+    await expect(del(arg)).resolves.toBeUndefined();
     send.mockRejectedValueOnce(s3Error("NotFound", 404));
-    await expect(del("a.png")).resolves.toBeUndefined();
+    await expect(del(arg)).resolves.toBeUndefined();
   });
 
   it("rejects when S3 refuses the delete", async () => {
     send.mockRejectedValueOnce(s3Error("AccessDenied", 403));
-    await expect(del("a.png")).rejects.toMatchObject({ name: "AccessDenied" });
+    await expect(del(arg)).rejects.toMatchObject({ name: "AccessDenied" });
   });
 
   it("rejects when the bucket is gone", async () => {
     send.mockRejectedValueOnce(s3Error("NoSuchBucket", 404));
-    await expect(del("a.png")).rejects.toMatchObject({ name: "NoSuchBucket" });
+    await expect(del(arg)).rejects.toMatchObject({ name: "NoSuchBucket" });
   });
 
   it("rejects on a network failure", async () => {
     send.mockRejectedValueOnce(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
-    await expect(del("a.png")).rejects.toThrow("socket hang up");
+    await expect(del(arg)).rejects.toThrow("socket hang up");
+  });
+});
+
+describe("getThumbnail (#976)", () => {
+  it("returns the thumbnail buffer when the object exists", async () => {
+    send.mockResolvedValueOnce({
+      Body: { transformToByteArray: async () => new Uint8Array([0xff, 0xd8, 0xff]) },
+    });
+    await expect(getThumbnail("a.png")).resolves.toEqual(Buffer.from([0xff, 0xd8, 0xff]));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "thumbs/a.png.thumb.jpg",
+    });
+  });
+
+  it("returns null when the thumbnail is missing in S3", async () => {
+    send.mockRejectedValueOnce(s3Error("NoSuchKey", 404));
+    await expect(getThumbnail("a.png")).resolves.toBeNull();
+    send.mockRejectedValueOnce(s3Error("NotFound", 404));
+    await expect(getThumbnail("a.png")).resolves.toBeNull();
+  });
+
+  it("rejects when S3 refuses the read", async () => {
+    send.mockRejectedValueOnce(s3Error("AccessDenied", 403));
+    await expect(getThumbnail("a.png")).rejects.toMatchObject({ name: "AccessDenied" });
+  });
+
+  it("rejects when S3 throttles or errors", async () => {
+    send.mockRejectedValueOnce(s3Error("SlowDown", 503));
+    await expect(getThumbnail("a.png")).rejects.toMatchObject({ name: "SlowDown" });
+  });
+
+  it("rejects when the bucket is gone", async () => {
+    send.mockRejectedValueOnce(s3Error("NoSuchBucket", 404));
+    await expect(getThumbnail("a.png")).rejects.toMatchObject({ name: "NoSuchBucket" });
+  });
+
+  it("rejects on a network failure", async () => {
+    send.mockRejectedValueOnce(Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }));
+    await expect(getThumbnail("a.png")).rejects.toThrow("socket hang up");
+  });
+
+  it("rejects when S3 returns a response without a body", async () => {
+    send.mockResolvedValueOnce({});
+    await expect(getThumbnail("a.png")).rejects.toThrow(
+      "S3 object response for thumbs/a.png.thumb.jpg did not include a body",
+    );
+  });
+
+  it("rejects when reading the response body fails mid-stream", async () => {
+    send.mockResolvedValueOnce({
+      Body: {
+        transformToByteArray: async () => {
+          throw Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+        },
+      },
+    });
+    await expect(getThumbnail("a.png")).rejects.toThrow("read ECONNRESET");
   });
 });
 
@@ -277,6 +340,18 @@ describe("getObject abort signal support (#1497)", () => {
 describe("S3Client requestHandler timeouts (#2755)", () => {
   beforeEach(() => {
     s3ClientConfigs.length = 0;
+  });
+
+  afterEach(() => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+    });
   });
 
   it("configures default connectionTimeout and socketTimeout on S3Client.requestHandler", async () => {

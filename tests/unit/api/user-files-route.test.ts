@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   offsetSpy: vi.fn(),
   parentRows: [] as unknown[],
   insertedValues: undefined as Record<string, unknown> | undefined,
+  getCachedThumbnail: vi.fn<() => Promise<Buffer | null>>(() => Promise.resolve(null)),
   saveFile: vi.fn(() => Promise.resolve("stored-result.png")),
   saveThumbnail: vi.fn<() => Promise<void>>(() => Promise.resolve()),
   readStoredFile: vi.fn<() => Promise<Buffer>>(() => Promise.resolve(Buffer.alloc(0))),
@@ -116,7 +117,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
   deleteStoredFile: vi.fn(() => Promise.resolve()),
-  getCachedThumbnail: vi.fn(() => Promise.resolve(null)),
+  getCachedThumbnail: mocks.getCachedThumbnail,
   isStorageServiceFault: vi.fn(() => false),
   readStoredFile: mocks.readStoredFile,
   saveFile: mocks.saveFile,
@@ -450,6 +451,7 @@ describe("user files route logic", () => {
       mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
       mocks.hasEffectivePermission.mockResolvedValue(true);
       mocks.quotaRefusal.mockResolvedValue(null);
+      mocks.getCachedThumbnail.mockResolvedValue(null);
       mocks.saveFile.mockResolvedValue("stored-result.png");
       mocks.saveThumbnail.mockResolvedValue();
       mocks.videoPosterPreview.mockResolvedValue(Buffer.from("webp-poster"));
@@ -785,6 +787,30 @@ describe("user files route logic", () => {
             expect.any(String),
           );
         }
+      });
+
+      it("does not read the source file or regenerate the thumbnail when getCachedThumbnail rejects (#976)", async () => {
+        const row = makeFileRow({
+          id: "file-s3-denied",
+          storedName: "stored-s3-denied.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        const denied = Object.assign(new Error("AccessDenied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        });
+        mocks.getCachedThumbnail.mockRejectedValueOnce(denied);
+
+        const reply = makeReply();
+        await expect(
+          thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            reply,
+          ),
+        ).rejects.toBe(denied);
+        expect(mocks.readStoredFile).not.toHaveBeenCalled();
+        expect(mocks.saveThumbnail).not.toHaveBeenCalled();
       });
     });
   });

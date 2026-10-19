@@ -198,8 +198,9 @@ export async function getThumbnail(storedName: string): Promise<Buffer | null> {
       }),
     );
     return Buffer.from(await requireObjectBody(response, key).transformToByteArray());
-  } catch {
-    return null;
+  } catch (err) {
+    if (isMissingObjectError(err)) return null;
+    throw err;
   }
 }
 
@@ -318,8 +319,8 @@ export async function deleteGenericObject(key: string): Promise<void> {
         Key: genericKey(key),
       }),
     );
-  } catch {
-    // Object already gone or doesn't exist
+  } catch (err) {
+    if (!isMissingObjectError(err)) throw err;
   }
 }
 

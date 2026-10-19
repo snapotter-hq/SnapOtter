@@ -307,6 +307,15 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
     expect(s3.deleteObject).toHaveBeenCalledWith("uploads/job-del/gone.bin");
   });
 
+  it("propagates a rejection when the S3 backend refuses deleteObject (#976)", async () => {
+    const denied = Object.assign(new Error("Access Denied"), {
+      name: "AccessDenied",
+      $metadata: { httpStatusCode: 403 },
+    });
+    s3.deleteObject.mockRejectedValueOnce(denied);
+    await expect(deleteObject("uploads/job-del/denied.bin")).rejects.toBe(denied);
+  });
+
   it("routes deletePrefix to the S3 backend with the exact prefix", async () => {
     await deletePrefix("outputs/job-prefix");
     expect(s3.deletePrefix).toHaveBeenCalledWith("outputs/job-prefix");
