@@ -24,7 +24,7 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { asInputErrorIfUndecodable, withAiImageEncodeContext } from "../../lib/image-error.js";
+import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
@@ -38,47 +38,46 @@ const settingsSchema = z.object({
 });
 
 // -- AI job handler (runs inside the BullMQ worker) --
-registerAiJobHandler(
-  "blur-background",
-  withAiImageEncodeContext<z.infer<typeof settingsSchema>>(
+registerAiJobHandler("blur-background", async (input, data, ctx) => {
+  const settings = settingsSchema.parse(data.settings);
+
+  ctx.report(5, "Removing background");
+
+  let subjectPng: Buffer;
+  try {
+    subjectPng = await removeBackground(
+      input,
+      ctx.scratchDir,
+      { signal: ctx.signal, toolId: "blur-background" },
+      (percent, stage) => {
+        // Scale rembg progress into 5..80 range
+        const scaled = 5 + Math.round(percent * 0.75);
+        ctx.report(Math.min(scaled, 80), stage);
+      },
+    );
+  } catch (err) {
+    throw await asInputErrorIfUndecodable(input, err);
+  }
+
+  ctx.report(85, "Blurring background");
+
+  return withImageEncodeContext<z.infer<typeof settingsSchema>>(
     "Background blur failed",
-    (s) => s?.format ?? "png",
-    async (input, data, ctx) => {
-      const settings = settingsSchema.parse(data.settings);
-
-      ctx.report(5, "Removing background");
-
-      let subjectPng: Buffer;
-      try {
-        subjectPng = await removeBackground(
-          input,
-          ctx.scratchDir,
-          { signal: ctx.signal, toolId: "blur-background" },
-          (percent, stage) => {
-            // Scale rembg progress into 5..80 range
-            const scaled = 5 + Math.round(percent * 0.75);
-            ctx.report(Math.min(scaled, 80), stage);
-          },
-        );
-      } catch (err) {
-        throw await asInputErrorIfUndecodable(input, err);
-      }
-
-      ctx.report(85, "Blurring background");
-
+    (s) => s.format,
+    async (inputBuffer, s, filename) => {
       // If feather > 0, soften the subject alpha edge before compositing. Read the
       // subject as raw RGBA plus a separately-blurred copy of its alpha and
       // overwrite the alpha bytes in place; joinChannel does not reliably re-tag the
       // merged channel as alpha.
       let compositeSubject = subjectPng;
-      if (settings.feather > 0) {
+      if (s.feather > 0) {
         const { data: rgba, info } = await sharp(subjectPng)
           .ensureAlpha()
           .raw()
           .toBuffer({ resolveWithObject: true });
         const { data: blurredAlpha } = await sharp(subjectPng)
           .extractChannel(3)
-          .blur(settings.feather)
+          .blur(s.feather)
           .raw()
           .toBuffer({ resolveWithObject: true });
         for (let p = 3, a = 0; p < rgba.length; p += 4, a++) {
@@ -93,14 +92,14 @@ registerAiJobHandler(
 
       let blurred: Buffer;
       try {
-        blurred = await blurBackground(input, compositeSubject, settings.intensity);
+        blurred = await blurBackground(inputBuffer, compositeSubject, s.intensity);
       } catch (err) {
-        throw await asInputErrorIfUndecodable(input, err);
+        throw await asInputErrorIfUndecodable(inputBuffer, err);
       }
 
       // Encode in the requested output format
-      const fmt = settings.format;
-      const base = data.filename.replace(/\.[^.]+$/, "");
+      const fmt = s.format;
+      const base = filename.replace(/\.[^.]+$/, "");
       const outName = `${base}_blurbg.${fmt}`;
       const contentType = fmt === "webp" ? "image/webp" : "image/png";
       const result =
@@ -112,8 +111,8 @@ registerAiJobHandler(
         contentType,
       };
     },
-  ),
-);
+  )(input, settings, data.filename, ctx);
+});
 
 export function registerBlurBackground(app: FastifyInstance) {
   app.post(

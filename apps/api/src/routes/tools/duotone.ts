@@ -1,3 +1,4 @@
+import { SafeError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -95,9 +96,10 @@ export function registerDuotone(app: FastifyInstance) {
             const duo = await sharp(buf).removeAlpha().toColourspace("srgb").raw().toBuffer();
             const pixels = origRaw.data;
             if (duo.length !== pixels.length) {
-              throw new Error(
+              throw new SafeError(
                 `duotone blend: duotone buffer is ${duo.length} bytes, original is ${pixels.length} ` +
                   `(${origRaw.info.width}x${origRaw.info.height}x${origRaw.info.channels})`,
+                { kind: "bug", code: "duotone" },
               );
             }
             const blended = Buffer.alloc(pixels.length);

@@ -166,6 +166,13 @@ export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknow
     if (probeErr instanceof Error && isOperationalErrno(probeErr)) {
       return err instanceof Error ? err : new Error(String(err));
     }
+    if (
+      probeErr instanceof Error &&
+      /unsupported image format/i.test(probeErr.message) &&
+      !(err instanceof Error && /unsupported image format/i.test(err.message))
+    ) {
+      return err instanceof Error ? err : new Error(String(err));
+    }
     logger.info({ err, probeErr }, "undecodable image input rejected");
     if (isPixelSafetyError(probeErr)) {
       return new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
