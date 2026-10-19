@@ -1049,23 +1049,56 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   knownFirstToolId === "ocr-pdf"
                     ? resolveOcrUploadLimits(env.MAX_UPLOAD_SIZE_MB)
                     : undefined;
+                const configuredMaxBytes = configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB);
+                const fileMaxBytes =
+                  configuredMaxBytes !== undefined && knownOcrLimits !== undefined
+                    ? Math.min(configuredMaxBytes, knownOcrLimits.fileBytes)
+                    : (configuredMaxBytes ?? knownOcrLimits?.fileBytes);
                 const remainingAggregate =
-                  (knownOcrLimits?.aggregateBytes ?? Number.MAX_SAFE_INTEGER) - totalStagedBytes;
-                const file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
-                  maxBytes: Math.min(
-                    configuredUploadLimit(env.MAX_UPLOAD_SIZE_MB) ?? Number.MAX_SAFE_INTEGER,
-                    knownOcrLimits?.fileBytes ?? Number.MAX_SAFE_INTEGER,
-                    Math.max(0, remainingAggregate),
-                  ),
-                  signal: ingressAbort.signal,
-                });
+                  knownOcrLimits !== undefined
+                    ? Math.max(0, knownOcrLimits.aggregateBytes - totalStagedBytes)
+                    : undefined;
+                const partMaxBytes =
+                  fileMaxBytes !== undefined && remainingAggregate !== undefined
+                    ? Math.min(fileMaxBytes, remainingAggregate)
+                    : (fileMaxBytes ?? remainingAggregate);
+                let file: SpooledMultipartFile;
+                try {
+                  file = await spoolMultipartFile(part, scratchDir, filePartIndex, {
+                    maxBytes: partMaxBytes,
+                    signal: ingressAbort.signal,
+                  });
+                } catch (spoolErr) {
+                  if (
+                    knownOcrLimits !== undefined &&
+                    remainingAggregate !== undefined &&
+                    (fileMaxBytes === undefined || remainingAggregate < fileMaxBytes) &&
+                    (spoolErr as { statusCode?: unknown })?.statusCode === 413 &&
+                    (spoolErr as { limitBytes?: unknown })?.limitBytes === remainingAggregate
+                  ) {
+                    throw new InputValidationError(
+                      `OCR pipeline input exceeds the ${formatLimit(knownOcrLimits.aggregateBytes)} aggregate safety limit`,
+                      413,
+                    );
+                  }
+                  throw spoolErr;
+                }
+                totalStagedBytes += file.size;
+                if (
+                  knownOcrLimits !== undefined &&
+                  totalStagedBytes > knownOcrLimits.aggregateBytes
+                ) {
+                  throw new InputValidationError(
+                    `OCR pipeline input exceeds the ${formatLimit(knownOcrLimits.aggregateBytes)} aggregate safety limit`,
+                    413,
+                  );
+                }
                 // Empty parts keep their slot: the client maps results back
                 // onto its own file list by index, so dropping one here
                 // would label a converted file with a different file's name
                 // (issue #2684, mirroring #645). They fail in place in the
                 // loop below.
                 files.push(file);
-                totalStagedBytes += file.size;
                 filePartIndex++;
               } else if (part.fieldname === "pipeline") {
                 pipelineRaw = part.value as string;
@@ -1074,6 +1107,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               }
             }
           } catch (err) {
+            if (err instanceof InputValidationError) {
+              return reply.status(err.statusCode).send({ error: err.message });
+            }
             const statusCode = ocrUploadErrorStatus(err);
             if (statusCode === 413) {
               const failure = multipartFailure(err);

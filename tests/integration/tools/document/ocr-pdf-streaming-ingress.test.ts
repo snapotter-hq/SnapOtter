@@ -220,6 +220,44 @@ describe("OCR PDF path-backed batch and pipeline ingress", () => {
     }
   });
 
+  it.each(["file-first", "field-first"] as const)(
+    "answers 413 with the OCR aggregate safety limit message when batch-pipeline files cross the aggregate cap (%s) (#2685)",
+    async (ordering) => {
+      const originalLimit = env.MAX_UPLOAD_SIZE_MB;
+      env.MAX_UPLOAD_SIZE_MB = 0;
+      mocks.ocrUploadLimitsOverride = { fileBytes: 2048, aggregateBytes: 2048 };
+      try {
+        const first = {
+          name: "file",
+          filename: "first.pdf",
+          contentType: "application/pdf",
+          content: Buffer.alloc(1500, 0x31),
+        };
+        const second = {
+          name: "file",
+          filename: "second.pdf",
+          contentType: "application/pdf",
+          content: Buffer.alloc(1500, 0x32),
+        };
+        const pipelinePart = { name: "pipeline", content: OCR_PIPELINE };
+        const parts =
+          ordering === "file-first" ? [first, second, pipelinePart] : [pipelinePart, first, second];
+
+        const batch = await postMultipart("/api/v1/pipeline/batch", parts);
+
+        expect(batch.statusCode).toBe(413);
+        expect(JSON.parse(batch.body)).toEqual({
+          error: "OCR pipeline input exceeds the 2 KB aggregate safety limit",
+        });
+        expect(mocks.flowAdd).not.toHaveBeenCalled();
+        expect(prepareSpy).not.toHaveBeenCalled();
+      } finally {
+        mocks.ocrUploadLimitsOverride = null;
+        env.MAX_UPLOAD_SIZE_MB = originalLimit;
+      }
+    },
+  );
+
   it("validates tool-batch PDF files by path without invoking the buffered document handler", async () => {
     const response = await postMultipart("/api/v1/tools/pdf/ocr-pdf/batch", [
       invalidPdfPart(),

@@ -55,19 +55,21 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   return { ...actual, reportError: reportErrorMock };
 });
 
+const envMock = vi.hoisted(() => ({
+  BASE_PATH: "",
+  WORKSPACE_PATH: "/tmp/test",
+  SCRATCH_PATH: "",
+  MAX_MEGAPIXELS: 100,
+  MAX_SVG_SIZE_MB: 10,
+  MAX_PIPELINE_STEPS: 20,
+  MAX_PIPELINE_STEP_PIXELS: 0,
+  MAX_BATCH_SIZE: 10,
+  MAX_UPLOAD_SIZE_MB: 100,
+  CONCURRENT_JOBS: 3,
+}));
+
 vi.mock("../../../apps/api/src/config.js", () => ({
-  env: {
-    BASE_PATH: "",
-    WORKSPACE_PATH: "/tmp/test",
-    SCRATCH_PATH: "",
-    MAX_MEGAPIXELS: 100,
-    MAX_SVG_SIZE_MB: 10,
-    MAX_PIPELINE_STEPS: 20,
-    MAX_PIPELINE_STEP_PIXELS: 0,
-    MAX_BATCH_SIZE: 10,
-    MAX_UPLOAD_SIZE_MB: 100,
-    CONCURRENT_JOBS: 3,
-  },
+  env: envMock,
 }));
 
 vi.mock("../../../apps/api/src/lib/analytics.js", () => ({
@@ -144,6 +146,9 @@ vi.mock("../../../apps/api/src/lib/ocr-pdf-ingress.js", async (importOriginal) =
   return {
     ...actual,
     spoolMultipartFile: async (...args: Parameters<typeof actual.spoolMultipartFile>) => {
+      if (spoolMultipartFileSpy.getMockImplementation()) {
+        return spoolMultipartFileSpy(...args);
+      }
       const res = await actual.spoolMultipartFile(...args);
       spoolMultipartFileSpy(...args);
       return res;
@@ -440,9 +445,9 @@ describe("POST /api/v1/pipeline/save database error handling (#1988)", () => {
   });
 });
 
-// ── POST /api/v1/pipeline/batch empty file handling (#2684) ────────────
+// ── POST /api/v1/pipeline/batch ingress (#2684, #2685) ─────────────────
 
-describe("POST /api/v1/pipeline/batch empty file handling (#2684)", () => {
+describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
   const batchTestToolId = `pipeline-batch-test-${Math.random().toString(36).slice(2, 8)}`;
   registerToolProcessFn({
     toolId: batchTestToolId,
@@ -594,5 +599,254 @@ describe("POST /api/v1/pipeline/batch empty file handling (#2684)", () => {
         errors: [{ filename: "empty.png", error: "File is empty" }],
       }),
     );
+  });
+
+  it.each(["field-first", "file-first"] as const)(
+    "answers 413 with the OCR aggregate safety limit message when spooled parts cross the 512 MB aggregate cap (%s) (#2685)",
+    async (ordering) => {
+      vi.clearAllMocks();
+      spoolMultipartFileSpy.mockReset();
+      const prevMaxUpload = envMock.MAX_UPLOAD_SIZE_MB;
+      envMock.MAX_UPLOAD_SIZE_MB = 0;
+
+      try {
+        const mib = 1024 * 1024;
+        spoolMultipartFileSpy
+          .mockResolvedValueOnce({
+            path: "/tmp/scratch/0-first.png",
+            filename: "first.png",
+            size: 300 * mib,
+          })
+          .mockImplementationOnce(async (_part, _scratchDir, _index, opts) => {
+            throw Object.assign(
+              new Error(`Object exceeds the maximum allowed size (${opts?.maxBytes} bytes)`),
+              {
+                statusCode: 413,
+                limitBytes: opts?.maxBytes,
+              },
+            );
+          });
+
+        const pipelinePart = {
+          type: "field" as const,
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+          }),
+        };
+        const fileParts = [
+          { type: "file" as const, filename: "first.png", content: Buffer.from("a") },
+          { type: "file" as const, filename: "second.png", content: Buffer.from("b") },
+        ];
+        const parts =
+          ordering === "field-first" ? [pipelinePart, ...fileParts] : [...fileParts, pipelinePart];
+
+        const reply = await invokePipelineBatchRoute(parts);
+
+        expect(reply.statusCode).toBe(413);
+        expect(reply.payload).toEqual({
+          error: "OCR pipeline input exceeds the 512 MB aggregate safety limit",
+        });
+        expect(spoolMultipartFileSpy.mock.calls[0]?.[3]?.maxBytes).toBe(512 * mib);
+        expect(spoolMultipartFileSpy.mock.calls[1]?.[3]?.maxBytes).toBe(212 * mib);
+        expect(readFileSpy).not.toHaveBeenCalled();
+      } finally {
+        spoolMultipartFileSpy.mockReset();
+        envMock.MAX_UPLOAD_SIZE_MB = prevMaxUpload;
+      }
+    },
+  );
+
+  it("narrows partMaxBytes from configured fileMaxBytes to remainingAggregate when 0 < MAX_UPLOAD_SIZE_MB < 512 (#2685)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+    const prevMaxUpload = envMock.MAX_UPLOAD_SIZE_MB;
+    envMock.MAX_UPLOAD_SIZE_MB = 200;
+
+    try {
+      const mib = 1024 * 1024;
+      spoolMultipartFileSpy
+        .mockResolvedValueOnce({
+          path: "/tmp/scratch/0-first.png",
+          filename: "first.png",
+          size: 200 * mib,
+        })
+        .mockResolvedValueOnce({
+          path: "/tmp/scratch/1-second.png",
+          filename: "second.png",
+          size: 200 * mib,
+        })
+        .mockImplementationOnce(async (_part, _scratchDir, _index, opts) => {
+          throw Object.assign(
+            new Error(`Object exceeds the maximum allowed size (${opts?.maxBytes} bytes)`),
+            {
+              statusCode: 413,
+              limitBytes: opts?.maxBytes,
+            },
+          );
+        });
+
+      const reply = await invokePipelineBatchRoute([
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+          }),
+        },
+        { type: "file", filename: "first.png", content: Buffer.from("a") },
+        { type: "file", filename: "second.png", content: Buffer.from("b") },
+        { type: "file", filename: "third.png", content: Buffer.from("c") },
+      ]);
+
+      expect(reply.statusCode).toBe(413);
+      expect(reply.payload).toEqual({
+        error: "OCR pipeline input exceeds the 512 MB aggregate safety limit",
+      });
+      expect(spoolMultipartFileSpy.mock.calls[0]?.[3]?.maxBytes).toBe(200 * mib);
+      expect(spoolMultipartFileSpy.mock.calls[1]?.[3]?.maxBytes).toBe(200 * mib);
+      expect(spoolMultipartFileSpy.mock.calls[2]?.[3]?.maxBytes).toBe(112 * mib);
+      expect(readFileSpy).not.toHaveBeenCalled();
+    } finally {
+      spoolMultipartFileSpy.mockReset();
+      envMock.MAX_UPLOAD_SIZE_MB = prevMaxUpload;
+    }
+  });
+
+  it("does not apply the OCR aggregate cap to field-first non-OCR pipelines when MAX_UPLOAD_SIZE_MB is 0 (#2685)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+    const prevMaxUpload = envMock.MAX_UPLOAD_SIZE_MB;
+    envMock.MAX_UPLOAD_SIZE_MB = 0;
+
+    try {
+      const mib = 1024 * 1024;
+      spoolMultipartFileSpy
+        .mockResolvedValueOnce({
+          path: "/tmp/scratch/0-first.png",
+          filename: "first.png",
+          size: 300 * mib,
+        })
+        .mockResolvedValueOnce({
+          path: "/tmp/scratch/1-second.png",
+          filename: "second.png",
+          size: 300 * mib,
+        });
+
+      await invokePipelineBatchRoute([
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: batchTestToolId, settings: {} }],
+          }),
+        },
+        { type: "file", filename: "first.png", content: Buffer.from("a") },
+        { type: "file", filename: "second.png", content: Buffer.from("b") },
+      ]).catch(() => {});
+
+      expect(spoolMultipartFileSpy).toHaveBeenCalledTimes(2);
+      expect(spoolMultipartFileSpy.mock.calls[0]?.[3]?.maxBytes).toBeUndefined();
+      expect(spoolMultipartFileSpy.mock.calls[1]?.[3]?.maxBytes).toBeUndefined();
+    } finally {
+      spoolMultipartFileSpy.mockReset();
+      envMock.MAX_UPLOAD_SIZE_MB = prevMaxUpload;
+    }
+  });
+
+  it("answers 413 with the per-file upload limit when a single file exceeds fileMaxBytes (#2685)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+
+    try {
+      spoolMultipartFileSpy.mockImplementation(async (_part, _scratchDir, _index, opts) => {
+        throw Object.assign(
+          new Error(`Object exceeds the maximum allowed size (${opts?.maxBytes} bytes)`),
+          {
+            statusCode: 413,
+            limitBytes: opts?.maxBytes,
+          },
+        );
+      });
+
+      const ocrReply = await invokePipelineBatchRoute([
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+          }),
+        },
+        { type: "file", filename: "huge.png", content: Buffer.from("a") },
+      ]);
+      expect(ocrReply.statusCode).toBe(413);
+      expect(ocrReply.payload).toEqual({
+        error: "File exceeds the 100 MB upload limit",
+      });
+      expect(spoolMultipartFileSpy.mock.calls[0]?.[3]?.maxBytes).toBe(100 * 1024 * 1024);
+
+      const resizeReply = await invokePipelineBatchRoute([
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: batchTestToolId, settings: {} }],
+          }),
+        },
+        { type: "file", filename: "huge.png", content: Buffer.from("a") },
+      ]);
+      expect(resizeReply.statusCode).toBe(413);
+      expect(resizeReply.payload).toEqual({
+        error: "File exceeds the 100 MB upload limit",
+      });
+      expect(spoolMultipartFileSpy.mock.calls[1]?.[3]?.maxBytes).toBe(100 * 1024 * 1024);
+    } finally {
+      spoolMultipartFileSpy.mockReset();
+    }
+  });
+
+  it("answers 413 with the OCR aggregate safety limit message when totalStagedBytes exceeds aggregateBytes (#2685)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+    const prevMaxUpload = envMock.MAX_UPLOAD_SIZE_MB;
+    envMock.MAX_UPLOAD_SIZE_MB = 0;
+
+    try {
+      const mib = 1024 * 1024;
+      spoolMultipartFileSpy
+        .mockResolvedValueOnce({
+          path: "/tmp/scratch/0-first.png",
+          filename: "first.png",
+          size: 300 * mib,
+        })
+        .mockResolvedValueOnce({
+          path: "/tmp/scratch/1-second.png",
+          filename: "second.png",
+          size: 300 * mib,
+        });
+
+      const reply = await invokePipelineBatchRoute([
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+          }),
+        },
+        { type: "file", filename: "first.png", content: Buffer.from("a") },
+        { type: "file", filename: "second.png", content: Buffer.from("b") },
+        { type: "file", filename: "third.png", content: Buffer.from("c") },
+      ]);
+
+      expect(reply.statusCode).toBe(413);
+      expect(reply.payload).toEqual({
+        error: "OCR pipeline input exceeds the 512 MB aggregate safety limit",
+      });
+      expect(spoolMultipartFileSpy).toHaveBeenCalledTimes(2);
+      expect(readFileSpy).not.toHaveBeenCalled();
+    } finally {
+      spoolMultipartFileSpy.mockReset();
+      envMock.MAX_UPLOAD_SIZE_MB = prevMaxUpload;
+    }
   });
 });
