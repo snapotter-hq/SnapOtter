@@ -171,14 +171,16 @@ describe("late batch frames and the failBatchJob guard", () => {
   it("failBatchJob refuses to downgrade a completed batch and announces nothing", async () => {
     const id = await seedBatchJob("completed");
 
-    await failBatchJob({
-      jobId: id,
-      totalFiles: 1,
-      completedFiles: 1,
-      failedFiles: 1,
-      errors: [],
-      message: "Failed to package batch results",
-    });
+    await expect(
+      failBatchJob({
+        jobId: id,
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        errors: [],
+        message: "Failed to package batch results",
+      }),
+    ).resolves.toBe(false);
 
     const row = await readJob(id);
     expect(row.status).toBe("completed");
@@ -274,14 +276,16 @@ describe("late batch frames and the failBatchJob guard", () => {
   it("failBatchJob owns the transition on a live batch and announces it", async () => {
     const id = await seedBatchJob("processing");
 
-    await failBatchJob({
-      jobId: id,
-      totalFiles: 1,
-      completedFiles: 1,
-      failedFiles: 1,
-      errors: [{ filename: "a.png", error: "boom" }],
-      message: "Failed to package batch results",
-    });
+    await expect(
+      failBatchJob({
+        jobId: id,
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        errors: [{ filename: "a.png", error: "boom" }],
+        message: "Failed to package batch results",
+      }),
+    ).resolves.toBe(true);
 
     const row = await readJob(id);
     expect(row.status).toBe("failed");

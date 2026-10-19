@@ -1586,9 +1586,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               message: shared?.error ?? "All files failed processing",
               ...(shared && { code: shared.code }),
               ...(shared?.details && { details: shared.details }),
-            }).catch((err) => {
-              request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
-            });
+            })
+              .then((applied) => {
+                if (!applied) {
+                  request.log.warn(
+                    { jobId: parentId },
+                    "all-prefail pipeline batch progress row was missing or already terminal; no terminal frame announced",
+                  );
+                }
+              })
+              .catch((err) => {
+                request.log.error({ err, jobId: parentId }, "all-prefail terminal write failed");
+              });
             return reply.status(shared?.statusCode ?? 422).send({
               error: shared?.error ?? "All files failed processing",
               ...(shared && { code: shared.code }),
@@ -1771,7 +1780,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               if (childIds.length > 0) {
                 await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
               }
-              await failBatchJob({
+              const applied = await failBatchJob({
                 jobId: parentId,
                 totalFiles,
                 completedFiles: totalFiles,
@@ -1784,6 +1793,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     ? { code: err.code }
                     : {}),
               });
+              if (!applied) {
+                request.log.warn(
+                  { jobId: parentId },
+                  "faulted pipeline batch progress row was missing or already terminal; no terminal frame announced",
+                );
+              }
               if (conflict) {
                 return reply.status(409).send({ error: message, code: "CONFLICT" });
               }

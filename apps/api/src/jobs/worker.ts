@@ -1880,7 +1880,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
         ? `${fault.error}: ${fault.details}`
         : fault.error
       : sharedFailureReason(counters.errors);
-    await failBatchJob({
+    const applied = await failBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
@@ -1890,6 +1890,12 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       ...(fault && { code: fault.code }),
       ...(fault?.details && { details: fault.details }),
     });
+    if (!applied) {
+      logger.warn(
+        { jobId: data.jobId },
+        "batch-finalize progress row was missing or already terminal; no terminal frame announced",
+      );
+    }
     return {
       outputRefs: [],
       filename: "",
@@ -1943,12 +1949,21 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       errors: [...counters.errors, { filename: "", error: packagingError }],
       message: packagingError,
       code: packagingCode,
-    }).catch((persistErr) => {
-      logger.error(
-        { err: persistErr, jobId: data.jobId },
-        "failed to record batch packaging failure",
-      );
-    });
+    })
+      .then((applied) => {
+        if (!applied) {
+          logger.warn(
+            { jobId: data.jobId },
+            "batch-finalize progress row was missing or already terminal; no terminal frame announced",
+          );
+        }
+      })
+      .catch((persistErr) => {
+        logger.error(
+          { err: persistErr, jobId: data.jobId },
+          "failed to record batch packaging failure",
+        );
+      });
     throw err instanceof Error ? err : new Error(String(err));
   }
 

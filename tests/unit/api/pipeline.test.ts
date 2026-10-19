@@ -17,7 +17,7 @@ const readFileSpy = vi.hoisted(() => vi.fn());
 const rmSpy = vi.hoisted(() => vi.fn());
 const spoolMultipartFileSpy = vi.hoisted(() => vi.fn());
 const recordChildOutcomeMock = vi.hoisted(() => vi.fn(async () => {}));
-const failBatchJobMock = vi.hoisted(() => vi.fn(async () => {}));
+const failBatchJobMock = vi.hoisted(() => vi.fn(async () => true));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
 const flowAddMock = vi.hoisted(() => vi.fn(async () => {}));
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
@@ -467,6 +467,10 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
       | { type: "file"; filename: string; content: Buffer }
       | { type: "field"; fieldname: string; value: string }
     >,
+    log: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> } = {
+      error: vi.fn(),
+      warn: vi.fn(),
+    },
   ) {
     let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
     await registerPipelineRoutes({
@@ -480,7 +484,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
 
     const request = {
       headers: {},
-      log: { error: vi.fn(), warn: vi.fn() },
+      log,
       raw: {
         aborted: false,
         once: vi.fn(),
@@ -504,6 +508,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
     const reply = {
       statusCode: 200,
       payload: undefined as unknown,
+      log: request.log,
       status(code: number) {
         this.statusCode = code;
         return this;
@@ -599,6 +604,54 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
         errors: [{ filename: "empty.png", error: "File is empty" }],
       }),
     );
+  });
+
+  it("logs a warning when failBatchJob matches no live row on all-prefail or mid-batch fault (#1555)", async () => {
+    vi.clearAllMocks();
+    failBatchJobMock.mockResolvedValue(false);
+
+    try {
+      const unappliedReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "pipeline-batch-unapplied" },
+      ]);
+      expect(unappliedReply.statusCode).toBe(422);
+      expect(unappliedReply.log.warn).toHaveBeenCalledWith(
+        { jobId: "pipeline-batch-unapplied" },
+        expect.stringContaining("no terminal frame announced"),
+      );
+
+      putObjectMock.mockRejectedValueOnce(new Error("storage unavailable"));
+
+      const faultLog = { error: vi.fn(), warn: vi.fn() };
+      await expect(
+        invokePipelineBatchRoute(
+          [
+            { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+            },
+            { type: "field", fieldname: "clientJobId", value: "pipeline-batch-unapplied-fault" },
+          ],
+          faultLog,
+        ),
+      ).rejects.toThrow("storage unavailable");
+      expect(faultLog.warn).toHaveBeenCalledWith(
+        { jobId: "pipeline-batch-unapplied-fault" },
+        expect.stringContaining("no terminal frame announced"),
+      );
+    } finally {
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      failBatchJobMock.mockResolvedValue(true);
+    }
   });
 
   it.each(["field-first", "file-first"] as const)(

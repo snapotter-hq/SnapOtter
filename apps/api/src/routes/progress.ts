@@ -616,8 +616,9 @@ export interface FailBatchJobArgs {
  * Terminal batch failure. Guarded so a late safety-net call (the worker's
  * failed handler) can never downgrade an already-committed completion; the
  * frame is only announced when this call actually owned the transition.
+ * Returns whether the guarded update matched a live row (#1555).
  */
-export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
+export async function failBatchJob(args: FailBatchJobArgs): Promise<boolean> {
   const frame: JobProgress & { type: "batch" } = {
     jobId: args.jobId,
     type: "batch",
@@ -654,6 +655,7 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<void> {
     applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
   });
   if (applied) announce(frame);
+  return applied;
 }
 
 export interface FailSingleJobArgs {

@@ -12,7 +12,7 @@ import { z } from "zod";
 const mocks = vi.hoisted(() => ({
   autoOrient: vi.fn(async (buf: Buffer) => buf),
   deleteObject: vi.fn(async () => {}),
-  failBatchJob: vi.fn(async () => {}),
+  failBatchJob: vi.fn(async () => true),
   flowAdd: vi.fn(async () => {}),
   getFirstMissingBundleForTool: vi.fn((): string | null => null),
   getToolConfig: vi.fn(() => ({ settingsSchema: z.record(z.unknown()) })),
@@ -398,11 +398,13 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     mocks.waitForJob.mockResolvedValue(null);
     mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "png" });
     mocks.autoOrient.mockImplementation(async (buf: Buffer) => buf);
+    mocks.failBatchJob.mockResolvedValue(true);
   });
 
   async function invokeBatchRoute(opts: {
     section: string;
     toolId: string;
+    log?: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
     parts: Array<
       | { type: "file"; filename: string; content: Buffer }
       | { type: "field"; fieldname: string; value: string }
@@ -418,7 +420,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     const request = {
       params: { section: opts.section, toolId: opts.toolId },
       headers: {},
-      log: { error: vi.fn(), warn: vi.fn() },
+      log: opts.log ?? { error: vi.fn(), warn: vi.fn() },
       raw: {
         aborted: false,
         socket: { setTimeout: vi.fn() },
@@ -443,6 +445,7 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     const reply = {
       statusCode: 200,
       payload: undefined as unknown,
+      log: request.log,
       status(code: number) {
         this.statusCode = code;
         return this;
@@ -678,5 +681,50 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     expect(compressReply.payload).toEqual({
       error: "File exceeds the 100 MB upload limit",
     });
+  });
+
+  it("logs a warning when failBatchJob matches no live row on all-prefail or mid-batch fault (#1555)", async () => {
+    mocks.failBatchJob.mockResolvedValue(false);
+
+    const allEmptyReply = await invokeBatchRoute({
+      section: "image",
+      toolId: "compress",
+      parts: [
+        { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+        { type: "field", fieldname: "settings", value: "{}" },
+        { type: "field", fieldname: "clientJobId", value: "batch-unapplied-prefail" },
+      ],
+    });
+    expect(allEmptyReply.statusCode).toBe(422);
+    expect(allEmptyReply.log.warn).toHaveBeenCalledWith(
+      { jobId: "batch-unapplied-prefail" },
+      expect.stringContaining("no terminal frame announced"),
+    );
+
+    let callCount = 0;
+    mocks.readFile.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) return Buffer.from("first-ok");
+      throw new Error("EIO: i/o error reading scratch file");
+    });
+
+    const faultLog = { error: vi.fn(), warn: vi.fn() };
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "compress",
+        log: faultLog,
+        parts: [
+          { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+          { type: "file", filename: "second.png", content: Buffer.from("second-fail") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-unapplied-fault" },
+        ],
+      }),
+    ).rejects.toThrow("EIO: i/o error reading scratch file");
+    expect(faultLog.warn).toHaveBeenCalledWith(
+      { jobId: "batch-unapplied-fault" },
+      expect.stringContaining("no terminal frame announced"),
+    );
   });
 });

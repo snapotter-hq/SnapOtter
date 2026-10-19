@@ -444,8 +444,9 @@ describe("terminal batch writers", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("failBatchJob resolves after the durable write settles", async () => {
+  it("failBatchJob resolves to whether the guarded write changed a row (#1555)", async () => {
     dbMocks.failure = null;
+    dbMocks.rowCount = 0;
     await expect(
       failBatchJob({
         jobId: "batch-writer-2",
@@ -455,7 +456,19 @@ describe("terminal batch writers", () => {
         errors: [{ filename: "a.png", error: "corrupt" }],
         message: "All files failed processing",
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
+
+    dbMocks.rowCount = 1;
+    await expect(
+      failBatchJob({
+        jobId: "batch-writer-2",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [{ filename: "a.png", error: "corrupt" }],
+        message: "All files failed processing",
+      }),
+    ).resolves.toBe(true);
   });
 
   describe("failBatchJob and a shared fault (#2178)", () => {
@@ -526,9 +539,14 @@ describe("terminal batch writers", () => {
       dbMocks.failure = null;
       dbMocks.rowCount = 0;
 
-      await failBatchJob({ ...base, code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" });
+      const applied = await failBatchJob({
+        ...base,
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+      });
       await publishedFrames();
 
+      expect(applied).toBe(false);
       expect(redisMocks.published).toEqual([]);
     });
   });

@@ -535,6 +535,32 @@ export function registerPdfToImageRoute(
       ).fill(null);
       const errors: Array<{ filename: string; error: string }> = [];
 
+      const settleFaultedBatch = async (
+        failedFiles: number,
+        batchErrors: Array<{ filename: string; error: string }>,
+        message: string,
+        code?: string,
+      ) => {
+        const applied = await failBatchJob({
+          jobId,
+          totalFiles: files.length,
+          completedFiles: files.length,
+          failedFiles,
+          errors: batchErrors,
+          message,
+          ...(code ? { code } : {}),
+        }).catch((settleErr) => {
+          request.log.error({ err: settleErr, jobId }, "failed to settle a faulted PDF batch");
+          return null;
+        });
+        if (applied === false) {
+          request.log.warn(
+            { jobId },
+            "faulted PDF batch progress row was missing or already terminal; no terminal frame announced",
+          );
+        }
+      };
+
       const publishProgress = (completedFiles: number, currentFile?: string) =>
         updateJobProgress({
           jobId,
@@ -577,16 +603,11 @@ export function registerPdfToImageRoute(
             // until the next restart (#1443). Guarded, so it never overwrites a
             // terminal row, and a failed settle can't mask the real fault.
             const message = friendlyError(err instanceof Error ? err.message : String(err));
-            await failBatchJob({
-              jobId,
-              totalFiles: files.length,
-              completedFiles: files.length,
-              failedFiles: files.length,
-              errors: [{ filename: "", error: message }],
+            await settleFaultedBatch(
+              files.length,
+              [{ filename: "", error: message }],
               message,
-              ...(isSafeMessageError(err) && err.code ? { code: err.code } : {}),
-            }).catch((settleErr) =>
-              request.log.error({ err: settleErr, jobId }, "failed to settle a faulted PDF batch"),
+              isSafeMessageError(err) ? err.code : undefined,
             );
             // Nothing will be sent, so what this run already rendered (every
             // document up to this one) is only stranded storage with no jobs
@@ -630,22 +651,19 @@ export function registerPdfToImageRoute(
         }
       }
 
-      // Awaited: this route owns the row, and until it is terminal it counts
-      // against the user's concurrent-job limit (#1688). A failed write still
-      // sends the result, but is logged; nothing else will settle the row
-      // before the next restart.
-      await updateJobProgress({
-        jobId,
-        status: errors.length === files.length ? "failed" : "completed",
-        totalFiles: files.length,
-        completedFiles: files.length,
-        failedFiles: errors.length,
-        errors,
-      }).catch((err) =>
-        request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
-      );
-
       if (errors.length === files.length) {
+        // Awaited: this route owns the row, and until it is terminal it counts
+        // against the user's concurrent-job limit (#1688).
+        await updateJobProgress({
+          jobId,
+          status: "failed",
+          totalFiles: files.length,
+          completedFiles: files.length,
+          failedFiles: errors.length,
+          errors,
+        }).catch((err) =>
+          request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
+        );
         // parseApiError on the client reads `error` and `details`, so the
         // per-file reasons have to ride in `details` to be seen at all.
         return reply.status(422).send({
@@ -676,26 +694,58 @@ export function registerPdfToImageRoute(
       });
 
       const archive = archiver("zip", { zlib: { level: 5 } });
+      const openedStreams: Array<{ destroy?: (err?: Error) => void }> = [];
 
       // Headers are already out, so a failure here cannot change the status.
       // Destroy the socket rather than end() it: a clean end on a chunked
       // response is indistinguishable from success, and the client would keep
       // a truncated ZIP believing it complete.
-      let streamFailed = false;
+      let streamError = null as Error | null;
+      let rejectStream: ((err: Error) => void) | null = null;
+      const streamDone = new Promise<void>((resolve, reject) => {
+        rejectStream = reject;
+        archive.on("end", resolve);
+      });
+      streamDone.catch(() => {});
+
       const failStream = (err: Error, msg: string) => {
-        if (streamFailed) return;
-        streamFailed = true;
+        if (streamError) return;
+        streamError = err;
         request.log.error({ err, jobId }, msg);
         archive.abort();
-        reply.raw.destroy(err);
+        for (const s of openedStreams) {
+          s.destroy?.();
+        }
+        rejectStream?.(err);
       };
 
       archive.on("error", (err) => failStream(err, "Archiver error during PDF batch processing"));
-      archive.pipe(reply.raw);
+      const onReplyClose = () => {
+        if (!archive.readableEnded) {
+          failStream(
+            new Error("Response stream closed before PDF batch ZIP finished"),
+            "Response stream closed during PDF batch processing",
+          );
+        }
+      };
+      const onReplyError = (err: Error) =>
+        failStream(err, "Response stream error during PDF batch processing");
+      reply.raw.on("close", onReplyClose);
+      reply.raw.on("error", onReplyError);
+      // Keep reply.raw open until the terminal progress write settles (#1688,
+      // #1555): ending the socket is what resolves the client's request, so
+      // settling after pipe's default auto-end would race the next request's
+      // concurrency check, and settling before the stream finishes would leave
+      // the row completed when the ZIP stream fails.
+      archive.pipe(reply.raw, { end: false });
+      if (reply.raw.destroyed) {
+        onReplyClose();
+      }
 
       try {
         for (const entry of results) {
           if (!entry) continue;
+          if (streamError) break;
           const stream = await getObjectStream(entry.key);
           // The local backend resolves the stream and only then emits ENOENT,
           // so the catch below never sees it. Without this listener the error
@@ -703,13 +753,54 @@ export function registerPdfToImageRoute(
           stream.on("error", (err: Error) =>
             failStream(err, "Object stream error during PDF batch processing"),
           );
+          if (streamError) {
+            (stream as { destroy?: () => void }).destroy?.();
+            break;
+          }
+          openedStreams.push(stream as { destroy?: (err?: Error) => void });
           archive.append(stream, { name: entry.filename });
         }
-        await archive.finalize();
+        if (!streamError) {
+          void archive
+            .finalize()
+            .catch((err) =>
+              failStream(
+                err instanceof Error ? err : new Error(String(err)),
+                "Failed to finalize ZIP during PDF batch processing",
+              ),
+            );
+        }
+        await streamDone;
       } catch (err) {
         failStream(
           err instanceof Error ? err : new Error(String(err)),
           "Failed to stream ZIP entries during PDF batch processing",
+        );
+      } finally {
+        reply.raw.removeListener("close", onReplyClose);
+        reply.raw.removeListener("error", onReplyError);
+      }
+
+      if (streamError) {
+        const message = isSafeMessageError(streamError)
+          ? friendlyError(streamError.message)
+          : "Failed to package batch results";
+        await settleFaultedBatch(
+          errors.length,
+          [...errors, { filename: "", error: message }],
+          message,
+          isSafeMessageError(streamError) ? streamError.code : undefined,
+        );
+      } else {
+        await updateJobProgress({
+          jobId,
+          status: "completed",
+          totalFiles: files.length,
+          completedFiles: files.length,
+          failedFiles: errors.length,
+          errors,
+        }).catch((err) =>
+          request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
         );
       }
 
@@ -729,6 +820,12 @@ export function registerPdfToImageRoute(
             : null,
         ),
       );
+
+      if (streamError) {
+        reply.raw.destroy(streamError);
+      } else {
+        reply.raw.end();
+      }
     },
   );
 

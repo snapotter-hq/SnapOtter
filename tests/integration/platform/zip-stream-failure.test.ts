@@ -10,7 +10,9 @@
  * client sees a transport failure it can act on.
  */
 import AdmZip from "adm-zip";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -181,5 +183,8 @@ describe("ZIP streaming failure after headers are sent (issue #645)", () => {
 
     expect(result.settledWithin, "request hung instead of terminating").toBe(true);
     expect(result.deliveredCompleteZip).toBe(false);
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, "zipfail-pdf"));
+    expect(row?.status, "progress row stayed completed after ZIP stream failure").toBe("failed");
   }, 60_000);
 });

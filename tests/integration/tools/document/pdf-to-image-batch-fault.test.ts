@@ -11,30 +11,68 @@
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../../apps/api/src/db/index.js";
+import { sharedRedis } from "../../../../apps/api/src/jobs/connection.js";
+import { bullPrefix } from "../../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
   loginAsAdmin,
+  preReadyHooks,
   type TestApp,
 } from "../../test-server.js";
 
 const faults = vi.hoisted(() => ({
   /** Object keys (or key prefixes) whose putObject fails with a 503. */
   poison: new Set<string>(),
+  /** Object keys (or key prefixes) whose getObjectStream fails on read. */
+  streamPoison: new Set<string>(),
   /** When set, the route's failBatchJob call rejects. */
   settleFails: false,
+  /** Job id whose row is marked terminal right before a fault, so failBatchJob returns false. */
+  retireRowBeforeFault: null as string | null,
 }));
+
+const warnLogs: Array<{ bindings: unknown; msg: string }> = [];
+
+preReadyHooks.push((app) => {
+  app.addHook(
+    "onRequest",
+    (
+      request: { log: { warn: (...args: unknown[]) => unknown } },
+      _reply: unknown,
+      done: () => void,
+    ) => {
+      const origWarn = request.log.warn.bind(request.log);
+      request.log.warn = (objOrMsg: unknown, msg?: unknown) => {
+        if (typeof objOrMsg === "string") {
+          warnLogs.push({ bindings: {}, msg: objOrMsg });
+        } else {
+          warnLogs.push({ bindings: objOrMsg, msg: typeof msg === "string" ? msg : "" });
+        }
+        return origWarn(objOrMsg, msg);
+      };
+      done();
+    },
+  );
+});
 
 vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../../apps/api/src/lib/object-storage.js")>();
+  const { Readable } = await import("node:stream");
   const { SafeError } = await import("@snapotter/shared");
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
       for (const prefix of faults.poison) {
         if (key.startsWith(prefix)) {
+          if (faults.retireRowBeforeFault) {
+            await db
+              .update(schema.jobs)
+              .set({ status: "canceled", completedAt: new Date() })
+              .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+          }
           throw new SafeError("Workspace storage limit reached", {
             kind: "operational",
             code: "workspace-cap",
@@ -43,6 +81,24 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
         }
       }
       return actual.putObject(key, data);
+    },
+    getObjectStream: async (key: string) => {
+      for (const prefix of faults.streamPoison) {
+        if (key.startsWith(prefix)) {
+          if (faults.retireRowBeforeFault) {
+            await db
+              .update(schema.jobs)
+              .set({ status: "canceled", completedAt: new Date() })
+              .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+          }
+          return new Readable({
+            read() {
+              this.destroy(new Error(`test poison: stream error for ${key}`));
+            },
+          });
+        }
+      }
+      return actual.getObjectStream(key);
     },
   };
 });
@@ -72,7 +128,10 @@ beforeAll(async () => {
 
 afterEach(() => {
   faults.poison.clear();
+  faults.streamPoison.clear();
   faults.settleFails = false;
+  faults.retireRowBeforeFault = null;
+  warnLogs.length = 0;
 });
 
 afterAll(async () => {
@@ -154,5 +213,136 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
     expect(res.json()).toMatchObject({ code: "workspace-cap" });
     expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+  });
+
+  it("settles the progress row as failed and cleans up temporary outputs when the ZIP stream fails (#1555)", async () => {
+    const clientJobId = "batch-1555-zip-stream-fault";
+    faults.streamPoison.add(`outputs/${clientJobId}-f1/`);
+
+    const outcome = await postBatch(clientJobId).then(
+      (res: { statusCode: number }) => res,
+      () => null,
+    );
+    // Destroyed chunked response either rejects inject() or leaves a truncated payload.
+    expect(outcome === null || outcome.statusCode === 200).toBe(true);
+
+    const row = await readRow(clientJobId);
+    expect(row?.status, "progress row stayed completed after ZIP stream failure").toBe("failed");
+    expect(row?.completedAt).not.toBeNull();
+    expect(row?.error).toMatchObject({
+      message: "Failed to package batch results",
+      details: [{ filename: "", error: "Failed to package batch results" }],
+    });
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(cached).not.toBeNull();
+    expect(JSON.parse(cached as string)).toMatchObject({
+      jobId: clientJobId,
+      type: "batch",
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 0,
+      errors: [{ filename: "", error: "Failed to package batch results" }],
+    });
+
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+  });
+
+  it("preserves per-file errors on the failed row when the ZIP stream fails on a partial batch (#1555)", async () => {
+    const clientJobId = "batch-1555-partial-zip-stream-fault";
+    faults.streamPoison.add(`outputs/${clientJobId}-f1/`);
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("not a pdf"),
+      },
+      { name: "file", filename: "b.pdf", contentType: "application/pdf", content: PDF_2PAGE },
+      { name: "settings", content: JSON.stringify({ dpi: 72 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    await testApp.app
+      .inject({
+        method: "POST",
+        url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
+        body,
+        headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+      })
+      .then(
+        (res: unknown) => res,
+        () => null,
+      );
+
+    const row = await readRow(clientJobId);
+    expect(row?.status).toBe("failed");
+    expect(row?.error).toMatchObject({
+      message: "Failed to package batch results",
+      details: [
+        { filename: "bad.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "", error: "Failed to package batch results" },
+      ],
+    });
+    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+  });
+
+  it("logs a warning when failBatchJob matches no live row on a storage fault (#1555)", async () => {
+    const clientJobId = "batch-1555-unapplied-storage-settle";
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
+    faults.retireRowBeforeFault = clientJobId;
+
+    const res = await postBatch(clientJobId);
+
+    expect(res.statusCode).toBe(503);
+    expect((await readRow(clientJobId))?.status).toBe("canceled");
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(
+      warnLogs.some(
+        (entry) =>
+          (entry.bindings as { jobId?: string })?.jobId === clientJobId &&
+          entry.msg.includes("no terminal frame announced"),
+      ),
+      `expected warn log for ${clientJobId}, got ${JSON.stringify(warnLogs)}`,
+    ).toBe(true);
+  });
+
+  it("logs a warning when failBatchJob matches no live row on a ZIP stream fault (#1555)", async () => {
+    const clientJobId = "batch-1555-unapplied-stream-settle";
+    faults.streamPoison.add(`outputs/${clientJobId}-f1/`);
+    faults.retireRowBeforeFault = clientJobId;
+
+    await postBatch(clientJobId).then(
+      (res: unknown) => res,
+      () => null,
+    );
+
+    expect((await readRow(clientJobId))?.status).toBe("canceled");
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    expect(
+      warnLogs.some(
+        (entry) =>
+          (entry.bindings as { jobId?: string })?.jobId === clientJobId &&
+          entry.msg.includes("no terminal frame announced"),
+      ),
+      `expected warn log for ${clientJobId}, got ${JSON.stringify(warnLogs)}`,
+    ).toBe(true);
+  });
+
+  it("still cleans up temporary outputs and terminates the stream when settling fails after a ZIP stream fault (#1555)", async () => {
+    const clientJobId = "batch-1555-stream-settle-fails";
+    faults.streamPoison.add(`outputs/${clientJobId}-f1/`);
+    faults.settleFails = true;
+
+    const outcome = await postBatch(clientJobId).then(
+      (res: { statusCode: number }) => res,
+      () => null,
+    );
+    expect(outcome === null || outcome.statusCode === 200).toBe(true);
+    expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
   });
 });
