@@ -38,7 +38,7 @@ vi.mock("@/hooks/use-tool-processor", () => ({
     processAllFiles: vi.fn(),
     processing: false,
     error: null,
-    downloadUrl: null,
+    downloadUrl: toolPayload.current ? "/api/v1/download/job/out.png" : null,
     progress: { phase: "idle", percent: 0, elapsed: 0 },
     resultPayload: toolPayload.current,
   }),

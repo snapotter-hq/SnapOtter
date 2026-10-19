@@ -115,6 +115,7 @@ export function useToolProcessor(toolId: string) {
   const tRef = useRef(t);
   tRef.current = t;
   const {
+    currentEntry,
     processing,
     error,
     processedUrl,
@@ -130,6 +131,7 @@ export function useToolProcessor(toolId: string) {
   // Extra fields the route spreads into the result envelope (e.g. histogram
   // bins, lqip dataUri, AI detection counts). Null until a job completes.
   const [resultPayload, setResultPayload] = useState<Record<string, unknown> | null>(null);
+  const resultEntryRef = useRef<{ id: string; file: File; processedUrl: string } | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -593,6 +595,7 @@ export function useToolProcessor(toolId: string) {
       // A failed run shows no result. The completion branch sets the payload
       // only after its store writes, but its teardown can still throw after
       // that (#1739).
+      resultEntryRef.current = null;
       setWarning(null);
       setResultPayload(null);
       clearStallTimer();
@@ -929,6 +932,11 @@ export function useToolProcessor(toolId: string) {
                   // must not show a result beside the error a failed write ends
                   // the run with (#1739). Before the teardown, so a good run
                   // never ends processing with no payload.
+                  resultEntryRef.current = {
+                    id: entryId,
+                    file: entryFile,
+                    processedUrl: result.downloadUrl,
+                  };
                   setWarning(result.warning ?? null);
                   setResultPayload(result as unknown as Record<string, unknown>);
                 }
@@ -1202,6 +1210,7 @@ export function useToolProcessor(toolId: string) {
       let claimed = false;
       try {
         setError(null);
+        resultEntryRef.current = null;
         setWarning(null);
         setResultPayload(null);
         useFileStore.getState().setLastSavedLibraryFileId(null);
@@ -1434,6 +1443,11 @@ export function useToolProcessor(toolId: string) {
           // Last: tools that render straight from the payload (histogram, sprite
           // sheet) must not show a result beside the error a failed write ends
           // the run with.
+          resultEntryRef.current = {
+            id: capturedEntryId,
+            file: capturedFile,
+            processedUrl: result.downloadUrl,
+          };
           setWarning(result.warning ?? null);
           setResultPayload(result as unknown as Record<string, unknown>);
         };
@@ -1701,6 +1715,8 @@ export function useToolProcessor(toolId: string) {
         // A batch's per-file notes land on each entry (#1292), not in the
         // hook's single-run payload, so a previous single run's must not render
         // under the batch result.
+        resultEntryRef.current = null;
+        setWarning(null);
         setResultPayload(null);
         // Batch runs never auto-save to the library (no fileId is sent), so a
         // previous single run's saved indicator must not survive into this one.
@@ -2348,17 +2364,24 @@ export function useToolProcessor(toolId: string) {
     ],
   );
 
+  const hasResultEntry =
+    resultEntryRef.current !== null &&
+    currentEntry !== undefined &&
+    currentEntry.id === resultEntryRef.current.id &&
+    currentEntry.file === resultEntryRef.current.file &&
+    currentEntry.processedUrl === resultEntryRef.current.processedUrl;
+
   return {
     processFiles,
     processAllFiles,
     cancelCurrentJob,
     processing,
     error: error === "Canceled" ? t.tools.processing.canceled : error,
-    warning,
+    warning: hasResultEntry ? warning : null,
     downloadUrl: processedUrl,
     originalSize,
     processedSize,
     progress,
-    resultPayload,
+    resultPayload: hasResultEntry ? resultPayload : null,
   };
 }

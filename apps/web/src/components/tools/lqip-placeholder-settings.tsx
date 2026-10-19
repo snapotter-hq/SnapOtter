@@ -53,12 +53,13 @@ export function LqipPlaceholderSettings() {
   const statusOf = (label: string): CopyStatus =>
     copyResult?.label !== label ? null : copyResult.ok ? "copied" : "failed";
 
-  const dataUri = resultPayload?.dataUri as string | undefined;
-  const resultWidth = resultPayload?.width as number | undefined;
-  const resultHeight = resultPayload?.height as number | undefined;
-  const resultBytes = resultPayload?.bytes as number | undefined;
-  const resultHtml = resultPayload?.html as string | undefined;
-  const resultCss = resultPayload?.css as string | undefined;
+  const activePayload = downloadUrl ? resultPayload : null;
+  const dataUri = activePayload?.dataUri as string | undefined;
+  const resultWidth = activePayload?.width as number | undefined;
+  const resultHeight = activePayload?.height as number | undefined;
+  const resultBytes = activePayload?.bytes as number | undefined;
+  const resultHtml = activePayload?.html as string | undefined;
+  const resultCss = activePayload?.css as string | undefined;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

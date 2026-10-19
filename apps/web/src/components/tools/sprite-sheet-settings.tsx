@@ -190,7 +190,7 @@ export function SpriteSheetSettings() {
       {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="sprite-sheet-download" />}
 
       {/* Coordinate map output */}
-      {Array.isArray(resultPayload?.frames) && (
+      {downloadUrl && Array.isArray(resultPayload?.frames) && (
         <SpriteOutput
           payload={resultPayload}
           format={format}
