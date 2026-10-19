@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { logger as topLogger } from "../../../apps/api/src/lib/logger.js";
+import * as topObjectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, objectExists, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -813,4 +815,154 @@ describe("GDPR purge role hierarchy", () => {
       await db.delete(schema.users).where(eq(schema.users.id, targetId));
     }
   });
+
+  it("records the sanitized failure reason and logs the full error after BullMQ exhausts its retries (#1495)", async () => {
+    const objectStorage = await import("../../../apps/api/src/lib/object-storage.js");
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const { getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const { reconcileStrandedJobs, UNRECOVERABLE_STRANDED_JOB_ERROR } = await import(
+      "../../../apps/api/src/jobs/job-reconciliation.js"
+    );
+    const targetId = await createTarget("user");
+    const storageErr = new Error(
+      "EntityTooLarge: Your proposed upload exceeds the maximum allowed size at /data/workspace/outputs/gdpr-export.zip",
+    );
+    let writeAttempts = 0;
+    let cancelDuringWriteJobId = "";
+    const failPutStream = async () => {
+      writeAttempts += 1;
+      if (cancelDuringWriteJobId) {
+        await db
+          .update(schema.jobs)
+          .set({ status: "canceled", completedAt: new Date() })
+          .where(eq(schema.jobs.id, cancelDuringWriteJobId));
+      }
+      throw storageErr;
+    };
+    const putStreamSpy = vi
+      .spyOn(objectStorage, "putObjectStream")
+      .mockImplementation(failPutStream);
+    const topPutStreamSpy = vi
+      .spyOn(topObjectStorage, "putObjectStream")
+      .mockImplementation(failPutStream);
+    const errorSpy = vi.spyOn(logger, "error");
+    const topErrorSpy = vi.spyOn(topLogger, "error");
+    const systemQueue = getQueue("system");
+    let exportJobId = "";
+
+    try {
+      const startRes = await licensedApp.app.inject({
+        method: "POST",
+        url: `/api/v1/enterprise/users/${targetId}/export`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+      });
+      expect(startRes.statusCode, startRes.body).toBe(202);
+      exportJobId = JSON.parse(startRes.body).jobId as string;
+
+      await vi.waitFor(
+        async () => {
+          const job = await systemQueue.getJob(exportJobId);
+          expect(await job?.getState()).toBe("failed");
+          expect(job?.attemptsMade).toBe(2);
+        },
+        { timeout: 15_000, interval: 100 },
+      );
+      expect(writeAttempts).toBe(2);
+
+      await vi.waitFor(
+        async () => {
+          const statusRes = await licensedApp.app.inject({
+            method: "GET",
+            url: `/api/v1/enterprise/users/${targetId}/export/${exportJobId}`,
+            headers: { authorization: `Bearer ${licensedAdminToken}` },
+          });
+          expect(statusRes.statusCode).toBe(200);
+          expect(JSON.parse(statusRes.body)).toEqual({
+            status: "failed",
+            error:
+              "EntityTooLarge: Your proposed upload exceeds the maximum allowed size at [internal]",
+          });
+        },
+        { timeout: 5_000, interval: 50 },
+      );
+
+      const matchingErrorLogs = [...errorSpy.mock.calls, ...topErrorSpy.mock.calls].filter(
+        ([ctx, msg]) =>
+          (ctx as { jobId?: string } | undefined)?.jobId === exportJobId &&
+          typeof msg === "string" &&
+          msg.includes("gdpr export"),
+      );
+      expect(matchingErrorLogs).toHaveLength(1);
+      expect(matchingErrorLogs[0]?.[0]).toMatchObject({
+        err: storageErr,
+        jobId: exportJobId,
+        userId: targetId,
+      });
+
+      // Stranded-job reconciliation finds the row already terminal and does not
+      // overwrite the actionable error with UNRECOVERABLE_STRANDED_JOB_ERROR.
+      await db
+        .update(schema.jobs)
+        .set({ createdAt: new Date(Date.now() - 10 * 60_000) })
+        .where(eq(schema.jobs.id, exportJobId));
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.some((o) => o.jobId === exportJobId)).toBe(false);
+
+      const afterReconcileRes = await licensedApp.app.inject({
+        method: "GET",
+        url: `/api/v1/enterprise/users/${targetId}/export/${exportJobId}`,
+        headers: { authorization: `Bearer ${licensedAdminToken}` },
+      });
+      const body = JSON.parse(afterReconcileRes.body);
+      expect(body.status).toBe("failed");
+      expect(body.error).not.toBe(UNRECOVERABLE_STRANDED_JOB_ERROR);
+      expect(body.error).toBe(
+        "EntityTooLarge: Your proposed upload exceeds the maximum allowed size at [internal]",
+      );
+
+      // A row that becomes canceled while putObjectStream is in flight must
+      // not be overwritten when the subsequent throw triggers worker.on("failed").
+      const canceledJobId = randomUUID();
+      cancelDuringWriteJobId = canceledJobId;
+      await db.insert(schema.jobs).values({
+        id: canceledJobId,
+        userId: targetId,
+        toolId: "gdpr-export",
+        pool: "system",
+        type: "system",
+        status: "processing",
+      });
+      try {
+        const canceledQueueJob = await systemQueue.add(
+          "system:gdpr-export",
+          { userId: targetId, jobId: canceledJobId } as never,
+          { jobId: canceledJobId, attempts: 1 },
+        );
+        await vi.waitFor(async () => expect(await canceledQueueJob.getState()).toBe("failed"), {
+          timeout: 10_000,
+          interval: 50,
+        });
+        const [canceledRow] = await db
+          .select()
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, canceledJobId));
+        expect(canceledRow?.status).toBe("canceled");
+      } finally {
+        cancelDuringWriteJobId = "";
+        await systemQueue.remove(canceledJobId).catch(() => {});
+        await db.delete(schema.jobs).where(eq(schema.jobs.id, canceledJobId));
+      }
+    } finally {
+      putStreamSpy.mockRestore();
+      topPutStreamSpy.mockRestore();
+      errorSpy.mockRestore();
+      topErrorSpy.mockRestore();
+      if (exportJobId) {
+        await systemQueue.remove(exportJobId).catch(() => {});
+        await deletePrefix(`outputs/${exportJobId}/`).catch(() => {});
+        await db.delete(schema.jobs).where(eq(schema.jobs.id, exportJobId));
+      }
+      await db.delete(schema.users).where(eq(schema.users.id, targetId));
+    }
+  }, 30_000);
 });

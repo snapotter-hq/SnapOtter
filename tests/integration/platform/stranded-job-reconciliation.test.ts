@@ -280,24 +280,33 @@ describe("stranded-job reconciliation", () => {
       expect(row.outputRefs).toEqual([`outputs/${id}/gdpr-export.zip`]);
     });
 
-    // The #1441 path end to end: the export really throws on the system worker
-    // the test app runs, BullMQ keeps the job in its failed set (removeOnFail is
-    // by age), and nothing but the reconciler ever makes the row terminal.
+    // The #1441 backstop path end to end: when the system worker's own
+    // terminal status write is lost (or a job fails via stall eviction),
+    // BullMQ keeps the job in its failed set (removeOnFail is by age) and the
+    // reconciler settles the stranded row once Postgres answers again.
     it("fails a GDPR export that threw and sits in BullMQ's failed set", async () => {
       const id = await gdpr();
       const queue = getQueue("system");
-      // No users row for this id, so gdprExportJob throws "User ... not found".
-      const job = await queue.add(
-        SYSTEM_JOBS.gdprExport,
-        { userId: randomUUID(), jobId: id } as never,
-        { jobId: id, attempts: 1 },
-      );
       try {
-        await vi.waitFor(async () => expect(await job.getState()).toBe("failed"), {
-          timeout: 20_000,
-          interval: 200,
+        await withTerminalWriteOutage(async ({ terminalWriteFailures }) => {
+          // No users row for this id, so gdprExportJob throws "User ... not found".
+          const job = await queue.add(
+            SYSTEM_JOBS.gdprExport,
+            { userId: randomUUID(), jobId: id } as never,
+            { jobId: id, attempts: 1 },
+          );
+          await vi.waitFor(
+            async () => {
+              expect(await job.getState()).toBe("failed");
+              expect(terminalWriteFailures()).toBeGreaterThanOrEqual(1);
+            },
+            {
+              timeout: 20_000,
+              interval: 200,
+            },
+          );
         });
-        expect((await readJob(id)).status, "precondition: nothing else settles it").toBe("queued");
+        expect((await readJob(id)).status, "precondition: terminal write was lost").toBe("queued");
 
         const summary = await reconcileStrandedJobs({ graceMs: 0 });
         expect(summary.outcomes.find((o) => o.jobId === id)?.resolution).toBe("failed");

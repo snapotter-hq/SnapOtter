@@ -23,10 +23,10 @@
  *   1. Every tool, batch, pipeline and gdpr-export row is enqueued with `jobId`
  *      set to the row id, so `jobs.id` is also the BullMQ job id and "is there
  *      still a live queue entry" is a direct lookup. gdpr-export (type
- *      `system`) is included: nothing else settles an export that throws
- *      (#1441), and an archive it already wrote is adopted the same way a
- *      tool's output is, reaching the same download route its own completion
- *      would have used.
+ *      `system`) is included as the backstop when its terminal write is lost or
+ *      BullMQ fails it by stall eviction (#1441, #1495), and an archive it
+ *      already wrote is adopted the same way a tool's output is, reaching the
+ *      same download route its own completion would have used.
  *   2. Every write is guarded on the row still being non-terminal, so two
  *      reconcilers racing each other (or racing a worker that recovered)
  *      cannot double-resolve, and a genuinely canceled job is never

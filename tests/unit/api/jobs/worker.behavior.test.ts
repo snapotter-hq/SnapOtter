@@ -59,7 +59,9 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   }));
 
   vi.doMock("drizzle-orm", () => ({
-    eq: vi.fn(() => "eq"),
+    and: vi.fn((...conds: unknown[]) => ({ op: "and", conds })),
+    eq: vi.fn((col: unknown, val: unknown) => ({ op: "eq", col, val })),
+    notInArray: vi.fn((col: unknown, vals: unknown) => ({ op: "notInArray", col, vals })),
   }));
 
   vi.doMock("../../../../apps/api/src/config.js", () => ({
@@ -147,6 +149,17 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
 
   vi.doMock("../../../../apps/api/src/jobs/system-jobs.js", () => ({
     runSystemJob: vi.fn(),
+    SYSTEM_JOBS: {
+      storageTtl: "system:storage-ttl",
+      sessionPurge: "system:session-purge",
+      retention: "system:retention",
+      siemForward: "system:siem-forward",
+      auditArchive: "system:audit-archive",
+      storageReconciliation: "system:storage-reconciliation",
+      jobReconciliation: "system:job-reconciliation",
+      gdprExport: "system:gdpr-export",
+      alertEvaluator: "system:alert-evaluator",
+    },
   }));
 
   extraMocks?.();
@@ -786,5 +799,240 @@ describe("worker failure reports carry the job age (#1414)", () => {
       stalled,
       expect.objectContaining({ source: "worker", jobId: "job-3", jobAgeMs: 1_000 }),
     );
+  });
+
+  describe("GDPR export failure handling on the system pool (#1495)", () => {
+    const dbWhereMock = vi.fn().mockResolvedValue(undefined);
+    const dbSetMock = vi.fn(() => ({ where: dbWhereMock }));
+    const dbUpdateMock = vi.fn(() => ({ set: dbSetMock }));
+
+    async function systemFailedListener() {
+      dbWhereMock.mockReset().mockResolvedValue(undefined);
+      dbSetMock.mockClear();
+      dbUpdateMock.mockClear();
+
+      const actualErrors = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/errors.js")
+      >("../../../../apps/api/src/lib/errors.js");
+
+      const worker = await loadWorker("", () => {
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: { update: dbUpdateMock },
+          schema: {
+            jobs: {
+              id: "jobs.id",
+              status: "jobs.status",
+            },
+          },
+        }));
+        vi.doMock("../../../../apps/api/src/lib/errors.js", () => ({
+          friendlyError: vi.fn(actualErrors.friendlyError),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+          classifyError: vi.fn(() => "operational"),
+          reportError: reportErrorMock,
+          safeFormatTag: vi.fn(() => undefined),
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+      });
+      const { Worker } = await import("bullmq");
+      const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+      worker.startWorkers();
+      const workerMock = Worker as unknown as {
+        mock: {
+          calls: unknown[][];
+          results: { value: { on: { mock: { calls: unknown[][] } } } }[];
+        };
+      };
+      const listeners = new Map<string, FailedListener>();
+      workerMock.mock.calls.forEach((call, i) => {
+        const failed = workerMock.mock.results[i].value.on.mock.calls.find(
+          (c) => c[0] === "failed",
+        );
+        if (failed) listeners.set(call[0] as string, failed[1] as FailedListener);
+      });
+      return { listener: listenerFor(listeners, "system"), logger };
+    }
+
+    it("writes status failed with friendlyError and logs the full error when BullMQ has stopped retrying", async () => {
+      const { listener, logger } = await systemFailedListener();
+      const err = new Error(
+        "ENOSPC: no space left on device, write '/data/workspace/outputs/export-1/gdpr-export.zip'",
+      );
+      const job = {
+        id: "export-1",
+        name: "system:gdpr-export",
+        data: { userId: "user-1", jobId: "export-1" },
+        attemptsMade: 2,
+        opts: { attempts: 2 },
+        finishedOn: 1_700_000_000_000,
+      };
+
+      listener(job, err);
+      await vi.waitFor(() => expect(dbWhereMock).toHaveBeenCalledTimes(1));
+
+      expect(dbSetMock).toHaveBeenCalledWith({
+        status: "failed",
+        completedAt: expect.any(Date),
+        error: {
+          message: "ENOSPC: no space left on device, write '[internal]'",
+        },
+      });
+      expect(dbWhereMock).toHaveBeenCalledWith({
+        op: "and",
+        conds: [
+          { op: "eq", col: "jobs.id", val: "export-1" },
+          { op: "notInArray", col: "jobs.status", vals: ["completed", "failed", "canceled"] },
+        ],
+      });
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err,
+          jobId: "export-1",
+          userId: "user-1",
+        }),
+        expect.stringContaining("gdpr"),
+      );
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        err,
+        expect.objectContaining({
+          source: "worker",
+          pool: "system",
+          toolId: "gdpr-export",
+          jobId: "export-1",
+        }),
+      );
+    });
+
+    it("does not write failed or log a terminal error while BullMQ still has retries left", async () => {
+      const { listener, logger } = await systemFailedListener();
+      const err = new Error("S3 503 SlowDown");
+      const job = {
+        id: "export-retry",
+        name: "system:gdpr-export",
+        data: { userId: "user-1", jobId: "export-retry" },
+        attemptsMade: 1,
+        opts: { attempts: 2 },
+        finishedOn: undefined,
+      };
+
+      listener(job, err);
+
+      expect(dbUpdateMock).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it("settles the row when attemptsMade reaches opts.attempts even if finishedOn is absent", async () => {
+      const { listener, logger } = await systemFailedListener();
+      const err = new Error(
+        "EntityTooLarge: Your proposed upload exceeds the maximum allowed size",
+      );
+      const job = {
+        id: "export-attempts-exhausted",
+        name: "system:gdpr-export",
+        data: { userId: "user-2", jobId: "export-attempts-exhausted" },
+        attemptsMade: 2,
+        opts: { attempts: 2 },
+      };
+
+      listener(job, err);
+      await vi.waitFor(() => expect(dbWhereMock).toHaveBeenCalledTimes(1));
+
+      expect(dbSetMock).toHaveBeenCalledWith({
+        status: "failed",
+        completedAt: expect.any(Date),
+        error: {
+          message: "EntityTooLarge: Your proposed upload exceeds the maximum allowed size",
+        },
+      });
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err,
+          jobId: "export-attempts-exhausted",
+          userId: "user-2",
+        }),
+        expect.stringContaining("gdpr"),
+      );
+    });
+
+    it("settles the row when finishedOn is set before max attempts and falls back to job.id and 'Export failed'", async () => {
+      const { listener, logger } = await systemFailedListener();
+      const err = new Error("");
+      const job = {
+        id: "export-early-finish",
+        name: "system:gdpr-export",
+        data: {},
+        attemptsMade: 1,
+        opts: { attempts: 2 },
+        finishedOn: 1_700_000_000_000,
+      };
+
+      listener(job, err);
+      await vi.waitFor(() => expect(dbWhereMock).toHaveBeenCalledTimes(1));
+
+      expect(dbSetMock).toHaveBeenCalledWith({
+        status: "failed",
+        completedAt: expect.any(Date),
+        error: {
+          message: "Export failed",
+        },
+      });
+      expect(dbWhereMock).toHaveBeenCalledWith({
+        op: "and",
+        conds: [
+          { op: "eq", col: "jobs.id", val: "export-early-finish" },
+          { op: "notInArray", col: "jobs.status", vals: ["completed", "failed", "canceled"] },
+        ],
+      });
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err,
+          jobId: "export-early-finish",
+        }),
+        expect.stringContaining("gdpr"),
+      );
+    });
+
+    it("logs and reports a database fault when the guarded failure write rejects", async () => {
+      const { listener, logger } = await systemFailedListener();
+      const dbErr = new Error("connection terminated unexpectedly");
+      dbWhereMock.mockRejectedValueOnce(dbErr);
+      const err = new Error("The server's storage is full.");
+      const job = {
+        id: "export-db-fault",
+        name: "system:gdpr-export",
+        data: { userId: "user-3", jobId: "export-db-fault" },
+        attemptsMade: 2,
+        opts: { attempts: 2 },
+        finishedOn: 1_700_000_000_000,
+      };
+
+      listener(job, err);
+
+      await vi.waitFor(() =>
+        expect(logger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ err: dbErr, jobId: "export-db-fault" }),
+          expect.stringContaining("gdpr-export"),
+        ),
+      );
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        dbErr,
+        expect.objectContaining({
+          source: "worker",
+          pool: "system",
+          toolId: "gdpr-export",
+          jobId: "export-db-fault",
+        }),
+      );
+    });
   });
 });

@@ -115,7 +115,7 @@ import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
 import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
-import { runSystemJob } from "./system-jobs.js";
+import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
 import {
   POOLS,
   type Pool,
@@ -2103,10 +2103,60 @@ export function startWorkers(): void {
             void reportError(netErr, { source: "worker", pool, jobId: data.jobId });
           });
         }
+        // When a GDPR export exhausts its retry budget, settle the durable row
+        // with the sanitized reason and log the full error (#1495). Waiting for
+        // the final attempt keeps the row non-terminal while a retry is still
+        // pending so isExportJobLive() does not mistake the first failure for a
+        // cancel. Stranded-job reconciliation stays as the backstop for stall
+        // eviction or a lost database write.
+        if (
+          job.name === SYSTEM_JOBS.gdprExport &&
+          (Boolean(job.finishedOn) || (job.attemptsMade ?? 1) >= (job.opts?.attempts ?? 1))
+        ) {
+          const exportData = job.data as { userId?: string; jobId?: string } | undefined;
+          const exportJobId = exportData?.jobId ?? job.id;
+          logger.error(
+            {
+              err,
+              jobId: exportJobId,
+              ...(exportData?.userId ? { userId: exportData.userId } : {}),
+            },
+            "gdpr export job failed",
+          );
+          if (exportJobId) {
+            const rawMessage = err instanceof Error ? err.message : String(err);
+            const message = friendlyError(rawMessage) || "Export failed";
+            void db
+              .update(schema.jobs)
+              .set({
+                status: "failed",
+                completedAt: new Date(),
+                error: { message },
+              })
+              .where(
+                and(
+                  eq(schema.jobs.id, exportJobId),
+                  notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+                ),
+              )
+              .catch((netErr) => {
+                logger.error(
+                  { err: netErr, jobId: exportJobId },
+                  "gdpr-export failure status write failed",
+                );
+                void reportError(netErr, {
+                  source: "worker",
+                  pool,
+                  toolId: "gdpr-export",
+                  jobId: exportJobId,
+                });
+              });
+          }
+        }
         void reportError(err, {
           source: "worker",
           pool,
-          toolId: data?.toolId,
+          toolId: data?.toolId ?? (job.name === SYSTEM_JOBS.gdprExport ? "gdpr-export" : undefined),
           jobId: job.id,
         });
       });
