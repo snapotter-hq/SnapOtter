@@ -72,4 +72,33 @@ describe("generatePreview honesty (#746)", () => {
     expect(putObjectMock).not.toHaveBeenCalled();
     expect(loggerMock.warn).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    "application/epub+zip",
+    "text/html",
+    "text/markdown",
+    "text/plain",
+    "text/csv",
+    "application/json",
+    "application/xml",
+    "application/zip",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/x-subrip",
+    "application/octet-stream",
+  ])(
+    "returns undefined without invoking Sharp or logging a warning for non-image %s output (#2664)",
+    async (contentType) => {
+      const key = await generatePreview(
+        Buffer.from("non-image output payload"),
+        contentType,
+        JOB_ID,
+      );
+
+      expect(key).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    },
+  );
 });

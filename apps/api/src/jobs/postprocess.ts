@@ -141,6 +141,7 @@ export async function generatePreview(
   }
 
   // Image logic unchanged below
+  if (!contentType.startsWith("image/")) return undefined;
   if (BROWSER_PREVIEWABLE.has(contentType)) return undefined;
 
   const key = `outputs/${jobId}/preview.webp`;
