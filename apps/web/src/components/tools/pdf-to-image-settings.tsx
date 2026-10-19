@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
-import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
+import { isPdfFile, usePdfToImageStore } from "@/stores/pdf-to-image-store";
 import { claimToolResult, pdfToImageResultKey } from "@/stores/tool-result-claims";
 
 const FORMAT_OPTIONS = [
@@ -47,7 +47,14 @@ export function PdfToImageSettings() {
   const file = useFileStore((s) => s.entries[s.selectedIndex]?.file);
 
   useEffect(() => {
-    if (file && file !== store.file) {
+    const state = useFileStore.getState();
+    const activeFile = state.entries[state.selectedIndex]?.file;
+    if (!file || activeFile !== file) return;
+    if (!isPdfFile(file)) {
+      if (store.file !== null) store.setFile(null);
+      return;
+    }
+    if (file !== store.file) {
       store.setFile(file);
       store.loadPreview(file, t);
     }

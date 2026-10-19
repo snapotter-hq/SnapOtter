@@ -2,6 +2,11 @@ import { en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { useFileStore } from "@/stores/file-store";
+
+export function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
 
 export interface PageResult {
   page: number;
@@ -105,23 +110,29 @@ function parsePageRangeToSet(input: string, totalPages: number): Set<number> | n
   }
 }
 
+function emptyFileState() {
+  return {
+    file: null as File | null,
+    pageCount: null as number | null,
+    thumbnails: [] as Thumbnail[],
+    results: null as PageResult[] | null,
+    zipUrl: null as string | null,
+    zipSize: null as number | null,
+    error: null as string | null,
+    loadingPreview: false,
+    processing: false,
+    selectedPages: new Set<number>(),
+    pages: "",
+  };
+}
+
 const initialState = {
-  file: null as File | null,
-  pageCount: null as number | null,
-  thumbnails: [] as Thumbnail[],
+  ...emptyFileState(),
   format: "png",
   dpi: 150,
   customDpi: false,
   quality: 85,
   colorMode: "color" as ColorMode,
-  pages: "",
-  selectedPages: new Set<number>(),
-  processing: false,
-  loadingPreview: false,
-  error: null as string | null,
-  results: null as PageResult[] | null,
-  zipUrl: null as string | null,
-  zipSize: null as number | null,
 };
 
 /** Counts loadPreview and convert calls so only the newest one writes its outcome. */
@@ -129,6 +140,13 @@ let latestPreviewRequest = 0;
 let previewController: AbortController | null = null;
 let latestConvertRequest = 0;
 let convertController: AbortController | null = null;
+let fileStoreUnsubscribe: (() => void) | null = null;
+
+function stopWatchingFileStore() {
+  const unsub = fileStoreUnsubscribe;
+  fileStoreUnsubscribe = null;
+  unsub?.();
+}
 
 function cancelActiveRequests() {
   latestPreviewRequest++;
@@ -139,6 +157,25 @@ function cancelActiveRequests() {
   convertController = null;
   pCtrl?.abort();
   cCtrl?.abort();
+}
+
+function watchFileInStore(file: File, onLeavePdf: () => void, onSwitchPdf: () => void) {
+  stopWatchingFileStore();
+  const initial = useFileStore.getState();
+  if (initial.entries[initial.selectedIndex]?.file !== file) return;
+  let watchedFile: File = file;
+  fileStoreUnsubscribe = useFileStore.subscribe((state) => {
+    const current = state.entries[state.selectedIndex]?.file;
+    if (current === watchedFile) return;
+    cancelActiveRequests();
+    if (!current || !isPdfFile(current)) {
+      stopWatchingFileStore();
+      onLeavePdf();
+      return;
+    }
+    watchedFile = current;
+    onSwitchPdf();
+  });
 }
 
 export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
@@ -160,25 +197,20 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   setFile: (file) => {
-    latestPreviewRequest++;
-    const pCtrl = previewController;
-    previewController = null;
-    pCtrl?.abort();
+    cancelActiveRequests();
     if (!file) {
-      cancelActiveRequests();
+      stopWatchingFileStore();
       set({ ...initialState });
       return;
     }
-    set({
+    watchFileInStore(
       file,
-      pageCount: null,
-      thumbnails: [],
-      results: null,
-      zipUrl: null,
-      zipSize: null,
-      error: null,
-      selectedPages: new Set<number>(),
-      pages: "",
+      () => get().reset(),
+      () => set(emptyFileState()),
+    );
+    set({
+      ...emptyFileState(),
+      file,
     });
   },
 
@@ -210,6 +242,11 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   loadPreview: async (file, t = en) => {
+    watchFileInStore(
+      file,
+      () => get().reset(),
+      () => set(emptyFileState()),
+    );
     previewController?.abort();
     const controller = new AbortController();
     previewController = controller;
@@ -257,6 +294,11 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   convert: async (t = en) => {
     const { file, format, dpi, quality, colorMode, pages, selectedPages } = get();
     if (!file) return;
+    watchFileInStore(
+      file,
+      () => get().reset(),
+      () => set(emptyFileState()),
+    );
     convertController?.abort();
     const controller = new AbortController();
     convertController = controller;
@@ -301,6 +343,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   },
 
   reset: () => {
+    stopWatchingFileStore();
     cancelActiveRequests();
     set({ ...initialState });
   },
