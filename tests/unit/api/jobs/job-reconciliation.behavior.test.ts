@@ -291,4 +291,99 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
     expect(listObjectsMock).not.toHaveBeenCalled();
     expect(dbUpdateSetCalls).toHaveLength(0);
   });
+
+  it("logs a warning when getObjectSize fails with a non-missing storage fault in resolveOriginalSize, but stays quiet on missing inputs (#2924)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+
+    dbSelectRows.rows = [
+      {
+        id: "job-size-fault",
+        toolId: "merge-pdf",
+        pool: "docs",
+        type: "tool",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: [
+          "uploads/job-size-fault/gone.pdf",
+          "uploads/job-size-fault/denied.pdf",
+          "uploads/job-size-fault/ok.pdf",
+        ],
+        progress: null,
+      },
+      {
+        id: "job-all-size-fault",
+        toolId: "compress-pdf",
+        pool: "docs",
+        type: "tool",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: ["uploads/job-all-size-fault/gone.pdf", "uploads/job-all-size-fault/eio.pdf"],
+        progress: null,
+      },
+    ];
+
+    listObjectsMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "outputs/job-size-fault/") {
+        return [{ key: "outputs/job-size-fault/merged.pdf", size: 1024, mtimeMs: 2_000 }];
+      }
+      return [{ key: "outputs/job-all-size-fault/out.pdf", size: 512, mtimeMs: 2_000 }];
+    });
+
+    const enoentErr = Object.assign(new Error("ENOENT: no such file or directory"), {
+      code: "ENOENT",
+      syscall: "stat",
+    });
+    const eaccesErr = Object.assign(new Error("EACCES: permission denied, stat"), {
+      code: "EACCES",
+      syscall: "stat",
+    });
+    const eioErr = Object.assign(new Error("EIO: i/o error, stat"), {
+      code: "EIO",
+      syscall: "stat",
+    });
+    isMissingObjectErrorMock.mockImplementation(
+      (err: unknown) => (err as { code?: string })?.code === "ENOENT",
+    );
+    getObjectSizeMock.mockImplementation(async (key: string) => {
+      if (key.endsWith("/gone.pdf")) throw enoentErr;
+      if (key.endsWith("/denied.pdf")) throw eaccesErr;
+      if (key.endsWith("/eio.pdf")) throw eioErr;
+      return 400;
+    });
+
+    const summary = await reconcileStrandedJobs({ graceMs: 0 });
+    expect(summary.recovered).toBe(2);
+    expect(dbUpdateSetCalls[0]?.values.bytesIn).toBe(400);
+    expect(
+      (dbUpdateSetCalls[0]?.values.progress as { result?: { originalSize?: number } })?.result
+        ?.originalSize,
+    ).toBe(400);
+    expect(dbUpdateSetCalls[2]?.values.bytesIn).toBeNull();
+    expect(
+      (dbUpdateSetCalls[2]?.values.progress as { result?: { originalSize?: number } })?.result
+        ?.originalSize,
+    ).toBe(0);
+
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      {
+        err: eaccesErr,
+        jobId: "job-size-fault",
+        key: "uploads/job-size-fault/denied.pdf",
+      },
+      "Failed to read input object size during job reconciliation; counting as 0 bytes",
+    );
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      {
+        err: eioErr,
+        jobId: "job-all-size-fault",
+        key: "uploads/job-all-size-fault/eio.pdf",
+      },
+      "Failed to read input object size during job reconciliation; counting as 0 bytes",
+    );
+    expect(
+      loggerWarnMock.mock.calls.some(([ctx]) =>
+        (ctx as { key?: string } | undefined)?.key?.endsWith("/gone.pdf"),
+      ),
+    ).toBe(false);
+  });
 });

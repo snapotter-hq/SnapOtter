@@ -765,8 +765,12 @@ export async function objectExists(key: string): Promise<boolean> {
   try {
     await getObjectSize(key);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if (isMissingObjectError(err)) {
+      await verifyS3Bucket();
+      return false;
+    }
+    throw err;
   }
 }
 

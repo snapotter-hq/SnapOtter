@@ -1478,4 +1478,28 @@ describe("object-storage missing-key + robustness paths", () => {
   it("treats verifyS3Bucket as a no-op on the local backend (#996)", async () => {
     await expect(verifyS3Bucket()).resolves.toBeUndefined();
   });
+
+  it("rejects an invalid object key in objectExists instead of returning false (#2924)", async () => {
+    await expect(objectExists("outputs/job-1/.")).rejects.toThrow(/invalid object key/i);
+    await expect(objectExists("outputs/../../etc/passwd")).rejects.toThrow(/invalid object key/i);
+  });
+
+  it.skipIf(isRoot)(
+    "rethrows a non-ENOENT local stat fault in objectExists instead of returning false (#2924)",
+    async () => {
+      const lockedJobId = `locked-exists-${process.pid}`;
+      const lockedKey = `outputs/${lockedJobId}/locked.bin`;
+      const lockedDir = join(env.WORKSPACE_PATH, "outputs", lockedJobId);
+      await putObject(lockedKey, Buffer.from("locked bytes"));
+      await chmod(lockedDir, 0o000);
+      try {
+        await expect(objectExists(lockedKey)).rejects.toMatchObject({
+          code: "EACCES",
+        });
+      } finally {
+        await chmod(lockedDir, 0o700).catch(() => {});
+        await deletePrefix(`outputs/${lockedJobId}`).catch(() => {});
+      }
+    },
+  );
 });

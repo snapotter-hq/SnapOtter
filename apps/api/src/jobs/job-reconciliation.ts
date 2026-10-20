@@ -201,12 +201,25 @@ async function hasLiveQueueEntry(jobId: string, pool: string | null): Promise<bo
 }
 
 /** Best-effort input size so a recovered row still reports a real size delta. */
-async function resolveOriginalSize(bytesIn: number | null, inputRefs: string[] | null) {
+async function resolveOriginalSize(
+  jobId: string,
+  bytesIn: number | null,
+  inputRefs: string[] | null,
+) {
   if (bytesIn !== null) return bytesIn;
   if (!inputRefs?.length) return 0;
   let total = 0;
   for (const ref of inputRefs) {
-    total += await getObjectSize(ref).catch(() => 0);
+    try {
+      total += await getObjectSize(ref);
+    } catch (err) {
+      if (!isMissingObjectError(err)) {
+        logger.warn(
+          { err, jobId, key: ref },
+          "Failed to read input object size during job reconciliation; counting as 0 bytes",
+        );
+      }
+    }
   }
   return total;
 }
@@ -261,7 +274,7 @@ async function recoverFromOutputs(
   const primary = artifacts[0];
   const filename = primary.key.slice(primary.key.lastIndexOf("/") + 1);
   const preview = objects.find((object) => isPreviewKey(object.key));
-  const originalSize = await resolveOriginalSize(row.bytesIn, row.inputRefs);
+  const originalSize = await resolveOriginalSize(row.id, row.bytesIn, row.inputRefs);
   const outputRefs = artifacts.map((artifact) => artifact.key);
   const toolPayload = await readResultPayload(row.id, objects);
 

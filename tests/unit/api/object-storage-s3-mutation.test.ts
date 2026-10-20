@@ -81,6 +81,7 @@ import {
   listJobDirs,
   listObjects,
   normalizeS3ReadFault,
+  objectExists,
   putObject,
   putObjectStream,
   STORAGE_UNAVAILABLE_MESSAGE,
@@ -1140,5 +1141,81 @@ describe("verifyS3Bucket (#996)", () => {
     const bug = new TypeError("unexpected checkConnection defect");
     s3.checkConnection.mockRejectedValueOnce(bug);
     await expect(verifyS3Bucket()).rejects.toBe(bug);
+  });
+});
+
+describe("objectExists S3 fault classification (#2924)", () => {
+  it("returns true when getObjectSize resolves without calling verifyS3Bucket", async () => {
+    s3.getSize.mockResolvedValueOnce(64);
+    await expect(objectExists("outputs/job-1/result.png")).resolves.toBe(true);
+    expect(s3.getSize).toHaveBeenCalledWith("outputs/job-1/result.png");
+    expect(s3.checkConnection).not.toHaveBeenCalled();
+  });
+
+  it("returns false when getObjectSize rejects with a missing-key 404 and verifyS3Bucket succeeds", async () => {
+    const notFound = Object.assign(new Error("NotFound"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+    });
+    s3.getSize.mockRejectedValueOnce(notFound);
+    await expect(objectExists("outputs/job-1/missing.png")).resolves.toBe(false);
+    expect(s3.checkConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects with 503 storage-unavailable when getObjectSize returns 404 because the S3 bucket vanished", async () => {
+    const notFound = Object.assign(new Error("NotFound"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+    });
+    const noSuchBucket = Object.assign(new Error("The specified bucket does not exist"), {
+      name: "NoSuchBucket",
+      $metadata: { httpStatusCode: 404 },
+    });
+    s3.getSize.mockRejectedValueOnce(notFound);
+    s3.checkConnection.mockRejectedValueOnce(noSuchBucket);
+
+    await expect(objectExists("outputs/job-1/result.png")).rejects.toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: noSuchBucket,
+    });
+    expect(s3.checkConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      "AccessDenied on HeadObject",
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "SlowDown throttling on HeadObject",
+      Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      }),
+    ],
+    [
+      "an unreachable S3 endpoint",
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    ],
+  ])("rethrows %s from objectExists without calling verifyS3Bucket", async (_label, cause) => {
+    s3.getSize.mockRejectedValueOnce(cause);
+    await expect(objectExists("outputs/job-1/result.png")).rejects.toBe(cause);
+    expect(s3.checkConnection).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid key in objectExists before calling S3", async () => {
+    await expect(objectExists("outputs/../etc/passwd")).rejects.toThrow(/Invalid object key/);
+    expect(s3.getSize).not.toHaveBeenCalled();
+    expect(s3.checkConnection).not.toHaveBeenCalled();
   });
 });
